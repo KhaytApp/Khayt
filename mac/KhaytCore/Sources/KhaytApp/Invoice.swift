@@ -32,8 +32,18 @@ enum Invoice {
         // registration has nothing to split: the whole price is what it keeps,
         // and the document prints no tax line.
         let money = await shop.taxSplit(job.price)
+        let row = shop.orderRow(job.id) ?? .object([:])
+        // THE MOMENT, not the day. ZATCA's tag 3 is the invoice's date AND
+        // time; this passed `job.date`, "2026-07-02", where Khayt passes the
+        // order's `timestamp`. The order's own stamp when it has one, its day
+        // otherwise — and `KhaytZatcaQr.issueTimestamp` turns a bare day into
+        // a full ISO 8601 stamp either way.
+        var stamp = job.date
+        if case .object(let fields) = row, let ts = Shop.plainString(fields["timestamp"]), !ts.isEmpty {
+            stamp = ts
+        }
         let paper = Ingredients(
-            row: shop.orderRow(job.id) ?? .object([:]),
+            row: row,
             settings: shop.settingsDict,
             clients: shop.clientRows,
             orders: shop.orderRows,
@@ -46,7 +56,7 @@ enum Invoice {
             subtotal: money?.subtotal ?? job.price,
             taxTotal: money?.taxTotal ?? 0,
             vatRate: await shop.taxPercent(),
-            timestamp: job.date)
+            timestamp: stamp)
         return await document(paper, engine: engine, words: shop.words)
     }
 
@@ -110,6 +120,11 @@ enum Invoice {
             }
         }
 
+        // The lines under the table, by the shared rule: the Subtotal row is
+        // the ITEMS, so Subtotal + Rush + Shipping − Discount is the total
+        // printed under them. This printed the whole price there, and a 280
+        // job of 225 goods, 25 rush and 30 shipping read Subtotal 280.
+        let summary = try? await engine.invoiceSummary(order: paper.row, settings: paper.settings)
         let money: [String: JSONValue] = [
             "qrSvg": .string(qrSvg),
             "qrProblem": qrProblem.map(JSONValue.string) ?? .null,
@@ -117,9 +132,9 @@ enum Invoice {
             "total": .string(Self.amount(paper.subtotal + paper.taxTotal)),
             "vatAmount": .string(Self.amount(paper.taxTotal)),
             "subtotal": .string(Self.amount(paper.subtotal)),
-            // What the items came to before shipping was added — the figure the
-            // document reconciles its own table against.
-            "subtotalShown": .string(Self.amount(paper.price)),
+            // What the items came to before rush, shipping and the discount —
+            // the figure the document reconciles its own table against.
+            "subtotalShown": .string(Self.amount(summary?.itemsSubtotal ?? paper.price)),
             "vatRate": .number(paper.vatRate),
             "shipping": .number(0),
         ]

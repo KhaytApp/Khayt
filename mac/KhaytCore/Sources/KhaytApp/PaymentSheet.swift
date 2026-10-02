@@ -21,10 +21,18 @@ struct PaymentSheet: View {
     @State private var method = "cash"
     @State private var paidAt = Date()
     @State private var started = false
+    /// What the order is billed and already paid down without cash, by
+    /// `KhaytOrderPayment.cashDue`. Nil until asked, or with no engine.
+    @State private var due: KhaytEngine.CashDue?
     @FocusState private var focused: Bool
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
-    private var price: Double { job?.price ?? 0 }
+    /// What the customer is asked for — the price, or price + tax on a shop
+    /// that adds it on top.
+    private var price: Double { due?.gross ?? job?.price ?? 0 }
+    /// What the typed figure is measured against: the bill, less what a gift
+    /// card or a credit note has already taken off it.
+    private var cashDue: Double { due?.cash ?? price }
     private var currency: String { job?.currency ?? "SAR" }
 
     var body: some View {
@@ -74,10 +82,14 @@ struct PaymentSheet: View {
             // Said before it is saved, by the same rule every report will read
             // it with — a gift card or a credit note on the order can make a
             // part payment settle it, and the shop should see that here.
+            //
+            // It said `price − amount`, which is exactly what this comment
+            // promised it would not: a 500 job with a 100 gift card and 400
+            // typed read "Owed 100", and saved as settled.
             if let job {
-                Text(shop.words.callIt("flow.owed") + " " + Money.text(max(0, price - amount), currency))
+                Text(shop.words.callIt("flow.owed") + " " + Money.text(max(0, cashDue - amount), currency))
                     .font(.callout)
-                    .foregroundStyle(price - amount > 0.005 ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(cashDue - amount > 0.005 ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
                     .monospacedDigit()
                     .help(job.id)
             }
@@ -99,6 +111,7 @@ struct PaymentSheet: View {
         }
         .padding(18)
         .frame(width: Self.width)
+        .task(id: subject.id) { due = await shop.cashDue(subject.id) }
         .onAppear {
             guard !started else { return }
             started = true

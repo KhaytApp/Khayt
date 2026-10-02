@@ -42,12 +42,51 @@
   const numberOf = (v) => (+v || 0);
 
   /**
+   * What the customer is asked for, in the order's own currency.
+   *
+   * `KhaytOrderMoney.orderGrossRaw` when it is loaded — mode-aware, so an
+   * exclusive shop's bill is price + tax — and the bare price when it is not.
+   */
+  function grossOf(order, ctx) {
+    const M = (typeof globalThis !== 'undefined') ? globalThis.KhaytOrderMoney : undefined;
+    if (M && typeof M.orderGrossRaw === 'function') return numberOf(M.orderGrossRaw(order, ctx));
+    return numberOf(order && order.price);
+  }
+
+  /**
+   * What an order is billed, what has already taken it down without cash, and
+   * so the most CASH it can still take.
+   *
+   * `cash` is the ceiling on a payment and the figure a payment sheet previews
+   * "owed" from. It was `price − amount typed`, which ignored a gift card and a
+   * credit note — and, on an exclusive shop, the tax — so the sheet told a shop
+   * a customer owed money they had already settled another way.
+   *
+   * `ctx`: `{ settings }`, for the tax mode. Optional.
+   */
+  function cashDue(order, ctx) {
+    const gross = grossOf(order, ctx);
+    const credited = ((order && order.creditNotes) || [])
+      .reduce((s, cn) => s + numberOf(cn && cn.amount), 0);
+    const giftCard = numberOf(order && order.giftCardDiscount);
+    const round = (n) => Math.round(n * 100) / 100;
+    return {
+      gross: round(gross), credited: round(credited), giftCard: round(giftCard),
+      cash: round(Math.max(0, gross - credited - giftCard)),
+    };
+  }
+
+  /**
    * What this order's payment status IS, whatever it says it is.
    *
    * The stored `paymentStatus` field is an answer that was true when it was
    * written. This is the answer now.
+   *
+   * `ctx` is optional and carries `{ settings }`: an exclusive shop's order is
+   * settled at price + tax, not at the pre-tax price. Without it the price is
+   * what is due, as it always was.
    */
-  function statusOf(order) {
+  function statusOf(order, ctx) {
     if (!order) return 'unpaid';
     if (order.voidedAt) return 'voided';
     if (order.creditedAt) return 'voided';
@@ -56,7 +95,7 @@
     if (price === 0) return order.paymentStatus || 'paid';
 
     const credited = (order.creditNotes || []).reduce((s, cn) => s + numberOf(cn && cn.amount), 0);
-    const due = Math.max(0, price - credited);
+    const due = Math.max(0, grossOf(order, ctx) - credited);
     const paid = numberOf(order.paidAmount) + numberOf(order.giftCardDiscount);
 
     if (due <= 0) return 'paid';
@@ -65,19 +104,21 @@
   }
 
   /** True when there is still money to collect on this order. */
-  function isOutstanding(order) {
-    const s = statusOf(order);
+  function isOutstanding(order, ctx) {
+    const s = statusOf(order, ctx);
     return s === 'unpaid' || s === 'partial';
   }
 
   /**
    * Record what a customer has paid.
    *
-   * `payment`: `{ amount, method, paidAt }`. The amount is clamped to the
-   * order's price — a shop cannot be paid more for a job than it charged, and
-   * an overpayment is a credit note, not a bigger `paidAmount`.
+   * `payment`: `{ amount, method, paidAt }`. The amount is clamped to what the
+   * order is BILLED — a shop cannot be paid more for a job than it charged, and
+   * an overpayment is a credit note, not a bigger `paidAmount`. Billed, not
+   * priced: an exclusive shop charges price + tax, and clamping to the price
+   * recorded a $108.25 payment as $100.
    *
-   * `ctx`: `{ today }`.
+   * `ctx`: `{ today, settings }`. `settings` is what says the tax mode.
    *
    * Returns `{ notices, effects }` in the shape the status rules use, so a host
    * that already performs those effects performs these without learning
@@ -86,14 +127,14 @@
   function recordPayment(order, payment, ctx) {
     const p = payment || {};
     const c = ctx || {};
-    const price = numberOf(order.price);
+    const billed = grossOf(order, c);
 
-    order.paidAmount = Math.min(Math.max(0, numberOf(p.amount)), price);
+    order.paidAmount = Math.min(Math.max(0, numberOf(p.amount)), billed);
     order.paymentMethod = p.method || null;
     order.paidAt = p.paidAt || c.today || null;
     // Derived, never taken from the caller: a stored status that disagrees with
     // the arithmetic is how an order sits in receivables after it was settled.
-    order.paymentStatus = statusOf(order);
+    order.paymentStatus = statusOf(order, c);
 
     const effects = [
       { type: 'save' },
@@ -168,7 +209,7 @@
     return out;
   }
 
-  const api = { statusOf, isOutstanding, recordPayment, clearPayment, outboundFor };
+  const api = { statusOf, isOutstanding, cashDue, recordPayment, clearPayment, outboundFor };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderPayment = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

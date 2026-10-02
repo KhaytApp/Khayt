@@ -437,7 +437,7 @@ private struct JobCard: View {
                 }
                 Spacer(minLength: 4)
                 if !job.isSettled {
-                    Text(Money.figure(job.owed))
+                    Text(Money.figure(job.owedInOwnCurrency))
                         .font(.caption2)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)

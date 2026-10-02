@@ -483,8 +483,10 @@ private struct Owed: View {
     @Environment(\.accessibilityReduceMotion) private var reduced
 
     private var paidFraction: Double {
-        guard job.price > 0 else { return 0 }
-        return min(1, max(0, job.paidAmount / job.price))
+        // Against what the job is BILLED — price + tax on an exclusive shop.
+        let billed = job.figures?.billed ?? job.price
+        guard billed > 0 else { return 0 }
+        return min(1, max(0, job.paidAmount / billed))
     }
 
     var body: some View {
@@ -508,7 +510,8 @@ private struct Owed: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } else {
             VStack(alignment: .trailing, spacing: 3) {
-                Text(Money.figure(job.owed))
+                // The job's OWN currency, like the Price column beside it.
+                Text(Money.figure(job.owedInOwnCurrency))
                     .monospacedDigit()
                     // Recording a payment changes this number and the meter
                     // below it, and both used to simply BE different.

@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 import SwiftUI
 
 /// One job in the shop's book.
@@ -322,6 +323,19 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     var owed: Double { owedResolved ?? max(0, price - paidAmount) }
 
     var isSettled: Bool { owed < 0.005 }
+
+    /// What `KhaytOrderMoney` says this job is billed, keeps and still owes,
+    /// in its OWN currency — resolved once per load beside `owedResolved`.
+    var figures: KhaytEngine.OrderFigures?
+
+    /// What is still owed in the job's OWN currency — the figure to print
+    /// beside the job's currency mark.
+    ///
+    /// `owed` is the SHOP's currency (`orderOwedBase`), which is right for a
+    /// total across jobs and wrong beside a job's own price: a 100 USD job on
+    /// a riyal shop read "Owed 375.00 USD" in the inspector. The subtraction
+    /// is the dead-engine fallback, as it is for `owed`.
+    var owedInOwnCurrency: Double { figures?.owed ?? max(0, price - paidAmount) }
 
     /// Whether the attention engine calls this job late, resolved once per
     /// load by `Shop` — the same answer the dashboard's Late tile shows.

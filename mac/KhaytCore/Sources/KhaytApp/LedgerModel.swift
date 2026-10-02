@@ -95,21 +95,54 @@ extension Shop {
         return words.counting(blind, "mac.n_without_cost")
     }
 
+    /// The money half of a row, on its own so a test can hand it a job.
+    ///
+    /// ── A MARGIN IS ON WHAT THE SHOP KEEPS ─────────────────────────────
+    ///
+    /// It was on the GROSS price, so an inclusive-VAT shop read its own VAT
+    /// as margin: a job charged 115 that cost 80 said 30.4% here and 20% in
+    /// Reports' P&L, which has always taken the tax out. `figures.net` is the
+    /// price with the tax taken out by `lib/tax.js` — mode-aware, so an
+    /// exclusive shop's price is already the net and comes back unchanged.
+    /// `charged` is what the customer is BILLED, which on an exclusive shop
+    /// is the price plus the tax.
+    struct LedgerMoney: Equatable {
+        let charged: Double
+        let net: Double?
+        let vat: Double?
+        let margin: Double?
+        let marginMoney: Double?
+    }
+
+    static func ledgerMoney(_ order: Order) -> LedgerMoney {
+        let costKnown = order.costBasis > 0
+        let net = order.figures?.net ?? order.price
+        let tax = order.figures?.tax ?? 0
+        return LedgerMoney(
+            charged: order.figures?.billed ?? order.price,
+            // Only for a shop that charges tax: an unregistered shop has no
+            // split, and a zero tax line would claim one.
+            net: tax > 0 ? net : nil,
+            vat: tax > 0 ? tax : nil,
+            margin: costKnown && net > 0 ? (net - order.costBasis) / net : nil,
+            marginMoney: costKnown ? net - order.costBasis : nil)
+    }
+
     private func line(for order: Order) -> LedgerLine {
         let costKnown = order.costBasis > 0
         let where_ = state(of: order)
+        let money = Self.ledgerMoney(order)
         return LedgerLine(
             id: order.id,
             state: where_,
             title: order.project,
             who: order.client.isEmpty ? words.callIt("mac.no_customer") : order.client,
             due: dueWords(order, at: where_),
-            charged: order.price,
-            margin: costKnown && order.price > 0
-                ? (order.price - order.costBasis) / order.price : nil,
-            net: nil,
-            vat: nil,
-            marginMoney: costKnown ? order.price - order.costBasis : nil,
+            charged: money.charged,
+            margin: money.margin,
+            net: money.net,
+            vat: money.vat,
+            marginMoney: money.marginMoney,
             reference: "#" + order.id,
             costUnknownWhy: costKnown ? nil : words.callIt("mac.cost_never_recorded"),
             settled: order.isSettled)

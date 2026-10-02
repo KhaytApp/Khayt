@@ -1215,7 +1215,8 @@ public actor KhaytEngine {
     /// thing runs in one expression and the repaired order comes BACK, for the
     /// caller to write. It also refuses an order that no longer looks
     /// affected, which is what makes a stale list harmless.
-    public func restoreDeposit(orders: [JSONValue], orderId: String) throws -> DepositRepair {
+    public func restoreDeposit(orders: [JSONValue], orderId: String,
+                               settings: [String: JSONValue] = [:]) throws -> DepositRepair {
         try runtime.call2("""
         (function () {
           var A = globalThis.KhaytDepositAudit;
@@ -1225,14 +1226,14 @@ public actor KhaytEngine {
             if (hits[i].order && hits[i].order.id === ARG1) { entry = hits[i]; break; }
           }
           if (!entry) return { ok: false, error: 'gone', order: null, before: 0, after: 0 };
-          var res = A.restoreDeposit(entry);
+          var res = A.restoreDeposit(entry, { settings: ARG2 });
           if (!res.ok) return { ok: false, error: res.error, order: null, before: 0, after: 0 };
           return {
             ok: true, error: null, order: entry.order,
             before: res.before.paidAmount, after: res.after.paidAmount,
           };
         })()
-        """, [.array(orders), .string(orderId)], as: DepositRepair.self)
+        """, [.array(orders), .string(orderId), .object(settings)], as: DepositRepair.self)
     }
 
     /// What a repair did, and the order to write.
@@ -1252,8 +1253,12 @@ public actor KhaytEngine {
     /// itself: `orderOwedRaw` takes gift cards and credit notes off the price
     /// as well as the cash, and a plan built on price − paidAmount would bill a
     /// customer for a credit note they were already given.
-    public func owedRaw(order: JSONValue) throws -> Double {
-        try runtime.call("KhaytOrderMoney", "orderOwedRaw", [order], as: Double.self)
+    ///
+    /// `settings` say whether tax is added on top: an exclusive shop's job is
+    /// owed price + tax, and a plan built on the bare price never asks for it.
+    public func owedRaw(order: JSONValue, settings: [String: JSONValue] = [:]) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.orderOwedRaw(ARG0, {settings: ARG1})",
+                          [order, .object(settings)], as: Double.self)
     }
 
     /// The plan a shop is offered when it asks for one: three payments, a
@@ -1289,6 +1294,33 @@ public actor KhaytEngine {
         ]
         if let base = instalmentBase { arg["instalmentBase"] = .number(base) }
         return try runtime.call("KhaytPaymentPlan", "collectionTotals", [arg], as: PlanTotals.self)
+    }
+
+    /// `collectionTotals` for an order as it is written, with the rows it will
+    /// carry.
+    ///
+    /// The ORDER goes in rather than its price, because settled is judged on
+    /// more than the price: a gift card already paid part of it and a credit
+    /// note took part of it away, so a plan covering price − gift card that is
+    /// collected in full is SETTLED — it stayed "partial" for ever when the
+    /// rule was handed the price alone. And on an exclusive-tax shop what is
+    /// due is price + tax. Every one of those figures is read off the record
+    /// by the shared modules, in one crossing.
+    public func collectionTotals(order: JSONValue, instalments: [JSONValue],
+                                 settings: [String: JSONValue]) throws -> PlanTotals {
+        try runtime.call2("""
+            (function (o, rows, settings) {
+              var M = KhaytOrderMoney;
+              var base = (typeof o.instalmentBase === 'number') ? o.instalmentBase : undefined;
+              return KhaytPaymentPlan.collectionTotals({
+                price: +o.price || 0, paidAmount: +o.paidAmount || 0,
+                instalments: rows, instalmentBase: base,
+                giftCardDiscount: +o.giftCardDiscount || 0,
+                credited: M.orderCreditedRaw(o),
+                due: M.orderGrossRaw(o, {settings: settings}),
+              });
+            })(ARG0, ARG1, ARG2)
+            """, [order, .array(instalments), .object(settings)], as: PlanTotals.self)
     }
 
     // MARK: - What the shop has on order
@@ -4188,7 +4220,7 @@ public actor KhaytEngine {
           };
           if (Array.isArray(ARG11)) input.orders = ARG11;
           return globalThis.KhaytMachinePL.machineProfit(input, {
-            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderEarnedBase(o, ctx); },
             // WHAT WAS STOCKED, as the shop's P&L counts it (lib/pnl-report.js
             // stockShare): the machine's wear reaches this report once, as its
             // depreciation line, and not a second time inside material cost.
@@ -5123,7 +5155,7 @@ public actor KhaytEngine {
           return globalThis.KhaytProductProfit.productProfit({
             orders: ARG0, products: ARG1, expenses: ARG2, untagged: ARG3,
           }, {
-            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderEarnedBase(o, ctx); },
             partCostOf: function (p) { return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx); },
             nameOf: function (p) {
               return globalThis.KhaytContentLanguages.read(p, 'name', ARG6, ARG4)
@@ -5255,7 +5287,7 @@ public actor KhaytEngine {
             products: ARG0, orders: ARG1, expenses: ARG2,
             inventory: ARG3, consumables: ARG4, settings: ARG5,
           }, {
-            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+            revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderEarnedBase(o, ctx); },
             partCostOf: function (p) { return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx); },
             nameOf: function (p) {
               return globalThis.KhaytContentLanguages.read(p, 'name', ARG7, ARG5)
@@ -6284,7 +6316,7 @@ public actor KhaytEngine {
           var revenue = [], cost = [];
           for (var i = 0; i < ARG0.length; i++) {
             var o = ARG0[i];
-            var r = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
+            var r = Number(globalThis.KhaytOrderMoney.orderEarnedBase(o, ctx));
             revenue.push(isFinite(r) ? r : 0);
             var parts = (o && Array.isArray(o.parts)) ? o.parts : [];
             var sum = 0;
@@ -6611,6 +6643,28 @@ public actor KhaytEngine {
           + " total: ARG3, vatAmount: ARG4}, {})",
             [.string(sellerName), .string(vatNumber), .string(timestamp),
              .string(total), .string(vatAmount)], as: String.self)
+    }
+
+    /// The money lines under an invoice's table — `KhaytInvoiceDocument.invoiceSummary`.
+    public struct InvoiceSummary: Decodable, Sendable, Equatable {
+        /// The items, before rush, shipping and the discount.
+        public let itemsSubtotal: Double
+        public let discount: Double
+        public let rush: Double
+        public let shipping: Double
+        /// What the shop keeps of the price, and the tax.
+        public let subtotal: Double
+        public let taxTotal: Double
+        /// What the customer is asked for.
+        public let total: Double
+        /// True when the tax is added on top rather than already inside.
+        public let addsTax: Bool
+    }
+
+    public func invoiceSummary(order: JSONValue, settings: [String: JSONValue]) throws -> InvoiceSummary {
+        try runtime.call2(
+            "KhaytInvoiceDocument.invoiceSummary(ARG0, KhaytTax.profileFromSettings(ARG1))",
+            [order, .object(settings)], as: InvoiceSummary.self)
     }
 
     /// The invoice, as HTML.
@@ -9253,6 +9307,70 @@ public actor KhaytEngine {
         return Set(ids)
     }
 
+    /// What each order is billed, keeps and still owes, in its OWN currency.
+    public struct OrderFigures: Decodable, Sendable, Hashable {
+        /// What the customer is asked for: the price, or on an exclusive-tax
+        /// shop the price plus the tax (`orderGrossRaw`).
+        public let billed: Double
+        /// What the shop keeps of the price once the tax is taken out — the
+        /// figure a margin is a margin on (`computeTax(...).subtotal`).
+        public let net: Double
+        /// The tax inside or on top of the price. Zero for an unregistered shop.
+        public let tax: Double
+        /// What is still owed, in the order's own currency (`orderOwedRaw`).
+        public let owed: Double
+        public init(billed: Double, net: Double, tax: Double, owed: Double) {
+            self.billed = billed; self.net = net; self.tax = tax; self.owed = owed
+        }
+    }
+
+    /// `OrderFigures` for the whole book, keyed by id. ONE CROSSING, like
+    /// `owedByOrder` beside it.
+    ///
+    /// Two screens needed these and had none. The Ledger worked its margin out
+    /// of the GROSS price, so a 15% VAT-inclusive job charged 115 that cost 80
+    /// read 30.4% where the P&L said 20%. And every row that labels "Owed" in
+    /// the order's currency was handed `orderOwedBase` — the shop's — so a
+    /// 100 USD job on a riyal shop read "Owed 375.00 USD".
+    public func orderFigures(_ orders: [JSONValue], settings: [String: JSONValue],
+                             clients: [JSONValue]) throws -> [String: OrderFigures] {
+        try runtime.call2("""
+            (function (rows, ctx) {
+              var M = KhaytOrderMoney, T = KhaytTax;
+              var profile = T.profileFromSettings(ctx.settings || {});
+              var out = {};
+              for (var i = 0; i < rows.length; i++) {
+                var o = rows[i];
+                if (!o || !o.id) continue;
+                var split = T.computeTax(+o.price || 0, profile);
+                out[o.id] = {
+                  billed: M.orderGrossRaw(o, ctx), net: split.subtotal,
+                  tax: split.taxTotal, owed: M.orderOwedRaw(o, ctx),
+                };
+              }
+              return out;
+            })(ARG0, {settings: ARG1, clients: ARG2})
+            """,
+                          [.array(orders), .object(settings), .array(clients)],
+                          as: [String: OrderFigures].self)
+    }
+
+    /// What a payment against this order can be, by `KhaytOrderPayment.cashDue`.
+    public struct CashDue: Decodable, Sendable, Equatable {
+        public let gross: Double
+        public let credited: Double
+        public let giftCard: Double
+        /// The most cash the order can still take.
+        public let cash: Double
+    }
+
+    /// The payment sheet's figures: what is billed, and what is already paid
+    /// down without cash — so "owed" previews the way the saved order reads.
+    public func cashDue(order: JSONValue, settings: [String: JSONValue]) throws -> CashDue {
+        try runtime.call2("KhaytOrderPayment.cashDue(ARG0, {settings: ARG1})",
+                          [order, .object(settings)], as: CashDue.self)
+    }
+
     /// What every order still owes, in the shop's base currency, keyed by id.
     ///
     /// ONE CROSSING for the whole book. `orderOwedBase` is the rule that
@@ -10982,10 +11100,15 @@ public actor KhaytEngine {
     /// The status is DERIVED here, never taken from the caller — a stored
     /// status that disagrees with the arithmetic is how an order sits in
     /// receivables after it was settled.
+    ///
+    /// `settings` say the tax mode: an exclusive shop is paid price + tax, and
+    /// without them a $108.25 payment on a $100 job was clamped to $100.
     public func recordPayment(order: JSONValue, amount: Double, method: String,
-                              paidAt: String, today: String) throws -> PaymentRecorded {
+                              paidAt: String, today: String,
+                              settings: [String: JSONValue] = [:]) throws -> PaymentRecorded {
         try runtime.call2(PAYMENT_SCRIPT,
-                          [order, .number(amount), .string(method), .string(paidAt), .string(today)],
+                          [order, .number(amount), .string(method), .string(paidAt), .string(today),
+                           .object(settings)],
                           as: PaymentRecorded.self)
     }
 
@@ -11095,11 +11218,25 @@ private let INVOICE_SCRIPT = """
     // name is the document's own rule, and a host that supplies its own prints
     // a different invoice. Khayt stopped passing one for the same reason.
     BRAND_MARK_SVG: '',
-    orderCurrency: function (o) { return o.currency || settings.currency || 'SAR'; },
-    clientCurrency: function () { return settings.currency || 'SAR'; },
+    // ── THE ORDER'S CURRENCY: the order's own, then the CUSTOMER'S, then the
+    // shop's — `KhaytOrderMoney.orderCurrency`, the rule Electron's
+    // `renderer/currency.js` hands the same document. This skipped the
+    // customer, so a USD customer's job with no per-order override was
+    // invoiced in riyals on the Mac and in dollars in Khayt. `currencies` is
+    // the catalogue, so a code the app does not know falls through to the
+    // customer rather than being trusted.
+    orderCurrency: function (o) {
+      // An EMPTY catalogue is no catalogue — it would distrust every code.
+      var known = (currencies && Object.keys(currencies).length) ? currencies : null;
+      return globalThis.KhaytOrderMoney.orderCurrency(o, { settings: settings, clients: clients },
+                                                       known);
+    },
+    clientCurrency: function (id) {
+      return globalThis.KhaytOrderMoney.clientCurrency(id, { settings: settings, clients: clients });
+    },
     payStatus: function (o) {
       return globalThis.KhaytOrderPayment
-        ? globalThis.KhaytOrderPayment.statusOf(o)
+        ? globalThis.KhaytOrderPayment.statusOf(o, { settings: settings })
         : (o.paymentStatus || 'unpaid');
     },
     hijriDate: function () { return ''; },
@@ -11162,7 +11299,7 @@ private let PAYMENT_SCRIPT = """
 (function () {
   var order = ARG0, amount = ARG1, method = ARG2, paidAt = ARG3, today = ARG4;
   var r = KhaytOrderPayment.recordPayment(order, { amount: amount, method: method, paidAt: paidAt },
-                                          { today: today });
+                                          { today: today, settings: ARG5 || {} });
   // WITH their arguments, exactly as a move carries them. `effects` keeps the
   // flat list of types — what happened — and this carries what has to be sent.
   var webhookEffects = [];

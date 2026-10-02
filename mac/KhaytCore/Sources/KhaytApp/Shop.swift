@@ -951,6 +951,13 @@ final class Shop {
         // Kept whole, not just on the rows: `payment-reminder` asks what each
         // order still owes, converted, and this is the converted answer.
         owedByOrderId = owed
+        // And each job's figures in its OWN currency, for the rows that print
+        // money beside the job's currency mark — owed, billed, and the price
+        // net of tax a margin is worked on. Same crossing pattern: once a load.
+        if let figures = try? await engine.orderFigures(
+            rows, settings: Self.settings(root), clients: clients) {
+            for i in orders.indices { orders[i].figures = figures[orders[i].id] }
+        }
         await resolveLate(root)
     }
 
@@ -4993,7 +5000,7 @@ final class Shop {
             // one, so neither does this.
             let done = try await engine.recordPayment(
                 order: order, amount: amount, method: method,
-                paidAt: Self.localDay(paidAt), today: Self.localDay())
+                paidAt: Self.localDay(paidAt), today: Self.localDay(), settings: settings)
 
             // ── AND WHAT THE PAYMENT OWES OUTWARD ─────────────────────────
             //
@@ -6280,7 +6287,7 @@ final class Shop {
     func restoreDeposit(_ id: Order.ID) async {
         await writeToOneOrder(id, named: words.callIt("dep.restore_btn")) { _, engine, root in
             let out = try await engine.restoreDeposit(orders: Self.rows(root, "printLog"),
-                                                      orderId: id)
+                                                      orderId: id, settings: Self.settings(root))
             guard out.ok, let repaired = out.order else {
                 throw MoveRefused(sentence: self.words.callIt("mac.deposit_not_affected"))
             }
@@ -6315,8 +6322,8 @@ final class Shop {
     /// price − paidAmount bills a customer for a credit note they were already
     /// given, and one built on the gross price bills the deposit twice.
     func makePlan(_ id: Order.ID) async {
-        await writeToOneOrder(id, named: words.callIt("inst.generate")) { order, engine, _ in
-            let owed = try await engine.owedRaw(order: order)
+        await writeToOneOrder(id, named: words.callIt("inst.generate")) { order, engine, root in
+            let owed = try await engine.owedRaw(order: order, settings: Self.settings(root))
             guard case .object(var record) = order else {
                 throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
             }
@@ -6364,7 +6371,7 @@ final class Shop {
     /// a row clears the ROW, and the notice says where the cash figure is
     /// corrected. An immediate mis-tap is ⌘Z, which puts both back.
     func collect(_ id: Order.ID, rowId: String, collected: Bool) async {
-        await writeToOneOrder(id, named: words.callIt("inst.mark_paid")) { order, engine, _ in
+        await writeToOneOrder(id, named: words.callIt("inst.mark_paid")) { order, engine, root in
             guard case .object(var record) = order,
                   case .array(let rows)? = record["instalments"] else {
                 throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
@@ -6387,11 +6394,10 @@ final class Shop {
             guard found else { throw MoveRefused(sentence: self.words.callIt("mac.move_gone")) }
 
             let held = (Self.plainNumber(record["paidAmount"]) ?? 0)
-            var base: Double?
-            if case .number(let b)? = record["instalmentBase"] { base = b }
+            // The ORDER, not its price: a gift card and a credit note decide
+            // when a plan's collections settle it, and so does tax added on top.
             let totals = try await engine.collectionTotals(
-                price: (Self.plainNumber(record["price"]) ?? 0), paidAmount: held,
-                instalments: written, instalmentBase: base)
+                order: .object(record), instalments: written, settings: Self.settings(root))
             record["instalments"] = .array(written)
             record["paidAmount"] = .number(totals.paidAmount)
             record["paymentStatus"] = .string(totals.paymentStatus)
@@ -6427,10 +6433,17 @@ final class Shop {
     /// figure the masthead and the Spending screen already show — a second
     /// subtraction would give the plan sheet an opinion of its own about what a
     /// customer owes.
+    /// What a payment against this job can be — `KhaytOrderPayment.cashDue`.
+    func cashDue(_ id: Order.ID) async -> KhaytEngine.CashDue? {
+        guard let engine,
+              let raw = orderRows.first(where: { Self.recordId($0) == id }) else { return nil }
+        return try? await engine.cashDue(order: raw, settings: settingsDict)
+    }
+
     func owedOn(_ id: Order.ID) async -> Double? {
         guard let engine,
               let raw = orderRows.first(where: { Self.recordId($0) == id }) else { return nil }
-        return try? await engine.owedRaw(order: raw)
+        return try? await engine.owedRaw(order: raw, settings: settingsDict)
     }
 
     // MARK: - What the customer thought

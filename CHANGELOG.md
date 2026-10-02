@@ -11,6 +11,81 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   phone already paired says the same in its connection strip. The phone
   does not enforce the minimum itself: the Electron desktop has none, and a
   shop there with a short PIN would be locked out for nothing.
+- **Security: your book file is readable only by you.** On macOS and Linux,
+  each save wrote your data file so that any other account on the same
+  computer could read it, with every customer and price in it. The book and
+  its previous copy are now readable by your account only. The Mac app does
+  the same.
+- **Security: webhooks can no longer be redirected into your network, and can
+  be checked against replays.** Khayt checked a webhook's address and then
+  looked the name up again to send it, so a server that answered differently
+  the second time could reach a computer inside your network. It now sends to
+  the address it checked. That covers order webhooks, the event subscriptions
+  and accounting sync. Every signed webhook also carries `X-Khayt-Timestamp`
+  and `X-Khayt-Signature-V2`, so a receiver can refuse an old copy sent
+  again. The original `X-Khayt-Signature` is unchanged, so existing
+  integrations keep working. The Mac app sends the same headers.
+  **Accounting sync now needs an `https://` address.** It sends your secret
+  with every push, and plain `http://` let anyone between you and the
+  server read it. If yours starts with `http://`, change it in Settings ›
+  Accounting sync. Until you do, each paid order shows why it was not sent.
+- **Security: an older copy of your cloud data is not applied without you.**
+  Your cloud data is encrypted, so the server cannot change it, but a broken
+  or compromised server could still send back an older copy. Khayt would
+  have merged it as if it were current. It now remembers the newest version
+  it has seen for your shop and refuses an older one, showing why. If you
+  restored the cloud on purpose, **Trust the cloud's older copy** in
+  Settings › Khayt Cloud takes it, and changes made on this computer are
+  merged back in. The Mac app does the same.
+- **Freeing up space keeps the models you still need.** When old models were
+  moved off this computer to save space, "old" meant the file's own date. A
+  model downloaded years ago but imported last week counted as unused, and so
+  did one an unfinished job was waiting for. Now a model counts as used when
+  it was imported, last printed or last named in a job. A model an unfinished
+  job needs is never moved, and the settings say how many were kept for that
+  reason. The Mac app does the same.
+- **(Mac) Profit no longer counts VAT as money earned.** On a shop whose
+  prices include VAT, the machine profit, product profit, profit per hour,
+  break-even and Ledger margin figures counted the VAT as revenue: a job
+  charged 115 at 15% VAT that cost 80 showed a profit of 35 (30.4%) while the
+  P&L showed 20 (20%). They now take the tax out first, the same way the P&L
+  does. Shops that add tax on top, and shops with no tax set up, see no
+  change.
+- **Tax added on top is now part of what a customer owes.** For a shop whose
+  tax is added on top of the price (US sales tax, for example), a $100 job at
+  8.25% is billed $108.25. Recording a $108.25 payment saved only $100, and
+  the job showed as settled at $100. Payments, the amount owed and the
+  paid/partial status now use the billed total. Prices that include tax are
+  unaffected.
+- **A gift card and a payment plan now settle a job.** A plan covers the price
+  minus the gift card. Once every payment in it was collected, the job still
+  showed as partly paid, as if the gift card had never been used. Restoring a
+  lost deposit had the same problem. The Mac payment sheet's "Owed" preview
+  now also counts gift cards and credit notes.
+- **(Mac) Invoice totals add up.** A 280 job made of 225 goods, 25 rush and 30
+  shipping printed Subtotal 280, Rush 25, Shipping 30, Total 280. The
+  Subtotal now shows the goods (225), as the desktop invoice does.
+- **(Mac) Invoices use the customer's currency.** A job with no currency of
+  its own is now invoiced in the customer's currency, then the shop's, as the
+  desktop does. Before, the Mac skipped the customer and used the shop's
+  currency.
+- **(Mac) "Owed" is in the job's own currency.** The job inspector, the jobs
+  table, the board and the customer's job list showed the amount owed in the
+  shop's currency beside the job's currency sign. A 100 USD job on a riyal
+  shop read "Owed 375.00 USD". These now show the amount in the job's own
+  currency, like the price beside it.
+- **The ZATCA QR code includes the time.** The Mac stamped an invoice's QR
+  code with the date alone. It now uses the full date and time in the format
+  ZATCA requires (for example 2026-07-02T14:32:05Z). A job with no recorded
+  time is stamped at midday on its date.
+
+- **A model moved to Google Drive to save space comes back.** When old models
+  were moved off this computer to free space, the desktop recorded every one
+  as going to your bucket, even when it went to Google Drive, and only ever
+  looked in the storage you use now. A model moved to Drive, or moved before
+  you switched between Drive and a bucket, could fail to open. The desktop
+  now records where each model really went, looks there first, then tries
+  the other storage you have connected. The Mac app does the same.
 
 - **(Mac) A price only changes when you change it.** Opening a book used to
   re-cost every product whose spool size differed from the figure it was
