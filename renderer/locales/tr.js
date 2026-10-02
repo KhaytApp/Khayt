@@ -1921,6 +1921,7 @@
   "inv.unknown_material": "Bilinmiyor",
   "exp.budget_exceeded": "⚠ {cat} bütçesi aşıldı: bu ay {budget} bütçenin {spent} kadarı harcandı",
   "ord.due_extended": "Termin +{days}g uzatıldı (askıya alındı): şimdi {date}",
+  "ord.filament_returned": "{weight} g filament stoğa geri kondu",
   "ord.due_suggestion": "Kuyruk yoğunluğuna göre önerildi",
   "an.export_hint": "Verileri CSV olarak dışa aktar",
   "an.export_orders": "Siparişler CSV",

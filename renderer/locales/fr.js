@@ -1921,6 +1921,7 @@
   "inv.unknown_material": "Inconnu",
   "exp.budget_exceeded": "⚠ Budget {cat} dépassé : {spent} dépensés sur {budget} de budget ce mois",
   "ord.due_extended": "Échéance prolongée +{days}j (en attente) : maintenant {date}",
+  "ord.filament_returned": "{weight} g de filament remis en stock",
   "ord.due_suggestion": "Suggéré automatiquement par la file",
   "an.export_hint": "Exporter les données en CSV",
   "an.export_orders": "Commandes CSV",

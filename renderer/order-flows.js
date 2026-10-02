@@ -401,6 +401,9 @@ function showStatusNotices(notices) {
   for (const n of notices || []) {
     if (n.code === 'due_extended') {
       toast(t('ord.due_extended', { days: n.params.days, date: n.params.date }), 'info', 4000);
+    } else if (n.code === 'filament_returned') {
+      // Reopening a finished job gave its filament back to the shelf.
+      toast(t('ord.filament_returned', { weight: n.params.weight }) || `${n.params.weight} g of filament put back on the shelf`, 'info', 4000);
     }
   }
 }
@@ -480,6 +483,9 @@ function runStatusEffects(order, effects, { prevTier, undo, toastText } = {}) {
   }
 }
 
+/** The consumables list, or none on a page without it. */
+const _consumables = () => ((typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : []);
+
 function updateStatus(id, newStatus) {
   const order = printLog.find(o => o.id === id);
   if (!order) return;
@@ -504,16 +510,23 @@ function updateStatus(id, newStatus) {
 
   const _undoIdx = printLog.indexOf(order);
   const _undoSnap = structuredClone(order);
-  const out = StatusRules().apply(order, newStatus, { now: Date.now(), inventory });
+  // The move may write the shelf (reopening a finished job gives its filament
+  // back), so its Undo puts back the stock it changed, not just the order.
+  // Without that, giving material back would not be safe (lib/stock-undo.js).
+  const _stock = KhaytStockUndo.capture({ inventory, consumables: _consumables() });
+  const out = StatusRules().apply(order, newStatus, {
+    now: Date.now(), inventory, consumables: _consumables(), returnMaterial: true,
+  });
   showStatusNotices(out.notices);
   runStatusEffects(order, out.effects, {
     undo: _undoIdx >= 0 ? () => {
+      _stock.restore();
       printLog[_undoIdx] = _undoSnap;
       saveAll();
       renderKanban(); renderLogs(); renderAnalytics();
       if (typeof renderDashboard === 'function') renderDashboard();
     } : null,
-  });
+  });  _stock.seal();
 }
 
 /**
@@ -552,12 +565,14 @@ function holdOrder(id) {
 
       const _undoIdx = printLog.indexOf(order);
       const _undoSnap = structuredClone(order);
+      const _stock = KhaytStockUndo.capture({ inventory, consumables: _consumables() });
       const out = StatusRules().apply(order, 'on_hold', {
-        now: Date.now(), inventory, holdReason,
+        now: Date.now(), inventory, consumables: _consumables(), returnMaterial: true, holdReason,
       });
       showStatusNotices(out.notices);
       runStatusEffects(order, out.effects, {
         undo: _undoIdx >= 0 ? () => {
+          _stock.restore();
           printLog[_undoIdx] = _undoSnap;
           saveAll();
           renderKanban(); renderLogs(); renderAnalytics();
@@ -567,6 +582,7 @@ function holdOrder(id) {
         // the one move a shop starts from a dialog rather than a column.
         toastText: t('ord.on_hold'),
       });
+      _stock.seal();
       return true;
     },
   });

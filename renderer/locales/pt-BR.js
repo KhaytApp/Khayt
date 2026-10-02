@@ -1922,6 +1922,7 @@
   "inv.unknown_material": "Desconhecido",
   "exp.budget_exceeded": "⚠ Orçamento de {cat} excedido: {spent} gastos de {budget} previstos neste mês",
   "ord.due_extended": "Prazo estendido em +{days}d (em espera): agora {date}",
+  "ord.filament_returned": "{weight} g de filamento devolvidos ao estoque",
   "ord.due_suggestion": "Sugerido com base no tamanho da fila",
   "an.export_hint": "Exportar dados como CSV",
   "an.export_orders": "CSV de pedidos",

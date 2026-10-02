@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Reopening a finished job puts its filament back on the shelf.** Move a
+  finished job back (to fix it, re-check it or put it on hold) and the
+  filament and packaging it used go back into stock, with a note saying how
+  many grams. Finishing it again takes what it really uses this time. Undo
+  after reopening puts the stock back as it was, along with the job. The Mac
+  app does the same.
+
 - **(iOS) A PIN the Mac finds too short is said as one.** The native Mac now
   refuses an owner PIN shorter than 8 characters (#1713). Pairing with one
   used to read "That PIN was refused" — true, and no help, since the PIN was

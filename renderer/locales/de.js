@@ -1921,6 +1921,7 @@
   "inv.unknown_material": "Unbekannt",
   "exp.budget_exceeded": "⚠ {cat}-Budget überschritten: {spent} ausgegeben von {budget} Budget diesen Monat",
   "ord.due_extended": "Fälligkeitsdatum verlängert +{days}T (zurückgestellt): jetzt {date}",
+  "ord.filament_returned": "{weight} g Filament zurück ins Lager gebucht",
   "ord.due_suggestion": "Automatisch aus Warteschlange vorgeschlagen",
   "an.export_hint": "Daten als CSV exportieren",
   "an.export_orders": "Aufträge CSV",
