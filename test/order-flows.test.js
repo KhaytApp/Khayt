@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 // modules format dates with it — in the browser util.js is loaded first by
 // index.html; under node the test has to establish the same contract.
 require('../renderer/util.js');
+require('../lib/stock-undo.js');   // sets global.KhaytStockUndo, as the page's script tag does
 const flows = require('../renderer/order-flows.js');
 
 test('KhaytOrderFlows exports order lifecycle functions', () => {

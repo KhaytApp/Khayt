@@ -1921,6 +1921,7 @@
   "inv.unknown_material": "未知",
   "exp.budget_exceeded": "⚠ {cat} 预算超支：本月已支出 {spent}，预算为 {budget}",
   "ord.due_extended": "截止日期延长 +{days}天（待处理）：现为 {date}",
+  "ord.filament_returned": "已将 {weight} 克耗材放回库存",
   "ord.due_suggestion": "根据队列深度自动建议",
   "an.export_hint": "导出 CSV 数据",
   "an.export_orders": "订单 CSV",

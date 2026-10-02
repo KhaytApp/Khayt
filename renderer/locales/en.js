@@ -1922,6 +1922,7 @@
   "inv.unknown_material": "Unknown",
   "exp.budget_exceeded": "⚠ {cat} budget exceeded: {spent} spent of {budget} budget this month",
   "ord.due_extended": "Due date extended +{days}d (held): now {date}",
+  "ord.filament_returned": "{weight} g of filament put back on the shelf",
   "ord.due_suggestion": "Suggested based on queue depth",
   "an.export_hint": "Export data as CSV",
   "an.export_orders": "Orders CSV",

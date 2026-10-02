@@ -116,7 +116,13 @@
     let undoSnap = null;
     try { undoSnap = structuredClone(order); } catch (_) { undoSnap = null; }
 
-    const ctx = { now: Date.now(), inventory: (typeof inventory !== 'undefined' ? inventory : []) };
+    // Reopening a finished print gives its filament back; the Undo below puts
+    // back the stock the move changed as well as the job (lib/stock-undo.js),
+    // which is what makes giving it back safe.
+    const inv = (typeof inventory !== 'undefined' ? inventory : []);
+    const cons = (typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : [];
+    const stock = (typeof KhaytStockUndo !== 'undefined') ? KhaytStockUndo.capture({ inventory: inv, consumables: cons }) : null;
+    const ctx = { now: Date.now(), inventory: inv, consumables: cons, returnMaterial: !!stock };
     if (holdReason !== undefined) ctx.holdReason = holdReason;
     if (qc !== undefined) ctx.qc = qc;
     const out = Rules.apply(order, newStatus, ctx);
@@ -125,6 +131,8 @@
       if (n.code === 'due_extended') {
         say(T('ord.due_extended', `Due date extended by ${n.params.days} day(s): now ${n.params.date}`),
             'info', 4000);
+      } else if (n.code === 'filament_returned') {
+        say(T('ord.filament_returned', `${n.params.weight} g of filament put back on the shelf`), 'info', 4000);
       }
     }
 
@@ -153,6 +161,7 @@
           say(T('toast.status_updated', 'Status updated'), 'success', 5000,
             (undoIdx >= 0 && undoSnap && e.type === 'toast_updated_undoable') ? {
               undo: () => {
+                if (stock) stock.restore();
                 const list = orders();
                 if (list[undoIdx] && list[undoIdx].id === undoSnap.id) list[undoIdx] = undoSnap;
                 if (typeof saveAll === 'function') saveAll();
@@ -170,6 +179,8 @@
           break;
       }
     }
+    // What the move changed on the shelf, fixed now for the Undo above.
+    if (stock) stock.seal();
 
     // The job is completed either way. Offering the printer's own figures happens
     // AFTER, never as a gate: a dismissed dialog must not leave the card in the

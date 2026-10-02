@@ -1921,6 +1921,7 @@
   "inv.unknown_material": "不明",
   "exp.budget_exceeded": "⚠ {cat}の予算を超過しました：今月の予算 {budget} に対して {spent} 使用",
   "ord.due_extended": "納期を延長しました +{days}日（保留中）：現在 {date}",
+  "ord.filament_returned": "フィラメント {weight} g を在庫に戻しました",
   "ord.due_suggestion": "キューの深さに基づく提案",
   "an.export_hint": "データをCSVとして書き出す",
   "an.export_orders": "注文CSV",

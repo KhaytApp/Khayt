@@ -1964,6 +1964,7 @@
   "inv.unknown_material": "غير محدد",
   "exp.budget_exceeded": "⚠ تجاوز ميزانية {cat}: {spent} صُرف من {budget} هذا الشهر",
   "ord.due_extended": "تم تمديد تاريخ التسليم +{days} يوم (بسبب الإيقاف): الآن {date}",
+  "ord.filament_returned": "أُعيد {weight} غ من الخيط إلى المخزون",
   "ord.due_suggestion": "مقترح بناءً على عمق الطابور",
   "an.export_hint": "تصدير البيانات CSV",
   "an.export_orders": "تصدير الطلبات",
