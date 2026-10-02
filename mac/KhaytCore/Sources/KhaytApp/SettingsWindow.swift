@@ -356,24 +356,24 @@ struct BusinessPane: View {
                                 askingLogo = true
                             }
                             .disabled(!shop.canWrite)
-                            // No undo, and the file it came from may be long
-                            // gone from this Mac.
-                            .confirmationDialog(shop.words.callIt("mac.remove_logo_q"),
-                                                isPresented: $askingLogo, titleVisibility: .visible) {
-                                Button(shop.words.callIt("set.logo_remove"), role: .destructive) {
-                                    shop.clearLogo()
-                                }
-                                Button(shop.words.callIt("common.cancel"), role: .cancel) {}
-                            } message: {
-                                Text(shop.words.callIt("mac.remove_logo_note") + " "
-                                     + shop.words.callIt("mac.no_undo"))
-                            }
                         }
                         Spacer()
                     }
                     Text(shop.words.callIt("mac.logo_accepts"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                // Asked before Remove: no undo, and the file it came from may
+                // be long gone from this Mac.
+                .confirmationDialog(shop.words.callIt("mac.remove_logo_q"),
+                                    isPresented: $askingLogo, titleVisibility: .visible) {
+                    Button(shop.words.callIt("set.logo_remove"), role: .destructive) {
+                        shop.clearLogo()
+                    }
+                    Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+                } message: {
+                    Text(shop.words.callIt("mac.remove_logo_note") + " "
+                         + shop.words.callIt("mac.no_undo"))
                 }
                 // ── THE REDESIGNED WINDOW ─────────────────────────────────
                 //
