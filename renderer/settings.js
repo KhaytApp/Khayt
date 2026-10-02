@@ -2708,6 +2708,9 @@ async function renderPrintLibTier() {
       : 'Nothing to move — the library is already as small as this setting allows.');
     status.style.color = 'var(--text-muted)';
   }
+  // Never moved, however old: a job not yet finished will open it.
+  const inUse = (s.skipped && s.skipped['in-use']) || 0;
+  if (inUse > 0) parts.push(`${inUse} kept because an unfinished job uses ${inUse === 1 ? 'it' : 'them'}.`);
   if (s.alreadyTiered > 0) parts.push(`${s.alreadyTiered} already in the cloud.`);
   status.textContent = parts.join(' ');
 }
