@@ -2164,8 +2164,14 @@ final class Shop {
     /// to correct is the number everything downstream compares against. An
     /// order carries no total weight of its own; taking the first part's would
     /// under-quote every multi-part job on this screen.
+    /// What the job was quoted to take off the shelf: print AND support, per
+    /// piece, times the quantity — `order-deduction.partGramsConsumed`.
+    ///
+    /// Support was left out, so a part quoted 100 g + 30 g support pre-filled
+    /// "100" in the completion sheet, and a shop confirming it told the
+    /// deduction the job used 100 of its 130: the shelf kept 30 g it had lost.
     static func quotedGrams(_ job: Order) -> Double {
-        job.parts.reduce(0) { $0 + $1.printWeight * Double(max(1, $1.qty)) }
+        job.parts.reduce(0) { $0 + ($1.printWeight + $1.supportWeight) * Double(max(1, $1.qty)) }
     }
 
     struct PendingHold: Identifiable, Sendable {
@@ -12057,6 +12063,10 @@ final class Shop {
         //
         // A job leaving QC is asked once, in this sheet, rather than being
         // handed a second dialog for its notes.
+        // A job ALREADY finished — moved back from Shipped or Delivered — is
+        // not being finished again, and the sheet would overwrite what it
+        // really took. The move only takes the stamp off.
+        if to == .completed, job.status == "completed" || job.status == "delivered" { return nil }
         if to == .completed {
             let finishing = PendingCompletion(
                 id: id, project: job.project,
@@ -12621,7 +12631,15 @@ final class Shop {
         // Both figures and their provenance travel together. A record with
         // actuals and no `actualsSource` reads as measured to anything that
         // checks the source only when it is present.
-        if let actuals, case .object(var fields) = target {
+        // Already finished, the record keeps what the job really took: a move
+        // back from Shipped is not a second completion (`order-status.apply`).
+        let alreadyFinished: Bool = {
+            if case .object(let o) = target, case .string(let st)? = o["status"] {
+                return st == "completed" || st == "delivered"
+            }
+            return false
+        }()
+        if let actuals, !(stage == .completed && alreadyFinished), case .object(var fields) = target {
             fields["actualPrintTime"] = .number((actuals.hours * 100).rounded() / 100)
             fields["actualWeight"] = .number((actuals.grams * 10).rounded() / 10)
             fields["actualsSource"] = .object([
@@ -12662,7 +12680,7 @@ final class Shop {
         if !cannotSend.isEmpty {
             throw MoveRefused(sentence: words.outboundRefusal(cannotSend))
         }
-        let telegram = reaches.contains { $0.channel == "telegram" }
+        var telegram = reaches.contains { $0.channel == "telegram" }
             ? try? await engine.telegramMessage(order: target, newStatus: stage.rawValue,
                                                 settings: settings, currency: shopCurrencyOf(settings))
             : nil
@@ -12742,12 +12760,24 @@ final class Shop {
             ],
             now: Date())
 
-        let mail = try? await engine.orderEmail(
+        var mail = try? await engine.orderEmail(
             order: .object(changedOrder), newStatus: stage.rawValue,
             settings: settings, clients: clients,
             shopName: plainString(settings["bizEn"]) ?? plainString(settings["bizAr"]) ?? "Khayt",
             clientName: emailClientName(for: changedOrder, in: clients),
             statusLabel: words.callIt("queue." + stage.rawValue, fallback: stage.rawValue))
+
+        // ── A MOVE THAT ASKED FOR NOTHING OUTWARD SENDS NOTHING ───────────
+        //
+        // The message, the email and the portal refresh above are decided by
+        // the settings; whether THIS move owes them is the rule's. A job moved
+        // back from Shipped to Completed is no completion (`order-status`
+        // returns no outbound effect for it), and the customer was being told
+        // their finished job was finished again.
+        var portalOwed = portal
+        if (move.outbound ?? []).isEmpty {
+            telegram = nil; mail = nil; portalOwed = nil
+        }
 
         var undo: [ChangedRecord] = []
         write(&root, "printLog", changed: [.object(changedOrder)], before: ordersAsFound, into: &undo)
@@ -12760,7 +12790,7 @@ final class Shop {
 
         let notices = (move.notices ?? []).map { words.sentence(for: $0) }
         return MoveOutcome(undo: undo, notices: notices, telegram: telegram,
-                           webhooks: owed, email: mail, portal: portal)
+                           webhooks: owed, email: mail, portal: portalOwed)
     }
 
     // MARK: - Reading and writing rows

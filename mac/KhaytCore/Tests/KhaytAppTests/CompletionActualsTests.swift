@@ -99,6 +99,15 @@ struct CompletionActualsTests {
         ]
         let job = try JSONDecoder().decode(Order.self, from: JSONEncoder().encode(row))
         #expect(Shop.quotedGrams(job) == 350, "got \(Shop.quotedGrams(job)) rather than 3×100 + 1×50")
+
+        // Support is filament too: 100 g + 30 g support is 130 g off the shelf.
+        var supported = row
+        supported["parts"] = .array([.object(["id": .string("S"), "name": .string("S"), "material": .string("PLA"),
+                                              "qty": .number(1), "printWeight": .number(100),
+                                              "supportWeight": .number(30), "unitCost": .number(0),
+                                              "colour": .string("#ffffff")])])
+        let withSupport = try JSONDecoder().decode(Order.self, from: JSONEncoder().encode(supported))
+        #expect(Shop.quotedGrams(withSupport) == 130, "the sheet pre-filled the print weight without its support")
     }
 
     /// The fields are pre-filled by this app's own formatter, which groups
