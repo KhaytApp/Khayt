@@ -62,7 +62,7 @@ const PROFILES = [
   {
     id: 'prusa-mk4-mmu3', name: 'Prusa MK4 + MMU3', vendor: 'Prusa Research', flavour: 'prusa',
     maxColors: 5, bed: { x: 250, y: 210, z: 220 }, nozzle: 0.4,
-    printerModel: 'MK4IS', gcodeFlavour: 'marlin', system: 'MMU3 5-colour',
+    printerModel: 'MK4ISMMU3', gcodeFlavour: 'marlin', system: 'MMU3 5-colour',
   },
   {
     id: 'prusa-xl-5t', name: 'Prusa XL (5 toolheads)', vendor: 'Prusa Research', flavour: 'prusa',

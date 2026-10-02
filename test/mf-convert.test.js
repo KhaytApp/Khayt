@@ -363,7 +363,7 @@ test('Prusa flavour: filament_colour list + printer_model rewrite', () => {
   assert.equal(a.colorCount, 3);
   const r = convert(src, { targetId: 'prusa-mk4-mmu3', slotMap: [2, 1, 0] });
   const text = openZip(r.buffer).file('Metadata/Slic3r_PE.config').toString('utf8');
-  assert.match(text, /printer_model = MK4IS/);
+  assert.match(text, /printer_model = MK4ISMMU3$/m);
   assert.match(text, /filament_colour = #0000CC;#00BB00;#AA0000/);
 });
 

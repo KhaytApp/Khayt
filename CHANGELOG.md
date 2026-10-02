@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Prusa MK4 + MMU3 converts for the MMU3, not a single-extruder MK4.** The
+  print-file converter wrote `printer_model = MK4IS` for this target; PrusaSlicer's
+  bundle calls the MK4 with MMU3 `MK4ISMMU3`, so a converted file opened as the
+  wrong printer.
+
 - **Set your shop's electricity price once.** Settings › Business has a
   Running costs card with your price per kWh, and the 📍 Auto button can fill
   it from your country. The calculator starts on that price instead of 0.18,
