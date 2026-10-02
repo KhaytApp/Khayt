@@ -136,13 +136,27 @@ public enum SyncCrypto {
         /// default, which is what every keyset written so far carries.
         public static func from(_ value: JSONValue?) throws -> Kdf {
             guard case .object(let fields)? = value else { return Kdf() }
-            // Bounded: these come from a book that syncs and restores, and an
-            // infinite or enormous N either trapped in `Int(v)` or asked scrypt
-            // for more memory than the Mac has, at unlock.
-            let int = { (key: String, fallback: Int) -> Int in
+            // Bounded: these come from a book that syncs and restores, and
+            // from a sign-in RESPONSE — so whoever answers for the cloud
+            // chooses them. An infinite or enormous N either trapped in
+            // `Int(v)` or asked scrypt for more memory than the Mac has: the
+            // old ceiling (N 2^20, r 32, p 16) was 4 GiB per unlock.
+            //
+            // The caps are what a real keyset can carry. Every keyset ever
+            // written uses `DEFAULT_KDF` (N 2^15, r 8, p 1); nothing in
+            // `lib/`, the phone or khayt-cloud writes another, and the desktop
+            // could not open anything past 96 MiB anyway (`SCRYPT_MAXMEM` in
+            // `lib/sync-crypto.js`, N·r ≤ 2^16·8 at r 8). 2^17·8 is 128 MiB.
+            //
+            // REFUSED, NOT CLAMPED. A clamped N derives a different key, which
+            // then reads as a wrong passphrase — a shop retyping the right one.
+            let int = { (key: String, fallback: Int) throws -> Int in
                 guard case .number(let v)? = fields[key], v.isFinite, v >= 1 else { return fallback }
-                let ceiling: Double = switch key { case "N": 1_048_576; case "r": 32; case "p": 16; default: 64 }
-                return Int(min(v, ceiling))
+                if let ceiling = Self.ceiling[key], v > Double(ceiling) {
+                    throw Failure.malformed("this book's key asks for scrypt \(key) = \(v), beyond the "
+                                            + "\(ceiling) this app will spend unlocking it")
+                }
+                return Int(v)
             }
             var algorithm = "scrypt"
             if case .string(let a)? = fields["algo"], !a.isEmpty { algorithm = a }
@@ -151,9 +165,13 @@ public enum SyncCrypto {
             }
             let fallback = Kdf()
             return Kdf(algorithm: algorithm,
-                       n: int("N", fallback.n), r: int("r", fallback.r),
-                       p: int("p", fallback.p), keyLength: int("keyLen", fallback.keyLength))
+                       n: try int("N", fallback.n), r: try int("r", fallback.r),
+                       p: try int("p", fallback.p), keyLength: try int("keyLen", fallback.keyLength))
         }
+
+        /// The most this app will spend on one unlock: 128 · N · r · p bytes
+        /// of scrypt memory, so 128 MiB at the caps (p runs sequentially).
+        public static let ceiling: [String: Int] = ["N": 131_072, "r": 8, "p": 2, "keyLen": 64]
     }
 
     // MARK: - The store

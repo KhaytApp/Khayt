@@ -85,12 +85,47 @@ struct SecurityBatch4Tests {
     @Test("a Bambu's certificate is kept the first time and a different one refused, until re-trusted")
     func bambuPin() {
         let key = BambuPin.key(serial: "TEST-\(UUID().uuidString)", host: "192.168.1.50")
-        defer { UserDefaults.standard.removeObject(forKey: key) }
-        #expect(BambuPin.accept("aaaa", key: key), "first sight: trusted and remembered")
-        #expect(BambuPin.accept("aaaa", key: key))
-        #expect(!BambuPin.accept("bbbb", key: key), "somebody else answering for the printer")
-        UserDefaults.standard.removeObject(forKey: key)          // what saving the access code does
-        #expect(BambuPin.accept("bbbb", key: key))
+        let store = BambuPin.Store.memory()
+        #expect(BambuPin.accept("aaaa", key: key, in: store), "first sight: trusted and remembered")
+        #expect(BambuPin.accept("aaaa", key: key, in: store))
+        #expect(!BambuPin.accept("bbbb", key: key, in: store), "somebody else answering for the printer")
+        store.remove(key)                                        // what saving the access code does
+        #expect(BambuPin.accept("bbbb", key: key, in: store))
+    }
+
+    @Test("the pin is kept in the Keychain, and an old defaults pin is moved there")
+    func bambuPinInKeychain() {
+        let key = BambuPin.key(serial: "TEST-\(UUID().uuidString)", host: "192.168.1.50")
+        defer { BambuPin.Store.keychain.remove(key) }
+        // A CI runner has no login Keychain; there the store falls back to
+        // defaults, which the pin test above already covers.
+        guard BambuPin.Store.keychainWrite(key, "probe") else { return }
+        BambuPin.Store.keychain.remove(key)
+        UserDefaults.standard.set("legacy", forKey: key)
+        #expect(BambuPin.Store.keychain.read(key) == "legacy")
+        #expect(UserDefaults.standard.string(forKey: key) == nil,
+                "the pin stayed in a plist any process of this user can rewrite")
+        #expect(BambuPin.Store.keychainRead(key) == "legacy")
+        #expect(!BambuPin.accept("other", key: key, in: .keychain))
+    }
+
+    @Test("an MQTT packet longer than the cap is refused, not buffered toward")
+    func bambuPacketCap() throws {
+        // A header claiming 200 MB: type byte, then a four-byte remaining length.
+        let huge = 200 * 1024 * 1024
+        var claim: [UInt8] = [0x30]
+        var n = huge
+        repeat {
+            var b = UInt8(n % 128); n /= 128
+            if n > 0 { b |= 0x80 }
+            claim.append(b)
+        } while n > 0
+        #expect(throws: BambuMqtt.Trouble.malformed) { _ = try BambuMqtt.packets(from: claim + [0, 1, 2]) }
+        // A real-sized one still waits for the rest of itself.
+        let ok = BambuMqtt.publish(topic: "device/x/report", payload: String(repeating: "a", count: 70_000))
+        let half = try BambuMqtt.packets(from: Array(ok.prefix(1000)))
+        #expect(half.packets.isEmpty && half.rest.count == 1000)
+        #expect(try BambuMqtt.packets(from: ok).packets.count == 1)
     }
 
     @Test("an ntfy token is never sent over plain HTTP")

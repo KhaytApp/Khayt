@@ -103,6 +103,10 @@ enum BambuMqtt {
         packet(0x30, string(topic) + Array(payload.utf8))   // QoS 0, so no packet id
     }
 
+    /// The largest packet this app will wait for. A `pushall` report is tens
+    /// of kilobytes; 4 MB is two orders of magnitude of headroom.
+    static let maxPacket = 4 * 1024 * 1024
+
     static let pingreq: [UInt8] = [0xC0, 0x00]
     static let disconnect: [UInt8] = [0xE0, 0x00]
 
@@ -119,6 +123,10 @@ enum BambuMqtt {
         var at = 0
         while at < buf.count {
             guard let length = try readRemainingLength(buf, at: at + 1) else { break }
+            // The length is the PEER's claim, and MQTT lets it claim 256 MB.
+            // Buffering toward that is memory anyone answering for the printer
+            // can make this app hold; a Bambu's fullest report is tens of KB.
+            guard length.value <= maxPacket else { throw Trouble.malformed }
             let start = at + 1 + length.bytes
             let end = start + length.value
             guard end <= buf.count else { break }
@@ -173,20 +181,40 @@ enum BambuMqtt {
 /// per printer, on this Mac) and a DIFFERENT one afterwards is refused, with
 /// a message saying so. A printer that really did change — replaced, reset —
 /// is re-trusted by saving its access code again on the machine sheet.
+///
+/// ── IN THE KEYCHAIN, NOT USER DEFAULTS (Oct 2026) ──────────────────────────
+///
+/// The pin is what decides who receives the access code, so it must not be
+/// something any other process of this user can rewrite: a defaults plist is
+/// exactly that (`defaults write` is enough), and rewriting the pin to an
+/// attacker's fingerprint — or deleting it, to be trusted "first" — defeats
+/// it. A login-Keychain item is readable and writable by this app's
+/// signature only. A pin already in defaults is moved across on first read.
+/// Where there is no Keychain to write to (a CI runner) it falls back to
+/// defaults rather than to trusting every certificate.
 enum BambuPin {
+    /// Where pins live. A seam so tests do not write the login Keychain.
+    struct Store: Sendable {
+        var read: @Sendable (String) -> String?
+        var write: @Sendable (String, String) -> Void
+        var remove: @Sendable (String) -> Void
+    }
+
+    nonisolated(unsafe) static var store: Store = .keychain
+
     static func key(serial: String, host: String) -> String {
         "bambu.certpin." + (serial.isEmpty ? host.lowercased() : serial)
     }
-    static func stored(_ key: String) -> String? { UserDefaults.standard.string(forKey: key) }
-    static func remember(_ key: String, _ fingerprint: String) { UserDefaults.standard.set(fingerprint, forKey: key) }
+    static func stored(_ key: String) -> String? { store.read(key) }
+    static func remember(_ key: String, _ fingerprint: String) { store.write(key, fingerprint) }
     static func forget(serial: String, host: String) {
-        UserDefaults.standard.removeObject(forKey: key(serial: serial, host: host))
+        store.remove(key(serial: serial, host: host))
     }
 
     /// Accept this fingerprint for this printer? The first one is kept.
-    static func accept(_ fingerprint: String, key: String) -> Bool {
-        if let pinned = stored(key) { return pinned == fingerprint }
-        remember(key, fingerprint)
+    static func accept(_ fingerprint: String, key: String, in store: Store = BambuPin.store) -> Bool {
+        if let pinned = store.read(key) { return pinned == fingerprint }
+        store.write(key, fingerprint)
         return true
     }
 
@@ -196,6 +224,64 @@ enum BambuPin {
         guard let chain = SecTrustCopyCertificateChain(ref) as? [SecCertificate], let leaf = chain.first else { return nil }
         let der = SecCertificateCopyData(leaf) as Data
         return SHA256.hash(data: der).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+extension BambuPin.Store {
+    static let service = "Khayt Printer Certificate"
+
+    private static func query(_ key: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service,
+         kSecAttrAccount as String: key,
+         kSecAttrSynchronizable as String: false]
+    }
+
+    static func keychainRead(_ key: String) -> String? {
+        var q = query(key)
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess,
+              let data = out as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    @discardableResult
+    static func keychainWrite(_ key: String, _ value: String) -> Bool {
+        SecItemDelete(query(key) as CFDictionary)
+        var add = query(key)
+        add[kSecValueData as String] = Data(value.utf8)
+        add[kSecAttrLabel as String] = "Khayt printer certificate pin"
+        return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+    }
+
+    /// The login Keychain, with the old defaults pin moved across on read and
+    /// defaults as the fallback where the Keychain cannot be written.
+    static let keychain = BambuPin.Store(
+        read: { key in
+            if let pinned = keychainRead(key) { return pinned }
+            guard let legacy = UserDefaults.standard.string(forKey: key) else { return nil }
+            if keychainWrite(key, legacy) { UserDefaults.standard.removeObject(forKey: key) }
+            return legacy
+        },
+        write: { key, value in
+            if keychainWrite(key, value) { UserDefaults.standard.removeObject(forKey: key) }
+            else { UserDefaults.standard.set(value, forKey: key) }
+        },
+        remove: { key in
+            SecItemDelete(query(key) as CFDictionary)
+            UserDefaults.standard.removeObject(forKey: key)
+        })
+
+    /// In memory, for tests.
+    static func memory() -> BambuPin.Store {
+        final class Box: @unchecked Sendable { var map: [String: String] = [:]; let lock = NSLock() }
+        let box = Box()
+        return BambuPin.Store(
+            read: { k in box.lock.withLock { box.map[k] } },
+            write: { k, v in box.lock.withLock { box.map[k] = v } },
+            remove: { k in _ = box.lock.withLock { box.map.removeValue(forKey: k) } })
     }
 }
 

@@ -160,6 +160,8 @@ public enum CloudSignIn {
             throw Failure.badAddress((error as? LocalizedError)?.errorDescription
                                      ?? String(describing: error))
         }
+        do { try requireHttps(base) }
+        catch { throw Failure.badAddress(error.localizedDescription) }
         guard let endpoint = URL(string: base + path) else {
             throw Failure.badAddress("That address cannot be read")
         }
@@ -187,6 +189,35 @@ public enum CloudSignIn {
             throw Failure.refused(status, why)
         }
         return body
+    }
+
+    /// Why an address is refused for carrying a cloud credential.
+    public struct InsecureAddress: Error, LocalizedError {
+        public let address: String
+        public var errorDescription: String? {
+            "Use https:// — \(address) is plain http, and a password or token sent to it "
+            + "crosses the network unencrypted."
+        }
+    }
+
+    /// The cloud speaks https, and nothing that carries a password, a reset
+    /// code or a bearer token goes to it any other way.
+    ///
+    /// `lib/base-url.js` lets http through to a private or loopback address,
+    /// because the desktop uses it for servers a shop runs on its own network.
+    /// The CLOUD is not one of those — `CloudReader` has always refused http —
+    /// so sign-in and the portal now agree with it. Loopback over http is
+    /// allowed in a DEBUG build only, for a khayt-cloud running on this Mac.
+    public static func requireHttps(_ base: String) throws {
+        guard let url = URL(string: base), let scheme = url.scheme?.lowercased() else {
+            throw InsecureAddress(address: base)
+        }
+        if scheme == "https" { return }
+        #if DEBUG
+        let host = (url.host(percentEncoded: false) ?? "").lowercased()
+        if scheme == "http", host == "localhost" || host == "::1" || host.hasPrefix("127.") { return }
+        #endif
+        throw InsecureAddress(address: base)
     }
 
     /// A session that does NOT follow redirects.

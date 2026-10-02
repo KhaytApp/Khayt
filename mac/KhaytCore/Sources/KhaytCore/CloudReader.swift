@@ -28,6 +28,9 @@ public enum CloudReader {
         case http(Int, String)
         case malformed(String)
         case noBase
+        /// The cloud answered with a head BELOW one this device has already
+        /// seen for the same shop. See `RevisionMemory`.
+        case wentBackwards(seen: Int, got: Int)
 
         public var description: String {
             switch self {
@@ -47,6 +50,11 @@ public enum CloudReader {
                 return "Khayt Cloud sent changes but no store to apply them to. "
                      + "Refusing beats guessing: a store built on the wrong base is missing "
                      + "exactly the edits worth having."
+            case .wentBackwards(let seen, let got):
+                return "Khayt Cloud answered with revision \(got), but this Mac has already seen "
+                     + "revision \(seen) for this shop. A cloud does not go backwards on its own, so "
+                     + "nothing from it was applied. If you reset or restored the cloud yourself, "
+                     + "choose \"Trust the cloud's older copy\" to carry on from it."
             }
         }
     }
@@ -143,7 +151,12 @@ public enum CloudReader {
     /// unless the caller kept the store it had at `since` — see `store(_:…)`
     /// and the Mac app's `Shop.cloudSeen`. Passing `since` without keeping that store turns
     /// every warm pull into `Failure.noBase`.
+    ///
+    /// `memory`, when given, is the highest revision this device has seen for
+    /// the shop: a reply below it is refused (`wentBackwards`) and never
+    /// returned, and a reply at or above it raises it. See `RevisionMemory`.
     public static func pull(_ connection: Connection, token: String, since: Int? = nil,
+                     memory: RevisionMemory? = nil,
                      fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws -> Reply {
         let tail = since.map { "/store?since=\($0)" } ?? "/store"
         let request = try self.request(connection, token: token, method: "GET", tail: tail)
@@ -167,7 +180,15 @@ public enum CloudReader {
         guard let body = try? JSONDecoder().decode(Body.self, from: data) else {
             throw Failure.malformed("it did not decode")
         }
-        return Reply(rev: body.rev ?? 0, base: body.ciphertext,
+        let rev = body.rev ?? 0
+        if let memory {
+            if let seen = memory.highest(connection), rev < seen {
+                memory.refused(connection, rev: rev)
+                throw Failure.wentBackwards(seen: seen, got: rev)
+            }
+            memory.saw(connection, rev: rev)
+        }
+        return Reply(rev: rev, base: body.ciphertext,
                      deltas: (body.deltas ?? []).map { (rev: $0.rev, blob: $0.ciphertext) })
     }
 
@@ -230,6 +251,100 @@ public enum CloudReader {
 
         public init(store: [String: JSONValue], chain: Int, applied: Int, removed: Int) {
             self.store = store; self.chain = chain; self.applied = applied; self.removed = removed
+        }
+    }
+}
+
+extension CloudReader {
+
+    /// The highest revision of each shop's store this device has seen.
+    ///
+    /// ── ROLLBACK AND REPLAY, CHECKED ON THIS SIDE ONLY ───────────────────
+    ///
+    /// The store and its deltas are sealed with the shop's data key, so a
+    /// compromised or misbehaving server cannot WRITE a store this app would
+    /// open. It can still hand back an OLD one: a base and chain it served
+    /// last month, under whatever `rev` it likes, and every device would fold
+    /// it and treat the shop's newer records as the ones to overwrite. The
+    /// ciphertext does not bind the revision (the wire format is shared with
+    /// the desktop, the phone and khayt-cloud, and is not this app's to
+    /// change), so the only defence a client has alone is memory: a cloud
+    /// that answers BELOW a revision this device has already seen has gone
+    /// backwards, and that is refused, not applied.
+    ///
+    /// What it does not stop: a server that replays old ciphertext under a
+    /// NEW, higher rev. Closing that needs the revision inside the AEAD's
+    /// associated data — a format change every client has to make together.
+    ///
+    /// Raised by every pull that is accepted and SET by every push the server
+    /// confirms (`confirmed`), because a whole-book push after a cloud reset
+    /// legitimately restarts the count and the server has just told this
+    /// device so in answer to its own write. Kept per cloud address and shop,
+    /// in user defaults (it is a number, not a secret), so a relaunch
+    /// remembers it — an in-memory check would be reset by the very restart a
+    /// rollback is most likely to be noticed after.
+    ///
+    /// A shop that reset or restored its cloud on purpose says so with
+    /// `accept`, which takes the refused revision as the new mark.
+    public final class RevisionMemory: @unchecked Sendable {
+        private let defaults: UserDefaults?
+        private var memory: [String: Int] = [:]
+        private var pending: [String: Int] = [:]
+        private let lock = NSLock()
+
+        /// `nil` keeps it in memory only — for a book with no file behind it,
+        /// and for tests.
+        public init(defaults: UserDefaults?) { self.defaults = defaults }
+
+        public static let standard = RevisionMemory(defaults: .standard)
+
+        static func key(_ c: Connection) -> String {
+            "khayt.cloud.highestRev." + c.url.lowercased().trimmingTrailingSlash + "|" + c.shopId
+        }
+
+        public func highest(_ c: Connection) -> Int? {
+            let k = Self.key(c)
+            return lock.withLock {
+                if let defaults { return defaults.object(forKey: k) as? Int }
+                return memory[k]
+            }
+        }
+
+        private func set(_ c: Connection, _ rev: Int) {
+            let k = Self.key(c)
+            lock.withLock {
+                pending[k] = nil
+                if let defaults { defaults.set(rev, forKey: k) } else { memory[k] = rev }
+            }
+        }
+
+        /// A pull was accepted at `rev`: raise the mark, never lower it.
+        public func saw(_ c: Connection, rev: Int) {
+            if let seen = highest(c), seen >= rev { return }
+            set(c, rev)
+        }
+
+        /// The server accepted this device's own push and is now at `rev`.
+        public func confirmed(_ c: Connection, rev: Int) { set(c, rev) }
+
+        func refused(_ c: Connection, rev: Int) {
+            let k = Self.key(c)
+            lock.withLock { pending[k] = rev }
+        }
+
+        /// The revision last refused for this shop, while it is still refused.
+        public func refusal(_ c: Connection) -> Int? {
+            let k = Self.key(c)
+            return lock.withLock { pending[k] }
+        }
+
+        /// The shop says the older cloud is the right one: take the refused
+        /// revision as the mark. Nothing to accept is a no-op.
+        @discardableResult
+        public func accept(_ c: Connection) -> Bool {
+            guard let rev = refusal(c) else { return false }
+            set(c, rev)
+            return true
         }
     }
 }

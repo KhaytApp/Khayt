@@ -78,6 +78,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   code with the date alone. It now uses the full date and time in the format
   ZATCA requires (for example 2026-07-02T14:32:05Z). A job with no recorded
   time is stamped at midday on its date.
+- **(Mac) Network clients, security review.** Smart plugs are now held to
+  the same rule as printers: a public IP address, loopback or a malformed host
+  is refused before anything is sent (so a Home Assistant token or Tasmota
+  password never leaves the shop's network), no redirect is followed, and the
+  plug sheet warns when a token or password would go over plain http. A cloud
+  that answers with an older revision than this Mac has already seen for the
+  shop is refused instead of applied, with a "Trust the cloud's older copy"
+  button for a shop that reset or restored its cloud on purpose. A keyset may
+  no longer ask for more than 128 MiB of scrypt (all real keysets use 32 MiB).
+  Cloud sign-in and the customer portal require https. AI requests follow a
+  redirect only to the same host. Webhooks connect to the exact address that
+  was checked, so a name that changes its answer cannot redirect them inward,
+  and each delivery carries `X-Khayt-Timestamp` and `X-Khayt-Signature-V2`
+  (HMAC-SHA256 of `"<timestamp>.<body>"`) next to the unchanged
+  `X-Khayt-Signature`. A Bambu printer's certificate pin moves to the login
+  Keychain, and an MQTT packet over 4 MB is refused.
 
 - **A model moved to Google Drive to save space comes back.** When old models
   were moved off this computer to free space, the desktop recorded every one

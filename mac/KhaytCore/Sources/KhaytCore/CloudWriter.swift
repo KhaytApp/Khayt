@@ -111,6 +111,7 @@ public enum CloudWriter {
     /// credentials.
     public static func send(_ connection: CloudReader.Connection, token: String,
                      payload: KhaytEngine.Outbox, dek: Data, baseRev: Int,
+                     memory: CloudReader.RevisionMemory? = nil,
                      fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws -> Sent {
         var request = try CloudReader.request(connection, token: token,
                                               method: "POST", tail: "/deltas")
@@ -143,6 +144,7 @@ public enum CloudWriter {
         guard let reply = try? JSONDecoder().decode(Reply.self, from: data), let rev = reply.rev else {
             throw Failure.malformed("it carried no revision")
         }
+        memory?.confirmed(connection, rev: rev)
         return Sent(rev: rev, deltas: payload.deltas.count, tombstones: payload.tombstones.count)
     }
 
@@ -166,6 +168,7 @@ public enum CloudWriter {
     public static func sendWholeStore(_ connection: CloudReader.Connection, token: String,
                                store: [String: JSONValue], dek: Data, baseRev: Int,
                                mergedFrom: KhaytEngine.Merged,
+                               memory: CloudReader.RevisionMemory? = nil,
                                fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws -> Sent {
         _ = mergedFrom
         var request = try CloudReader.request(connection, token: token,
@@ -191,6 +194,7 @@ public enum CloudWriter {
         guard let reply = try? JSONDecoder().decode(Reply.self, from: data), let rev = reply.rev else {
             throw Failure.malformed("it carried no revision")
         }
+        memory?.confirmed(connection, rev: rev)
         return Sent(rev: rev, deltas: 0, tombstones: 0, wholeStore: true)
     }
 
