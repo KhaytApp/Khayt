@@ -47,6 +47,16 @@ struct UIPolishDTests {
         #expect(src.contains("ViewThatFits(in: .horizontal)"), "a narrow window has no way to drop the word")
     }
 
+    @Test("every system menu on the navy strip is drawn as on a dark ground")
+    func navyMenus() {
+        let src = MenuCoverageTests.source("ScreenActions.swift")
+        // The sort menu, the group/category/source group, the period menu and
+        // the P&L picker: four places, each forced dark.
+        #expect(src.components(separatedBy: ".navyMenu()").count - 1 >= 4,
+                "a strip menu draws dark grey on navy in light mode again")
+        #expect(src.contains("environment(\\.colorScheme, .dark)"))
+    }
+
     // ── 3. The cloud hint names a place this Mac has ──────────────────────
 
     @Test("the integrations hint names the Book menu, not a Cloud pane", arguments: ["en", "ar"])

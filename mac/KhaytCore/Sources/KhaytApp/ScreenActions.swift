@@ -89,6 +89,7 @@ struct ScreenActions: View {
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
+                .navyMenu()
                 .help(shop.words.callIt("mac.sort_by"))
                 // GROUP, CATEGORY, WHERE IT CAME FROM. The old shell put these
                 // in the window's toolbar and this shell has none, so a shop on
@@ -103,6 +104,7 @@ struct ScreenActions: View {
                 .foregroundStyle(Role.onNavy2)
                 .menuStyle(.borderlessButton)
                 .fixedSize()
+                .navyMenu()
                 NavyAction(label: shop.words.callIt("mac.import_models"),
                            symbol: "square.and.arrow.down",
                            enabled: shop.canMoveJobs && !shop.importing, titled: true) {
@@ -182,7 +184,7 @@ struct ScreenActions: View {
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
                 // On navy, like the button above: the segmented control's
                 // labels were dark grey on the strip.
-                .environment(\.colorScheme, .dark)
+                .navyMenu()
             }
 
             // THE PANEL'S SWITCH, on every screen that has a panel.
@@ -233,6 +235,7 @@ struct ScreenActions: View {
             .font(TypeScale.body(11.5))
             .foregroundStyle(Role.onNavy2)
             .fixedSize()
+            .navyMenu()
     }
 
     private var layoutSwitch: some View {
@@ -371,5 +374,20 @@ struct NavyAction: View {
         .background(Color.white.opacity(0.1), in:
                         RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .contentShape(Rectangle())
+    }
+}
+
+extension View {
+    /// A system menu or picker drawn on the navy strip.
+    ///
+    /// A borderless `Menu` ignores `foregroundStyle` for its title and draws
+    /// it in the system's ink for the CURRENT appearance — so in light mode
+    /// "This month", Group, Category and the sort order were dark grey on navy,
+    /// and the Library's Group menu was as good as invisible. The strip is
+    /// navy in both appearances, so its controls are always drawn as on a dark
+    /// ground; `NavyAction` and `WellButtonStyle(onNavy:)` already ink
+    /// themselves with `Role.onNavy*` for the same reason.
+    func navyMenu() -> some View {
+        environment(\.colorScheme, .dark)
     }
 }
