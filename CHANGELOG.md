@@ -76,6 +76,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Empty Expenses and Waste screens are one empty state with an add button,
   not three panes.
 
+- **(Mac) Move several groups into one at once, and rename a group.** In the
+  library, ⌘-click or ⇧-click group tiles to choose them (a plain click still
+  opens a group, and choosing a group never selects the models inside it).
+  Right-click one of them, or use the Group menu above the library, and pick
+  "Move into Group…": choose an existing group or type a new name, and each
+  chosen group moves under it keeping its own name — "pose 1", "pose 2" and
+  "tete multipart" become "Baby Grendizer/pose 1" and so on, sub-folders and
+  group kinds included. The sheet lists what moves where before you confirm;
+  a group whose name is already taken there joins it (and says so), two
+  chosen groups with the same name, or a path past 60 characters, are
+  refused. It is one change, so one Undo puts everything back. "Rename
+  Group…" on a group tile renames it the same way.
+
 - **Reopening a finished job puts its filament back on the shelf.** Move a
   finished job back (to fix it, re-check it or put it on hold) and the
   filament and packaging it used go back into stock, with a note saying how

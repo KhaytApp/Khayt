@@ -13,10 +13,17 @@ struct GroupMenu: View {
     @State private var typed = ""
 
     private var count: Int { shop.selectedIds.count }
+    /// Group TILES chosen with ⌘/⇧-click. Never at the same time as models
+    /// (`Shop.fileSelection`), so the menu offers one or the other.
+    private var chosenGroups: [String] { shop.selectedGroups }
 
     var body: some View {
         Menu {
-            if count == 0 {
+            if !chosenGroups.isEmpty {
+                // The groups themselves are being moved, so "file under" and
+                // "remove from group" — which act on MODELS — are not offered.
+                GroupTileActions(shop: shop, path: chosenGroups[0])
+            } else if count == 0 {
                 Text(shop.words.callIt("mac.pick_a_model"))
             } else {
                 ForEach(shop.groups, id: \.self) { group in
@@ -39,12 +46,15 @@ struct GroupMenu: View {
                 }
             }
         } label: {
-            Label(count > 1
+            Label(!chosenGroups.isEmpty
+                  ? shop.words.callIt("mac.group_n_groups",
+                                      ["groups": .string(shop.words.counting(chosenGroups.count, "mac.n_groups"))])
+                  : count > 1
                   ? shop.words.callIt("mac.group_n_models", ["n": .number(Double(count))])
                   : shop.words.callIt("mac.group"),
                   systemImage: "square.stack")
         }
-        .disabled(!shop.canWrite || count == 0)
+        .disabled(!shop.canWrite || (count == 0 && chosenGroups.isEmpty))
         .help(shop.canWrite
               ? shop.words.callIt("mac.group_why")
               : shop.words.callIt("mac.group_locked"))

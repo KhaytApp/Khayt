@@ -570,6 +570,7 @@ struct WindowSheets: ViewModifier {
             .sheet(item: $shop.ratingFor) { RatingSheet(shop: shop, job: $0) }
             .sheet(item: $shop.planFor) { PaymentPlanSheet(shop: shop, job: $0) }
             .sheet(isPresented: $shop.pausingProduction) { PauseSheet(shop: shop) }
+            .sheet(item: $shop.movingGroups) { GroupMoveSheet(shop: shop, request: $0) }
             // Cancelling throws away every hour already in the plate, and no
             // printer asks twice. Pause and resume are each other's undo and are
             // not confirmed.
