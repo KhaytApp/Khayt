@@ -484,7 +484,7 @@
   "whk.event_urls": "Webhook-URLs pro Ereignis",
   "whk.test": "Testen (Ping senden)",
   "ewh.title": "Signierte Event-Webhooks (Entwickler)",
-  "ewh.hint": "Senden Sie an einen HTTPS-Endpunkt einen sauberen, HMAC-signierten <code>order.*</code>-Event-Stream (created / status / paid) mit einem Idempotenzschlüssel — gebaut für Ihre eigenen Integrationen. Prüfen Sie den <code>X-Khayt-Signature</code>-Header, um jeder Payload zu vertrauen.",
+  "ewh.hint": "Senden Sie an einen HTTPS-Endpunkt einen sauberen, HMAC-signierten <code>order.*</code>-Event-Stream (created / status / paid) mit einem Idempotenzschlüssel — gebaut für Ihre eigenen Integrationen. Prüfen Sie den <code>X-Khayt-Signature</code>-Header, um jeder Payload zu vertrauen. Um Wiederholungen abzuweisen, prüfen Sie <code>X-Khayt-Signature-V2</code>, den HMAC von <code>timestamp.body</code>, und lehnen Sie einen alten <code>X-Khayt-Timestamp</code> ab.",
   "ewh.enabled": "Signierte Event-Webhooks aktivieren",
   "ewh.url": "Endpunkt-URL (nur https)",
   "ewh.secret": "Signierungsschlüssel (HMAC-SHA256)",

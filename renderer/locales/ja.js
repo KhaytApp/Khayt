@@ -484,7 +484,7 @@
   "whk.event_urls": "イベントごとの Webhook URL",
   "whk.test": "テスト（ping を送信）",
   "ewh.title": "署名付きイベントWebhook（開発者向け）",
-  "ewh.hint": "1つのHTTPSエンドポイントに、冪等性キー付きでクリーンかつHMAC署名された<code>order.*</code>イベントストリーム（created / status / paid）を送信します。独自の連携向けに設計されています。各ペイロードを信頼するには<code>X-Khayt-Signature</code>ヘッダーを検証してください。",
+  "ewh.hint": "1つのHTTPSエンドポイントに、冪等性キー付きでクリーンかつHMAC署名された<code>order.*</code>イベントストリーム（created / status / paid）を送信します。独自の連携向けに設計されています。各ペイロードを信頼するには<code>X-Khayt-Signature</code>ヘッダーを検証してください。再送を拒否するには、<code>timestamp.body</code>のHMACである<code>X-Khayt-Signature-V2</code>を検証し、古い<code>X-Khayt-Timestamp</code>は拒否してください。",
   "ewh.enabled": "署名付きイベントWebhookを有効にする",
   "ewh.url": "エンドポイントURL（httpsのみ）",
   "ewh.secret": "署名シークレット（HMAC-SHA256）",

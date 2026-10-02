@@ -484,7 +484,7 @@
   "whk.event_urls": "Webhook URLs per event",
   "whk.test": "Test (send ping)",
   "ewh.title": "Signed Event Webhooks (developer)",
-  "ewh.hint": "Send one HTTPS endpoint a clean, HMAC-signed <code>order.*</code> event stream (created / status / paid) with an idempotency key — built for your own integrations. Verify the <code>X-Khayt-Signature</code> header to trust each payload.",
+  "ewh.hint": "Send one HTTPS endpoint a clean, HMAC-signed <code>order.*</code> event stream (created / status / paid) with an idempotency key — built for your own integrations. Verify the <code>X-Khayt-Signature</code> header to trust each payload. To refuse replays, check <code>X-Khayt-Signature-V2</code>, the HMAC of <code>timestamp.body</code>, and reject an old <code>X-Khayt-Timestamp</code>.",
   "ewh.enabled": "Enable signed event webhooks",
   "ewh.url": "Endpoint URL (https only)",
   "ewh.secret": "Signing secret (HMAC-SHA256)",

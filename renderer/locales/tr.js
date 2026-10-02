@@ -484,7 +484,7 @@
   "whk.event_urls": "Olay başına Webhook URL'leri",
   "whk.test": "Test (ping gönder)",
   "ewh.title": "İmzalı Olay Webhook'ları (geliştirici)",
-  "ewh.hint": "Tek bir HTTPS uç noktasına, idempotency anahtarıyla temiz, HMAC imzalı bir <code>order.*</code> olay akışı (oluşturuldu / durum / ödendi) gönderin — kendi entegrasyonlarınız için tasarlandı. Her veriye güvenmek için <code>X-Khayt-Signature</code> başlığını doğrulayın.",
+  "ewh.hint": "Tek bir HTTPS uç noktasına, idempotency anahtarıyla temiz, HMAC imzalı bir <code>order.*</code> olay akışı (oluşturuldu / durum / ödendi) gönderin — kendi entegrasyonlarınız için tasarlandı. Her veriye güvenmek için <code>X-Khayt-Signature</code> başlığını doğrulayın. Tekrar gönderimleri reddetmek için <code>timestamp.body</code> HMAC'i olan <code>X-Khayt-Signature-V2</code>'yi doğrulayın ve eski bir <code>X-Khayt-Timestamp</code>'i reddedin.",
   "ewh.enabled": "İmzalı olay webhook'larını etkinleştir",
   "ewh.url": "Uç nokta URL'si (yalnızca https)",
   "ewh.secret": "İmzalama sırrı (HMAC-SHA256)",

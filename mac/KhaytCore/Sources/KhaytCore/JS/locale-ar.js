@@ -601,7 +601,7 @@
   "whk.event_urls": "روابط الويب هوك لكل حدث",
   "whk.test": "اختبار (إرسال ping)",
   "ewh.title": "ويب هوك موقّعة للأحداث (للمطورين)",
-  "ewh.hint": "أرسِل إلى نقطة نهاية HTTPS واحدة تدفّق أحداث <code>order.*</code> موقّعًا بـ HMAC (إنشاء / حالة / دفع) مع مفتاح منع التكرار — مصمّم لتكاملاتك الخاصة. تحقّق من ترويسة <code>X-Khayt-Signature</code> للوثوق بكل حمولة.",
+  "ewh.hint": "أرسِل إلى نقطة نهاية HTTPS واحدة تدفّق أحداث <code>order.*</code> موقّعًا بـ HMAC (إنشاء / حالة / دفع) مع مفتاح منع التكرار — مصمّم لتكاملاتك الخاصة. تحقّق من ترويسة <code>X-Khayt-Signature</code> للوثوق بكل حمولة. لرفض الإرسال المكرّر، تحقّق من <code>X-Khayt-Signature-V2</code>، وهو HMAC لـ <code>timestamp.body</code>، وارفض <code>X-Khayt-Timestamp</code> القديم.",
   "ewh.enabled": "تفعيل ويب هوك الأحداث الموقّعة",
   "ewh.url": "رابط النقطة النهائية (https فقط)",
   "ewh.secret": "مفتاح التوقيع (HMAC-SHA256)",
