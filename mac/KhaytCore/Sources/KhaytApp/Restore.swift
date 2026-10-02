@@ -217,6 +217,22 @@ enum Restore {
             snapshot = try await engine.keepMachineLocal(local: current ?? [:], incoming: snapshot)
         }
 
+        // ── A RESTORE THE NEXT SYNC CANNOT UNDO ───────────────────────────
+        //
+        // The bytes alone lost to the next merge: a delete made after the
+        // backup left a tombstone, and a tombstone removes a record of that id
+        // whatever its rev — so the record a shop restored to get back was
+        // deleted again within minutes. A record edited since the backup sat
+        // at a higher rev elsewhere and replaced the restored one the same way.
+        // So the restored book is made to WIN over the one it replaces, and a
+        // marker makes every sync do the same against the cloud's copy until
+        // one push has carried it up. See `RestoreGuard`.
+        let restored = BookRecords.keys(snapshot)
+        if let current {
+            snapshot = RestoreGuard.prevail(snapshot, over: current, restored: restored)
+            snapshot = RestoreGuard.carryTombstones(into: snapshot, from: current)
+        }
+
         let next = try JSONEncoder().encode(snapshot)
         guard next.count <= StoreWriter.maxStoreBytes else {
             throw StoreWriter.Refusal.tooLarge(next.count)
@@ -224,7 +240,12 @@ enum Restore {
         // Asked again, as late as it can be — the validation and the safety copy
         // both took time, and Electron takes the book on startup whatever it finds.
         guard owns() else { throw Refusal.notOurs(whoHasIt() ?? "Another app took the book") }
-        try StoreWriter.atomicWrite(next, to: storeURL)
+        // The marker BEFORE the book: a restored book with no marker is one
+        // the next sync can undo, and a marker with the old book still in
+        // place only makes records the cloud already agrees with win again.
+        try RestoreGuard.markPending(BookRecords.keys(snapshot), for: storeURL)
+        do { try StoreWriter.atomicWrite(next, to: storeURL) }
+        catch { RestoreGuard.clear(for: storeURL); throw error }
 
         forgetCloudView()
         return current == nil ? nil : storeURL

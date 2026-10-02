@@ -74,6 +74,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   a job's costing while the online quote ignored it. Both now treat it as not
   set, so the shop's own price applies. The same goes for the preset's other
   rates and a machine's power draw and wear rate.
+- **(Mac) A restored backup stays restored.** Restoring used to lose to the
+  next cloud sync: a record deleted after the backup was taken was deleted
+  again within minutes, and a record edited elsewhere since went back to that
+  edit. Now the restored book wins. A restored record whose id was deleted
+  comes back under a new id (with everything that pointed at it relinked), a
+  restored record held at a newer revision elsewhere is moved above it, and
+  every sync holds the restore against the cloud's copy until one push has
+  carried it up. Automatic sync also pauses while a restore runs.
+- **(Mac) Sync no longer replaces or removes records in silence.** When
+  automatic sync merges the cloud in and that removes a record, or overwrites
+  one changed on this Mac, a copy of each is first saved to `sync-conflicts/`
+  beside the backups (never synced), and a banner says "Sync replaced 2
+  records changed on this Mac and removed 1". Review lists them, with Put back
+  for each. The Mac now remembers what it last agreed with the cloud on, so an
+  overwritten local edit is actually detected.
+
 - **(Mac) Changing the electricity price in Settings › Business also updates
   the "Shop rates" preset that an earlier first-run setup made.** That preset's
   old price was used instead of the new one wherever the preset was picked.

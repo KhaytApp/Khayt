@@ -275,6 +275,11 @@ extension Shop {
         guard !offsite.busy else { return false }
         offsite.busy = true
         defer { offsite.busy = false }
+        // No sync under a restore. See `pauseSyncForRestore`.
+        guard await pauseSyncForRestore() else {
+            offsite.problem = words.callIt("mac.restore_wait_sync"); return false
+        }
+        defer { resumeSyncAfterRestore() }
         do {
             let destination = try await offsiteDestination().get()
             let book = try await OffsiteBackup.fetch(entry.name, from: destination, dek: offsiteKey)
