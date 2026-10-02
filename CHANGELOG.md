@@ -13,8 +13,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **Profit no longer counts the tax you collect.** Machine profit, product
   profit and break-even counted VAT as money the shop made, so a job charged
   115 that cost 80 showed 35 profit instead of 20. They now use what the job
-  earned, as the P&L already did. Revenue figures still show what customers
-  were charged.
+  earned, as the P&L already did. So do the forecast, customer mix, client
+  value, cost trends and client sources reports. Cash flow and the revenue
+  totals still show what customers were charged.
 - **A gift card plus a payment plan can reach "paid".** Such a job stayed
   "partial" after its last instalment, because the plan ignored the gift card
   and any credit note.

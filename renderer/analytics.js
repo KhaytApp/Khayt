@@ -606,7 +606,7 @@ function renderClientSourceChart() {
   const report = KhaytClientSources.byClient(
     { clients: clients || [], orders: printLog || [] },
     {
-      revenueOf: orderNetRevenueBase,
+      revenueOf: orderEarnedBase,
       isFinished: (o) => KhaytOrderStatus.isFinished(o),
       countsForBusiness: _countsForBusiness,
     },
@@ -810,7 +810,7 @@ function renderRevenueForecast() {
   const el = $('#revenueForecastChart');
   if (!el) return;
   if (typeof KhaytForecast === 'undefined') { el.innerHTML = ''; return; }
-  const f = KhaytForecast.forecast(printLog, { now: Date.now(), months: 6, periods: 3, revenueOf: orderNetRevenueBase });
+  const f = KhaytForecast.forecast(printLog, { now: Date.now(), months: 6, periods: 3, revenueOf: orderEarnedBase });
   if (f.method === 'none') { el.innerHTML = ''; return; } // nothing to forecast yet
 
   const monShort = (label) => { try { return new Date(label + '-01').toLocaleDateString(localeTag(), { month: 'short' }); } catch { return label; } };
@@ -1296,7 +1296,7 @@ function renderClientLtvTable() {
   const report = KhaytClientValue.clientValue({
     clients: clients || [], orders: printLog || [], now: Date.now(), limit: 10,
   }, {
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     countsForBusiness: _countsForBusiness,
   });
   const ltvData = report.rows.map((r) => ({
@@ -1519,7 +1519,7 @@ function renderNewVsReturning() {
   // The window is applied by the module; history is handed over whole, because
   // who is NEW cannot be decided from a slice of it.
   const mix = KhaytCustomerMix.customerMix({ orders: printLog || [] }, {
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     countsForBusiness: _countsForBusiness,
     // The range picker's own predicate. It offers named periods — "this
     // quarter" — and `lib/date-range.js` already answers what they mean, so
@@ -2442,7 +2442,7 @@ function renderCostTrends() {
   // times over.
   const trends = KhaytCostTrends.costTrends(printLog, inventory, {
     now: Date.now(), months: 12,
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     countsForBusiness: (o) => _countsForBusiness(o),
   });
   const months = trends.months.map((m) => {
