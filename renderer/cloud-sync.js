@@ -30,6 +30,7 @@
   let pendingAfter = false; // a change arrived mid-sync → run once more after
   let statusVal = 'off';    // off | idle | syncing | synced | conflict | locked | offline | error
   let lastError = null;
+  let lastCode = null;
   let listeners = [];
   // A refusal no retry can fix — docs/api-contract.md in khayt-cloud: 412 is
   // "stop syncing and tell the user to update. Do not retry"; 413 is the plan's
@@ -57,6 +58,9 @@
   function setStatus(s, detail) {
     statusVal = s;
     if (detail && detail.error) lastError = detail.error;
+    // Why the last attempt was refused, when there is a code for it; cleared by
+    // anything that is not an error, so a resolved refusal does not linger.
+    lastCode = (s === 'error' && detail && detail.code) ? detail.code : null;
     for (const fn of listeners) { try { fn(s, detail || {}); } catch (e) { /* listener must not break sync */ } }
   }
 
@@ -84,6 +88,7 @@
   function isOn() { return !!deps; }
   function status() { return statusVal; }
   function error() { return lastError; }
+  function refusalCode() { return lastCode; }
 
   /** Debounced trigger — call on every save. Coalesces bursts into one push. */
   function scheduleSync() {
@@ -121,8 +126,10 @@
       if (r && r.conflict) {
         const merged = await pullMerge();
         if (!merged.ok) {
-          refused = REFUSALS.has(merged.status);
-          setStatus('error', { error: merged.error, refused });
+          // A cloud that went backwards is a refusal too: retrying would only
+          // be refused again until the shop decides (lib/cloud-revision-memory.js).
+          refused = REFUSALS.has(merged.status) || merged.code === 'CLOUD_WENT_BACKWARDS';
+          setStatus('error', { error: merged.error, refused, code: merged.code || null });
           return merged;
         }
         r = await deps.push(deps.buildSnapshot()); // re-push the merged result
@@ -166,7 +173,7 @@
   async function pullMerge() {
     if (!deps) return { ok: false, error: 'off' };
     const r = await deps.pull();
-    if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'pull failed', status: (r && r.status) || null };
+    if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'pull failed', status: (r && r.status) || null, code: (r && r.code) || null };
     if (!r.store) return { ok: true, rev: r.rev || 0, empty: true }; // nothing on the server yet
     const local = deps.buildSnapshot();
     // `lib/cloud-inbox.js`, so the native Mac app merges by the same rule
@@ -189,7 +196,7 @@
   }
 
   const api = {
-    configure, stop, isOn, status, error, onStatus,
+    configure, stop, isOn, status, error, refusalCode, onStatus,
     scheduleSync, syncNow, pullMerge, flush,
     DEFAULT_DEBOUNCE_MS, DEFAULT_RETRY_BASE_MS, DEFAULT_RETRY_MAX_MS,
   };
