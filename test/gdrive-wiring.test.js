@@ -113,9 +113,14 @@ test('Drive and S3 are interchangeable to everything downstream', () => {
   for (const site of ['async function printLibMirrorFile(', 'async function printLibRehydrate(']) {
     const at = mainJs.indexOf(site);
     assert.ok(at > -1, `${site} went missing`);
-    assert.match(mainJs.slice(at, at + 2500), /printLibRemote\(\)/,
+    // The rehydrate asks printLibRemotesFor, which orders Drive and the bucket
+    // by the sidecar's provider and falls back to printLibRemote()'s kind.
+    assert.match(mainJs.slice(at, at + 2500), /printLibRemote\(\)|printLibRemotesFor\(/,
       `${site} is hard-wired to S3, so Drive silently does nothing there`);
   }
+  const order = mainJs.slice(mainJs.indexOf('function printLibRemotesFor('), mainJs.indexOf('function printLibRemotesFor(') + 900);
+  assert.match(order, /printLibDrive\(\{ evenIfOff: true \}\)/);
+  assert.match(order, /printLibS3\(\{ evenIfOff: true \}\)/);
 });
 
 test('the Drive controls are wired and exported', () => {

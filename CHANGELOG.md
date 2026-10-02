@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A model moved to Google Drive to save space comes back.** When old models
+  were moved off this computer to free space, the desktop recorded every one
+  as going to your bucket, even when it went to Google Drive, and only ever
+  looked in the storage you use now. A model moved to Drive, or moved before
+  you switched between Drive and a bucket, could fail to open. The desktop
+  now records where each model really went, looks there first, then tries
+  the other storage you have connected. The Mac app does the same.
+
 - **(Mac) Changing the electricity price in Settings › Business also updates
   the "Shop rates" preset that an earlier first-run setup made.** That preset's
   old price was used instead of the new one wherever the preset was picked.

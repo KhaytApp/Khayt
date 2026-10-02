@@ -76,7 +76,7 @@ test('the upload happens after the primary write, and cannot fail it', () => {
 });
 
 test('a half-configured bucket is not used', () => {
-  const at = mainJs.indexOf('function printLibS3()');
+  const at = mainJs.indexOf('function printLibS3(');
   const body = mainJs.slice(at, at + 400);
   assert.match(body, /cfg\.enabled/, 'the bucket is used even when the shop switched it off');
   assert.match(body, /S3C\.isConfigured\(cfg\)/, 'a bucket missing its key would be attempted on every save');
@@ -142,7 +142,7 @@ test('every read of the bucket config goes through the repair', () => {
     `these read settings.printLibrary.s3 without repairing it: ${raw.join(' | ')}`);
 
   // And the client is built from the repaired config, not a fresh raw read.
-  const client = mainJs.indexOf('function printLibS3()');
+  const client = mainJs.indexOf('function printLibS3(');
   assert.match(mainJs.slice(client, client + 400), /printLibS3Settings\(\)/,
     'the S3 client is built from an unrepaired config');
 });
