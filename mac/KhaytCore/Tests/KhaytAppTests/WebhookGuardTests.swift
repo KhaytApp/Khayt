@@ -344,7 +344,8 @@ struct WebhookWiringTests {
         // `addresses(of:)` is `resolve(host)` moved off the main thread — the
         // blocking `getaddrinfo` must not run on a `@MainActor` type. The
         // guard is unchanged; only which thread it waits on is.
-        #expect(client.contains("for address in await addresses(of: host)"),
+        #expect(client.contains("let resolved = await addresses(of: host)")
+                && client.contains("for address in resolved {"),
                 "the resolved addresses are never checked — a public name pointing inward passes")
         // And no Swift copy of the ranges.
         #expect(!client.contains("169.254") && !client.contains("192.168"),
@@ -388,11 +389,12 @@ struct WebhookWiringTests {
     func noRedirects() throws {
         // A consumer answering 302 to a metadata endpoint would walk straight
         // past both layers.
+        // The delivery is a hand-written HTTP/1.1 POST on a pinned socket: it
+        // cannot follow anything, and a 3xx is refused as the answer.
         let client = try Self.code("WebhookClient.swift")
-        #expect(client.contains("willPerformHTTPRedirection"),
-                "the session follows redirects, which defeats the guard")
-        #expect(client.contains("completionHandler(nil)"), "the redirect is followed anyway")
-        #expect(!client.contains("URLSession.shared"),
-                "URLSession.shared follows redirects")
+        #expect(client.contains("if (300..<400).contains(status) { throw Failure.redirected }"),
+                "a 3xx is no longer refused")
+        #expect(!client.contains("URLSession"),
+                "a URLSession resolves the name again and follows redirects")
     }
 }

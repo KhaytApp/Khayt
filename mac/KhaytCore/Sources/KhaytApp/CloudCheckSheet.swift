@@ -33,6 +33,15 @@ struct CloudCheckSheet: View {
                 Text(problem)
                     .font(.callout).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
+                // The cloud answered below a revision this Mac has seen and
+                // nothing was applied. Only the shop knows whether it reset or
+                // restored the cloud itself, so only the shop can say go on.
+                if shop.cloudRollbackRefused != nil {
+                    Button(shop.words.callIt("mac.cloud_accept_rollback")) {
+                        shop.acceptCloudRollback()
+                    }
+                    .disabled(shop.cloudBusy)
+                }
             }
 
         } footer: {

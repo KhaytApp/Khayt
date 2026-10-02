@@ -8100,6 +8100,31 @@ final class Shop {
 
     private(set) var cloudSeen: CloudSeen?
 
+    /// The highest revision this book has seen of its cloud, per shop — the
+    /// client-side rollback check (`CloudReader.RevisionMemory`). Kept in user
+    /// defaults for a book on disk; a book with no file behind it (the sample,
+    /// and tests) keeps it in memory only.
+    var cloudRevisions: CloudReader.RevisionMemory {
+        source.build == nil ? ephemeralCloudRevisions : .standard
+    }
+    @ObservationIgnored private let ephemeralCloudRevisions = CloudReader.RevisionMemory(defaults: nil)
+
+    /// The revision a pull was refused at for going backwards, while it still is.
+    var cloudRollbackRefused: Int? {
+        guard let connection = try? CloudReader.connection(settingsDict) else { return nil }
+        return cloudRevisions.refusal(connection)
+    }
+
+    /// The shop reset or restored its cloud on purpose: carry on from the
+    /// older copy. The next check pulls it cold, as after any reset.
+    func acceptCloudRollback() {
+        guard let connection = try? CloudReader.connection(settingsDict) else { return }
+        if cloudRevisions.accept(connection) {
+            cloudSeen = nil
+            cloudProblem = nil
+        }
+    }
+
     /// Pull the cloud's store, asking only for what this app has not seen.
     ///
     /// Falls back to a cold pull — no `since`, base included — whenever the
@@ -8121,7 +8146,8 @@ final class Shop {
         let warm = cloudSeen.flatMap { $0.shopId == connection.shopId ? $0 : nil }
         if let warm {
             let reply = try await CloudReader.pull(connection, token: token,
-                                                   since: warm.rev, fetch: fetch)
+                                                   since: warm.rev, memory: cloudRevisions,
+                                                   fetch: fetch)
             if reply.rev >= warm.rev {
                 let folded = try await CloudReader.store(reply, dek: dek, engine: engine,
                                                          onto: warm.store)
@@ -8132,7 +8158,8 @@ final class Shop {
             // The cloud is behind what this app remembers. Distrust the memory.
             cloudSeen = nil
         }
-        let reply = try await CloudReader.pull(connection, token: token, fetch: fetch)
+        let reply = try await CloudReader.pull(connection, token: token,
+                                               memory: cloudRevisions, fetch: fetch)
         let folded = try await CloudReader.store(reply, dek: dek, engine: engine)
         cloudSeen = CloudSeen(shopId: connection.shopId, rev: reply.rev, store: folded.store)
         return (reply, folded)
@@ -8622,7 +8649,8 @@ final class Shop {
             let token = try await Secrets.open(connection.storedToken, for: build)
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
 
-            let reply = try await CloudReader.pull(connection, token: token) { request in
+            let reply = try await CloudReader.pull(connection, token: token,
+                                                   memory: cloudRevisions) { request in
                 try await CloudReader.session.data(for: request)
             }
             guard case .object(let keyset)? = cloudKeyset() else {
@@ -8747,7 +8775,8 @@ final class Shop {
 
             do {
                 cloudSent = try await CloudWriter.send(connection, token: token, payload: outbox,
-                                                       dek: dek, baseRev: reply.rev) { request in
+                                                       dek: dek, baseRev: reply.rev,
+                                                       memory: cloudRevisions) { request in
                     try await session.data(for: request)
                 }
             } catch CloudWriter.Failure.notAccepted {
@@ -9001,7 +9030,7 @@ final class Shop {
         let forCloud = try await engine.storeForCloud(book)
         let sent = try await CloudWriter.sendWholeStore(
             connection, token: token, store: forCloud, dek: dek, baseRev: baseRev,
-            mergedFrom: report) { request in
+            mergedFrom: report, memory: cloudRevisions) { request in
             try await session.data(for: request)
         }
         // The cloud now holds this book, record for record.
@@ -10151,7 +10180,7 @@ final class Shop {
         guard let engine, let record = await plugRecord(machine.id),
               let request = try? await engine.plugRequest(machine: record, action: "status") else { return }
         do {
-            let answer = try await SmartPlug.send(request)
+            let answer = try await SmartPlug.send(request, engine: engine)
             plugStates[machine.id] = try await engine.plugAnswer(machine: record, answer: answer)
         } catch {
             plugStates[machine.id] = KhaytEngine.PlugState(on: nil, watts: nil)
@@ -10172,7 +10201,7 @@ final class Shop {
         }
         guard let request = try? await engine.plugRequest(machine: record, action: on ? "on" : "off") else { return }
         do {
-            let answer = try await SmartPlug.send(request)
+            let answer = try await SmartPlug.send(request, engine: engine)
             let state = try await engine.plugAnswer(machine: record, answer: answer)
             // Home Assistant answers a switch with what changed, which can be
             // nothing yet; ask again rather than trusting an empty answer.

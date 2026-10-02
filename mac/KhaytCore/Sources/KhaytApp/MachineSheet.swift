@@ -479,11 +479,34 @@ struct MachineSheet: View {
                     }
                 }
             }
+            if Self.plugSendsCredentialInClear(type: plugType, host: plugHost,
+                                               user: plugUser) {
+                // A token or password sent over plain http is readable by
+                // anything else on the network. Said, not refused: most plugs
+                // speak nothing but http, and the shop's own LAN is the place
+                // the shop decides what to trust.
+                Label(shop.words.callIt("plug.cleartext"), systemImage: "exclamationmark.triangle")
+                    .font(.callout).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if plugType != "none" {
                 Text(shop.words.callIt("plug.why"))
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    /// Will this plug's credential go over plain http? Home Assistant always
+    /// sends its token; Tasmota sends a user and password when one is set.
+    /// A host with no scheme is spoken to over http (`lib/smart-plug.js`).
+    static func plugSendsCredentialInClear(type: String, host: String, user: String) -> Bool {
+        let h = host.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !h.isEmpty, !h.hasPrefix("https://") else { return false }
+        switch type {
+        case "homeassistant": return true
+        case "tasmota": return !user.trimmingCharacters(in: .whitespaces).isEmpty
+        default: return false
         }
     }
 

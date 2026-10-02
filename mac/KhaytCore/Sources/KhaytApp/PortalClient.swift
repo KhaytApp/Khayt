@@ -60,6 +60,9 @@ enum PortalClient {
         let base: String
         do {
             base = try await engine.cloudBaseUrl(baseUrl)
+            // https only — the bearer token rides in the header. See
+            // `CloudSignIn.requireHttps`.
+            try CloudSignIn.requireHttps(base)
         } catch {
             throw Failure.badAddress((error as? LocalizedError)?.errorDescription
                                      ?? String(describing: error))

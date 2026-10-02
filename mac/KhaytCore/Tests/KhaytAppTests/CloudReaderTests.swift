@@ -399,11 +399,13 @@ struct WarmPullTests {
     }
 
     /// THE ONE THAT WOULD HAVE BEEN SILENT. A cloud that has gone BACKWARDS —
-    /// reset, or restored from a backup — answers with a head below what this
-    /// app remembers. Folding its shorter chain onto a store from the future
-    /// would report this device's own records as the cloud's, and the next
-    /// push would send them.
-    @Test("a cloud that went backwards is pulled cold, not folded onto memory")
+    /// reset, restored from a backup, or a compromised server replaying an
+    /// old store — answers with a head below what this app has seen. Folding
+    /// its shorter chain onto a store from the future would report this
+    /// device's own records as the cloud's; pulling it cold and trusting it
+    /// (what this did until Oct 2026) hands the shop an older book. It is
+    /// REFUSED, and applied only once the shop says it reset the cloud itself.
+    @Test("a cloud that went backwards is refused until the shop accepts it")
     func cloudWentBackwards() async throws {
         let shop = Shop()
         let engine = try KhaytEngine()
@@ -414,15 +416,26 @@ struct WarmPullTests {
 
         var asked: [String] = []
         let reset = try Self.reply(rev: 2, base: ["orders": .array([.string("new")])])
-        let out = try await shop.pullCloudStore(Self.connection, token: "t", dek: Self.dek,
-                                                engine: engine) { request in
+        let fetch: (URLRequest) async throws -> (Data, URLResponse) = { request in
             asked.append(request.url?.query ?? "")
             return try await Self.answer(reset)(request)
         }
-        // It asks warm first — it cannot know — and then pulls cold rather
-        // than folding the answer onto a memory that is ahead of it.
-        #expect(asked.count == 2, "it did not re-pull after seeing the cloud was behind")
-        #expect(asked.last == "", "the recovery pull asked for a slice again")
+        do {
+            _ = try await shop.pullCloudStore(Self.connection, token: "t", dek: Self.dek,
+                                              engine: engine, fetch: fetch)
+            Issue.record("a cloud at rev 2 was applied over one this Mac saw at 40")
+        } catch CloudReader.Failure.wentBackwards(let seen, let got) {
+            #expect(seen == 40 && got == 2)
+        }
+        #expect(shop.cloudSeen?.rev == 40, "the refused pull still moved what this app remembers")
+        #expect(shop.cloudRevisions.refusal(Self.connection) == 2)
+
+        // The shop says it reset the cloud itself: the next pull is cold and taken.
+        #expect(shop.cloudRevisions.accept(Self.connection))
+        shop.forgetCloud()
+        let out = try await shop.pullCloudStore(Self.connection, token: "t", dek: Self.dek,
+                                                engine: engine, fetch: fetch)
+        #expect(asked.last == "", "the pull after accepting asked for a slice")
         #expect(out.reply.rev == 2)
         #expect(shop.cloudSeen?.rev == 2)
     }
@@ -514,5 +527,91 @@ struct WarmPullTests {
         request.setValue("Bearer secret", forHTTPHeaderField: "Authorization")
         let (_, response) = try await CloudReader.session.data(for: request)
         #expect((response as? HTTPURLResponse)?.statusCode == 302)
+    }
+}
+
+/// The client-side rollback check: the highest revision seen, per shop.
+@MainActor
+struct CloudRollbackTests {
+
+    static let connection = CloudReader.Connection(
+        url: "https://cloud.khayt.example/", shopId: "shop_rb", storedToken: "")
+
+    static func reply(_ rev: Int) -> (URLRequest) async throws -> (Data, URLResponse) {
+        { request in
+            (Data(#"{"rev":\#(rev),"deltas":[]}"#.utf8),
+             HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+    }
+
+    static func suite() -> UserDefaults {
+        let name = "khayt.test.rollback.\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: name)!
+        d.removePersistentDomain(forName: name)
+        return d
+    }
+
+    @Test("a pull below the highest revision seen is refused, and one at or above raises it")
+    func refusesBackwards() async throws {
+        let memory = CloudReader.RevisionMemory(defaults: nil)
+        _ = try await CloudReader.pull(Self.connection, token: "t", memory: memory, fetch: Self.reply(10))
+        #expect(memory.highest(Self.connection) == 10)
+        _ = try await CloudReader.pull(Self.connection, token: "t", memory: memory, fetch: Self.reply(10))
+        _ = try await CloudReader.pull(Self.connection, token: "t", memory: memory, fetch: Self.reply(12))
+        #expect(memory.highest(Self.connection) == 12)
+        await #expect(throws: CloudReader.Failure.self) {
+            _ = try await CloudReader.pull(Self.connection, token: "t", memory: memory, fetch: Self.reply(11))
+        }
+        #expect(memory.highest(Self.connection) == 12, "a refused pull lowered the mark")
+        #expect(memory.refusal(Self.connection) == 11)
+        // Without a memory the reader is unchanged — what the other callers rely on.
+        let plain = try await CloudReader.pull(Self.connection, token: "t", fetch: Self.reply(1))
+        #expect(plain.rev == 1)
+    }
+
+    @Test("the mark survives a relaunch, and is per cloud and per shop")
+    func persists() async throws {
+        let defaults = Self.suite()
+        _ = try await CloudReader.pull(Self.connection, token: "t",
+                                       memory: CloudReader.RevisionMemory(defaults: defaults),
+                                       fetch: Self.reply(30))
+        let relaunched = CloudReader.RevisionMemory(defaults: defaults)
+        #expect(relaunched.highest(Self.connection) == 30)
+        // Trailing slash and case are the same cloud.
+        let same = CloudReader.Connection(url: "https://CLOUD.khayt.example", shopId: "shop_rb", storedToken: "")
+        #expect(relaunched.highest(same) == 30)
+        let other = CloudReader.Connection(url: Self.connection.url, shopId: "shop_other", storedToken: "")
+        #expect(relaunched.highest(other) == nil)
+        await #expect(throws: CloudReader.Failure.self) {
+            _ = try await CloudReader.pull(Self.connection, token: "t", memory: relaunched, fetch: Self.reply(3))
+        }
+    }
+
+    @Test("accepting a refusal takes it as the mark; with nothing refused it does nothing")
+    func accept() async throws {
+        let memory = CloudReader.RevisionMemory(defaults: nil)
+        #expect(!memory.accept(Self.connection))
+        memory.saw(Self.connection, rev: 50)
+        _ = try? await CloudReader.pull(Self.connection, token: "t", memory: memory, fetch: Self.reply(4))
+        #expect(memory.accept(Self.connection))
+        #expect(memory.highest(Self.connection) == 4)
+        #expect(memory.refusal(Self.connection) == nil)
+        let ok = try await CloudReader.pull(Self.connection, token: "t", memory: memory, fetch: Self.reply(4))
+        #expect(ok.rev == 4)
+    }
+
+    @Test("a push the server confirms sets the mark, even lower — its answer to this device's own write")
+    func pushConfirms() async throws {
+        let memory = CloudReader.RevisionMemory(defaults: nil)
+        memory.saw(Self.connection, rev: 57)
+        memory.confirmed(Self.connection, rev: 1)
+        #expect(memory.highest(Self.connection) == 1)
+        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+        // Every pull and push of the shop's store goes through the memory.
+        #expect(shop.components(separatedBy: "memory: cloudRevisions").count - 1 >= 5,
+                "a store pull or push skips the rollback check")
+        #expect(!shop.contains("CloudReader.pull(connection, token: token, fetch: fetch)"))
     }
 }

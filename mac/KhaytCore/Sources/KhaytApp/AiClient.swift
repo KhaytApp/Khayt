@@ -215,6 +215,13 @@ enum AiClient {
                                             fallbackMargin: fallback)
     }
 
+    /// The session every AI request goes through. Ephemeral, and a redirect
+    /// is followed only to the same scheme, host and port: the provider's API
+    /// key is in a header, and `URLSession.shared` would carry it along a 30x
+    /// to wherever that pointed. Oct 2026 security review.
+    nonisolated static let session = URLSession(configuration: .ephemeral,
+                                                delegate: SameHostRedirects(), delegateQueue: nil)
+
     /// POST it, retrying only what the shared policy says is transient.
     private static func send(_ shaped: KhaytEngine.AiRequest,
                              engine: KhaytEngine) async throws -> JSONValue {
@@ -229,7 +236,7 @@ enum AiClient {
             let body: Data
             let response: URLResponse
             do {
-                (body, response) = try await URLSession.shared.data(for: req)
+                (body, response) = try await Self.session.data(for: req)
             } catch {
                 // A network fault or a timeout — transient by nature, so it
                 // retries like a 5xx does.

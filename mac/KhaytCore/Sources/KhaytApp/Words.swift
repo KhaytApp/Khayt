@@ -3154,6 +3154,8 @@ final class Words {
         "plug.not_answering": ["en": "Not while the printer is not answering: it may still be printing.", "ar": "ليس والطابعة لا تجيب: قد تكون ما زالت تطبع."],
         "plug.no_reading": ["en": "Not until Khayt has heard from the printer.", "ar": "ليس قبل أن يسمع خيط من الطابعة."],
         "plug.hot": ["en": "Not until the nozzle has cooled below 50 °C.", "ar": "ليس قبل أن تبرد الفوهة إلى أقل من 50 °م."],
+        "mac.cloud_accept_rollback": ["en": "Trust the cloud's older copy", "ar": "اعتمد النسخة الأقدم في السحابة"],
+        "plug.cleartext": ["en": "This address is plain http: the plug's token or password crosses the network unencrypted. Use https if the plug offers it.", "ar": "هذا العنوان http غير مشفّر: يمر رمز المقبس أو كلمة مروره عبر الشبكة دون تشفير. استخدم https إن كان المقبس يدعمه."],
         "plug.unreachable": ["en": "The plug did not answer.", "ar": "المقبس لم يُجب."],
         "plug.auto_off_done": ["en": "Turned off {name}: the print finished and it has cooled.", "ar": "أُطفئت {name}: انتهت الطباعة وبردت."],
         "mac.printer_resume": ["en": "Resume",       "ar": "استئناف"],

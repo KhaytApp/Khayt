@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import Darwin
+import Network
 import KhaytCore
 
 /// Telling somebody else's software that an order changed.
@@ -22,15 +23,23 @@ import KhaytCore
 ///      answer is put through the same rule. A name that passes layer one and
 ///      resolves to one blocked address is refused.
 ///
-/// This is best-effort against a determined rebinder: `URLSession` resolves
-/// again when it connects, and there is no supported way to pin the socket to
-/// the address checked here. `main.js` carries the same caveat in the same
-/// words. It stops the accident and the casual attempt, which is what it is for.
+/// ── AND THE SOCKET GOES TO THE ADDRESS THAT WAS CHECKED ───────────────────
+///
+/// It used to be best-effort against a rebinder: `URLSession` resolved the name
+/// AGAIN when it connected, so a name answering a public address to the check
+/// and `10.0.0.1` a moment later went where the check never looked. Now the
+/// delivery is one HTTP/1.1 POST over a Network.framework connection made to
+/// the checked ADDRESS, with TLS told the NAME (`sec_protocol_options_set_tls_
+/// server_name`) so SNI and certificate validation are still against the host
+/// the shop typed — measured, Oct 2026: github.com's address with the name
+/// `github.com` connects, with `example.com` it fails the handshake. Nothing
+/// resolves the name a second time. (`main.js` still carries the old caveat.)
 ///
 /// ── AND REDIRECTS ARE NOT FOLLOWED ────────────────────────────────────────
 ///
 /// A consumer answering `302 Location: http://169.254.169.254/` would walk the
-/// app straight past both layers. A redirect is refused rather than followed.
+/// app straight past both layers. This client follows nothing: a 3xx is the
+/// answer, and it is refused as one.
 @MainActor
 enum WebhookClient {
 
@@ -72,18 +81,60 @@ enum WebhookClient {
         if (try? await engine.isBlockedHost(host)) ?? true { throw Failure.blocked(host) }
 
         // Layer two: every address it resolves to.
-        for address in await addresses(of: host) {
+        let resolved = await addresses(of: host)
+        for address in resolved {
             if (try? await engine.isBlockedHost(address)) ?? true {
                 throw Failure.blocked("\(host) → \(address)")
             }
         }
+        // Nothing to connect to is a fault, not a pass: the old path would
+        // have let URLSession resolve it on its own, unchecked.
+        guard !resolved.isEmpty else { throw Failure.refused("\(host) did not resolve") }
 
         let payload = try JSONEncoder().encode(body)
-        var request = URLRequest(url: url, timeoutInterval: timeout)
-        request.httpMethod = "POST"
-        request.httpBody = payload
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(event, forHTTPHeaderField: "X-Khayt-Event")
+        let headers = signedHeaders(payload: payload, secret: secret, event: event, now: Date())
+        let head = requestHead(url, host: host, headers: headers, length: payload.count)
+
+        // The checked addresses, in the resolver's order; the first that
+        // connects takes the delivery. Every one of them passed layer two.
+        var last: Error = Failure.refused("\(host) could not be reached")
+        for address in resolved {
+            do {
+                let status = try await pinnedPost(url, host: host, address: address,
+                                                  message: head + payload, timeout: timeout)
+                if (300..<400).contains(status) { throw Failure.redirected }
+                return status
+            } catch let failure as Failure {
+                throw failure
+            } catch let sent as Unanswered {
+                // The request went out; trying the next address would deliver
+                // it twice.
+                throw Failure.refused(sent.description)
+            } catch {
+                last = error
+            }
+        }
+        throw last
+    }
+
+    /// The headers of one delivery, signature included.
+    ///
+    /// ── TWO SIGNATURES, AND THE FIRST ONE IS UNCHANGED ───────────────────
+    ///
+    /// `X-Khayt-Signature` is what every consumer verifies today, and it stays
+    /// exactly as it was (see below). It signs the body alone, so a captured
+    /// delivery can be replayed for ever — the body's own `timestamp` is
+    /// covered, but only a consumer that thinks to read it is protected.
+    ///
+    /// So each delivery also carries `X-Khayt-Timestamp` (Unix seconds) and
+    /// `X-Khayt-Signature-V2`, the bare hex HMAC-SHA256 of
+    /// `"<timestamp>.<body>"` with the same secret — the scheme Stripe and
+    /// Slack use. A consumer that checks V2 and refuses an old timestamp
+    /// refuses a replay; one that does not is unaffected.
+    nonisolated static func signedHeaders(payload: Data, secret: String, event: String,
+                                          now: Date) -> [(String, String)] {
+        var headers: [(String, String)] = [("Content-Type", "application/json"),
+                                           ("X-Khayt-Event", event)]
         if !secret.isEmpty {
             // ── BARE HEX, NOT `sha256=<hex>` ───────────────────────────────
             //
@@ -96,36 +147,127 @@ enum WebhookClient {
             // to get its retries. So the prefixed spelling is the one nobody
             // receives, and matching it would have meant every delivery from
             // this Mac failing verification at a consumer that accepts Khayt's.
-            let mac = HMAC<SHA256>.authenticationCode(
-                for: payload, using: SymmetricKey(data: Data(secret.utf8)))
-            request.setValue(mac.map { String(format: "%02x", $0) }.joined(),
-                             forHTTPHeaderField: "X-Khayt-Signature")
+            let key = SymmetricKey(data: Data(secret.utf8))
+            let hex = { (data: Data) in
+                HMAC<SHA256>.authenticationCode(for: data, using: key)
+                    .map { String(format: "%02x", $0) }.joined()
+            }
+            headers.append(("X-Khayt-Signature", hex(payload)))
+            let stamp = String(Int(now.timeIntervalSince1970))
+            headers.append(("X-Khayt-Timestamp", stamp))
+            headers.append(("X-Khayt-Signature-V2", hex(Data((stamp + ".").utf8) + payload)))
         }
-
-        let (_, response) = try await session.data(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        if (300..<400).contains(status) { throw Failure.redirected }
-        return status
+        return headers
     }
 
-    /// A session that does NOT follow redirects.
+    /// The request line and headers of one POST, as bytes.
     ///
-    /// `URLSession.shared` follows them, and a consumer answering
-    /// `302 Location: http://169.254.169.254/` would take the app straight past
-    /// both layers of the guard to a cloud metadata endpoint.
-    private static let session: URLSession = {
-        let delegate = NoRedirects()
-        return URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
-    }()
-
-    private final class NoRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
-        func urlSession(_ session: URLSession, task: URLSessionTask,
-                        willPerformHTTPRedirection response: HTTPURLResponse,
-                        newRequest request: URLRequest,
-                        completionHandler: @escaping (URLRequest?) -> Void) {
-            // nil = do not follow; the 3xx is handed back as the response.
-            completionHandler(nil)
+    /// `Host` is the NAME, with the port when it is not 443, because the
+    /// socket is opened to an address and the consumer routes on this. CR and
+    /// LF are taken out of every value: an event name or a path is not the
+    /// place to start a second header.
+    nonisolated static func requestHead(_ url: URL, host: String, headers: [(String, String)],
+                                        length: Int) -> Data {
+        // By SCALAR: "\r\n" is one Character in Swift, equal to neither.
+        let clean = { (s: String) in
+            String(String.UnicodeScalarView(s.unicodeScalars.filter { $0 != "\r" && $0 != "\n" }))
         }
+        var target = url.path(percentEncoded: true)
+        if target.isEmpty { target = "/" }
+        if let q = url.query(percentEncoded: true), !q.isEmpty { target += "?" + q }
+        let name = host.contains(":") ? "[\(host)]" : host
+        let authority = url.port.map { $0 == 443 ? name : "\(name):\($0)" } ?? name
+        var lines = ["POST \(clean(target)) HTTP/1.1", "Host: \(clean(authority))"]
+        for (k, v) in headers { lines.append("\(clean(k)): \(clean(v))") }
+        lines += ["Content-Length: \(length)", "Connection: close", "User-Agent: Khayt", "", ""]
+        return Data(lines.joined(separator: "\r\n").utf8)
+    }
+
+    /// The status code from the first line of an HTTP/1.x answer.
+    nonisolated static func statusCode(_ head: Data) -> Int? {
+        guard let end = head.firstRange(of: Data("\r\n".utf8)),
+              let line = String(data: head[..<end.lowerBound], encoding: .utf8) else { return nil }
+        let parts = line.split(separator: " ", maxSplits: 2)
+        guard parts.count >= 2, parts[0].hasPrefix("HTTP/1."), let code = Int(parts[1]),
+              (100..<600).contains(code) else { return nil }
+        return code
+    }
+
+    /// The request went out and no status came back.
+    struct Unanswered: Error, CustomStringConvertible {
+        let why: String
+        var description: String { "The webhook was sent but the answer could not be read: \(why)" }
+    }
+
+    /// One HTTPS POST to `address`, with TLS validating `host`.
+    ///
+    /// Network.framework rather than `URLSession` because only it can be told
+    /// WHERE to connect separately from WHO to expect there. It follows no
+    /// redirect and resolves nothing.
+    nonisolated static func pinnedPost(_ url: URL, host: String, address: String,
+                                       message: Data, timeout: TimeInterval) async throws -> Int {
+        let tls = NWProtocolTLS.Options()
+        sec_protocol_options_set_tls_server_name(tls.securityProtocolOptions, host)
+        sec_protocol_options_add_tls_application_protocol(tls.securityProtocolOptions, "http/1.1")
+        guard let port = NWEndpoint.Port(rawValue: UInt16(clamping: url.port ?? 443)) else {
+            throw Failure.blocked("port")
+        }
+        let connection = NWConnection(host: NWEndpoint.Host(address), port: port,
+                                      using: NWParameters(tls: tls))
+        let queue = DispatchQueue(label: "khayt.webhook.post")
+        let once = Once()
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int, Error>) in
+                let finish: @Sendable (Result<Int, Error>) -> Void = { result in
+                    guard once.claim() else { return }
+                    connection.cancel()
+                    continuation.resume(with: result)
+                }
+                queue.asyncAfter(deadline: .now() + timeout) {
+                    finish(.failure(URLError(.timedOut)))
+                }
+                @Sendable func read(_ buffer: Data) {
+                    connection.receive(minimumIncompleteLength: 1, maximumLength: 16_384) {
+                        data, _, complete, error in
+                        let buffer = buffer + (data ?? Data())
+                        if let code = statusCode(buffer) { finish(.success(code)); return }
+                        if let error { finish(.failure(Unanswered(why: "\(error)"))); return }
+                        if complete || buffer.count > 16_384 {
+                            finish(.failure(Unanswered(why: "no HTTP status line")))
+                            return
+                        }
+                        read(buffer)
+                    }
+                }
+                connection.stateUpdateHandler = { state in
+                    switch state {
+                    case .ready:
+                        connection.send(content: message, completion: .contentProcessed { error in
+                            if let error { finish(.failure(Unanswered(why: "\(error)"))); return }
+                            read(Data())
+                        })
+                    // `.waiting` is how an unreachable address and a failed
+                    // certificate both arrive; a webhook does not wait.
+                    case .failed(let error), .waiting(let error):
+                        finish(.failure(error))
+                    default:
+                        break
+                    }
+                }
+                connection.start(queue: queue)
+            }
+        } onCancel: {
+            connection.cancel()
+        }
+    }
+
+    /// Resumes a continuation exactly once, whichever of the answer, the
+    /// failure or the timeout gets there first.
+    final class Once: @unchecked Sendable {
+        private let lock = NSLock()
+        private var done = false
+        func claim() -> Bool { lock.withLock { if done { return false }; done = true; return true } }
     }
 
     /// Every address a name resolves to, off the thread that asked.
