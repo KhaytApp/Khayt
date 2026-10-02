@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Security: customer names in campaign emails are sent as text.** A
+  customer whose name contained HTML (for example `<img …>`) had it read as
+  part of the email's markup. Names and the other filled-in values are now
+  escaped in emails. WhatsApp and SMS messages are unchanged.
+
 - **Shops that add tax on top are paid on the right amount.** If your prices
   are before tax, a $100 job with 8.25% tax is $108.25. Khayt already showed
   $108.25 owed, but capped a payment at $100 and called the job paid at
