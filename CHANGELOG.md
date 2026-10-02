@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(iOS) A PIN the Mac finds too short is said as one.** The native Mac now
+  refuses an owner PIN shorter than 8 characters (#1713). Pairing with one
+  used to read "That PIN was refused" — true, and no help, since the PIN was
+  right. It now says to set a longer one (8+ characters) on the Mac, and a
+  phone already paired says the same in its connection strip. The phone
+  does not enforce the minimum itself: the Electron desktop has none, and a
+  shop there with a short PIN would be locked out for nothing.
+
 - **A model moved to Google Drive to save space comes back.** When old models
   were moved off this computer to free space, the desktop recorded every one
   as going to your bucket, even when it went to Google Drive, and only ever

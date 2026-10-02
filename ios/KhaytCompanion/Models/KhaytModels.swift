@@ -685,6 +685,10 @@ enum KhaytAPIError: Error, Sendable {
     case notConfigured
     case invalidURL
     case unauthorized
+    /// The Mac refused the owner PIN because it is too short — since the
+    /// native Mac's minimum of 8 characters. The PIN is right; the Mac wants
+    /// a longer one set before it opens anything.
+    case pinTooShort
     case server(String)
     case transport(Error)
 }

@@ -43,6 +43,10 @@ struct ConnectionBanner: View {
             .padding(.horizontal, KhaytDesign.pad)
             .padding(.vertical, 7)
             .background(KhaytDesign.attention.opacity(0.12))
+        } else if health.state == .pinTooShort {
+            strip(tint: KhaytDesign.attention, loud: true,
+                  title: L10n.tr("connection.pin_too_short"), line: L10n.tr("pair.pin.too_short"),
+                  action: true)
         } else if health.state == .unauthorized {
             strip(tint: KhaytDesign.attention, loud: true,
                   title: L10n.tr("connection.unauthorized"), line: L10n.tr("connection.banner.pin"),

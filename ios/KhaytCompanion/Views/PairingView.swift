@@ -21,6 +21,7 @@ struct PairingView: View {
     @State private var showCloudSignIn = false
     @State private var isConnecting = false
     @State private var pinRefused = false
+    @State private var pinTooShort = false
     @State private var failure: String?
     @State private var summary: PairingSummary?
     @State private var sampleFailure: String?
@@ -218,6 +219,7 @@ struct PairingView: View {
     private func goToPin() {
         settings.pin = ""
         pinRefused = false
+        pinTooShort = false
         failure = nil
         step = .pin
     }
@@ -229,7 +231,7 @@ struct PairingView: View {
             title(L10n.tr("pair.pin.title"))
             lead(L10n.tr("pair.pin.body"))
                 .padding(.bottom, 22)
-            SecureField("••••", text: $settings.pin)
+            SecureField("••••••••", text: $settings.pin)
                 .keyboardType(.numberPad)
                 .textContentType(.password)
                 .focused($pinFocused)
@@ -240,9 +242,14 @@ struct PairingView: View {
                 .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(pinRefused ? KhaytDesign.late : KhaytDesign.hairline, lineWidth: 1))
-                .onChange(of: settings.pin) { _, _ in pinRefused = false; failure = nil }
+                .onChange(of: settings.pin) { _, _ in pinRefused = false; pinTooShort = false; failure = nil }
                 .onAppear { pinFocused = true }
-            if pinRefused {
+            if pinTooShort {
+                Text(L10n.tr("pair.pin.too_short"))
+                    .font(.khayt(13, .medium, relativeTo: .footnote))
+                    .foregroundStyle(KhaytDesign.attention)
+                    .padding(.top, 10)
+            } else if pinRefused {
                 Text(L10n.tr("pair.pin.wrong"))
                     .font(.khayt(13, .medium, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.late)
@@ -270,6 +277,10 @@ struct PairingView: View {
             _ = try await api.validatePairing()
         } catch KhaytAPIError.unauthorized {
             pinRefused = true
+            CompanionHaptics.warning()
+            return
+        } catch KhaytAPIError.pinTooShort {
+            pinTooShort = true
             CompanionHaptics.warning()
             return
         } catch {

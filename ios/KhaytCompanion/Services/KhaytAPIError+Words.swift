@@ -9,6 +9,7 @@ extension KhaytAPIError: LocalizedError {
         case .notConfigured: return L10n.tr("error.not_configured")
         case .invalidURL: return L10n.tr("error.invalid_url")
         case .unauthorized: return L10n.tr("error.unauthorized")
+        case .pinTooShort: return L10n.tr("pair.pin.too_short")
         case .server(let msg): return msg
         case .transport(let err): return err.localizedDescription
         }

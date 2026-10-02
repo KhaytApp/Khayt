@@ -902,7 +902,7 @@ final class KhaytAPIClient: ObservableObject {
             if case .unauthorized = err {
                 throw KhaytAPIError.unauthorized
             }
-            throw err
+            throw err   // `.pinTooShort` included: it says what to do
         }
         return status
     }
@@ -1023,12 +1023,27 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     private func decodeAPIError(_ data: Data, status: Int) throws -> KhaytAPIError {
-        if status == 401 { return .unauthorized }
+        if status == 401 { return Self.unauthorizedKind(data) }
         if let decoded = try? JSONDecoder().decode(APIErrorResponse.self, from: data),
            let msg = decoded.error, !msg.isEmpty {
             return .server(msg)
         }
         return .server("Request failed (HTTP \(status))")
+    }
+}
+
+extension KhaytAPIClient {
+    /// Which 401 this is. The native Mac refuses an owner PIN shorter than 8
+    /// characters with its own reason (#1713); that is not a wrong PIN, and
+    /// telling a shop "that PIN was refused" would send it hunting for a typo.
+    /// A `reason` code is preferred; the sentence is the fallback for a Mac
+    /// that does not send one.
+    nonisolated static func unauthorizedKind(_ body: Data) -> KhaytAPIError {
+        if case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body) {
+            if case .string(let reason)? = o["reason"], reason == "pin-too-short" { return .pinTooShort }
+            if case .string(let error)? = o["error"], error.lowercased().contains("too short") { return .pinTooShort }
+        }
+        return .unauthorized
     }
 }
 
