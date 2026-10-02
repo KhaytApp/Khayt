@@ -353,15 +353,8 @@ struct MoveJobTests {
         let (undo, _) = try await Self.move(&root, "J1", .completed)
 
         // What restoreMove does to the book, without the file and the menu.
-        for record in undo {
-            guard case .array(var rows)? = root[record.collection] else { continue }
-            for i in rows.indices {
-                guard case .object(let current) = rows[i],
-                      case .string(let id)? = current["id"], id == record.id else { continue }
-                rows[i] = .object(StoreWriter.restoring(record.was, over: current))
-            }
-            root[record.collection] = .array(rows)
-        }
+        let outcome = Shop.undoing(undo, in: &root)
+        #expect(outcome.notUndone.isEmpty, "nothing was written in between: \(outcome.notUndone)")
 
         #expect(Self.string(Self.row(root, "printLog", "J1")?["status"]) == "printing")
         #expect(Self.number(Self.row(root, "inventory", "S1")?["weight"]) == 100)
@@ -1287,15 +1280,7 @@ struct MoveOnARealBookTests {
         }
         #expect(!undo.isEmpty, "the move wrote nothing, so the undo proves nothing")
         try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
-            for record in undo {
-                guard case .array(var rows)? = root[record.collection] else { continue }
-                for i in rows.indices {
-                    guard case .object(let current) = rows[i],
-                          case .string(let id)? = current["id"], id == record.id else { continue }
-                    rows[i] = .object(StoreWriter.restoring(record.was, over: current))
-                }
-                root[record.collection] = .array(rows)
-            }
+            _ = Shop.undoing(undo, in: &root)
         }
 
         let after = try Self.read(url)

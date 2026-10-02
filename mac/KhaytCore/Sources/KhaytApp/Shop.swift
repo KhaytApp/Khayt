@@ -1718,9 +1718,20 @@ final class Shop {
     /// The kinds are part of it because a folder move MOVES them
     /// (`GroupKinds.carry`): without them an undone move would put the files
     /// back under paths whose kinds had gone.
+    ///
+    /// FIELD-LEVEL, like every undo (`FieldUndo.swift`): each record and kind
+    /// entry is kept as it was AND as the edit left it, so Undo puts back only
+    /// what the edit changed and leaves whatever was written since — a
+    /// remeasure, a phone's rename, a cloud merge.
     struct LibraryUndo {
         var files: [String: [String: JSONValue]] = [:]
         var groupEntries: [String: JSONValue?] = [:]
+        /// Each file record as the edit left it.
+        var after: [String: [String: JSONValue]] = [:]
+        /// Each kind entry the edit changed, as it left it (nil: removed).
+        var groupAfter: [String: JSONValue?] = [:]
+        /// What an Undo producing this could not put back. Only set on a redo.
+        var notUndone: [String] = []
         var isEmpty: Bool { files.isEmpty && groupEntries.isEmpty }
     }
 
@@ -1749,30 +1760,64 @@ final class Shop {
             undo.files[id] = record
             change(&record)
             StoreWriter.stamp(&record)
+            undo.after[id] = record
             rows[i] = .object(record)
         }
         root["printFiles"] = .array(rows)
         alsoRoot?(&root)
-        undo.groupEntries = groupEntriesChanged(from: kindsBefore, to: GroupKinds.entries(root))
+        let kindsAfter = GroupKinds.entries(root)
+        undo.groupEntries = groupEntriesChanged(from: kindsBefore, to: kindsAfter)
+        for key in undo.groupEntries.keys { undo.groupAfter[key] = .some(kindsAfter[key]) }
         return undo
     }
 
-    /// The store write an Undo makes, on a book in memory: the records and
-    /// the kind entries put back. Returns what Redo needs.
+    /// The store write an Undo makes, on a book in memory: the FIELDS the
+    /// edit changed put back on each record, and the kind entries it changed
+    /// — each only where it still holds what the edit wrote. Returns what
+    /// Redo needs, with `notUndone` naming what had changed since.
     static func applyRestore(_ root: inout [String: JSONValue], _ snapshot: LibraryUndo) -> LibraryUndo {
         var redo = LibraryUndo()
         guard case .array(var rows)? = root["printFiles"] else { return redo }
         let kindsBefore = GroupKinds.entries(root)
+        var seen: Set<String> = []
         for i in rows.indices {
             guard case .object(let current) = rows[i],
                   case .string(let id)? = current["id"],
                   let wanted = snapshot.files[id] else { continue }
+            seen.insert(id)
+            guard let now = snapshot.after[id] else {
+                // No after-copy: nothing can be compared, so nothing is put
+                // back rather than a stale whole record.
+                redo.notUndone.append(id)
+                continue
+            }
+            var (next, changed, kept) = undoFields(current: current, was: wanted,
+                                                   now: now, byDelta: [])
+            redo.notUndone += kept.map { "\($0) (\(id))" }
+            guard changed else { continue }
+            next["rev"] = current["rev"]
+            StoreWriter.stamp(&next)
             redo.files[id] = current
-            rows[i] = .object(StoreWriter.restoring(wanted, over: current))
+            redo.after[id] = next
+            rows[i] = .object(next)
         }
+        for id in snapshot.files.keys.sorted() where !seen.contains(id) { redo.notUndone.append(id) }
         root["printFiles"] = .array(rows)
-        GroupKinds.restore(snapshot.groupEntries, into: &root)
-        redo.groupEntries = groupEntriesChanged(from: kindsBefore, to: GroupKinds.entries(root))
+
+        // A kind entry goes back only if it still reads what the edit wrote.
+        var entries: [String: JSONValue?] = [:]
+        for (key, before) in snapshot.groupEntries {
+            let wrote: JSONValue? = snapshot.groupAfter[key] ?? nil
+            if snapshot.groupAfter[key] == nil || kindsBefore[key] == wrote {
+                entries[key] = before
+            } else if kindsBefore[key] != before {
+                redo.notUndone.append(key)
+            }
+        }
+        GroupKinds.restore(entries, into: &root)
+        let kindsAfter = GroupKinds.entries(root)
+        redo.groupEntries = groupEntriesChanged(from: kindsBefore, to: kindsAfter)
+        for key in redo.groupEntries.keys { redo.groupAfter[key] = .some(kindsAfter[key]) }
         return redo
     }
 
@@ -1818,7 +1863,7 @@ final class Shop {
             try StoreWriter.update(build) { root in
                 redo = Self.applyRestore(&root, snapshot)
             }
-            writeProblem = nil
+            writeProblem = Self.partialUndoSentence(redo.notUndone, words: words)
             registerUndo(of: redo, named: actionName)
             Task { await load(source) }
         } catch {
@@ -1828,6 +1873,40 @@ final class Shop {
         }
     }
 
+
+    /// The QC failure's write, on a book in memory: the order, the waste row
+    /// and the shelf, in one swap. Returns what Undo needs — including the
+    /// waste row as a record this action CREATED, so undoing the failure takes
+    /// it away again (if nobody has changed it since).
+    static func writeQcFailure(_ root: inout [String: JSONValue], order: JSONValue,
+                               waste wasteRow: JSONValue, inventory: [JSONValue],
+                               ordersBefore orders: [JSONValue],
+                               shelfBefore: [JSONValue]) -> [ChangedRecord] {
+        var undo: [ChangedRecord] = []
+        Self.write(&root, "printLog", changed: [order], before: orders, into: &undo)
+
+        // Newest first, the way the waste screen reads it. A new row is
+        // not an edit to an existing one, so nothing is stamped.
+        var waste = Self.rows(root, "wasteLog")
+        waste.insert(wasteRow, at: 0)
+        root["wasteLog"] = .array(waste)
+        // Made by this action, so undoing it takes the row away again — a
+        // failure undone whose scrap stayed on the waste screen would
+        // overstate the shop's waste.
+        if let wasteId = Self.recordId(wasteRow) {
+            undo.append(ChangedRecord(collection: "wasteLog", id: wasteId, was: [:], kind: .created))
+        }
+
+        // THE SHELF, in the same swap. A failed print takes its filament off
+        // the spools it was printing from — a book saying a print failed and
+        // wasted 200g while the spool still holds them has told the shop it
+        // has filament it has already burned. Only the spools it actually
+        // touched are stamped, and they go into the undo so putting the
+        // failure back puts the grams back.
+        Self.write(&root, "inventory", changed: inventory, before: shelfBefore, into: &undo)
+        Self.sealUndo(&undo, in: root)
+        return undo
+    }
 
     // MARK: - Moving a job
 
@@ -1893,22 +1972,9 @@ final class Shop {
                     settings: Self.settings(root), machines: Self.rows(root, "machines"),
                     today: Self.today(), costing: costing)
 
-                Self.write(&root, "printLog", changed: [out.order], before: orders, into: &undo)
-
-                // Newest first, the way the waste screen reads it. A new row is
-                // not an edit to an existing one, so nothing is stamped.
-                var waste = Self.rows(root, "wasteLog")
-                waste.insert(out.waste, at: 0)
-                root["wasteLog"] = .array(waste)
-
-                // THE SHELF, in the same swap. A failed print takes its
-                // filament off the spools it was printing from — a book saying
-                // a print failed and wasted 200g while the spool still holds
-                // them has told the shop it has filament it has already burned.
-                // Only the spools it actually touched are stamped, and they go
-                // into the undo so putting the failure back puts the grams back.
-                Self.write(&root, "inventory", changed: out.inventory,
-                           before: shelfBefore, into: &undo)
+                undo = Self.writeQcFailure(&root, order: out.order, waste: out.waste,
+                                           inventory: out.inventory,
+                                           ordersBefore: orders, shelfBefore: shelfBefore)
             }
             // The waste row is saved: a kept meter reading it used is spent.
             if let spentAttempt { energyMeter()?.consumeAttempt(for: spentAttempt) }
@@ -2126,6 +2192,7 @@ final class Shop {
                     rows.append(.object(record))
                 }
                 root["clients"] = .array(rows)
+                Self.sealUndo(&undo, in: root)
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("mac.edit_customer")) }
             editingCustomer = nil
@@ -3931,6 +3998,7 @@ final class Shop {
                     rows.append(.object(record))
                 }
                 root["products"] = .array(rows)
+                Self.sealUndo(&undo, in: root)
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("mac.edit_product")) }
             // ONLY NOW. A file unlinked before the record is written is a file
@@ -6048,6 +6116,7 @@ final class Shop {
                 StoreWriter.stamp(&record)
                 rows[at] = .object(record)
                 root["suppliers"] = .array(rows)
+                Self.sealUndo(&undo, in: root)
             }
             registerMoveUndo(undo, named: words.callIt("sup.log_purchase"))
             await load(source)
@@ -6122,6 +6191,7 @@ final class Shop {
                     rows.append(.object(record))
                 }
                 root["suppliers"] = .array(rows)
+                Self.sealUndo(&undo, in: root)
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("sup.edit")) }
             editingSupplier = nil
@@ -10640,6 +10710,7 @@ final class Shop {
                     return
                 }
                 root["inventory"] = .array(shelf)
+                Self.sealUndo(&undo, in: root)
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("mac.edit_spool")) }
             editingSpool = nil
@@ -10752,6 +10823,7 @@ final class Shop {
                     shelf.append(record)
                 }
                 root["consumables"] = .array(shelf)
+                Self.sealUndo(&undo, in: root)
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("cons.edit_title")) }
             editingConsumable = nil
@@ -10963,6 +11035,12 @@ final class Shop {
                     for i in log.indices {
                         guard case .object(var order) = log[i],
                               case .string(let orderId)? = order["id"], unlinked.contains(orderId) else { continue }
+                        // Only a job still pointing at nothing: one re-pointed
+                        // at another product since is someone's later choice.
+                        switch order["productId"] {
+                        case nil, .null?: break
+                        default: continue
+                        }
                         order["productId"] = .string(id)
                         StoreWriter.stamp(&order)
                         log[i] = .object(order)
@@ -11102,6 +11180,7 @@ final class Shop {
                                                              engine: engine, newId: Self.uid("MACH")),
                        let id {
                         undo.append(ChangedRecord(collection: "machines", id: id, was: was))
+                        Self.sealUndo(&undo, in: root)
                     }
                 } catch let refused as MachineRefused {
                     throw MoveRefused(sentence: self.words.callIt(refused == .gone ? "mac.move_gone"
@@ -11777,12 +11856,22 @@ final class Shop {
                 try ProductPhotos.write(made.full, productId: productId, imageId: imageId, in: build)
             }
             guard let fields else { writeProblem = nil; return .already }
-            guard case .object(let was) = row else { return .failed }
-            try StoreWriter.updateRecord(build, collection: "products", id: productId) { record in
+            guard case .object = row else { return .failed }
+            // The before- and after-copies read INSIDE the write, off the book
+            // on disk, so the undo puts back only the picture fields.
+            var undo: [ChangedRecord] = []
+            try StoreWriter.update(build) { root in
+                var rows = Self.rows(root, "products")
+                guard let at = rows.firstIndex(where: { Self.recordId($0) == productId }),
+                      case .object(var record) = rows[at] else { return }
+                undo.append(ChangedRecord(collection: "products", id: productId, was: record))
                 for (key, value) in fields { record[key] = value }
+                StoreWriter.stamp(&record)
+                rows[at] = .object(record)
+                root["products"] = .array(rows)
+                Self.sealUndo(&undo, in: root)
             }
-            registerMoveUndo([ChangedRecord(collection: "products", id: productId, was: was)],
-                             named: words.callIt("mac.edit_product"))
+            registerMoveUndo(undo, named: words.callIt("mac.edit_product"))
             writeProblem = nil
             await load(source)
             return .added
@@ -12341,10 +12430,21 @@ final class Shop {
     /// collections back — including the spools. Undoing a completion that
     /// emptied a spool without returning the filament would be an undo that
     /// lies about the shelf.
+    ///
+    /// Undo is FIELD-LEVEL (`FieldUndo.swift`): it needs what the action wrote
+    /// (`now`) as well as what was there, so it can put back only the fields
+    /// the action changed and leave whatever was written since.
     struct ChangedRecord: Sendable {
         let collection: String
         let id: String
+        /// The record before the action. Empty for one the action created.
         let was: [String: JSONValue]
+        /// The record as the action left it — filled in by `write` or
+        /// `sealUndo`. Nil until then.
+        var now: [String: JSONValue]? = nil
+        var kind: UndoKind = .edited
+        /// Where a deleted record sat, so putting it back puts it there.
+        var at: Int? = nil
     }
 
     /// A move the rules refused, said in the shop's own words.
@@ -12406,6 +12506,10 @@ final class Shop {
     async throws -> MoveOutcome {
 
         var orders = rows(root, "printLog")
+        // The book as found, for the undo: the actuals below are written onto
+        // `orders` first, and an undo whose before-copy already carried them
+        // would leave a job undone from done still holding what it "took".
+        let ordersAsFound = orders
         let inventory = rows(root, "inventory")
         let consumables = rows(root, "consumables")
         let machines = rows(root, "machines")
@@ -12565,7 +12669,7 @@ final class Shop {
             statusLabel: words.callIt("queue." + stage.rawValue, fallback: stage.rawValue))
 
         var undo: [ChangedRecord] = []
-        write(&root, "printLog", changed: [.object(changedOrder)], before: orders, into: &undo)
+        write(&root, "printLog", changed: [.object(changedOrder)], before: ordersAsFound, into: &undo)
         write(&root, "inventory", changed: move.inventory ?? [], before: inventory, into: &undo)
         write(&root, "consumables", changed: move.consumables ?? [], before: consumables, into: &undo)
 
@@ -12612,8 +12716,8 @@ final class Shop {
         for i in out.indices {
             guard let id = recordId(out[i]), let next = byId[id], next != out[i] else { continue }
             guard case .object(let was) = out[i], case .object(var now) = next else { continue }
-            undo.append(ChangedRecord(collection: collection, id: id, was: was))
             StoreWriter.stamp(&now)
+            undo.append(ChangedRecord(collection: collection, id: id, was: was, now: now))
             out[i] = .object(now)
             touched = true
         }
@@ -12690,32 +12794,26 @@ final class Shop {
         }
     }
 
-    /// Put every collection back exactly as it was, and make THAT undoable.
+    /// Undo what an action changed — field by field — and make THAT undoable.
     ///
     /// The deductions come back with it: undoing a completion that emptied a
     /// spool has to put the filament back, or the undo is a lie about the shelf.
+    /// But ONLY what the action took (`FieldUndo.swift`): a delivery received
+    /// onto the same spool since, a payment the phone recorded, another job's
+    /// deduction — all of that stays, and a field someone else wrote since is
+    /// left and named rather than overwritten with a stale copy.
     private func restoreMove(_ snapshot: [ChangedRecord], named actionName: String) {
         guard let build = source.build else { return }
-        var before: [ChangedRecord] = []
+        var outcome = UndoOutcome()
         do {
             try StoreWriter.update(build) { root in
-                for (collection, wanted) in Dictionary(grouping: snapshot, by: \.collection) {
-                    guard case .array(var rows)? = root[collection] else { continue }
-                    let byId = Dictionary(wanted.map { ($0.id, $0.was) }, uniquingKeysWith: { a, _ in a })
-                    var touched = false
-                    for i in rows.indices {
-                        guard case .object(let current) = rows[i],
-                              case .string(let id)? = current["id"],
-                              let was = byId[id] else { continue }
-                        before.append(ChangedRecord(collection: collection, id: id, was: current))
-                        rows[i] = .object(StoreWriter.restoring(was, over: current))
-                        touched = true
-                    }
-                    if touched { root[collection] = .array(rows) }
-                }
+                outcome = Self.undoing(snapshot, in: &root)
             }
             moveProblem = nil
-            registerMoveUndo(before, named: actionName)
+            if let partial = Self.partialUndoSentence(outcome.notUndone, words: words) {
+                moveNotices = [partial]
+            }
+            registerMoveUndo(outcome.redo, named: actionName)
             Task { await load(source) }
         } catch {
             moveProblem = String(describing: error)
