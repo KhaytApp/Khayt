@@ -9246,11 +9246,16 @@ final class Shop {
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { continue }
             if isDir.boolValue {
-                let walker = fm.enumerator(at: url, includingPropertiesForKeys: [.isDirectoryKey],
+                let walker = fm.enumerator(at: url, includingPropertiesForKeys: LibraryImport.fileKeys,
                                            options: [.skipsHiddenFiles, .skipsPackageDescendants])
                 var here: [URL] = []
                 while let next = walker?.nextObject() as? URL {
+                    // Regular files only: a symlink named `x.stl` in a folder
+                    // the shop picked is a pointer to somewhere else on this
+                    // Mac (or to `/dev/zero`, which hashes for ever), not a
+                    // model that lives in that folder.
                     if LibraryImport.kinds.contains(next.pathExtension.lowercased()),
+                       LibraryImport.isRegularFile(next),
                        !isInVault(next) {
                         here.append(next)
                     }
@@ -14693,7 +14698,11 @@ final class Shop {
     /// than for a made-up one: `{{name}}` going out empty is the fault this
     /// rule's own comments are about, and the only way to see it is to fill it
     /// in for somebody the list actually contains.
-    func campaignPreview(_ body: String, for recipient: KhaytEngine.Recipient) async -> String {
+    ///
+    /// `html` for the body of an email: the values filled in are escaped, so a
+    /// name holding markup reads as the characters it is.
+    func campaignPreview(_ body: String, for recipient: KhaytEngine.Recipient,
+                         html: Bool = false) async -> String {
         guard let engine else { return body }
         let money = Money.text(recipient.stats.totalSpend, currency)
         var payload: [String: JSONValue] = ["client": recipient.client]
@@ -14704,7 +14713,7 @@ final class Shop {
         ])
         return (try? await engine.fillCampaignTemplate(
             body, recipient: .object(payload), spend: money,
-            settings: settingsValue)) ?? body
+            settings: settingsValue, html: html)) ?? body
     }
 
     /// The provider the shop configured, or empty.
@@ -14810,7 +14819,7 @@ final class Shop {
             // Cancellable: a shop that closes the sheet halfway has stopped,
             // and the count it is shown afterwards is what actually went.
             if Task.isCancelled { break }
-            let filled = await campaignPreview(body, for: recipient)
+            let filled = await campaignPreview(body, for: recipient, html: true)
             // ── THE SUBJECT IS A TEMPLATE TOO ─────────────────────────────
             //
             // `{{name}}` in a subject line is the whole reason to have one —

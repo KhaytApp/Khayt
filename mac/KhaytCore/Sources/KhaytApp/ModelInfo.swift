@@ -173,29 +173,16 @@ enum ModelInfo {
     @discardableResult
     private static func run(_ path: String, _ arguments: [String],
                             timeout: TimeInterval, name: String = "") throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = arguments
-        let out = Pipe()
-        process.standardOutput = out
         // Kept apart. A slicer writes warnings to stderr on files that load
         // perfectly well, and folding them into the output would have the
-        // parser reading a warning's numbers as a model's.
-        process.standardError = Pipe()
-
-        do { try process.run() } catch { throw Failure.failed(error.localizedDescription) }
-
-        // Read while it runs. A slicer that fills the pipe and blocks waiting
-        // for somebody to drain it never exits, and then the timeout below
-        // "expires" on a program that was only ever waiting for us.
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-
-        let deadline = Date().addingTimeInterval(timeout)
-        while process.isRunning, Date() < deadline { usleep(50_000) }
-        if process.isRunning {
-            process.terminate()
-            throw Failure.tookTooLong(name.isEmpty ? path : name)
-        }
-        return String(decoding: data, as: UTF8.self)
+        // parser reading a warning's numbers as a model's. BOTH are drained
+        // while it runs, and the deadline is enforced on the program — the
+        // old loop read stdout to the end first, so a slicer that hung (or
+        // filled stderr, which nobody read) hung the caller with it.
+        let outcome: BoundedProcess.Outcome
+        do { outcome = try BoundedProcess.run(path, arguments, timeout: timeout) }
+        catch { throw Failure.failed(error.localizedDescription) }
+        if outcome.timedOut { throw Failure.tookTooLong(name.isEmpty ? path : name) }
+        return String(decoding: outcome.stdout, as: UTF8.self)
     }
 }

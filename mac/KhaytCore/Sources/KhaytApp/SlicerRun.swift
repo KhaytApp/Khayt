@@ -70,27 +70,28 @@ enum SlicerRun {
         var material: String?
     }
 
-    /// Slice `model` and read the result.
+    /// Slice `model`. The G-code lands wherever `argv` told the slicer to put
+    /// it — the caller's own scratch directory, which the caller removes.
     ///
     /// `allowed` is the caller's answer from `isAllowedSlicerBinary`, asked
     /// through the engine — passed in rather than asked here so this stays
     /// free of the runtime and testable on its own.
+    ///
+    /// BLOCKING for as long as the slicer runs (up to `timeout`): a caller on
+    /// the main actor goes through `Task.detached`.
+    ///
+    /// It used to make a scratch directory of its own and hand it back, but the
+    /// slicer never wrote there — `argv` already named the caller's directory —
+    /// and nobody removed it, so every customer upload left an empty
+    /// `khayt-slice-…` folder behind in the temporary directory.
     static func slice(_ model: URL, with slicer: KhaytEngine.Slicer, argv: [String],
-                      allowed: Bool, timeout: TimeInterval = patience) throws -> URL {
+                      allowed: Bool, timeout: TimeInterval = patience) throws {
         guard allowed else { throw Failure.notAllowed(slicer.name) }
         guard !slicer.path.isEmpty, FileManager.default.isExecutableFile(atPath: slicer.path) else {
             throw Failure.noSlicer
         }
         guard FileManager.default.fileExists(atPath: model.path) else { throw Failure.missingModel }
-
-        let outDir = try scratch()
-        do {
-            try run(slicer.path, argv, timeout: timeout, name: slicer.name)
-        } catch {
-            try? FileManager.default.removeItem(at: outDir)
-            throw error
-        }
-        return outDir
+        try run(slicer.path, argv, timeout: timeout, name: slicer.name)
     }
 
     /// A directory of our own to slice into, so nothing lands beside the model.
@@ -145,29 +146,18 @@ enum SlicerRun {
     /// library full of names like `Remb Studios - Articulated Dragon.3mf`.
     private static func run(_ path: String, _ arguments: [String],
                             timeout: TimeInterval, name: String) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = arguments
-        // Drained, not inherited: a slicer that fills a pipe nobody is reading
-        // blocks forever, and the timeout then "expires" on a program that was
-        // only ever waiting for us.
-        let err = Pipe()
-        process.standardOutput = Pipe()
-        process.standardError = err
-
-        do { try process.run() } catch { throw Failure.failed(error.localizedDescription) }
-        let complaints = err.fileHandleForReading.readDataToEndOfFile()
-
-        let deadline = Date().addingTimeInterval(timeout)
-        while process.isRunning, Date() < deadline { usleep(50_000) }
-        if process.isRunning {
-            process.terminate()
-            throw Failure.tookTooLong(name)
-        }
-        if process.terminationStatus != 0 {
-            let why = String(decoding: complaints.suffix(400), as: UTF8.self)
+        // Both pipes drained while it runs and the deadline enforced on the
+        // slicer itself — see `BoundedProcess` for the hang this used to be.
+        // Nothing reads stdout; it is drained only so a chatty slicer never
+        // stalls on a full pipe.
+        let outcome: BoundedProcess.Outcome
+        do { outcome = try BoundedProcess.run(path, arguments, timeout: timeout, keepOut: 0) }
+        catch { throw Failure.failed(error.localizedDescription) }
+        if outcome.timedOut { throw Failure.tookTooLong(name) }
+        if outcome.status != 0 {
+            let why = String(decoding: outcome.stderr.suffix(400), as: UTF8.self)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            throw Failure.producedNothing(why.isEmpty ? "exit \(process.terminationStatus)" : why)
+            throw Failure.producedNothing(why.isEmpty ? "exit \(outcome.status)" : why)
         }
     }
 }

@@ -27,6 +27,43 @@ struct ScanHardeningTests {
         #expect(try runtime.call2("typeof __karg0", [], as: String.self) == "undefined")
     }
 
+    /// `call` pasted each argument's JSON into the source as an object
+    /// literal, and in a literal `"__proto__"` sets the prototype instead of
+    /// making a key — so a record carrying it inherited what it said.
+    @Test("a record's __proto__ key is a key, not a prototype")
+    func protoIsAKey() throws {
+        let runtime = try JSRuntime(modules: [])
+        try runtime.evaluate("""
+            globalThis.Probe = {
+              inherits: function (o) { return o.isAdmin === true && !Object.prototype.hasOwnProperty.call(o, 'isAdmin'); },
+              ownProto: function (o) { return Object.prototype.hasOwnProperty.call(o, '__proto__'); },
+            };
+            """)
+        let record: JSONValue = .object(["__proto__": .object(["isAdmin": .bool(true)])])
+        #expect(try runtime.call("Probe", "inherits", [record], as: Bool.self) == false,
+                "a key in the book became the record's prototype")
+        #expect(try runtime.call("Probe", "ownProto", [record], as: Bool.self) == true)
+        // Strings still cross whole, quotes and all, and nothing stays bound.
+        let crafted = "\"); globalThis.__callPwned = 1; (\""
+        #expect(try runtime.call2("typeof ARG0", [.string(crafted)], as: String.self) == "string")
+        try runtime.evaluate("globalThis.Echo = { it: function (s) { return s; } };")
+        #expect(try runtime.call("Echo", "it", [crafted], as: String.self) == crafted)
+        #expect(try runtime.call2("typeof globalThis.__callPwned", [], as: String.self) == "undefined")
+        #expect(try runtime.call2("typeof __karg0", [], as: String.self) == "undefined")
+    }
+
+    /// The language was pasted into the script between quotes.
+    @Test("a language code is data, not script")
+    func languageIsData() async throws {
+        let engine = try KhaytEngine()
+        let hostile = "en'];globalThis.__langPwned=1;(['"
+        #expect(try await engine.translations(language: hostile).isEmpty)
+        #expect(try await engine.translations(language: "__proto__").isEmpty)
+        #expect(try await engine.translations(language: "constructor").isEmpty)
+        #expect(!(try await engine.translations(language: "en")).isEmpty)
+        #expect(try await engine.raw("typeof globalThis.__langPwned", as: String.self) == "undefined")
+    }
+
     static func write(_ bytes: [UInt8]) throws -> URL {
         let url = FileManager.default.temporaryDirectory.appending(path: "scan-\(UUID().uuidString).zip")
         try Data(bytes).write(to: url)

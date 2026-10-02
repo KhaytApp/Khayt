@@ -146,6 +146,20 @@ function currencyMarkHtml(code, symbol, escapeHtml) {
  * A trailing `.0` goes: "6 hrs" is what a person writes, "6.0 hrs" is what a
  * spreadsheet writes.
  */
+/*
+ * An attribute value, escaped HERE rather than through the host's
+ * `escapeHtml`: that one is injected and defaults to the identity, and the
+ * logo is a settings string — `safeBizLogo` checks only that it STARTS with
+ * `data:image/`, so `data:image/png" onerror="…` passed it and closed the
+ * attribute. A real data URL has none of these characters, so a good logo
+ * comes out byte for byte.
+ */
+function attr(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function hoursForPrint(hours) {
   const n = Number(hours);
   if (!isFinite(n)) return String(hours);
@@ -519,7 +533,7 @@ function invoiceHtml(order, ctx) {
 
       <div class="inv-header">
         <div class="biz">
-          <div class="mark">${safeBizLogo() ? `<img src="${safeBizLogo()}" style="max-height:80px; max-width:150px; object-fit:contain;" alt="logo">` : BRAND_MARK_SVG}</div>
+          <div class="mark">${safeBizLogo() ? `<img src="${attr(safeBizLogo())}" style="max-height:80px; max-width:150px; object-fit:contain;" alt="logo">` : BRAND_MARK_SVG}</div>
           <div class="biz-name">
             <h1>${escapeHtml(bizPrimary || 'Khayt')}</h1>
             ${taglinePrimary ? `<div class="biz-tagline">${escapeHtml(taglinePrimary)}</div>` : ''}

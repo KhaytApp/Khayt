@@ -988,7 +988,14 @@ public actor KhaytEngine {
     /// bridge with four thousand strings, which is cheap once and absurd per
     /// label. The caller holds the result for the life of the language.
     public func translations(language: String) throws -> [String: String] {
-        try raw("(globalThis.KhaytLocales||{})['\(language)']||{}", as: [String: String].self)
+        // The language is an ARGUMENT, not source: pasted into the script, a
+        // code like `en'];globalThis.x=1;//` was code. It comes from settings.
+        // `hasOwnProperty`, so `__proto__` or `constructor` reads as no catalogue.
+        try runtime.call2("""
+            (function (all, lang) {
+              return Object.prototype.hasOwnProperty.call(all, lang) ? all[lang] : {};
+            })(globalThis.KhaytLocales || {}, ARG0)
+            """, [.string(language)], as: [String: String].self)
     }
 
     // MARK: - Tax
@@ -6970,15 +6977,20 @@ public actor KhaytEngine {
     /// The MONEY is formatted on this side and handed in, because how a shop
     /// writes an amount is a property of the shop — its currency, its digits —
     /// and the rule holds no formatter.
+    ///
+    /// `html`: the result goes into an HTML email, so the filled-in VALUES are
+    /// escaped (a customer's name is data). Off for anything shown or sent as
+    /// plain text, where `&amp;` would be printed as written.
     public func fillCampaignTemplate(_ body: String, recipient: JSONValue,
-                                     spend: String, settings: JSONValue) throws -> String {
+                                     spend: String, settings: JSONValue,
+                                     html: Bool = false) throws -> String {
         try runtime.call2("""
-            (function (body, recipient, spend, settings) {
+            (function (body, recipient, spend, settings, html) {
               return globalThis.KhaytCampaigns.fillTemplate(
-                body, recipient, function () { return spend; }, settings);
-            })(ARG0, ARG1, ARG2, ARG3)
+                body, recipient, function () { return spend; }, settings, { html: html });
+            })(ARG0, ARG1, ARG2, ARG3, ARG4)
             """,
-            [.string(body), recipient, .string(spend), settings], as: String.self)
+            [.string(body), recipient, .string(spend), settings, .bool(html)], as: String.self)
     }
 
     /// Whether a category has gone past its monthly budget, AFTER the expense

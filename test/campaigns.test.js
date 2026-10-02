@@ -99,3 +99,20 @@ test('a legacy `delivered` order is money the customer spent', () => {
   assert.equal(s.completedCount, 2);
   assert.equal(s.totalSpend, 140);
 });
+
+test('a merge value is a value: `$&` and friends are not replacement patterns', () => {
+  /* A string replacement reads `$&` as "the match", so a client called `A$&B`
+   * went out as `A{{name}}B`. */
+  const rec = { client: { name: "A$&B $' $` $$" }, stats: { lastOrderDate: '$1' } };
+  assert.equal(C.fillTemplate('Hi {{name}} {{last_order}}', rec, null), "Hi A$&B $' $` $$ $1");
+});
+
+test('an HTML email escapes the values it fills in, and only those', () => {
+  const rec = { client: { name: '<img src=x onerror=alert(1)> & "Co"' },
+                stats: { completedCount: 2, lastOrderDate: '2026-01-01' } };
+  const html = C.fillTemplate('<b>Hi</b> {{name}}, {{orders}} orders', rec, () => '<5>', null, { html: true });
+  assert.equal(html, '<b>Hi</b> &lt;img src=x onerror=alert(1)&gt; &amp; &quot;Co&quot;, 2 orders');
+  // Plain text (WhatsApp, SMS, a preview) is untouched — `&amp;` would be printed.
+  assert.equal(C.fillTemplate('Hi {{name}}', rec, null), 'Hi <img src=x onerror=alert(1)> & "Co"');
+  assert.equal(C.fillTemplate('{{spend}}', rec, () => 'A&B', null, { html: true }), 'A&amp;B');
+});

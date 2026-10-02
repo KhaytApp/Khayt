@@ -189,8 +189,18 @@ public enum StoreWriter {
         let tmp = url.deletingLastPathComponent()
             .appending(path: "\(url.lastPathComponent).tmp.\(ProcessInfo.processInfo.processIdentifier).\(UUID().uuidString)")
         let fm = FileManager.default
-        fm.createFile(atPath: tmp.path, contents: nil)
-        let handle = try FileHandle(forWritingTo: tmp)
+        // ── OWNER-ONLY, FROM THE FIRST BYTE ───────────────────────────────
+        //
+        // The book holds every customer's name, phone and address, the shop's
+        // takings and — sealed or not — its integration keys. `createFile` made
+        // it 0644 (whatever the umask allowed), so any other account on the Mac
+        // could read it. Created 0600 here, with O_EXCL so the name cannot be a
+        // link somebody planted, and `rename` carries the mode onto the book.
+        // The desktop app writes the same file with its own mode; the next write
+        // from this app puts 0600 back.
+        let fd = open(tmp.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, S_IRUSR | S_IWUSR)
+        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
         do {
             try handle.write(contentsOf: data)
             // fsync, not just close: a crash between the write and the swap must
@@ -217,6 +227,10 @@ public enum StoreWriter {
         if fm.fileExists(atPath: url.path) {
             try? fm.removeItem(at: prev)
             if link(url.path, prev.path) != 0 { try? fm.copyItem(at: url, to: prev) }   // best-effort rollback
+            // The rollback is the same book, so the same mode. A hard link
+            // shares the inode, so this also narrows the book being replaced —
+            // which is about to stop being the book anyway.
+            chmod(prev.path, S_IRUSR | S_IWUSR)
         }
         if rename(tmp.path, url.path) != 0 {
             let code = POSIXErrorCode(rawValue: errno) ?? .EIO

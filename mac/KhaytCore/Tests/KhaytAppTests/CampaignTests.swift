@@ -129,6 +129,31 @@ struct CampaignTests {
         #expect(filled.contains("450.00"))
     }
 
+    /// A campaign email is HTML, and `{{name}}` is a customer's name — data,
+    /// which can hold markup. The values are escaped there; the preview and
+    /// the subject are text and are not.
+    @Test("an emailed campaign escapes the name it fills in, and only there")
+    func emailEscapesValues() async throws {
+        let engine = try KhaytEngine()
+        let recipient = JSONValue.object([
+            "client": .object(["id": .string("C7"), "name": .string("<img src=x onerror=alert(1)> & $&")]),
+            "stats": .object(["completedCount": .number(1), "totalSpend": .number(1),
+                              "lastOrderDate": .string("")]),
+        ])
+        let html = try await engine.fillCampaignTemplate(
+            "<p>Hi {{name}}</p>", recipient: recipient, spend: "1", settings: .object([:]), html: true)
+        #expect(html == "<p>Hi &lt;img src=x onerror=alert(1)&gt; &amp; $&amp;</p>")
+        let text = try await engine.fillCampaignTemplate(
+            "Hi {{name}}", recipient: recipient, spend: "1", settings: .object([:]))
+        #expect(text == "Hi <img src=x onerror=alert(1)> & $&")
+        // The send path asks for the escaped form.
+        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+        #expect(shop.contains("campaignPreview(body, for: recipient, html: true)"),
+                "the campaign email is filled as plain text")
+    }
+
     @Test("the sheet shows who and what before it will send to anybody")
     func whoAndWhatComeFirst() throws {
         let sources = URL(fileURLWithPath: #filePath)

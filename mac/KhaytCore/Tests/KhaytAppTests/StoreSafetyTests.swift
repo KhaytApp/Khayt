@@ -34,6 +34,29 @@ struct StoreSafetyTests {
         #expect(try Self.read(url.appendingPathExtension("prev"))["n"] == .number(2))
     }
 
+    /// The book was created 0644: any account on the Mac could read every
+    /// customer's phone and address.
+    @Test("the book and its rollback are readable by their owner only")
+    func ownerOnly() throws {
+        let url = try Self.scratch(["n": .number(1)])
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        func mode(_ u: URL) throws -> Int {
+            try (FileManager.default.attributesOfItem(atPath: u.path)[.posixPermissions] as? Int ?? -1) & 0o777
+        }
+        // As the desktop app leaves it.
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+        try StoreWriter.atomicWrite(try JSONEncoder().encode(["n": 2]), to: url)
+        #expect(try mode(url) == 0o600)
+        #expect(try mode(url.appendingPathExtension("prev")) == 0o600)
+        try StoreWriter.atomicWrite(try JSONEncoder().encode(["n": 3]), to: url)
+        #expect(try mode(url) == 0o600)
+        #expect(try mode(url.appendingPathExtension("prev")) == 0o600)
+        #expect(try Self.read(url)["n"] == .number(3))
+        // No temp left beside it.
+        let left = try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)
+        #expect(left.sorted() == ["khayt-store.json", "khayt-store.json.prev"])
+    }
+
     /// An async change suspended inside its mutation, another write landed,
     /// and the first wrote its stale copy over it.
     @Test("a write that lands while another is being worked out is not lost")

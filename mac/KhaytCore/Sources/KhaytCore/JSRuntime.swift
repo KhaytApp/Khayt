@@ -263,13 +263,23 @@ public final class JSRuntime {
     /// slower, and it means a shape change on either side is a decoding error
     /// here rather than a silently missing field somewhere downstream — which
     /// is the failure this codebase keeps having.
+    ///
+    /// The arguments are BOUND, not pasted — the same as `call2`. Pasting each
+    /// one's JSON into the source made it an object LITERAL, and in a literal
+    /// `"__proto__": {…}` does not make a key: it sets the object's prototype.
+    /// A record in the shop's book carrying that key (the book is a file, and a
+    /// sync or an import can put anything in it) reached the rule as an object
+    /// that inherited whatever the record said. `JSON.parse` makes it an
+    /// ordinary own property, which is what the record holds.
     public func call<T: Decodable>(_ object: String, _ method: String, _ args: [Encodable] = [], as type: T.Type) throws -> T {
         let encoder = JSONEncoder()
         let encoded = try args.map { arg -> String in
             let data = try encoder.encode(AnyEncodable(arg))
             return String(data: data, encoding: .utf8) ?? "null"
         }
-        let call = "JSON.stringify(\(object).\(method)(\(encoded.joined(separator: ", "))))"
+        let names = try bind(encoded)
+        defer { unbind(names) }
+        let call = "JSON.stringify(\(object).\(method)(\(names.joined(separator: ", "))))"
         let value = try evaluate(call)
         guard let json = value.toString(), json != "undefined", let data = json.data(using: .utf8) else {
             throw KhaytJSError.unexpectedResult("\(object).\(method) returned undefined")
@@ -332,28 +342,37 @@ public final class JSRuntime {
         // developer wrote is rewritten — `ARG3` becomes `__karg3`, in one pass,
         // over text no argument can reach.
         let encoder = JSONEncoder()
-        let parse = context.objectForKeyedSubscript("JSON").objectForKeyedSubscript("parse")
-        var bound: [String] = []
-        defer {
-            for name in bound {
-                context.setObject(JSValue(undefinedIn: context), forKeyedSubscript: name as NSString)
-            }
-        }
-        for (i, arg) in args.enumerated() {
-            let json = String(data: try encoder.encode(arg), encoding: .utf8) ?? "null"
-            lastException = nil
-            let value = parse?.call(withArguments: [json])
-            if let problem = lastException { throw KhaytJSError.evaluationFailed(problem) }
-            let name = "__karg\(i)"
-            context.setObject(value ?? JSValue(nullIn: context), forKeyedSubscript: name as NSString)
-            bound.append(name)
-        }
+        let bound = try bind(args.map { String(data: try encoder.encode($0), encoding: .utf8) ?? "null" })
+        defer { unbind(bound) }
         let script = expression.replacing(/\bARG(\d+)\b/) { match in "__karg" + match.output.1 }
         let value = try evaluate("JSON.stringify(\(script))")
         guard let json = value.toString(), json != "undefined", let data = json.data(using: .utf8) else {
             throw KhaytJSError.unexpectedResult(expression)
         }
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// Parse each JSON text with `JSON.parse` — handed over as a VALUE, never
+    /// as source — and bind it to `__karg0`, `__karg1`, …, returning the names.
+    private func bind(_ jsons: [String]) throws -> [String] {
+        let parse = context.objectForKeyedSubscript("JSON").objectForKeyedSubscript("parse")
+        var bound: [String] = []
+        for (i, json) in jsons.enumerated() {
+            lastException = nil
+            let value = parse?.call(withArguments: [json])
+            if let problem = lastException { unbind(bound); throw KhaytJSError.evaluationFailed(problem) }
+            let name = "__karg\(i)"
+            context.setObject(value ?? JSValue(nullIn: context), forKeyedSubscript: name as NSString)
+            bound.append(name)
+        }
+        return bound
+    }
+
+    /// Clear what `bind` set, so an argument cannot outlive its call.
+    private func unbind(_ names: [String]) {
+        for name in names {
+            context.setObject(JSValue(undefinedIn: context), forKeyedSubscript: name as NSString)
+        }
     }
 
     /// Read `object.property` and decode it as `T`. Same JSON crossing as

@@ -287,6 +287,45 @@ struct ConverterTests {
                 "the advice in the refusal does not work")
     }
 
+    /// Each member under `Zip`'s one-gigabyte cap, the sum not: a file of a
+    /// dozen such members asked the rebuild to hold all of them at once.
+    @Test("a 3MF whose members together are past the rebuild limit is refused before it is read")
+    func refusesTooMuchInTotal() async throws {
+        let dir = Self.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = dir.appending(path: "many.3mf")
+        let out = dir.appending(path: "out.3mf")
+        let real = Converter.rebuildLimit
+        Converter.rebuildLimit = 256 << 10
+        defer { Converter.rebuildLimit = real }
+        // Four 100 KB members: each one is fine, all four are not.
+        var members: [ZipWrite.Member] = [
+            .init("[Content_Types].xml", Data("<Types/>".utf8)),
+            .init("3D/3dmodel.model", Data(Self.model.utf8)),
+        ]
+        for i in 0..<4 {
+            members.append(.init("Metadata/extra\(i).bin", Data(repeating: 0x20, count: 100 << 10)))
+        }
+        try ZipWrite.archive(members).write(to: source)
+
+        await #expect {
+            _ = try await Converter.convert(source, into: out,
+                                            options: ["targetId": .string("snapmaker-u1")],
+                                            engine: try Self.engine())
+        } throws: { error in
+            guard case Converter.Failure.tooBig(let bytes)? = error as? Converter.Failure else { return false }
+            return bytes > Converter.rebuildLimit
+        }
+        #expect(!FileManager.default.fileExists(atPath: out.path), "a refused conversion wrote a file")
+
+        // The same file under the real limit converts.
+        Converter.rebuildLimit = real
+        _ = try await Converter.convert(source, into: out,
+                                        options: ["targetId": .string("snapmaker-u1")],
+                                        engine: try Self.engine())
+        #expect(FileManager.default.fileExists(atPath: out.path))
+    }
+
     /// A COLOUR PLAN REWRITES THE PAINT AND NOTHING ELSE.
     ///
     /// This is the guarantee that replaces "the mesh never crosses". It has

@@ -34,6 +34,15 @@ import KhaytCore
 @MainActor
 enum LibraryImport {
 
+    nonisolated static let fileKeys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey]
+
+    /// A regular file and not a symlink — read from the item itself (lstat),
+    /// so a link to a model is not taken for one.
+    nonisolated static func isRegularFile(_ url: URL) -> Bool {
+        guard let v = try? url.resourceValues(forKeys: Set(fileKeys)) else { return false }
+        return v.isRegularFile == true && v.isSymbolicLink != true
+    }
+
     enum Failure: Error, CustomStringConvertible, Equatable {
         case notOurs
         case noLibrary
@@ -205,6 +214,12 @@ enum LibraryImport {
         guard kinds.contains(ext) else { throw Failure.unknownKind(ext) }
 
         let originalName = source.lastPathComponent
+        // What it RESOLVES to must be a plain file: a device (`/dev/zero`), a
+        // pipe or a directory wearing a model's name hashes for ever or not at
+        // all. The walkers already skip symlinks; this is the last door.
+        guard isRegularFile(source.resolvingSymlinksInPath()) else {
+            throw Failure.failed("\(originalName) is not a file")
+        }
 
         // THE SOURCE IS HASHED FIRST, and that is the whole shape of this.
         //
