@@ -242,8 +242,10 @@ struct SyncSafetyTests {
         var losses: [SyncLoss] = []
         try await StoreWriter.update(storeURL: store, owns: { true }, whoHasIt: { nil },
                                      recordingDeletes: false) { root in
-            losses = try await Shop.mergeKeepingLosses(&root, cloud: try Self.object(Self.theirs),
-                                                       engine: engine, keepAt: file).losses
+            let before = root
+            let merged = try await engine.mergeFromCloud(local: root, server: try Self.object(Self.theirs))
+            losses = try Shop.keepLosses(before: before, merged: merged, at: file)
+            root = merged.store
         }
 
         #expect(losses.count == 2)

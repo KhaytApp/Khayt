@@ -14,8 +14,8 @@ struct SyncLossesSheet: View {
         // moved to reach buttons below the screen.
         SheetFrame(width: 560) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(shop.words.callIt("mac.sync_losses_head")).font(.headline)
-                Text(shop.words.callIt("mac.sync_losses_body"))
+                Text(shop.words.callIt("mac.losses_head")).font(.headline)
+                Text(shop.words.callIt("mac.losses_body"))
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -31,7 +31,7 @@ struct SyncLossesSheet: View {
             }
         } footer: {
             HStack {
-                Button(shop.words.callIt("mac.sync_show_file")) { shop.revealSyncLosses() }
+                Button(shop.words.callIt("mac.losses_show_file")) { shop.revealSyncLosses() }
                 Spacer()
                 Button(shop.words.callIt("common.close")) { shop.reviewingSyncLosses = false }
                     .keyboardShortcut(.cancelAction)
@@ -48,10 +48,10 @@ struct SyncLossesSheet: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if shop.syncLossesPutBack.contains(loss.id) {
-                Label(shop.words.callIt("mac.sync_put_back_done"), systemImage: "checkmark.circle")
+                Label(shop.words.callIt("mac.losses_put_back_done"), systemImage: "checkmark.circle")
                     .font(.caption).foregroundStyle(Khayt.done)
             } else {
-                Button(shop.words.callIt("mac.sync_put_back")) {
+                Button(shop.words.callIt("mac.losses_put_back")) {
                     Task { await shop.putBackSyncLoss(loss) }
                 }
                 .disabled(!shop.canMoveJobs)
@@ -62,9 +62,9 @@ struct SyncLossesSheet: View {
 
     private func describe(_ kind: SyncLoss.Kind) -> String {
         switch kind {
-        case .removed: return shop.words.callIt("mac.sync_loss_removed")
-        case .replaced: return shop.words.callIt("mac.sync_loss_replaced")
-        case .keptDeleted: return shop.words.callIt("mac.sync_loss_kept_deleted")
+        case .removed: return shop.words.callIt("mac.losses_removed")
+        case .replaced: return shop.words.callIt("mac.losses_replaced")
+        case .keptDeleted: return shop.words.callIt("mac.losses_kept_deleted")
         }
     }
 }

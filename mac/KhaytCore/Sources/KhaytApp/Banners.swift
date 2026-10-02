@@ -66,7 +66,7 @@ struct MoveBanners: View {
         // its own, and a record it replaced or removed used to be gone with
         // nothing on screen. A copy of each is kept; this offers them back.
         if let lost = shop.syncLossNotice {
-            Banner(text: shop.words.callIt("mac.sync_losses",
+            Banner(text: shop.words.callIt("mac.losses_banner",
                                            ["replaced": .number(Double(lost.replaced + lost.keptDeleted)),
                                             "removed": .number(Double(lost.removed))]),
                    symbol: "arrow.triangle.2.circlepath", tint: Khayt.attention) {

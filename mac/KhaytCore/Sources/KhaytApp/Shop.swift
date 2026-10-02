@@ -8701,13 +8701,8 @@ final class Shop {
                 connection, token: token, dek: dek, engine: engine) { request in
                 try await session.data(for: request)
             }
-            // A RESTORE WINS, before anything is measured or merged. Without
-            // this the merge below deleted every restored record the cloud had
-            // tombstoned and replaced every one it held at a higher rev, and
-            // the delta outbox never sent a restored record the cloud had
-            // deleted. See `RestoreGuard`.
-            let restorePending = RestoreGuard.pending(for: build.storeURL) != nil
-            try await holdRestore(build: build, cloud: folded.store)
+            // A restore wins before anything is measured. See `RestoreGuard`.
+            let restorePending = try await holdRestore(build: build, cloud: folded.store)
             // From disk, for the same reason the comparison reads from disk:
             // the screens hold two collections out of thirty-three, and a
             // payload built from those would claim the other thirty-one are
@@ -8727,10 +8722,8 @@ final class Shop {
 
             let collections = (try? await engine.storeCollections()) ?? []
             guard !outbox.isEmpty else {
-                // The cloud already holds everything here, a restore included.
-                if restorePending { RestoreGuard.clear(for: build.storeURL) }
-                await noteSyncAgreement(build: build, shopId: connection.shopId, engine: engine,
-                                        book: mine, cloud: folded.store)
+                await cloudAgrees(build: build, shopId: connection.shopId, engine: engine,
+                                  book: mine, cloud: folded.store, restored: restorePending)
                 // Nothing to do is not a failure. Show the fresh comparison so
                 // the screen stops offering a button that would do nothing.
                 cloudCheck = CloudCompare.compare(here: mine, there: folded.store,
@@ -8903,10 +8896,11 @@ final class Shop {
                 if let restored {
                     root = RestoreGuard.prevail(root, over: folded.store, restored: restored)
                 }
-                let out = try await Self.mergeKeepingLosses(&root, cloud: folded.store,
-                                                            engine: engine, keepAt: keepAt)
-                report = out.merged
-                losses = out.losses
+                let before = root
+                let merged = try await engine.mergeFromCloud(local: root, server: folded.store)
+                losses = try Self.keepLosses(before: before, merged: merged, at: keepAt)
+                root = merged.store
+                report = merged
             }
             cloudPulled = report
             announceSyncLosses(losses, file: keepAt)
@@ -8972,11 +8966,12 @@ final class Shop {
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
             recordingDeletes: false
         ) { root in
-            let out = try await Self.mergeKeepingLosses(&root, cloud: server,
-                                                        engine: engine, keepAt: keepAt)
-            merged = out.merged
-            losses = out.losses
-            book = root
+            let before = root
+            let out = try await engine.mergeFromCloud(local: root, server: server)
+            losses = try Self.keepLosses(before: before, merged: out, at: keepAt)
+            root = out.store
+            merged = out
+            book = out.store
         }
         guard let report = merged else {
             throw CloudWriter.Failure.malformed("the merge produced nothing to send")

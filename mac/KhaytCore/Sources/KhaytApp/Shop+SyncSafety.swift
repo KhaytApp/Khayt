@@ -10,13 +10,17 @@ extension Shop {
     // MARK: - The restore, held
 
     /// Make a pending restore win over what the cloud holds, before anything
-    /// is sent or merged. A no-op when there is no restore waiting.
+    /// is sent or merged. Without this the whole-book merge deleted every
+    /// restored record the cloud had tombstoned and replaced every one it held
+    /// at a higher rev, and the delta outbox never sent a restored record the
+    /// cloud had deleted. Returns whether a restore was pending.
     ///
     /// `recordingDeletes: false`: moving a restored record to a new id is not
     /// a delete of the old one — the cloud's tombstone already says that — and
     /// the stamping here is the restore's, not an edit's.
-    func holdRestore(build: StoreReader.Build, cloud: [String: JSONValue]) async throws {
-        guard let pending = RestoreGuard.pending(for: build.storeURL) else { return }
+    @discardableResult
+    func holdRestore(build: StoreReader.Build, cloud: [String: JSONValue]) async throws -> Bool {
+        guard let pending = RestoreGuard.pending(for: build.storeURL) else { return false }
         let restored = Set(pending.records)
         try await StoreWriter.update(
             storeURL: build.storeURL,
@@ -26,6 +30,15 @@ extension Shop {
         ) { root in
             root = RestoreGuard.prevail(root, over: cloud, restored: restored)
         }
+        return true
+    }
+
+    /// Nothing to send: the cloud already holds everything here, a pending
+    /// restore included, so the restore is done and the baseline moves up.
+    func cloudAgrees(build: StoreReader.Build, shopId: String, engine: KhaytEngine,
+                     book: [String: JSONValue], cloud: [String: JSONValue], restored: Bool) async {
+        if restored { RestoreGuard.clear(for: build.storeURL) }
+        await noteSyncAgreement(build: build, shopId: shopId, engine: engine, book: book, cloud: cloud)
     }
 
     // MARK: - The baseline
@@ -48,20 +61,15 @@ extension Shop {
 
     // MARK: - What a merge took
 
-    /// Merge the cloud into `root`, keeping a copy of everything the merge
-    /// removes or overwrites-after-an-edit in `sync-conflicts/` FIRST. The one
-    /// merge both the button and automatic sync run.
-    static func mergeKeepingLosses(_ root: inout [String: JSONValue], cloud: [String: JSONValue],
-                                   engine: KhaytEngine, keepAt file: URL)
-    async throws -> (merged: KhaytEngine.Merged, losses: [SyncLoss]) {
-        let before = root
-        let merged = try await engine.mergeFromCloud(local: root, server: cloud)
+    /// What a merge took from `before`, kept in `sync-conflicts/` FIRST — called
+    /// inside the write, before the merged book replaces this one, by both the
+    /// button and automatic sync. Throws, and the merge does not go ahead, when
+    /// the copies cannot be written.
+    static func keepLosses(before: [String: JSONValue], merged: KhaytEngine.Merged,
+                           at file: URL) throws -> [SyncLoss] {
         let losses = SyncLosses.compute(before: before, after: merged.store, conflicts: merged.conflicts)
-        // Before the book is replaced, and fatal to the merge if it fails: a
-        // merge that cannot keep what it is about to take does not go ahead.
         try SyncLosses.keep(losses, at: file)
-        root = merged.store
-        return (merged, losses)
+        return losses
     }
 
     /// Put the window's notice up, or add to the one already there.
@@ -86,7 +94,7 @@ extension Shop {
             syncLossesPutBack.insert(loss.id)
             await load(source)
         } catch {
-            moveProblem = words.callIt("mac.sync_put_back_failed") + " " + String(describing: error)
+            moveProblem = words.callIt("mac.losses_put_back_failed") + " " + String(describing: error)
         }
     }
 
