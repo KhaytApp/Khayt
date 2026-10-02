@@ -44,6 +44,25 @@ test('recent models stay on the disk', () => {
   assert.equal(T.evictable(file('edge.stl', 80e6, 89), POLICY, NOW).ok, false);
 });
 
+test('a model imported recently is recent, whatever its copied mtime says', () => {
+  // A copy keeps the download's mtime: 400 days old on disk, imported 5 days ago.
+  const imported = { ...file('old-download.3mf', 80e6, 400), lastUsedMs: daysAgo(5) };
+  assert.equal(T.evictable(imported, POLICY, NOW).reason, 'too-recent');
+  // The NEWEST of the two counts — an older lastUsed does not age a fresh file.
+  const fresh = { ...file('fresh.3mf', 80e6, 2), lastUsedMs: daysAgo(500) };
+  assert.equal(T.evictable(fresh, POLICY, NOW).reason, 'too-recent');
+  // Both old: it goes.
+  assert.equal(T.evictable({ ...file('cold.3mf', 80e6, 400), lastUsedMs: daysAgo(200) }, POLICY, NOW).ok, true);
+});
+
+test('a model an unfinished job needs is never moved off, however old', () => {
+  const v = T.evictable({ ...file('queued.3mf', 80e6, 900), inUse: true }, POLICY, NOW);
+  assert.deepEqual(v, { ok: false, reason: 'in-use' });
+  const p = T.plan([{ ...file('queued.3mf', 80e6, 900), inUse: true }, file('cold.3mf', 80e6, 900)], POLICY, NOW);
+  assert.deepEqual(p.candidates.map((f) => f.filename), ['cold.3mf']);
+  assert.equal(p.skipped['in-use'], 1);
+});
+
 test('small files are left alone — the request costs more than the space', () => {
   assert.equal(T.evictable(file('tiny.gcode', 4096, 500), POLICY, NOW).reason, 'too-small');
 });

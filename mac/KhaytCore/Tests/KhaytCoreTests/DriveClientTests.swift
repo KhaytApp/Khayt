@@ -37,7 +37,7 @@ final class FakeGoogle: @unchecked Sendable {
                 let c = URLComponents(url: url, resolvingAgainstBaseURL: false)!
                 let q = c.queryItems?.first { $0.name == "q" }?.value ?? ""
                 if c.path == "/drive/v3/files", r.httpMethod == "GET" {
-                    let live = files.filter { !$0.value.trashed }
+                    let live = files.filter { $0.value.trashed == q.contains("trashed=true") }
                     let hit: (String, (name: String, parent: String?, key: String?, data: Data, folder: Bool, trashed: Bool))?
                     if q.contains("khaytKey") {
                         hit = live.first { f in f.value.key.map { q.contains("value='\($0)'") } ?? false }.map { ($0.key, $0.value) }
@@ -114,6 +114,25 @@ struct DriveClientTests {
         #expect(try await drive.head("print-files/PF-1/Benchy.3mf") == nil)
         #expect(google.files.values.contains { $0.trashed && $0.key == "print-files/PF-1/Benchy.3mf" },
                 "to Drive's trash, not gone")
+    }
+
+    @Test("a trashed model is found in Drive's Trash and restored from it — not reported lost")
+    func trashAndRestore() async throws {
+        let google = FakeGoogle()
+        let drive = DriveClient(.init(clientId: "c", refreshToken: "r"), fetch: google.fetch)
+        let data = Data((0..<5_000).map { UInt8($0 % 251) })
+        try await drive.put("print-files/PF-9/Dragon.3mf", data: data)
+        #expect(try await drive.trashedCopy("print-files/PF-9/Dragon.3mf") == nil, "a live file is not in the Trash")
+        try await drive.delete("print-files/PF-9/Dragon.3mf")
+        #expect(try await drive.head("print-files/PF-9/Dragon.3mf") == nil)
+        let trashed = try #require(try await drive.trashedCopy("print-files/PF-9/Dragon.3mf"))
+        #expect(trashed.size == data.count)
+        #expect(try await drive.restoreFromTrash("print-files/PF-9/Dragon.3mf"))
+        #expect(try await drive.head("print-files/PF-9/Dragon.3mf")?.size == data.count)
+        #expect(try await drive.get("print-files/PF-9/Dragon.3mf") == data)
+        #expect(try await drive.restoreFromTrash("print-files/PF-9/nothing.stl") == false)
+        #expect(try await LibraryRemote.bucket(.init(endpoint: "https://x", bucket: "b", accessKeyId: "k", secretAccessKey: "s"))
+                    .trashedCopy("k", fetch: google.fetch) == nil, "a bucket has no Trash to look in")
     }
 
     @Test("a key with a quote in it cannot break out of the query")

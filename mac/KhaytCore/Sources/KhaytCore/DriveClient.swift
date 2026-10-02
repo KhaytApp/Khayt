@@ -214,8 +214,11 @@ public actor DriveClient {
     struct Found { let id: String; let size: Int; let md5: String? }
 
     /// The file carrying this key — one indexed query, no path walking.
-    func find(_ key: String) async throws -> Found? {
-        let q = "appProperties has { key='khaytKey' and value=\(Self.quoted(key)) } and trashed=false"
+    /// `trashed` looks in Drive's Trash instead: a model whose only copy is
+    /// on Drive, trashed there by hand or by a cleanup, is not LOST until
+    /// Drive empties it (30 days), and that is the place to look first.
+    func find(_ key: String, trashed: Bool = false) async throws -> Found? {
+        let q = "appProperties has { key='khaytKey' and value=\(Self.quoted(key)) } and trashed=\(trashed)"
         let r = try await object(try await request(Self.query(q, fields: "files(id,size,md5Checksum)")), "find")
         guard let f = (r["files"] as? [[String: Any]])?.first, let id = f["id"] as? String else { return nil }
         let size = Int((f["size"] as? String) ?? "") ?? (f["size"] as? Int) ?? 0
@@ -261,6 +264,22 @@ public actor DriveClient {
     public func head(_ key: String) async throws -> S3.Head? {
         guard let f = try await find(key) else { return nil }
         return S3.Head(size: f.size, etag: f.md5)
+    }
+
+    /// Size and MD5 of a copy sitting in Drive's Trash under this key, or nil.
+    public func trashedCopy(_ key: String) async throws -> S3.Head? {
+        guard let f = try await find(key, trashed: true) else { return nil }
+        return S3.Head(size: f.size, etag: f.md5)
+    }
+
+    /// Take the copy under this key back out of Drive's Trash. False when
+    /// there is none there to restore.
+    @discardableResult
+    public func restoreFromTrash(_ key: String) async throws -> Bool {
+        guard let f = try await find(key, trashed: true) else { return false }
+        _ = try await object(try await request("\(Self.api)/files/\(f.id)", method: "PATCH", json: ["trashed": false]),
+                             "restore")
+        return true
     }
 
     /// To Drive's trash, not gone: Drive has an undo, so this uses it.
@@ -345,4 +364,20 @@ public enum LibraryRemote: Sendable {
         case .drive(let d): try await d.delete(key)
         }
     }
+    /// A copy in the remote's own trash — Drive has one, a bucket does not.
+    public func trashedCopy(_ key: String, fetch: S3.Fetch) async throws -> S3.Head? {
+        switch self {
+        case .bucket: nil
+        case .drive(let d): try await d.trashedCopy(key)
+        }
+    }
+    /// Out of the trash again; false when there is nothing there (or no trash).
+    @discardableResult
+    public func restoreFromTrash(_ key: String, fetch: S3.Fetch) async throws -> Bool {
+        switch self {
+        case .bucket: false
+        case .drive(let d): try await d.restoreFromTrash(key)
+        }
+    }
+    public var isDrive: Bool { if case .drive = self { true } else { false } }
 }

@@ -22,6 +22,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   product (or confirm in that review): it holds the update and says "Prices
   changed — review before publishing", with the old and new prices listed in
   the Web store sheet. Publishing from there sends them.
+- **(Mac) The print library stops losing files.** Five fixes:
+  - **Free up space now** asks first, with the number of models, their total
+    size and the first few names. A model counts as unused from the latest of
+    its import date, its last print and its last job. Before, only the file's
+    date counted, and an import keeps the download's date. One shop had 113
+    models (1.39 GB), imported that month, offered for moving. Models on a job
+    that is not finished are never moved. The settings text no longer says
+    moved models come back when you open them: you bring one back from its
+    page, or all of them with Bring everything back.
+  - Every model moved online is checked when the app opens and once a day
+    after that. A model the cloud no longer has shows a warning on every
+    screen. If it is in Google Drive's Trash, Settings offers **Restore from
+    Drive Trash**.
+  - Bringing a model back asks the storage it was moved to (the sidecar
+    names it), not just whichever one is in use now. Switching between
+    Google Drive and a bucket is refused while models moved to the other one
+    are still out there, and the message says to bring them back first.
+  - Adding models **keeps your original files** by default. Moving them in
+    (originals go to the Trash) is a choice in the Add panel and in
+    Settings, and it is remembered. In iCloud Drive or Dropbox, sending a file
+    to the Trash removes it from every device. An import also never takes
+    files out of a linked folder.
+  - Moving the library to a new folder takes back only Khayt's own model
+    folders from the old one. Before, it took every file there.
+  The shared tiering rule (`lib/print-library-tier.js`) also takes an
+  optional last-used date and in-use flag. The desktop app does not send
+  them yet, so its behaviour is unchanged.
 
 - **Prusa multi-material targets name the right printer.** The print-file
   converter wrote `MK4IS` for the MK4 + MMU3, `MK3S` for the MK3S + MMU2S (both
