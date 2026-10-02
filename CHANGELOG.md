@@ -173,6 +173,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   shelf had since stopped covering was marked done with nothing printed. It
   is now counted again at the moment it is written, and whatever the shelf no
   longer holds goes to a machine.
+- **Moving a finished job back no longer takes its filament twice.** Finished
+  → QC → finished took a 200 g job's filament off the spool twice (1000 g to
+  600 g), in both apps, and the same with Move back or a drag. On the Mac,
+  leaving Completed now puts back exactly what finishing it took — each
+  spool's grams, and the glue and parts it used — and finishing again takes
+  one print's worth. In the desktop app the first deduction stands and
+  finishing again takes nothing more. A print that failed inspection is still
+  booked as waste, so a job re-opened, failed and reprinted takes two prints,
+  as it should. Jobs finished before this update are not charged again either.
+  Cancelling a finished job gives nothing back: the piece was made.
+- **(Mac) Undo no longer throws away what was written since.** Undo used to
+  put back the whole record as it was before the action, so anything changed
+  in between was lost: a delivery received onto a spool, a payment taken on the
+  phone, another job's filament, a cloud or phone edit. It now puts back only
+  what the action itself changed. A spool gets back just the grams the job
+  took — complete a job (1000 g → 800 g), receive 1000 g, undo, and the spool
+  reads 2000 g, not 1000 g. A field someone else has changed since is left as
+  it is, and the app says what it did not undo. Undoing a completion also
+  removes the actual time and weight recorded with it, undoing a QC failure
+  removes its waste row, and undoing a library edit keeps a remeasure or a
+  phone's change to the same model.
 
 - **(Mac) A restored backup stays restored.** Restoring used to lose to the
   next cloud sync: a record deleted after the backup was taken was deleted

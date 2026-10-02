@@ -453,6 +453,8 @@ final class Words {
                               "ar": "لم يعد هذا العمل في الدفتر."],
         "mac.filament_returned": ["en": "Put {weight}g back on the shelf — the job is no longer finished, so its filament is not used yet.",
                                   "ar": "أُعيد {weight} غ إلى المخزون — لم يعد العمل منتهيًا، فخيوطه لم تُستهلك بعد."],
+        "mac.undo_partial":  ["en": "Some of this changed since — not undone: {fields}",
+                              "ar": "تغيّر بعض هذا منذ ذلك الحين — لم يُتراجع عنه: {fields}"],
         "mac.move_sample":   ["en": "The sample shop cannot be changed.",
                               "ar": "لا يمكن تغيير المحل التجريبي."],
         "mac.remeasured":    ["en": "{n} models were measured again — their sizes were wrong.",
