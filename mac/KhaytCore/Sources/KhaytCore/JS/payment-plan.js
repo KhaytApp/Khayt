@@ -358,9 +358,26 @@ function monthlyPlan({ owed, today, installments = 3, intervalDays = 30 } = {}) 
  * @param {number} opts.paidAmount     What the order already holds.
  * @param {Array} opts.instalments     Rows of `{amount, paid}`.
  * @param {number} [opts.instalmentBase] Cash held when the plan was generated.
+ * @param {number} [opts.giftCardDiscount] Gift card spent on the order.
+ * @param {number} [opts.credited]  Credit notes against it.
+ * @param {number} [opts.due]       What the order is BILLED, when that is not
+ *                                  the price — an exclusive shop's price + tax
+ *                                  (`KhaytOrderMoney.orderGrossRaw`).
  * @returns {{paidAmount:number, paymentStatus:string, collected:number}}
+ *
+ * ── A GIFT CARD IS A TENDER, AND THE PLAN DOES NOT COVER IT ──────────────
+ *
+ * A plan is generated over what is OWED — price less the gift card and the
+ * credit notes — so collecting every row of it brings the CASH to
+ * price − gift card. Judged against the bare price, that order stayed
+ * "partial" for ever: a 500 job with a 100 card and a 400 plan, fully
+ * collected, was chased for the 100 the card had already paid. Settled is
+ * judged the way `KhaytOrderPayment.statusOf` judges it: cash + gift card
+ * against what is billed less credit notes.
  */
-function collectionTotals({ price, paidAmount, instalments, instalmentBase } = {}) {
+function collectionTotals({
+  price, paidAmount, instalments, instalmentBase, giftCardDiscount, credited, due,
+} = {}) {
   const held = Number(paidAmount) || 0;
   const rows = Array.isArray(instalments) ? instalments : [];
   const collected = round2(rows.reduce(
@@ -370,10 +387,12 @@ function collectionTotals({ price, paidAmount, instalments, instalmentBase } = {
     ? round2(instalmentBase + collected)
     : collected;
   const paid = Math.max(held, fromPlan);
-  const owed = Number(price) || 0;
-  const paymentStatus = paid <= 0
+  const billed = (typeof due === 'number' && due >= 0) ? due : (Number(price) || 0);
+  const owed = Math.max(0, billed - pos(credited));
+  const tendered = paid + pos(giftCardDiscount);
+  const paymentStatus = tendered <= 0
     ? 'unpaid'
-    : (owed > 0 && paid + 0.005 >= owed ? 'paid' : 'partial');
+    : (owed > 0 && tendered + 0.005 >= owed ? 'paid' : 'partial');
   return { paidAmount: paid, paymentStatus, collected };
 }
 

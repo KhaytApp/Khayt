@@ -242,7 +242,10 @@ private struct Detail: View {
                      Money.text(split.taxTotal, job.currency), dim: true)
             }
             DetailLine(shop.words.callIt("mac.paid"), Money.text(job.paidAmount, job.currency))
-            DetailLine(shop.words.callIt("flow.owed"), Money.text(job.owed, job.currency), strong: !job.isSettled)
+            // In the job's OWN currency, beside its total and what was paid —
+            // `owed` is the shop's, and printed it under this job's mark read
+            // a 100 USD job as "Owed 375.00 USD".
+            DetailLine(shop.words.callIt("flow.owed"), Money.text(job.owedInOwnCurrency, job.currency), strong: !job.isSettled)
             if shop.canMoveJobs {
                 // Where somebody is already reading what is owed. ⇧⌘P does the
                 // same thing from anywhere; this is the one place the question

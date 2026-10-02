@@ -71,7 +71,7 @@
     const known = c.currencies || null;
     const clients = Array.isArray(c.clients) ? c.clients : [];
 
-    const statusOf = (o) => (P ? P.statusOf(o) : (o.paymentStatus || 'unpaid'));
+    const statusOf = (o) => (P ? P.statusOf(o, moneyCtx) : (o.paymentStatus || 'unpaid'));
     const owedOf = (o) => (M ? M.orderOwedBase(o, moneyCtx, known) : Math.max(0, num(o.price) - num(o.paidAmount)));
 
     const rows = [];

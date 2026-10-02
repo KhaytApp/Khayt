@@ -152,6 +152,53 @@ function hoursForPrint(hours) {
   return String(Math.round(n * 10) / 10);
 }
 
+/**
+ * The money lines under an invoice's table, as one rule both apps print.
+ *
+ * `order.price` already bundles rush, shipping and the extras
+ * (`finalPrice = goods + rush + shipping + extras`), and the summary prints
+ * Rush and Shipping as rows of their own under "Subtotal". So the Subtotal row
+ * is the ITEMS — the price less rush and shipping, shown before the discount
+ * when there is one — or the rows do not add up to the total under them. The
+ * Mac printed the whole price there: a 280 job of 225 goods, 25 rush and 30
+ * shipping read Subtotal 280, Rush 25, Shipping 30, Total 280.
+ *
+ *   itemsSubtotal − discount + rush + shipping = price
+ *
+ * in the price's own terms — tax-inclusive for an inclusive shop, pre-tax for
+ * an exclusive one, whose `total` is the price plus `taxTotal` on a line of
+ * its own (`addsTax`).
+ *
+ * @param {object} order
+ * @param {object} profile from `KhaytTax.profileFromSettings`
+ */
+function invoiceSummary(order, profile) {
+  const o = order || {};
+  const r2 = (n) => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
+  const price = +o.price || 0;
+  const T = (typeof globalThis !== 'undefined') ? globalThis.KhaytTax : undefined;
+  const p = profile || {};
+  const tax = (T && typeof T.computeTax === 'function')
+    ? T.computeTax(price, p)
+    : { subtotal: r2(price), taxTotal: 0, total: r2(price) };
+  const shipping = +o.shippingCost || 0;
+  const rush = +o.rushFeeAmount || 0;
+  const discount = (+o.discountPct || 0) > 0
+    ? Math.max(0, (+o.priceBeforeDiscount || 0) * (+o.discountPct || 0) / 100)
+    : 0;
+  const rates = Array.isArray(p.rates) ? p.rates.filter((r) => r && +r.percent > 0) : [];
+  return {
+    itemsSubtotal: r2(price - shipping - rush + discount),
+    discount: r2(discount),
+    rush: r2(rush),
+    shipping: r2(shipping),
+    subtotal: tax.subtotal,
+    taxTotal: tax.taxTotal,
+    total: tax.total,
+    addsTax: p.mode === 'exclusive' && rates.length > 0,
+  };
+}
+
 function invoiceHtml(order, ctx) {
   const {
     qrSvg, qrProblem = null, payQrSvg = '', total, vatAmount, subtotal,
@@ -661,7 +708,7 @@ function invoiceHtml(order, ctx) {
   return { html, arabicNumerals: !!(isAr && settings.useArabicNumerals),
            selector: NUMERAL_SELECTOR };
 }
-const api = { invoiceHtml, contactLine, isolate, NUMERAL_SELECTOR };
+const api = { invoiceHtml, invoiceSummary, contactLine, isolate, NUMERAL_SELECTOR };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 global.KhaytInvoiceDocument = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
