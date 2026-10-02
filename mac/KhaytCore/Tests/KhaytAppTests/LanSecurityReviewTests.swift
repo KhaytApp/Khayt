@@ -144,22 +144,55 @@ struct LanSecurityReviewTests {
 
     // MARK: 2 — three measurements at once means three
 
+    /// Counts measurements in progress and holds each until released.
+    final class Gate: @unchecked Sendable {
+        private let lock = NSLock()
+        private var entered = 0
+        let release = DispatchSemaphore(value: 0)
+        var inside: Int { lock.lock(); defer { lock.unlock() }; return entered }
+        func enter() { lock.lock(); entered += 1; lock.unlock(); release.wait() }
+    }
+
     @Test("a burst of uploads cannot get past the three-at-once cap")
     func measuringCapHoldsUnderABurst() async throws {
-        let server = try await Self.server(measureDelay: 1.0, book: LanServerTests.quotingBook)
-        var statuses: [Int] = []
+        // Deterministic, not timed: every measurement that gets in is HELD
+        // until all the others have answered, so a slow runner cannot turn
+        // a burst into a queue and pass the test by accident.
+        let gate = Gate()
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let store = LanServerTests.quotingBook(shop.lanBook)
+        var host = LanServer.Host(store: { store }, pin: "24682468", engine: engine)
+        host.intakeToken = "intake-token-for-tests"
+        host.pricing = { store }
+        host.measure = { _, _ in gate.enter(); return LanServerTests.measuredCube }
+        let server = LanServer(host: host)
+        let answered = LanServerTests.Counter()
         let uploads = (0..<8).map { i in
             Task { @MainActor in
-                await server.respond(to: LanServer.Request(
+                let status = await server.respond(to: LanServer.Request(
                     method: "POST", path: "/api/intake/estimate", query: ["name": "cube.stl"],
                     headers: ["x-khayt-intake-token": "intake-token-for-tests"],
                     body: Data(LanServerTests.stlBytes.utf8), remote: "192.168.1.\(i + 10)")).status
+                answered.n += 1
+                return status
             }
         }
+        // Wait (generously) for the five that should be turned away.
+        let deadline = Date().addingTimeInterval(120)
+        while answered.n < 8 - LanServer.maxMeasuring, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        let inside = gate.inside
+        for _ in 0..<8 { gate.release.signal() }
+        var statuses: [Int] = []
         for upload in uploads { statuses.append(await upload.value) }
-        #expect(statuses.filter { $0 == 200 }.count <= LanServer.maxMeasuring, Comment(rawValue: "\(statuses)"))
-        #expect(statuses.filter { $0 == 503 }.count >= 8 - LanServer.maxMeasuring, Comment(rawValue: "\(statuses)"))
+        #expect(inside <= LanServer.maxMeasuring, "\(inside) measured at once")
+        #expect(statuses.filter { $0 == 200 }.count == LanServer.maxMeasuring, Comment(rawValue: "\(statuses)"))
+        #expect(statuses.filter { $0 == 503 }.count == 8 - LanServer.maxMeasuring, Comment(rawValue: "\(statuses)"))
         // And the slots came back: the next one is measured.
+        gate.release.signal()
         let later = await server.respond(to: LanServer.Request(
             method: "POST", path: "/api/intake/estimate", query: ["name": "cube.stl"],
             headers: ["x-khayt-intake-token": "intake-token-for-tests"],
@@ -199,7 +232,38 @@ struct LanSecurityReviewTests {
         #expect(!LanServer.takesLargeBody(method: "POST", target: "/api/intake/estimate/x"))
     }
 
-    @Test("a two-megabyte model is priced, and two megabytes anywhere else is still a 413")
+    /// Send a request head that PROMISES `length` bytes of body and none of
+    /// them, and read the status line. A refusal for size has to come back
+    /// before a byte of body is read; sending the body would only race the
+    /// server's close (EPIPE). Blocking, so it is run detached — the server
+    /// shares the main actor with this test.
+    nonisolated static func headOnly(port: UInt16, path: String, length: Int) -> String {
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { return "no socket" }
+        defer { close(fd) }
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = port.bigEndian
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let ok = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard ok == 0 else { return "no connect" }
+        let head = "POST \(path) HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n"
+            + "Content-Length: \(length)\r\n\r\n"
+        let data = Data(head.utf8)
+        _ = data.withUnsafeBytes { write(fd, $0.baseAddress, data.count) }
+        var tv = timeval(tv_sec: 60, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        var buf = [UInt8](repeating: 0, count: 512)
+        let n = read(fd, &buf, 512)
+        guard n > 0 else { return "no answer" }
+        return String(decoding: buf[0..<n], as: UTF8.self)
+    }
+
+    @Test("a two-megabyte model is priced over the wire")
     func largeUploadOverTheWire() async throws {
         let bench = try await LanServerTests.Bench()
         defer { bench.stop() }
@@ -209,7 +273,23 @@ struct LanSecurityReviewTests {
         let priced = try await bench.post("/api/intake/estimate?name=cube.stl", json: big,
                                           headers: ["Cookie": cookie])
         #expect(priced.status == 200, Comment(rawValue: priced.text))
-        let elsewhere = try await bench.post("/api/intake", json: big, headers: ["Cookie": cookie])
-        #expect(elsewhere.status == 413)
+    }
+
+    @Test("over a megabyte anywhere else, or over 32 MB to the upload, is refused before the body")
+    func largeBodiesRefusedElsewhere() async throws {
+        let bench = try await LanServerTests.Bench()
+        defer { bench.stop() }
+        let port = bench.port
+        let elsewhere = await Task.detached { Self.headOnly(port: port, path: "/api/intake", length: 2 << 20) }.value
+        #expect(elsewhere.hasPrefix("HTTP/1.1 413"), Comment(rawValue: elsewhere))
+        let deltas = await Task.detached {
+            Self.headOnly(port: port, path: "/api/store/deltas", length: 2 << 20)
+        }.value
+        #expect(deltas.hasPrefix("HTTP/1.1 413"), Comment(rawValue: deltas))
+        let huge = await Task.detached {
+            Self.headOnly(port: port, path: "/api/intake/estimate?name=a.stl", length: LanServer.maxUpload + 1)
+        }.value
+        #expect(huge.hasPrefix("HTTP/1.1 413"), Comment(rawValue: huge))
+        #expect(huge.contains("too-large"), Comment(rawValue: huge))
     }
 }
