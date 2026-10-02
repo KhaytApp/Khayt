@@ -1482,7 +1482,13 @@ function openCampaignModal() {
         const msg = KhaytCampaigns.fillTemplate(body, r, fmtMoney, settings);
         try {
           let ok;
-          if (ch === 'email') ok = await window.hubAPI.sendEmail({ to: r.contact, subject: KhaytCampaigns.fillTemplate(subject || 'Khayt', r, fmtMoney, settings), body: msg.replace(/\n/g, '<br>'), smtpConfig: settings.emailConfig });
+          if (ch === 'email') {
+            // The body is HTML: a customer's name (or any merged value) is
+            // escaped so "<b>Ali</b>" arrives as text, not markup. The shop's
+            // own wording is its own; the subject is a plain-text header.
+            const html = KhaytCampaigns.fillTemplate(body, r, fmtMoney, settings, { html: true });
+            ok = await window.hubAPI.sendEmail({ to: r.contact, subject: KhaytCampaigns.fillTemplate(subject || 'Khayt', r, fmtMoney, settings), body: html.replace(/\n/g, '<br>'), smtpConfig: settings.emailConfig });
+          }
           else ok = await window.hubAPI.sendSms({ to: r.contact, message: msg, channel: ch, smsConfig: settings.smsConfig });
           (ok && ok.ok) ? sent++ : failed++;
         } catch (e) { failed++; }
