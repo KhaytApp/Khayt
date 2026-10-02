@@ -203,6 +203,27 @@ extension Shop {
         webStoreHeroes = [:]
     }
 
+    /// Called each time a book is read, before `webStoreFollow`. True when it
+    /// is a different book from the last one read (or the first), and only
+    /// then is the last store forgotten.
+    ///
+    /// `resetWebStore` used to run on EVERY load, after `webStoreFollow`, so a
+    /// reload — and a change to the book IS a reload — cancelled the republish
+    /// the follow had just scheduled and forgot the store was live. Automatic
+    /// republishing never fired.
+    @discardableResult
+    func webStoreBookRead(_ book: URL?) -> Bool {
+        let another = !webStoreBookKnown || webStoreBook != book
+        webStoreBookKnown = true
+        webStoreBook = book
+        if another {
+            resetWebStore()
+            // Another shop's catalogue is not this one's "before".
+            webStoreSeen = nil
+        }
+        return another
+    }
+
     /// Ask the service whether the store is live. Quiet about a shop with no cloud.
     func refreshWebStore() async {
         guard let build = source.build, Self.cloudConnected(settingsDict) else {
@@ -263,23 +284,10 @@ extension Shop {
             // following it if not.
             if automatic {
                 let now = try await CatalogPublisher.status(connection, token: token) { try await session.data(for: $0) }
-                guard now.live else {
-                    webStoreLive = false
-                    webStoreHeld = now
-                    return
-                }
-                // ── A PRICE NOBODY SET IS NOT PUBLISHED ON ITS OWN ───────────
-                //
-                // Compared with what the store holds RIGHT NOW, not with the
-                // last read of the book: whatever moved a price — a spool
-                // size, a sync, a repair — a customer would see it. Held, and
-                // the shop is asked; pressing Publish in the sheet sends it.
-                if holdUnsetPrices(sending: catalog, published: now) { return }
-                // EVERYTHING WAS DELETED. The service refuses an empty catalogue,
-                // so without this the old one stayed up: customers could still
-                // order what the shop had removed. An empty catalogue now means
-                // no store, and the shop is told.
-                if sent == 0 {
+                switch automaticGate(sending: catalog, sent: sent, published: now) {
+                case .send: break
+                case .stop, .held: return
+                case .empty:
                     try await CatalogPublisher.publish(connection, token: token, catalog: nil) {
                         try await session.data(for: $0)
                     }
@@ -383,17 +391,57 @@ extension Shop {
         ])
         defer { webStoreSeen = seen }
         guard let before = webStoreSeen, before != seen,
-              webStoreLive == true, let book = source.build?.storeURL,
-              cloudRoleCanWrite else { return }
+              webStoreLive == true, cloudRoleCanWrite else { return }
+        // The book `webStoreBookRead` recorded for this load — the same one
+        // `source.build?.storeURL` names, and set for the sample too.
+        let book = webStoreBook
+        let delay = webStoreFollowDelay
         webStoreRepublish?.cancel()
         webStoreRepublish = Task { [weak self] in
-            try? await Task.sleep(for: CatalogPublisher.followDelay)
+            try? await Task.sleep(for: delay)
             // Still the same book, and still live: a book opened in the
             // meantime is a different shop with a store of its own.
-            guard !Task.isCancelled, let self, self.source.build?.storeURL == book,
+            guard !Task.isCancelled, let self, self.webStoreBook == book,
                   self.webStoreLive == true else { return }
+            if let stand = self.webStoreAutoPublish { await stand(self); return }
             await self.publishWebStore(automatic: true)
         }
+    }
+
+    /// What an automatic publish does once it knows what the store holds.
+    enum AutoGate: Equatable {
+        /// Send the catalogue.
+        case send
+        /// The store is no longer live: stop following it.
+        case stop
+        /// A price nobody set would change: held for review, nothing sent.
+        case held
+        /// Nothing left to list: take the store offline.
+        case empty
+    }
+
+    /// The checks an automatic publish makes before it sends anything. Its own
+    /// function so the rule can be asked without a network.
+    func automaticGate(sending catalog: JSONValue, sent: Int,
+                       published now: CatalogPublisher.Held) -> AutoGate {
+        guard now.live else {
+            webStoreLive = false
+            webStoreHeld = now
+            return .stop
+        }
+        // ── A PRICE NOBODY SET IS NOT PUBLISHED ON ITS OWN ───────────────
+        //
+        // Compared with what the store holds RIGHT NOW, not with the last read
+        // of the book: whatever moved a price — a spool size, a sync, a repair
+        // — a customer would see it. Held, and the shop is asked; pressing
+        // Publish in the sheet sends it.
+        if holdUnsetPrices(sending: catalog, published: now) { return .held }
+        // EVERYTHING WAS DELETED. The service refuses an empty catalogue, so
+        // without this the old one stayed up: customers could still order what
+        // the shop had removed. An empty catalogue now means no store, and the
+        // shop is told.
+        if sent == 0 { return .empty }
+        return .send
     }
 
     /// Hold an automatic republish that would change a price the shop did

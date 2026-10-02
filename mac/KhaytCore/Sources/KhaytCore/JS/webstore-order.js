@@ -415,8 +415,16 @@
    * one: a basket half of whose lines are unpriced has not told us its total,
    * and a partial sum recorded as "paid" would leave a balance that is not owed.
    * A payload `paidTotal`, should the cloud ever send one, wins.
+   *
+   * `ctx` is optional and carries the shop's `settings`. A line's `unitPrice`
+   * is the catalogue's price, and on a shop that ADDS TAX ON TOP that is the
+   * pre-tax figure: the customer paid it plus the tax. Summed bare, a paid
+   * order was recorded short by exactly the tax and could never settle. Given
+   * the settings, the line total is grossed up the way `orderGrossRaw` grosses
+   * up a job's price; an inclusive or untaxed shop is unchanged, and so is an
+   * explicit `paidTotal`, which is already the money that moved.
    */
-  function paidTotal(payload) {
+  function paidTotal(payload, ctx) {
     const p = payload || {};
     const said = moneyOf(p.paidTotal);
     if (said !== null) return said;
@@ -429,7 +437,13 @@
       const q = Math.round(Number(l.qty != null ? l.qty : l.quantity));
       sum += unit * (Number.isFinite(q) && q > 0 ? q : 1);
     }
-    return round2(sum);
+    sum = round2(sum);
+    const Money = global.KhaytOrderMoney
+      || (typeof require === 'function' ? require('./order-money.js') : null);
+    if (ctx && ctx.settings && Money && typeof Money.orderGrossRaw === 'function') {
+      return round2(Money.orderGrossRaw({ price: sum }, { settings: ctx.settings }));
+    }
+    return sum;
   }
 
   const api = {

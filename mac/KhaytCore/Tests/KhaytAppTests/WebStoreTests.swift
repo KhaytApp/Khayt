@@ -189,9 +189,11 @@ struct WebStoreTests {
         #expect(src.contains("guard now.live else"))
         #expect(src.contains("mac.ws_emptied"))
         #expect(src.contains("cloudRoleCanWrite"), "a viewer's Mac follows a store it cannot publish")
-        #expect(src.contains("self.source.build?.storeURL == book"))
+        #expect(src.contains("self.webStoreBook == book"))
         let shop = try QuoteSheetStatusTests.source("Shop.swift")
-        #expect(shop.contains("resetWebStore()"))
+        #expect(shop.contains("webStoreBookRead(next.build?.storeURL)"))
+        // Never on every load: that cancelled the follow it had just scheduled.
+        #expect(!shop.contains("            resetWebStore()\n"))
     }
 
     @Test("the read-back asks past the service's 60-second cache")

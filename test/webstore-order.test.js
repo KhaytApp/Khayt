@@ -264,3 +264,20 @@ test('what the platform says was paid: every line priced, or nothing said', () =
   assert.equal(W.paidTotal(medusa()), null, 'an open form names no price');
   assert.equal(W.paidTotal({ paidTotal: 99.5, lines: [{ qty: 1, unitPrice: 1 }] }), 99.5);
 });
+
+test('paidTotal on a tax-on-top shop is the lines plus the tax the customer paid', () => {
+  require('../lib/tax.js');
+  require('../lib/order-money.js');
+  const salesTax = { currency: 'USD', tax: { name: 'Sales Tax', mode: 'exclusive',
+    rates: [{ id: 'st', label: 'Sales tax', percent: 8.25 }] } };
+  const vat15 = { currency: 'SAR', enableVat: true, vatRate: 15 };
+  const order = { lines: [{ name: 'Hood', qty: 2, unitPrice: 50 }] };
+  // Recorded bare, the job read 8.25 short and could never settle.
+  assert.equal(W.paidTotal(order, { settings: salesTax }), 108.25);
+  // Inclusive: the price already holds the VAT.
+  assert.equal(W.paidTotal(order, { settings: vat15 }), 100);
+  // No settings: the old answer.
+  assert.equal(W.paidTotal(order), 100);
+  // An explicit total is already the money that moved.
+  assert.equal(W.paidTotal({ paidTotal: 100, lines: order.lines }, { settings: salesTax }), 100);
+});
