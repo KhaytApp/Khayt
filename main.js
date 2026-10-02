@@ -5018,18 +5018,21 @@ ipcMain.handle('hub:send-sms', async (_e, { to, message, channel, smsConfig } = 
 // owner's webhook (bridge to QuickBooks/Zoho/Xero via Zapier/Make/own endpoint).
 // Idempotent by payload.idempotencyKey; secret resolves from the encrypted store.
 ipcMain.handle('hub:accounting-push', async (_e, { url, secret, payload } = {}) => {
-  if (!/^https?:\/\//i.test(String(url || ''))) return { ok: false, error: 'Accounting webhook needs an http(s) URL' };
+  // https only (maintainer, 2026-10-02): this request carries the shop's
+  // secret in a header, which plain http would hand to anyone on the path. A
+  // shop still set up with http:// sees this on the order and in a toast.
+  if (!/^https:\/\//i.test(String(url || ''))) return { ok: false, error: 'Accounting webhook needs an https:// URL' };
   // Same hardening as hub:webhook-post: the URL comes from the store
   // (settings.accountingSync.webhookUrl), which can arrive via restore/sync, so
   // private/loopback/metadata targets are refused, the connection goes to the
   // address that was checked (lib/webhook-send.js, no DNS rebinding) and a
-  // redirect is never followed. http stays allowed here, as it always was.
+  // redirect is never followed.
   secret = resolveStoreSecret(secret, d => d?.settings?.accountingSync?.secret);
   try {
     const headers = { 'content-type': 'application/json' };
     if (secret) headers['X-Khayt-Secret'] = String(secret);
     if (payload && payload.idempotencyKey) headers['Idempotency-Key'] = String(payload.idempotencyKey);
-    const r = await webhookSend.postPinned(url, { headers, body: JSON.stringify(payload || {}), timeoutMs: 15000, allowHttp: true });
+    const r = await webhookSend.postPinned(url, { headers, body: JSON.stringify(payload || {}), timeoutMs: 15000 });
     if (r.error) {
       const error = r.error === 'Webhook redirects are not allowed' ? 'Blocked redirect from accounting webhook'
         : r.error === 'Invalid webhook URL' ? 'Invalid accounting webhook URL' : r.error.replace('cannot send webhooks to', 'cannot send to');

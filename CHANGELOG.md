@@ -32,6 +32,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and `X-Khayt-Signature-V2`, so a receiver can refuse an old copy sent
   again. The original `X-Khayt-Signature` is unchanged, so existing
   integrations keep working. The Mac app sends the same headers.
+  **Accounting sync now needs an `https://` address.** It sends your secret
+  with every push, and plain `http://` let anyone between you and the
+  server read it. If yours starts with `http://`, change it in Settings ›
+  Accounting sync. Until you do, each paid order shows why it was not sent.
 
 - **A model moved to Google Drive to save space comes back.** When old models
   were moved off this computer to free space, the desktop recorded every one

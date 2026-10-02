@@ -75,17 +75,22 @@ test('a name with any private answer is refused before connecting (DNS rebinding
   assert.match(literal.error, /private\/loopback/);
 });
 
-test('a redirect is refused, http only where the caller allows it', async () => {
+test('a redirect is refused, and plain http never sent to', async () => {
   const r = await postPinned('https://hooks.example.com/', {}, { lookupAll: async () => [{ address: '93.184.216.34', family: 4 }], request: fakeRequest(302, {}) });
   assert.equal(r.ok, false);
   assert.equal(r.error, 'Webhook redirects are not allowed');
-  const plain = await postPinned('http://hooks.example.com/', {}, { lookupAll: async () => [{ address: '93.184.216.34', family: 4 }], request: fakeRequest(200, {}) });
-  assert.equal(plain.ok, false);
   const seen = {};
-  const allowed = await postPinned('http://hooks.example.com/', { allowHttp: true }, { lookupAll: async () => [{ address: '93.184.216.34', family: 4 }], request: fakeRequest(200, seen) });
-  assert.equal(allowed.ok, true);
-  assert.equal(seen.opts.servername, undefined, 'no SNI over plain http');
-  assert.equal(seen.opts.port, 80);
+  const plain = await postPinned('http://hooks.example.com/', {}, { lookupAll: async () => [{ address: '93.184.216.34', family: 4 }], request: fakeRequest(200, seen) });
+  assert.equal(plain.ok, false);
+  assert.equal(seen.opts, undefined, 'nothing was opened');
+});
+
+test('accounting sync is https only: its secret travels in a header', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'main.js'), 'utf8');
+  const at = src.indexOf("ipcMain.handle('hub:accounting-push'");
+  const body = src.slice(at, src.indexOf('\n});\n', at));
+  assert.match(body, /\^https:/);
+  assert.doesNotMatch(body, /allowHttp|https\?/);
 });
 
 test('every outgoing webhook in main.js goes through the pinned sender', () => {
