@@ -69,6 +69,8 @@ enum CatalogPublisher {
         var at: Date?
         var items = 0
         var photos = 0
+        /// Product id → the price the store lists it at, as held.
+        var prices: [String: String] = [:]
     }
 
     static func status(_ connection: CloudReader.Connection, token: String,
@@ -94,6 +96,7 @@ enum CatalogPublisher {
                 for case .object(let item) in items {
                     if case .array(let photos)? = item["photos"] { held.photos += photos.count }
                 }
+                held.prices = prices(of: .object(catalog))
             }
             return held
         case 404: return Held(live: false)
@@ -127,6 +130,59 @@ enum CatalogPublisher {
     /// How long a live store waits after a change before republishing, so a
     /// run of edits sends one catalogue rather than one each.
     static let followDelay: Duration = .seconds(4)
+
+    // MARK: Prices nobody set are not published on their own
+
+    /// A price as one comparable text: numbers in one spelling ("50", "50.0"
+    /// and 50 are one price), anything else trimmed, nothing for no price.
+    nonisolated static func priceText(_ value: JSONValue?) -> String? {
+        let raw: String
+        switch value {
+        case .number(let n)?: raw = String(n)
+        case .string(let s)?: raw = s.trimmingCharacters(in: .whitespaces)
+        default: return nil
+        }
+        guard !raw.isEmpty else { return nil }
+        guard let n = Double(raw), n.isFinite else { return raw }
+        return n == n.rounded() && abs(n) < 1e15 ? String(Int64(n)) : String(n)
+    }
+
+    /// Product id → listed price, out of a catalogue (sent or held).
+    nonisolated static func prices(of catalog: JSONValue) -> [String: String] {
+        guard case .object(let o) = catalog, case .array(let items)? = o["items"] else { return [:] }
+        var out: [String: String] = [:]
+        for case .object(let item) in items {
+            guard case .string(let id)? = item["id"], !id.isEmpty,
+                  let price = priceText(item["price"]) else { continue }
+            out[id] = price
+        }
+        return out
+    }
+
+    /// The products whose price a live store would change WITHOUT the shop
+    /// having set it: listed at one price now, about to be sent at another,
+    /// and not the price the shop saved for it (`explicit`). A product being
+    /// added or taken off is not a re-price and is not held.
+    ///
+    /// Why it exists: a spool's size edited, a record merged by sync, a repair
+    /// run on open — each could re-price the catalogue, and a store that
+    /// followed the catalogue published it. A price change customers see has
+    /// to be one somebody made.
+    nonisolated static func heldPrices(sending: [String: String], published: [String: String],
+                                       explicit: [String: String]) -> [String] {
+        sending.keys.sorted().filter { id in
+            guard let now = sending[id], let was = published[id], now != was else { return false }
+            return explicit[id] != now
+        }
+    }
+}
+
+/// One price a live store was about to change on its own, held for review.
+struct WebStorePriceChange: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let was: String
+    let now: String
 }
 
 // MARK: - The shop's side
@@ -212,6 +268,13 @@ extension Shop {
                     webStoreHeld = now
                     return
                 }
+                // ── A PRICE NOBODY SET IS NOT PUBLISHED ON ITS OWN ───────────
+                //
+                // Compared with what the store holds RIGHT NOW, not with the
+                // last read of the book: whatever moved a price — a spool
+                // size, a sync, a repair — a customer would see it. Held, and
+                // the shop is asked; pressing Publish in the sheet sends it.
+                if holdUnsetPrices(sending: catalog, published: now) { return }
                 // EVERYTHING WAS DELETED. The service refuses an empty catalogue,
                 // so without this the old one stayed up: customers could still
                 // order what the shop had removed. An empty catalogue now means
@@ -243,6 +306,11 @@ extension Shop {
             // is what it now holds.
             webStoreLive = true
             webStoreAt = Date()
+            // What is listed now is what was just sent: nothing left to hold,
+            // and the shop's saved prices are the store's prices.
+            webStorePriceHold = []
+            webStoreHoldBook = nil
+            webStoreExplicitPrices = [:]
             // Its own failure: the catalogue WAS stored, and a read-back that
             // timed out must not say otherwise.
             guard let held = try? await CatalogPublisher.status(connection, token: token, fetch: {
@@ -326,6 +394,53 @@ extension Shop {
                   self.webStoreLive == true else { return }
             await self.publishWebStore(automatic: true)
         }
+    }
+
+    /// Hold an automatic republish that would change a price the shop did
+    /// not set. True when held.
+    func holdUnsetPrices(sending catalog: JSONValue, published: CatalogPublisher.Held) -> Bool {
+        let sending = CatalogPublisher.prices(of: catalog)
+        let ids = CatalogPublisher.heldPrices(sending: sending, published: published.prices,
+                                              explicit: webStoreExplicitPrices)
+        guard !ids.isEmpty else { return false }
+        var names: [String: String] = [:]
+        if case .object(let o) = catalog, case .array(let items)? = o["items"] {
+            for case .object(let item) in items {
+                if case .string(let id)? = item["id"], case .string(let name)? = item["name"] { names[id] = name }
+            }
+        }
+        let hold = ids.map {
+            WebStorePriceChange(id: $0, name: names[$0] ?? $0, was: published.prices[$0] ?? "", now: sending[$0] ?? "")
+        }
+        let fresh = hold != webStorePriceHold
+        webStorePriceHold = hold
+        webStoreHoldBook = source.build?.storeURL
+        webStoreSaid = words.callIt("mac.ws_prices_held")
+        webStoreProblem = true
+        webStoreSaidAt = Date()
+        // Once per new set of prices, not on every edit that follows.
+        if fresh { moveNotices.append(webStoreSaid ?? "") }
+        FileHandle.standardError.write(Data("khayt: web store — held \(ids.count) price change(s) the shop did not make\n".utf8))
+        return true
+    }
+
+    /// The held prices for THIS book; another book's are not this shop's.
+    var webStorePricesHeld: [WebStorePriceChange] {
+        guard let book = webStoreHoldBook, book == source.build?.storeURL else { return [] }
+        return webStorePriceHold
+    }
+
+    /// The price the shop just saved for a product, as the store would list
+    /// it: `lib/storefront-catalog.js`'s rule — the storefront's own entry,
+    /// else the price, else the base.
+    func noteExplicitPrice(_ id: String) {
+        guard case .object(let p)? = productRows.first(where: { Self.recordId($0) == id }) else { return }
+        var listed: String?
+        if case .object(let sf)? = settingsDict["storefront"], case .object(let prices)? = sf["prices"] {
+            listed = CatalogPublisher.priceText(prices[id])
+        }
+        listed = listed ?? CatalogPublisher.priceText(p["price"]) ?? CatalogPublisher.priceText(p["basePrice"])
+        if let listed { webStoreExplicitPrices[id] = listed } else { webStoreExplicitPrices[id] = nil }
     }
 
     /// The web-sized pictures, made off the main thread and kept while the
@@ -589,6 +704,30 @@ struct WebStoreSheet: View {
                         Label(shop.words.callIt("mac.ws_follows"), systemImage: "arrow.triangle.2.circlepath")
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                // ── PRICES HELD BACK ─────────────────────────────────────────
+                //
+                // A live store follows the catalogue, but not into a price the
+                // shop did not set. What was held is listed, old and new, and
+                // the Publish button below is the shop saying yes.
+                if !shop.webStorePricesHeld.isEmpty {
+                    Section {
+                        ForEach(shop.webStorePricesHeld) { change in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle").foregroundStyle(Khayt.attention)
+                                Text(verbatim: change.name).font(.callout.weight(.medium))
+                                Spacer(minLength: 8)
+                                Text(verbatim: change.was + " \u{2192} " + change.now)
+                                    .font(.callout.monospacedDigit())
+                                    .environment(\.layoutDirection, .leftToRight)
+                            }
+                        }
+                        Text(shop.words.callIt("mac.ws_prices_held_hint"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } header: {
+                        Text(shop.words.callIt("mac.ws_prices_held"))
                     }
                 }
                 // ── BEFORE YOU PUBLISH ────────────────────────────────────────

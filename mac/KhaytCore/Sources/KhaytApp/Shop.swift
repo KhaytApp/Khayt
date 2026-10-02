@@ -870,7 +870,11 @@ final class Shop {
             // outside it races whatever is in flight — and only for a real
             // book, which is the only kind that can have one.
             rescueStrandedServiceLog(next.build)
-            if next.build != nil { await repairSpoolSizes() }
+            // COUNTED, never repaired, on open: see `applySpoolRepair`. A
+            // write here re-priced every product on a spool whose size changed,
+            // without the shop seeing a single new price.
+            spoolRepairPending = next.build != nil
+                ? Self.spoolRepairCount(products: productRows, sizes: spoolSizes) : 0
             await readSlicers()
             remeasureIfDue()
             createRecurringIfDue()
@@ -3930,6 +3934,9 @@ final class Shop {
             }
             editingProduct = nil
             await load(source)
+            // A price the shop just saved in the product sheet: a live web
+            // store may follow it (see `CatalogPublisher.heldPrices`).
+            noteExplicitPrice(product.id)
         } catch {
             moveProblem = String(describing: error)
         }
@@ -10194,6 +10201,14 @@ final class Shop {
     /// to it can be told apart from a re-read of the same book.
     var webStoreSeen: JSONValue?
     var webStoreRepublish: Task<Void, Never>?
+    /// Prices a live store would have republished on its own that the shop
+    /// did not set: held, and shown for review instead (`heldPrices`). Kept
+    /// across re-reads of the same book, which `resetWebStore` is not.
+    var webStorePriceHold: [WebStorePriceChange] = []
+    var webStoreHoldBook: URL?
+    /// Product id → the listed price the shop itself saved (product sheet, or
+    /// a reviewed repair) since the store was last published.
+    var webStoreExplicitPrices: [String: String] = [:]
     /// Web-sized pictures already made, by file name and the file's date.
     var webStoreHeroes: [String: (Date, String)] = [:]
 
@@ -15219,18 +15234,7 @@ final class Shop {
     /// point: the next interval is counted from this moment, and writing the
     /// figure the card happened to be showing would count any job that finished
     /// while the card was open twice.
-    /// Move a service log written under the old key into the right one.
-    ///
-    /// ── WHY THIS RUNS AT ALL, AND WHY IT RUNS ONCE ────────────────────────
-    ///
-    /// A fix verified only on newly-created data strands what a shop already
-    /// has. Alphas 21 through 23 wrote every repair into `hub_maint_log_v1`,
-    /// which nothing reads, so those rows are a shop's own work sitting in a
-    /// field that has no meaning. They are moved, not dropped.
-    ///
-    /// It is a no-op the second time: the stray key is removed by the same
-    /// write, so there is nothing left to find.
-    /// Put back the spool SIZE a product was costed on, and re-price it.
+    /// Put back the spool SIZE a product was costed on — when the shop says so.
     ///
     /// ── WHAT WAS WRONG ─────────────────────────────────────────────────────
     ///
@@ -15238,14 +15242,25 @@ final class Shop {
     /// `spoolWeight`, which `calculator-cost.js` divides the spool's price by.
     /// A product costed from a spool with 859 g left paid 75/859 a gram, not
     /// 75/1000: 16% too much for the plastic, and more as the spool empties.
-    /// The code is fixed; this fixes what it already wrote (the shop chose to
-    /// have its four products repaired and re-priced).
+    /// The code is fixed; this fixes what it already wrote.
     ///
-    /// Idempotent: a part is touched only when its figure differs from the
-    /// spool's size, so the second open finds nothing. Each product is priced
-    /// by the same rule the product editor saves with, and written only if it
-    /// is still exactly as it was read, so an edit made meanwhile is never
-    /// overwritten. A spool with no recorded size is 1000 g, as everywhere.
+    /// ── WHY IT NO LONGER RUNS ON ITS OWN ──────────────────────────────────
+    ///
+    /// It used to run on EVERY open, and every write reopens the book. "A part
+    /// whose figure differs from its spool's size" is not only the old bug: it
+    /// is also every product costed on a spool whose size the shop has since
+    /// edited, or that a sync merged a different record of. So changing one
+    /// spool's size silently re-priced every product made from it — and a live
+    /// web store then followed. That is the shape of the Sep 2026 catalogue
+    /// price incident (a save re-priced a product 50 → 13.74 without asking).
+    ///
+    /// A price is a promise the shop makes to customers. Nothing here changes
+    /// one without the shop seeing the before and after first: an open only
+    /// COUNTS the products that would change (`spoolRepairPending`), the
+    /// catalogue offers a review, `spoolRepairPreview` says what each price
+    /// would become, and `applySpoolRepair` writes only what was shown.
+    ///
+    /// A spool with no recorded size is 1000 g, as everywhere.
     /// The parts with each spool's SIZE in place, or nil when none differed.
     static func spoolSizesFixed(_ parts: [JSONValue], sizes: [String: Double]) -> [JSONValue]? {
         var changed = false
@@ -15260,51 +15275,141 @@ final class Shop {
         return changed ? fixed : nil
     }
 
-    func repairSpoolSizes() async {
-        guard let engine, let build = source.build, canMoveJobs else { return }
+    /// Each spool's size as the cost model reads it: at least a gram, 1000
+    /// when none is recorded.
+    var spoolSizes: [String: Double] {
         var sizes: [String: Double] = [:]
         for spool in spools { sizes[spool.id] = max(1, spool.spoolWeight ?? 1000) }
-        var repaired: [String: (was: JSONValue, now: [String: JSONValue])] = [:]
-        for row in productRows {
+        return sizes
+    }
+
+    /// How many products are costed on a figure other than their spool's
+    /// size. Pure and cheap, so an open can afford it — and it WRITES NOTHING.
+    static func spoolRepairCount(products: [JSONValue], sizes: [String: Double]) -> Int {
+        products.reduce(0) { n, row in
+            guard case .object(let p) = row, case .array(let parts)? = p["parts"] else { return n }
+            return spoolSizesFixed(parts, sizes: sizes) == nil ? n : n + 1
+        }
+    }
+
+    /// One product the repair would change, and what its price would become.
+    struct SpoolRepairChange: Identifiable, Equatable {
+        let id: String
+        let name: String
+        /// The record as it was read, so a product edited since the preview
+        /// was shown is left alone rather than overwritten.
+        let was: JSONValue
+        /// The record as it would be written.
+        let now: [String: JSONValue]
+        let priceWas: Double?
+        let priceNow: Double?
+    }
+
+    /// The price a product is listed at: its typed price, else the base.
+    static func listedPrice(_ record: [String: JSONValue]) -> Double? {
+        for key in ["price", "basePrice"] {
+            switch record[key] {
+            case .number(let n)?: return n
+            case .string(let s)?: if let n = Double(s.trimmingCharacters(in: .whitespaces)) { return n }
+            default: continue
+            }
+        }
+        return nil
+    }
+
+    /// What the repair WOULD do, priced by the same rule the product editor
+    /// saves with. Reads only.
+    func spoolRepairPreview() async -> [SpoolRepairChange] {
+        guard let engine else { return [] }
+        let inventory = inventoryRows, settings = settingsDict, consumables = consumableRows
+        return await Self.spoolRepairPlan(products: productRows, sizes: spoolSizes) { input in
+            try? await engine.productPricingFields(.object(input), inventory: inventory,
+                                                   settings: settings, consumables: consumables)
+        }
+    }
+
+    /// The plan, given the catalogue, the spools' sizes and the pricing rule.
+    /// Static so a test can hold it to the sample book with a size changed.
+    static func spoolRepairPlan(products: [JSONValue], sizes: [String: Double],
+                                price: ([String: JSONValue]) async -> [String: JSONValue]?) async -> [SpoolRepairChange] {
+        var out: [SpoolRepairChange] = []
+        for row in products {
             guard case .object(let product) = row, case .string(let id)? = product["id"],
-                  case .array(let parts)? = product["parts"] else { continue }
-            guard let fixed = Self.spoolSizesFixed(parts, sizes: sizes) else { continue }
+                  case .array(let parts)? = product["parts"],
+                  let fixed = spoolSizesFixed(parts, sizes: sizes) else { continue }
             var input: [String: JSONValue] = ["parts": .array(fixed)]
             for key in ["defaultMargin", "components", "priceRound", "priceOverride"] {
                 if let v = product[key] { input[key] = v }
             }
             var next = product
             next["parts"] = .array(fixed)
-            if let priced = try? await engine.productPricingFields(
-                .object(input), inventory: inventoryRows, settings: settingsDict, consumables: consumableRows) {
+            if let priced = await price(input) {
                 for (key, value) in priced { next[key] = value }
             }
-            repaired[id] = (row, next)
-        }
-        guard !repaired.isEmpty else { return }
-        var done = 0
-        do {
-            try StoreWriter.update(build) { root in
-                var rows = Self.rows(root, "products")
-                for i in rows.indices {
-                    guard let id = Self.recordId(rows[i]), let fix = repaired[id], rows[i] == fix.was else { continue }
-                    var record = fix.now
-                    StoreWriter.stamp(&record)
-                    rows[i] = .object(record)
-                    done += 1
-                }
-                root["products"] = .array(rows)
+            var name = ""
+            for key in ["name", "nameEn", "nameAr"] where name.isEmpty {
+                if case .string(let s)? = product[key] { name = s.trimmingCharacters(in: .whitespaces) }
             }
-        } catch {
-            FileHandle.standardError.write(Data("khayt: spool size repair — \(error)\n".utf8))
-            return
+            out.append(SpoolRepairChange(id: id, name: name, was: row, now: next,
+                                         priceWas: listedPrice(product),
+                                         priceNow: listedPrice(next)))
         }
-        guard done > 0 else { return }
-        FileHandle.standardError.write(Data("khayt: spool size repair — re-priced \(done) product(s)\n".utf8))
-        moveNotices.append(words.counting(done, "mac.spool_repair_done"))
-        await load(source)
+        return out
     }
 
+    /// Write the reviewed changes into a book. A product is written only if it
+    /// is still exactly as the preview read it. Returns the ids written.
+    static func applySpoolRepair(_ changes: [SpoolRepairChange], to root: inout [String: JSONValue]) -> [String] {
+        let byId = Dictionary(changes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var rows = rows(root, "products")
+        var done: [String] = []
+        for i in rows.indices {
+            guard let id = recordId(rows[i]), let fix = byId[id], rows[i] == fix.was else { continue }
+            var record = fix.now
+            StoreWriter.stamp(&record)
+            rows[i] = .object(record)
+            done.append(id)
+        }
+        if !done.isEmpty { root["products"] = .array(rows) }
+        return done
+    }
+
+    /// The shop confirmed the preview: write it. Each product re-priced here
+    /// is a price the shop chose, so a live web store may follow it.
+    func applySpoolRepair(_ changes: [SpoolRepairChange]) async {
+        guard let build = source.build, canMoveJobs, !changes.isEmpty else { return }
+        var done: [String] = []
+        do {
+            try StoreWriter.update(build) { root in
+                done = Self.applySpoolRepair(changes, to: &root)
+            }
+        } catch {
+            moveProblem = String(describing: error)
+            return
+        }
+        guard !done.isEmpty else { return }
+        FileHandle.standardError.write(Data("khayt: spool size repair — re-priced \(done.count) product(s) on the shop's say-so\n".utf8))
+        moveNotices.append(words.counting(done.count, "mac.spool_repair_done"))
+        await load(source)
+        for id in done { noteExplicitPrice(id) }
+    }
+
+    /// Products costed on a figure other than their spool's size, counted on
+    /// each open. Nothing is changed until the shop reviews them.
+    var spoolRepairPending = 0
+    var showingSpoolRepair = false
+
+    /// Move a service log written under the old key into the right one.
+    ///
+    /// ── WHY THIS RUNS AT ALL, AND WHY IT RUNS ONCE ────────────────────────
+    ///
+    /// A fix verified only on newly-created data strands what a shop already
+    /// has. Alphas 21 through 23 wrote every repair into `hub_maint_log_v1`,
+    /// which nothing reads, so those rows are a shop's own work sitting in a
+    /// field that has no meaning. They are moved, not dropped.
+    ///
+    /// It is a no-op the second time: the stray key is removed by the same
+    /// write, so there is nothing left to find.
     func rescueStrandedServiceLog(_ build: StoreReader.Build?) {
         guard let build, canWrite else { return }
         // Asked before writing, so an ordinary load of an ordinary book does
