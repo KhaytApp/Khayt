@@ -116,44 +116,6 @@ struct LibraryFileSafetyTests {
         #expect(CloudLibrary.stranded(switchingTo: .drive, providers: [], current: .bucket) == 0)
     }
 
-    @Test("a model moved to the old bucket is brought back from there, not refused by the new one")
-    func bringBackFromWhereItWent() async throws {
-        let bucket = FakeBucket()
-        CloudLibrary.fetch = bucket.fetch
-        let engine = try KhaytEngine()
-        let old = S3Config(endpoint: "https://old.r2.cloudflarestorage.com", bucket: "old", accessKeyId: "k", secretAccessKey: "s")
-        let new = S3Config(endpoint: "https://new.r2.cloudflarestorage.com", bucket: "new", accessKeyId: "k", secretAccessKey: "s")
-        let dir = FileManager.default.temporaryDirectory.appending(path: "fs-\(UUID().uuidString)/PF-1")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appending(path: "Benchy.3mf")
-        let original = Data((0..<4096).map { UInt8($0 % 251) })
-        try original.write(to: url)
-        let key = "print-files/PF-1/Benchy.3mf"
-        let proved = try await CloudLibrary.ensureInBucket(.bucket(old), key: key, file: url, engine: engine)
-        // The NEW bucket holds something else under the same key: refused by
-        // the hash, and the old one is asked next.
-        try await LibraryRemote.bucket(new).put(key, data: Data(repeating: 7, count: 4096), fetch: bucket.fetch)
-        let text = try await engine.sidecarText(size: proved.size, sha256: proved.sha256, key: key,
-                                                provider: old.endpoint, at: "2026-09-24T00:00:00.000Z")
-        try Data(text.utf8).write(to: CloudLibrary.sidecar(for: url))
-        try FileManager.default.removeItem(at: url)
-
-        // Only the one in use, as before: refused, nothing written.
-        await #expect(throws: (any Error).self) {
-            try await CloudLibrary.bringBack(url, remotes: { _ in [.bucket(new)] }, engine: engine)
-        }
-        #expect(!FileManager.default.fileExists(atPath: url.path))
-        // Routed: the new one first, then the old — and it comes back intact.
-        var askedWith: String?
-        try await CloudLibrary.bringBack(url, remotes: { side in
-            askedWith = side.provider
-            return [.bucket(new), .bucket(old)]
-        }, engine: engine)
-        #expect(askedWith == old.endpoint)
-        #expect(try Data(contentsOf: url) == original)
-        #expect(!FileManager.default.fileExists(atPath: CloudLibrary.sidecar(for: url).path))
-    }
-
     // MARK: 4 — adding models
 
     @Test("adding models keeps the originals unless the shop chose to move them")
@@ -208,5 +170,48 @@ struct LibraryFileSafetyTests {
         let rels = Set(LibraryMove.walk(root.path, recordDirs: ["my_record"]).map(\.rel))
         #expect(rels == ["PF-abc/model.3mf", "my_record/model.stl"])
         #expect(LibraryMove.walk(root.path).count == 5, "the unrestricted walk still sees everything")
+    }
+}
+
+/// In `CloudLibraryTests`' own (serialized) suite: it swaps the shared
+/// `CloudLibrary.fetch`, and two suites doing that in parallel see each
+/// other's bucket.
+extension CloudLibraryTests {
+    @Test("a model moved to the old bucket is brought back from there, not refused by the new one")
+    func bringBackFromWhereItWent() async throws {
+        let bucket = FakeBucket()
+        CloudLibrary.fetch = bucket.fetch
+        let engine = try KhaytEngine()
+        let old = S3Config(endpoint: "https://old.r2.cloudflarestorage.com", bucket: "old", accessKeyId: "k", secretAccessKey: "s")
+        let new = S3Config(endpoint: "https://new.r2.cloudflarestorage.com", bucket: "new", accessKeyId: "k", secretAccessKey: "s")
+        let dir = FileManager.default.temporaryDirectory.appending(path: "fs-\(UUID().uuidString)/PF-1")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appending(path: "Benchy.3mf")
+        let original = Data((0..<4096).map { UInt8($0 % 251) })
+        try original.write(to: url)
+        let key = "print-files/PF-1/Benchy.3mf"
+        let proved = try await CloudLibrary.ensureInBucket(.bucket(old), key: key, file: url, engine: engine)
+        // The NEW bucket holds something else under the same key: refused by
+        // the hash, and the old one is asked next.
+        try await LibraryRemote.bucket(new).put(key, data: Data(repeating: 7, count: 4096), fetch: bucket.fetch)
+        let text = try await engine.sidecarText(size: proved.size, sha256: proved.sha256, key: key,
+                                                provider: old.endpoint, at: "2026-09-24T00:00:00.000Z")
+        try Data(text.utf8).write(to: CloudLibrary.sidecar(for: url))
+        try FileManager.default.removeItem(at: url)
+
+        // Only the one in use, as before: refused, nothing written.
+        await #expect(throws: (any Error).self) {
+            try await CloudLibrary.bringBack(url, remotes: { _ in [.bucket(new)] }, engine: engine)
+        }
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        // Routed: the new one first, then the old — and it comes back intact.
+        var askedWith: String?
+        try await CloudLibrary.bringBack(url, remotes: { side in
+            askedWith = side.provider
+            return [.bucket(new), .bucket(old)]
+        }, engine: engine)
+        #expect(askedWith == old.endpoint)
+        #expect(try Data(contentsOf: url) == original)
+        #expect(!FileManager.default.fileExists(atPath: CloudLibrary.sidecar(for: url).path))
     }
 }
