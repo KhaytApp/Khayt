@@ -267,6 +267,10 @@ final class Words {
         case "filament_deducted":      key = "inv.deducted_summary"
         case "filament_deducted_low":  key = "inv.deducted_summary_low"
         case "packaging_deducted":     key = "cons.packaging_deducted"
+        // A finished job moved back gives its completion's filament back
+        // (`KhaytOrderDeduction.returnForOrder`). Said, because a spool that
+        // grows by itself is a number nobody trusts.
+        case "filament_returned":      key = "mac.filament_returned"
         case "consumable_low", "packaging_low":
             return callIt("cons.low") + ": " + Self.plain(notice.params["name"] ?? .string(""))
         default:
@@ -447,6 +451,8 @@ final class Words {
         "mac.move_refused":  ["en": "That move was refused.", "ar": "رُفض هذا النقل."],
         "mac.move_gone":     ["en": "That job is no longer in the book.",
                               "ar": "لم يعد هذا العمل في الدفتر."],
+        "mac.filament_returned": ["en": "Put {weight}g back on the shelf — the job is no longer finished, so its filament is not used yet.",
+                                  "ar": "أُعيد {weight} غ إلى المخزون — لم يعد العمل منتهيًا، فخيوطه لم تُستهلك بعد."],
         "mac.move_sample":   ["en": "The sample shop cannot be changed.",
                               "ar": "لا يمكن تغيير المحل التجريبي."],
         "mac.remeasured":    ["en": "{n} models were measured again — their sizes were wrong.",

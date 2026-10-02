@@ -67,7 +67,10 @@ test('H4: reopening a completed order clears stale completion state', () => {
 
   assert.equal(order.status, 'printing');
   assert.equal(order.completedAt, undefined);
-  assert.equal(order.materialDeducted, undefined);
+  // Finished before completions recorded what they took, so the flag stays:
+  // re-finishing it must not take the filament a second time
+  // (lib/order-deduction.js returnForOrder).
+  assert.equal(order.materialDeducted, true);
   // a fresh print-start timestamp is set, not the stale one
   assert.ok(order.printingStartedAt && order.printingStartedAt !== '2026-01-01T08:00:00Z');
 });

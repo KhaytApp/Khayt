@@ -57,6 +57,30 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   The shared tiering rule (`lib/print-library-tier.js`) also takes an
   optional last-used date and in-use flag. The desktop app does not send
   them yet, so its behaviour is unchanged.
+- **(Mac) A web-store order for several of a thing is charged for all of them.**
+  Three of a product with its own price of 50 became a job of 50, recorded as
+  paid 50; a basket of two products lost both prices and was priced at the
+  first one's margin. Each line is now priced at what the catalogue published
+  for it (the web store's price, else the product's), else the product's own
+  price, else what the catalogue works out — times how many were ordered —
+  and the job is their sum. Where the store sent what the customer paid, that
+  is the payment recorded. Six of a product with magnets also takes six sets
+  of magnets off the shelf, not one.
+- **(Mac) An online order is checked against the shelf again when it is
+  recorded.** It used the count from when the queue was read, so an order the
+  shelf had since stopped covering was marked done with nothing printed. It
+  is now counted again at the moment it is written, and whatever the shelf no
+  longer holds goes to a machine.
+- **Moving a finished job back no longer takes its filament twice.** Finished
+  → QC → finished took a 200 g job's filament off the spool twice (1000 g to
+  600 g), in both apps, and the same with Move back or a drag. On the Mac,
+  leaving Completed now puts back exactly what finishing it took — each
+  spool's grams, and the glue and parts it used — and finishing again takes
+  one print's worth. In the desktop app the first deduction stands and
+  finishing again takes nothing more. A print that failed inspection is still
+  booked as waste, so a job re-opened, failed and reprinted takes two prints,
+  as it should. Jobs finished before this update are not charged again either.
+  Cancelling a finished job gives nothing back: the piece was made.
 
 - **Prusa multi-material targets name the right printer.** The print-file
   converter wrote `MK4IS` for the MK4 + MMU3, `MK3S` for the MK3S + MMU2S (both

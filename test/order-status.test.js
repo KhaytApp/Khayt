@@ -369,6 +369,19 @@ test('the lifted rules and the originals agree on every transition', () => {
           };
           originalUpdateStatus(a, o.id, target);
           liftedUpdateStatus(b, o.id, target);
+          // ONE DELIBERATE DIVERGENCE. The original cleared `materialDeducted`
+          // when a finished job was re-opened and gave nothing back, so the
+          // next completion deducted the filament a second time. The lift
+          // returns what the completion recorded (`materialDrawn`) — and a job
+          // finished before that record existed, which is every order here,
+          // KEEPS its flag rather than being charged twice. A cancelled one keeps it
+          // too: the piece was made. See "re-opening a finished job …" below.
+          const reopened = (o.status === 'completed' || o.status === 'delivered')
+            && target !== 'completed' && target !== 'delivered';
+          if (reopened && o.materialDeducted) {
+            const moved = a.printLog.find((x) => x.id === o.id);
+            if (moved) moved.materialDeducted = true;
+          }
           const label = `${o.id} ${o.status} → ${target} / ${JSON.stringify(settings)}`;
           assert.deepEqual(b.printLog, a.printLog, `order state diverged: ${label}`);
           assert.deepEqual(b.calls, a.calls, `effects diverged: ${label}`);
@@ -407,15 +420,174 @@ test('a job completed straight out of hold keeps its due date but loses the hold
   assert.deepEqual(out.notices, []);
 });
 
-test('re-opening a finished job clears what would make the reprint free', () => {
+test('re-opening a finished job clears its completion and gives back what it took', () => {
+  const inventory = [{ id: 'f1', material: 'PLA', weight: 800,
+    usageHistory: [{ orderId: 'o1', project: '', weightUsed: 200, date: '2026-09-01' }] }];
   const order = {
     id: 'o1', status: 'completed', completedAt: NOW_ISO,
-    materialDeducted: true, printingStartedAt: '2026-09-01T00:00:00.000Z',
+    materialDeducted: true, materialDrawn: { spools: [{ spoolId: 'f1', grams: 200 }], consumables: [] },
+    printingStartedAt: '2026-09-01T00:00:00.000Z',
   };
-  S.apply(order, 'printing', { now: NOW_MS });
+  S.apply(order, 'printing', { now: NOW_MS, inventory, returnMaterial: true });
   assert.equal(order.completedAt, undefined);
   assert.equal(order.materialDeducted, undefined, 'else the reprint consumes no filament');
+  assert.equal(order.materialDrawn, undefined);
+  assert.equal(inventory[0].weight, 1000, 'the completion\'s 200 g are back on the spool');
+  assert.deepEqual(inventory[0].usageHistory, [], 'and the spool no longer shows that print');
   assert.equal(order.printingStartedAt, NOW_ISO, 'the new run starts now');
+});
+
+/* ── Re-opening a finished job does not charge the shelf twice ──────────────── *
+ * The bug: completed → QC → completed cleared `materialDeducted`, returned
+ * nothing, and deducted again. A 200 g job took a 1000 g spool to 600 g. */
+
+const D = require('../lib/order-deduction.js');
+
+/** Move a job the way both hosts do: apply, then run the deductions it asks for. */
+function move(order, status, shop) {
+  const out = S.apply(order, status, { now: NOW_MS, inventory: shop.inventory,
+    consumables: shop.consumables, returnMaterial: true });
+  for (const e of out.effects) {
+    if (e.type === 'deduct_filament') {
+      D.deductForOrder(order, { settings: { autoDeduct: true }, inventory: shop.inventory,
+        consumables: shop.consumables, machines: [], today: '2026-09-10',
+        actualGrams: order.actualWeight });
+    }
+  }
+  return out;
+}
+
+const job200 = () => ({ id: 'J1', status: 'qc', printTime: 2,
+  parts: [{ id: 'p', qty: 1, filamentId: 'f1', printWeight: 200 }],
+  components: [{ consumableId: 'mag', qtyPerUnit: 4 }], assemblyQty: 1 });
+const shop1000 = () => ({
+  inventory: [{ id: 'f1', material: 'PLA', weight: 1000 }],
+  consumables: [{ id: 'mag', name: 'Magnet', stock: 100 }, { id: 'glue', name: 'Glue', stock: 50, usagePerHour: 1 }],
+});
+
+test('completed → qc → completed takes ONE print off the spool, not two', () => {
+  const shop = shop1000();
+  const job = job200();
+  move(job, 'completed', shop);
+  assert.equal(shop.inventory[0].weight, 800);
+  assert.equal(shop.consumables[0].stock, 96);
+  assert.equal(shop.consumables[1].stock, 48);
+  move(job, 'qc', shop);
+  assert.equal(shop.inventory[0].weight, 1000, 'leaving completed puts the 200 g back');
+  assert.equal(shop.consumables[0].stock, 100, 'and the magnets');
+  assert.equal(shop.consumables[1].stock, 50, 'and the glue');
+  move(job, 'completed', shop);
+  assert.equal(shop.inventory[0].weight, 800, 'one print, 200 g — not 600 g left');
+  assert.equal(shop.consumables[0].stock, 96);
+  assert.equal(job.materialDeducted, true);
+  assert.equal((shop.inventory[0].usageHistory || []).length, 1, 'one usage line, for one print');
+});
+
+test('Move back to printing and finish again: still one print', () => {
+  const shop = shop1000();
+  const job = job200();
+  move(job, 'completed', shop);
+  move(job, 'printing', shop);
+  move(job, 'completed', shop);
+  assert.equal(shop.inventory[0].weight, 800);
+});
+
+test('re-opened, failed QC at 200 g and reprinted: exactly two prints come off', () => {
+  const QC = require('../lib/qc-failure.js');
+  const shop = shop1000();
+  const job = job200();
+  move(job, 'completed', shop);            // 800
+  move(job, 'qc', shop);                   // back to 1000: not finished any more
+  QC.record(job, { failureType: 'warping', weight: 200 }, {
+    now: NOW_MS, inventory: shop.inventory, wasteLog: [], settings: {}, machines: [], today: '2026-09-10',
+  });                                      // the failed print is waste: 800
+  move(job, 'pending', shop);
+  move(job, 'completed', shop);            // the reprint: 600
+  assert.equal(shop.inventory[0].weight, 600);
+});
+
+test('a job finished before completions were recorded keeps its flag when re-opened', () => {
+  const shop = shop1000();
+  shop.inventory[0].weight = 800;          // its completion took 200 g, unrecorded
+  const job = Object.assign(job200(), { status: 'completed', materialDeducted: true });
+  move(job, 'qc', shop);
+  assert.equal(job.materialDeducted, true, 'nothing knows what it took, so it is not taken again');
+  assert.equal(shop.inventory[0].weight, 800, 'and nothing is invented back onto the spool');
+  move(job, 'completed', shop);
+  assert.equal(shop.inventory[0].weight, 800, 'the old bug: this was 600');
+});
+
+test('cancelling a finished job gives nothing back — the piece was made', () => {
+  const shop = shop1000();
+  const job = job200();
+  move(job, 'completed', shop);
+  move(job, 'cancelled', shop);
+  assert.equal(shop.inventory[0].weight, 800);
+  assert.equal(job.materialDeducted, true);
+});
+
+test('a host that hands over no consumables keeps their draw on the record, not forgotten', () => {
+  const shop = shop1000();
+  const job = job200();
+  move(job, 'completed', shop);
+  // A host that opts in but passes only `inventory`.
+  S.apply(job, 'qc', { now: NOW_MS, inventory: shop.inventory, returnMaterial: true });
+  assert.equal(shop.inventory[0].weight, 1000);
+  assert.equal(shop.consumables[0].stock, 96, 'not handed over, so not touched');
+  assert.equal(job.materialDrawn.carriedFor, 'J1');
+  move(job, 'completed', shop);
+  assert.equal(shop.inventory[0].weight, 800);
+  assert.equal(shop.consumables[0].stock, 96, 'the magnets still out are not taken a second time');
+  assert.equal(shop.consumables[1].stock, 48);
+  // …and the next re-open, with them handed over, puts them back.
+  move(job, 'qc', shop);
+  assert.equal(shop.consumables[0].stock, 100);
+  assert.equal(shop.consumables[1].stock, 50);
+});
+
+/** A host that does not opt in (its Undo restores the order alone). */
+function moveKeeping(order, status, shop) {
+  const out = S.apply(order, status, { now: NOW_MS, inventory: shop.inventory });
+  for (const e of out.effects) {
+    if (e.type === 'deduct_filament') {
+      D.deductForOrder(order, { settings: { autoDeduct: true }, inventory: shop.inventory,
+        consumables: shop.consumables, machines: [], today: '2026-09-10' });
+    }
+  }
+}
+
+test('a host that does not ask for the return keeps the flag: still one print, nothing given back', () => {
+  const shop = shop1000();
+  const job = job200();
+  moveKeeping(job, 'completed', shop);
+  moveKeeping(job, 'qc', shop);
+  assert.equal(job.materialDeducted, true);
+  assert.equal(shop.inventory[0].weight, 800, 'nothing returned that an order-only Undo could not take back');
+  moveKeeping(job, 'completed', shop);
+  assert.equal(shop.inventory[0].weight, 800, 'the bug took this to 600');
+  assert.equal(shop.consumables[0].stock, 96);
+});
+
+test('…and its re-opened, failed, reprinted job still takes exactly two prints', () => {
+  const QC = require('../lib/qc-failure.js');
+  const shop = shop1000();
+  const job = job200();
+  moveKeeping(job, 'completed', shop);     // 800
+  moveKeeping(job, 'qc', shop);            // flag kept: 800
+  QC.record(job, { failureType: 'warping', weight: 200 }, {
+    now: NOW_MS, inventory: shop.inventory, wasteLog: [], settings: {}, machines: [], today: '2026-09-10',
+  });                                      // waste: 600
+  moveKeeping(job, 'pending', shop);
+  moveKeeping(job, 'completed', shop);     // the first completion stands for the reprint: 600
+  assert.equal(shop.inventory[0].weight, 600);
+});
+
+test('a copied record does not inherit another job\'s carried consumables', () => {
+  const shop = shop1000();
+  const job = Object.assign(job200(), { id: 'J2',
+    materialDrawn: { spools: [], consumables: [{ consumableId: 'mag', qty: 4 }], carriedFor: 'J1' } });
+  move(job, 'completed', shop);
+  assert.equal(shop.consumables[0].stock, 96, 'J2 is a new job and takes its own magnets');
 });
 
 test('the cost basis is fixed once and never rewritten', () => {

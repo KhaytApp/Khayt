@@ -192,3 +192,75 @@ test('old finished business is not news; old unfinished work still is', () => {
   const owed = W.pending(log, {}, { notBefore: '2026-01-01T00:00:00Z' });
   assert.deepEqual(owed.map((u) => u.jobId), ['STUCK']);
 });
+
+// ── What the order comes to ──────────────────────────────────────────────
+//
+// The Mac priced three of a product with a typed price of 50 as a job of 50,
+// and a basket of two products at the first one's margin. Each line is priced
+// at what the catalogue PUBLISHED for it, times how many were ordered.
+
+for (const m of ['content-languages', 'product-images', 'product-specs']) require(`../lib/${m}.js`);
+require('../lib/storefront-catalog.js');
+
+const PRODUCTS = [
+  { id: 'P-TYPED', nameEn: 'Hood', priceOverride: 50 },
+  { id: 'P-PUB', nameEn: 'Vase', price: 80, priceOverride: 75 },
+  { id: 'P-BASE', nameEn: 'Lamp', basePrice: 33.3 },
+  { id: 'P-NONE', nameEn: 'Clip' },
+];
+
+test('three of a 50 product is 150, not 50', () => {
+  const out = W.linePrices([{ productId: 'P-TYPED', qty: 3 }], { products: PRODUCTS, settings: {} });
+  assert.equal(out.total, 150);
+  assert.deepEqual(out.lines[0], { productId: 'P-TYPED', qty: 3, unit: 50, total: 150, source: 'typed' });
+});
+
+test('a basket keeps each product\'s own price', () => {
+  const out = W.linePrices([
+    { productId: 'P-TYPED', qty: 2 }, { productId: 'P-PUB', qty: 1 }, { productId: 'P-BASE', qty: 3 },
+  ], { products: PRODUCTS, settings: {} });
+  assert.deepEqual(out.lines.map((l) => [l.unit, l.source]),
+    [[50, 'typed'], [80, 'published'], [33.3, 'published']]);
+  assert.equal(out.total, 100 + 80 + 99.9);
+});
+
+test('the storefront\'s own price is the one the customer saw, and wins', () => {
+  const settings = { storefront: { prices: { 'P-TYPED': '45', 'P-PUB': 0 } } };
+  const out = W.linePrices([{ productId: 'P-TYPED', qty: 2 }, { productId: 'P-PUB', qty: 1 }],
+    { products: PRODUCTS, settings });
+  assert.deepEqual(out.lines.map((l) => [l.unit, l.source]), [[45, 'published'], [0, 'published']],
+    '0 is a price — a giveaway is a decision');
+  assert.equal(out.total, 90);
+});
+
+test('a product nothing published is priced by the host\'s computed figure, else left unpriced', () => {
+  const out = W.linePrices([{ productId: 'P-NONE', qty: 2 }, { name: 'a stranger\'s thing', qty: 1 }],
+    { products: PRODUCTS, settings: {}, computed: { 'P-NONE': 12.5 } });
+  assert.deepEqual(out.lines.map((l) => [l.unit, l.total, l.source]),
+    [[12.5, 25, 'computed'], [null, 0, 'none']]);
+  assert.equal(out.total, 25);
+  assert.equal(out.priced, true);
+  const bare = W.linePrices([{ name: 'x', qty: 1 }], { products: PRODUCTS, settings: {} });
+  assert.equal(bare.priced, false);
+  assert.equal(bare.total, 0);
+});
+
+test('the published price is the catalogue builder\'s own rule, not a copy of it', () => {
+  const SC = require('../lib/storefront-catalog.js');
+  const settings = { storefront: { prices: { 'P-TYPED': '45' } } };
+  const built = SC.build({ products: PRODUCTS, settings, withPhotos: false });
+  for (const item of built.items) {
+    const line = W.linePrices([{ productId: item.id, qty: 1 }], { products: PRODUCTS, settings }).lines[0];
+    if (item.price === undefined) assert.notEqual(line.source, 'published', item.id);
+    else assert.equal(line.unit, Number(item.price), `${item.id} is published at ${item.price}`);
+  }
+});
+
+test('what the platform says was paid: every line priced, or nothing said', () => {
+  assert.equal(W.paidTotal({ lines: [{ name: 'Hood', qty: 3, unitPrice: 50 }, { name: 'Vase', qty: 1, unitPrice: '80' }] }), 230);
+  assert.equal(W.paidTotal({ lines: [{ name: 'Hood', qty: 3, unitPrice: 50 }, { name: 'Vase', qty: 1 }] }), null,
+    'half a basket priced is not a total');
+  assert.equal(W.paidTotal({ lines: [] }), null);
+  assert.equal(W.paidTotal(medusa()), null, 'an open form names no price');
+  assert.equal(W.paidTotal({ paidTotal: 99.5, lines: [{ qty: 1, unitPrice: 1 }] }), 99.5);
+});
