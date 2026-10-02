@@ -2096,9 +2096,11 @@ function printLibS3Settings() {
 }
 
 /** The bucket the library is backed up to, or null. */
-function printLibS3() {
+function printLibS3(opts) {
   const cfg = printLibS3Settings();
-  if (!cfg || !cfg.enabled || !S3C.isConfigured(cfg)) return null;
+  // `evenIfOff`: a configured bucket that is not the remote IN USE. Only for
+  // fetching back a model that was moved there before the shop switched.
+  if (!cfg || (!cfg.enabled && !(opts && opts.evenIfOff)) || !S3C.isConfigured(cfg)) return null;
   return { client: S3C.createS3(cfg), prefix: cfg.prefix || '', kind: 's3' };
 }
 
@@ -2115,9 +2117,9 @@ function printLibS3() {
 // Drive off, does not keep serving the old one.
 let printLibDriveCache = { key: '', client: null };
 
-function printLibDrive() {
+function printLibDrive(opts) {
   const cfg = (printLibSettings() || {}).gdrive;
-  if (!cfg || !cfg.enabled || !GD.isConfigured(cfg)) return null;
+  if (!cfg || (!cfg.enabled && !(opts && opts.evenIfOff)) || !GD.isConfigured(cfg)) return null;
   const key = `${cfg.clientId}\u0000${cfg.refreshToken}\u0000${cfg.folderName || ''}`;
   if (printLibDriveCache.key !== key) {
     printLibDriveCache = { key, client: GD.createDrive(cfg) };
@@ -2140,6 +2142,32 @@ function printLibDrive() {
  */
 function printLibRemote() {
   return printLibS3() || printLibDrive();
+}
+
+/**
+ * What a tiered model's sidecar records as where it went: 'gdrive' for Drive,
+ * the bucket's endpoint for a bucket. The Mac reads it by the same rule
+ * (CloudLibrary.route): "gdrive" is Drive, anything else non-empty a bucket.
+ * This wrote the bucket endpoint for a model that had gone to Drive.
+ */
+function printLibSidecarProvider(remote) {
+  return remote && remote.kind === 'gdrive' ? 'gdrive' : (printLibS3Settings().endpoint || '');
+}
+
+/**
+ * The remotes to ask for a tiered model, in order: the one its sidecar names,
+ * then the other, so a model moved before the shop switched remotes still
+ * comes back. An empty provider (an older sidecar) starts with the remote in
+ * use. Same order as the Mac's CloudLibrary.remoteOrder. A configured remote
+ * that is not in use is asked too: it is where those older models are.
+ */
+function printLibRemotesFor(provider) {
+  const p = String(provider || '').trim();
+  const cur = printLibRemote();
+  const first = p === 'gdrive' ? 'gdrive' : (p ? 's3' : ((cur && cur.kind) || 's3'));
+  const drive = printLibDrive({ evenIfOff: true });
+  const s3 = printLibS3({ evenIfOff: true });
+  return (first === 'gdrive' ? [drive, s3] : [s3, drive]).filter(Boolean);
 }
 
 /**
@@ -2322,13 +2350,23 @@ async function printLibRehydrate(fullPath) {
     catch (_) { side = null; }
     if (!side) return { ok: false, error: 'The record of this file in the cloud is unreadable.' };
 
-    const s3 = printLibRemote();
-    if (!s3) return { ok: false, error: 'This file is in cloud storage, but no bucket is configured. Add the credentials in Settings.' };
+    const remotes = printLibRemotesFor(side.provider);
+    if (!remotes.length) return { ok: false, error: 'This file is in cloud storage, but no bucket or Google Drive is connected. Add the credentials in Settings.' };
 
-    let buf;
-    try { buf = await s3.client.get(side.key); }
-    catch (e) { return { ok: false, error: `Could not download the file: ${e.message}` }; }
-    if (!buf) return { ok: false, error: 'The file is no longer in the bucket.' };
+    // The remote the sidecar names first, then the other. A miss or an error
+    // on one is not the answer while another is left to ask.
+    let buf = null;
+    let lastErr = null;
+    for (const r of remotes) {
+      try { buf = await r.client.get(side.key); }
+      catch (e) { lastErr = e; buf = null; }
+      if (buf) break;
+    }
+    if (!buf) {
+      return lastErr
+        ? { ok: false, error: `Could not download the file: ${lastErr.message}` }
+        : { ok: false, error: 'The file is no longer in cloud storage.' };
+    }
 
     const v = PLT.verifyRehydrate(side, buf.length, crypto.createHash('sha256').update(buf).digest('hex'));
     if (!v.ok) return { ok: false, error: v.error };
@@ -2673,7 +2711,7 @@ ipcMain.handle('hub:printlib-tier-run', async (event) => {
       // loses the model on the same crash.
       const side = PLT.makeSidecar({
         size: f.size, sha256: r.sha256, key: r.key,
-        provider: printLibS3Settings().endpoint || '', at: new Date().toISOString(),
+        provider: printLibSidecarProvider(s3), at: new Date().toISOString(),
       });
       try {
         await fs.promises.writeFile(f.fullPath + PLT.SIDECAR_EXT, JSON.stringify(side));
