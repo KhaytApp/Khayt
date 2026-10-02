@@ -764,3 +764,19 @@ test('the key main.js writes is the key that is rescued', () => {
   assert.ok(MAIN_OWNED_KEYS.includes(m[1]),
     `main.js persists "${m[1]}" but MAIN_OWNED_KEYS does not rescue it — every save will delete it`);
 });
+
+test('the book and its .prev are owner-only (0600) after a save', { skip: process.platform === 'win32' }, async () => {
+  const io = makeStoreIo();
+  const fp = io.dataFilePath();
+  fs.mkdirSync(path.dirname(fp), { recursive: true });
+  // A book written by an older Khayt, readable by everyone on the computer.
+  fs.writeFileSync(fp, JSON.stringify({ printLog: [] }), { mode: 0o644 });
+  fs.chmodSync(fp, 0o644);
+  await io.atomicWriteStore(JSON.stringify({ printLog: [{ id: 'O-1' }] }));
+  const mode = (f) => fs.statSync(f).mode & 0o777;
+  assert.equal(mode(fp), 0o600, 'the book');
+  assert.equal(mode(fp + '.prev'), 0o600, 'the older book, now one save back');
+  await io.atomicWriteStore(JSON.stringify({ printLog: [] }));
+  assert.equal(mode(fp), 0o600);
+  assert.equal(mode(fp + '.prev'), 0o600);
+});
