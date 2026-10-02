@@ -12,6 +12,41 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   now records where each model really went, looks there first, then tries
   the other storage you have connected. The Mac app does the same.
 
+- **(Mac) A price only changes when you change it.** Opening a book used to
+  re-cost every product whose spool size differed from the figure it was
+  costed on, and re-price it on the spot — so editing one spool's size, or a
+  spool record merged by sync, silently re-priced every product made from it.
+  Now the open only counts them: the Catalogue says how many, and Review shows
+  each price before and after; nothing changes until you press Re-price. A
+  live web store also no longer republishes a price you did not save in a
+  product (or confirm in that review): it holds the update and says "Prices
+  changed — review before publishing", with the old and new prices listed in
+  the Web store sheet. Publishing from there sends them.
+
+- **Prusa multi-material targets name the right printer.** The print-file
+  converter wrote `MK4IS` for the MK4 + MMU3, `MK3S` for the MK3S + MMU2S (both
+  the single-extruder printers) and `XL5T` (not a Prusa model id) for the
+  5-toolhead XL. They now write `MK4ISMMU3`, `MK3SMMU2S` and `XL5IS`, as
+  PrusaSlicer's own vendor profile names them.
+
+- **Set your shop's electricity price once.** Settings › Business has a
+  Running costs card with your price per kWh, and the 📍 Auto button can fill
+  it from your country. The calculator starts on that price instead of 0.18,
+  and changes with it unless you have typed your own figure there. A printer
+  preset with its own electricity price still wins. Leave it empty to keep
+  Khayt's default. The Mac app reads the same setting.
+
+- **The shop's electricity price takes a real figure in every currency.** It
+  was capped at 100 per kWh, so a shop pricing in won or naira had its real
+  ~250 saved as 100 without a word. The ceiling is now 10,000 per kWh, and
+  every place that reads the price uses that one figure: a higher stored
+  value is costed at the ceiling, and a blank, negative or non-numeric one is
+  still ignored.
+- **A blank electricity figure on a calculator preset no longer means free
+  electricity.** A tariff field holding only spaces was costed at 0 per kWh in
+  a job's costing while the online quote ignored it. Both now treat it as not
+  set, so the shop's own price applies. The same goes for the preset's other
+  rates and a machine's power draw and wear rate.
 - **(Mac) Changing the electricity price in Settings › Business also updates
   the "Shop rates" preset that an earlier first-run setup made.** That preset's
   old price was used instead of the new one wherever the preset was picked.

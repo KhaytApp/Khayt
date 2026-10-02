@@ -39,6 +39,7 @@ struct Catalogue: View {
         content
             .sheet(isPresented: $shop.showingOnlineOrders) { OnlineOrdersSheet(shop: shop) }
             .sheet(isPresented: $shop.showingWebStore) { WebStoreSheet(shop: shop) }
+            .sheet(isPresented: $shop.showingSpoolRepair) { SpoolRepairSheet(shop: shop) }
             .screenToolbar {
                 ToolbarItem {
                     Picker("", selection: $layout) {
@@ -102,6 +103,28 @@ struct Catalogue: View {
             // Above both layouts, because the chips narrow the CATALOGUE and
             // not the table: a filter that survived switching to the grid and a
             // filter that did not would be two filters.
+            // ── PRICES THAT WAIT FOR THE SHOP ──────────────────────────
+            //
+            // Two ways a price could move without anybody typing it: products
+            // costed on a spool size that has since changed, and a live store
+            // about to publish a price the shop did not set. Neither is done
+            // on its own any more; each is said here, with the way to review.
+            if shop.spoolRepairPending > 0 && shop.canMoveJobs {
+                Banner(text: shop.words.counting(shop.spoolRepairPending, "mac.spool_repair_pending"),
+                       symbol: "scalemass", tint: Khayt.attention) {
+                    Button(shop.words.callIt("mac.spool_repair_review") + "\u{2026}") {
+                        shop.showingSpoolRepair = true
+                    }
+                }
+            }
+            if !shop.webStorePricesHeld.isEmpty {
+                Banner(text: shop.words.callIt("mac.ws_prices_held"),
+                       symbol: "storefront", tint: Khayt.attention) {
+                    Button(shop.words.callIt("mac.spool_repair_review") + "\u{2026}") {
+                        shop.showingWebStore = true
+                    }
+                }
+            }
             CatalogueFilterBar(shop: shop)
             switch layout {
             case .table: table
