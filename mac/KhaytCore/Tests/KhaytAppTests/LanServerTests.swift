@@ -34,7 +34,7 @@ struct LanServerTests {
         let foldCalls = Counter()
         var tokens = 0
 
-        init(pin: String = "2468", intakeToken: String = "", recordFails: Bool = false,
+        init(pin: String = "24682468", intakeToken: String = "", recordFails: Bool = false,
              calendarToken: String = "", measures: Bool = true, sliced: Bool = false,
              readTimeout: TimeInterval = 15, foldsDeltas: Bool = false) async throws {
             let shop = Shop()
@@ -259,17 +259,17 @@ struct LanServerTests {
         #expect(reply.headers["location"] == "/intake")
     }
 
-    @Test("the queue API is the module's JSON behind the PIN, by header or by query")
+    @Test("the queue API is the module's JSON behind the PIN, by header only")
     func queueBehindPin() async throws {
         let bench = try await Bench()
         defer { bench.stop() }
         let expected = try await bench.engine.lanQueueBody(store: .object(bench.shop.lanBook))
-        let byHeader = try await bench.get("/api/queue", headers: ["x-khayt-pin": "2468"])
+        let byHeader = try await bench.get("/api/queue", headers: ["x-khayt-pin": "24682468"])
         #expect(byHeader.status == 200)
         #expect(byHeader.text == expected)
-        let byQuery = try await bench.get("/api/queue?pin=2468")
-        #expect(byQuery.status == 200)
-        #expect(byQuery.text == expected)
+        // The PIN in the address is ignored on an API route, read or write.
+        let byQuery = try await bench.get("/api/queue?pin=24682468")
+        #expect(byQuery.status == 401)
         let none = try await bench.get("/api/queue")
         #expect(none.status == 401)
         #expect(none.text == #"{"error":"Unauthorized"}"#)
@@ -305,7 +305,7 @@ struct LanServerTests {
         let none = try await bench.get("/api/store")
         #expect(none.status == 401, "the shop's book must never be open on the LAN")
 
-        let reply = try await bench.get("/api/store", headers: ["x-khayt-pin": "2468"])
+        let reply = try await bench.get("/api/store", headers: ["x-khayt-pin": "24682468"])
         #expect(reply.status == 200, Comment(rawValue: reply.text))
 
         struct Envelope: Decodable {
@@ -351,7 +351,7 @@ struct LanServerTests {
     func wholeOnRequest() async throws {
         let bench = try await Bench()
         defer { bench.stop() }
-        let reply = try await bench.get("/api/store?scope=whole", headers: ["x-khayt-pin": "2468"])
+        let reply = try await bench.get("/api/store?scope=whole", headers: ["x-khayt-pin": "24682468"])
         #expect(reply.status == 200, Comment(rawValue: reply.text))
 
         struct Envelope: Decodable {
@@ -420,7 +420,7 @@ struct LanServerTests {
         #expect(none.status == 401, "a phone's edits reached the book without the PIN")
 
         let reply = try await bench.post("/api/store/deltas", json: outbox,
-                                         headers: ["x-khayt-pin": "2468"])
+                                         headers: ["x-khayt-pin": "24682468"])
         #expect(reply.status == 200, Comment(rawValue: reply.text))
         #expect(reply.text.contains("\"applied\":1"), Comment(rawValue: reply.text))
         #expect(reply.text.contains("\"skipped\":1"), Comment(rawValue: reply.text))
@@ -448,7 +448,7 @@ struct LanServerTests {
         defer { bench.stop() }
         let reply = try await bench.post("/api/store/deltas",
                                          json: #"{"deltas":[{"collection":"clients","record":{"id":"C-9","rev":2}}],"tombstones":[],"cursor":null}"#,
-                                         headers: ["x-khayt-pin": "2468"])
+                                         headers: ["x-khayt-pin": "24682468"])
         #expect(reply.status == 405, Comment(rawValue: reply.text))
         #expect(reply.text.contains("does not take changes"))
     }
@@ -464,7 +464,7 @@ struct LanServerTests {
             ("tombstones missing", #"{"deltas":[]}"#),
         ] {
             let reply = try await bench.post("/api/store/deltas", json: raw,
-                                             headers: ["x-khayt-pin": "2468"])
+                                             headers: ["x-khayt-pin": "24682468"])
             #expect(reply.status == 400, Comment(rawValue: "\(label): \(reply.status) \(reply.text)"))
         }
 
@@ -472,7 +472,7 @@ struct LanServerTests {
         // no change still rewrites the file and still rolls `.prev`.
         let empty = try await bench.post("/api/store/deltas",
                                          json: #"{"deltas":[],"tombstones":[],"cursor":null}"#,
-                                         headers: ["x-khayt-pin": "2468"])
+                                         headers: ["x-khayt-pin": "24682468"])
         #expect(empty.status == 200)
 
         #expect(bench.foldCalls.n == 0,
@@ -485,30 +485,32 @@ struct LanServerTests {
         defer { bench.stop() }
         let outbox = #"{"deltas":[{"collection":"clients","record":{"id":"C-9","rev":2}}],"tombstones":[],"cursor":null}"#
         // The right PIN, in the address: ignored on a POST, so refused.
-        let inQuery = try await bench.post("/api/store/deltas?pin=2468", json: outbox)
+        let inQuery = try await bench.post("/api/store/deltas?pin=24682468", json: outbox)
         #expect(inQuery.status == 401, Comment(rawValue: "\(inQuery.status) \(inQuery.text)"))
         // A cross-origin "simple" POST cannot send application/json; refused
         // before the PIN is even looked at.
         for type in ["text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x"] {
             let reply = try await bench.post("/api/store/deltas", json: outbox,
-                                             headers: ["x-khayt-pin": "2468", "Content-Type": type])
+                                             headers: ["x-khayt-pin": "24682468", "Content-Type": type])
             #expect(reply.status == 415, Comment(rawValue: "\(type): \(reply.status)"))
         }
         #expect(bench.foldCalls.n == 0)
         // What the phone sends — the header, and JSON with a charset — lands.
         let phone = try await bench.post("/api/store/deltas", json: outbox,
-                                         headers: ["x-khayt-pin": "2468",
+                                         headers: ["x-khayt-pin": "24682468",
                                                    "Content-Type": "application/json; charset=utf-8"])
         #expect(phone.status == 200, Comment(rawValue: phone.text))
-        // A GET still takes `?pin=`: the queue's first visit, a calendar app.
-        #expect(try await bench.get("/api/queue?pin=2468").status == 200)
+        // And so is a GET's: the header is the only way in to the API.
+        for path in ["/api/queue", "/api/store", "/api/machines/live", "/v1/queue"] {
+            #expect(try await bench.get("\(path)?pin=24682468").status == 401, Comment(rawValue: path))
+        }
     }
 
     @Test("the live queue page is the module's HTML, with the clock it was given")
     func queuePageIsTheModules() async throws {
         let bench = try await Bench()
         defer { bench.stop() }
-        let reply = try await bench.get("/", headers: ["x-khayt-pin": "2468"])
+        let reply = try await bench.get("/", headers: ["x-khayt-pin": "24682468"])
         #expect(reply.status == 200)
         #expect(reply.headers["content-type"] == "text/html; charset=utf-8")
         let expected = try await bench.engine.lanQueuePage(store: .object(bench.shop.lanBook), now: "09:16")
@@ -528,7 +530,7 @@ struct LanServerTests {
         defer { bench.stop() }
         // An old bookmark with ?pin= still works — once, and is sent on to a
         // clean address carrying a cookie instead.
-        let byLink = try await bench.get("/?pin=2468")
+        let byLink = try await bench.get("/?pin=24682468")
         #expect(byLink.status == 303)
         #expect(byLink.headers["location"] == "/")
         let setCookie = try #require(byLink.headers["set-cookie"])
@@ -538,7 +540,7 @@ struct LanServerTests {
         #expect(queue.status == 200 && !queue.text.contains(#"action="/session""#), "the session opens the queue")
 
         // The form posts the PIN in the body.
-        let posted = try await bench.form("/session", body: "pin=2468")
+        let posted = try await bench.form("/session", body: "pin=24682468")
         #expect(posted.status == 303)
         let wrong = try await bench.form("/session", body: "pin=0000")
         #expect(wrong.status == 401 && wrong.text.contains(#"action="/session""#))
@@ -612,18 +614,18 @@ struct LanServerTests {
             #expect(wrong.status == 401, Comment(rawValue: "attempt \(i) gave \(wrong.status)"))
         }
         // The eleventh, RIGHT PIN included, is refused.
-        let locked = try await bench.get("/api/queue", headers: ["x-khayt-pin": "2468"])
+        let locked = try await bench.get("/api/queue", headers: ["x-khayt-pin": "24682468"])
         #expect(locked.status == 429, Comment(rawValue: locked.text))
         #expect(locked.text.contains("Too many attempts"))
         // A minute later the address may try again, and the right PIN opens it.
         bench.advance(seconds: 61)
-        let after = try await bench.get("/api/queue", headers: ["x-khayt-pin": "2468"])
+        let after = try await bench.get("/api/queue", headers: ["x-khayt-pin": "24682468"])
         #expect(after.status == 200, Comment(rawValue: after.text))
         // And a success clears the count: nine more wrong ones do not lock.
         for _ in 1...9 {
             _ = try await bench.get("/api/queue", headers: ["x-khayt-pin": "no"])
         }
-        let still = try await bench.get("/api/queue", headers: ["x-khayt-pin": "2468"])
+        let still = try await bench.get("/api/queue", headers: ["x-khayt-pin": "24682468"])
         #expect(still.status == 200)
     }
 
@@ -641,10 +643,10 @@ struct LanServerTests {
 
     @Test("the PIN comparison is byte-for-byte and length-aware")
     func constantTime() {
-        #expect(LanServer.constantTimeEqual("2468", "2468"))
-        #expect(!LanServer.constantTimeEqual("2468", "2469"))
-        #expect(!LanServer.constantTimeEqual("246", "2468"))
-        #expect(!LanServer.constantTimeEqual("", "2468"))
+        #expect(LanServer.constantTimeEqual("24682468", "24682468"))
+        #expect(!LanServer.constantTimeEqual("24682468", "24682469"))
+        #expect(!LanServer.constantTimeEqual("246", "24682468"))
+        #expect(!LanServer.constantTimeEqual("", "24682468"))
         #expect(LanServer.constantTimeEqual("", ""))
     }
 
@@ -1319,7 +1321,7 @@ struct LanServerTests {
 
     // MARK: - The calendar
 
-    @Test("the calendar feed is the module's, for the subscription token or the owner PIN")
+    @Test("the calendar feed is the module's, for the subscription token only")
     func calendarFeed() async throws {
         let bench = try await Bench(calendarToken: "cal-token-1")
         defer { bench.stop() }
@@ -1340,19 +1342,32 @@ struct LanServerTests {
         #expect(byToken.text.contains("BEGIN:VCALENDAR") && byToken.text.contains("UID:khayt-D-1@khaytapp.com"))
         #expect(byToken.text.contains("DTSTART;VALUE=DATE:20270201"))
         #expect(byToken.text.contains("SUMMARY:Bracket (Sara)"))
-        let byPin = try await bench.get("/calendar.ics", headers: ["x-khayt-pin": "2468"])
-        #expect(byPin.status == 200)
-        #expect(byPin.text == expected)
+        // The owner PIN is not a calendar credential, by header or address:
+        // it was an unthrottled oracle for the PIN that opens the whole book.
+        let byPin = try await bench.get("/calendar.ics", headers: ["x-khayt-pin": "24682468"])
+        #expect(byPin.status == 401)
+        #expect(try await bench.get("/calendar.ics?pin=24682468").status == 401)
     }
 
-    @Test("with no calendar token the feed opens only to the PIN")
+    @Test("with no calendar token the feed opens to nobody — the PIN included")
     func calendarNeedsAToken() async throws {
         let bench = try await Bench()
         defer { bench.stop() }
         let empty = try await bench.get("/calendar.ics?token=")
         #expect(empty.status == 401)
-        let byPin = try await bench.get("/calendar.ics?pin=2468")
-        #expect(byPin.status == 200)
+        #expect(try await bench.get("/calendar.ics?pin=24682468").status == 401)
+        #expect(try await bench.get("/calendar.ics", headers: ["x-khayt-pin": "24682468"]).status == 401)
+    }
+
+    @Test("wrong PINs at the calendar are not free guesses: the feed never says yes to one")
+    func calendarIsNotAPinOracle() async throws {
+        let bench = try await Bench(calendarToken: "cal-token-1")
+        defer { bench.stop() }
+        // Fifty guesses at the calendar, the right one among them.
+        for i in 0..<50 {
+            let guess = i == 37 ? "24682468" : "guess\(i)xx"
+            #expect(try await bench.get("/calendar.ics?pin=\(guess)").status == 401)
+        }
     }
 
     // MARK: - The pane that makes public pricing reachable

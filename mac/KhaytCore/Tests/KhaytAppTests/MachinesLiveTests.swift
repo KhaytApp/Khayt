@@ -57,7 +57,7 @@ struct MachinesLiveTests {
         let bench = try await LanServerTests.Bench()
         defer { bench.stop() }
         #expect(try await bench.get("/api/machines/live").status == 401)
-        let ok = try await bench.get("/api/machines/live", headers: ["x-khayt-pin": "2468"])
+        let ok = try await bench.get("/api/machines/live", headers: ["x-khayt-pin": "24682468"])
         #expect(ok.status == 200)
         #expect((try? JSONSerialization.jsonObject(with: ok.body)) is [Any])
     }

@@ -37,9 +37,12 @@ import KhaytCore
 /// ── THE GATE ──────────────────────────────────────────────────────────────
 ///
 /// Owner data (names of customers and jobs) is behind the shop's PIN, sent
-/// as `x-khayt-pin` (or `?pin=` on a GET — a write takes the header only,
-/// so a page on another origin cannot aim a plain form or `<img>` at a write
-/// route with the PIN in its address). Ten wrong PINs from one address lock it out
+/// as `x-khayt-pin` — the header only, on every API route, read or write: a
+/// PIN in an address lands in logs, history and every proxy on the way, and
+/// the phone has always sent the header. The one place `?pin=` is still read
+/// is the queue page's old bookmark, which trades it once for a session
+/// cookie. A PIN shorter than `minimumPin` opens nothing (see `pinGate`).
+/// Ten wrong PINs from one address (or IPv6 /64) lock it out
 /// for a minute — the rule is `lan-auth`'s, run in JavaScriptCore, so the two
 /// apps cannot come to disagree about what a lockout is. The comparison is
 /// constant-time and in Swift: a primitive, not a rule (see lan-auth.js).
@@ -75,7 +78,7 @@ final class LanServer {
         /// running at the same time.
         var readTimeout: TimeInterval = 15
         /// The calendar subscription token (`settings.lanApi.calendarToken`),
-        /// opened. Empty means only the owner PIN opens the feed.
+        /// opened. Empty means the feed opens to nobody — never to the owner PIN.
         var calendarToken: String = ""
         /// The legacy intake token (`settings.lanApi.intakeToken`), opened.
         /// Empty means the header route is closed; the cookie route is open.
@@ -157,6 +160,14 @@ final class LanServer {
         /// it moved, or nil when the book as it is now had nothing to move.
         var carrierEvent: (_ event: JSONValue, _ at: String) async throws -> JSONValue?
             = { _, _ in throw CocoaError(.fileWriteUnknown) }
+        /// Whether this server is reachable from beyond the shop's own network
+        /// (a tunnel). Only then is the WHOLE server's wrong-PIN budget armed —
+        /// `lib/lan-auth.js`'s rule, which the Node server applies behind its
+        /// tunnel only. On the LAN it is a lockout anyone on the Wi-Fi can
+        /// trip for everybody, the owner's phone with the right PIN included,
+        /// so it costs more than the per-address lockout it backs up. This Mac
+        /// has no tunnel today, so the app never sets it. Oct 2026 review.
+        var exposedBeyondLan = false
     }
 
     struct Request {
@@ -211,6 +222,41 @@ final class LanServer {
     private var submits: [String: KhaytEngine.LanFailures] = [:]
     private var surveys: [String: KhaytEngine.LanFailures] = [:]
     private var estimates: [String: KhaytEngine.LanFailures] = [:]
+
+    // ── ONE COUNTER UPDATE AT A TIME ──────────────────────────────────────
+    //
+    // Every counter here — wrong PINs, forms opened, estimates asked — is a
+    // read, an `await` on the engine, and a write of what the engine said.
+    // The main actor lets another request run at that `await`, so sixteen
+    // requests sent together all read the SAME old count and each wrote back
+    // "one more": sixteen guesses at the PIN for the price of one. The lock
+    // makes the read-decide-write one step. Oct 2026 review.
+    private var counting = false
+    private var countWaiters: [CheckedContinuation<Void, Never>] = []
+    private func lockCounters() async {
+        guard counting else { counting = true; return }
+        await withCheckedContinuation { countWaiters.append($0) }
+    }
+    private func unlockCounters() {
+        if countWaiters.isEmpty { counting = false } else { countWaiters.removeFirst().resume() }
+    }
+
+    /// One step of a per-visitor rate limit, under the lock, keyed on the
+    /// visitor's `throttleKey` (an IPv6 /64, not one of its billions of
+    /// addresses). False when the visitor is over the limit; true when allowed
+    /// or when the rule could not be run (as before).
+    private func rateStep(_ map: ReferenceWritableKeyPath<LanServer, [String: KhaytEngine.LanFailures]>,
+                          _ request: Request, now: Date, limit: Int) async -> Bool {
+        await lockCounters()
+        defer { unlockCounters() }
+        let key = Self.throttleKey(request.remote)
+        let step = try? await host.engine.lanIntakeRate(self[keyPath: map][key], now: now, limit: limit)
+        if let step {
+            self[keyPath: map][key] = step.rec
+            sweep(&self[keyPath: map], now: now)
+        }
+        return step?.allowed != false
+    }
     /// What was quoted, by reference — so a submitted form is attached to the
     /// figure THIS server produced and not to whatever the browser posts back.
     private var quoted: [String: (quote: JSONValue, at: Date, ip: String)] = [:]
@@ -251,6 +297,34 @@ final class LanServer {
     nonisolated static let quoteTTL: TimeInterval = 2 * 60 * 60
     static let maxFailureKeys = 5000
     static let maxBody = 1_048_576
+    /// A body larger than `maxBody` is read only for the upload route, only up
+    /// to `maxUpload`, and only this many at once. Before this the 1 MB cap
+    /// was checked first for every route, so the 32 MB `maxUpload` the
+    /// estimate route advertises could never be reached — a customer's 2 MB
+    /// model was a 413. Capped in number because 64 connections each holding
+    /// 32 MB is two gigabytes of a shop's memory handed to strangers.
+    nonisolated static let maxLargeBodies = 3
+    private var largeBodies = 0
+    /// What an upload may inflate to, whatever its size: 250× a 32 MB upload
+    /// is eight gigabytes of inflating for one request. A real model pack of
+    /// that size is far under this.
+    nonisolated static let maxInflate = 1 << 30
+
+    /// Paths a body over `maxBody` may be sent to — the estimate route under
+    /// both of its names.
+    nonisolated static func takesLargeBody(method: String, target: String) -> Bool {
+        guard method.uppercased() == "POST" else { return false }
+        var path = String(target.split(separator: "?", maxSplits: 1).first ?? "")
+        if path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        return path == "/api/intake/estimate" || path == "/v1/intake/estimate"
+    }
+
+    /// Why a request was not read: too big for its route, or every
+    /// large-body slot is taken.
+    enum ReadRefusal: Error { case tooLarge, busy }
+
+    /// Whether this connection holds one of the `maxLargeBodies` slots.
+    final class LargeBodySlot { var held = false }
 
     /// How long a client may take to finish sending its request.
     ///
@@ -496,8 +570,10 @@ final class LanServer {
             connection.cancel()
         }
         defer { watchdog.cancel() }
+        let slot = LargeBodySlot()
+        defer { if slot.held { largeBodies -= 1 } }
         do {
-            guard let request = try await readRequest(connection, remote: remote) else { return }
+            guard let request = try await readRequest(connection, remote: remote, slot: slot) else { return }
             // The head and body are in; the clock stops. A slow READER must not
             // be killed halfway through the response it asked for.
             watchdog.cancel()
@@ -505,6 +581,10 @@ final class LanServer {
             try await write(response, method: request.method, to: connection)
         } catch let error as URLError where error.code == .dataLengthExceedsMaximum {
             try? await write(.open(413, #"{"error":"Request too large"}"#), method: "POST", to: connection)
+        } catch ReadRefusal.tooLarge {
+            try? await write(.open(413, #"{"ok":false,"reason":"too-large"}"#), method: "POST", to: connection)
+        } catch ReadRefusal.busy {
+            try? await write(.open(503, #"{"ok":false,"reason":"busy"}"#), method: "POST", to: connection)
         } catch {
             // A client that hung up mid-request, a read that ran out of time,
             // or a listener being stopped.
@@ -513,7 +593,8 @@ final class LanServer {
 
     /// Read one HTTP/1.1 request: the head to the blank line, then as much
     /// body as Content-Length says, capped. Nil when the client sent nothing.
-    private func readRequest(_ connection: NWConnection, remote: String) async throws -> Request? {
+    private func readRequest(_ connection: NWConnection, remote: String,
+                             slot: LargeBodySlot = LargeBodySlot()) async throws -> Request? {
         var buffer = Data()
         let headEnd = Data("\r\n\r\n".utf8)
         var headRange: Range<Data.Index>?
@@ -536,7 +617,18 @@ final class LanServer {
         }
         var body = Data(buffer[headRange!.upperBound...])
         let length = Int(headers["content-length"] ?? "0") ?? 0
-        if length > Self.maxBody { throw URLError(.dataLengthExceedsMaximum) }
+        if length > Self.maxBody {
+            // Only the upload route reads past a megabyte, and the slot is
+            // taken BEFORE the first byte of body is awaited — with no
+            // suspension between the check and the claim.
+            guard Self.takesLargeBody(method: requestLine[0], target: requestLine[1]) else {
+                throw URLError(.dataLengthExceedsMaximum)
+            }
+            guard length <= Self.maxUpload else { throw ReadRefusal.tooLarge }
+            guard largeBodies < Self.maxLargeBodies else { throw ReadRefusal.busy }
+            largeBodies += 1
+            slot.held = true
+        }
         while body.count < length {
             guard let chunk = try await receive(connection) else { break }
             body.append(chunk)
@@ -743,8 +835,8 @@ final class LanServer {
             // exchanged ONCE for a session cookie (HttpOnly, SameSite=Strict,
             // this page only) and the browser sent back to a clean address. The
             // phone app sends the PIN in a header and is unaffected. Sep 2026.
-            if request.query["pin"] != nil {
-                if let refused = await pinGate(request) { return refused }
+            if let bookmarked = request.query["pin"] {
+                if let refused = await pinGate(request, formPin: bookmarked) { return refused }
                 return sessionResponse(to: "/")
             }
             if !(Self.hostIsLocal(request.headers["host"]) && hasSession(request)) {
@@ -851,10 +943,8 @@ final class LanServer {
         if hasSession(request, now: now, sessionMs: limits?.SESSION_MS ?? 14_400_000) {
             return .html(200, page, extra: ["Cache-Control": "no-cache"])
         }
-        let step = try? await engine.lanIntakeRate(grants[request.remote], now: now,
-                                                   limit: Int(limits?.SESSION_GRANT_LIMIT ?? 40))
-        if let step { grants[request.remote] = step.rec; sweep(&grants, now: now) }
-        guard step?.allowed != false else {
+        let allowed = await rateStep(\.grants, request, now: now, limit: Int(limits?.SESSION_GRANT_LIMIT ?? 40))
+        guard allowed else {
             let tooMany = (try? await engine.lanIntakeTooManyPage()) ?? ""
             return .html(429, tooMany)
         }
@@ -873,10 +963,8 @@ final class LanServer {
         guard hasSession(request, now: now, sessionMs: limits?.SESSION_MS ?? 14_400_000) || hasIntakeToken(request) else {
             return .open(401, #"{"error":"Unauthorized"}"#)
         }
-        let step = try? await engine.lanIntakeRate(submits[request.remote], now: now,
-                                                   limit: Int(limits?.SUBMIT_LIMIT ?? 20))
-        if let step { submits[request.remote] = step.rec; sweep(&submits, now: now) }
-        guard step?.allowed != false else {
+        let allowed = await rateStep(\.submits, request, now: now, limit: Int(limits?.SUBMIT_LIMIT ?? 20))
+        guard allowed else {
             return .open(429, #"{"error":"Too many submissions — try again later"}"#)
         }
         guard let body = try? JSONDecoder().decode(JSONValue.self, from: request.body), case .object = body else {
@@ -1120,9 +1208,7 @@ final class LanServer {
         let engine = host.engine
         let now = host.now()
         let limit = (try? await engine.lanSurveyLimit()) ?? 30
-        let step = try? await engine.lanIntakeRate(surveys[request.remote], now: now, limit: limit)
-        if let step { surveys[request.remote] = step.rec; sweep(&surveys, now: now) }
-        guard step?.allowed != false else {
+        guard await rateStep(\.surveys, request, now: now, limit: limit) else {
             return .open(429, #"{"error":"Too many attempts — try again later"}"#)
         }
         guard let body = try? JSONDecoder().decode(JSONValue.self, from: request.body), case .object = body else {
@@ -1169,9 +1255,7 @@ final class LanServer {
             // request anyone on the shop's Wi-Fi can make.
             perHour = typed.isFinite ? Int(min(10_000, typed)) : 10_000
         }
-        let step = try? await engine.lanIntakeRate(estimates[request.remote], now: now, limit: perHour)
-        if let step { estimates[request.remote] = step.rec; sweep(&estimates, now: now) }
-        guard step?.allowed != false else {
+        guard await rateStep(\.estimates, request, now: now, limit: perHour) else {
             return .open(429, #"{"error":"Too many estimates — try again later"}"#)
         }
         guard Self.quotingIsOn(host.store()) else {
@@ -1192,6 +1276,15 @@ final class LanServer {
         guard measuring < Self.maxMeasuring else {
             return .open(503, #"{"ok":false,"reason":"busy"}"#)
         }
+        // ── THE SLOT IS TAKEN BEFORE THE FIRST AWAIT ──────────────────────
+        //
+        // It was taken after the scan below, which awaits the engine — so any
+        // number of requests could pass the check above while the first was
+        // still being scanned, and the cap of three meant nothing to a burst.
+        // Taken here, with no suspension between the check and the claim, and
+        // given back on every path out by the `defer`. Oct 2026 review.
+        measuring += 1
+        defer { measuring -= 1 }
         // ── LOOKED AT BEFORE IT IS USED ───────────────────────────────────
         //
         // The file is about to be measured, and where the shop has turned
@@ -1211,8 +1304,6 @@ final class LanServer {
             let escaped = (try? String(decoding: JSONEncoder().encode(reason), as: UTF8.self)) ?? "\"refused\""
             return .open(400, "{\"ok\":false,\"reason\":\(escaped)}")
         }
-        measuring += 1
-        defer { measuring -= 1 }
 
         // What the file says it is: a sliced file is taken at the slicer's own
         // figures, a mesh is measured here.
@@ -1233,7 +1324,9 @@ final class LanServer {
             let measure = host.measure
             let body = request.body
             intake = try? await Task.detached {
-                try Zip.$inflateBudget.withValue(max(body.count, 1) * 250) { try measure(body, ext) }
+                try Zip.$inflateBudget.withValue(min(max(body.count, 1) * 250, LanServer.maxInflate)) {
+                    try measure(body, ext)
+                }
             }.value
         }
         guard let intake else {
@@ -1344,15 +1437,19 @@ final class LanServer {
 
     // MARK: - The calendar
 
-    /// `GET /calendar.ics`: the shop's due dates, for the calendar token or the
-    /// owner PIN — a plain compare with no lockout, as the Node route has it,
-    /// because a calendar app polls this on a schedule of its own.
+    /// `GET /calendar.ics`: the shop's due dates, for the calendar token ONLY.
+    ///
+    /// It took the owner PIN too — from `?pin=` or the header, compared with
+    /// no lockout, no throttle and no Host check, because a calendar app polls
+    /// on a schedule of its own. That made it an unlimited PIN oracle: guess
+    /// here until a 200, then open `/api/store` and write `/api/store/deltas`.
+    /// The token is 128 random bits and minted for every shop
+    /// (`ensureCalendarToken`); the link the app shows has always carried it.
+    /// Oct 2026 review.
     private func calendar(_ request: Request, store: JSONValue) async -> Response {
         let token = (request.query["token"] ?? "").trimmingCharacters(in: .whitespaces)
-        let pin = (request.query["pin"] ?? request.headers["x-khayt-pin"] ?? "").trimmingCharacters(in: .whitespaces)
         let byToken = !host.calendarToken.isEmpty && !token.isEmpty && Self.constantTimeEqual(token, host.calendarToken)
-        let byPin = !host.pin.isEmpty && !pin.isEmpty && Self.constantTimeEqual(pin, host.pin)
-        guard byToken || byPin else {
+        guard byToken else {
             return Response(status: 401, headers: ["Content-Type": "text/plain; charset=utf-8"],
                             body: Data("Unauthorized — use the calendar subscription link from Khayt Settings → Online.".utf8))
         }
@@ -1435,7 +1532,7 @@ final class LanServer {
     /// `lib/storefront-webhook.js`, the rule the Node server runs.
     private func storefrontHook(_ request: Request, source: String) async -> Response {
         let now = host.now()
-        let key = request.remote + ":wh:" + source
+        let key = Self.throttleKey(request.remote) + ":wh:" + source
         let record = webhookFailures[key]
         if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
             return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
@@ -1504,7 +1601,7 @@ final class LanServer {
     /// `lib/carrier-webhook.js`.
     private func carrierHook(_ request: Request, carrier: String) async -> Response {
         let now = host.now()
-        let key = request.remote + ":wh:" + carrier
+        let key = Self.throttleKey(request.remote) + ":wh:" + carrier
         let record = webhookFailures[key]
         if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
             return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
@@ -1629,11 +1726,16 @@ final class LanServer {
     /// Nil when the caller may pass; the refusal to send otherwise. The same
     /// answers, in the same order, as the Node server's `checkPinForGet`.
     ///
-    /// Where the PIN may come from: a GET may carry it as `?pin=` (the queue
-    /// page's first visit, a calendar); anything else takes the `x-khayt-pin`
-    /// header only — or `formPin`, the `/session` form's field, which the
-    /// caller reads out of the body. A PIN in the address of a write is
-    /// ignored, not accepted.
+    /// Where the PIN may come from: the `x-khayt-pin` header — or `formPin`,
+    /// which the caller reads out of the `/session` form's body or the queue
+    /// page's old `/?pin=` bookmark. A `?pin=` on an API route is ignored, not
+    /// accepted, read or write: it was accepted on every GET, so the PIN sat
+    /// in the address of every phone-made link, in clear over plain HTTP.
+    /// The phone sends the header and always has. Oct 2026 review.
+    ///
+    /// The `Secure` cookie flag is NOT set on the session it buys: this
+    /// server speaks plain HTTP, and a browser would refuse to send a Secure
+    /// cookie back over it — the flag would only break the session.
     private func pinGate(_ request: Request, formPin: String? = nil) async -> Response? {
         // DNS REBINDING: a web page the owner visits can point its own name at
         // this Mac and read the book through the owner's browser, same-origin.
@@ -1647,7 +1749,20 @@ final class LanServer {
         guard !host.pin.isEmpty else {
             return .json(401, #"{"error":"Configure a LAN PIN in Khayt settings to access this data"}"#)
         }
+        // ── A SHORT PIN OPENS NOTHING ─────────────────────────────────────
+        //
+        // Eight characters was the Online pane's rule only: a four-digit PIN
+        // saved before it — or by the other app — kept opening the whole book
+        // to anyone on the Wi-Fi, and ten thousand guesses is a day at the
+        // per-address limit. Refused here, whoever wrote it, until the shop
+        // sets a new one; the app says so in the Online pane. Oct 2026 review.
+        guard !Self.pinTooShort(host.pin) else {
+            return .json(401, #"{"error":"The LAN PIN is too short. Set a new one of at least 8 characters in Khayt settings to access this data"}"#)
+        }
         let provided = (formPin ?? Self.pinProvided(request)).trimmingCharacters(in: .whitespaces)
+        // Under the counter lock: see `lockCounters`.
+        await lockCounters()
+        defer { unlockCounters() }
         let now = host.now()
         // One lockout per IPv6 /64: a phone — or an attacker — has billions of
         // addresses in its prefix, and a lockout per address was none at all.
@@ -1656,14 +1771,19 @@ final class LanServer {
         if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
             return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
         }
-        if let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: false), g.blocked {
+        // The whole server's budget, only when exposed beyond the LAN — see
+        // `Host.exposedBeyondLan`. On the shop's own network it let anyone on
+        // the Wi-Fi lock the owner out, right PIN and all.
+        if host.exposedBeyondLan,
+           let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: false), g.blocked {
             return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
         }
         guard Self.constantTimeEqual(provided, host.pin) else {
             if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
                 failures[key] = bumped
             }
-            if let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: true) {
+            if host.exposedBeyondLan,
+               let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: true) {
                 throttle = g.state
             }
             sweepFailures(now: now)
@@ -1673,10 +1793,21 @@ final class LanServer {
         return nil
     }
 
-    /// The PIN a request carries: the header, or on a GET/HEAD only, `?pin=`.
+    /// The PIN a request carries: the header, and nothing else.
     nonisolated static func pinProvided(_ request: Request) -> String {
-        let isGet = request.method == "GET" || request.method == "HEAD"
-        return (isGet ? request.query["pin"] : nil) ?? request.headers["x-khayt-pin"] ?? ""
+        request.headers["x-khayt-pin"] ?? ""
+    }
+
+    /// The shortest owner PIN the server accepts — the Online pane's rule,
+    /// held here too so a PIN saved before it (or by the other app) cannot
+    /// open the book.
+    nonisolated static let minimumPin = 8
+
+    /// Whether an opened PIN is long enough to guard the book. Empty is "not
+    /// configured", which is a different message, so it is not "too short".
+    nonisolated static func pinTooShort(_ opened: String) -> Bool {
+        let p = opened.trimmingCharacters(in: .whitespaces)
+        return !p.isEmpty && p.count < minimumPin
     }
 
     /// `application/json`, with or without parameters (`; charset=utf-8`).
@@ -2002,6 +2133,12 @@ extension Shop {
             lanServer = server
             lanRunning = config
             lanCalendarToken = calendarToken
+            // The server refuses a short PIN on every owner route; the shop
+            // is told why here rather than finding its phone locked out.
+            if LanServer.pinTooShort(pin) {
+                lanProblem = words.callIt("mac.lan_pin_too_short_stored",
+                                          ["n": .number(Double(LanServer.minimumPin))])
+            }
         } catch {
             lanProblem = Self.lanFailure(error, port: Int(config.port), words: words)
         }

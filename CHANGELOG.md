@@ -353,6 +353,32 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   for each. The Mac now remembers what it last agreed with the cloud on, so an
   overwritten local edit is actually detected.
 
+- **The shop's electricity price takes a real figure in every currency.** It
+  was capped at 100 per kWh, so a shop pricing in won or naira had its real
+  ~250 saved as 100 without a word. The ceiling is now 10,000 per kWh, and
+  every place that reads the price uses that one figure: a higher stored
+  value is costed at the ceiling, and a blank, negative or non-numeric one is
+  still ignored.
+- **A blank electricity figure on a calculator preset no longer means free
+  electricity.** A tariff field holding only spaces was costed at 0 per kWh in
+  a job's costing while the online quote ignored it. Both now treat it as not
+  set, so the shop's own price applies. The same goes for the preset's other
+  rates and a machine's power draw and wear rate.
+- **(Mac) LAN server security fixes.** The calendar feed (`/calendar.ics`)
+  now opens only with its own subscription token. It used to accept the owner
+  PIN with no lockout, so anyone on the shop's Wi-Fi could guess the PIN there
+  without limit and then read or change the whole book. An owner PIN shorter
+  than 8 characters no longer opens anything: the Online pane asks the shop to
+  set a new one, and customer pages keep working meanwhile. API routes take the
+  PIN from the `x-khayt-pin` header only, never from `?pin=` in the address
+  (the phone app already uses the header). Wrong PINs sent all at once are now
+  each counted. Wrong PINs from many addresses can no longer lock the owner
+  out (that server-wide limit is now only for a server reachable from outside
+  the shop network). Customer rate limits count an IPv6 visitor once per /64
+  rather than once per address. A burst of uploads can no longer get past the
+  three-at-once measuring cap. Uploaded models up to the advertised 32 MB are
+  accepted; before, anything over 1 MB was refused.
+
 - **(Mac) Changing the electricity price in Settings › Business also updates
   the "Shop rates" preset that an earlier first-run setup made.** That preset's
   old price was used instead of the new one wherever the preset was picked.

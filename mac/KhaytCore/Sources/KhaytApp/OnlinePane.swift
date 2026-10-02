@@ -43,8 +43,10 @@ struct OnlinePane: View {
 
         /// A NEW PIN shorter than eight characters. The PIN is the only lock on
         /// the whole book over the network, and a four-digit one falls to the
-        /// per-address limit in a day. A PIN already stored keeps working.
-        static let minimumPin = 8
+        /// per-address limit in a day. The server holds the same rule
+        /// (`LanServer.minimumPin`), so a short PIN already stored opens
+        /// nothing until the shop sets a new one.
+        static let minimumPin = LanServer.minimumPin
         var pinTooShort: Bool {
             let p = pin.trimmingCharacters(in: .whitespaces)
             return !p.isEmpty && p.count < Self.minimumPin
