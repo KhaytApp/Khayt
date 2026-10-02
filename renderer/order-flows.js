@@ -1306,7 +1306,7 @@ function openPaymentModal(orderId) {
         amount: draft.paidAmount,
         method: draft.paymentMethod,
         paidAt: draft.paidAt,
-      }, { today: localDateStr() });
+      }, { today: localDateStr(), settings });   // the cap is price + tax for a tax-added shop
       runPaymentEffects(order, out.effects);
       return true;
     }
@@ -2105,6 +2105,11 @@ function openOrderEditor(orderId) {
           paidAmount: order.paidAmount,
           instalments: draft.instalments,
           instalmentBase: draft.instalmentBase,
+          // A gift card and a credit note pay an order down too, and a
+          // tax-added shop is owed price + tax (lib/payment-plan.js).
+          giftCardDiscount: +order.giftCardDiscount || 0,
+          credited: KhaytOrderMoney.orderCreditedRaw(order),
+          due: KhaytOrderMoney.orderGrossRaw(order, { settings }),
         });
         order.paidAmount = totals.paidAmount;
         order.paymentStatus = totals.paymentStatus;
@@ -2147,7 +2152,7 @@ function openOrderEditor(orderId) {
       // money — lib/order-edit.js.
       const typedPrice = String(document.querySelector('[data-f="priceOverride"]')?.value ?? '').trim();
       if (typedPrice !== '') {
-        EditRules().applyEdit(order, { price: Math.max(0, +typedPrice || 0) }, { now: Date.now(), id: uid('edit') });
+        EditRules().applyEdit(order, { price: Math.max(0, +typedPrice || 0) }, { now: Date.now(), id: uid('edit'), settings });
       }
       // Persist extra lines (after price recalculation to use correct prev values)
       order.extraLines = draft.extraLines.length > 0 ? draft.extraLines.map(l => ({ ...l })) : undefined;

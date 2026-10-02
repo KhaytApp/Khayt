@@ -182,7 +182,7 @@ function computeHandoffMachineRows() {
     orders: printLog,
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     // Only what was stocked: wear reaches this table as depreciation, once.
     partCostOf: stockedPartCost,
   });
@@ -880,7 +880,7 @@ function renderMachineRevenueChart() {
     if (!machMap[o.machineId]) {
       machMap[o.machineId] = { name: o.machine || o.machineId, color: '#6b7280', revenue: 0, count: 0 };
     }
-    machMap[o.machineId].revenue += orderNetRevenueBase(o);
+    machMap[o.machineId].revenue += orderEarnedBase(o);
     machMap[o.machineId].count++;
   }
 
@@ -1596,7 +1596,7 @@ function renderPrinterUtilizationChart() {
     orders: printLog,
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     // Only what was stocked: wear reaches this table as depreciation, once.
     partCostOf: stockedPartCost,
   });
@@ -1770,7 +1770,7 @@ function renderProductProfitability() {
     orders: (printLog || []).filter(o => inRange(o.date, analyticsRange, 'analytics')),
     products: products || [], expenses: expenses || [], untagged: t('an.untagged'),
   }, {
-    revenueOf: orderNetRevenueBase, partCostOf: partTotalCost,
+    revenueOf: orderEarnedBase, partCostOf: partTotalCost,
     nameOf: localName, countsForBusiness: _countsForBusiness,
   });
   if (report.rows.length === 0) {
@@ -1979,7 +1979,7 @@ function renderMachinePL() {
     orders: printLog,
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
   }, {
-    revenueOf: orderNetRevenueBase,
+    revenueOf: orderEarnedBase,
     // Only what was stocked: wear reaches this table as depreciation, once.
     partCostOf: stockedPartCost,
   });
@@ -3346,7 +3346,7 @@ function computeBreakEven() {
     completed: printLog.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o)),
     since: localDateStr(cutoff),
     month: localMonthStr(new Date()),
-  }, { revenueOf: orderNetRevenueBase, partCostOf: partTotalCost });
+  }, { revenueOf: orderEarnedBase, partCostOf: partTotalCost });
   // The callers below have always read `null` as "no fixed costs at all".
   return r.totalFixed === 0 ? null : {
     totalFixed: r.totalFixed,

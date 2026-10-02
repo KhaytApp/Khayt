@@ -746,11 +746,10 @@ async function renderInvoiceForOrder(order) {
   // shown as "included". order.price already bundles shipping+rush+extras
   // (build.js: finalPrice = goods + rush + shipping + extras), so the old
   // Subtotal=exVat double-counted the separate Rush/Shipping rows.
-  const _shipIncl  = +order.shippingCost || 0;
-  const _rushIncl  = +order.rushFeeAmount || 0;
-  const _discAmt   = Math.max(0, (+order.priceBeforeDiscount || 0) * (+order.discountPct || 0) / 100);
-  const itemsSubtotalIncl = price - _shipIncl - _rushIncl;          // parts + extras, post-discount
-  const subtotalShown = fmtMoney(order.discountPct > 0 ? itemsSubtotalIncl + _discAmt : itemsSubtotalIncl);
+  // The items row: price less rush and shipping, before any discount. The rule
+  // is lib/invoice-document.js invoiceSummary, so the Mac's invoice prints the
+  // same Subtotal (it printed the whole price there).
+  const subtotalShown = fmtMoney(KhaytInvoiceDocument.invoiceSummary(order, _taxProfile).itemsSubtotal);
   let qrSvg = '';
   // Why there is no QR, when there is none. An empty box on a tax invoice needs
   // to say what is missing, and the shop needs telling before it hands the
