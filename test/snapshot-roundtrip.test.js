@@ -141,7 +141,7 @@ test('an order built from a hostile outside body still survives normalization', 
   // What matters is the record that comes out, so that is what is asserted.
   const { registerLanServer } = require(path.join(ROOT, 'lib/lan-server.js'));
 
-  const PORT = 3994;
+  const PORT = 3988;
   const PIN = '4321';
   const handlers = new Map();
   const noop = () => {};
