@@ -4,43 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **A job with a missing date, status or project is no longer deleted.** Such
-  a job can arrive from the phone, the cloud or an import, and the Mac app
-  shows it. The desktop threw it away when it opened your book, and the next
-  save removed it from the file and then from the cloud. It is now kept, with
-  the missing fields left blank, as on the Mac. No shop is known to have lost
-  a job this way.
-
-- **Prusa multi-material targets name the right printer.** The print-file
-  converter wrote `MK4IS` for the MK4 + MMU3, `MK3S` for the MK3S + MMU2S (both
-  the single-extruder printers) and `XL5T` (not a Prusa model id) for the
-  5-toolhead XL. They now write `MK4ISMMU3`, `MK3SMMU2S` and `XL5IS`, as
-  PrusaSlicer's own vendor profile names them.
-
-- **Set your shop's electricity price once.** Settings › Business has a
-  Running costs card with your price per kWh, and the 📍 Auto button can fill
-  it from your country. The calculator starts on that price instead of 0.18,
-  and changes with it unless you have typed your own figure there. A printer
-  preset with its own electricity price still wins. Leave it empty to keep
-  Khayt's default. The Mac app reads the same setting.
-
-- **The shop's electricity price takes a real figure in every currency.** It
-  was capped at 100 per kWh, so a shop pricing in won or naira had its real
-  ~250 saved as 100 without a word. The ceiling is now 10,000 per kWh, and
-  every place that reads the price uses that one figure: a higher stored
-  value is costed at the ceiling, and a blank, negative or non-numeric one is
-  still ignored.
-- **A blank electricity figure on a calculator preset no longer means free
-  electricity.** A tariff field holding only spaces was costed at 0 per kWh in
-  a job's costing while the online quote ignored it. Both now treat it as not
-  set, so the shop's own price applies. The same goes for the preset's other
-  rates and a machine's power draw and wear rate.
 - **(Mac) Changing the electricity price in Settings › Business also updates
   the "Shop rates" preset that an earlier first-run setup made.** That preset's
   old price was used instead of the new one wherever the preset was picked.
   Clearing the price removes it from that preset too, so it falls back to the
   shop's price. A preset the shop named itself is left alone. Saving the pane
   without touching the price keeps whatever was stored exactly as it was.
+
 - **Mac: fixes from the alpha.57 review.** A group tile inside another group
   now names where it lives ("Set A · in Collection X"), and its picture lines
   up with the model tiles beside it. The All models / Groups switch is hidden
@@ -54,24 +24,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the multi-delete title count correctly in English and Arabic. The two kinds in
   New Group line up, and the sync status in the title strip no longer breaks
   mid-word.
-- **Selecting print files only ever holds what is on screen.** Changing the
-  filter, the search or the view now drops any selected file it hides, and
-  Delete refuses outright if anything selected is not shown. A selection used
-  to be kept when you changed the filter, so Delete could take files you were
-  no longer looking at. The Mac app lost 34 models that way, and both apps now
-  work the same. To act on files from several groups, show them together (for
-  example, clear the filter) and select them there.
-- **One electricity price for the whole shop.** A shop can now say what a
-  kWh costs it once (`settings.elecRate`), and every costing uses it unless a
-  calculator preset sets its own: a job on a machine, a failed print, the
-  electricity-by-machine report, and an online quote whose preset leaves
-  electricity blank. Until now a tariff lived only on a preset, so anything
-  costed without one — every failed print — was charged 0.18. A shop that has
-  not set it is costed exactly as before.
+
 - **(Mac) Electricity per kWh in Settings › Business, and the first-run setup
   writes it there.** The setup's electricity answer becomes the shop's price
   instead of a new "Shop rates" calculator preset; a preset an earlier setup
   made is kept in step. Clearing the field goes back to Khayt's default.
+
 - **(Mac) Groups read as groups.** A group now says what it is: **one print
   in parts** (several files that make one print — the default, and what every
   existing group is read as) or **separate prints** kept together. In All
@@ -86,6 +44,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   makes a group inside a group ("Luffy Card/Poster" is filed as "Luffy Card –
   Poster", and the box says so before filing). Filing models into a group says
   where they went, with Show Group.
+
 - **(Mac) A group keeps its kind when a name lands on it.** Typing a name the
   engine files under an existing group — "Saudi  Kings" with two spaces, a
   different case, or a name past 60 characters — no longer turns that group
@@ -95,16 +54,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   folder moved onto a deleted group's name does not inherit that group's kind.
   Kinds for groups no model sits in any more are tidied away whenever the
   kinds are written, and Undo of a move puts the kinds back with the files.
+
 - **(Mac) An absurd print time no longer crashes the app.** A job whose
   `printTime` is something like `1e300` used to quit the app while drawing the
   machine band; times, weights and day counts turned into whole numbers are now
   held to a sane range.
-- **Deleting several print files warns when some of them are not on screen.**
-  A selection is kept when you change the filter, so you can pick files from
-  several groups. That also means Delete can include files you are no longer
-  looking at. The delete dialog now says how many of them the current filter
-  hides, in red, and lists those first. The Mac app lost 34 models to this
-  kind of hidden selection.
 
 - **(Mac) The spool sheet says each unit once, and an unset value is an empty
   box.** Print temp, bed temp and max speed read "Print temp (°C) … °C": the
@@ -113,10 +67,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Arabic (°م, مم/ث after the box). A temperature, speed or order quantity
   nobody has set showed "0"; it now shows an empty box, and saving it untouched
   still writes nothing.
+
 - **(Mac) Feedback relies on the shared export redaction alone.** The shared
   rule now deletes each job's survey link and the cloud's wrapped key itself, so
   the Mac's own copy of that step is gone; the feedback test still plants every
   token and checks none survives.
+
 - **(Mac) Jobs with a missing field or a price written as text show up.** A
   job without a date, status, project name, price, amount paid, payment
   status, print time, priority or notes, or with a number stored as text
@@ -128,6 +84,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   are only for display. Opening such a job and saving it without changes
   leaves it exactly as it was in the book. A job with no id still can't be
   read, and the app still says how many there are.
+
 - **(Mac) Selecting models in the library can no longer reach models you
   cannot see.** In the Groups view, Select All (⌘A), a Shift-click range and
   Shift-arrow also picked every model hidden inside the group folders, and the
@@ -4129,6 +4086,81 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.2] - 2026-10-02
+
+A data-loss fix and the shop's own electricity price, since 3.11.1.
+Individual entries are kept below; this is what changed for you.
+
+**A job is never thrown away for a missing field.** A job that arrived from
+the phone, the cloud or an import without a date, status or project was
+dropped when Khayt opened your book, and the next save removed it for good.
+It is kept now, with those fields left blank. No shop is known to have lost
+a job this way.
+
+**Set your electricity price once.** Settings › Business has a Running costs
+card with your price per kWh. The calculator, failed prints and the power
+report use it unless a printer preset sets its own.
+
+**Deleting several print files only ever deletes what you can see.** A
+selection now drops whatever the filter hides, and Delete refuses anything
+off screen.
+
+**Prusa multi-material printers are named correctly** when converting a 3MF
+for the MK4 + MMU3, the MK3S + MMU2S and the 5-toolhead XL.
+
+### Added
+
+- **Set your shop's electricity price once.** Settings › Business has a
+  Running costs card with your price per kWh, and the 📍 Auto button can fill
+  it from your country. The calculator starts on that price instead of 0.18,
+  and changes with it unless you have typed your own figure there. A printer
+  preset with its own electricity price still wins. Leave it empty to keep
+  Khayt's default. The Mac app reads the same setting.
+
+- **One electricity price for the whole shop.** A shop can now say what a
+  kWh costs it once (`settings.elecRate`), and every costing uses it unless a
+  calculator preset sets its own: a job on a machine, a failed print, the
+  electricity-by-machine report, and an online quote whose preset leaves
+  electricity blank. Until now a tariff lived only on a preset, so anything
+  costed without one — every failed print — was charged 0.18. A shop that has
+  not set it is costed exactly as before.
+
+- **The shop's electricity price takes a real figure in every currency.** It
+  was capped at 100 per kWh, so a shop pricing in won or naira had its real
+  ~250 saved as 100 without a word. The ceiling is now 10,000 per kWh, and
+  every place that reads the price uses that one figure: a higher stored
+  value is costed at the ceiling, and a blank, negative or non-numeric one is
+  still ignored.
+
+### Fixed
+
+- **A job with a missing date, status or project is no longer deleted.** Such
+  a job can arrive from the phone, the cloud or an import, and the Mac app
+  shows it. The desktop threw it away when it opened your book, and the next
+  save removed it from the file and then from the cloud. It is now kept, with
+  the missing fields left blank, as on the Mac. No shop is known to have lost
+  a job this way.
+
+- **Selecting print files only ever holds what is on screen.** Changing the
+  filter, the search or the view now drops any selected file it hides, and
+  Delete refuses outright if anything selected is not shown. A selection used
+  to be kept when you changed the filter, so Delete could take files you were
+  no longer looking at. The Mac app lost 34 models that way, and both apps now
+  work the same. To act on files from several groups, show them together (for
+  example, clear the filter) and select them there.
+
+- **Prusa multi-material targets name the right printer.** The print-file
+  converter wrote `MK4IS` for the MK4 + MMU3, `MK3S` for the MK3S + MMU2S (both
+  the single-extruder printers) and `XL5T` (not a Prusa model id) for the
+  5-toolhead XL. They now write `MK4ISMMU3`, `MK3SMMU2S` and `XL5IS`, as
+  PrusaSlicer's own vendor profile names them.
+
+- **A blank electricity figure on a calculator preset no longer means free
+  electricity.** A tariff field holding only spaces was costed at 0 per kWh in
+  a job's costing while the online quote ignored it. Both now treat it as not
+  set, so the shop's own price applies. The same goes for the preset's other
+  rates and a machine's power draw and wear rate.
 
 ## [3.11.1] - 2026-10-01
 
