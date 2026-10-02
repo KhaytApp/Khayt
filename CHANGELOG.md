@@ -44,6 +44,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   restored the cloud on purpose, **Trust the cloud's older copy** in
   Settings › Khayt Cloud takes it, and changes made on this computer are
   merged back in. The Mac app does the same.
+- **Freeing up space keeps the models you still need.** When old models were
+  moved off this computer to save space, "old" meant the file's own date. A
+  model downloaded years ago but imported last week counted as unused, and so
+  did one an unfinished job was waiting for. Now a model counts as used when
+  it was imported, last printed or last named in a job. A model an unfinished
+  job needs is never moved, and the settings say how many were kept for that
+  reason. The Mac app does the same.
 
 - **A model moved to Google Drive to save space comes back.** When old models
   were moved off this computer to free space, the desktop recorded every one

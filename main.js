@@ -2651,11 +2651,27 @@ async function printLibAllFiles() {
  * the migration does: acting on a list gathered minutes ago evicts files the
  * shop has since opened.
  */
+/**
+ * The library listing with each model's last use and whether an open job needs
+ * it (lib/print-library-tier.js usageFromBook): a model a job is still waiting
+ * for is never moved off, and "unused" counts from the import, the last print
+ * and the last job, not just the copied file's date. Read from the book on disk.
+ */
+async function printLibFilesWithUsage() {
+  const files = await printLibAllFiles();
+  let book = null;
+  try { book = readStoreDecryptedFromDisk(); } catch (_) { book = null; }
+  if (!book) return files;
+  const { itemDirName } = require('./lib/print-library-location');
+  const usage = PLT.usageFromBook({ printFiles: book.printFiles, orders: book.printLog, itemDirName });
+  return PLT.annotate(files, usage);
+}
+
 ipcMain.handle('hub:printlib-tier-scan', async () => {
   try {
     const policy = printLibTierPolicy();
     const s3 = printLibRemote();
-    const files = await printLibAllFiles();
+    const files = await printLibFilesWithUsage();
     const p = PLT.plan(files, policy, Date.now());
     const tiered = files.filter((f) => PLT.isSidecar(f.filename)).length;
     return {
@@ -2695,7 +2711,7 @@ ipcMain.handle('hub:printlib-tier-run', async (event) => {
     if (!s3) return { ok: false, error: 'No object storage is configured. Add the bucket details first.' };
     requirePrintLib();
 
-    const p = PLT.plan(await printLibAllFiles(), policy, Date.now());
+    const p = PLT.plan(await printLibFilesWithUsage(), policy, Date.now());
     const send = (m) => { try { event.sender.send('hub:printlib-tier-progress', m); } catch (_) { /* window gone */ } };
 
     let freed = 0;
