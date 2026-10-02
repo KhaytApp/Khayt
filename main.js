@@ -78,6 +78,7 @@ const { normalizeStoreSnapshot, STORE_VERSION } = require('./lib/store-validate'
 const upgradeBackup = require('./lib/upgrade-backup');
 const safeNames = require('./lib/safe-names');
 const { createStoreIo, MAX_STORE_BYTES } = require('./lib/store-io');
+const webhookSend = require('./lib/webhook-send');
 const { parseGcodeText } = require('./lib/gcode-parse');
 const moonrakerHistory = require('./lib/moonraker-history');
 // Reading a Klipper printer's answer — shared with the Mac app, which polls the
@@ -5018,60 +5019,49 @@ ipcMain.handle('hub:send-sms', async (_e, { to, message, channel, smsConfig } = 
 // Idempotent by payload.idempotencyKey; secret resolves from the encrypted store.
 ipcMain.handle('hub:accounting-push', async (_e, { url, secret, payload } = {}) => {
   if (!/^https?:\/\//i.test(String(url || ''))) return { ok: false, error: 'Accounting webhook needs an http(s) URL' };
-  // Same SSRF hardening as hub:webhook-post — the URL comes from the store
+  // Same hardening as hub:webhook-post: the URL comes from the store
   // (settings.accountingSync.webhookUrl), which can arrive via restore/sync, so
-  // block private/loopback/metadata targets, DNS-rebinding and redirects.
-  let parsed;
-  try {
-    parsed = new URL(url);
-    if (isBlockedHost(parsed.hostname)) return { ok: false, error: 'Blocked URL — cannot send to private/loopback addresses' };
-  } catch { return { ok: false, error: 'Invalid accounting webhook URL' }; }
-  if (await resolvesToBlockedHost(parsed.hostname)) {
-    return { ok: false, error: 'Blocked URL — hostname resolves to a private/loopback address' };
-  }
+  // private/loopback/metadata targets are refused, the connection goes to the
+  // address that was checked (lib/webhook-send.js, no DNS rebinding) and a
+  // redirect is never followed. http stays allowed here, as it always was.
   secret = resolveStoreSecret(secret, d => d?.settings?.accountingSync?.secret);
   try {
     const headers = { 'content-type': 'application/json' };
     if (secret) headers['X-Khayt-Secret'] = String(secret);
     if (payload && payload.idempotencyKey) headers['Idempotency-Key'] = String(payload.idempotencyKey);
-    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload || {}), redirect: 'manual', signal: AbortSignal.timeout(15000) });
-    if (res.status >= 300 && res.status < 400) return { ok: false, error: 'Blocked redirect from accounting webhook' };
-    if (!res.ok) {
-      let detail = `HTTP ${res.status}`;
-      try { const txt = await res.text(); if (txt) detail += ` — ${txt.slice(0, 200)}`; } catch { /* ignore */ }
-      return { ok: false, status: res.status, error: detail };
+    const r = await webhookSend.postPinned(url, { headers, body: JSON.stringify(payload || {}), timeoutMs: 15000, allowHttp: true });
+    if (r.error) {
+      const error = r.error === 'Webhook redirects are not allowed' ? 'Blocked redirect from accounting webhook'
+        : r.error === 'Invalid webhook URL' ? 'Invalid accounting webhook URL' : r.error.replace('cannot send webhooks to', 'cannot send to');
+      return { ok: false, status: r.status, error };
     }
-    return { ok: true, status: res.status };
+    if (!r.ok) {
+      let detail = `HTTP ${r.status}`;
+      if (r.text) detail += ` — ${r.text.slice(0, 200)}`;
+      return { ok: false, status: r.status, error: detail };
+    }
+    return { ok: true, status: r.status };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
-// Generic outbound event webhook poster: signs the body with HMAC-SHA256
-// (X-Khayt-Signature: sha256=<hex>) so the receiver can verify authenticity, and
-// sends an Idempotency-Key (the event id) so retries dedupe. Same SSRF hardening
-// as hub:fire-webhook — https-only, blocked-host string + DNS-rebinding checks,
-// no redirects.
+// Generic outbound event webhook poster. Signed by lib/webhook-send.js: the
+// original `X-Khayt-Signature: sha256=<hex>` unchanged, plus X-Khayt-Timestamp
+// and X-Khayt-Signature-V2 so a receiver can refuse a replay. Sends an
+// Idempotency-Key (the event id) so retries dedupe. https only, and connected
+// to the address that was checked (no DNS rebinding), never redirected.
 ipcMain.handle('hub:webhook-post', async (_e, { url, secret, payload } = {}) => {
   if (!url || !String(url).startsWith('https://')) return { ok: false, error: 'Webhook needs an https:// URL' };
-  let parsed;
-  try {
-    parsed = new URL(url);
-    if (isBlockedHost(parsed.hostname)) return { ok: false, error: 'Blocked URL — cannot send webhooks to private/loopback addresses' };
-  } catch { return { ok: false, error: 'Invalid webhook URL' }; }
-  if (await resolvesToBlockedHost(parsed.hostname)) {
-    return { ok: false, error: 'Blocked URL — hostname resolves to a private/loopback address' };
-  }
   secret = resolveStoreSecret(secret, d => d?.settings?.eventWebhooks?.secret);
   try {
     const body = JSON.stringify(payload || {});
-    const headers = { 'content-type': 'application/json' };
-    if (payload && payload.id) headers['Idempotency-Key'] = String(payload.id);
-    if (secret) {
-      const sig = require('crypto').createHmac('sha256', String(secret)).update(body).digest('hex');
-      headers['X-Khayt-Signature'] = 'sha256=' + sig;
-    }
-    const res = await fetch(url, { method: 'POST', headers, body, redirect: 'manual', signal: AbortSignal.timeout(15000) });
-    if (res.status >= 300 && res.status < 400) return { ok: false, error: 'Webhook redirects are not allowed' };
-    return res.ok ? { ok: true, status: res.status } : { ok: false, status: res.status, error: `HTTP ${res.status}` };
+    const headers = {
+      'content-type': 'application/json',
+      ...(payload && payload.id ? { 'Idempotency-Key': String(payload.id) } : {}),
+      ...webhookSend.signatureHeaders(secret, body, Date.now(), { v1Prefix: true }),
+    };
+    const r = await webhookSend.postPinned(url, { headers, body, timeoutMs: 15000 });
+    if (r.error) return { ok: false, status: r.status, error: r.error };
+    return r.ok ? { ok: true, status: r.status } : { ok: false, status: r.status, error: `HTTP ${r.status}` };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
@@ -5798,31 +5788,19 @@ ipcMain.handle('hub:cloud-snapshot-get', async (_e, { id } = {}) => {
 });
 
 ipcMain.handle('hub:fire-webhook', async (event, { url, event: webhookEvent, payload, secret }) => {
-  // Restrict to https:// only — prevents SSRF to localhost and internal network
+  // https only, never a private/loopback address, and connected to the address
+  // that was checked rather than one resolved again at connect time: the old
+  // check-then-fetch let a rebinding name through. lib/webhook-send.js.
   if (!url || !url.startsWith('https://')) return { ok: false, error: 'Invalid URL — only https:// allowed' };
-  let parsedWebhook;
-  try {
-    parsedWebhook = new URL(url);
-    if (isBlockedHost(parsedWebhook.hostname)) return { ok: false, error: 'Blocked URL — cannot send webhooks to private/loopback addresses' };
-  } catch { return { ok: false, error: 'Invalid webhook URL' }; }
-  // DNS-rebinding defence: the string check above only inspects the hostname,
-  // so a public-looking name (e.g. evil.example.com) could still resolve to an
-  // internal IP. Resolve it and reject if ANY answer is in a blocked range.
-  // NOTE: best-effort / TOCTOU — fetch() resolves again at connect time and
-  // Node does not expose the resolved peer address for a post-connect re-check.
-  if (await resolvesToBlockedHost(parsedWebhook.hostname)) {
-    return { ok: false, error: 'Blocked URL — hostname resolves to a private/loopback address' };
-  }
   try {
     const body = JSON.stringify(webhookBus.buildWireBody(webhookEvent, payload));
-    const headers = { 'Content-Type': 'application/json', 'X-Khayt-Event': webhookEvent };
-    if (secret) headers['X-Khayt-Signature'] = require('crypto')
-      .createHmac('sha256', secret).update(body).digest('hex');
-    const res = await fetch(url, { method: 'POST', headers, body, redirect: 'manual', signal: AbortSignal.timeout(10000) });
-    if (res.status >= 300 && res.status < 400) {
-      return { ok: false, error: 'Webhook redirects are not allowed' };
-    }
-    return { ok: res.ok, status: res.status };
+    // V1 stays bare hex, as this transport has always sent it; V2 and the
+    // timestamp are added (see webhook-send.js).
+    const headers = { 'Content-Type': 'application/json', 'X-Khayt-Event': webhookEvent,
+      ...webhookSend.signatureHeaders(secret, body, Date.now()) };
+    const r = await webhookSend.postPinned(url, { headers, body, timeoutMs: 10000 });
+    if (r.error) return { ok: false, status: r.status, error: r.error };
+    return { ok: r.ok, status: r.status };
   } catch(e) { return { ok: false, error: String(e) }; }
 });
 

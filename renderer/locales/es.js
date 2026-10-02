@@ -484,7 +484,7 @@
   "whk.event_urls": "URLs de webhook por evento",
   "whk.test": "Probar (enviar ping)",
   "ewh.title": "Webhooks de eventos firmados (desarrollador)",
-  "ewh.hint": "Envía a un único endpoint HTTPS un flujo de eventos <code>order.*</code> limpio y firmado con HMAC (created / status / paid) con una clave de idempotencia, pensado para tus propias integraciones. Verifica la cabecera <code>X-Khayt-Signature</code> para confiar en cada payload.",
+  "ewh.hint": "Envía a un único endpoint HTTPS un flujo de eventos <code>order.*</code> limpio y firmado con HMAC (created / status / paid) con una clave de idempotencia, pensado para tus propias integraciones. Verifica la cabecera <code>X-Khayt-Signature</code> para confiar en cada payload. Para rechazar reenvíos, comprueba <code>X-Khayt-Signature-V2</code>, el HMAC de <code>timestamp.body</code>, y rechaza un <code>X-Khayt-Timestamp</code> antiguo.",
   "ewh.enabled": "Activar webhooks de eventos firmados",
   "ewh.url": "URL del endpoint (solo https)",
   "ewh.secret": "Secreto de firma (HMAC-SHA256)",

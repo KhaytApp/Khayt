@@ -23,6 +23,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   computer could read it, with every customer and price in it. The book and
   its previous copy are now readable by your account only. The Mac app does
   the same.
+- **Security: webhooks can no longer be redirected into your network, and can
+  be checked against replays.** Khayt checked a webhook's address and then
+  looked the name up again to send it, so a server that answered differently
+  the second time could reach a computer inside your network. It now sends to
+  the address it checked. That covers order webhooks, the event subscriptions
+  and accounting sync. Every signed webhook also carries `X-Khayt-Timestamp`
+  and `X-Khayt-Signature-V2`, so a receiver can refuse an old copy sent
+  again. The original `X-Khayt-Signature` is unchanged, so existing
+  integrations keep working. The Mac app sends the same headers.
 
 - **A model moved to Google Drive to save space comes back.** When old models
   were moved off this computer to free space, the desktop recorded every one

@@ -484,7 +484,7 @@
   "whk.event_urls": "URLs de webhook par événement",
   "whk.test": "Tester (envoyer un ping)",
   "ewh.title": "Webhooks d'événements signés (développeur)",
-  "ewh.hint": "Envoyez à un seul point de terminaison HTTPS un flux d'événements <code>order.*</code> propre et signé en HMAC (created / status / paid) avec une clé d'idempotence — conçu pour vos propres intégrations. Vérifiez l'en-tête <code>X-Khayt-Signature</code> pour faire confiance à chaque charge utile.",
+  "ewh.hint": "Envoyez à un seul point de terminaison HTTPS un flux d'événements <code>order.*</code> propre et signé en HMAC (created / status / paid) avec une clé d'idempotence — conçu pour vos propres intégrations. Vérifiez l'en-tête <code>X-Khayt-Signature</code> pour faire confiance à chaque charge utile. Pour refuser les rejeux, vérifiez <code>X-Khayt-Signature-V2</code>, le HMAC de <code>timestamp.body</code>, et rejetez un <code>X-Khayt-Timestamp</code> trop ancien.",
   "ewh.enabled": "Activer les webhooks d'événements signés",
   "ewh.url": "URL du point de terminaison (https uniquement)",
   "ewh.secret": "Secret de signature (HMAC-SHA256)",

@@ -484,7 +484,7 @@
   "whk.event_urls": "各事件的 Webhook URL",
   "whk.test": "测试（发送 ping）",
   "ewh.title": "签名事件 Webhook（开发者）",
-  "ewh.hint": "向一个 HTTPS 端点发送干净、经 HMAC 签名的 <code>order.*</code> 事件流（创建 / 状态 / 已付款），并附带幂等键——专为你自己的集成而设计。请校验 <code>X-Khayt-Signature</code> 标头以确认每个负载可信。",
+  "ewh.hint": "向一个 HTTPS 端点发送干净、经 HMAC 签名的 <code>order.*</code> 事件流（创建 / 状态 / 已付款），并附带幂等键——专为你自己的集成而设计。请校验 <code>X-Khayt-Signature</code> 标头以确认每个负载可信。如需拒绝重放，请校验 <code>X-Khayt-Signature-V2</code>（<code>timestamp.body</code> 的 HMAC），并拒绝过旧的 <code>X-Khayt-Timestamp</code>。",
   "ewh.enabled": "启用签名事件 Webhook",
   "ewh.url": "端点 URL（仅限 https）",
   "ewh.secret": "签名密钥（HMAC-SHA256）",
