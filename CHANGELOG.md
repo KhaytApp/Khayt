@@ -4,13 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Reopening a finished job puts its filament back on the shelf.** Move a
-  finished job back (to fix it, re-check it or put it on hold) and the
-  filament and packaging it used go back into stock, with a note saying how
-  many grams. Finishing it again takes what it really uses this time. Undo
-  after reopening puts the stock back as it was, along with the job. The Mac
-  app does the same.
-
 - **(iOS) A PIN the Mac finds too short is said as one.** The native Mac now
   refuses an owner PIN shorter than 8 characters (#1713). Pairing with one
   used to read "That PIN was refused" — true, and no help, since the PIN was
@@ -18,47 +11,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   phone already paired says the same in its connection strip. The phone
   does not enforce the minimum itself: the Electron desktop has none, and a
   shop there with a short PIN would be locked out for nothing.
-- **Security: your book file is readable only by you.** On macOS and Linux,
-  each save wrote your data file so that any other account on the same
-  computer could read it, with every customer and price in it. The book and
-  its previous copy are now readable by your account only. The Mac app does
-  the same.
-- **Security: webhooks can no longer be redirected into your network, and can
-  be checked against replays.** Khayt checked a webhook's address and then
-  looked the name up again to send it, so a server that answered differently
-  the second time could reach a computer inside your network. It now sends to
-  the address it checked. That covers order webhooks, the event subscriptions
-  and accounting sync. Every signed webhook also carries `X-Khayt-Timestamp`
-  and `X-Khayt-Signature-V2`, so a receiver can refuse an old copy sent
-  again. The original `X-Khayt-Signature` is unchanged, so existing
-  integrations keep working. The Mac app sends the same headers.
-  **Accounting sync now needs an `https://` address.** It sends your secret
-  with every push, and plain `http://` let anyone between you and the
-  server read it. If yours starts with `http://`, change it in Settings ›
-  Accounting sync. Until you do, each paid order shows why it was not sent.
-- **Security: an older copy of your cloud data is not applied without you.**
-  Your cloud data is encrypted, so the server cannot change it, but a broken
-  or compromised server could still send back an older copy. Khayt would
-  have merged it as if it were current. It now remembers the newest version
-  it has seen for your shop and refuses an older one, showing why. If you
-  restored the cloud on purpose, **Trust the cloud's older copy** in
-  Settings › Khayt Cloud takes it, and changes made on this computer are
-  merged back in. The Mac app does the same.
-- **Freeing up space keeps the models you still need.** When old models were
-  moved off this computer to save space, "old" meant the file's own date. A
-  model downloaded years ago but imported last week counted as unused, and so
-  did one an unfinished job was waiting for. Now a model counts as used when
-  it was imported, last printed or last named in a job. A model an unfinished
-  job needs is never moved, and the settings say how many were kept for that
-  reason. The Mac app does the same.
-
-- **A model moved to Google Drive to save space comes back.** When old models
-  were moved off this computer to free space, the desktop recorded every one
-  as going to your bucket, even when it went to Google Drive, and only ever
-  looked in the storage you use now. A model moved to Drive, or moved before
-  you switched between Drive and a bucket, could fail to open. The desktop
-  now records where each model really went, looks there first, then tries
-  the other storage you have connected. The Mac app does the same.
 
 - **(Mac) A price only changes when you change it.** Opening a book used to
   re-cost every product whose spool size differed from the figure it was
@@ -70,6 +22,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   product (or confirm in that review): it holds the update and says "Prices
   changed — review before publishing", with the old and new prices listed in
   the Web store sheet. Publishing from there sends them.
+
 - **(Mac) The print library stops losing files.** Five fixes:
   - **Free up space now** asks first, with the number of models, their total
     size and the first few names. A model counts as unused from the latest of
@@ -97,6 +50,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   The shared tiering rule (`lib/print-library-tier.js`) also takes an
   optional last-used date and in-use flag. The desktop app does not send
   them yet, so its behaviour is unchanged.
+
 - **(Mac) A web-store order for several of a thing is charged for all of them.**
   Three of a product with its own price of 50 became a job of 50, recorded as
   paid 50; a basket of two products lost both prices and was priced at the
@@ -106,46 +60,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and the job is their sum. Where the store sent what the customer paid, that
   is the payment recorded. Six of a product with magnets also takes six sets
   of magnets off the shelf, not one.
+
 - **(Mac) An online order is checked against the shelf again when it is
   recorded.** It used the count from when the queue was read, so an order the
   shelf had since stopped covering was marked done with nothing printed. It
   is now counted again at the moment it is written, and whatever the shelf no
   longer holds goes to a machine.
-- **Moving a finished job back no longer takes its filament twice.** Finished
-  → QC → finished took a 200 g job's filament off the spool twice (1000 g to
-  600 g), in both apps, and the same with Move back or a drag. On the Mac,
-  leaving Completed now puts back exactly what finishing it took — each
-  spool's grams, and the glue and parts it used — and finishing again takes
-  one print's worth. In the desktop app the first deduction stands and
-  finishing again takes nothing more. A print that failed inspection is still
-  booked as waste, so a job re-opened, failed and reprinted takes two prints,
-  as it should. Jobs finished before this update are not charged again either.
-  Cancelling a finished job gives nothing back: the piece was made.
 
-- **Prusa multi-material targets name the right printer.** The print-file
-  converter wrote `MK4IS` for the MK4 + MMU3, `MK3S` for the MK3S + MMU2S (both
-  the single-extruder printers) and `XL5T` (not a Prusa model id) for the
-  5-toolhead XL. They now write `MK4ISMMU3`, `MK3SMMU2S` and `XL5IS`, as
-  PrusaSlicer's own vendor profile names them.
-
-- **Set your shop's electricity price once.** Settings › Business has a
-  Running costs card with your price per kWh, and the 📍 Auto button can fill
-  it from your country. The calculator starts on that price instead of 0.18,
-  and changes with it unless you have typed your own figure there. A printer
-  preset with its own electricity price still wins. Leave it empty to keep
-  Khayt's default. The Mac app reads the same setting.
-
-- **The shop's electricity price takes a real figure in every currency.** It
-  was capped at 100 per kWh, so a shop pricing in won or naira had its real
-  ~250 saved as 100 without a word. The ceiling is now 10,000 per kWh, and
-  every place that reads the price uses that one figure: a higher stored
-  value is costed at the ceiling, and a blank, negative or non-numeric one is
-  still ignored.
-- **A blank electricity figure on a calculator preset no longer means free
-  electricity.** A tariff field holding only spaces was costed at 0 per kWh in
-  a job's costing while the online quote ignored it. Both now treat it as not
-  set, so the shop's own price applies. The same goes for the preset's other
-  rates and a machine's power draw and wear rate.
 - **(Mac) A restored backup stays restored.** Restoring used to lose to the
   next cloud sync: a record deleted after the backup was taken was deleted
   again within minutes, and a record edited elsewhere since went back to that
@@ -154,6 +75,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   restored record held at a newer revision elsewhere is moved above it, and
   every sync holds the restore against the cloud's copy until one push has
   carried it up. Automatic sync also pauses while a restore runs.
+
 - **(Mac) Sync no longer replaces or removes records in silence.** When
   automatic sync merges the cloud in and that removes a record, or overwrites
   one changed on this Mac, a copy of each is first saved to `sync-conflicts/`
@@ -4244,6 +4166,92 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.3] - 2026-10-02
+
+Security fixes and stock that adds up, since 3.11.2. Individual entries
+are kept below; this is what changed for you.
+
+**Three security fixes.** Your data file is readable only by your account.
+Webhooks are sent to the address Khayt checked and carry a timestamped
+signature a receiver can use to refuse replays. An older copy of your cloud
+data is no longer applied unless you choose to trust it.
+
+**Accounting sync now needs an `https://` address.** It sends your secret
+with every push. If yours starts with `http://`, change it in Settings ›
+Accounting sync; until then each paid order shows why it was not sent.
+
+**Reopening a finished job puts its filament back**, and finishing it again
+takes one print's worth. Undo puts the stock back too.
+
+**Freeing up space keeps the models you still need**, and a model moved to
+Google Drive comes back when you open it.
+
+### Security
+
+- **Security: your book file is readable only by you.** On macOS and Linux,
+  each save wrote your data file so that any other account on the same
+  computer could read it, with every customer and price in it. The book and
+  its previous copy are now readable by your account only. The Mac app does
+  the same.
+
+- **Security: webhooks can no longer be redirected into your network, and can
+  be checked against replays.** Khayt checked a webhook's address and then
+  looked the name up again to send it, so a server that answered differently
+  the second time could reach a computer inside your network. It now sends to
+  the address it checked. That covers order webhooks, the event subscriptions
+  and accounting sync. Every signed webhook also carries `X-Khayt-Timestamp`
+  and `X-Khayt-Signature-V2`, so a receiver can refuse an old copy sent
+  again. The original `X-Khayt-Signature` is unchanged, so existing
+  integrations keep working. The Mac app sends the same headers.
+  **Accounting sync now needs an `https://` address.** It sends your secret
+  with every push, and plain `http://` let anyone between you and the
+  server read it. If yours starts with `http://`, change it in Settings ›
+  Accounting sync. Until you do, each paid order shows why it was not sent.
+
+- **Security: an older copy of your cloud data is not applied without you.**
+  Your cloud data is encrypted, so the server cannot change it, but a broken
+  or compromised server could still send back an older copy. Khayt would
+  have merged it as if it were current. It now remembers the newest version
+  it has seen for your shop and refuses an older one, showing why. If you
+  restored the cloud on purpose, **Trust the cloud's older copy** in
+  Settings › Khayt Cloud takes it, and changes made on this computer are
+  merged back in. The Mac app does the same.
+
+### Fixed
+
+- **Moving a finished job back no longer takes its filament twice.** Finished
+  → QC → finished took a 200 g job's filament off the spool twice (1000 g to
+  600 g), in both apps, and the same with Move back or a drag. Leaving
+  Completed now puts back exactly what finishing it took — each spool's
+  grams, and the glue and parts it used — and finishing again takes one
+  print's worth. A print that failed inspection is still
+  booked as waste, so a job re-opened, failed and reprinted takes two prints,
+  as it should. Jobs finished before this update are not charged again either.
+  Cancelling a finished job gives nothing back: the piece was made.
+
+- **Reopening a finished job puts its filament back on the shelf.** Move a
+  finished job back (to fix it, re-check it or put it on hold) and the
+  filament and packaging it used go back into stock, with a note saying how
+  many grams. Finishing it again takes what it really uses this time. Undo
+  after reopening puts the stock back as it was, along with the job. The Mac
+  app does the same.
+
+- **Freeing up space keeps the models you still need.** When old models were
+  moved off this computer to save space, "old" meant the file's own date. A
+  model downloaded years ago but imported last week counted as unused, and so
+  did one an unfinished job was waiting for. Now a model counts as used when
+  it was imported, last printed or last named in a job. A model an unfinished
+  job needs is never moved, and the settings say how many were kept for that
+  reason. The Mac app does the same.
+
+- **A model moved to Google Drive to save space comes back.** When old models
+  were moved off this computer to free space, the desktop recorded every one
+  as going to your bucket, even when it went to Google Drive, and only ever
+  looked in the storage you use now. A model moved to Drive, or moved before
+  you switched between Drive and a bucket, could fail to open. The desktop
+  now records where each model really went, looks there first, then tries
+  the other storage you have connected. The Mac app does the same.
 
 ## [3.11.2] - 2026-10-02
 
