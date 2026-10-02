@@ -9107,6 +9107,40 @@ public actor KhaytEngine {
                           [.object(local), .object(incoming), .string(mask)], as: [String: JSONValue].self)
     }
 
+    /// Tell the shared rule the rev at which this device last agreed with the
+    /// cloud on each record (`collection:id` → rev) — `KhaytSync.markSynced`.
+    ///
+    /// ── WITHOUT IT, AN OVERWRITTEN EDIT IS NEVER REPORTED ────────────────
+    ///
+    /// `applyDeltas` reports `remote_over_local_edit` only when it knows that
+    /// baseline, and says nothing when it does not (a false report teaches a
+    /// shop to ignore the message). The desktop learns it as it saves and
+    /// syncs; this app never told it, so every whole-book merge replaced
+    /// records edited on this Mac without a word. Installed before each merge
+    /// from the baseline the Mac keeps on disk.
+    @discardableResult
+    public func markSynced(_ revs: [String: Double]) throws -> Int {
+        guard !revs.isEmpty else { return 0 }
+        return Int(try runtime.call2("""
+            (function (revs) {
+              var snap = {};
+              Object.keys(revs).forEach(function (k) {
+                var i = k.indexOf(':');
+                if (i <= 0) return;
+                var c = k.slice(0, i);
+                (snap[c] = snap[c] || []).push({ id: k.slice(i + 1), rev: revs[k] });
+              });
+              return KhaytSync.markSynced(snap);
+            })(ARG0)
+            """, [.object(revs.mapValues { .number($0) })], as: Double.self))
+    }
+
+    /// The baseline the shared rule holds for one record, or nil — for tests.
+    public func syncedRev(collection: String, id: String) throws -> Double? {
+        try runtime.call2("KhaytSync.syncedRevOf(ARG0, ARG1)",
+                          [.string(collection), .string(id)], as: Double?.self)
+    }
+
     public func mergeFromCloud(local: [String: JSONValue],
                                server: [String: JSONValue]) throws -> Merged {
         try runtime.call2("KhaytCloudInbox.merge(ARG0, ARG1)",

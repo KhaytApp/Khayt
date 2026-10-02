@@ -8675,6 +8675,7 @@ final class Shop {
     func sendToCloud() async {
         cloudProblem = nil
         cloudSent = nil
+        guard !restoreInProgress else { cloudProblem = words.callIt("mac.restore_wait_sync"); return }
         cloudBusy = true
         defer { cloudBusy = false }
         guard let build = source.build, let engine, let dek = cloudDek else {
@@ -8700,6 +8701,13 @@ final class Shop {
                 connection, token: token, dek: dek, engine: engine) { request in
                 try await session.data(for: request)
             }
+            // A RESTORE WINS, before anything is measured or merged. Without
+            // this the merge below deleted every restored record the cloud had
+            // tombstoned and replaced every one it held at a higher rev, and
+            // the delta outbox never sent a restored record the cloud had
+            // deleted. See `RestoreGuard`.
+            let restorePending = RestoreGuard.pending(for: build.storeURL) != nil
+            try await holdRestore(build: build, cloud: folded.store)
             // From disk, for the same reason the comparison reads from disk:
             // the screens hold two collections out of thirty-three, and a
             // payload built from those would claim the other thirty-one are
@@ -8719,6 +8727,10 @@ final class Shop {
 
             let collections = (try? await engine.storeCollections()) ?? []
             guard !outbox.isEmpty else {
+                // The cloud already holds everything here, a restore included.
+                if restorePending { RestoreGuard.clear(for: build.storeURL) }
+                await noteSyncAgreement(build: build, shopId: connection.shopId, engine: engine,
+                                        book: mine, cloud: folded.store)
                 // Nothing to do is not a failure. Show the fresh comparison so
                 // the screen stops offering a button that would do nothing.
                 cloudCheck = CloudCompare.compare(here: mine, there: folded.store,
@@ -8789,7 +8801,12 @@ final class Shop {
                 forgetCloud()
             } else if let sent = cloudSent {
                 rememberCloud(shopId: connection.shopId, rev: sent.rev, store: after.store)
+                await noteSyncAgreement(build: build, shopId: connection.shopId, engine: engine,
+                                        book: mine, cloud: after.store)
             }
+            // Carried up: the restored book is the cloud's now, and from here
+            // the ordinary rule applies to it again.
+            if restorePending, cloudSent != nil { RestoreGuard.clear(for: build.storeURL) }
             cloudCheck = CloudCompare.compare(here: mine, there: after.store,
                                               collections: collections,
                                               cloudRev: cloudSent?.rev ?? reply.rev,
@@ -8844,6 +8861,7 @@ final class Shop {
         cloudProblem = nil
         cloudSent = nil
         cloudPulled = nil
+        guard !restoreInProgress else { cloudProblem = words.callIt("mac.restore_wait_sync"); return }
         cloudBusy = true
         defer { cloudBusy = false }
         guard let build = source.build, let engine, let dek = cloudDek else {
@@ -8868,18 +8886,30 @@ final class Shop {
             // merge.
             try await safetyBackup(build)
 
+            // A restore not yet carried up wins over the cloud's copy, and the
+            // shared rule is told what this Mac last agreed on, so an edit
+            // made here and overwritten is reported rather than lost quietly.
+            let restored = RestoreGuard.pending(for: build.storeURL).map { Set($0.records) }
+            await installSyncBaseline(build: build, shopId: connection.shopId, engine: engine)
+            let keepAt = SyncLosses.fileURL(for: build.storeURL)
             var report: KhaytEngine.Merged?
+            var losses: [SyncLoss] = []
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
                 recordingDeletes: false
             ) { root in
-                let merged = try await engine.mergeFromCloud(local: root, server: folded.store)
-                root = merged.store
-                report = merged
+                if let restored {
+                    root = RestoreGuard.prevail(root, over: folded.store, restored: restored)
+                }
+                let out = try await Self.mergeKeepingLosses(&root, cloud: folded.store,
+                                                            engine: engine, keepAt: keepAt)
+                report = out.merged
+                losses = out.losses
             }
             cloudPulled = report
+            announceSyncLosses(losses, file: keepAt)
             await load(source)
 
             // Say what is true now rather than what was true before: compare
@@ -8887,6 +8917,8 @@ final class Shop {
             let mine = (try? Data(contentsOf: build.storeURL))
                 .flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) } ?? [:]
             let collections = (try? await engine.storeCollections()) ?? []
+            await noteSyncAgreement(build: build, shopId: connection.shopId, engine: engine,
+                                    book: mine, cloud: folded.store)
             cloudCheck = CloudCompare.compare(here: mine, there: folded.store,
                                               collections: collections, cloudRev: reply.rev,
                                               chain: folded.chain, applied: folded.applied)
@@ -8919,7 +8951,20 @@ final class Shop {
         // A backup first, exactly as a pull takes one: this writes to the book.
         try await safetyBackup(build)
 
+        // ── NOTHING THIS MERGE TAKES GOES IN SILENCE ──────────────────────
+        //
+        // This runs on its own every quarter of an hour, and it used to apply
+        // the cloud's deletes and overwrites with nothing on screen: the
+        // conflicts reached `cloudPulled`, which only a sheet nobody had open
+        // read, and an overwritten local edit was never even detected because
+        // the shared rule was never told what this Mac last agreed on. Now the
+        // baseline is installed first, a copy of everything taken is written
+        // to `sync-conflicts/` before the book is replaced, and the window
+        // says so. (A pending restore was already made to win by `sendToCloud`.)
+        await installSyncBaseline(build: build, shopId: connection.shopId, engine: engine)
+        let keepAt = SyncLosses.fileURL(for: build.storeURL)
         var merged: KhaytEngine.Merged?
+        var losses: [SyncLoss] = []
         var book: [String: JSONValue] = [:]
         try await StoreWriter.update(
             storeURL: build.storeURL,
@@ -8927,15 +8972,17 @@ final class Shop {
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
             recordingDeletes: false
         ) { root in
-            let out = try await engine.mergeFromCloud(local: root, server: server)
-            root = out.store
-            merged = out
-            book = out.store
+            let out = try await Self.mergeKeepingLosses(&root, cloud: server,
+                                                        engine: engine, keepAt: keepAt)
+            merged = out.merged
+            losses = out.losses
+            book = root
         }
         guard let report = merged else {
             throw CloudWriter.Failure.malformed("the merge produced nothing to send")
         }
         cloudPulled = report
+        announceSyncLosses(losses, file: keepAt)
         await load(source)
 
         // MASKED, and this is the last thing before it is sealed. The desktop's
@@ -8944,11 +8991,15 @@ final class Shop {
         // them out itself or the shop's API key, sync token and S3 secret go up
         // with everything else.
         let forCloud = try await engine.storeForCloud(book)
-        return try await CloudWriter.sendWholeStore(
+        let sent = try await CloudWriter.sendWholeStore(
             connection, token: token, store: forCloud, dek: dek, baseRev: baseRev,
             mergedFrom: report) { request in
             try await session.data(for: request)
         }
+        // The cloud now holds this book, record for record.
+        await noteSyncAgreement(build: build, shopId: connection.shopId, engine: engine,
+                                book: book, cloud: book)
+        return sent
     }
 
     private func cloudKeyset() -> JSONValue? {
@@ -9782,6 +9833,40 @@ final class Shop {
     /// Set once the service has refused a delta for this shop. The desktop
     /// remembers the same 404 for the same reason: one probe per session.
     private var chainIsClosed = false
+    /// A backup is being put back. No sync starts until it is in place: a
+    /// merge that read the book before the restore and wrote after it would
+    /// put the old book back, and one that ran in between would fold the
+    /// cloud's deletes into the restored one before it could be held.
+    private(set) var restoreInProgress = false
+    /// What the last merges took from this book, kept and not yet looked at.
+    var syncLossNotice: SyncLossNotice?
+    var reviewingSyncLosses = false
+    /// Kept records already put back, so the sheet stops offering them.
+    var syncLossesPutBack: Set<String> = []
+
+    /// Stop automatic sync for a restore, and wait for one already running to
+    /// finish. False when it did not finish in time — the restore must not go
+    /// ahead under a merge.
+    func pauseSyncForRestore() async -> Bool {
+        restoreInProgress = true
+        cancelPendingSync()
+        for _ in 0..<600 where syncInFlight || cloudBusy {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        if syncInFlight || cloudBusy {
+            restoreInProgress = false
+            return false
+        }
+        return true
+    }
+
+    /// The restore is in place (or refused). Sync again, soon: a restored book
+    /// is held against the cloud on the next push, and sooner is better than
+    /// another device editing what was just put back.
+    func resumeSyncAfterRestore() {
+        restoreInProgress = false
+        bookChanged()
+    }
 
     /// Start listening for this app's own writes.
     ///
@@ -9797,6 +9882,7 @@ final class Shop {
 
     /// This app just changed the book. Push it, shortly.
     func bookChanged() {
+        if restoreInProgress { return }
         guard AutoSync.shouldSyncOnWrite(unlocked: cloudUnlocked,
                                          connected: Self.cloudConnected(settingsDict),
                                          canWrite: canMoveJobs) else {
@@ -9856,6 +9942,7 @@ final class Shop {
             return
         }
         guard !syncInFlight, !cloudBusy else { syncAgainAfter = true; return }
+        guard !restoreInProgress else { return }
 
         // The expensive path has a floor. Checked BEFORE the pull, so a gated
         // shop inside its floor costs nothing at all rather than a request.
@@ -10342,6 +10429,10 @@ final class Shop {
         guard let build = source.build else {
             spendProblem = words.callIt("mac.move_sample"); return
         }
+        guard await pauseSyncForRestore() else {
+            spendProblem = words.callIt("mac.restore_wait_sync"); return
+        }
+        defer { resumeSyncAfterRestore() }
         do {
             try await Restore.restore(candidate.filename, for: build, engine: engine)
             lastBackup = Backups.lastBackupDay(in: Backups.directory(for: build))
