@@ -88,6 +88,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   chosen groups with the same name, or a path past 60 characters, are
   refused. It is one change, so one Undo puts everything back. "Rename
   Group…" on a group tile renames it the same way.
+- **(Mac) "Free up space now" decides by the desktop's own rule.** Which
+  models count as recently used, and which an unfinished job still needs,
+  is now worked out on the Mac by the same shared code the desktop uses,
+  instead of a separate Mac copy that could drift from it.
 
 - **Reopening a finished job puts its filament back on the shelf.** Move a
   finished job back (to fix it, re-check it or put it on hold) and the

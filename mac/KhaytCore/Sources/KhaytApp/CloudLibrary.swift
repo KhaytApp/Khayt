@@ -470,20 +470,9 @@ enum CloudLibrary {
 
     // MARK: - How long since a model was last needed
 
-    /// What the book knows about one record's use, keyed by its folder name.
-    struct Usage: Equatable, Sendable {
-        /// The latest of: added to the library, last printed, last on a job.
-        var lastUsedMs: Double
-        /// A job that is not finished has it on a part.
-        var inUse: Bool
-        var title: String
-    }
-
-    /// A job in one of these is over — the model may leave this Mac.
-    /// `Shop.finishedStatuses` plus the two ways a job ends without one.
-    static let doneStatuses: Set<String> = Shop.finishedStatuses.union(["cancelled", "canceled", "shipped"])
-
-    /// Every record's use, from the book alone.
+    /// The listing with what the book knows folded in: the import date, the
+    /// last print, the jobs that name each model and whether one is still
+    /// open.
     ///
     /// ── WHY NOT THE FILE'S MTIME ─────────────────────────────────────────
     ///
@@ -493,36 +482,32 @@ enum CloudLibrary {
     /// offered for "Free up space now". The record's own date, its last print
     /// and the jobs that name it are what "used" means; the mtime is only one
     /// more vote (`lib/print-library-tier.js evictable`, the newest wins).
-    static func usage(files: [LibraryFile], orders: [Order]) -> [String: Usage] {
-        var out: [String: Usage] = [:]
-        let ms = { (d: Date?) -> Double in (d?.timeIntervalSince1970 ?? 0) * 1000 }
-        for f in files {
-            let last = max(ms(f.createdAt?.date), ms(f.lastPrintedDate))
-            out[LibraryLocation.itemDirName(f.id)] = Usage(lastUsedMs: last, inUse: false, title: f.title)
-        }
-        for o in orders {
-            let open = !doneStatuses.contains(o.status)
-            let when = max(ms(Order.day(o.date)), ms(Order.day(o.completedAt)))
-            for id in Set(o.parts.compactMap(\.printFileId)) where !id.isEmpty {
-                let dir = LibraryLocation.itemDirName(id)
-                var u = out[dir] ?? Usage(lastUsedMs: 0, inUse: false, title: id)
-                u.lastUsedMs = max(u.lastUsedMs, when)
-                if open { u.inUse = true }
-                out[dir] = u
-            }
-        }
-        return out
+    ///
+    /// ── ONE RULE, NOT TWO ────────────────────────────────────────────────
+    ///
+    /// This was a Swift copy of the rule (#1706) beside the Electron app's
+    /// (#1716) — the "tested copy vs shipped copy" shape. Both apps now call
+    /// `usageFromBook` and `annotate` in `lib/print-library-tier.js`, over the
+    /// book's raw `printFiles` and `printLog`; `TierUsageParityTests` runs the
+    /// module under node and through the engine on the same book.
+    static func annotated(_ listed: [KhaytEngine.TierFile], engine: KhaytEngine,
+                          printFiles: [JSONValue], orders: [JSONValue]) async throws -> [KhaytEngine.TierFile] {
+        try await engine.tierAnnotate(listed, printFiles: printFiles, orders: orders,
+                                      dirNames: dirNames(printFiles: printFiles, orders: orders))
     }
 
-    /// The listing with what the book knows folded in, for the shared rule.
-    nonisolated static func annotate(_ files: [KhaytEngine.TierFile], usage: [String: Usage]) -> [KhaytEngine.TierFile] {
-        files.map { f in
-            guard let u = usage[f.id ?? ""] else { return f }
-            var g = f
-            g.lastUsedMs = max(f.lastUsedMs ?? 0, u.lastUsedMs)
-            g.inUse = u.inUse
-            return g
+    /// Every record id the book names — in the library and on a job's part —
+    /// mapped to its item folder.
+    nonisolated static func dirNames(printFiles: [JSONValue], orders: [JSONValue]) -> [String: String] {
+        var ids: [String] = []
+        for case .object(let f) in printFiles { if case .string(let id)? = f["id"] { ids.append(id) } }
+        for case .object(let o) in orders {
+            guard case .array(let parts)? = o["parts"] else { continue }
+            for case .object(let p) in parts { if case .string(let id)? = p["printFileId"] { ids.append(id) } }
         }
+        var out: [String: String] = [:]
+        for id in ids where !id.isEmpty { out[id] = LibraryLocation.itemDirName(id) }
+        return out
     }
 
     /// "a, b, c and 4 more" — the first few names in a confirmation.
@@ -556,7 +541,7 @@ enum CloudLibrary {
                       file.resolvingSymlinksInPath().standardizedFileURL.path
                         .hasPrefix(rootReal.hasSuffix("/") ? rootReal : rootReal + "/") else { continue }
                 // When the file landed in its folder — the import, for a copy
-                // whose mtime is still the download's. See `usage`.
+                // whose mtime is still the download's. See `annotated`.
                 let added = values?.addedToDirectoryDate.map { $0.timeIntervalSince1970 * 1000 }
                 out.append(.init(filename: file.lastPathComponent, fullPath: file.path,
                                  size: Double(values?.fileSize ?? 0),
@@ -651,11 +636,14 @@ extension Shop {
 
     /// What the shared rule plans, with what the book knows folded in: the
     /// import date, the last print, the jobs still open — see
-    /// `CloudLibrary.usage`.
+    /// `CloudLibrary.annotated`. No plan at all when the book's use cannot be
+    /// read: planning on the mtimes alone would offer a model an open job
+    /// still needs.
     private func tierPlan(engine: KhaytEngine, config: CloudLibrary.Config,
                           roots: LibraryLocation.Roots) async -> KhaytEngine.TierPlan? {
         let listed = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
-        let all = CloudLibrary.annotate(listed, usage: CloudLibrary.usage(files: files, orders: orders))
+        guard let all = try? await CloudLibrary.annotated(listed, engine: engine,
+                                                          printFiles: fileRows, orders: orderRows) else { return nil }
         return try? await engine.tierPlan(all, policy: config.tier, now: Date())
     }
 
