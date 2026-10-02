@@ -162,7 +162,7 @@
           if (!primary) continue;
           const grams = Math.max(0, (+col.grams || 0) * perQty);
           if (grams <= 0) continue;
-          out.push({ spool: primary, grams });
+          out.push({ spool: primary, grams, full: grams, extra: 0 });
         }
         continue;
       }
@@ -172,9 +172,12 @@
       // Grams the spool-switch flow already took off other spools are not owed
       // again — otherwise switching spools mid-print charges the job twice.
       const extra = (part.additionalSpools || []).reduce((s, a) => s + (+a.weight || 0), 0);
-      const remaining = Math.max(0, partGramsConsumed(part) - extra);
+      const full = partGramsConsumed(part);
+      const remaining = Math.max(0, full - extra);
       if (remaining <= 0) continue;
-      out.push({ spool: primary, grams: remaining });
+      // `full` and `extra` travel with the claim so a MEASURED total can be
+      // shared out part by part (`drawsFor`).
+      out.push({ spool: primary, grams: remaining, full, extra });
     }
     return out;
   }
@@ -203,6 +206,55 @@
     const claimed = claimedGrams(claims);
     if (claimed <= 0) return 1;
     return actual / claimed;
+  }
+
+  /**
+   * What the WHOLE job was estimated to use — every part, with a spool or
+   * without one, support included, before any spool switch. A measured total
+   * is a measurement of the whole print, so this is what it is compared with.
+   */
+  function estimatedGrams(order) {
+    let total = 0;
+    for (const part of ((order && order.parts) || [])) {
+      if (!part) continue;
+      if (part.colours && part.colours.length) {
+        const perQty = Math.max(1, +part.qty || 1);
+        for (const col of part.colours) total += Math.max(0, (+((col && col.grams)) || 0) * perQty);
+        continue;
+      }
+      total += Math.max(0, partGramsConsumed(part));
+    }
+    return total;
+  }
+
+  /**
+   * What each claim draws, given a measured total for the whole print.
+   *
+   * `ratio` is the measurement over the WHOLE job's estimate — 1 when nothing
+   * was measured. Each part's share is its own full estimate × the ratio, less
+   * what a spool switch already took off another roll for that part. Three
+   * ways the old "measurement ÷ what the spools claim" got this wrong:
+   *
+   *   - a part with no spool has no claim, so its grams were charged to the
+   *     parts that had one (two 100 g parts, one on a spool, 200 g measured:
+   *     that spool lost 200);
+   *   - a switch's grams were subtracted from the claims but not from the
+   *     measurement, which is the WHOLE print (switch took 50, 200 measured:
+   *     250 in all);
+   *   - support was in the claims, so a measurement typed without it (the
+   *     Mac's sheet pre-filled print weight alone) under-charged the shelf.
+   *     That one is the hosts' prefill; the rule here was already right.
+   */
+  function drawsFor(order, claims, actualGrams) {
+    const actual = +actualGrams;
+    const est = estimatedGrams(order);
+    const measured = Number.isFinite(actual) && actual > 0 && est > 0;
+    const ratio = measured ? actual / est : 1;
+    return arrayOf(claims).map((claim) => {
+      const full = Number.isFinite(+claim.full) ? +claim.full : +claim.grams || 0;
+      const extra = +claim.extra || 0;
+      return { spool: claim.spool, grams: Math.max(0, full * ratio - extra) };
+    });
   }
 
   /**
@@ -245,11 +297,11 @@
      * this a job that switched 50 g and then failed at 120 g would take 120
      * more off the shelf, charging 170 for 120 used.
      */
-    const alreadyTaken = ((order && order.parts) || []).reduce(
-      (s, part) => s + ((part.additionalSpools || []).reduce((n, a) => n + (+a.weight || 0), 0)), 0);
-    const owed = Math.max(0, wanted - alreadyTaken);
-    if (owed <= 0) return empty;
-    const scale = scaleFor(claims, owed);
+    //
+    // `drawsFor` does it part by part: each part's share of the measured
+    // print, less what its own switch took. And a part with no spool keeps
+    // its share rather than handing it to the parts that have one.
+    const draws = drawsFor(order, claims, wanted);
 
     let deducted = 0;
     const spools = [];
@@ -257,8 +309,8 @@
     const nowLow = [];
     const orderLoc = orderLocationId(order, c.machines);
 
-    for (const claim of claims) {
-      let remaining = claim.grams * scale;
+    for (const claim of draws) {
+      let remaining = claim.grams;
       if (remaining <= 0) continue;
       const others = inventory.filter(s =>
         s.id !== claim.spool.id && s.material === claim.spool.material && (+s.weight || 0) > 0);
@@ -382,11 +434,9 @@
      * its own spool, in its own proportion.
      */
     const claims = claimsFor(order, inventory);
-    const scale = scaleFor(claims, c.actualGrams);
-    for (const claim of claims) {
-      const grams = claim.grams * scale;
-      if (grams <= 0) continue;
-      drawDown(claim.spool, grams);
+    for (const claim of drawsFor(order, claims, c.actualGrams)) {
+      if (claim.grams <= 0) continue;
+      drawDown(claim.spool, claim.grams);
     }
 
     if (deductedAny) {
@@ -584,7 +634,7 @@
     USAGE_CAP, DEFAULT_LOW_STOCK,
     isLowStock, spoolsByLocationPreference, partGramsConsumed, orderLocationId,
     deductForOrder, deductPackaging, returnForOrder,
-    claimsFor, claimedGrams, scaleFor, deductActual, restoreDrawn,
+    claimsFor, claimedGrams, scaleFor, estimatedGrams, drawsFor, deductActual, restoreDrawn,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderDeduction = api;

@@ -323,7 +323,7 @@ extension Shop {
         // The same email or phone is the same customer; anybody else is a new
         // one, filed as having come from online. `lib/webstore-order.js`
         // decides, as the desktop's Order requests screen always has.
-        var input = input
+        var input = printOnly(input, reading: fresh)
         if allFromShelf { input["fromStock"] = .bool(true) } else { input.removeValue(forKey: "fromStock") }
         var clients = rows(root, "clients")
         var clientId: String?
@@ -535,17 +535,21 @@ extension Shop {
     /// the shop pressed the button.
     func onlineJobInput(_ order: OnlineOrder) async -> [String: JSONValue] {
         var drafts: [NewJobSheet.Draft] = []
+        // For each draft: the line it came from and its count per ONE piece,
+        // so `printOnly` can size it to what the shelf cannot cover.
+        var origin: [(line: Int, perPiece: Int)?] = []
         var margin = defaultMargin
         var onlyProduct: Product?
         var products = 0
 
-        for line in order.lines {
+        for (index, line) in order.lines.enumerated() {
             guard let id = line.productId,
                   let product = await productForEditing(id) else {
                 var unpriced = NewJobSheet.Draft()
                 unpriced.name = line.name
                 unpriced.qty = max(1, line.qty)
                 drafts.append(unpriced)
+                origin.append(nil)
                 continue
             }
             products += 1
@@ -554,8 +558,10 @@ extension Shop {
             for var part in await jobParts(from: product) {
                 // The product's part count is PER ONE. Six hoods is six times
                 // each of a hood's parts.
-                part.qty = max(1, part.qty) * max(1, line.qty)
+                let perPiece = max(1, part.qty)
+                part.qty = perPiece * max(1, line.qty)
                 drafts.append(part)
+                origin.append((index, perPiece))
             }
         }
 
@@ -618,6 +624,66 @@ extension Shop {
         // (`putOnlineOrder`), against the count the book holds then; this is
         // what the screen showed.
         if order.allFromShelf { input["fromStock"] = .bool(true) }
+        // Each product part remembers its line and its count per piece, so the
+        // write can print only what the shelf does not cover (`printOnly`).
+        if case .array(var rows)? = input["parts"], rows.count == origin.count {
+            for (i, from) in origin.enumerated() {
+                guard let from, case .object(var row) = rows[i] else { continue }
+                row[Self.lineKey] = .number(Double(from.line))
+                row[Self.perPieceKey] = .number(Double(from.perPiece))
+                rows[i] = .object(row)
+            }
+            input["parts"] = .array(rows)
+        }
         return input
+    }
+
+    static let lineKey = "_onlineLine"
+    static let perPieceKey = "_onlinePerPiece"
+
+    /// The job's parts sized to what the shelf does NOT cover.
+    ///
+    /// A mixed order — two from the shelf, one to print — took the shelf's two
+    /// AND got parts for all three, so the shop printed (and the completion
+    /// deducted filament for) pieces it had already handed out of stock. Each
+    /// product line now prints `toPrint` pieces, as the reading taken INSIDE
+    /// the write counts them; a line the shelf covers whole prints nothing. An
+    /// order the shelf covers entirely keeps its parts — that job is recorded
+    /// finished from stock, and its parts are what it cost.
+    ///
+    /// The markers are removed either way: they are this app's bookkeeping,
+    /// not the book's.
+    static func printOnly(_ input: [String: JSONValue], reading fresh: OnlineOrder) -> [String: JSONValue] {
+        guard case .array(let rows)? = input["parts"] else { return input }
+        var out = input
+        var kept: [JSONValue] = []
+        let lines = fresh.lines
+        var scaledLines: [Int: (ordered: Int, toPrint: Int)] = [:]
+        for row in rows {
+            guard case .object(var part) = row else { kept.append(row); continue }
+            let line = plainNumber(part[lineKey]).map { Int($0) }
+            let perPiece = plainNumber(part[perPieceKey]).map { Int($0) }
+            part.removeValue(forKey: lineKey)
+            part.removeValue(forKey: perPieceKey)
+            if !fresh.allFromShelf, let line, let perPiece, lines.indices.contains(line) {
+                let l = lines[line]
+                let ordered = max(1, l.qty)
+                let toPrint = max(0, min(ordered, l.toPrint))
+                scaledLines[line] = (ordered, toPrint)
+                if toPrint == 0 { continue }
+                let qty = Double(perPiece * toPrint)
+                part["qty"] = .number(qty)
+                if let unit = plainNumber(part["unitCost"]) { part["baseCost"] = .number(unit * qty) }
+            }
+            kept.append(.object(part))
+        }
+        out["parts"] = .array(kept)
+        // The assembly count goes with it: a set of magnets per piece MADE.
+        if scaledLines.count == 1, let only = scaledLines.values.first,
+           let assembly = plainNumber(out["assemblyQty"]), only.toPrint < only.ordered {
+            let perOne = max(1, assembly / Double(only.ordered))
+            out["assemblyQty"] = .number(perOne * Double(max(1, only.toPrint)))
+        }
+        return out
     }
 }

@@ -5125,8 +5125,7 @@ final class Shop {
             // the same module a move's email is, from the order as recorded.
             mail = await Self.paymentEmail(
                 after: done, settings: settings, clients: clients, engine: engine,
-                statusLabel: self.words.callIt("queue.payment_received",
-                                               fallback: self.words.callIt("mac.email_when_payment_received")))
+                statusLabel: self.words.callIt("mac.payment_received_label"))
             return OneOrderEdit(order: done.order)
         }
         // After the write, like a move's: a delivery that went out for a

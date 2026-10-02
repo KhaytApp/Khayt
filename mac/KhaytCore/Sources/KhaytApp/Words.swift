@@ -2097,6 +2097,7 @@ final class Words {
         "mac.email_when_completed": ["en": "It is ready to collect", "ar": "عند الجاهزية للاستلام"],
         "mac.email_when_quote": ["en": "A quote is made", "ar": "عند إنشاء عرض سعر"],
         "mac.email_when_payment_received": ["en": "A payment arrives", "ar": "عند استلام دفعة"],
+        "mac.payment_received_label": ["en": "Payment received", "ar": "تم استلام الدفعة"],
         // ── WHAT THE SHOP PAYS EVERY MONTH ────────────────────────────────
         //
         // `an.be_none` on the break-even screen has told shops to add these

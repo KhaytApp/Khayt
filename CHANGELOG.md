@@ -26,6 +26,36 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and any credit note.
 - **The invoice Subtotal line uses the same rule as the Mac.** It is the
   items before any discount, so Subtotal, Rush, Shipping and Total add up.
+- **Dates, stock and the dashboard: a correctness sweep.**
+  - **(Mac) A Mac set to the Hijri calendar keeps its figures.** "This month",
+    the masthead's net/gross/COGS, Reports by month/quarter/year and the
+    storefront lead time read the Mac's own calendar, so on Umm al-Qura the
+    month was "1448-04" and matched nothing. They read the book's Gregorian
+    calendar now; a test fails on any `Calendar.current` default.
+  - **(Mac) "A payment arrives" emails are sent.** Recording a payment let it
+    through for SendGrid, Mailgun or SMTP and then sent only the webhooks.
+  - **A measured weight is the whole print.** Completing with a measured
+    weight charged it all to the parts that have a spool, and added it to
+    what a mid-print spool switch had already taken. Each part now takes its
+    own share, less its switch. The Mac's completion sheet also counts
+    support in the weight it suggests.
+  - **(Mac) A web-store order that is partly on the shelf prints only the
+    rest**, instead of printing the shelf's pieces again.
+  - **Moving a job back from Shipped to Completed un-ships it.** It used to
+    complete the job a second time: the webhooks, Telegram and the order
+    email went out again and the Mac asked for the actuals again.
+  - **Printer measurements survive a restart.** After a relaunch, the first
+    finished print replaced the saved history. A job whose file matches no
+    print no longer gets another print's figures.
+  - **Depreciation by the hour stops at the machine's life**, with or without
+    a purchase date.
+  - **The dashboard leaves out cancelled jobs** from the order count and
+    what is owed, and judges on-time by your own day. The Mac's cost of goods
+    now matches the desktop's (costed parts and shipping).
+  - QC waste is dated by your own day. (Mac) The gift card status filter
+    works with an empty search, shipping fires `order_shipped`, "Open in
+    slicer" never opens a PDF, and moving a folder refuses a path past 60
+    characters, which would have merged it with another folder.
 
 - **(iOS) A PIN the Mac finds too short is said as one.** The native Mac now
   refuses an owner PIN shorter than 8 characters (#1713). Pairing with one
