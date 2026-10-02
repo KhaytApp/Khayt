@@ -5566,6 +5566,9 @@ ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase
       // left behind, so the first pull asks for a slice instead of the base and
       // the whole chain. docs/KHAYT-CLOUD-DELTA-SYNC.md §7.
       cacheDir: ensureDir('cloud-cache'),
+      // The highest revision this device has seen per cloud and shop, so a
+      // cloud that goes backwards is refused (lib/cloud-revision-memory.js).
+      revisionFile: path.join(ensureDir('cloud-cache'), 'highest-revisions.json'),
       // The store as it is ON DISK, which is what the cached view was last
       // reconciled against. Unsaved renderer edits only make local NEWER than
       // disk, and the check refuses on local being OLDER — so reading the file
@@ -5750,7 +5753,16 @@ ipcMain.handle('hub:cloud-push', async (_e, snapshot) => {
 ipcMain.handle('hub:cloud-pull', async () => {
   if (!cloudBackend) return { ok: false, error: 'locked' };
   try { return { ok: true, ...(await cloudBackend.pull()) }; }
-  catch (e) { return { ok: false, error: String(e && e.message || e), status: (e && e.status) || null }; }
+  catch (e) {
+    return { ok: false, error: String(e && e.message || e), status: (e && e.status) || null,
+      code: (e && e.code) || null, seen: (e && e.seen) ?? null, got: (e && e.got) ?? null };
+  }
+});
+// The shop restored its cloud on purpose: trust the older copy the last pull
+// refused, so syncing can resume from it.
+ipcMain.handle('hub:cloud-accept-rollback', () => {
+  if (!cloudBackend) return { ok: false, error: 'locked' };
+  return { ok: !!cloudBackend.acceptRollback() };
 });
 
 /**

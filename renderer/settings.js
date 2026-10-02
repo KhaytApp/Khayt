@@ -2231,7 +2231,13 @@ function wireCloudSyncStatusOnce() {
     // `window.`-qualified, not bare: Bed Ready loads this file but not
     // cloud-sync.js, and a bare global read there is a ReferenceError. The
     // module-parity test enforces exactly that, and caught this.
-    const why = (detail && detail.error)
+    // A cloud that went backwards is refused until the shop decides; offer the
+    // one way out next to the badge (lib/cloud-revision-memory.js).
+    const accept = document.getElementById('btnCloudAcceptRollback');
+    if (accept) accept.style.display = (s === 'error' && detail && detail.code === 'CLOUD_WENT_BACKWARDS') ? '' : 'none';
+    const why = (detail && detail.code === 'CLOUD_WENT_BACKWARDS')
+      ? (t('cloud.went_backwards') || 'The cloud copy is older than one this computer has already seen, so it was not applied. If you restored the cloud on purpose, trust the older copy.')
+      : (detail && detail.error)
       || (s === 'error' && window.KhaytCloudSync ? window.KhaytCloudSync.error() : '');
     if ((s === 'error' || s === 'offline') && why) badge.title = String(why);
     else badge.removeAttribute('title');
@@ -3014,7 +3020,7 @@ function renderCloudSettings() {
   const syncStatus = (connected && window.KhaytCloudSync) ? cloudSyncStatusLabel(KhaytCloudSync.status()) : '';
   const showUnverified = connected && c.email && c.verified === false;
   el.innerHTML = `
-    ${connected ? `<p style="font-size:12.5px;margin:0 0 8px;">${escapeHtml(t('cloud.signed_in_as') || 'Signed in as')}: <strong>${escapeHtml(c.email || c.shopId)}</strong> · <span style="color:var(--text-muted);">${escapeHtml(c.url || '')}</span> <span id="cloudSyncStatus" style="font-size:12px;margin-inline-start:6px;color:var(--text-muted);">${escapeHtml(syncStatus)}</span></p>` : ''}
+    ${connected ? `<p style="font-size:12.5px;margin:0 0 8px;">${escapeHtml(t('cloud.signed_in_as') || 'Signed in as')}: <strong>${escapeHtml(c.email || c.shopId)}</strong> · <span style="color:var(--text-muted);">${escapeHtml(c.url || '')}</span> <span id="cloudSyncStatus" style="font-size:12px;margin-inline-start:6px;color:var(--text-muted);">${escapeHtml(syncStatus)}</span> <button type="button" id="btnCloudAcceptRollback" class="btn small" style="${(window.KhaytCloudSync && KhaytCloudSync.refusalCode() === 'CLOUD_WENT_BACKWARDS') ? '' : 'display:none;'}">${escapeHtml(t('cloud.accept_rollback') || "Trust the cloud's older copy")}</button></p>` : ''}
     ${showUnverified ? `<div style="background:color-mix(in srgb, var(--warning,#d97706) 14%, transparent);border:1px solid var(--warning,#d97706);border-radius:6px;padding:8px 10px;margin:0 0 8px;font-size:12.5px;">⚠ ${escapeHtml(t('cloud.unverified') || 'Email not verified.')} <button id="btnCloudVerify" class="btn small" style="margin-inline-start:6px;">${escapeHtml(t('cloud.verify_email') || 'Verify email')}</button></div>` : ''}
     ${connected ? `<p id="cloudPlan" style="font-size:12.5px;margin:0 0 8px;color:var(--text-muted);"></p>` : ''}
     <label>${escapeHtml(t('cloud.url') || 'Server URL')}</label>
@@ -3254,6 +3260,17 @@ function renderCloudSettings() {
     else if (r.conflict) result('⚠ ' + (t('cloud.conflict') || 'Server has newer data — Restore from cloud first'), 'var(--warning, #d97706)');
     else if (r.error === 'locked') result('✗ ' + (t('cloud.locked') || 'Unlock first (enter passphrase)'), 'var(--danger)');
     else result('✗ ' + (r.error || 'sync failed'), 'var(--danger)');
+  });
+
+  // The cloud went backwards and the shop says that is on purpose (it restored
+  // an older cloud copy): take the refused revision as the new mark and sync.
+  el.querySelector('#btnCloudAcceptRollback')?.addEventListener('click', async () => {
+    const ok = await confirmModal(t('cloud.accept_rollback_q')
+      || "Use the cloud's older copy from now on? Only do this if you restored or reset the cloud yourself. Changes made on this computer since then are merged back in, not lost.", { danger: true });
+    if (!ok) return;
+    const r = await window.hubAPI.cloudAcceptRollback();
+    if (!r || !r.ok) { result('✗ ' + ((r && r.error) || 'nothing to accept'), 'var(--danger)'); return; }
+    if (window.KhaytCloudSync) KhaytCloudSync.syncNow();
   });
 
   // Restore from cloud: pull the encrypted store, decrypt, and replace local data

@@ -36,6 +36,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   with every push, and plain `http://` let anyone between you and the
   server read it. If yours starts with `http://`, change it in Settings ›
   Accounting sync. Until you do, each paid order shows why it was not sent.
+- **Security: an older copy of your cloud data is not applied without you.**
+  Your cloud data is encrypted, so the server cannot change it, but a broken
+  or compromised server could still send back an older copy. Khayt would
+  have merged it as if it were current. It now remembers the newest version
+  it has seen for your shop and refuses an older one, showing why. If you
+  restored the cloud on purpose, **Trust the cloud's older copy** in
+  Settings › Khayt Cloud takes it, and changes made on this computer are
+  merged back in. The Mac app does the same.
 
 - **A model moved to Google Drive to save space comes back.** When old models
   were moved off this computer to free space, the desktop recorded every one
