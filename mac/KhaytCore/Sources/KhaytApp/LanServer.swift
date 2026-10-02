@@ -1757,7 +1757,7 @@ final class LanServer {
         // per-address limit. Refused here, whoever wrote it, until the shop
         // sets a new one; the app says so in the Online pane. Oct 2026 review.
         guard !Self.pinTooShort(host.pin) else {
-            return .json(401, #"{"error":"The LAN PIN is too short. Set a new one of at least 8 characters in Khayt settings to access this data"}"#)
+            return .json(401, #"{"reason":"pin-too-short","error":"The LAN PIN is too short. Set a new one of at least 8 characters in Khayt settings to access this data"}"#)
         }
         let provided = (formPin ?? Self.pinProvided(request)).trimmingCharacters(in: .whitespaces)
         // Under the counter lock: see `lockCounters`.

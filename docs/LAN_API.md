@@ -59,7 +59,7 @@ Authorization: Bearer khayt_<random>
 - If **no** owner PIN is configured, sensitive `GET` routes return **401** (queue/inventory/machines are unavailable until a PIN is set).
 - **Writes** without a configured PIN return **403**.
 - **Brute force:** 10 failed attempts per client IP → **429** for 1 minute (the native Mac app counts an IPv6 client per /64).
-- **Native Mac app:** an owner PIN shorter than 8 characters opens nothing — owner routes answer **401** until the shop sets a new one. `/calendar.ics` takes the calendar token only, never the owner PIN.
+- **Native Mac app:** an owner PIN shorter than 8 characters opens nothing — owner routes answer **401** with `{"reason":"pin-too-short", "error": …}` until the shop sets a new one (clients should key on `reason`, not the sentence). `/calendar.ics` takes the calendar token only, never the owner PIN.
 
 ### Public routes (no owner PIN)
 

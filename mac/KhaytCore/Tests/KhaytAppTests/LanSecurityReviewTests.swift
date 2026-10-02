@@ -47,6 +47,8 @@ struct LanSecurityReviewTests {
                                                       headers: ["x-khayt-pin": "2468"]))
         #expect(reply.status == 401)
         #expect(String(decoding: reply.body, as: UTF8.self).contains("too short"))
+        // The phone keys on this, not the sentence.
+        #expect(String(decoding: reply.body, as: UTF8.self).contains(#""reason":"pin-too-short""#))
         let store = await server.respond(to: Self.get("/api/store", from: "192.168.1.5",
                                                       headers: ["x-khayt-pin": "2468"]))
         #expect(store.status == 401, "the short PIN still opened the whole book")
