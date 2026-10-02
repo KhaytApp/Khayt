@@ -536,6 +536,7 @@ struct CountTheShelf: View {
     let row: KhaytEngine.CatalogueRow
     @Environment(\.dismiss) private var dismiss
     @State private var typed = ""
+    @State private var askingNotStocked = false
     @FocusState private var focused: Bool
 
     private var count: Int? {
@@ -603,8 +604,8 @@ struct CountTheShelf: View {
                 // and the shelf is empty. Both are reachable, and neither is
                 // the accident of leaving a box blank.
                 if shop.stockCount(of: row.id) != nil {
-                    Button(shop.words.callIt("mac.not_stocked"), role: .destructive) {
-                        Task { await shop.recordStockCount(nil, for: row.id); dismiss() }
+                    Button(shop.words.callIt("mac.not_stocked") + "\u{2026}", role: .destructive) {
+                        askingNotStocked = true
                     }
                 }
                 Spacer()
@@ -620,6 +621,17 @@ struct CountTheShelf: View {
         .onAppear {
             typed = shop.stockCount(of: row.id).map(String.init) ?? ""
             focused = true
+        }
+        // Clearing the count has no undo, and the button sat beside the one
+        // that records a count — the count the shop came here to correct.
+        .confirmationDialog(shop.words.callIt("mac.not_stocked_q", ["name": .string(row.name)]),
+                            isPresented: $askingNotStocked, titleVisibility: .visible) {
+            Button(shop.words.callIt("mac.not_stocked"), role: .destructive) {
+                Task { await shop.recordStockCount(nil, for: row.id); dismiss() }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(shop.words.callIt("mac.not_stocked_note") + " " + shop.words.callIt("mac.no_undo"))
         }
     }
 }

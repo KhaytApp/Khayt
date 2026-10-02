@@ -147,6 +147,7 @@ struct CustomerInspector: View {
     /// The line being written in the communications log.
     @State private var newKind = "call"
     @State private var newNote = ""
+    @State private var removingLine: RemovingLine?
     /// Why WhatsApp could not be opened on this customer's number, or nil.
     @State private var whatsAppProblem: (id: String, text: String)?
 
@@ -413,7 +414,7 @@ struct CustomerInspector: View {
                     Spacer(minLength: 8)
                     if shop.canMoveJobs {
                         Button {
-                            Task { await shop.removeCommunication(line, from: record.id) }
+                            removingLine = RemovingLine(line: line, client: record.id)
                         } label: { Image(systemName: "minus.circle") }
                             .buttonStyle(.plain)
                             .help(shop.words.callIt("common.delete"))
@@ -437,7 +438,21 @@ struct CustomerInspector: View {
                 }
             }
         }
+        // A small minus beside every line of the log, no undo behind it: one
+        // stray click lost what a customer was told. Named before it goes.
+        .askFirst($removingLine,
+                  title: { shop.words.callIt("mac.delete_product_q",
+                                             ["name": .string(shop.words.callIt($0.line.wordKey)
+                                                              + " · " + $0.line.day)]) },
+                  message: { $0.line.note + "\n\n" + shop.words.callIt("mac.no_undo") },
+                  confirm: shop.words.callIt("common.delete"),
+                  cancel: shop.words.callIt("common.cancel")) { chosen in
+            Task { await shop.removeCommunication(chosen.line, from: chosen.client) }
+        }
     }
+
+    /// One line of the log, chosen for removal and waiting on the answer.
+    private struct RemovingLine { let line: CommEntry; let client: String }
 
     private func addNote(to record: Client) {
         let note = newNote.trimmingCharacters(in: .whitespacesAndNewlines)

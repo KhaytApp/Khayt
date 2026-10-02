@@ -23,6 +23,8 @@ struct SpoolSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var material = ""
+    /// Delete was pressed and not yet answered: it sat beside Save, one click.
+    @State private var deleting: Spool?
     /// What this item is counted in. `g` because every item recorded before
     /// Khayt could ask is filament — see `lib/inventory-units.js`.
     @State private var unit = "g"
@@ -322,10 +324,8 @@ struct SpoolSheet: View {
         } footer: {
             HStack {
                 if !isNew, shop.canMoveJobs {
-                    Button(shop.words.callIt("common.delete"), role: .destructive) {
-                        guard let id = existing?.id else { return }
-                        dismiss()
-                        Task { await shop.deleteSpool(id) }
+                    Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                        deleting = existing
                     }
                 }
                 Spacer()
@@ -337,6 +337,14 @@ struct SpoolSheet: View {
             }
         }
         .onAppear(perform: fill)
+        .askFirst($deleting,
+                  title: { shop.words.callIt("mac.delete_product_q", ["name": .string(AskName.spool($0))]) },
+                  message: { _ in shop.words.callIt("mac.undo_after") },
+                  confirm: shop.words.callIt("common.delete"),
+                  cancel: shop.words.callIt("common.cancel")) { chosen in
+            dismiss()
+            Task { await shop.deleteSpool(chosen.id) }
+        }
         .task { units = await shop.inventoryUnitChoices() }
         .task(id: material) { await loadColours() }
         .task(id: material) { catalogue = await shop.filamentSearch(material) }

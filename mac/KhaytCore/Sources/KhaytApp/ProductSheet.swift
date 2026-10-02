@@ -62,6 +62,8 @@ struct ProductSheet: View {
     @State private var pickNote: String?
     /// What those parts cost, priced by the shared rule.
     @State private var pricing: KhaytEngine.ProductPricing?
+    /// Save was pressed at a price of zero; the question is up.
+    @State private var askingZero = false
     /// The shop's own rounding and typed price for this product — the two
     /// fields `lib/product-price.js` reads. Held here and written into the
     /// draft's record as they change, so the preview and the save agree.
@@ -350,22 +352,29 @@ struct ProductSheet: View {
                 Button(shop.words.callIt("common.cancel")) { shop.editingProduct = nil }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
-                    let saving = draft
-                    let staged = pictures
-                    let unlink = removedPictures
-                    let sent = Self.payload(draft: saving, parts: effectiveParts, tiers: tiers,
-                                            docs: docs, spools: shop.spools)
-                    let rows = sent.parts
-                    let tierRows = sent.tiers
-                    let docRows = sent.docs
-                    let dropped = removedDocs
-                    Task { await shop.saveProduct(saving, pictures: staged,
-                                                  unlinking: unlink, parts: rows,
-                                                  tiers: tierRows, docs: docRows,
-                                                  unlinkingDocs: dropped) }
+                    // ── A ZERO PRICE IS ASKED ABOUT, NOT JUST WARNED OF ────
+                    //
+                    // The Sep 2026 incident was this button: a save that
+                    // re-priced a product the shop sold at 50. The caption
+                    // above already said the parts cost nothing, and Save
+                    // was still one click (and Return) away. Now a price of
+                    // zero stops here until the shop says it means it.
+                    if Self.savesAtZero(pricing) { askingZero = true } else { save() }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!draft.hasAName)
+                .confirmationDialog(shop.words.callIt("mac.save_zero_q"),
+                                    isPresented: $askingZero, titleVisibility: .visible) {
+                    Button(shop.words.callIt("mac.save_zero_do"), role: .destructive) { save() }
+                    Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+                } message: {
+                    if let was = Self.storedPrice(existing), was > 0 {
+                        Text(shop.words.callIt("mac.save_zero_note",
+                                               ["price": .string(Money.text(was, shop.currency))]))
+                    } else {
+                        Text(shop.words.callIt("mac.save_zero_new"))
+                    }
+                }
             }
         }
         .onAppear {
@@ -959,6 +968,39 @@ struct ProductSheet: View {
     static func payload(_ opened: Opened, spools: [Spool]) -> Payload {
         payload(draft: opened.draft, parts: opened.parts, tiers: opened.tiers,
                 docs: opened.docs, spools: spools)
+    }
+
+    /// What Save writes — the pictures, the parts, the tiers and the docs.
+    private func save() {
+        let saving = draft
+        let staged = pictures
+        let unlink = removedPictures
+        let sent = Self.payload(draft: saving, parts: effectiveParts, tiers: tiers,
+                                docs: docs, spools: shop.spools)
+        let rows = sent.parts
+        let tierRows = sent.tiers
+        let docRows = sent.docs
+        let dropped = removedDocs
+        Task { await shop.saveProduct(saving, pictures: staged,
+                                      unlinking: unlink, parts: rows,
+                                      tiers: tierRows, docs: docRows,
+                                      unlinkingDocs: dropped) }
+    }
+
+    /// True when Save would write a price of zero. Nil pricing — the figure
+    /// not worked out yet — is not read as zero.
+    static func savesAtZero(_ pricing: KhaytEngine.ProductPricing?) -> Bool {
+        guard let pricing else { return false }
+        return abs(pricing.price) < 0.005
+    }
+
+    /// The price the record carries now, to say what a zero save replaces.
+    static func storedPrice(_ product: Product) -> Double? {
+        switch product.rest["price"] {
+        case .number(let n)?: return n
+        case .string(let s)?: return Double(s)
+        default: return nil
+        }
     }
 
     /// Price what is in the list, through the shared rule.

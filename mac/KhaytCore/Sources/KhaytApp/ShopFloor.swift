@@ -520,6 +520,9 @@ struct Upkeep: View {
     let shop: Shop
     @State private var working = false
     @State private var editing = false
+    /// Delete was chosen and not yet answered. A task has no undo, and the
+    /// item sat one row under Edit in a menu opened to change the interval.
+    @State private var deleting: KhaytEngine.MaintenanceCard.Task?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -562,8 +565,8 @@ struct Upkeep: View {
             // reach either action.
             Menu {
                 Button(shop.words.callIt("common.edit")) { editing = true }
-                Button(shop.words.callIt("common.delete"), role: .destructive) {
-                    Task { await shop.deleteMaintenanceTask(task.id) }
+                Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                    deleting = task
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -577,6 +580,15 @@ struct Upkeep: View {
             .accessibilityLabel(shop.words.callIt("common.edit"))
             .sheet(isPresented: $editing) {
                 MaintenanceTaskSheet(shop: shop, machine: machine, existing: task)
+            }
+            .askFirst($deleting,
+                      title: { shop.words.callIt("mac.delete_product_q",
+                                                 ["name": .string($0.name.isEmpty
+                                                                  ? shop.words.callIt("mac.unnamed") : $0.name)]) },
+                      message: { _ in shop.words.callIt("mac.no_undo") },
+                      confirm: shop.words.callIt("common.delete"),
+                      cancel: shop.words.callIt("common.cancel")) { chosen in
+                Task { await shop.deleteMaintenanceTask(chosen.id) }
             }
         }
     }
@@ -641,6 +653,8 @@ struct Upkeep: View {
 struct Inventory: View {
     @Bindable var shop: Shop
     @State private var selection: Spool.ID?
+    /// The spool chosen for Delete, held until the shop answers.
+    @State private var deletingSpool: Spool?
     @State private var needs: [KhaytEngine.ConsumableNeed] = []
     /// The tallest card on the shelf — see `CardHeight`. A spool carrying
     /// "needs drying" and "empty in 14 days" is two lines taller than one that
@@ -860,8 +874,8 @@ struct Inventory: View {
                                         Button(shop.words.callIt("mac.edit_spool")) {
                                             shop.editingSpool = spool
                                         }
-                                        Button(shop.words.callIt("common.delete"), role: .destructive) {
-                                            Task { await shop.deleteSpool(spool.id) }
+                                        Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                                            deletingSpool = spool
                                         }
                                     }
                                 }
@@ -903,6 +917,16 @@ struct Inventory: View {
         // finish even when nobody has touched the stock.
         .task(id: shop.consumableSignature) {
             needs = await shop.consumableNeeds()
+        }
+        // Edit › Undo can bring a spool back, but the item sits under Edit in
+        // a context menu on a grid of near-identical cards — named before it
+        // goes, so a right-click on the neighbouring card is caught here.
+        .askFirst($deletingSpool,
+                  title: { shop.words.callIt("mac.delete_product_q", ["name": .string(AskName.spool($0))]) },
+                  message: { _ in shop.words.callIt("mac.undo_after") },
+                  confirm: shop.words.callIt("common.delete"),
+                  cancel: shop.words.callIt("common.cancel")) { spool in
+            Task { await shop.deleteSpool(spool.id) }
         }
     }
 }
@@ -1121,6 +1145,8 @@ struct ConsumablesCard: View {
         /// Only when the list is not already narrowed to it — the picker says
         /// it otherwise.
         let showCategory: Bool
+        /// Delete chosen, not yet answered.
+        @State private var deleting: Consumable?
 
         private var unit: String { (item.unit ?? "").trimmingCharacters(in: .whitespaces) }
 
@@ -1207,10 +1233,17 @@ struct ConsumablesCard: View {
                         }
                     }
                     Divider()
-                    Button(shop.words.callIt("common.delete"), role: .destructive) {
-                        Task { await shop.deleteConsumable(item.id) }
+                    Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                        deleting = item
                     }
                 }
+            }
+            .askFirst($deleting,
+                      title: { shop.words.callIt("mac.delete_product_q", ["name": .string($0.title(shop.words))]) },
+                      message: { _ in shop.words.callIt("mac.undo_after") },
+                      confirm: shop.words.callIt("common.delete"),
+                      cancel: shop.words.callIt("common.cancel")) { chosen in
+                Task { await shop.deleteConsumable(chosen.id) }
             }
         }
 

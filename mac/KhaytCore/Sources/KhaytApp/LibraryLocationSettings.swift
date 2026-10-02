@@ -14,6 +14,8 @@ struct LibraryLocationSettings: View {
     @State private var pending: URL?
     /// `Shop.importMovesOriginals` — the same default the Add panel asks.
     @AppStorage(Shop.importMovesOriginalsKey) private var movesOriginals = false
+    /// The linked folder chosen for Unlink, held until the shop answers.
+    @State private var unlinking: String?
 
     private var here: String { shop.libraryRoots?.primary ?? "" }
     private var inICloud: Bool {
@@ -69,7 +71,7 @@ struct LibraryLocationSettings: View {
                                 .foregroundStyle(here ? AnyShapeStyle(.secondary) : AnyShapeStyle(Khayt.attention))
                             Text(verbatim: (path as NSString).abbreviatingWithTildeInPath)
                                 .font(.callout.monospaced()).lineLimit(1).truncationMode(.middle)
-                            Button(shop.words.callIt("mac.linked_unlink")) { Task { await shop.unlinkFolder(path) } }
+                            Button(shop.words.callIt("mac.linked_unlink") + "\u{2026}") { unlinking = path }
                                 .controlSize(.small)
                         }
                     }
@@ -114,6 +116,17 @@ struct LibraryLocationSettings: View {
         } message: {
             Text(shop.words.callIt("mac.libmove_confirm_body",
                                    ["path": .string(((pending?.path ?? "") as NSString).abbreviatingWithTildeInPath)]))
+        }
+        // Unlinking drops every model indexed from the folder — with the tags,
+        // notes and pictures the shop gave them — and there is no undo.
+        .askFirst($unlinking,
+                  title: { shop.words.callIt("mac.unlink_folder_q",
+                                             ["name": .string(($0 as NSString).abbreviatingWithTildeInPath)]) },
+                  message: { _ in shop.words.callIt("mac.unlink_folder_note") + " "
+                                  + shop.words.callIt("mac.no_undo") },
+                  confirm: shop.words.callIt("mac.linked_unlink"),
+                  cancel: shop.words.callIt("common.cancel")) { path in
+            Task { await shop.unlinkFolder(path) }
         }
     }
 

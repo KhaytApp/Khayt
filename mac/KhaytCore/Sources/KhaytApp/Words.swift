@@ -3328,6 +3328,47 @@ final class Words {
         "mac.picture_caption": ["en": "Caption", "ar": "تعليق"],
         "mac.delete_product": ["en": "Delete product", "ar": "حذف المنتج"],
         "mac.delete_product_q": ["en": "Delete “{name}”?", "ar": "حذف «{name}»؟"],
+        // ── ASKED BEFORE A ONE-CLICK REMOVAL (see `AskFirst`) ────────────
+        // `mac.delete_product_q` above is the title for every named delete —
+        // "Delete “{name}”?" is not about products. These say what happens
+        // next: whether Edit › Undo can bring it back, and what survives.
+        "mac.no_undo":        ["en": "This cannot be undone.",
+                               "ar": "لا يمكن التراجع عن هذا."],
+        "mac.undo_after":     ["en": "Edit › Undo brings it back.",
+                               "ar": "يمكن استعادته من تحرير › تراجع."],
+        "mac.clear_payment_q": ["en": "Clear the {amount} recorded as paid on “{name}”?",
+                                "ar": "مسح مبلغ {amount} المسجّل كمدفوع على «{name}»؟"],
+        "mac.clear_payment_note": ["en": "The job will show nothing paid, and owe that amount again.",
+                                   "ar": "سيظهر العمل بلا مبلغ مدفوع، ويعود ذلك المبلغ مستحقًا."],
+        "mac.remove_plan_q":  ["en": "Remove the payment plan for “{name}”?",
+                               "ar": "إزالة خطة الدفع لـ«{name}»؟"],
+        "mac.remove_plan_note": ["en": "{n} agreed payments, {amount} in all, are dropped. "
+                                 + "What has already been paid stays recorded.",
+                                 "ar": "تُحذف الدفعات المتفق عليها ({n}) ومجموعها {amount}. "
+                                 + "ما دُفع بالفعل يبقى مسجّلًا."],
+        "mac.save_zero_q":    ["en": "Save at a price of 0?",
+                               "ar": "الحفظ بسعر 0؟"],
+        "mac.save_zero_note": ["en": "This product would be sold and quoted for nothing. "
+                               + "Its price now is {price}.",
+                               "ar": "سيُباع هذا المنتج ويُسعَّر بلا مقابل. "
+                               + "سعره الحالي {price}."],
+        "mac.save_zero_new":  ["en": "This product would be sold and quoted for nothing.",
+                               "ar": "سيُباع هذا المنتج ويُسعَّر بلا مقابل."],
+        "mac.save_zero_do":   ["en": "Save at 0", "ar": "حفظ بسعر 0"],
+        "mac.not_stocked_q":  ["en": "Mark “{name}” as not stocked?",
+                               "ar": "تعليم «{name}» كغير مخزّن؟"],
+        "mac.not_stocked_note": ["en": "Its shelf count is cleared.",
+                                 "ar": "يُمسح جرد الرف الخاص به."],
+        "mac.unlink_folder_q": ["en": "Stop indexing “{name}”?",
+                                "ar": "إيقاف فهرسة «{name}»؟"],
+        "mac.unlink_folder_note": ["en": "Its models leave the library, with their tags, notes and "
+                                   + "pictures. The files in the folder are not touched.",
+                                   "ar": "تخرج نماذجه من المكتبة مع وسومها وملاحظاتها وصورها. "
+                                   + "لا تُمسّ الملفات الموجودة في المجلد."],
+        "mac.remove_logo_q":  ["en": "Remove the shop's logo?",
+                               "ar": "إزالة شعار المتجر؟"],
+        "mac.remove_logo_note": ["en": "Invoices and quotes print without it.",
+                                 "ar": "تُطبع الفواتير وعروض الأسعار بدونه."],
         // The document a customer is handed
         "mac.save_pdf":      ["en": "Save PDF",     "ar": "حفظ PDF"],
         "mac.saved_to":      ["en": "Saved as",     "ar": "حُفظ باسم"],
