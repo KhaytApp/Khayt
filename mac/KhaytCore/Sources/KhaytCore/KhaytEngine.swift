@@ -10270,6 +10270,40 @@ public actor KhaytEngine {
         return try runtime.call2("KhaytWebstoreOrder.fingerprint(ARG0)", [value], as: String.self)
     }
 
+    /// One line of an online order, priced — `KhaytWebstoreOrder.linePrices`.
+    public struct WebStoreLinePrice: Decodable, Sendable, Equatable {
+        public let productId: String?
+        public let qty: Int
+        /// Per one. Nil for a line nothing could price.
+        public let unit: Double?
+        public let total: Double
+        /// `published`, `typed`, `computed` or `none`.
+        public let source: String
+    }
+
+    public struct WebStorePricing: Decodable, Sendable, Equatable {
+        public let lines: [WebStoreLinePrice]
+        public let total: Double
+        /// False when no line found a price at all.
+        public let priced: Bool
+    }
+
+    /// Each line at the price the catalogue published for it, times how many.
+    /// `computed` is product id → what this app's own price rule makes it, for
+    /// a product nothing published.
+    public func webStoreLinePrices(lines: [JSONValue], products: [JSONValue], settings: JSONValue,
+                                   computed: [String: Double]) throws -> WebStorePricing {
+        try runtime.call2("KhaytWebstoreOrder.linePrices(ARG0, { products: ARG1, settings: ARG2, computed: ARG3 })",
+                          [.array(lines), .array(products), settings,
+                           .object(computed.mapValues(JSONValue.number))],
+                          as: WebStorePricing.self)
+    }
+
+    /// What the platform says the customer paid, or nil when it did not say.
+    public func webStorePaidTotal(_ payload: JSONValue) throws -> Double? {
+        try runtime.call2("KhaytWebstoreOrder.paidTotal(ARG0)", [payload], as: Double?.self)
+    }
+
     public func medusaSubscriberPath() throws -> String {
         try runtime.call2("KhaytMedusa.SUBSCRIBER_PATH", [], as: String.self)
     }
@@ -11176,7 +11210,11 @@ private let MOVE_SCRIPT = """
   var gate = KhaytOrderStatus.gate(order, status, { orders: orders, settings: settings });
   if (!gate.ok) return { ok: false, gate: gate };
 
-  var moveCtx = { now: now, inventory: inventory };
+  // A finished job moved back gives back what its completion took
+  // (`KhaytOrderDeduction.returnForOrder`) — the consumables too. Asked for,
+  // because this host can take it back: the spools and consumables a move
+  // changes are written with it and restored by its Undo.
+  var moveCtx = { now: now, inventory: inventory, consumables: consumables, returnMaterial: true };
   // Present only when there is something to say, because the rules distinguish
   // "no reason given" from "nobody mentioned the reason".
   if (holdReason !== null) moveCtx.holdReason = holdReason;

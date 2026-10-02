@@ -304,7 +304,19 @@ test('the lifted deductions and the originals agree, shelf for shelf', () => {
         b.effects = [...d1.effects, ...d2.effects];
 
         const label = `${order.id} / ${JSON.stringify(settings)} / skipRender=${skipRender}`;
+        // ONE FIELD IS NEW: `materialDrawn`, the record of what came off, so
+        // re-opening the job can give it back (`returnForOrder`). Everything
+        // else is the original's — and the record must add up to what the
+        // shelf actually lost.
+        const drawnRecord = orderB.materialDrawn;
+        delete orderB.materialDrawn;
         assert.deepEqual(orderB, orderA, `the order diverged: ${label}`);
+        if (drawnRecord) {
+          const lost = shop.inventory.reduce((s, sp) => s + (+sp.weight || 0), 0)
+            - b.inventory.reduce((s, sp) => s + (+sp.weight || 0), 0);
+          const recorded = drawnRecord.spools.reduce((s, d) => s + d.grams, 0);
+          assert.ok(Math.abs(lost - recorded) < 1e-9, `the record says ${recorded} g, the shelf lost ${lost} g: ${label}`);
+        }
         assert.deepEqual(b.inventory, a.inventory, `the spools diverged: ${label}`);
         assert.deepEqual(b.consumables, a.consumables, `the consumables diverged: ${label}`);
         assert.deepEqual(b.notices, a.notices, `the messages diverged: ${label}`);

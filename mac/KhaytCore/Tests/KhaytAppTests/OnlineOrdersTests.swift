@@ -304,6 +304,64 @@ struct OnlineOrderReadingTests {
         #expect(price > singlePrice, "two of a thing cost the same as one")
     }
 
+    /// What the catalogue publishes for each product, by the same builder
+    /// the web store is published with — the price the customer was shown.
+    static func published(_ shop: Shop) async throws -> [String: Double] {
+        let engine = try #require(shop.engine)
+        let catalog = try await engine.storefrontCatalog(
+            products: shop.productRows, settings: shop.settingsValue, lang: "en",
+            withPhotos: false, heroes: [:])
+        guard case .object(let o) = catalog, case .array(let items)? = o["items"] else { return [:] }
+        var out: [String: Double] = [:]
+        for case .object(let item) in items {
+            if case .string(let id)? = item["id"], case .string(let price)? = item["price"],
+               let n = Double(price) { out[id] = n }
+        }
+        return out
+    }
+
+    static func price(_ input: [String: JSONValue], shop: Shop) async throws -> Double {
+        let engine = try #require(shop.engine)
+        let out = try await engine.newOrder(
+            input, orders: [], settings: shop.settingsDict, now: Date(),
+            tokens: (tracking: Shop.randomBytes(16), quoteApproval: Shop.randomBytes(16)))
+        guard case .object(let record) = out.order, case .number(let p)? = record["price"] else {
+            Issue.record("no priced record"); return -1
+        }
+        return p
+    }
+
+    /// ── THREE OF A THING IS THREE TIMES ITS PRICE ───────────────────────
+    ///
+    /// The parts were multiplied by the quantity and the price was not: a
+    /// product with a typed price brought it in as the WHOLE job's total, so
+    /// three of a 50 product became a job of 50, recorded as paid 50.
+    @Test("several of one product is priced at the published price times how many")
+    func quantityIsPriced() async throws {
+        let shop = await Self.shop()
+        let published = try await Self.published(shop)
+        let stocked = try #require(Self.stocked(shop).first { published[$0.0] != nil },
+                                   "nothing in the sample book is both stocked and published")
+        let unit = try #require(published[stocked.0])
+        let order = try await Self.order("• \(stocked.1) × 3", shop: shop)
+        let price = try await Self.price(await shop.onlineJobInput(order), shop: shop)
+        #expect(abs(price - unit * 3) < 0.005, "three at \(unit) came to \(price)")
+    }
+
+    /// A basket of two products lost both prices and was priced at the first
+    /// one's margin. Each line keeps its own.
+    @Test("a basket is the sum of each line at its own published price")
+    func basketIsSumOfLines() async throws {
+        let shop = await Self.shop()
+        let published = try await Self.published(shop)
+        let two = Self.stocked(shop).filter { published[$0.0] != nil }
+        guard two.count >= 2 else { return }
+        let order = try await Self.order("• \(two[0].1) × 2\n• \(two[1].1) × 1", shop: shop)
+        let price = try await Self.price(await shop.onlineJobInput(order), shop: shop)
+        let expected = (published[two[0].0] ?? 0) * 2 + (published[two[1].0] ?? 0)
+        #expect(abs(price - expected) < 0.005, "the basket came to \(price), its lines to \(expected)")
+    }
+
     /// A basket of three different things is not one of them. Stamping the
     /// record with a `productId` would report the sale against the wrong
     /// catalogue row — and bring that product's packaging and assembly count

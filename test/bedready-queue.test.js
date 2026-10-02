@@ -23,7 +23,7 @@ const SRC = fs.readFileSync(path.join(ROOT, 'renderer/bedready-queue.js'), 'utf8
    page loads them into, because "the module is present" is exactly the sort of
    thing that is true in a unit test and false on the page — which is the bug
    this file's own header is about. */
-const RULES = ['lib/assembly.js', 'lib/order-status.js', 'lib/qc-failure.js']
+const RULES = ['lib/assembly.js', 'lib/order-status.js', 'lib/order-deduction.js', 'lib/qc-failure.js']
   .map((f) => fs.readFileSync(path.join(ROOT, f), 'utf8'));
 
 /** A renderer-ish global scope with only what Bed Ready actually provides. */
@@ -203,20 +203,38 @@ test('a completion fixes what the job cost', () => {
   assert.equal(order.costBasis, 16.5, "or the margin is recomputed at next year's filament prices");
 });
 
-test('re-opening a finished job lets it deduct its filament again', () => {
+test('re-opening a finished job does not let it deduct its filament a second time', () => {
   const { ctx, order, calls } = boot({
+    orders: [job({
+      status: 'completed', completedAt: '2026-01-01T00:00:00Z',
+      materialDeducted: true, printingStartedAt: '2026-01-01T00:00:00Z',
+      materialDrawn: { spools: [{ spoolId: 'S1', grams: 200 }], consumables: [] },
+    })],
+  });
+  ctx.inventory = [{ id: 'S1', material: 'PLA', weight: 800 }];
+  ctx.updateStatus('J1', 'printing');
+  // Bed Ready's Undo restores the order alone, so it does not ask for the
+  // filament back (`returnMaterial`): the flag stays and finishing again
+  // takes nothing more. It used to clear the flag, and the second
+  // completion took the same 200 g off the spool again.
+  assert.equal(order.materialDeducted, true);
+  assert.equal(ctx.inventory[0].weight, 800);
+  assert.ok(order.printingStartedAt !== '2026-01-01T00:00:00Z', 'and the new run starts now');
+
+  ctx.updateStatus('J1', 'completed');
+  assert.deepEqual(calls.filament, ['J1'], 'the deduction is still asked for; the flag makes it a no-op');
+});
+
+test('a job finished before completions were recorded keeps its flag when re-opened', () => {
+  const { ctx, order } = boot({
     orders: [job({
       status: 'completed', completedAt: '2026-01-01T00:00:00Z',
       materialDeducted: true, printingStartedAt: '2026-01-01T00:00:00Z',
     })],
   });
   ctx.updateStatus('J1', 'printing');
-  assert.equal(order.materialDeducted, undefined,
-    'else the reprint consumes nothing and the shelf reports filament it has already used');
-  assert.ok(order.printingStartedAt !== '2026-01-01T00:00:00Z', 'and the new run starts now');
-
-  ctx.updateStatus('J1', 'completed');
-  assert.deepEqual(calls.filament, ['J1'], 'the second run empties the spool too');
+  assert.equal(order.materialDeducted, true,
+    'nothing knows what it took — clearing the flag blind is how it was charged twice');
 });
 
 test('a resin job entering post gets somewhere to record the wash and the cure', () => {

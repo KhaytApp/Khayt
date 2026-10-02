@@ -19,6 +19,8 @@
  *   - `customerFor`  — which customer in the book is this, or who to create.
  *   - `statusFor`    — what the store should be told about a job, if anything.
  *   - `pending`      — which of those have not been told yet.
+ *   - `linePrices`   — what each line of the order sells for, and the total.
+ *   - `paidTotal`    — what the platform says the customer paid, if it said.
  *
  * Pure: no clock, no randomness, no I/O. The caller hands in the book and the
  * memory of what it already sent.
@@ -320,10 +322,121 @@
     return out.slice(0, max);
   }
 
+  // ── WHAT THE ORDER COMES TO ─────────────────────────────────────────────
+
+  /** A money figure, or null — never 0 for "not said". */
+  const moneyOf = (v) => {
+    if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const round2 = (n) => Math.round(n * 100) / 100;
+
+  /** `lib/storefront-catalog.js`, however this file was loaded. */
+  function catalogApi() {
+    if (global.KhaytStorefrontCatalog) return global.KhaytStorefrontCatalog;
+    try { return require('./storefront-catalog.js'); } catch (e) { return null; }
+  }
+
+  /**
+   * Each line of an online order at the price the shop SELLS it for, and the
+   * job's total as their sum.
+   *
+   * ── WHY PER LINE ─────────────────────────────────────────────────────────
+   *
+   * The Mac priced a web-store order by handing the whole basket to the job
+   * calculator with ONE product's rule: the parts were multiplied by the
+   * quantity, but a product with a typed price brought that price in as the
+   * job's total — so three of a 50 product became a job of 50, recorded as
+   * paid 50. And a basket of two products lost both typed prices and was
+   * priced at the first product's margin. Neither is what the storefront
+   * charged.
+   *
+   * A line is priced, in order:
+   *
+   *   published  what the catalogue PUBLISHED for it — the storefront's own
+   *              price, else the product's price, else its base price
+   *              (`KhaytStorefrontCatalog.publishedPrice`, the rule `build`
+   *              publishes with). This is the figure the customer was shown.
+   *   typed      the product's own `priceOverride`, for a product the
+   *              catalogue has no price for.
+   *   computed   `ctx.computed[productId]` — what the host's own price rule
+   *              makes it (the Mac's catalogue row `final`), for a product
+   *              priced by its parts and margin and never published.
+   *   none       a line naming nothing this shop sells, or a product nothing
+   *              can price. It is 0 because it genuinely is not priced yet.
+   *
+   * × the line's quantity, every time.
+   *
+   * `lines`: `[{ productId?, qty }]` — the shelf reading's lines will do.
+   * `ctx`: `{ products, settings, computed }`.
+   * Returns `{ lines: [{ productId, qty, unit, total, source }], total, priced }`
+   * — `priced` is false when no line found a price at all.
+   */
+  function linePrices(lines, ctx) {
+    const c = ctx || {};
+    const products = Array.isArray(c.products) ? c.products : [];
+    const settings = c.settings || {};
+    const computed = (c.computed && typeof c.computed === 'object') ? c.computed : {};
+    const Cat = catalogApi();
+    const out = [];
+    let total = 0;
+    let priced = false;
+    for (const line of Array.isArray(lines) ? lines : []) {
+      if (!line) continue;
+      const qty = Math.max(1, Math.round(Number(line.qty) || 1));
+      const productId = str(line.productId) || null;
+      const product = productId ? products.find((p) => p && str(p.id) === productId) : null;
+      let unit = null;
+      let source = 'none';
+      if (product) {
+        const published = Cat && typeof Cat.publishedPrice === 'function'
+          ? moneyOf(Cat.publishedPrice(product, settings)) : null;
+        const typed = moneyOf(product.priceOverride);
+        const made = moneyOf(computed[productId]);
+        if (published !== null) { unit = published; source = 'published'; }
+        else if (typed !== null) { unit = typed; source = 'typed'; }
+        else if (made !== null) { unit = made; source = 'computed'; }
+      }
+      const lineTotal = unit === null ? 0 : round2(unit * qty);
+      if (unit !== null) priced = true;
+      total += lineTotal;
+      out.push({ productId, qty, unit, total: lineTotal, source });
+    }
+    return { lines: out, total: round2(total), priced };
+  }
+
+  /**
+   * What the platform says the customer paid, or null when it did not say.
+   *
+   * khayt-cloud carries a line's `unitPrice` from a KEYED import only
+   * (docs/api-contract.md, "Intake fields") — an open form cannot name a price.
+   * The total is the sum of `unitPrice × qty`, and only when EVERY line carries
+   * one: a basket half of whose lines are unpriced has not told us its total,
+   * and a partial sum recorded as "paid" would leave a balance that is not owed.
+   * A payload `paidTotal`, should the cloud ever send one, wins.
+   */
+  function paidTotal(payload) {
+    const p = payload || {};
+    const said = moneyOf(p.paidTotal);
+    if (said !== null) return said;
+    const lines = Array.isArray(p.lines) ? p.lines.filter((l) => l && typeof l === 'object') : [];
+    if (!lines.length) return null;
+    let sum = 0;
+    for (const l of lines) {
+      const unit = moneyOf(l.unitPrice);
+      if (unit === null) return null;
+      const q = Math.round(Number(l.qty != null ? l.qty : l.quantity));
+      sum += unit * (Number.isFinite(q) && q > 0 ? q : 1);
+    }
+    return round2(sum);
+  }
+
   const api = {
     PLATFORMS, PAID_WHEN_PLACED,
     platformOf, paidState, decide, contactOf, phoneKey, customerFor,
     storeStatusOf, scopedRef, statusFor, fingerprint, pending,
+    linePrices, paidTotal,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytWebstoreOrder = api;

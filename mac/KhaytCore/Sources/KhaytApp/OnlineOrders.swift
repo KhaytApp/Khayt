@@ -240,8 +240,6 @@ extension Shop {
         guard case .store(let build) = source, let engine else {
             return .failure(OnlineWriteFailure(words.callIt("mac.move_sample")))
         }
-        let effects = (try? await engine.shelfSaleEffects(order.reading, at: now)) ?? []
-        let deductions = Self.deductions(effects)
         let input = await onlineJobInput(order)
         var outcome: Recorded = .alreadyThere
         var owed: [KhaytEngine.WebhookDelivery] = []
@@ -252,7 +250,6 @@ extension Shop {
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
                 let put = try await Self.putOnlineOrder(order, input: input, paid: paid,
-                                                        deductions: deductions,
                                                         into: &root, engine: engine, now: now)
                 outcome = put.recorded
                 owed = put.webhooks
@@ -295,7 +292,6 @@ extension Shop {
     /// retried by simply running again, without a second job or a second
     /// deduction from the shelf.
     static func putOnlineOrder(_ order: OnlineOrder, input: [String: JSONValue], paid: Bool,
-                               deductions: [(String, Int)],
                                into root: inout [String: JSONValue],
                                engine: KhaytEngine, now: Date) async throws -> PutOnline {
         let orders = rows(root, "printLog")
@@ -304,12 +300,31 @@ extension Shop {
             return PutOnline(recorded: .alreadyThere)
         }
 
+        // ── THE SHELF, COUNTED AGAIN, HERE ─────────────────────────────────
+        //
+        // `order.reading` was taken when the queue was read — minutes ago, or
+        // longer for an order left on the sheet. Since then a piece can have
+        // gone over the counter, a recount or another Mac's sync can have
+        // landed. Trusting the old reading marked an order "all from the
+        // shelf" — completed, nothing to print — when the shelf no longer held
+        // it: the customer's pieces were never made. So the order is read
+        // against the book as it is INSIDE this write, and whatever the shelf
+        // cannot cover now goes to a machine.
+        let fresh = OnlineOrder(
+            item: order.item,
+            reading: try await engine.shelfSaleReading(
+                payload: order.item.payload, products: Self.rows(root, "products"),
+                stock: Self.stockCounts(Self.settings(root))))
+        let deductions = Self.deductions(try await engine.shelfSaleEffects(fresh.reading, at: now))
+        let allFromShelf = fresh.allFromShelf
+
         // ── THE CUSTOMER ───────────────────────────────────────────────────
         //
         // The same email or phone is the same customer; anybody else is a new
         // one, filed as having come from online. `lib/webstore-order.js`
         // decides, as the desktop's Order requests screen always has.
         var input = input
+        if allFromShelf { input["fromStock"] = .bool(true) } else { input.removeValue(forKey: "fromStock") }
         var clients = rows(root, "clients")
         var clientId: String?
         var newCustomer = false
@@ -349,7 +364,7 @@ extension Shop {
         if !order.item.reference.isEmpty {
             record["sourceOrderId"] = .string(order.item.reference)
         }
-        if order.allFromShelf {
+        if allFromShelf {
             // Nothing about this waits on a machine. A shelf sale under
             // Pending is a job somebody goes looking for a free printer to
             // start.
@@ -373,10 +388,17 @@ extension Shop {
         var job: JSONValue = .object(record)
         var webhooks: [KhaytEngine.WebhookDelivery] = []
         let price = plainNumber(record["price"]) ?? 0
+        // WHAT THE CUSTOMER PAID, where the platform said — a keyed import
+        // carries each line's price — else the job's own price. The platform's
+        // figure is the money that moved; a job priced differently (a discount
+        // the store ran, a price changed since it was published) is left with
+        // the honest balance either way rather than recorded as settled.
+        let platformPaid = (try? await engine.webStorePaidTotal(order.item.payload)) ?? nil
+        let amount = platformPaid ?? price
         let settingsNow = out.settings
-        if paid, price > 0 {
+        if paid, amount > 0 {
             let day = localDay(now)
-            let done = try await engine.recordPayment(order: job, amount: price, method: "other",
+            let done = try await engine.recordPayment(order: job, amount: amount, method: "other",
                                                       paidAt: day, today: day)
             job = done.order
             if let asked = done.webhookEffects, !asked.isEmpty, case .object(let o) = job {
@@ -415,7 +437,7 @@ extension Shop {
         }
         root["settings"] = .object(settings)
         return PutOnline(recorded: .made(jobId: jobId, clientId: clientId,
-                                         newCustomer: newCustomer, paid: paid && price > 0),
+                                         newCustomer: newCustomer, paid: paid && amount > 0),
                          webhooks: webhooks)
     }
 
@@ -460,6 +482,26 @@ extension Shop {
         }
     }
 
+    /// Each line of the order at its price, by the shared rule — nil only when
+    /// the rule could not be asked.
+    func onlinePricing(_ order: OnlineOrder) async -> KhaytEngine.WebStorePricing? {
+        guard let engine else { return nil }
+        let lines: [JSONValue] = order.lines.map { line in
+            var row: [String: JSONValue] = ["qty": .number(Double(max(1, line.qty)))]
+            if let id = line.productId { row["productId"] = .string(id) }
+            return .object(row)
+        }
+        // What this app's catalogue prices each product at — the fallback for a
+        // product the storefront was never given a price for. Only a real
+        // figure: a product with nothing to price it is not free.
+        var computed: [String: Double] = [:]
+        for row in catalogueRows where row.final > 0 && computed[row.id] == nil {
+            computed[row.id] = row.final
+        }
+        return try? await engine.webStoreLinePrices(lines: lines, products: productRows,
+                                                    settings: settingsValue, computed: computed)
+    }
+
     /// The job this order becomes, COSTED.
     ///
     /// ── THE BUG THIS EXISTS TO NOT REPEAT ────────────────────────────────
@@ -478,14 +520,14 @@ extension Shop {
     /// counter sale and the new-job sheet use — multiplied by how many were
     /// ordered.
     ///
-    /// ── AND THE STOREFRONT'S FIGURE IS NOT USED ──────────────────────────
+    /// ── PRICED AT WHAT THE CATALOGUE PUBLISHED ───────────────────────────
     ///
-    /// Deliberately, and it is not even in the payload: khayt-cloud's
-    /// `mapPlatformOrder` does not carry money across. It would be the wrong
-    /// number anyway — the storefront's total is after its own tax, shipping
-    /// and whatever discount it was running, in whatever currency it charges.
-    /// The shop's book is kept in the shop's money, and the price the shop
-    /// would charge for this work is the one its catalogue already says.
+    /// Each line at the price the shop's catalogue published for it, times the
+    /// quantity (`onlinePricing`). The parts carry the COST; the price is the
+    /// figure the customer was shown. What the platform says was actually
+    /// PAID — a keyed import carries each line's price — is the payment
+    /// recorded, in `putOnlineOrder`; it is not the job's price, because it is
+    /// after whatever discount the store was running.
     ///
     /// A line that names nothing this shop sells is a part with the customer's
     /// own words and no cost, which is what a request is. It prices at zero
@@ -517,6 +559,25 @@ extension Shop {
             }
         }
 
+        // ── EACH LINE AT ITS OWN PRICE, TIMES HOW MANY ────────────────────
+        //
+        // The parts above were multiplied by the quantity; the PRICE was not.
+        // Handed the one product's rule, a product with a typed price brought
+        // that price in as the whole job's total — three of a 50 product was a
+        // job of 50, recorded as paid 50 — and a basket of two products lost
+        // both typed prices and was priced at the first one's margin.
+        //
+        // So every line is priced by the shared rule
+        // (`KhaytWebstoreOrder.linePrices`) at what the catalogue PUBLISHED for
+        // it — the figure the customer was shown — else the product's typed
+        // price, else what this app's catalogue computes it at; times the
+        // line's quantity. The job's total is their sum, and travels as the
+        // job's typed price so nothing re-derives it from a margin.
+        var rule = onlyProduct.map(Self.priceRule(of:)) ?? PriceRule()
+        if let pricing = await onlinePricing(order), pricing.priced {
+            rule = PriceRule(override: pricing.total)
+        }
+
         var input = newJobInput(
             parts: drafts, project: order.title, clientId: nil,
             margin: margin, discountPct: 0, shippingCost: 0, deposit: 0,
@@ -526,7 +587,18 @@ extension Shop {
             // productId would report the sale against the wrong catalogue row
             // — and bring that product's packaging and assembly with it.
             fromProduct: onlyProduct,
-            rule: onlyProduct.map(Self.priceRule(of:)) ?? PriceRule())
+            rule: rule)
+        // The product's components are PER ONE assembled piece, and the shared
+        // deduction draws `qtyPerUnit × assemblyQty`. Six hoods take six sets
+        // of magnets, not one.
+        if let onlyProduct {
+            let ordered = order.lines.filter { $0.productId == onlyProduct.id }
+                .reduce(0) { $0 + max(1, $1.qty) }
+            if ordered > 1 {
+                let perOne = Self.plainNumber(onlyProduct.rest["assemblyQty"]).map { max(1, $0) } ?? 1
+                input["assemblyQty"] = .number(perOne * Double(ordered))
+            }
+        }
 
         input["source"] = .string(order.source.isEmpty ? "online" : order.source)
         // WHAT THE CUSTOMER CHOSE, where the person at the printer reads. A
@@ -542,6 +614,9 @@ extension Shop {
         if !order.item.reference.isEmpty {
             input["sourceOrderId"] = .string(order.item.reference)
         }
+        // Whether it all comes off the shelf is decided again inside the write
+        // (`putOnlineOrder`), against the count the book holds then; this is
+        // what the screen showed.
         if order.allFromShelf { input["fromStock"] = .bool(true) }
         return input
     }

@@ -80,23 +80,37 @@ struct WebStoreOrdersTests {
 
     /// Read the order against the book on disk, then put it in, in one write —
     /// the same two steps `writeOnlineOrder` takes.
+    ///
+    /// `meanwhile` changes the book on disk AFTER the order was read and
+    /// before it is put — a counter sale, a recount, another Mac's sync.
     static func put(_ payload: JSONValue, intakeId: String, input: [String: JSONValue] = input,
-                    into scratch: Scratch, engine: KhaytEngine) async throws -> Shop.Recorded {
+                    into scratch: Scratch, engine: KhaytEngine,
+                    meanwhile: ((inout [String: JSONValue]) -> Void)? = nil) async throws -> Shop.Recorded {
         let now = Date()
         let root = try scratch.read()
         let order = try await Shop.onlineOrder(
             CloudIntake.Item(id: intakeId, payload: payload, createdAt: now),
             products: Shop.rows(root, "products"),
             stock: Shop.stockCounts(Shop.settings(root)), engine: engine)
-        let deductions = Shop.deductions(try await engine.shelfSaleEffects(order.reading, at: now))
+        if let meanwhile {
+            var later = root
+            meanwhile(&later)
+            try JSONEncoder().encode(later).write(to: scratch.url)
+        }
         let paid = order.decision?.paid ?? false
         var recorded: Shop.Recorded = .alreadyThere
         try await StoreWriter.update(storeURL: scratch.url, owns: { true }, whoHasIt: { nil }) { root in
             recorded = try await Shop.putOnlineOrder(order, input: input, paid: paid,
-                                                     deductions: deductions, into: &root,
-                                                     engine: engine, now: now).recorded
+                                                     into: &root, engine: engine, now: now).recorded
         }
         return recorded
+    }
+
+    /// The shelf count for PRD-A, set on a book.
+    static func setShelf(_ count: Int, in root: inout [String: JSONValue]) {
+        var settings = Shop.settings(root)
+        Shop.putStockCount(count, for: "PRD-A", into: &settings, at: Date())
+        root["settings"] = .object(settings)
     }
 
     static func jobs(_ root: [String: JSONValue]) -> [[String: JSONValue]] {
@@ -150,6 +164,49 @@ struct WebStoreOrdersTests {
         let printing = try #require(Self.jobs(book).first)
         #expect(printing["status"] != .string("completed"),
                 "an order with printing left in it was marked done")
+    }
+
+    /// The order was read when the shelf held five. By the time it is put, a
+    /// counter sale has left one. The stale reading said "all from the shelf"
+    /// — so the job was marked completed and nothing was printed, and the
+    /// customer's second piece was never made.
+    @Test("the shelf is counted again inside the write, and what it no longer covers is printed")
+    func staleShelfFallsBackToPrinting() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+
+        var fromStock = Self.input
+        fromStock["fromStock"] = .bool(true)   // what the screen built from the old reading
+        _ = try await Self.put(Self.payload(qty: 2), intakeId: "1", input: fromStock,
+                               into: scratch, engine: engine,
+                               meanwhile: { Self.setShelf(1, in: &$0) })
+        let book = try scratch.read()
+        let job = try #require(Self.jobs(book).first)
+        #expect(job["status"] != .string("completed"),
+                "an order the shelf could no longer cover was marked done")
+        #expect(job["fromStock"] == nil, "a job with printing in it is not a shelf sale")
+        #expect(Shop.stockCount(of: "PRD-A", in: .object(Shop.settings(book))) == 0,
+                "the one that was there is taken; never below nothing")
+    }
+
+    /// …and the other way: read when the shelf was empty, restocked since.
+    @Test("a shelf restocked since the order was read sells from the shelf")
+    func restockedShelfSells() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        var root = try scratch.read()
+        Self.setShelf(0, in: &root)
+        try JSONEncoder().encode(root).write(to: scratch.url)
+
+        _ = try await Self.put(Self.payload(qty: 2), intakeId: "1", into: scratch, engine: engine,
+                               meanwhile: { Self.setShelf(4, in: &$0) })
+        let book = try scratch.read()
+        let job = try #require(Self.jobs(book).first)
+        #expect(job["status"] == .string("completed"))
+        #expect(job["fromStock"] == .bool(true))
+        #expect(Shop.stockCount(of: "PRD-A", in: .object(Shop.settings(book))) == 2)
     }
 
     // MARK: - The customer
@@ -230,6 +287,29 @@ struct WebStoreOrdersTests {
         #expect(Shop.plainNumber(job["paidAmount"]) == Shop.plainNumber(job["price"]))
         #expect(job["sourceOrderId"] == .string("medusa:#1042"))
         #expect(job["intakeId"] == .string("1"))
+    }
+
+    /// A keyed import carries each line's price. That is the money that
+    /// moved, and it is what the payment records — not the job's price.
+    @Test("the platform's own paid total is the payment recorded")
+    func platformPaidTotal() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        guard case .object(var payload) = Self.payload(qty: 3) else { return }
+        payload["lines"] = .array([.object([
+            "name": .string("Flexi Dragon"), "qty": .number(3), "productId": .string("PRD-A"),
+            "unitPrice": .number(45),
+        ])])
+        var priced = Self.input
+        priced["priceOverride"] = .number(150)    // the catalogue's 50 × 3
+        _ = try await Self.put(.object(payload), intakeId: "1", input: priced,
+                               into: scratch, engine: engine)
+        let job = try #require(Self.jobs(try scratch.read()).first)
+        #expect(Shop.plainNumber(job["price"]) == 150)
+        #expect(Shop.plainNumber(job["paidAmount"]) == 135, "what the customer paid: 3 × 45")
+        #expect(job["paymentStatus"] == .string("partial"),
+                "a job priced above what was paid shows the honest balance")
     }
 
     @Test("an order the store has not said is paid is left for a person")

@@ -283,6 +283,70 @@ struct MoveJobTests {
         #expect(sentence.contains("Telegram"), "naming it is the point: \(sentence)")
     }
 
+    // MARK: - Moving a finished job back
+
+    /// The bug: leaving `completed` cleared `materialDeducted` and gave nothing
+    /// back, so finishing the job again took the filament a second time. "Move
+    /// back" (Job menu) and a drag off the Completed column both run this path.
+    static func shelf(_ root: [String: JSONValue]) -> [Double] {
+        ["S1", "S2", "S3"].map { number(row(root, "inventory", $0)?["weight"]) ?? -1 }
+    }
+
+    @Test("completed, moved back to QC, completed again: one print off the shelf, not two")
+    func reopenedAndRefinishedDeductsOnce() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed)
+        let once = Self.shelf(root)
+        #expect(once == [0, 840, 900])
+        #expect(Self.number(Self.row(root, "consumables", "C1")?["stock"]) == 8)
+
+        let (undo, notices) = try await Self.move(&root, "J1", .qc)
+        #expect(Self.shelf(root) == [100, 900, 900],
+                "leaving completed must give back exactly what the completion took, spool by spool")
+        #expect(Self.number(Self.row(root, "consumables", "C1")?["stock"]) == 10,
+                "and the IPA its hours used")
+        #expect(Self.number(Self.row(root, "consumables", "C2")?["stock"]) == 4,
+                "the box was packed and stays packed")
+        let job = try #require(Self.row(root, "printLog", "J1"))
+        #expect(job["materialDeducted"] == nil)
+        #expect(job["materialDrawn"] == nil)
+        #expect(Set(undo.map(\.collection)).contains("inventory"),
+                "the spools that grew are undoable with the move")
+        #expect(notices.contains { $0.contains("160") }, "the shop is told what went back: \(notices)")
+        #expect(!notices.contains("filament_returned"), "a code with no sentence reached the screen")
+
+        _ = try await Self.move(&root, "J1", .completed)
+        #expect(Self.shelf(root) == once, "finishing it again took the filament a second time")
+        #expect(Self.number(Self.row(root, "consumables", "C1")?["stock"]) == 8)
+    }
+
+    @Test("Move back to printing and finish again is still one print")
+    func movedBackToPrinting() async throws {
+        var root = Self.book()
+        _ = try await Self.move(&root, "J1", .completed)
+        _ = try await Self.move(&root, "J1", .post)
+        _ = try await Self.move(&root, "J1", .printing)
+        _ = try await Self.move(&root, "J1", .completed)
+        #expect(Self.shelf(root) == [0, 840, 900])
+    }
+
+    @Test("a job finished before completions were recorded is not charged again")
+    func legacyFinishedJobKeepsItsFlag() async throws {
+        var root = Self.book()
+        // Finished by an older build: flagged, with no record of what it took.
+        if case .array(var log)? = root["printLog"], case .object(var j) = log[0] {
+            j["status"] = .string("completed")
+            j["materialDeducted"] = .bool(true)
+            log[0] = .object(j)
+            root["printLog"] = .array(log)
+        }
+        _ = try await Self.move(&root, "J1", .qc)
+        #expect(Self.shelf(root) == [100, 900, 900], "nothing invented back onto a spool")
+        #expect(Self.row(root, "printLog", "J1")?["materialDeducted"] == .bool(true))
+        _ = try await Self.move(&root, "J1", .completed)
+        #expect(Self.shelf(root) == [100, 900, 900], "the old bug took 160 g here")
+    }
+
     @Test("an undone move puts the filament back on the spool")
     func undoRestoresTheShelf() async throws {
         var root = Self.book()
