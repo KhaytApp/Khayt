@@ -445,7 +445,7 @@
 "pair.manual.body" = "Khayt prints both on the desktop, under Settings → LAN API.";
 "pair.manual.port" = "Port";
 "pair.pin.title" = "The owner PIN";
-"pair.pin.body" = "Four digits from Settings → LAN API. The intake PIN will not work here.";
+"pair.pin.body" = "The owner PIN from Settings → LAN API on the Mac. The intake PIN will not work here.";
 "pair.pin.foot" = "Kept in the iPhone Keychain, never sent anywhere but this Mac.";
 "pair.pin.wrong" = "That PIN was refused. Check Settings → LAN API on the Mac.";
 "pair.connect" = "Connect";
@@ -567,3 +567,5 @@
 "sample.banner" = "Sample shop";
 "sample.banner.line" = "Nothing here is real, and nothing leaves this phone.";
 "sample.pair" = "Pair with my Mac";
+"pair.pin.too_short" = "Set a longer PIN on your Mac (8+ characters) in Settings → Online, then connect again.";
+"connection.pin_too_short" = "The Mac needs a longer PIN";

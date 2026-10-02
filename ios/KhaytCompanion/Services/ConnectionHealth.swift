@@ -5,6 +5,8 @@ enum ConnectionHealthState: String, Sendable {
     case connected
     case unreachable
     case unauthorized
+    /// The Mac wants a longer owner PIN before it opens anything.
+    case pinTooShort
 
     var label: String {
         switch self {
@@ -12,6 +14,7 @@ enum ConnectionHealthState: String, Sendable {
         case .connected: return L10n.tr("connection.connected")
         case .unreachable: return L10n.tr("connection.unreachable")
         case .unauthorized: return L10n.tr("connection.unauthorized")
+        case .pinTooShort: return L10n.tr("connection.pin_too_short")
         }
     }
 
@@ -20,7 +23,7 @@ enum ConnectionHealthState: String, Sendable {
         case .unknown: return "wifi.exclamationmark"
         case .connected: return "wifi"
         case .unreachable: return "wifi.slash"
-        case .unauthorized: return "lock.slash"
+        case .unauthorized, .pinTooShort: return "lock.slash"
         }
     }
 }
@@ -85,7 +88,9 @@ final class ConnectionHealth: ObservableObject {
                 await refreshWidgetsAndAlerts(status: status, queue: queue)
             } catch let err as KhaytAPIError {
                 lastStatus = nil
-                if case .unauthorized = err {
+                if case .pinTooShort = err {
+                    state = .pinTooShort
+                } else if case .unauthorized = err {
                     state = .unauthorized
                 } else {
                     state = .unreachable
@@ -97,6 +102,7 @@ final class ConnectionHealth: ObservableObject {
         } catch let err as KhaytAPIError {
             lastStatus = nil
             if case .unauthorized = err { state = .unauthorized }
+            if case .pinTooShort = err { state = .pinTooShort }
             else { state = .unreachable }
             lastChecked = Date()
             notifyConnectionChange()
