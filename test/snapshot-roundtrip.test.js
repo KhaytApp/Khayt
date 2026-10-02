@@ -106,20 +106,22 @@ test('sync metadata survives normalization', () => {
   assert.deepEqual(normalized.printLog[0], store.printLog[0], 'records are kept whole, not rebuilt');
 });
 
-test('an order missing a required field is dropped — which is why creation must not produce one', () => {
-  // Stated as the hazard rather than as a feature. This filter is the strictest
-  // in the app; every other collection only wants an id. A record that fails it
-  // is dropped on the device that MERGES it and kept on the device that made it,
-  // and the two never converge. The next test is the one that matters.
+test('an order missing a field is KEPT, read as "", so every device converges', () => {
+  // This was the hazard: the strictest filter in the app dropped such an order
+  // on the device that merged it and kept it on the one that made it, so the
+  // two never converged, and the desktop's next save erased it. Since the
+  // Mac's data-loss audit (2026-10-02) an order only needs an id, like every
+  // other collection; a missing text field reads as "", as the Mac decodes it.
   const cases = {
-    'no date': { id: 'o1', status: 'pending', project: 'p' },
-    'no status': { id: 'o1', date: '2026-07-01', project: 'p' },
-    'no project': { id: 'o1', date: '2026-07-01', status: 'pending' },
-    'project not a string': { id: 'o1', date: '2026-07-01', status: 'pending', project: 12 },
+    'no date': [{ id: 'o1', status: 'pending', project: 'p' }, { date: '' }],
+    'no status': [{ id: 'o1', date: '2026-07-01', project: 'p' }, { status: '' }],
+    'no project': [{ id: 'o1', date: '2026-07-01', status: 'pending' }, { project: '' }],
+    'project not a string': [{ id: 'o1', date: '2026-07-01', status: 'pending', project: 12 }, { project: '12' }],
   };
-  for (const [label, order] of Object.entries(cases)) {
+  for (const [label, [order, filled]] of Object.entries(cases)) {
     const { normalized } = V.normalizeStoreSnapshot({ printLog: [order] });
-    assert.equal(normalized.printLog.length, 0, `${label}: expected to be dropped`);
+    assert.equal(normalized.printLog.length, 1, `${label}: must be kept`);
+    assert.deepEqual(normalized.printLog[0], { ...order, ...filled }, label);
   }
   const good = { id: 'o1', date: '2026-07-01', status: 'pending', project: 'p' };
   assert.equal(V.normalizeStoreSnapshot({ printLog: [good] }).normalized.printLog.length, 1);

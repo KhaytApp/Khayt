@@ -472,12 +472,11 @@ function sanitiseForAssign(obj) {
   }
   return clean;
 }
+// lib/store-validate.js decides, so this window cannot drop a job the Mac,
+// the phone and the cloud all keep (a job missing its date, status or project
+// is kept and read as ""; see normalizeOrder there).
 function isValidOrder(o) {
-  return o && typeof o === 'object' &&
-    typeof o.id === 'string' && o.id.length > 0 &&
-    typeof o.date === 'string' &&
-    typeof o.status === 'string' &&
-    typeof o.project === 'string';
+  return KhaytStoreValidate.isValidOrder(o);
 }
 function isValidClient(c) {
   return c && typeof c === 'object' && typeof c.id === 'string' && c.id.length > 0;
