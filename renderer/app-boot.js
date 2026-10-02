@@ -566,8 +566,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           toast('📱 ' + t('ord.status_updated_phone', { id, status }), 'info', 3000);
         }
       } else if (id && payload.project && isValidOrder(payload)) {
-        // New order from Salla/Zid (or other source): add to printLog
-        printLog.unshift({ ...payload });
+        // New order from Salla/Zid (or other source): add to printLog, with any
+        // missing date/status read as "" like every other job.
+        printLog.unshift({ ...KhaytStoreValidate.normalizeOrder(payload) });
         saveAll();
         renderLogs();
         renderKanban();

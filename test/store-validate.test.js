@@ -8,10 +8,31 @@ const {
   isValidOrder,
 } = require('../lib/store-validate');
 
-test('isValidOrder requires id, date, status, project', () => {
+test('isValidOrder keeps any job that has an id', () => {
   assert.equal(isValidOrder({ id: 'O-1', date: '2026-01-01', status: 'queued', project: 'X' }), true);
+  assert.equal(isValidOrder({ id: 'O-2' }), true, 'missing date/status/project is kept, not dropped');
   assert.equal(isValidOrder({ id: '', date: '2026-01-01', status: 'queued', project: 'X' }), false);
+  assert.equal(isValidOrder({ date: '2026-01-01' }), false);
   assert.ok(!isValidOrder(null));
+  assert.ok(!isValidOrder([]));
+});
+
+test('a job missing its date, status or project survives load and save, read as ""', () => {
+  // Found in the Mac's data-loss audit: such a job came in by phone, cloud or
+  // import, the desktop dropped it on load, and the next save erased it.
+  const { normalizeOrder } = require('../lib/store-validate');
+  const whole = { id: 'O-1', date: '2026-01-01', status: 'queued', project: 'X', price: 5 };
+  const bare = { id: 'O-2', price: 7, date: null, status: 3 };
+  const { normalized, warnings } = normalizeStoreSnapshot({ printLog: [whole, bare] });
+  assert.equal(normalized.printLog.length, 2);
+  assert.equal(warnings.some((w) => /printLog/.test(w)), false, 'nothing dropped');
+  assert.equal(normalized.printLog[0], whole, 'a well-formed job is not copied');
+  assert.deepEqual(normalized.printLog[1], { id: 'O-2', price: 7, date: '', status: '3', project: '' });
+  assert.deepEqual(bare, { id: 'O-2', price: 7, date: null, status: 3 }, 'the input is not mutated');
+  // Saved and loaded again, it stays.
+  const again = normalizeStoreSnapshot(JSON.parse(JSON.stringify(normalized))).normalized;
+  assert.deepEqual(again.printLog.map((o) => o.id), ['O-1', 'O-2']);
+  assert.equal(normalizeOrder(whole), whole);
 });
 
 test('validateStoreSnapshot rejects non-objects', () => {

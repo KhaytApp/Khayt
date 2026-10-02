@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A job with a missing date, status or project is no longer deleted.** Such
+  a job can arrive from the phone, the cloud or an import, and the Mac app
+  shows it. The desktop threw it away when it opened your book, and the next
+  save removed it from the file and then from the cloud. It is now kept, with
+  the missing fields left blank, as on the Mac. No shop is known to have lost
+  a job this way.
+
 - **Prusa multi-material targets name the right printer.** The print-file
   converter wrote `MK4IS` for the MK4 + MMU3, `MK3S` for the MK3S + MMU2S (both
   the single-extruder printers) and `XL5T` (not a Prusa model id) for the
