@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Prusa multi-material targets name the right printer.** The print-file
+  converter wrote `MK4IS` for the MK4 + MMU3, `MK3S` for the MK3S + MMU2S (both
+  the single-extruder printers) and `XL5T` (not a Prusa model id) for the
+  5-toolhead XL. They now write `MK4ISMMU3`, `MK3SMMU2S` and `XL5IS`, as
+  PrusaSlicer's own vendor profile names them.
+
 - **Set your shop's electricity price once.** Settings › Business has a
   Running costs card with your price per kWh, and the 📍 Auto button can fill
   it from your country. The calculator starts on that price instead of 0.18,
