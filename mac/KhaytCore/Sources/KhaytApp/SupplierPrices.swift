@@ -22,6 +22,11 @@ struct SupplierPricesCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             CapsLabel(shop.words.callIt("mac.price_history"), tint: Role.text3, size: 9)
+            // The LOG's price, said as such — see `MaterialCostCard`, which
+            // is the shelf's.
+            Text(shop.words.callIt("mac.price_history_sub"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 0) {
                 ForEach(groups) { group in
                     Row(shop: shop, group: group)
@@ -42,8 +47,10 @@ struct SupplierPricesCard: View {
                         Text(group.material).lineLimit(1)
                         // THE UNIT IS PART OF THE NAME HERE. Two cards reading
                         // "PLA" with different figures would look like a bug;
-                        // "PLA /kg" and "PLA /spool" are two honest answers.
-                        Text("/" + group.unit)
+                        // "PLA per kg" and "PLA per spool" are two honest
+                        // answers. Said the way the shelf's card says it, in
+                        // the shop's word for the unit.
+                        Text(shop.words.callIt("mac.mc_per", ["unit": .string(shop.words.unitWord(group.unit))]))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Text(said).font(.caption).foregroundStyle(.secondary).lineLimit(1)

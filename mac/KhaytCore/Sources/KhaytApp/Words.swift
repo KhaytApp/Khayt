@@ -647,7 +647,13 @@ final class Words {
         "mac.qc_none":       ["en": "Nothing has been through inspection yet.",
                               "ar": "لم يمر أي عمل بالفحص بعد."],
         // What the shelf costs.
-        "mac.mc_title":      ["en": "What materials cost", "ar": "تكلفة المواد"],
+        "mac.mc_title":      ["en": "Price on the shelf", "ar": "السعر على الرف"],
+        "mac.mc_sub":        ["en": "Per unit, from the most recent spool of each material.",
+                              "ar": "لكل وحدة، من أحدث بكرة لكل مادة."],
+        "mac.mc_spools":     ["en": "{n} spools", "ar": "{n} بكرة"],
+        "mac.mc_spools_one": ["en": "{n} spool", "ar": "بكرة واحدة"],
+        "mac.mc_spools_two": ["en": "{n} spools", "ar": "بكرتان"],
+        "mac.mc_spools_few": ["en": "{n} spools", "ar": "{n} بكرات"],
         "mac.full_spool":   ["en": "Full spool", "ar": "البكرة كاملة"],
         "mac.mc_needs_full": ["en": "What a kilo costs needs each spool's full weight. Edit a spool and fill in Full spool (1,000 g for a 1 kg roll).", "ar": "تكلفة الكيلو تحتاج وزن كل بكرة كاملة. عدّل البكرة واملأ «البكرة كاملة» (1,000 غ لبكرة 1 كغ)."],
         "mac.mc_per":        ["en": "per {unit}",        "ar": "لكل {unit}"],
@@ -726,8 +732,14 @@ final class Words {
                               "ar": "{n} عروض ما زالت مفتوحة بقيمة {amount}. أقدمها ينتظر منذ {days} يومًا."],
         // Whether the shop can take another job.
         "mac.cap_clear_days": ["en": "clear in {n} days", "ar": "يخلو خلال {n} يومًا"],
+        "mac.cap_clear_days_one": ["en": "clear in {n} day", "ar": "يخلو خلال يوم واحد"],
+        "mac.cap_clear_days_two": ["en": "clear in {n} days", "ar": "يخلو خلال يومين"],
+        "mac.cap_clear_days_few": ["en": "clear in {n} days", "ar": "يخلو خلال {n} أيام"],
         "mac.cap_clear_soon": ["en": "free today",       "ar": "متاح اليوم"],
         "mac.cap_over":       ["en": "{n} days behind",  "ar": "متأخر {n} يومًا"],
+        "mac.cap_over_one":   ["en": "{n} day behind",   "ar": "متأخر بيوم واحد"],
+        "mac.cap_over_two":   ["en": "{n} days behind",  "ar": "متأخر بيومين"],
+        "mac.cap_over_few":   ["en": "{n} days behind",  "ar": "متأخر {n} أيام"],
         "mac.cap_untargeted": ["en": "{h} h of booked work is on machines with no daily target, so it is in no percentage here.",
                                "ar": "{h} ساعة من العمل المحجوز على آلات بلا هدف يومي، فلا تدخل في أي نسبة هنا."],
         "mac.cap_hours":      ["en": "{booked} h of {available} h", "ar": "{booked} من {available} ساعة"],
@@ -893,8 +905,11 @@ final class Words {
         "mac.converted_into_library":
                              ["en": "Saved {name} for {target}, and added it to the library.",
                               "ar": "حُفظ {name} لـ {target}، وأُضيف إلى المكتبة."],
-        "mac.no_customers_hint": ["en": "A customer appears here once a job is billed to them.",
-                                  "ar": "يظهر العميل هنا بعد أن يُحرَّر له حساب على عمل."],
+        "mac.no_customers_hint": ["en": "Add one now, or they appear here once a job is billed to them.",
+                                  "ar": "أضف عميلًا الآن، أو يظهر هنا بعد أن يُحرَّر له حساب على عمل."],
+        "mac.add_customer":  ["en": "Add customer", "ar": "إضافة عميل"],
+        "mac.integ_cloud_hint": ["en": "Sign in to Khayt Cloud ({where}) to get import and feed links for these storefronts.",
+                                 "ar": "سجّل الدخول إلى سحابة خيط ({where}) للحصول على روابط الاستيراد والخلاصة لهذه المتاجر."],
         "mac.past_due":      ["en": "Past due",        "ar": "متأخر السداد"],
         // Khayt's `flow.paid` is the STATUS word — lowercase "paid", which is
         // right beside a job and wrong as a row label between "Total" and
@@ -1345,8 +1360,8 @@ final class Words {
         "mac.setup_printer_title": ["en": "Your printer", "ar": "طابعتك"],
         "mac.setup_printer_why": ["en": "Pick the model and Khayt fills in its power. What it cost and how long it should last become a wear cost on every print hour.",
                                   "ar": "اختر الطراز وسيملأ خيط قدرتها. ما كلّفته والمدة المتوقعة لعمرها يتحوّلان إلى تكلفة استهلاك لكل ساعة طباعة."],
-        "mac.setup_printer_hint": ["en": "5,000 print hours is a careful guess for most desktop printers. You can change all of this later on the machine’s Value tab.",
-                                   "ar": "5000 ساعة طباعة تقدير حذر لمعظم الطابعات المكتبية. يمكنك تغيير كل هذا لاحقًا من تبويب القيمة في الآلة."],
+        "mac.setup_printer_hint": ["en": "Expected life is in print hours here, and 5,000 is a careful guess for most desktop printers. The machine’s Value tab opens in the same print hours, and can switch the life to years if you prefer.",
+                                   "ar": "العمر المتوقع هنا بساعات الطباعة، و5000 ساعة تقدير حذر لمعظم الطابعات المكتبية. يفتح تبويب القيمة في الآلة بساعات الطباعة نفسها، ويمكنه تحويل العمر إلى سنوات إن فضّلت."],
         "mac.setup_filament_title": ["en": "Your filament", "ar": "خيطك"],
         "mac.setup_filament_why": ["en": "What a typical spool costs you. It goes on the shelf as your first spool, and a job’s plastic is costed from it.",
                                    "ar": "كم تكلّفك البكرة المعتادة. توضع على الرف كأول بكرة لديك، وتُحسب منها تكلفة الخيط في كل عمل."],
@@ -1631,8 +1646,10 @@ final class Words {
         // WHAT A MATERIAL HAS COST. The other app draws this chart under a
         // bare div with no heading of its own, so there is no shared key to
         // borrow — these are this app's words.
-        "mac.price_history": ["en": "What materials have cost",
-                              "ar": "ما كلّفته المواد"],
+        "mac.price_history": ["en": "Price paid to suppliers",
+                              "ar": "السعر المدفوع للموردين"],
+        "mac.price_history_sub": ["en": "Per unit, the latest purchase in the log.",
+                                  "ar": "لكل وحدة، آخر عملية شراء في السجل."],
         "mac.purchases_word":     ["en": "{n} purchases", "ar": "{n} مشتريات"],
         "mac.purchases_word_one": ["en": "{n} purchase",  "ar": "شراء واحد"],
         "mac.purchases_word_two": ["en": "2 purchases",   "ar": "شراءان"],
@@ -3127,6 +3144,39 @@ final class Words {
         // Finding a printer, so nobody types an address off the front of a
         // machine across the room.
         "mac.find_printers":  ["en": "Find printers", "ar": "ابحث عن طابعات"],
+        // ── A UNIT OR A SHELF AS IT IS READ, never as it is stored ──────────
+        // The book keeps whatever the shop typed ("L", "roll", "Cleaning");
+        // these are only how a known one is SAID. See `Words.unitWord`.
+        "mac.unit_each":     ["en": "each",   "ar": "حبة"],
+        "mac.unit_piece":    ["en": "pcs",    "ar": "قطعة"],
+        "mac.unit_roll":     ["en": "roll",   "ar": "لفة"],
+        "mac.unit_box":      ["en": "box",    "ar": "علبة"],
+        "mac.unit_bag":      ["en": "bag",    "ar": "كيس"],
+        "mac.unit_pack":     ["en": "pack",   "ar": "عبوة"],
+        "mac.unit_pair":     ["en": "pair",   "ar": "زوج"],
+        "mac.unit_bottle":   ["en": "bottle", "ar": "زجاجة"],
+        "mac.unit_spool":    ["en": "spool",  "ar": "بكرة"],
+        "mac.unit_sheet":    ["en": "sheet",  "ar": "لوح"],
+        "mac.unit_kg":       ["en": "kg",     "ar": "كغ"],
+        "mac.unit_g":        ["en": "g",      "ar": "غ"],
+        "mac.unit_l":        ["en": "L",      "ar": "لتر"],
+        "mac.unit_ml":       ["en": "ml",     "ar": "مل"],
+        "mac.unit_m":        ["en": "m",      "ar": "م"],
+        "mac.shelf_packaging":   ["en": "Packaging",   "ar": "تغليف"],
+        "mac.shelf_cleaning":    ["en": "Cleaning",    "ar": "تنظيف"],
+        "mac.shelf_spares":      ["en": "Spares",      "ar": "قطع غيار"],
+        "mac.shelf_tools":       ["en": "Tools",       "ar": "أدوات"],
+        "mac.shelf_hardware":    ["en": "Hardware",    "ar": "عُدد ومثبتات"],
+        "mac.shelf_adhesives":   ["en": "Adhesives",   "ar": "مواد لاصقة"],
+        "mac.shelf_maintenance": ["en": "Maintenance", "ar": "صيانة"],
+        "mac.shelf_safety":      ["en": "Safety",      "ar": "سلامة"],
+        "mac.shelf_cat_labels":  ["en": "Labels",      "ar": "ملصقات"],
+        "mac.shelf_finishing":   ["en": "Finishing",   "ar": "تشطيب"],
+        "mac.shelf_electronics": ["en": "Electronics", "ar": "إلكترونيات"],
+        "mac.find_cant_add_sample": ["en": "This is the sample shop: printers it finds can be seen, not added.",
+                                     "ar": "هذا هو المحل التجريبي: تظهر الطابعات التي يجدها لكن لا يمكن إضافتها."],
+        "mac.find_cant_add_locked": ["en": "Another app has this book open, so a printer it finds cannot be added here.",
+                                     "ar": "تطبيق آخر يفتح هذا الدفتر، فلا يمكن إضافة طابعة يجدها من هنا."],
         "mac.find_looking":   ["en": "Looking on this network…", "ar": "يبحث في هذه الشبكة…"],
         // NOT "no printers on this network": this app cannot tell an empty
         // network from a refused permission, and saying the first when it is
@@ -3508,6 +3558,12 @@ final class Words {
                                 "ar": "عيّن رمز PIN للمالك — فالقائمة تعرض أسماء العملاء."],
         "mac.lan_failed":    ["en": "The server could not start: {error}",
                               "ar": "تعذّر تشغيل الخادم: {error}"],
+        "mac.lan_port_busy": ["en": "Another app is already using port {port}. Quit it, or choose a different port here and start again.",
+                              "ar": "تطبيق آخر يستخدم المنفذ {port} بالفعل. أغلقه، أو اختر منفذًا آخر هنا وابدأ من جديد."],
+        "mac.lan_port_denied": ["en": "macOS would not let Khayt use port {port}. Choose a port above 1024 and start again.",
+                                "ar": "لم يسمح macOS لخيط باستخدام المنفذ {port}. اختر منفذًا أعلى من 1024 وابدأ من جديد."],
+        "mac.lan_no_address": ["en": "This Mac has no network address to listen on yet. Check it is connected, then start again.",
+                               "ar": "ليس لهذا الماك عنوان شبكة يستمع عليه بعد. تأكد من اتصاله ثم ابدأ من جديد."],
         "mac.lan_restart_note": ["en": "Saved settings take effect at once: the server restarts on Save.",
                                  "ar": "تسري الإعدادات فور حفظها: يُعاد تشغيل الخادم عند الحفظ."],
         // The customer's quote link, from the job
@@ -3758,4 +3814,80 @@ extension Words {
         case nil: return callIt("mac.setup_err_other")
         }
     }
+}
+
+extension Words {
+
+    /// A unit as this shop READS it — never as it is stored.
+    ///
+    /// The book keeps whatever was typed into the unit field ("L", "roll",
+    /// "each", "kg"), and the Arabic inventory printed those as they were:
+    /// English units under Arabic names, and "3× · kg" pulled apart by the
+    /// bidi algorithm. A unit this app knows is said in the shop's language;
+    /// one it does not is shown exactly as the shop wrote it. The stored value
+    /// is never touched, so a supplier's form and the other app still read "kg".
+    func unitWord(_ stored: String) -> String {
+        let raw = stored.trimmingCharacters(in: .whitespaces)
+        guard let key = Self.unitKeys[raw.lowercased()] else { return raw }
+        // English keeps the shop's own spelling ("Rolls", "pcs") — only a
+        // language with a word of its own replaces it.
+        if language == "en" { return raw }
+        guard let said = Self.own[key]?[language], !said.isEmpty else { return raw }
+        return said
+    }
+
+    /// A quantity and its unit, held together in their own direction.
+    ///
+    /// A first-strong isolate: "3 لتر" runs right to left and "3 pcs" left to
+    /// right, and neither is reordered by the sentence around it.
+    func amount(_ figure: String, _ storedUnit: String) -> String {
+        let unit = unitWord(storedUnit)
+        guard !unit.isEmpty else { return figure }
+        return "\u{2068}" + figure + " " + unit + "\u{2069}"
+    }
+
+    /// A consumable shelf (its category) as this shop reads it. The common
+    /// English names a shop or the sample book types are said in the shop's
+    /// language; anything else is the shop's own word, untouched.
+    func shelfWord(_ stored: String) -> String {
+        let raw = stored.trimmingCharacters(in: .whitespaces)
+        let folded = raw.lowercased().split(separator: " ", omittingEmptySubsequences: true)
+            .joined(separator: " ")
+        guard language != "en", let key = Self.shelfKeys[folded],
+              let said = Self.own[key]?[language], !said.isEmpty else { return raw }
+        return said
+    }
+
+    /// Spellings a shop actually types, to the word that says them.
+    nonisolated static let unitKeys: [String: String] = [
+        "each": "mac.unit_each", "ea": "mac.unit_each", "unit": "mac.unit_each", "units": "mac.unit_each",
+        "pc": "mac.unit_piece", "pcs": "mac.unit_piece", "piece": "mac.unit_piece", "pieces": "mac.unit_piece",
+        "roll": "mac.unit_roll", "rolls": "mac.unit_roll",
+        "box": "mac.unit_box", "boxes": "mac.unit_box",
+        "bag": "mac.unit_bag", "bags": "mac.unit_bag",
+        "pack": "mac.unit_pack", "packs": "mac.unit_pack",
+        "pair": "mac.unit_pair", "pairs": "mac.unit_pair",
+        "bottle": "mac.unit_bottle", "bottles": "mac.unit_bottle",
+        "spool": "mac.unit_spool", "spools": "mac.unit_spool",
+        "sheet": "mac.unit_sheet", "sheets": "mac.unit_sheet",
+        "kg": "mac.unit_kg", "kilo": "mac.unit_kg", "kilogram": "mac.unit_kg", "kilograms": "mac.unit_kg",
+        "g": "mac.unit_g", "gram": "mac.unit_g", "grams": "mac.unit_g",
+        "l": "mac.unit_l", "litre": "mac.unit_l", "liter": "mac.unit_l", "litres": "mac.unit_l", "liters": "mac.unit_l",
+        "ml": "mac.unit_ml",
+        "m": "mac.unit_m", "metre": "mac.unit_m", "meter": "mac.unit_m",
+    ]
+
+    nonisolated static let shelfKeys: [String: String] = [
+        "packaging": "mac.shelf_packaging", "packing": "mac.shelf_packaging",
+        "cleaning": "mac.shelf_cleaning",
+        "spares": "mac.shelf_spares", "spare parts": "mac.shelf_spares", "spare": "mac.shelf_spares",
+        "tools": "mac.shelf_tools",
+        "hardware": "mac.shelf_hardware", "fasteners": "mac.shelf_hardware",
+        "adhesives": "mac.shelf_adhesives", "glue": "mac.shelf_adhesives",
+        "maintenance": "mac.shelf_maintenance",
+        "safety": "mac.shelf_safety", "ppe": "mac.shelf_safety",
+        "labels": "mac.shelf_cat_labels",
+        "finishing": "mac.shelf_finishing", "post-processing": "mac.shelf_finishing",
+        "electronics": "mac.shelf_electronics",
+    ]
 }

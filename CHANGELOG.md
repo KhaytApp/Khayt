@@ -56,6 +56,32 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     works with an empty search, shipping fires `order_shipped`, "Open in
     slicer" never opens a PDF, and moving a folder refuses a path past 60
     characters, which would have merged it with another folder.
+- **(Mac) Eleven fixes from the screen-by-screen review.** Customers has a
+  "New customer" button on the strip and an "Add customer" button on the empty
+  screen (and File ▸ New Customer is off on a book this Mac cannot change).
+  Each screen's main action now shows its name (New Job, New product, Add
+  Printer, New Spool…), falling back to the icon when the window is narrow.
+  The Integrations hint names the Book menu's "Sign in to the cloud…" rather
+  than a Cloud pane the Mac does not have. "Find printers" works on any book
+  and says why a printer cannot be added when it cannot. A port another app
+  is using is said as a sentence ("Another app is already using port 8787…")
+  instead of a system error code. In Arabic, consumable units and common
+  shelf names (L, roll, each, kg; Cleaning, Spares, Packaging) are shown in
+  Arabic, without changing what is stored, and quantities no longer scramble.
+  The two price cards on Inventory are named apart ("Price on the shelf" and
+  "Price paid to suppliers") and give the unit the same way. First-run setup
+  says the expected life is in print hours, which is what the machine's
+  Value tab opens in. The sync status in the top strip draws Arabic words
+  joined up, and the capacity card counts days with Arabic's number forms.
+  Empty Expenses and Waste screens are one empty state with an add button,
+  not three panes.
+
+- **Reopening a finished job puts its filament back on the shelf.** Move a
+  finished job back (to fix it, re-check it or put it on hold) and the
+  filament and packaging it used go back into stock, with a note saying how
+  many grams. Finishing it again takes what it really uses this time. Undo
+  after reopening puts the stock back as it was, along with the job. The Mac
+  app does the same.
 
 - **(iOS) A PIN the Mac finds too short is said as one.** The native Mac now
   refuses an owner PIN shorter than 8 characters (#1713). Pairing with one

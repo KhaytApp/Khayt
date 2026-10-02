@@ -440,16 +440,25 @@ final class LanServer {
     /// Otherwise, or if that fails too, say so.
     func failedAfterReady(_ error: Error) {
         running = false
-        guard let was = startedWith else { host.failed(String(describing: error)); return }
+        guard let was = startedWith else { host.failed(Self.plain(error)); return }
         if advertising {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 do { _ = try await self.start(port: was.port, bind: was.bind, advertise: false) }
-                catch { self.host.failed(String(describing: error)) }
+                catch { self.host.failed(Self.plain(error)) }
             }
         } else {
-            host.failed(String(describing: error))
+            host.failed(Self.plain(error))
         }
+    }
+
+    /// The system's words for a failure, not Swift's description of its type —
+    /// "Address already in use", never "POSIXErrorCode(rawValue: 48): …".
+    nonisolated static func plain(_ error: Error) -> String {
+        if let nw = error as? NWError, case .posix(let c) = nw {
+            return String(cString: strerror(c.rawValue))
+        }
+        return error.localizedDescription
     }
 
     /// Whether the running listener is advertising — for the tests.
@@ -1994,7 +2003,32 @@ extension Shop {
             lanRunning = config
             lanCalendarToken = calendarToken
         } catch {
-            lanProblem = words.callIt("mac.lan_failed", ["error": .string(String(describing: error))])
+            lanProblem = Self.lanFailure(error, port: Int(config.port), words: words)
+        }
+    }
+
+    /// A failure to start, as a sentence.
+    ///
+    /// Settings → Online printed Swift's own description of the error —
+    /// "POSIXErrorCode(rawValue: 48): Address already in use" — which tells a
+    /// shop nothing it can act on. The two a shop actually meets are named;
+    /// anything else keeps the old line, with the system's words rather than
+    /// the type's.
+    static func lanFailure(_ error: Error, port: Int, words: Words) -> String {
+        let code: POSIXErrorCode? = {
+            if case .posix(let c)? = error as? NWError { return c }
+            return (error as? POSIXError)?.code
+        }()
+        let port = String(port)
+        switch code {
+        case .EADDRINUSE?:
+            return words.callIt("mac.lan_port_busy", ["port": .string(port)])
+        case .EACCES?, .EPERM?:
+            return words.callIt("mac.lan_port_denied", ["port": .string(port)])
+        case .EADDRNOTAVAIL?:
+            return words.callIt("mac.lan_no_address")
+        default:
+            return words.callIt("mac.lan_failed", ["error": .string(LanServer.plain(error))])
         }
     }
 

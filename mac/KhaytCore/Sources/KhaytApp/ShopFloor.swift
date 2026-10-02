@@ -69,7 +69,15 @@ struct Machines: View {
                         Label(shop.words.callIt("mac.find_printers"),
                               systemImage: "antenna.radiowaves.left.and.right")
                     }
-                    .disabled(!shop.canMoveJobs)
+                    // LOOKING IS NOT A WRITE. It was greyed out on any book this
+                    // app could not change, with nothing saying why, so it read
+                    // as broken. Scanning the network changes nothing; adding a
+                    // printer it finds does, and the sheet still refuses that —
+                    // with the reason, under the list.
+                    if let why = Shop.findPrintersCaveat(shop) {
+                        Text(why).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     Spacer()
                 }
                 // ── AND WHETHER THERE IS ROOM FOR ANOTHER ─────────────────
@@ -1104,7 +1112,9 @@ struct ConsumablesCard: View {
             ForEach(shelves) { shelf in
                 // NEVER the sentinel's own label — it is a NUL-prefixed string
                 // and renders as a replacement character.
-                Button("\(shelf.key == uncategorised ? shop.words.callIt("cons.cat_none") : shelf.label) (\(shelf.count))") {
+                // The shelf's name as the shop READS it; the choice is still
+                // the stored label, so the rule matches it as written.
+                Button("\(shelf.key == uncategorised ? shop.words.callIt("cons.cat_none") : shop.words.shelfWord(shelf.label)) (\(shelf.count))") {
                     choose(shelf.key == uncategorised ? uncategorised : shelf.label)
                 }
             }
@@ -1117,7 +1127,7 @@ struct ConsumablesCard: View {
     private var chosenLabel: String {
         if chosen.isEmpty { return shop.words.callIt("cons.cat_all") }
         if chosen == uncategorised { return shop.words.callIt("cons.cat_none") }
-        return chosen
+        return shop.words.shelfWord(chosen)
     }
 
     private func choose(_ selection: String) {
@@ -1164,12 +1174,20 @@ struct ConsumablesCard: View {
         private var shelfChip: String? {
             let said = (item.category ?? "").trimmingCharacters(in: .whitespaces)
             guard !said.isEmpty else { return nil }
-            guard item.isPackaging == true else { return said }
+            // Said in the shop's language — "Cleaning" under an Arabic name
+            // was an English chip on an Arabic shelf. The stored word is not
+            // changed; see `Words.shelfWord`.
+            let shown = shop.words.shelfWord(said)
+            guard item.isPackaging == true else { return shown }
             let fold = { (v: String) in
                 v.lowercased().split(separator: " ", omittingEmptySubsequences: true)
                     .joined(separator: " ")
             }
-            return fold(said) == fold(shop.words.callIt("cons.packaging_badge")) ? nil : said
+            // Compared as SHOWN as well as stored: in Arabic the badge reads
+            // تغليف and a shelf stored as "Packaging" is shown as تغليف too,
+            // so comparing only the stored word drew "تغليف" beside "Packaging".
+            let badge = fold(shop.words.callIt("cons.packaging_badge"))
+            return fold(said) == badge || fold(shown) == badge ? nil : shown
         }
 
         var body: some View {
@@ -1208,7 +1226,7 @@ struct ConsumablesCard: View {
                     // figure. It refuses when there is no rate and no minimum,
                     // and an invented number there lands on a purchase order.
                     if let need, need.suggestQty > 0 {
-                        Text("\(shop.words.callIt("reorder.suggest")) \(Self.qty(need.suggestQty)) \(need.unit)")
+                        Text("\(shop.words.callIt("reorder.suggest")) \(shop.words.amount(Self.qty(need.suggestQty), need.unit))")
                             .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
                     }
                 }
@@ -1249,8 +1267,9 @@ struct ConsumablesCard: View {
 
         /// What is on hand, in the shop's own word for it.
         private var stockLine: String {
-            let counted = "\(shop.words.callIt("reorder.in_stock")): \(Self.qty(item.onHand))"
-            return unit.isEmpty ? counted : "\(counted) \(unit)"
+            // The figure and its unit as one isolated run, in the shop's word
+            // for the unit — never the stored "L" or "each" in an Arabic line.
+            "\(shop.words.callIt("reorder.in_stock")): \(shop.words.amount(Self.qty(item.onHand), unit))"
         }
 
         /// Days of cover, where the rule had a forecast at all. Nil means

@@ -145,7 +145,12 @@ struct ShellTitleBar: View {
                     .layoutPriority(-1)
             }
             .lineLimit(1)
-            .font(TypeScale.figure(10.5))
+            // WORDS IN THE BODY FACE. This was the monospaced figure face, which
+            // is for columns of numbers: it spaces Arabic letters a fixed width
+            // apart and breaks the joins, so "متزامن · حُفظ أمس" drew as loose
+            // letters. The status is words with at most a date in it, so it
+            // takes the body face, with tabular digits for that date.
+            .font(TypeScale.body(10.5).monospacedDigit())
             .foregroundStyle(Role.onNavy3)
         }
         .padding(.horizontal, Space.lg)
