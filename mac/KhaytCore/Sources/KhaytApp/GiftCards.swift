@@ -25,11 +25,20 @@ struct GiftCards: View {
     @Bindable var shop: Shop
 
     private var shown: [GiftCard] {
-        let term = shop.search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !term.isEmpty else { return shop.giftCards }
-        return shop.giftCards.filter {
-            guard shop.giftCardState == nil
-                    || shop.giftCardStatuses[$0.id] ?? "active" == shop.giftCardState else { return false }
+        Self.filter(shop.giftCards, search: shop.search, state: shop.giftCardState,
+                    statuses: shop.giftCardStatuses, holder: holder)
+    }
+
+    /// The cards the search AND the status filter let through.
+    ///
+    /// The status filter used to sit behind an early return for an empty
+    /// search, so picking "Expired" with nothing typed showed every card.
+    static func filter(_ cards: [GiftCard], search: String, state: String?,
+                       statuses: [String: String],
+                       holder: (GiftCard) -> String?) -> [GiftCard] {
+        let term = search.trimmingCharacters(in: .whitespaces).lowercased()
+        return cards.filter {
+            guard state == nil || statuses[$0.id] ?? "active" == state else { return false }
             guard !term.isEmpty else { return true }
             return $0.code.lowercased().contains(term)
                 || (holder($0) ?? "").lowercased().contains(term)

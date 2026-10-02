@@ -3861,6 +3861,16 @@ public actor KhaytEngine {
         """#, [cache], as: JSONValue.self)
     }
 
+    /// The book's saved completions and this session's, made one
+    /// (`printer-poll-cache.mergePersisted`). A poller starts empty after a
+    /// relaunch, so writing its own list over the book's threw away every
+    /// measurement saved before the restart.
+    public func mergePersistedCompletions(saved: JSONValue, mine: JSONValue) throws -> JSONValue {
+        try runtime.call2(#"""
+        globalThis.KhaytPollCache.mergePersisted(ARG0, ARG1)
+        """#, [saved, mine], as: JSONValue.self)
+    }
+
 
     // MARK: - The camera on a machine
 
@@ -11452,10 +11462,9 @@ private let MOVE_SCRIPT = """
 
 /// The one expression that puts the three modules together.
 ///
-/// `cost` is the parts, the way the renderer computes it. The renderer adds
-/// shipping through `convertToBase`; this does not, because an order in this
-/// store has no `shippingCost` and inventing a conversion for a field that is
-/// never set would be a difference waiting to appear.
+/// `cost` is `KhaytKpiRows.orderCost` — the parts as costed, the stocked
+/// share, and shipping in the base currency — so both apps' dashboards price
+/// a job the same way.
 private let KPI_SCRIPT = """
 (function () {
   var ctx = { settings: ARG2, clients: ARG1 };
@@ -11470,12 +11479,12 @@ private let KPI_SCRIPT = """
     money: function (o) {
       return {
         revenue: M.orderNetRevenueBase(o, ctx),
-        // Only what was STOCKED, as Reports counts it (lib/pnl-report.js
-        // stockShare): power, wear and labour reach the P&L as the bills,
-        // fixed costs and depreciation the shop records, never twice.
-        cost: (o.parts || []).reduce(function (s, p) {
-          return s + (+p.unitCost || 0) * (+p.qty || 1);
-        }, 0) * globalThis.KhaytPnl.stockShare(o, { inventory: ARG6 || [], settings: ARG2 }),
+        // The shared rule (`KhaytKpiRows.orderCost`), the one Khayt's
+        // dashboard is to use too. This summed `unitCost × qty` — which only
+        // a line priced from a product carries — and left shipping out, so a
+        // costed job cost nothing here and the margin disagreed with Khayt's.
+        cost: globalThis.KhaytKpiRows.orderCost(o,
+          { settings: ARG2, inventory: ARG6 || [], clients: ARG1 }),
         outstanding: M.orderOwedBase(o, ctx)
       };
     },

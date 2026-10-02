@@ -207,3 +207,18 @@ test('a QC failure and a waste entry cost the same plastic the same', () => {
   // And the shared answer is the roll's real price per gram, not what is left.
   assert.equal(Math.round(Q.wasteCost('PA-CF', 180, roll, false) * 100) / 100, 86.40);
 });
+
+test('the waste row is dated by the shop\'s local day when one is given', () => {
+  // 01:00 in Riyadh on 5 Sep is 22:00 UTC on 4 Sep. The waste report, the
+  // spool's usage history and the P&L all place it by the LOCAL day.
+  const order = { id: 'J1', material: 'PLA' };
+  const r = Q.record(order, { weight: 10 }, {
+    now: Date.parse('2026-09-04T22:00:00.000Z'), inventory: [], today: '2026-09-05',
+  });
+  assert.equal(r.waste.date, '2026-09-05');
+  // Without one, the instant's own day as before.
+  const r2 = Q.record({ id: 'J2', material: 'PLA' }, { weight: 10 }, {
+    now: Date.parse('2026-09-04T22:00:00.000Z'), inventory: [],
+  });
+  assert.equal(r2.waste.date, '2026-09-04');
+});

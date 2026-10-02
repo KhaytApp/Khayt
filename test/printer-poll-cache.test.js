@@ -336,13 +336,23 @@ test('findCompletion returns THIS job, not merely the latest', () => {
   assert.equal(findCompletion(e, { filename: 'WANTED.GCODE  ' }).actuals.filamentGrams, 111, 'case and padding are not the shop\'s problem');
 });
 
-test('findCompletion falls back to the newest, which is what it always did', () => {
+test('findCompletion falls back to the newest only when the job names no file', () => {
   let e = mergePollSuccess(null, aJob('a.gcode', 10, 100), 1000);
   e = mergePollSuccess(e, ended('a.gcode', 100, 3600), 2000);
   assert.equal(findCompletion(e, {}).actuals.filamentGrams, 100, 'no filename known');
-  assert.equal(findCompletion(e, { filename: 'never-seen.gcode' }).actuals.filamentGrams, 100, 'no match');
+  // A job that names its file and finds no print of that file was NOT that
+  // print. Handing it the machine's newest attributed another job's grams to
+  // it, labelled "Measured".
+  assert.equal(findCompletion(e, { filename: 'never-seen.gcode' }), null, 'no match is no measurement');
   assert.equal(findCompletion(null, {}), null);
   assert.equal(findCompletion({}, {}), null);
+});
+
+test('findCompletion matches the same model through a path or a sliced extension', () => {
+  let e = mergePollSuccess(null, aJob('/usb/Bracket.gcode.3mf', 10, 100), 1000);
+  e = mergePollSuccess(e, ended('/usb/Bracket.gcode.3mf', 42, 3600), 2000);
+  assert.equal(findCompletion(e, { filename: 'bracket.3mf' }).actuals.filamentGrams, 42);
+  assert.equal(findCompletion(e, { filename: 'Bracket v2.3mf' }), null);
 });
 
 test('findCompletion reads a cache saved before this change', () => {
@@ -484,4 +494,17 @@ test('the real capture, end to end through a merge', () => {
   // …and that is what reaches the disk and comes back.
   const back = C.restoreCompletions(C.completionsToPersist({ 'MACH-1': entry }));
   assert.equal(back['MACH-1'].lastCompleted.actuals.durationS, 9682.160404825001);
+});
+
+test('a relaunched poller adds to the saved completions instead of replacing them', () => {
+  const C = require('../lib/printer-poll-cache.js');
+  const a = (at, f) => ({ at, filename: f, actuals: { filamentGrams: at, durationS: 1 } });
+  const onDisk = { M1: [a(300, 'c.gcode'), a(200, 'b.gcode')], M2: [a(50, 'x.gcode')] };
+  // The new session saw one job end on M1 — and the same job already on disk.
+  const mine = { M1: [a(400, 'd.gcode'), a(300, 'c.gcode')] };
+  const merged = C.mergePersisted(onDisk, mine);
+  assert.deepEqual(merged.M1.map((c) => c.filename), ['d.gcode', 'c.gcode', 'b.gcode']);
+  assert.deepEqual(merged.M2.map((c) => c.filename), ['x.gcode']);
+  const many = { M1: Array.from({ length: 12 }, (_, i) => a(i + 1, i + '.gcode')) };
+  assert.equal(C.mergePersisted(many, {}).M1.length, C.COMPLETIONS_KEPT);
 });

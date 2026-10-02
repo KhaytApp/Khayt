@@ -29,11 +29,36 @@ struct BookCalendarTests {
             guard url.pathExtension == "swift" else { continue }
             let text = try String(contentsOf: url, encoding: .utf8)
             for (i, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()
-            where line.contains("Calendar.current") && !line.trimmingCharacters(in: .whitespaces).hasPrefix("//") {
+            where Self.readsTheMacCalendar(line) && !line.trimmingCharacters(in: .whitespaces).hasPrefix("//") {
                 offences.append("\(url.lastPathComponent):\(i + 1)")
             }
         }
         #expect(offences.isEmpty, "use Calendar.book: \(offences)")
+    }
+
+    /// `Calendar.current` spelled out, AND spelled as a default argument —
+    /// `calendar: Calendar = .current` reads the Mac's calendar just the same
+    /// and slipped past a scan for the long spelling (DateRange.localMonth and
+    /// LeadTime.localDay, Oct 2026: the masthead month became "1448-04").
+    static func readsTheMacCalendar(_ line: Substring) -> Bool {
+        line.contains("Calendar.current") || line.contains("Calendar.autoupdatingCurrent")
+            || line.range(of: #"Calendar\s*=\s*\.(current|autoupdatingCurrent)\b"#, options: .regularExpression) != nil
+            || line.range(of: #"calendar:\s*\.(current|autoupdatingCurrent)\b"#, options: .regularExpression) != nil
+    }
+
+    @Test("the period and lead-time helpers default to the book's calendar, not the Mac's")
+    func defaultsAreTheBook() {
+        // An Umm al-Qura calendar names this month 1448-04; the book names it 2026-09.
+        var hijri = Calendar(identifier: .islamicUmmAlQura)
+        hijri.timeZone = Calendar.book.timeZone
+        let now = Calendar.book.date(from: DateComponents(year: 2026, month: 9, day: 24, hour: 12))!
+        #expect(DateRange.localMonth(now, calendar: hijri).hasPrefix("14"), "the hazard: a Hijri month")
+        #expect(DateRange.localMonth(now) == "2026-09")
+        #expect(DateRange.localDay(now) == "2026-09-24")
+        #expect(DateRange.inRange("2026-09-02", range: "month", now: now))
+        #expect(DateRange.inRange("2026-07-02", range: "quarter", now: now))
+        #expect(DateRange.inRange("2026-01-02", range: "year", now: now))
+        #expect(LeadTimePublisher.localDay(now) == "2026-09-24")
     }
 
     @Test("a day is the shop's local midnight, and a timestamp is the local day it happened on")

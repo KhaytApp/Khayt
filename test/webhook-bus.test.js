@@ -191,3 +191,11 @@ test('the transport builds its body from this module, not from a literal', () =>
   assert.match(main, /webhookBus\.buildWireBody\(webhookEvent, payload\)/,
     'hub:fire-webhook no longer uses the shared envelope');
 });
+
+test('order_shipped carries the carrier and tracking number, in the Ship dialog\'s key order', () => {
+  const order = { id: 'O-9', project: 'Lamp', client: 'Nouf', carrier: 'aramex', trackingNumber: 'TRK1' };
+  assert.equal(
+    JSON.stringify(B.statusPayload('order_shipped', order, null)),
+    JSON.stringify({ orderId: 'O-9', project: 'Lamp', carrier: 'aramex', trackingNumber: 'TRK1' })
+  );
+});

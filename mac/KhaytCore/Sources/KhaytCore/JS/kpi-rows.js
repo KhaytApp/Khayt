@@ -74,6 +74,11 @@
    */
   function counts(o) {
     if (!o || o.voidedAt || o.status === 'quote') return false;
+    /* A CANCELLED JOB IS NOT AN ORDER. It never reached revenue (it is not
+     * done), but `orderCount` is every row and `outstanding` is summed over
+     * every row — so a cancelled 400 SAR job counted as an order and as 400
+     * owed, money nobody will ever be asked for. */
+    if (o.status === 'cancelled') return false;
     /* NOR IS WORK THAT IS NOT THE SHOP'S TRADE. The P&L and product profit
      * already leave out a job marked Not business (lib/business-scope.js),
      * and these tiles did not: a shop that marked its nineteen test prints
@@ -99,7 +104,76 @@
    * rather than as late or on time.
    */
   function doneOn(o) {
-    return String((o && (o.completedAt || o.deliveredAt || o.date)) || '').slice(0, 10);
+    const raw = String((o && (o.completedAt || o.deliveredAt || o.date)) || '');
+    return localDayOf(raw);
+  }
+
+  /**
+   * The LOCAL day a stamp falls on. `completedAt` is an ISO instant, and its
+   * first ten characters are the UTC day — in Riyadh, yesterday until 03:00.
+   * A job finished at 01:30 on the 6th and due on the 5th was counted on time
+   * here and late on the On-time card, which reads the local day. A bare
+   * `YYYY-MM-DD` is already the shop's day and is read as written.
+   */
+  function localDayOf(raw) {
+    const s = String(raw || '');
+    if (s.length > 10 && /^\d{4}-\d{2}-\d{2}T/.test(s)) {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return ymd(d);
+    }
+    return s.slice(0, 10);
+  }
+
+  /** Load a sibling module the way the host has it: a global, else require. */
+  function sibling(name, file) {
+    if (global[name]) return global[name];
+    try { return require(file); } catch (_) { return null; }
+  }
+
+  /**
+   * What a job cost to make, for the dashboard's cost and margin — ONE rule.
+   *
+   * The two apps had two: Khayt summed each part's computed cost
+   * (`partTotalCost`) and added shipping; the Mac summed `unitCost × qty`,
+   * which only a line priced from a product carries, and left shipping out.
+   * So the same book showed two different margins.
+   *
+   * Per part: its cost as costed (`lib/calculator-cost.js`), or — a line with
+   * no costing inputs, priced from a product's unit cost — `unitCost` (else the
+   * frozen `baseCost`) × qty. Then the P&L's stocked share
+   * (`lib/pnl-report.js stockShare`), then shipping in the base currency.
+   *
+   * `ctx`: `{ settings, inventory, clients, known }`.
+   */
+  function orderCost(o, ctx) {
+    const c = ctx || {};
+    const order = o || {};
+    const CC = sibling('KhaytCalculatorCost', './calculator-cost.js');
+    const P = sibling('KhaytPnl', './pnl-report.js');
+    const M = sibling('KhaytOrderMoney', './order-money.js');
+    const costCtx = { inventory: c.inventory || [], settings: c.settings || {} };
+    let parts = 0;
+    for (const p of Array.isArray(order.parts) ? order.parts : []) {
+      if (!p) continue;
+      const qty = Math.max(1, +p.qty || 1);
+      let each = 0;
+      if (CC && typeof CC.partTotalCost === 'function') {
+        try { each = CC.partTotalCost(p, costCtx) / qty; } catch (_) { each = 0; }
+      }
+      // Packaging alone is not a costing: a product line has no inputs and
+      // would otherwise read as a few halalas.
+      const hasInputs = (+p.spoolCost || 0) > 0 || (+p.printTime || 0) > 0
+        || (+p.prepTime || 0) > 0 || (+p.postTime || 0) > 0
+        || (Array.isArray(p.extraMaterials) && p.extraMaterials.length > 0);
+      if (!hasInputs || !(each > 0)) each = (+p.unitCost || 0) > 0 ? +p.unitCost : Math.max(0, +p.baseCost || 0);
+      parts += each * qty;
+    }
+    const share = (P && typeof P.stockShare === 'function') ? P.stockShare(order, costCtx) : 1;
+    const moneyCtx = { settings: c.settings || {}, clients: c.clients || [] };
+    const shipping = M
+      ? M.convertToBase(+order.shippingCost || 0, M.orderCurrency(order, moneyCtx, c.known), moneyCtx)
+      : (+order.shippingCost || 0);
+    return parts * share + shipping;
   }
 
   /**
@@ -174,7 +248,7 @@
     });
   }
 
-  const api = { bounds, inRange, counts, isDone, doneOn, onTime, kpiRows };
+  const api = { bounds, inRange, counts, isDone, doneOn, localDayOf, onTime, orderCost, kpiRows };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytKpiRows = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

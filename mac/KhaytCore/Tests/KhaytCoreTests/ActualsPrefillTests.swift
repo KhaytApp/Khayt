@@ -72,6 +72,24 @@ import Testing
         #expect(pre.filename == "lantern.gcode", "the shop cannot tell which print this was")
     }
 
+    /// A job that names its file and finds no print of it was not that print.
+    /// Offering the machine's newest anyway put another job's grams on this
+    /// one, labelled "measured".
+    @Test("a job whose file matches no print is offered nothing measured")
+    func noMatchIsNoMeasurement() async throws {
+        let engine = try KhaytEngine()
+        let now = Date()
+        let cache = Self.saved("M1", [
+            Self.completion(at: now.addingTimeInterval(-600), filename: "lantern.gcode",
+                            durationS: 3600, filamentG: 240),
+        ])
+        let pre = try await engine.actualsPrefill(completions: cache, machineId: "M1",
+                                                  filename: "falcon.3mf",
+                                                  estimateHours: 18.6, estimateGrams: 197, now: now)
+        #expect(!pre.measured, "another print's figures were offered as this job's")
+        #expect(pre.weightG != 240)
+    }
+
     /// PrusaLink reports a duration and no filament. Reporting the estimate as
     /// measured on the axis it never read would put a fabricated variance into
     /// every report that reads the source.
