@@ -334,3 +334,28 @@ test('loyalty off means no badge, whatever the host passes', () => {
     settings: { loyaltyEnabled: false }, clientTier: { name: 'Gold' } }));
   assert.doesNotMatch(out.html, /Gold/);
 });
+
+/* ── The shop's logo is a settings string, and it goes into an attribute ─────
+   `safeBizLogo` checks only that the value STARTS with `data:image/`, so
+   `data:image/png" onerror="…` passed it and closed the `src` attribute — a
+   script on a document a customer opens. The document escapes it itself now,
+   rather than trusting the host's `escapeHtml`, which defaults to the identity. */
+test('a logo cannot close its own attribute', () => {
+  const { context } = require('./helpers/invoice-harness.js');
+  const evil = 'data:image/png;base64,AAAA" onerror="alert(1)';
+  const { ctx, area } = context({ settings: SHOP });
+  ctx.safeBizLogo = () => evil;
+  ctx.renderInvoice(ORDER, { qrSvg: '', qrProblem: null, payQrSvg: '', total: '1', vatAmount: '0',
+                             subtotal: '1', subtotalShown: '1', vatRate: 15, shipping: 0 });
+  const html = area.innerHTML;
+  assert.ok(!html.includes('" onerror="'), 'the logo broke out of its attribute');
+  assert.ok(html.includes('src="data:image/png;base64,AAAA&quot; onerror=&quot;alert(1)"'));
+
+  // A real logo comes out byte for byte.
+  const good = 'data:image/png;base64,iVBORw0KGgo+/=';
+  const again = context({ settings: SHOP });
+  again.ctx.safeBizLogo = () => good;
+  again.ctx.renderInvoice(ORDER, { qrSvg: '', qrProblem: null, payQrSvg: '', total: '1', vatAmount: '0',
+                                   subtotal: '1', subtotalShown: '1', vatRate: 15, shipping: 0 });
+  assert.ok(again.area.innerHTML.includes(`src="${good}"`));
+});

@@ -102,6 +102,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   you switched between Drive and a bucket, could fail to open. The desktop
   now records where each model really went, looks there first, then tries
   the other storage you have connected. The Mac app does the same.
+- **(Mac) Security: imported files, the slicer and the book file.** A model
+  pack can no longer slip in a link dressed as a model: a `dragon.stl` inside a
+  RAR, 7-Zip or tgz pack that pointed at the shop's own book, an SSH key or
+  `/dev/zero` was read, copied into the library and could be uploaded to the
+  cloud bucket (and `/dev/zero` hung the import). Only real files inside the
+  unpacked pack are taken now, and the same check covers folder imports and the
+  cloud library. Slicing a customer's upload for a quote no longer runs on the
+  app's main thread, so a slow slicer no longer freezes the app, and a slicer
+  that prints a lot or never finishes is stopped at its deadline instead of
+  hanging the app. Unpacking a pack also runs off the main thread now. A 3MF
+  conversion refuses a file whose parts add up to more than 2 GB instead of
+  trying to hold all of it in memory. The book file (`khayt-store.json`) and its
+  `.prev` copy are now readable by your own Mac account only. Invoice logos and
+  customer names in campaign emails are escaped, so a logo or name containing
+  HTML cannot change the document or email. A name with `$&` in it no longer
+  comes out garbled in a campaign message.
 
 - **(Mac) A price only changes when you change it.** Opening a book used to
   re-cost every product whose spool size differed from the figure it was

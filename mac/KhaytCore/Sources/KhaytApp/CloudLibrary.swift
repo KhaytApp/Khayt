@@ -537,18 +537,24 @@ enum CloudLibrary {
     nonisolated static func libraryFiles(root: String) -> [KhaytEngine.TierFile] {
         let fm = FileManager.default
         let rootURL = URL(fileURLWithPath: root)
+        let rootReal = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
         let items = (try? fm.contentsOfDirectory(at: rootURL, includingPropertiesForKeys: [.isDirectoryKey],
                                                  options: [.skipsHiddenFiles])) ?? []
         var out: [KhaytEngine.TierFile] = []
         for item in items {
             guard (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
             let keys: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey, .addedToDirectoryDateKey,
-                                             .isDirectoryKey]
+                                             .isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
             let files = (try? fm.contentsOfDirectory(at: item, includingPropertiesForKeys: Array(keys),
                                                      options: [.skipsHiddenFiles])) ?? []
             for file in files {
                 let values = try? file.resourceValues(forKeys: keys)
-                guard values?.isDirectory != true else { continue }
+                // Regular files only, and really inside the library. A symlink
+                // in a vault folder points somewhere else on this Mac, and
+                // tiering it would upload whatever that is to the shop's bucket.
+                guard values?.isRegularFile == true, values?.isSymbolicLink != true,
+                      file.resolvingSymlinksInPath().standardizedFileURL.path
+                        .hasPrefix(rootReal.hasSuffix("/") ? rootReal : rootReal + "/") else { continue }
                 // When the file landed in its folder — the import, for a copy
                 // whose mtime is still the download's. See `usage`.
                 let added = values?.addedToDirectoryDate.map { $0.timeIntervalSince1970 * 1000 }

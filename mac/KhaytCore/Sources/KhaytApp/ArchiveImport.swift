@@ -259,44 +259,48 @@ enum ArchiveImport {
             .appending(path: "khayt-archive-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
         // `-x` extracts, `-f` names the archive, `-C` puts it in the scratch.
-        // No `-v`: nothing reads the output and a pack of ten thousand members
-        // would fill a pipe nobody drains.
-        task.arguments = ["-x", "-f", url.path, "-C", scratch.path]
-        task.standardOutput = FileHandle.nullDevice
-        let errors = Pipe()
-        task.standardError = errors
-        do { try task.run() } catch {
+        // No `-v`: nothing reads the output.
+        //
+        // NO `-P`, ever. Without it libarchive strips a leading `/`, refuses a
+        // member whose path holds `..`, and refuses to write THROUGH a symlink
+        // the archive planted earlier — the three ways a pack writes outside
+        // the scratch directory. A symlink member itself still lands (as a
+        // link); the walk below is what refuses to treat one as a model. The
+        // `--no-*` flags are already the default for a non-root user and are
+        // spelled out so that stays true if this ever runs as somebody else:
+        // no owners, no set-id bits, no ACLs, flags or extended attributes
+        // from a stranger's archive.
+        let arguments = ["-x", "-f", url.path, "-C", scratch.path,
+                         "--no-same-owner", "--no-same-permissions", "--no-acls",
+                         "--no-fflags", "--no-xattrs", "--no-mac-metadata"]
+        // OFF THE MAIN ACTOR, both pipes drained (a pack of ten thousand bad
+        // members fills stderr), and watched while it runs: a bomb is stopped
+        // part way rather than after it has filled the disk.
+        let ran: BoundedProcess.Outcome
+        do {
+            ran = try await Task.detached {
+                try BoundedProcess.run("/usr/bin/tar", arguments, timeout: Self.tarPatience,
+                                       keepOut: 0, every: 0.4,
+                                       watch: { bytes(under: scratch) > unpackedBudget })
+            }.value
+        } catch {
             try? FileManager.default.removeItem(at: scratch)
             throw Failure.unreadable(name, error)
         }
-
-        // Watched while it runs: a bomb is stopped part way rather than after
-        // it has filled the disk.
-        let watcher = Task.detached {
-            while task.isRunning {
-                try? await Task.sleep(for: .milliseconds(400))
-                if bytes(under: scratch) > unpackedBudget { task.terminate(); return true }
-            }
-            return false
-        }
-        task.waitUntilExit()
-        let stopped = await watcher.value
-        let said = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(),
-                          as: UTF8.self)
+        let stopped = ran.stopped
+        let said = String(decoding: ran.stderr, as: UTF8.self)
 
         if stopped || bytes(under: scratch) > unpackedBudget {
             try? FileManager.default.removeItem(at: scratch)
             throw Failure.refused(name, reason: "too-big-unpacked")
         }
-        guard task.terminationStatus == 0 else {
+        guard !ran.timedOut, ran.status == 0 else {
             try? FileManager.default.removeItem(at: scratch)
             // libarchive's own sentence, which names the format it could not
             // read — far more use than "could not open".
-            throw Failure.refused(name, reason: said.isEmpty
-                                  ? "unreadable" : Self.oneLine(said))
+            throw Failure.refused(name, reason: ran.timedOut ? "unreadable"
+                                  : said.isEmpty ? "unreadable" : Self.oneLine(said))
         }
 
         // The models, wherever they ended up. The group is the archive's own
@@ -304,9 +308,15 @@ enum ArchiveImport {
         var models: [URL] = []
         var documents: [URL] = []
         let walker = FileManager.default.enumerator(at: scratch,
-                                                    includingPropertiesForKeys: nil,
+                                                    includingPropertiesForKeys: Self.fileKeys,
                                                     options: [.skipsHiddenFiles])
         while let next = walker?.nextObject() as? URL {
+            // A REGULAR FILE INSIDE THE SCRATCH, or it is not ours to import.
+            // A pack can carry `dragon.stl` as a symlink to the shop's own book,
+            // an SSH key or `/dev/zero`, and a name-only walk took it for a
+            // model: hashed (for ever, on `/dev/zero`), copied into the vault
+            // and uploaded to the shop's bucket.
+            guard Self.isOwnRegularFile(next, under: scratch) else { continue }
             let ext = next.pathExtension.lowercased()
             if LibraryImport.kinds.contains(ext) {
                 models.append(next)
@@ -327,6 +337,24 @@ enum ArchiveImport {
            // if the rule finds nothing in it worth calling a group.
            group: ImportGrouping.meaningful((name as NSString).deletingPathExtension)
                ?? (name as NSString).deletingPathExtension)
+    }
+
+    /// How long `bsdtar` may take. Ten minutes is far past anything the
+    /// unpacked budget can hold; it exists so an archive that stalls the
+    /// reader cannot keep a process (and an import) waiting for ever.
+    nonisolated static let tarPatience: TimeInterval = 600
+
+    nonisolated static let fileKeys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey]
+
+    /// A regular file — not a symlink, device, pipe or directory — whose real
+    /// path is inside `root`. `URLResourceValues` describe the item itself
+    /// (lstat), so a symlink reads as a symlink and not as what it points at.
+    nonisolated static func isOwnRegularFile(_ url: URL, under root: URL) -> Bool {
+        guard let v = try? url.resourceValues(forKeys: Set(fileKeys)),
+              v.isRegularFile == true, v.isSymbolicLink != true else { return false }
+        let base = root.resolvingSymlinksInPath().standardizedFileURL.path
+        let real = url.resolvingSymlinksInPath().standardizedFileURL.path
+        return real.hasPrefix(base.hasSuffix("/") ? base : base + "/")
     }
 
     /// What has landed so far, in bytes.

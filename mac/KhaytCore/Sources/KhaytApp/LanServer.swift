@@ -2215,9 +2215,16 @@ extension Shop {
         guard (try? data.write(to: model, options: .atomic)) != nil else { return nil }
         guard let argv = try? await engine.sliceArgv(template: slicer.args, model: model.path,
                                                      output: output.path, outdir: dir.path) else { return nil }
-        guard (try? SlicerRun.slice(model, with: slicer, argv: argv, allowed: true)) != nil,
-              let gcode = SlicerRun.gcode(in: dir, expected: output),
-              let text = try? SlicerRun.totalsText(of: gcode) else { return nil }
+        // OFF THE MAIN ACTOR. A slice takes up to three minutes and `slice`
+        // blocks for all of it; run here, on the shop's main actor, a stranger's
+        // upload froze the whole app — and a slicer that never exited froze it
+        // for good.
+        let text: String? = await Task.detached {
+            guard (try? SlicerRun.slice(model, with: slicer, argv: argv, allowed: true)) != nil,
+                  let gcode = SlicerRun.gcode(in: dir, expected: output) else { return nil }
+            return try? SlicerRun.totalsText(of: gcode)
+        }.value
+        guard let text else { return nil }
         return try? await engine.gcodeIntake(text: text)
     }
 

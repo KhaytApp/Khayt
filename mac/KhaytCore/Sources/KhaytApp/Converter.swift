@@ -68,6 +68,22 @@ enum Converter {
     /// after `defaultMeshBudget()`.
     nonisolated(unsafe) static var paintInlineLimit = defaultMeshBudget()
 
+    /// How much a whole conversion may hold, every member together.
+    ///
+    /// The rebuild reads each member back out of the source — the mesh whole —
+    /// and keeps them all until the new zip is written. `Zip` caps any ONE
+    /// member at a gigabyte, but nothing capped the sum: a 3MF of a dozen
+    /// near-gigabyte members (each compressing a thousand to one, so the file
+    /// itself is small) asked for twelve. Two gigabytes is twice the largest
+    /// single member `Zip` will read, so every file that converted before
+    /// still does.
+    ///
+    /// Checked against the sizes the directory declares, before anything is
+    /// read, and again as the members come out: `Zip.data` never hands back
+    /// more than an entry declared, so the two agree. A `var` for the same
+    /// reason as `paintInlineLimit` — a test would otherwise need gigabytes.
+    nonisolated(unsafe) static var rebuildLimit = 2 << 30
+
     /// How much model XML this Mac will hold at once, from how much memory it
     /// has.
     ///
@@ -148,6 +164,8 @@ enum Converter {
         case refused(String)
         /// A colour plan was asked for on a mesh too large to bring in.
         case meshTooBig(String, bytes: Int)
+        /// Every member together is more than a conversion will hold.
+        case tooBig(bytes: Int)
 
         var description: String {
             switch self {
@@ -163,6 +181,10 @@ enum Converter {
                 return "A colour plan has to rewrite the model itself, and \(name) is \(mb) MB — "
                      + "more than the \(cap) MB this app will bring in at once. "
                      + "Convert it in Khayt, or retarget it here without a colour plan."
+            case .tooBig(let bytes):
+                let mb = String(format: "%.0f", Double(bytes) / 1_048_576)
+                let cap = Converter.rebuildLimit / 1_048_576
+                return "This 3MF unpacks to \(mb) MB, more than the \(cap) MB a conversion will hold at once."
             }
         }
     }
@@ -186,6 +208,10 @@ enum Converter {
         do { entries = try Zip.entries(of: source) }
         catch { throw Failure.unreadable(String(describing: error)) }
         guard !entries.isEmpty else { throw Failure.unreadable("it holds nothing") }
+        // The whole file's declared size, summed before a byte is read — see
+        // `rebuildLimit`. Overflow-safe: a lying directory can claim anything.
+        let declared = entries.reduce(0) { $0 > Int.max - $1.size ? Int.max : $0 + $1.size }
+        guard declared <= rebuildLimit else { throw Failure.tooBig(bytes: declared) }
 
         // What the engine is told about each member: everything small enough to
         // decide about, and nothing else.
@@ -251,9 +277,17 @@ enum Converter {
         // a conversion byte for byte.
         let byName = Dictionary(entries.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
         var out: [ZipWrite.Member] = []
+        /// What the rebuild holds so far, against the same cap.
+        var held = 0
+        func hold(_ data: Data) throws {
+            held += data.count
+            guard held <= rebuildLimit else { throw Failure.tooBig(bytes: held) }
+        }
         for member in members {
             if let text = member.text {
-                out.append(.init(member.name, Data(text.utf8)))
+                let data = Data(text.utf8)
+                try hold(data)
+                out.append(.init(member.name, data))
             } else if let block = member.buildBlock {
                 // A re-tiled layout, put back exactly where it came from. The
                 // triangles either side of it are the bytes that were there.
@@ -263,11 +297,13 @@ enum Converter {
                     throw Failure.unreadable("\(member.name)'s plate layout would not go back in")
                 }
                 data.replaceSubrange(range, with: Data(block.utf8))
+                try hold(data)
                 out.append(.init(member.name, data))
             } else if let entry = byName[member.name] {
                 guard let data = try? Zip.data(of: entry, in: source, limit: .max) else {
                     throw Failure.unreadable("\(member.name) would not come back out")
                 }
+                try hold(data)
                 out.append(.init(member.name, data))
             } else {
                 // The plan named a member the source does not have, which is a
