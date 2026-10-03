@@ -207,9 +207,15 @@ struct Alpha58SecurityTests {
                                                     engine: engine, resolve: dns))
         #expect(a.url.absoluteString == "http://192.168.1.40:8080/relay/0?x=1")
         #expect(a.host == "plug.local:8080")
+        // Link-local alone: checked, but sent by name — the zone it needs is not kept.
         let b = try #require(await SmartPlug.target(URL(string: "http://ha.local/api")!, engine: engine, resolve: dns))
-        #expect(b.url.absoluteString == "http://[fe80::1%25en0]/api")
-        #expect(b.host == "ha.local")
+        #expect(b.url.absoluteString == "http://ha.local/api")
+        #expect(b.host == nil)
+        // Unique-local IPv6 needs no zone, and is pinned.
+        let ula = Self.resolver(["ula.local": ["fd12::40"]])
+        let u = try #require(await SmartPlug.target(URL(string: "http://ula.local:81/x")!, engine: engine, resolve: ula))
+        #expect(u.url.absoluteString == "http://[fd12::40]:81/x")
+        #expect(u.host == "ula.local:81")
         // HTTPS keeps its name: the certificate is checked against it.
         let c = try #require(await SmartPlug.target(URL(string: "https://plug.local/x")!, engine: engine, resolve: dns))
         #expect(c.url.host() == "plug.local")

@@ -45,7 +45,7 @@ enum SmartPlug {
     /// characters it would strip) and an address it allows — and a NAME must
     /// resolve only to such addresses. See `target`.
     static func allowed(_ url: URL, engine: KhaytEngine,
-                        resolve: @escaping @Sendable (String) async -> [String] = SmartPlug.resolve) async -> Bool {
+                        resolve: @escaping @Sendable (String) async -> [String] = { await SmartPlug.addresses(of: $0) }) async -> Bool {
         await target(url, engine: engine, resolve: resolve) != nil
     }
 
@@ -61,7 +61,9 @@ enum SmartPlug {
     /// address took the token with it. So a name is resolved here and EVERY
     /// address it gives must pass the same rule as a typed address would. And
     /// for plain HTTP the request is then sent to the address that was
-    /// checked, with the name in `Host`, so a second lookup that answers
+    /// checked (unless it is only link-local IPv6, which cannot be reached
+    /// without the zone the resolver trims), with the name in `Host`, so a
+    /// second lookup that answers
     /// differently (DNS rebinding) has nothing to change. HTTPS keeps the name
     /// — its certificate is checked against it — so there the check is the
     /// defence. A public name (a Nabu Casa remote URL) is refused like a
@@ -71,7 +73,7 @@ enum SmartPlug {
     /// is. The shared sanitiser strips `:`, which made every one of them read
     /// as "not the host it says" and refused every IPv6 plug.
     static func target(_ url: URL, engine: KhaytEngine,
-                       resolve: @escaping @Sendable (String) async -> [String] = SmartPlug.resolve)
+                       resolve lookUp: @escaping @Sendable (String) async -> [String] = { await SmartPlug.addresses(of: $0) })
     async -> (url: URL, host: String?)? {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
               url.user == nil, url.password == nil,
@@ -89,20 +91,22 @@ enum SmartPlug {
         if IPv4Address(host) != nil { return (url, nil) }
 
         // A name: every address it resolves to must be one a plug may be at.
-        let addresses = await resolve(host)
+        let addresses = await lookUp(host)
         guard !addresses.isEmpty else { return nil }
         for address in addresses {
             let bare = String(address.split(separator: "%", maxSplits: 1).first ?? "")
             guard await addressAllowed(bare, engine: engine) else { return nil }
         }
         guard scheme == "http" else { return (url, nil) }
-        // Pinned: IPv4 first (no zone to carry), else the first IPv6 with its
-        // zone, which a link-local address cannot be reached without.
-        let chosen = addresses.first { !$0.contains(":") } ?? addresses[0]
+        // Pinned to an address that needs no zone to reach: IPv4 first, else
+        // a unique-local IPv6. A name that resolves to link-local IPv6 alone
+        // is sent by name — the resolver has trimmed the zone a link-local
+        // address cannot be reached without — having been checked above.
+        guard let chosen = addresses.first(where: { !$0.contains(":") })
+                ?? addresses.first(where: { $0.contains(":") && !$0.lowercased().hasPrefix("fe") })
+        else { return (url, nil) }
         guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
-        parts.percentEncodedHost = chosen.contains(":")
-            ? "[" + chosen.replacingOccurrences(of: "%", with: "%25") + "]"
-            : chosen
+        parts.percentEncodedHost = chosen.contains(":") ? "[" + chosen + "]" : chosen
         guard let pinned = parts.url else { return nil }
         let authority = url.port.map { "\(host):\($0)" } ?? host
         return (pinned, authority)
@@ -124,42 +128,17 @@ enum SmartPlug {
         return (try? await engine.printerHostAllowed(address)) == true
     }
 
-    /// Every address a name resolves to, zones kept (`fe80::1%en0`).
-    ///
-    /// `getaddrinfo` blocks until DNS answers or gives up, so it runs on a
-    /// dispatch queue and is awaited through a continuation — never on the
-    /// cooperative pool, which a blocked lookup would starve.
-    nonisolated static func resolve(_ host: String) async -> [String] {
-        await withCheckedContinuation { (done: CheckedContinuation<[String], Never>) in
-            resolveQueue.async { done.resume(returning: lookup(host)) }
-        }
-    }
-
-    nonisolated static let resolveQueue = DispatchQueue(label: "khayt.plug.resolve", attributes: .concurrent)
-
-    nonisolated static func lookup(_ host: String) -> [String] {
-        var hints = addrinfo(ai_flags: 0, ai_family: AF_UNSPEC, ai_socktype: SOCK_STREAM,
-                             ai_protocol: 0, ai_addrlen: 0, ai_canonname: nil,
-                             ai_addr: nil, ai_next: nil)
-        var head: UnsafeMutablePointer<addrinfo>?
-        guard getaddrinfo(host, nil, &hints, &head) == 0, let first = head else { return [] }
-        defer { freeaddrinfo(head) }
-        var out: [String] = []
-        var node: UnsafeMutablePointer<addrinfo>? = first
-        while let current = node {
-            var text = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            if getnameinfo(current.pointee.ai_addr, current.pointee.ai_addrlen,
-                           &text, socklen_t(text.count), nil, 0, NI_NUMERICHOST) == 0 {
-                let said = String(decoding: text.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
-                if !out.contains(said) { out.append(said) }
-            }
-            node = current.pointee.ai_next
-        }
-        return out
+    /// Every address a name resolves to — through `WebhookClient.addresses`,
+    /// the one wrapper that takes the blocking `getaddrinfo` off the caller
+    /// (`SmtpHostGuardTests` holds every lookup in the app to it). Zones are
+    /// trimmed there, which is why a link-local answer is checked but never
+    /// pinned (`target`).
+    static func addresses(of host: String) async -> [String] {
+        await WebhookClient.addresses(of: host)
     }
 
     static func send(_ request: KhaytEngine.PlugRequest, engine: KhaytEngine,
-                     resolve: @escaping @Sendable (String) async -> [String] = SmartPlug.resolve,
+                     resolve: @escaping @Sendable (String) async -> [String] = { await SmartPlug.addresses(of: $0) },
                      fetch: (URLRequest) async throws -> (Data, URLResponse) = { r in
                          try await SmartPlug.session.data(for: r) }) async throws -> JSONValue {
         guard let url = URL(string: request.url) else { throw URLError(.badURL) }
