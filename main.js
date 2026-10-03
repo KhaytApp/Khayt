@@ -65,7 +65,7 @@ const { isBlockedHost, isAllowedPrinterHost, sanitizeMailgunDomain, resolvesToBl
         sanitizePrinterHost } = require('./lib/host-guard');
 const { sendCustomSmtp } = require('./lib/custom-smtp');
 const {
-  mergePollSuccess, mergePollFailure, completionsToPersist, restoreCompletions, completionIsNew,
+  mergePollSuccess, mergePollFailure, completionsToPersist, restoreCompletions, completionIsNew, mergePersisted,
 } = require('./lib/printer-poll-cache');
 const sdcpClient = require('./lib/sdcp-client');
 const { normalizeProgress, fileProgressPct, explainPrinterHttp } = require('./lib/printer-status');
@@ -3906,7 +3906,9 @@ async function persistCompletions() {
     // write already in flight was still invisible. updateStoreOnDisk takes the
     // read inside the chain, which closes it.
     const saved = completionsToPersist(printerStatusCache);
-    await updateStoreOnDisk((cur) => ({ ...cur, [COMPLETIONS_KEY]: saved }));
+    // Merged with what is already there, not written over it: another window
+    // or the Mac app may have saved completions this session never saw.
+    await updateStoreOnDisk((cur) => ({ ...cur, [COMPLETIONS_KEY]: mergePersisted(cur && cur[COMPLETIONS_KEY], saved) }));
   } catch (e) {
     console.error('persistCompletions:', e && e.message ? e.message : e);
   }
@@ -3923,9 +3925,12 @@ function rehydrateCompletions() {
     const saved = (lanServerStore || {})[COMPLETIONS_KEY];
     const restored = restoreCompletions(saved);
     for (const [machineId, entry] of Object.entries(restored)) {
-      // A poll that has already run since boot knows more than the disk does.
-      if (printerStatusCache[machineId]) continue;
-      printerStatusCache[machineId] = entry;
+      const live = printerStatusCache[machineId];
+      if (!live) { printerStatusCache[machineId] = entry; continue; }
+      // A poll that has already run since boot keeps its live state, and its
+      // completions are merged with the saved ones rather than replacing them.
+      const merged = mergePersisted({ [machineId]: entry.completions }, { [machineId]: completionsToPersist({ [machineId]: live })[machineId] || [] })[machineId];
+      if (merged && merged.length) { live.completions = merged; live.lastCompleted = merged[0]; }
     }
   } catch (e) {
     console.error('rehydrateCompletions:', e && e.message ? e.message : e);

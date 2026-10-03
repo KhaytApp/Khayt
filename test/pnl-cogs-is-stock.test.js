@@ -47,7 +47,10 @@ test("the quarter uses the FROZEN cost, scaled — not today's prices", () => {
 
 test('the desktop applies the same share to the headline and the CSV', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'analytics.js'), 'utf8');
-  assert.equal((src.match(/\* KhaytPnl\.stockShare\(o, \{ inventory, settings \}\)/g) || []).length, 2,
-    'the P&L headline and the dashboard KPI margin, by the same rule');
+  // The P&L headline applies the share inline; the dashboard KPI margin gets
+  // it from lib/kpi-rows.js orderCost, the rule the Mac uses (#1720).
+  assert.equal((src.match(/\* KhaytPnl\.stockShare\(o, \{ inventory, settings \}\)/g) || []).length, 1,
+    'the P&L headline');
+  assert.match(src, /cost: KhaytKpiRows\.orderCost\(o, \{/, 'the dashboard KPI margin, by the shared rule');
   assert.equal((src.match(/inventory: \(typeof inventory !== 'undefined' \? inventory : \[\]\)/g) || []).length, 3);
 });

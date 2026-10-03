@@ -23,6 +23,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Use a Model's Picture borrows one of the group's models, and Remove Group
   Picture goes back to the first model's picture. The choice moves with the
   group when its folder moves, and is dropped when the group is.
+- **Marking a job shipped tells your webhooks.** The Mark shipped button on
+  the board never sent the `order_shipped` event that the Ship dialog does,
+  so an automation listening for parcels missed those jobs. Both now send
+  the same event with the same contents, as the Mac app does.
+- **The weight estimate in the "what did it really use" box includes
+  supports.** It counted the model only, so a print with supports looked
+  over its estimate.
+- **The executive summary costs a job the way the Mac does,** so its margin
+  matches the dashboard on both apps.
+- **Finished-print records are kept when two places save them.** Saving
+  wrote this session's list over what was there, so a record saved by the
+  Mac app or another window could be lost. They are merged now.
 
 - **Security: customer names in campaign emails are sent as text.** A
   customer whose name contained HTML (for example `<img …>`) had it read as

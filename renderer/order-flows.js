@@ -242,8 +242,11 @@ function recordSetupOutcomes(order, ok) {
    Actual-vs-estimated — prompt on job completion
    ============================================================ */
 function promptActuals(order, onConfirm) {
+  // The model and its supports both come off the spool, so the estimate the
+  // printer's figure is compared with includes them (as lib/order-deduction.js
+  // now scales by).
   const estWeight = order.parts
-    ? order.parts.reduce((s, p) => s + (+p.printWeight || 0) * (p.qty || 1), 0)
+    ? order.parts.reduce((s, p) => s + ((+p.printWeight || 0) + (+p.supportWeight || 0)) * (p.qty || 1), 0)
     : 0;
   // Ask the printer first. This dialog used to pre-fill BOTH fields from the
   // estimate, so a shop glancing at it and hitting confirm wrote the estimate
@@ -978,6 +981,9 @@ function markShipped(orderId) {
   const out = StatusRules().markShipped(order, { now: Date.now() });
   if (!out.ok) return;   // not finished, or already arrived
   runStatusEffects(order, out.effects, { toastText: t('queue.shipped_toast', { id: order.id }) });
+  // A parcel leaving is the event a shop's fulfilment automation listens for.
+  // This button never sent it; the Ship dialog did. Same payload, by the bus.
+  fireStatusWebhook('order_shipped', order);
 }
 
 /* ============================================================
@@ -1182,7 +1188,10 @@ function openShipModal(orderId) {
       KhaytShipment.create(order, { carrier: carrierId, service, trackingNumber, source, labelUrl, meta },
         new Date().toISOString());
 
-      if (typeof fireWebhook === 'function') fireWebhook('order_shipped', { orderId: order.id, project: order.project, carrier: carrierId, trackingNumber: order.trackingNumber });
+      // The payload is lib/webhook-bus.js statusPayload's, so the Mac and both
+      // shipping buttons send the same bytes (KhaytShipment.create has just set
+      // order.carrier and order.trackingNumber).
+      fireStatusWebhook('order_shipped', order);
       saveAll();
       renderKanban(); renderLogs();
       if (typeof republishPortalIfPublished === 'function') republishPortalIfPublished(order.id);
