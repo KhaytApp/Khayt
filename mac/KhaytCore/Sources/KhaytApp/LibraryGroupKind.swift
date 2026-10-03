@@ -123,25 +123,48 @@ enum GroupKinds {
     /// book as it stands, minus the moving files.
     static func carry(from path: String, to destination: String, moving: Set<String>,
                       in root: inout [String: JSONValue]) {
-        guard path != destination else { return }
+        carry([(from: path, to: destination)], moving: moving, in: &root)
+    }
+
+    /// Several folders moved in ONE write (`Shop.moveGroups`), each taking
+    /// its kinds — the rule above, applied to every move before the map is
+    /// written once.
+    ///
+    /// ── WHY NOT `carry` ONCE PER MOVE ─────────────────────────────────────
+    ///
+    /// Every write of the map prunes it (`prune`), and by the time the kinds
+    /// are carried every moving file has already been rewritten. Carrying the
+    /// first folder therefore pruned the SECOND folder's entries — no file
+    /// sat under its old path any more — and the second group arrived with
+    /// no kind. One pass over the map as the book held it, one write.
+    ///
+    /// `moving` is every file the batch moves. The moves' sources must not
+    /// nest and their destinations must differ (`Shop.planGroupMove` makes
+    /// sure), so no move reaches into another's subtree.
+    static func carry(_ moves: [(from: String, to: String)], moving: Set<String>,
+                      in root: inout [String: JSONValue]) {
+        let moves = moves.filter { $0.from != $0.to }
+        guard !moves.isEmpty else { return }
         let settings = Shop.settings(root)
         let stored = settings[settingsKey]
         guard case .object(let original)? = stored else { return }
         let staying = groupPaths(root, except: moving)
         var map = original
-        // The source subtree empties.
-        for key in original.keys where Shop.isUnder(key, path) { map[key] = nil }
-        // The destination subtree: every path an entry moves to, and every
-        // entry already there.
-        var targets = Set(original.keys.filter { Shop.isUnder($0, destination) })
-        for key in original.keys where Shop.isUnder(key, path) {
-            targets.insert(destination + key.dropFirst(path.count))
-        }
-        for target in targets {
-            if staying.contains(where: { Shop.isUnder($0, target) }) {
-                map[target] = original[target]
-            } else {
-                map[target] = original[path + target.dropFirst(destination.count)]
+        for (path, destination) in moves {
+            // The source subtree empties.
+            for key in original.keys where Shop.isUnder(key, path) { map[key] = nil }
+            // The destination subtree: every path an entry moves to, and every
+            // entry already there.
+            var targets = Set(original.keys.filter { Shop.isUnder($0, destination) })
+            for key in original.keys where Shop.isUnder(key, path) {
+                targets.insert(destination + key.dropFirst(path.count))
+            }
+            for target in targets {
+                if staying.contains(where: { Shop.isUnder($0, target) }) {
+                    map[target] = original[target]
+                } else {
+                    map[target] = original[path + target.dropFirst(destination.count)]
+                }
             }
         }
         write(map: map, stored: stored, settings: settings, into: &root)

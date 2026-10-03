@@ -307,7 +307,21 @@ final class Shop {
     }
 
     var selection: Order.ID?
-    var fileSelection: Set<LibraryFile.ID> = []
+    var fileSelection: Set<LibraryFile.ID> = [] {
+        // One kind of selection at a time: choosing a model — click, ⌘A, an
+        // arrow — lets go of any chosen group tiles, so no action is ever
+        // offered for a mixture of the two.
+        didSet { if !fileSelection.isEmpty, !groupSelection.isEmpty { groupSelection = []; groupAnchor = nil } }
+    }
+    /// Group tiles chosen with ⌘/⇧-click, by PATH — for "Move into Group…".
+    /// Apart from `fileSelection` on purpose: a selected group tile is a
+    /// group, never the models hidden inside it (#1691). See
+    /// `LibraryGroupMove.swift`.
+    var groupSelection: Set<String> = []
+    /// Where a ⇧-click run of group tiles started.
+    var groupAnchor: String?
+    /// The move or rename the shop has asked for, until it confirms.
+    var movingGroups: GroupMoveRequest?
     /// Set by the model's right-click "New Group…": a context menu cannot
     /// hold a text field, so it asks the toolbar's Group menu to open its
     /// naming popover over the same selection.
@@ -576,6 +590,7 @@ final class Shop {
                                              defaultRoot: LibraryLocation.defaultRoot(for: build))
             }
             fileSelection = []
+            groupSelection = []
             // Read, never taken. This app does not write, and a reader that
             // claimed ownership would lock a shop out of its own app for
             // nothing. When writing arrives, this is the check that gates it.
@@ -1720,9 +1735,10 @@ final class Shop {
     }
 
     /// Does every path a folder move would write survive `normalise`'s
-    /// 60-unit cut intact?
+    /// 60-unit cut intact? (`groupPathLimit`; "Move into Group…" asks the
+    /// same question of every group it moves — `planGroupMove`.)
     nonisolated static func folderMoveFits(_ wanted: [String: String]) -> Bool {
-        wanted.values.allSatisfy { $0.utf16.count <= 60 }
+        wanted.values.allSatisfy { $0.utf16.count <= groupPathLimit }
     }
 
     /// One file's record, moved to where `folderMoveTargets` put it.
@@ -1852,7 +1868,7 @@ final class Shop {
     /// from the files it describes. What it changes in the kind map is undone
     /// with the files (`LibraryUndo`).
     @discardableResult
-    private func editFiles(_ ids: Set<LibraryFile.ID>, named actionName: String,
+    func editFiles(_ ids: Set<LibraryFile.ID>, named actionName: String,
                            alsoRoot: ((inout [String: JSONValue]) -> Void)? = nil,
                            change: @escaping (inout [String: JSONValue]) -> Void) -> Bool {
         guard let build = source.build, !ids.isEmpty else { return false }
@@ -14483,17 +14499,22 @@ final class Shop {
 
     /// Drop from the selection anything no longer drawn as a model tile.
     func pruneSelectionToVisible() {
-        guard !fileSelection.isEmpty || anchor != nil || cursor != nil else { return }
+        guard !fileSelection.isEmpty || anchor != nil || cursor != nil else {
+            pruneGroupSelectionToVisible(); return
+        }
         let visible = Set(visibleFiles.map(\.id))
         let kept = fileSelection.intersection(visible)
         if kept != fileSelection { fileSelection = kept }
         if let a = anchor, !visible.contains(a) { anchor = nil }
         if let c = cursor, !visible.contains(c) { cursor = nil }
+        pruneGroupSelectionToVisible()
     }
 
     /// Nothing selected, and the keyboard standing nowhere.
     func clearLibrarySelection() {
         if !fileSelection.isEmpty { fileSelection = [] }
+        if !groupSelection.isEmpty { groupSelection = [] }
+        groupAnchor = nil
         anchor = nil
         cursor = nil
     }

@@ -69,7 +69,8 @@ struct LibraryGrid: View {
                                            thumbnail: cover.flatMap { shop.thumbnail(for: $0) },
                                            words: shop.words,
                                            kind: shop.groupKind(path),
-                                           parent: FolderCell.parent(of: path, open: shop.shelf))
+                                           parent: FolderCell.parent(of: path, open: shop.shelf),
+                                           selected: shop.groupSelection.contains(path))
                                     .id(entry.id)
                                     // A folder OPENS. The shelf already filters
                                     // by group, so entering one is setting it —
@@ -78,7 +79,16 @@ struct LibraryGrid: View {
                                     // The PATH, not the name: two projects are
                                     // each allowed a folder called `Blue`, and
                                     // opening one of them must not show both.
-                                    .onTapGesture { shop.shelf = .library(path) }
+                                    //
+                                    // ⌘- and ⇧-click CHOOSE it instead, for
+                                    // "Move into Group…" — a group tile, never
+                                    // the models inside it (#1691).
+                                    .onTapGesture {
+                                        let flags = NSEvent.modifierFlags
+                                        if flags.contains(.command) { shop.selectGroup(path, modifiers: .toggle) }
+                                        else if flags.contains(.shift) { shop.selectGroup(path, modifiers: .extend) }
+                                        else { shop.shelf = .library(path) }
+                                    }
                                     // MOVING THE WHOLE FOLDER, because the
                                     // alternative is opening it, selecting all
                                     // of it and typing a path exactly — once
@@ -90,6 +100,9 @@ struct LibraryGrid: View {
                                         // models" draws it.
                                         GroupKindMenu(shop: shop, path: path)
                                         FolderMoveMenu(shop: shop, path: path)
+                                        // Every chosen group at once, and a
+                                        // new name for this one.
+                                        GroupTileActions(shop: shop, path: path)
                                         Divider()
                                         // A project folder is often exactly a
                                         // product: a set, a kit, a figure in parts.
@@ -173,8 +186,9 @@ struct LibraryGrid: View {
                 return .handled
             }
             .onKeyPress(.escape) {
-                guard !shop.fileSelection.isEmpty else { return .ignored }
+                guard !shop.fileSelection.isEmpty || !shop.groupSelection.isEmpty else { return .ignored }
                 shop.fileSelection = []
+                shop.groupSelection = []
                 return .handled
             }
             .onAppear { focused = true }
@@ -360,6 +374,8 @@ struct FolderCell: View {
     /// The level this group sits in, when the screen does not already say so
     /// — see `parent(of:open:)`.
     var parent: String? = nil
+    /// Chosen with ⌘/⇧-click, drawn the way a chosen model is.
+    var selected: Bool = false
 
     /// How far each card behind the picture shows above it.
     static let peek: CGFloat = 4
@@ -396,13 +412,15 @@ struct FolderCell: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(6)
+        .background(selected ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
+                    in: RoundedRectangle(cornerRadius: 8))
         .contentShape(RoundedRectangle(cornerRadius: 8))
         // One element that says what it is: a group, its name, how many.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Self.accessibilityText(
             name: parent.map { name + ", " + words.callIt("mac.group_in_parent", ["name": .string($0)]) } ?? name,
             count: count, kind: kind, words: words))
-        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
     private var title: Text {

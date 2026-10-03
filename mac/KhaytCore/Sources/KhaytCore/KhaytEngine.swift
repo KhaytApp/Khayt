@@ -8562,6 +8562,41 @@ public actor KhaytEngine {
                                  [rows, policy, .number(now.timeIntervalSince1970 * 1000)], as: TierPlan.self)
     }
 
+    /// When each model was last used, and whether an open job needs it, by
+    /// item folder — `lib/print-library-tier.js usageFromBook`, the rule the
+    /// Electron app runs over the same book (#1716). `orders` is the book's
+    /// `printLog` as stored; `dirNames` maps a record id to its item folder
+    /// (`LibraryLocation.itemDirName`, which has its own parity guard).
+    public struct TierUsage: Decodable, Sendable, Equatable {
+        public let lastUsedMs: Double
+        public let inUse: Bool
+    }
+
+    public func tierUsage(printFiles: [JSONValue], orders: [JSONValue],
+                          dirNames: [String: String]) throws -> [String: TierUsage] {
+        try runtime.call2("KhaytPrintLibraryTier.usageFromBook(\(Self.tierBook))",
+                          [.array(printFiles), .array(orders), .object(dirNames.mapValues(JSONValue.string))],
+                          as: [String: TierUsage].self)
+    }
+
+    /// The listing with what the book knows folded in — `usageFromBook`, then
+    /// the module's own `annotate` — ready for `tierPlan`. ONE rule for both
+    /// apps: the Mac's Swift copy of it (#1706) is gone.
+    public func tierAnnotate(_ files: [TierFile], printFiles: [JSONValue], orders: [JSONValue],
+                             dirNames: [String: String]) throws -> [TierFile] {
+        let rows = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(files))
+        return try runtime.call2(
+            "KhaytPrintLibraryTier.annotate(ARG3, KhaytPrintLibraryTier.usageFromBook(\(Self.tierBook)))",
+            [.array(printFiles), .array(orders), .object(dirNames.mapValues(JSONValue.string)), rows],
+            as: [TierFile].self)
+    }
+
+    /// The book `usageFromBook` reads: ARG0 printFiles, ARG1 orders, ARG2 the
+    /// id → folder map. An id the map lacks is its own folder name, as the
+    /// module's default is.
+    private static let tierBook = "{printFiles: ARG0, orders: ARG1, itemDirName: function (id) { "
+        + "return Object.prototype.hasOwnProperty.call(ARG2, id) ? ARG2[id] : String(id); }}"
+
     /// The sidecar's TEXT, exactly as the other app writes it — the same
     /// function and the same `JSON.stringify`, so field order and all match.
     public func sidecarText(size: Int, sha256: String, key: String, provider: String, at: String) throws -> String {

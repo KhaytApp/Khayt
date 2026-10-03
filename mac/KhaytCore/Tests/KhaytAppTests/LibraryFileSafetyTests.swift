@@ -12,21 +12,27 @@ struct LibraryFileSafetyTests {
     static let now = Date(timeIntervalSince1970: 1_790_000_000)   // Sep 2026
     static var nowMs: Double { now.timeIntervalSince1970 * 1000 }
 
-    static func record(_ id: String, created: Date, lastPrinted: String? = nil) throws -> LibraryFile {
+    /// A library record as the book stores it.
+    static func record(_ id: String, created: Date, lastPrinted: String? = nil) -> JSONValue {
         var o: [String: JSONValue] = ["id": .string(id), "name": .string("Model \(id)"),
                                       "createdAt": .string(ISO8601DateFormatter().string(from: created))]
         if let lastPrinted { o["lastPrinted"] = .string(lastPrinted) }
-        return try JSONDecoder().decode(LibraryFile.self, from: JSONEncoder().encode(JSONValue.object(o)))
+        return .object(o)
     }
 
-    static func job(_ status: String, date: String, files: [String]) throws -> Order {
+    /// A `printLog` row naming those models on its parts.
+    static func job(_ status: String, date: String, files: [String]) -> JSONValue {
         let parts = files.enumerated().map { i, id in
             JSONValue.object(["id": .string("p\(i)"), "name": .string("part"), "printFileId": .string(id)])
         }
-        return try JSONDecoder().decode(Order.self, from: JSONEncoder().encode(JSONValue.object([
-            "id": .string("J-\(status)-\(date)"), "status": .string(status), "date": .string(date),
-            "parts": .array(parts),
-        ])))
+        return .object(["id": .string("J-\(status)-\(date)"), "status": .string(status), "date": .string(date),
+                        "parts": .array(parts)])
+    }
+
+    static func usage(_ engine: KhaytEngine, files: [JSONValue], orders: [JSONValue]) async throws
+    -> [String: KhaytEngine.TierUsage] {
+        try await engine.tierUsage(printFiles: files, orders: orders,
+                                   dirNames: CloudLibrary.dirNames(printFiles: files, orders: orders))
     }
 
     static func tierFile(_ id: String, ageDays: Double) -> KhaytEngine.TierFile {
@@ -39,11 +45,11 @@ struct LibraryFileSafetyTests {
     @Test("a model imported this month is not 'unused for 90 days' because its copied mtime is old")
     func importDateCounts() async throws {
         let engine = try KhaytEngine()
-        let fresh = try Self.record("PF-new", created: Self.now.addingTimeInterval(-5 * 86_400))
-        let cold = try Self.record("PF-cold", created: Self.now.addingTimeInterval(-400 * 86_400))
-        let usage = CloudLibrary.usage(files: [fresh, cold], orders: [])
+        let fresh = Self.record("PF-new", created: Self.now.addingTimeInterval(-5 * 86_400))
+        let cold = Self.record("PF-cold", created: Self.now.addingTimeInterval(-400 * 86_400))
         let listed = [Self.tierFile("PF-new", ageDays: 700), Self.tierFile("PF-cold", ageDays: 700)]
-        let plan = try await engine.tierPlan(CloudLibrary.annotate(listed, usage: usage),
+        let annotated = try await CloudLibrary.annotated(listed, engine: engine, printFiles: [fresh, cold], orders: [])
+        let plan = try await engine.tierPlan(annotated,
                                              policy: .object(["enabled": .bool(true), "keepDays": .number(90)]),
                                              now: Self.now)
         #expect(plan.candidates.map(\.id) == ["PF-cold"])
@@ -54,18 +60,19 @@ struct LibraryFileSafetyTests {
     func openJobsKeepTheirModels() async throws {
         let engine = try KhaytEngine()
         let old = Self.now.addingTimeInterval(-900 * 86_400)
-        let files = try ["PF-q", "PF-done", "PF-x"].map { try Self.record($0, created: old) }
-        let orders = try [
+        let files = ["PF-q", "PF-done", "PF-x"].map { Self.record($0, created: old) }
+        let orders = [
             Self.job("pending", date: "2024-01-01", files: ["PF-q"]),
             Self.job("completed", date: "2024-01-01", files: ["PF-done"]),
             Self.job("cancelled", date: "2024-01-01", files: ["PF-x"]),
         ]
-        let usage = CloudLibrary.usage(files: files, orders: orders)
+        let usage = try await Self.usage(engine, files: files, orders: orders)
         #expect(usage["PF-q"]?.inUse == true)
         #expect(usage["PF-done"]?.inUse == false)
         #expect(usage["PF-x"]?.inUse == false)
         let listed = ["PF-q", "PF-done", "PF-x"].map { Self.tierFile($0, ageDays: 900) }
-        let plan = try await engine.tierPlan(CloudLibrary.annotate(listed, usage: usage),
+        let annotated = try await CloudLibrary.annotated(listed, engine: engine, printFiles: files, orders: orders)
+        let plan = try await engine.tierPlan(annotated,
                                              policy: .object(["enabled": .bool(true), "keepDays": .number(90)]),
                                              now: Self.now)
         #expect(Set(plan.candidates.compactMap(\.id)) == ["PF-done", "PF-x"])
@@ -73,12 +80,12 @@ struct LibraryFileSafetyTests {
     }
 
     @Test("a recent print or a recent job makes an old model recent")
-    func recentUseCounts() throws {
+    func recentUseCounts() async throws {
         let old = Self.now.addingTimeInterval(-900 * 86_400)
-        let printed = try Self.record("PF-p", created: old, lastPrinted: "2026-09-10")
-        let jobbed = try Self.record("PF-j", created: old)
-        let usage = CloudLibrary.usage(files: [printed, jobbed],
-                                       orders: [try Self.job("delivered", date: "2026-09-12", files: ["PF-j"])])
+        let printed = Self.record("PF-p", created: old, lastPrinted: "2026-09-10")
+        let jobbed = Self.record("PF-j", created: old)
+        let usage = try await Self.usage(try KhaytEngine(), files: [printed, jobbed],
+                                         orders: [Self.job("delivered", date: "2026-09-12", files: ["PF-j"])])
         let sep = try #require(Order.day("2026-09-01")).timeIntervalSince1970 * 1000
         #expect((usage["PF-p"]?.lastUsedMs ?? 0) > sep)
         #expect((usage["PF-j"]?.lastUsedMs ?? 0) > sep)
