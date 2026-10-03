@@ -1053,6 +1053,14 @@ function openInventoryEditor(id) {
     <input type="number" id="ieCostInput" value="${item.cost}" min="0" step="0.01">
     <label style="margin-top:14px;" id="ieWeightLabel">${escapeHtml(t(item.materialType === 'resin' ? 'inv.volume_ml' : 'inv.remaining'))}</label>
     <input type="number" id="ieWeightInput" value="${Math.round(item.weight)}" min="0" step="1">
+    <!-- What the spool held when it was bought. Every cost-per-gram divides the
+         price by this (build.js, inventory.js, lib/po-audit.js), and a spool added
+         before it was recorded is costed as a kilo — so a 3 kg roll read three
+         times dear and a 250 g sample a quarter of its cost, with nowhere to fix
+         it. lib/spool-edit.js already accepts it; blank leaves it as stored. -->
+    <label style="margin-top:14px;" for="ieSpoolWeightInput">${escapeHtml(t(item.materialType === 'resin' ? 'inv.spool_size_ml' : 'inv.spool_size'))}</label>
+    <input type="number" id="ieSpoolWeightInput" value="${+item.spoolWeight > 0 ? Math.round(item.spoolWeight) : ''}" placeholder="1000" min="1" step="1">
+    <p class="hint" style="margin:4px 0 0;font-size:11px;color:var(--text-muted);">${escapeHtml(t('inv.spool_size_hint'))}</p>
     <div class="inline-pair" style="margin-top:14px;">
       <div>
         <label style="margin-top:0;">${escapeHtml(t('inv.purchased_on'))}</label>
@@ -1123,6 +1131,7 @@ function openInventoryEditor(id) {
         colourVariant: el('ieColourInput')?.value,
         cost:         el('ieCostInput').value,
         weight:       el('ieWeightInput').value,
+        spoolWeight:  el('ieSpoolWeightInput')?.value,
         purchasedAt:  el('iePurchasedAt').value,
         openedAt:     el('ieOpenedAt').value,
         lot:          el('ieLot')?.value,

@@ -4,6 +4,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Spools added before this release can be given their size.** Material cost
+  is the spool's price divided by what it held when bought, and a spool from an
+  earlier release has no record of that, so every one was costed as a kilo — a
+  3 kg roll read three times dear and a 250 g sample a quarter of its real cost,
+  with no field anywhere to correct it. The spool editor now has **Size when
+  new**; blank leaves it as it was. Khayt and Bed Ready both.
+- **(Bed Ready) Print-file cards hold their own buttons again.** The action row
+  does not wrap, and Bed Ready's narrower content area left every card at 231px,
+  so the More actions button hung off the card's edge. Cards are now at least
+  260px wide, which fits the row; Khayt at its usual window size is unchanged.
+- **(Bed Ready) Update and safety messages say Bed Ready.** The new
+  explanations for a failed update check ("…Khayt will try again later"), the
+  full-wipe dialogs, the newer-data-file refusal and the printer-history error
+  named Khayt in Bed Ready.
+
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its

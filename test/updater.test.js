@@ -443,3 +443,30 @@ test('a bare string error still produces something sayable', () => {
   const empty = explainUpdateError(undefined);
   assert.equal(empty.message, 'Update check failed');
 });
+
+test('Bed Ready\'s update explanations name Bed Ready, not Khayt', () => {
+  // Bed Ready loads this same updater (its own feed, its own update UI), and these
+  // sentences reach its Settings screen. They were written with "Khayt" spelled in,
+  // so a Bed Ready user checking for updates offline was told "Khayt will try again
+  // later". The flavor is fixed when lib/flavor.js loads, so run it in a child.
+  const { execFileSync } = require('child_process');
+  const script = `
+    const Module = require('module');
+    const orig = Module.prototype.require;
+    Module.prototype.require = function (id) {
+      if (id === 'electron-updater') return { autoUpdater: { on() {} } };
+      return orig.apply(this, arguments);
+    };
+    const { explainUpdateError } = require(${JSON.stringify(path.join(__dirname, '..', 'lib', 'updater'))});
+    const err = (code, extra) => Object.assign(new Error('x'), { code }, extra);
+    const out = ['ENOTFOUND', 'ERR_UPDATER_NO_PUBLISHED_VERSIONS', 'ERR_UPDATER_INVALID_RELEASE_FEED',
+      'ERR_UPDATER_INVALID_VERSION', 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND']
+      .map((c) => explainUpdateError(err(c)).message);
+    out.push(explainUpdateError(err('', { statusCode: 503 })).message);
+    process.stdout.write(JSON.stringify(out));`;
+  const messages = JSON.parse(execFileSync(process.execPath, ['-e', script], {
+    env: { ...process.env, KHAYT_FLAVOR: 'bedready' }, encoding: 'utf8',
+  }));
+  for (const m of messages) assert.doesNotMatch(m, /Khayt/, m);
+  assert.ok(messages.some((m) => /Bed Ready/.test(m)), 'at least one sentence names the app');
+});

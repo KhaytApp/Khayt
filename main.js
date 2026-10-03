@@ -376,7 +376,7 @@ ipcMain.handle('hub:request-full-wipe', async (event) => {
     cancelId: 0,
     noLink: true,
     title: 'Full wipe',
-    message: 'Delete ALL Khayt data on this computer?',
+    message: `Delete ALL ${FLAVOR_NAME} data on this computer?`,
     detail: 'Store, photos, invoices, backups, and keys will be removed, and the app will restart empty. '
       + 'One safety copy of your book is saved first, in the backups folder, so a wipe made by mistake can be restored from Settings → Backups.',
   });
@@ -390,7 +390,7 @@ ipcMain.handle('hub:request-full-wipe', async (event) => {
     await dialog.showMessageBox(win || undefined, {
       type: 'error', buttons: ['OK'], title: 'Full wipe',
       message: 'Nothing was deleted.',
-      detail: `Khayt could not save a safety copy of your book first, so it stopped before deleting anything.\n\n${why}`,
+      detail: `${FLAVOR_NAME} could not save a safety copy of your book first, so it stopped before deleting anything.\n\n${why}`,
     });
     return { ok: false, error: 'safety-backup-failed', detail: why };
   }
@@ -1820,7 +1820,7 @@ let _diskStoreVersion = null;
 ipcMain.handle('hub:save-store', async (event, data) => {
   try {
     if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
-      const msg = `This data file was written by a newer version of Khayt (v${_diskStoreVersion}); this build supports v${STORE_VERSION}. Not saving, so nothing is lost — please update Khayt.`;
+      const msg = `This data file was written by a newer version of ${FLAVOR_NAME} (v${_diskStoreVersion}); this build supports v${STORE_VERSION}. Not saving, so nothing is lost — please update ${FLAVOR_NAME}.`;
       console.error('hub:save-store:', msg);
       return { ok: false, error: msg };
     }
@@ -4440,7 +4440,7 @@ ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
 async function fetchPrinterHistory(machine, limit) {
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
-    return { ok: false, error: 'Only Klipper/Moonraker printers keep a job history Khayt can read' };
+    return { ok: false, error: `Only Klipper/Moonraker printers keep a job history ${FLAVOR_NAME} can read` };
   }
   const printerHost = sanitizePrinterHost(host);
   if (!isAllowedPrinterHost(printerHost)) return { ok: false, error: 'Invalid printer host' };
