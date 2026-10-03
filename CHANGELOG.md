@@ -377,7 +377,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the shop network). Customer rate limits count an IPv6 visitor once per /64
   rather than once per address. A burst of uploads can no longer get past the
   three-at-once measuring cap. Uploaded models up to the advertised 32 MB are
-  accepted; before, anything over 1 MB was refused.
+  accepted; before, anything over 1 MB was refused. Measuring or slicing a
+  customer's upload no longer takes the threads the rest of the app runs on,
+  so three uploads at once on a three-core Mac cannot stall the whole app.
 
 - **(Mac) Changing the electricity price in Settings › Business also updates
   the "Shop rates" preset that an earlier first-run setup made.** That preset's

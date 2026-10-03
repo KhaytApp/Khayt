@@ -290,6 +290,10 @@ final class LanServer {
     /// three at once is a shop's machine given over to strangers.
     private var measuring = 0
     nonisolated static let maxMeasuring = 3
+    /// Where an upload is measured: dispatch's threads, never the cooperative
+    /// pool — see `estimate`. Concurrent, and bounded by `maxMeasuring`.
+    nonisolated static let measureQueue = DispatchQueue(label: "khayt.lan.measure", qos: .utility,
+                                                        attributes: .concurrent)
     nonisolated static let maxUpload = 32 * 1024 * 1024
     /// Above this a model is measured but not walked for risk — the walk is
     /// the expensive half, and the shop can re-check it on a real printer.
@@ -1321,13 +1325,28 @@ final class LanServer {
             // was sent: a small deflate bomb measured here froze the shop's
             // window, and `maxMeasuring` meant nothing while every
             // measurement queued on the one thread. Sep 2026 scan.
+            //
+            // ── AND OFF THE COOPERATIVE POOL ──────────────────────────────
+            //
+            // It ran in `Task.detached`, which is the same small pool every
+            // `await` in the app resumes on — one thread per core. Reading a
+            // model is seconds of synchronous work, and three at once (the
+            // cap) on a three-core machine took EVERY thread: the engine, the
+            // other requests and the window's own tasks waited until the
+            // meshes were done. On CI's three-core runner a test that held its
+            // measurements open hung the whole suite for six hours, because
+            // the code that would have let them go needed a pool thread too.
+            // A queue of its own spends dispatch's threads, not the pool's.
+            // Oct 2026.
             let measure = host.measure
             let body = request.body
-            intake = try? await Task.detached {
-                try Zip.$inflateBudget.withValue(min(max(body.count, 1) * 250, LanServer.maxInflate)) {
-                    try measure(body, ext)
+            let budget = min(max(body.count, 1) * 250, LanServer.maxInflate)
+            intake = await withCheckedContinuation { (done: CheckedContinuation<JSONValue?, Never>) in
+                LanServer.measureQueue.async {
+                    let measured = try? Zip.$inflateBudget.withValue(budget) { try measure(body, ext) }
+                    done.resume(returning: measured ?? nil)
                 }
-            }.value
+            }
         }
         guard let intake else {
             return .open(400, #"{"ok":false,"reason":"no-numbers"}"#)
@@ -2390,11 +2409,19 @@ extension Shop {
         // blocks for all of it; run here, on the shop's main actor, a stranger's
         // upload froze the whole app — and a slicer that never exited froze it
         // for good.
-        let text: String? = await Task.detached {
-            guard (try? SlicerRun.slice(model, with: slicer, argv: argv, allowed: true)) != nil,
-                  let gcode = SlicerRun.gcode(in: dir, expected: output) else { return nil }
-            return try? SlicerRun.totalsText(of: gcode)
-        }.value
+        //
+        // And off the cooperative pool, on the measuring queue: three-minute
+        // blocking slices, three at once, would hold every pool thread on a
+        // three-core Mac (see `LanServer.estimate`). Oct 2026.
+        let text: String? = await withCheckedContinuation { (done: CheckedContinuation<String?, Never>) in
+            LanServer.measureQueue.async {
+                guard (try? SlicerRun.slice(model, with: slicer, argv: argv, allowed: true)) != nil,
+                      let gcode = SlicerRun.gcode(in: dir, expected: output) else {
+                    done.resume(returning: nil); return
+                }
+                done.resume(returning: try? SlicerRun.totalsText(of: gcode))
+            }
+        }
         guard let text else { return nil }
         return try? await engine.gcodeIntake(text: text)
     }

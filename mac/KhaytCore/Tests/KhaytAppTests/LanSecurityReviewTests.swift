@@ -10,6 +10,12 @@ import KhaytCore
 /// sixteen requests that genuinely interleave at the server's `await`s — the
 /// two things the findings were about — without depending on how quickly the
 /// test runner gets round to sixteen URLSession tasks.
+///
+/// No `.timeLimit` here, deliberately: a @MainActor test's clock runs while it
+/// waits its turn for the main actor, and in a full run that wait alone is
+/// twenty minutes — every test in this suite "exceeded" five. The guards
+/// against a hang are on the things that can hang: `Gate` lets go by itself,
+/// and blocking probes go through `offPool`.
 @MainActor
 struct LanSecurityReviewTests {
 
@@ -146,13 +152,30 @@ struct LanSecurityReviewTests {
 
     // MARK: 2 — three measurements at once means three
 
+    final class Labels: @unchecked Sendable {
+        private let lock = NSLock()
+        private var seen: [String] = []
+        func add(_ label: String) { lock.lock(); seen.append(label); lock.unlock() }
+        var entries: [String] { lock.lock(); defer { lock.unlock() }; return seen }
+    }
+
     /// Counts measurements in progress and holds each until released.
     final class Gate: @unchecked Sendable {
         private let lock = NSLock()
         private var entered = 0
         let release = DispatchSemaphore(value: 0)
         var inside: Int { lock.lock(); defer { lock.unlock() }; return entered }
-        func enter() { lock.lock(); entered += 1; lock.unlock(); release.wait() }
+        private var expired = 0
+        /// How many measurements gave up waiting — a hang turned into a failure.
+        var timedOut: Int { lock.lock(); defer { lock.unlock() }; return expired }
+        /// Held until released, or for at most ten minutes: a test that
+        /// never lets go must FAIL, not hold a thread for the life of the run.
+        /// (Generous, because the test that releases it is a main-actor task
+        /// in a suite that queues for the main actor.)
+        func enter() {
+            lock.lock(); entered += 1; lock.unlock()
+            if release.wait(timeout: .now() + 600) == .timedOut { lock.lock(); expired += 1; lock.unlock() }
+        }
     }
 
     @Test("a burst of uploads cannot get past the three-at-once cap")
@@ -168,7 +191,12 @@ struct LanSecurityReviewTests {
         var host = LanServer.Host(store: { store }, pin: "24682468", engine: engine)
         host.intakeToken = "intake-token-for-tests"
         host.pricing = { store }
-        host.measure = { _, _ in gate.enter(); return LanServerTests.measuredCube }
+        let where_ = Labels()
+        host.measure = { _, _ in
+            where_.add(currentQueueLabel())
+            gate.enter()
+            return LanServerTests.measuredCube
+        }
         let server = LanServer(host: host)
         let answered = LanServerTests.Counter()
         let uploads = (0..<8).map { i in
@@ -181,8 +209,9 @@ struct LanSecurityReviewTests {
                 return status
             }
         }
-        // Wait (generously) for the five that should be turned away.
-        let deadline = Date().addingTimeInterval(120)
+        // Wait for the five that should be turned away — shorter than the
+        // gate's own ten minutes, so the test lets go before the gate does.
+        let deadline = Date().addingTimeInterval(300)
         while answered.n < 8 - LanServer.maxMeasuring, Date() < deadline {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
@@ -191,6 +220,7 @@ struct LanSecurityReviewTests {
         var statuses: [Int] = []
         for upload in uploads { statuses.append(await upload.value) }
         #expect(inside <= LanServer.maxMeasuring, "\(inside) measured at once")
+        #expect(gate.timedOut == 0, "a held measurement was never let go")
         #expect(statuses.filter { $0 == 200 }.count == LanServer.maxMeasuring, Comment(rawValue: "\(statuses)"))
         #expect(statuses.filter { $0 == 503 }.count == 8 - LanServer.maxMeasuring, Comment(rawValue: "\(statuses)"))
         // And the slots came back: the next one is measured.
@@ -200,6 +230,10 @@ struct LanSecurityReviewTests {
             headers: ["x-khayt-intake-token": "intake-token-for-tests"],
             body: Data(LanServerTests.stlBytes.utf8), remote: "192.168.1.99"))
         #expect(later.status == 200, Comment(rawValue: String(decoding: later.body, as: UTF8.self)))
+        // Every measurement ran on the server's own queue — never on the
+        // cooperative pool, where three held measurements hung CI for 6 h.
+        #expect(!where_.entries.isEmpty)
+        #expect(where_.entries.allSatisfy { $0 == "khayt.lan.measure" }, Comment(rawValue: "\(where_.entries)"))
     }
 
     @Test("a refused upload gives its slot back")
@@ -282,15 +316,15 @@ struct LanSecurityReviewTests {
         let bench = try await LanServerTests.Bench()
         defer { bench.stop() }
         let port = bench.port
-        let elsewhere = await Task.detached { Self.headOnly(port: port, path: "/api/intake", length: 2 << 20) }.value
+        let elsewhere = await offPool { Self.headOnly(port: port, path: "/api/intake", length: 2 << 20) }
         #expect(elsewhere.hasPrefix("HTTP/1.1 413"), Comment(rawValue: elsewhere))
-        let deltas = await Task.detached {
+        let deltas = await offPool {
             Self.headOnly(port: port, path: "/api/store/deltas", length: 2 << 20)
-        }.value
+        }
         #expect(deltas.hasPrefix("HTTP/1.1 413"), Comment(rawValue: deltas))
-        let huge = await Task.detached {
+        let huge = await offPool {
             Self.headOnly(port: port, path: "/api/intake/estimate?name=a.stl", length: LanServer.maxUpload + 1)
-        }.value
+        }
         #expect(huge.hasPrefix("HTTP/1.1 413"), Comment(rawValue: huge))
         #expect(huge.contains("too-large"), Comment(rawValue: huge))
     }

@@ -21,7 +21,8 @@ import KhaytCore
 /// the test body. The test and the server share the MainActor, so it was the
 /// TEST that stopped the server answering, and it would have "proved" the bug
 /// whether or not it existed — and then "proved" the fix did not work when it
-/// did. Anything that blocks goes through `Task.detached` here for that reason.
+/// did. Anything that blocks goes through `offPool` here for that reason — not
+/// `Task.detached`, which blocks a cooperative-pool thread instead (see OffPool.swift).
 @MainActor
 struct LanStallTests {
 
@@ -92,7 +93,7 @@ struct LanStallTests {
     func silentConnection() async throws {
         let bench = try await LanServerTests.Bench(readTimeout: Self.short)
         let port = bench.port
-        let verdict = await Task.detached { Self.stall(port: port, send: nil, waitFor: Self.patience) }.value
+        let verdict = await offPool { Self.stall(port: port, send: nil, waitFor: Self.patience) }
         #expect(verdict == "closed",
                 Comment(rawValue: "a silent client was \(verdict) — it holds a connection and a task"))
     }
@@ -102,7 +103,7 @@ struct LanStallTests {
         let bench = try await LanServerTests.Bench(readTimeout: Self.short)
         let port = bench.port
         let head = "POST /api/intake HTTP/1.1\r\nHost: x\r\nContent-Length: 1000\r\n\r\n"
-        let verdict = await Task.detached { Self.stall(port: port, send: head, waitFor: Self.patience) }.value
+        let verdict = await offPool { Self.stall(port: port, send: head, waitFor: Self.patience) }
         #expect(verdict == "closed", Comment(rawValue: "a stalled body was \(verdict)"))
     }
 
@@ -111,7 +112,7 @@ struct LanStallTests {
         let bench = try await LanServerTests.Bench(readTimeout: Self.short)
         let port = bench.port
         let head = "GET /api/status HTTP/1.1\r\nHost: x\r\n"
-        let verdict = await Task.detached { Self.stall(port: port, send: head, waitFor: Self.patience) }.value
+        let verdict = await offPool { Self.stall(port: port, send: head, waitFor: Self.patience) }
         #expect(verdict == "closed", Comment(rawValue: "a partial head was \(verdict)"))
     }
 
