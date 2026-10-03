@@ -1054,7 +1054,9 @@ struct MachineSheet: View {
                 if let headers = try? await engine.webcamAuthHeaders(printerApi: row) {
                     for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
                 }
-                guard let (data, response) = try? await URLSession.shared.data(for: request) else { continue }
+                // The poller's session: ephemeral, and no redirect carries the
+                // printer's key to an address `assertWebcamHost` never saw.
+                guard let (data, response) = try? await PrinterWatch.session.data(for: request) else { continue }
                 let http = response as? HTTPURLResponse
                 let refusal = try? await engine.checkSnapshot(
                     status: http?.statusCode ?? 0,
@@ -1100,7 +1102,7 @@ struct MachineSheet: View {
                 }
                 let base = try await PrinterWatch.baseURL(draft, engine: engine)
                 let status = try await PrinterWatch.read(draft, engine: engine, base: base, key: key,
-                                                         fetch: { try await URLSession.shared.data(for: $0) })
+                                                         fetch: { try await PrinterWatch.session.data(for: $0) })
                 testWorked = true
                 let state = status.state.isEmpty ? "—" : status.state
                 testSaid = status.filename.isEmpty

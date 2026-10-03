@@ -3814,6 +3814,31 @@ final class Shop {
     /// editing a record a newer one saved writes the legacy fields and leaves
     /// the array behind — and deciding which wins is exactly the migration
     /// `lib/product-images.js` exists to own.
+    /// Every picture file named by a product OTHER than `productId` — the
+    /// legacy `imagePath` and each `images[].path`, by file name. What a save
+    /// or a delete of `productId` must never rewrite or unlink.
+    func pictureFilesOfOtherProducts(than productId: String) -> Set<String> {
+        Self.pictureFiles(in: productRows, except: productId)
+    }
+
+    static func pictureFiles(in productRows: [JSONValue], except productId: String) -> Set<String> {
+        var names: Set<String> = []
+        for row in productRows {
+            guard case .object(let record) = row, Self.recordId(row) != productId else { continue }
+            if case .string(let path)? = record["imagePath"], !path.isEmpty {
+                names.insert((path as NSString).lastPathComponent)
+            }
+            if case .array(let images)? = record["images"] {
+                for case .object(let image) in images {
+                    if case .string(let path)? = image["path"], !path.isEmpty {
+                        names.insert((path as NSString).lastPathComponent)
+                    }
+                }
+            }
+        }
+        return names
+    }
+
     func pictures(of productId: String) async -> [StagedPicture] {
         guard let engine,
               let row = productRows.first(where: { Self.recordId($0) == productId }),
@@ -3944,13 +3969,19 @@ final class Shop {
         // A turned picture is rewritten OVER its own file (`ProductPhotos
         // .target`); only one whose file is not a JPEG moves, and its old file
         // is unlinked with the removals — after the record, like them.
-        var removed = removed
+        // Only this product's own files are rewritten or unlinked — never a
+        // file another product's record names (`ProductPhotos.target`).
+        let othersUse = pictureFilesOfOtherProducts(than: product.id)
+        var removed = removed.filter {
+            ProductPhotos.mayTouch($0, productId: product.id, othersUse: othersUse)
+        }
         if staged != nil {
             for i in staged!.indices {
                 guard let bytes = staged![i].bytes else { continue }
                 do {
                     let target = ProductPhotos.target(existing: staged![i].path,
-                                                      productId: product.id, imageId: staged![i].id)
+                                                      productId: product.id, imageId: staged![i].id,
+                                                      othersUse: othersUse)
                     staged![i].path = try ProductPhotos.write(bytes, named: target.name, in: build)
                     if let old = target.unlink { removed.append(old) }
                     staged![i].bytes = nil
@@ -11095,6 +11126,7 @@ final class Shop {
         // The pictures, read BEFORE the record goes: afterwards there is
         // nothing left to read their names off.
         let pictureNames = await pictures(of: id).compactMap(\.path)
+        let othersUse = pictureFilesOfOtherProducts(than: id)
         var removed: [String: JSONValue]?
         var unlinked: [String] = []
         var bundles: [String] = []
@@ -11146,7 +11178,8 @@ final class Shop {
             // The bytes go LAST, and only once the record is gone: a picture
             // deleted beside a record that survived is a broken thumbnail on
             // every screen that draws the catalogue.
-            for name in pictureNames where !name.isEmpty {
+            for name in pictureNames where !name.isEmpty
+                && ProductPhotos.mayTouch(name, productId: id, othersUse: othersUse) {
                 ProductPhotos.delete(name, in: build)
             }
             registerProductUndo(removed, unlinked: unlinked, bundles: bundles, pictures: pictureNames)

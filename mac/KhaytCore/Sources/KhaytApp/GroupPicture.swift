@@ -68,7 +68,11 @@ enum GroupPictures {
         let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int
         if let size, size > ProductPhotos.maxSourceBytes { throw ProductPhotos.Failure.tooBig(size) }
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = ProductPhotos.upright(source) else { throw ProductPhotos.Failure.notAnImage }
+              // Decoded at no more than the size it is written at: a group
+              // picture is 600 px, and nothing bigger is ever needed of it.
+              let image = ProductPhotos.upright(source, maxPixel: maxDim) else {
+            throw ProductPhotos.Failure.notAnImage
+        }
         guard let jpeg = ProductPhotos.jpeg(image, maxDim: maxDim, quality: quality) else {
             throw ProductPhotos.Failure.couldNotEncode
         }

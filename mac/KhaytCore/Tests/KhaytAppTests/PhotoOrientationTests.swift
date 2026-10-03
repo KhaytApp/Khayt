@@ -270,9 +270,10 @@ struct PhotoOrientationTests {
         let target = ProductPhotos.target(existing: "PROD-1.png", productId: "PROD-1", imageId: "IMG-c")
         #expect(target.name == "PROD-1-IMG-c.jpeg")
         #expect(target.unlink == "PROD-1.png")
-        // A path off a synced record cannot reach outside the folder.
+        // A path off a synced record cannot reach outside the folder — nor
+        // name a file that is not this product's (Alpha58PictureTests).
         let odd = ProductPhotos.target(existing: "../../etc/x.jpeg", productId: "PROD-1", imageId: "i")
-        #expect(odd.name == "x.jpeg")
+        #expect(odd.name == "PROD-1-i.jpeg" && odd.unlink == nil)
     }
 
     @Test("an untouched save writes the pictures back exactly as the book holds them (#1676)")

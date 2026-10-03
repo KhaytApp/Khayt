@@ -47,7 +47,9 @@ enum LibraryPhoto {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               // Upright, for the reason `ProductPhotos.upright` gives: the
               // JPEG written below carries no orientation tag.
-              let image = ProductPhotos.upright(source) else {
+              // …and decoded no larger than a group picture is, which is
+              // already more than the 480 px written.
+              let image = ProductPhotos.upright(source, maxPixel: GroupPictures.maxDim) else {
             throw ProductPhotos.Failure.notAnImage
         }
         guard let jpeg = ProductPhotos.jpeg(image, maxDim: maxDim, quality: quality) else {

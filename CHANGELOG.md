@@ -42,6 +42,41 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   records. They are now readable by your user account only, and conflict
   copies older than 60 days, or beyond the newest 200, are removed.
 - **(Mac) Unpacking a large archive no longer slows the rest of the app.**
+- **(Mac) Security fixes before alpha.58.**
+  - **Phones on your own Wi-Fi are now counted separately.** The LAN server
+    grouped every IPv6 address in the same /64 as one visitor. Your network
+    is one /64, so ten wrong PINs from any device on the Wi-Fi locked out
+    your own iPhone, even with the right PIN. All IPv6 devices also shared
+    one intake limit and one share of the connection cap. Link-local,
+    unique-local and same-network addresses now each count on their own.
+    Visitors from outside your network are still grouped by /64.
+  - **Khayt Cloud can no longer lower the rollback check.** After a push,
+    the Mac raises the highest cloud revision it remembers and never lowers
+    it. It refuses a push reply at or below the revision it sent. If you
+    reset your cloud and push the whole book again, the Mac asks before it
+    accepts the older revision: use "Trust the cloud's older copy".
+  - **Large uploads are checked before they are read.** A price-estimate
+    upload over 1 MB is refused straight away when quoting is off or the
+    visitor has no form session or intake token. Before, the server read up
+    to 32 MB first.
+  - **Smart plugs must stay on your network.** A plug's hostname is now
+    looked up, and every address it resolves to must be private or
+    link-local. Over plain HTTP, the request goes to the address that was
+    checked. A plug with a public name, such as a Nabu Casa remote URL, is
+    now refused. IPv6 plug addresses such as `[fe80::…]` work now; before,
+    they were always refused.
+  - **Bambu certificate pins:** a pin stored in user defaults is moved to
+    the Keychain once and never read again. Another app cannot plant one
+    later.
+  - **Printer API keys no longer follow redirects.** The machine sheet's
+    Test button and camera search now use the same connection as the
+    printer monitor, which does not follow redirects.
+  - **Model import refuses symlinks**, even a symlink to a real model file.
+  - **Pictures with huge dimensions are refused before they are decoded,**
+    and pictures are never decoded larger than they are used.
+  - **Rotating a product picture only changes that product's own file.**
+    Saving or deleting a product now leaves alone any file that another
+    product uses, or that is not named for this product.
 
 - **(Mac) An automatic web-store republish no longer fails as soon as it
   starts.** The republish that follows a catalogue change cancelled its own

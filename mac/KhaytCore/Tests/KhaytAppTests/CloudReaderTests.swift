@@ -600,12 +600,24 @@ struct CloudRollbackTests {
         #expect(ok.rev == 4)
     }
 
-    @Test("a push the server confirms sets the mark, even lower — its answer to this device's own write")
+    @Test("a push the server confirms only RAISES the mark; a lower answer waits for the shop to accept it")
     func pushConfirms() async throws {
         let memory = CloudReader.RevisionMemory(defaults: nil)
         memory.saw(Self.connection, rev: 57)
+        memory.confirmed(Self.connection, rev: 60)
+        #expect(memory.highest(Self.connection) == 60)
+        // A cloud answering a push with rev 1 cannot lower the guard by itself…
         memory.confirmed(Self.connection, rev: 1)
+        #expect(memory.highest(Self.connection) == 60, "the server's answer lowered the rollback mark")
+        await #expect(throws: CloudReader.Failure.self) {
+            _ = try await CloudReader.pull(Self.connection, token: "t", memory: memory, fetch: Self.reply(1))
+        }
+        // …but a shop that really did reset its cloud says so, and carries on.
+        #expect(memory.refusal(Self.connection) == 1)
+        #expect(memory.accept(Self.connection))
         #expect(memory.highest(Self.connection) == 1)
+        let ok = try await CloudReader.pull(Self.connection, token: "t", memory: memory, fetch: Self.reply(1))
+        #expect(ok.rev == 1)
         let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)

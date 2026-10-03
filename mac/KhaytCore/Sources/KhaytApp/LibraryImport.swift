@@ -214,10 +214,16 @@ enum LibraryImport {
         guard kinds.contains(ext) else { throw Failure.unknownKind(ext) }
 
         let originalName = source.lastPathComponent
-        // What it RESOLVES to must be a plain file: a device (`/dev/zero`), a
+        // The item ITSELF must be a plain file: a device (`/dev/zero`), a
         // pipe or a directory wearing a model's name hashes for ever or not at
         // all. The walkers already skip symlinks; this is the last door.
-        guard isRegularFile(source.resolvingSymlinksInPath()) else {
+        //
+        // Read with lstat, on the source as given. It used to be asked of
+        // `resolvingSymlinksInPath()` — so a symlink to any regular file, picked
+        // on its own, passed, and an import that MOVES then took a file from
+        // wherever the link pointed: outside every folder the shop chose.
+        // Oct 2026 review.
+        guard isRegularFile(source) else {
             throw Failure.failed("\(originalName) is not a file")
         }
 

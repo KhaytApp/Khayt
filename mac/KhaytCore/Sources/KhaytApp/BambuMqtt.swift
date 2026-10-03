@@ -189,9 +189,10 @@ enum BambuMqtt {
 /// exactly that (`defaults write` is enough), and rewriting the pin to an
 /// attacker's fingerprint — or deleting it, to be trusted "first" — defeats
 /// it. A login-Keychain item is readable and writable by this app's
-/// signature only. A pin already in defaults is moved across on first read.
-/// Where there is no Keychain to write to (a CI runner) it falls back to
-/// defaults rather than to trusting every certificate.
+/// signature only. A pin already in defaults is moved across ONCE, the first
+/// time this version runs, and never read from defaults again (see
+/// `Store.guarded`). Where there is no Keychain to write to (a CI runner) it
+/// falls back to defaults rather than to trusting every certificate.
 enum BambuPin {
     /// Where pins live. A seam so tests do not write the login Keychain.
     struct Store: Sendable {
@@ -256,23 +257,90 @@ extension BambuPin.Store {
         return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
     }
 
-    /// The login Keychain, with the old defaults pin moved across on read and
-    /// defaults as the fallback where the Keychain cannot be written.
-    static let keychain = BambuPin.Store(
-        read: { key in
-            if let pinned = keychainRead(key) { return pinned }
-            guard let legacy = UserDefaults.standard.string(forKey: key) else { return nil }
-            if keychainWrite(key, legacy) { UserDefaults.standard.removeObject(forKey: key) }
-            return legacy
-        },
-        write: { key, value in
-            if keychainWrite(key, value) { UserDefaults.standard.removeObject(forKey: key) }
-            else { UserDefaults.standard.set(value, forKey: key) }
-        },
-        remove: { key in
-            SecItemDelete(query(key) as CFDictionary)
-            UserDefaults.standard.removeObject(forKey: key)
-        })
+    /// The Keychain primitives a guarded store is built on — a seam, so the
+    /// migration below is tested without touching the login Keychain.
+    struct Backend: Sendable {
+        var read: @Sendable (String) -> String?
+        var write: @Sendable (String, String) -> Bool
+        var remove: @Sendable (String) -> Void
+
+        static let login = Backend(read: { keychainRead($0) },
+                                   write: { keychainWrite($0, $1) },
+                                   remove: { SecItemDelete(query($0) as CFDictionary) })
+    }
+
+    /// The Keychain item that says defaults pins were moved across once.
+    /// In the Keychain, not defaults, so another process cannot forge it —
+    /// and forging it the other way (deleting it) needs this app's signature.
+    static let migratedMarker = "bambu.certpin.__migrated-to-keychain.v1"
+
+    /// The login Keychain. See `guarded`.
+    static let keychain = guarded(.login, defaults: .standard)
+
+    /// A pin store on `keychain`, with defaults used ONLY where the Keychain
+    /// cannot be written at all (a CI runner).
+    ///
+    /// ── DEFAULTS ARE MIGRATED ONCE, NEVER READ AFTER ──────────────────────
+    ///
+    /// The read used to fall back to defaults and MOVE whatever it found
+    /// there into the Keychain — every time a printer had no Keychain pin.
+    /// So any process of this user could `defaults write` an attacker's
+    /// fingerprint for a printer not yet pinned (or one whose pin was just
+    /// cleared by saving its access code), and the next connect promoted it
+    /// into the Keychain as the trusted certificate. Now the move happens
+    /// once, the first time this version runs, and is recorded in the
+    /// Keychain (`migratedMarker`); after that a pin in defaults is never
+    /// read, let alone trusted. Oct 2026 review.
+    ///
+    /// The data-protection keychain (`kSecUseDataProtectionKeychain`) would
+    /// also shut out same-user processes by access group, but it needs a
+    /// keychain-access-groups entitlement the unsigned SwiftPM build and its
+    /// tests do not have, and moving to it would orphan every existing pin.
+    static func guarded(_ keychain: Backend, defaults: UserDefaults) -> BambuPin.Store {
+        // UserDefaults is thread-safe and not marked Sendable; the box says so.
+        final class Once: @unchecked Sendable {
+            let lock = NSLock()
+            var usable: Bool?
+            let defaults: UserDefaults
+            init(_ defaults: UserDefaults) { self.defaults = defaults }
+        }
+        let once = Once(defaults)
+        let prefix = "bambu.certpin."
+        // True when the Keychain is usable; migrates on the first call only.
+        let keychainUsable: @Sendable () -> Bool = {
+            once.lock.withLock {
+                if let usable = once.usable { return usable }
+                let usable: Bool
+                if keychain.read(migratedMarker) != nil {
+                    usable = true
+                } else if keychain.write(migratedMarker, "1") {
+                    usable = true
+                    for (key, value) in once.defaults.dictionaryRepresentation()
+                    where key.hasPrefix(prefix) && key != migratedMarker {
+                        guard let pin = value as? String else { continue }
+                        if keychain.read(key) != nil || keychain.write(key, pin) {
+                            once.defaults.removeObject(forKey: key)
+                        }
+                    }
+                } else {
+                    usable = false
+                }
+                once.usable = usable
+                return usable
+            }
+        }
+        return BambuPin.Store(
+            read: { key in
+                keychainUsable() ? keychain.read(key) : once.defaults.string(forKey: key)
+            },
+            write: { key, value in
+                if keychainUsable() { _ = keychain.write(key, value) } else { once.defaults.set(value, forKey: key) }
+            },
+            remove: { key in
+                keychain.remove(key)
+                once.defaults.removeObject(forKey: key)
+            })
+    }
 
     /// In memory, for tests.
     static func memory() -> BambuPin.Store {

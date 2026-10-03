@@ -87,7 +87,7 @@ enum ProductPhotos {
         // side with a tag saying which way up it goes, and the files written
         // below carry no tag — so the turn has to be in the pixels.
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = upright(source) else {
+              let image = upright(source, maxPixel: maxDecodeDim) else {
             throw Failure.notAnImage
         }
         guard let thumb = jpeg(image, maxDim: thumbMaxDim, quality: thumbQuality),
@@ -123,11 +123,23 @@ enum ProductPhotos {
     ///
     /// `maxPixel` nil keeps every pixel (the scaling is `jpeg`'s, which has to
     /// round as the canvas does). Nil when the source holds no image.
+    ///
+    /// ── NEVER DECODED WHOLE, AND NEVER ABSURD ─────────────────────────────
+    ///
+    /// The 8 MB file limit is no limit on PIXELS: a PNG of one colour at
+    /// 40,000 × 40,000 is a few hundred kilobytes and six gigabytes decoded.
+    /// So the size the file DECLARES is read first and anything over
+    /// `maxSourcePixels` is refused before a pixel is decoded, and the decode
+    /// itself is never larger than `maxPixel` — `maxDecodeDim` when the caller
+    /// gives none — on its longest side. ImageIO subsamples as it reads, so a
+    /// 48-megapixel photo costs a 4096-pixel image, not the whole sensor.
+    /// Oct 2026 review.
     nonisolated static func upright(_ source: CGImageSource, maxPixel: Int? = nil) -> CGImage? {
         let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         let w = (props?[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue ?? 0
         let h = (props?[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue ?? 0
-        let longest = maxPixel ?? max(w, h)
+        guard Self.sensiblePixels(width: w, height: h) else { return nil }
+        let longest = min(maxPixel ?? max(w, h), max(w, h), maxDecodeDim)
         if longest > 0, let turned = CGImageSourceCreateThumbnailAtIndex(source, 0, [
             // From the full image, never the small preview a camera embeds.
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -137,7 +149,19 @@ enum ProductPhotos {
         ] as CFDictionary) {
             return turned
         }
-        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+        return nil
+    }
+
+    /// The most pixels a picked picture may declare: a 108-megapixel phone
+    /// sensor fits, a decompression bomb does not.
+    nonisolated static let maxSourcePixels = 120_000_000
+    /// The longest side anything is decoded at. Every picture this app writes
+    /// is far smaller (1600 for a product's full size, 1000 for the web store).
+    nonisolated static let maxDecodeDim = 4096
+
+    /// Does the file declare a size worth decoding at all? Unknown (0) is no.
+    nonisolated static func sensiblePixels(width w: Int, height h: Int) -> Bool {
+        w > 0 && h > 0 && w <= 100_000 && h <= 100_000 && w * h <= maxSourcePixels
     }
 
     /// The EXIF orientation a file carries — 1 is upright, and so is no tag.
@@ -183,7 +207,7 @@ enum ProductPhotos {
     /// from the way the shop SEES it.
     nonisolated static func turn(_ data: Data, quarterTurns: Int) -> (thumb: String, full: Data)? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let image = upright(source),
+              let image = upright(source, maxPixel: maxDecodeDim),
               let turned = rotated(image, quarterTurns: quarterTurns),
               let thumb = jpeg(turned, maxDim: thumbMaxDim, quality: thumbQuality),
               let full = jpeg(turned, maxDim: fullMaxDim, quality: fullQuality) else { return nil }
@@ -351,14 +375,43 @@ enum ProductPhotos {
     /// Not over a file whose extension says it is not a JPEG: the bytes are
     /// JPEG, and the other app names the type from the extension. That picture
     /// moves to the main.js name, and the old file is handed back to unlink.
+    ///
+    /// ── ONLY EVER THIS PRODUCT'S OWN FILE ─────────────────────────────────
+    ///
+    /// The path comes off the product's record, and a record can arrive from a
+    /// sync with anything in it — including the name of ANOTHER product's
+    /// picture. Rewritten in place, turning this product's photo overwrote
+    /// that one's; moved, the old name was unlinked from under it. So a file
+    /// is rewritten or unlinked only when its name is one this product's own
+    /// pictures are given (`belongs`) and no other product in the book names
+    /// it (`othersUse`). Anything else is left exactly where it is, and the
+    /// turned bytes go to this picture's own minted name. Oct 2026 review.
     static func target(existing path: String, productId: String,
-                       imageId: String) -> (name: String, unlink: String?) {
+                       imageId: String, othersUse: Set<String> = []) -> (name: String, unlink: String?) {
         let leaf = (path as NSString).lastPathComponent
         let minted = filename(productId: productId, imageId: imageId)
         guard !leaf.isEmpty, leaf != ".", leaf != ".." else { return (minted, nil) }
+        let ours = mayTouch(leaf, productId: productId, othersUse: othersUse)
         let ext = (leaf as NSString).pathExtension.lowercased()
-        if ext == "jpeg" || ext == "jpg" { return (leaf, nil) }
-        return (minted, leaf == minted ? nil : leaf)
+        if ours, ext == "jpeg" || ext == "jpg" { return (leaf, nil) }
+        return (minted, ours && leaf != minted ? leaf : nil)
+    }
+
+    /// Is `name` a file this product's pictures are named — `<id>.jpeg`, or
+    /// `<id>-<image id>.<ext>` — by `main.js`'s rule (`filename`)?
+    nonisolated static func belongs(_ name: String, toProduct productId: String) -> Bool {
+        let leaf = (name as NSString).lastPathComponent
+        let base = (leaf as NSString).deletingPathExtension
+        let id = safe(productId)
+        guard !id.isEmpty, !base.isEmpty else { return false }
+        return base == id || base.hasPrefix(id + "-")
+    }
+
+    /// May a save or a delete of THIS product rewrite or unlink `name`? Only
+    /// when it is named as this product's own, and no other product names it.
+    nonisolated static func mayTouch(_ name: String, productId: String, othersUse: Set<String>) -> Bool {
+        let leaf = (name as NSString).lastPathComponent
+        return belongs(leaf, toProduct: productId) && !othersUse.contains(leaf)
     }
 }
 
