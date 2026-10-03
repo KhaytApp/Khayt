@@ -187,7 +187,14 @@ struct WebStoreTests {
         let src = try QuoteSheetStatusTests.source("WebStore.swift")
         #expect(src.contains("if automatic {"))
         #expect(src.contains("guard now.live else"))
-        #expect(src.contains("mac.ws_emptied"))
+        // NEVER OFFLINE BY ITSELF. An automatic publish that finds nothing to
+        // list holds and tells the shop; only a person takes the store down.
+        #expect(src.contains("mac.ws_empty_held"))
+        #expect(!src.contains("mac.ws_emptied"))
+        let auto = try #require(src.range(of: "if automatic {"))
+        let rest = src[auto.upperBound...]
+        let block = rest[..<(rest.range(of: "if sent == 0 { throw")?.lowerBound ?? rest.endIndex)]
+        #expect(!block.contains("catalog: nil"), "an automatic publish took the store offline")
         #expect(src.contains("cloudRoleCanWrite"), "a viewer's Mac follows a store it cannot publish")
         #expect(src.contains("self.webStoreBook == book"))
         let shop = try QuoteSheetStatusTests.source("Shop.swift")

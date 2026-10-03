@@ -298,16 +298,11 @@ extension Shop {
                 case .send: break
                 case .stop, .held: return
                 case .empty:
-                    try await CatalogPublisher.publish(connection, token: token, catalog: nil) {
-                        try await session.data(for: $0)
-                    }
-                    webStoreLive = false
-                    webStoreHeld = CatalogPublisher.Held(live: false)
-                    webStoreAt = Date()
-                    webStoreSaid = words.callIt("mac.ws_emptied")
-                    webStoreProblem = true
-                    webStoreSaidAt = Date()
-                    moveNotices.append(webStoreSaid ?? "")
+                    // NEVER OFFLINE BY ITSELF. This used to publish nothing —
+                    // taking a live store down because a sync, a repair or a
+                    // half-finished edit left nothing listable for a moment.
+                    // Held, and the shop is told; a person takes it offline.
+                    holdEmptyStore()
                     return
                 }
             }
@@ -426,7 +421,8 @@ extension Shop {
         case stop
         /// A price nobody set would change: held for review, nothing sent.
         case held
-        /// Nothing left to list: take the store offline.
+        /// Nothing left to list: HELD — an automatic publish never takes the
+        /// store offline (`holdEmptyStore`).
         case empty
     }
 
@@ -446,10 +442,10 @@ extension Shop {
         // — a customer would see it. Held, and the shop is asked; pressing
         // Publish in the sheet sends it.
         if holdUnsetPrices(sending: catalog, published: now) { return .held }
-        // EVERYTHING WAS DELETED. The service refuses an empty catalogue, so
-        // without this the old one stayed up: customers could still order what
-        // the shop had removed. An empty catalogue now means no store, and the
-        // shop is told.
+        // NOTHING LISTABLE. The service refuses an empty catalogue. This used
+        // to take the store offline by itself; an automatic publish must never
+        // do that (a sync or a repair can empty the list for a moment), so it
+        // is held and the shop is told — taking the store down is theirs.
         if sent == 0 { return .empty }
         return .send
     }
@@ -480,6 +476,18 @@ extension Shop {
         if fresh { moveNotices.append(webStoreSaid ?? "") }
         FileHandle.standardError.write(Data("khayt: web store — held \(ids.count) price change(s) the shop did not make\n".utf8))
         return true
+    }
+
+    /// An automatic publish found nothing to list: leave the store as it is
+    /// and say so — once, not on every edit that follows.
+    func holdEmptyStore() {
+        let said = words.callIt("mac.ws_empty_held")
+        let fresh = webStoreSaid != said
+        webStoreSaid = said
+        webStoreProblem = true
+        webStoreSaidAt = Date()
+        if fresh { moveNotices.append(said) }
+        FileHandle.standardError.write(Data("khayt: web store — automatic publish found nothing to list; store left as it is\n".utf8))
     }
 
     /// The held prices for THIS book; another book's are not this shop's.

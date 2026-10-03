@@ -76,6 +76,13 @@ struct MoveBanners: View {
                 BannerClose(words: shop.words) { shop.dismissSyncLosses() }
             }
         }
+        // A RESTORE NO LONGER HELD against the cloud: other devices' edits to
+        // the restored records win again from here, and the shop is told.
+        if let note = shop.restoreHoldNote {
+            Banner(text: note, symbol: "clock.arrow.circlepath", tint: Khayt.attention) {
+                BannerClose(words: shop.words) { shop.restoreHoldNote = nil }
+            }
+        }
         // THE OFF-SITE BACKUP HAS BEEN FAILING FOR MORE THAN TWO DAYS. A
         // problem, not a notice: it stays until closed, and comes back on the
         // next launch if it is still true. The settings line says why.

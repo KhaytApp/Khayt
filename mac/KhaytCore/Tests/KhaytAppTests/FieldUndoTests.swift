@@ -118,6 +118,43 @@ struct FieldUndoTests {
         #expect(MoveJobTests.string(MoveJobTests.row(root, "printLog", "J1")?["status"]) == "completed")
     }
 
+    @Test("a phone that re-opened the job and gave the grams back: undo does not give them back twice")
+    func returnedElsewhereIsNotReturnedTwice() async throws {
+        var root = Self.book()
+        let (undo, _) = try await MoveJobTests.move(&root, "J1", .completed)
+        #expect(Self.weight(root) == 800)
+        // The phone re-opens the job through the shared returnForOrder: the
+        // grams go back, the usage line goes, the job's deduction marks go.
+        Self.elsewhere(&root, "printLog", "J1") {
+            $0["status"] = .string("printing")
+            $0["materialDeducted"] = nil
+            $0["materialDrawn"] = nil
+        }
+        Self.elsewhere(&root, "inventory", "S1") {
+            $0["weight"] = .number(1000)
+            $0["usageHistory"] = .array([])
+        }
+        let outcome = Shop.undoing(undo, in: &root)
+        #expect(Self.weight(root) == 1000, "the phone already put the 200 g back — not 1200")
+        #expect(outcome.notUndone.contains("weight (S1)"), "\(outcome.notUndone)")
+    }
+
+    @Test("a sync tie that took the other copy of the spool: undo adds nothing it never took")
+    func remoteSpoolWithoutTheDrawIsLeft() async throws {
+        var root = Self.book()
+        let (undo, _) = try await MoveJobTests.move(&root, "J1", .completed)
+        // The job kept this Mac's copy, the spool took the other machine's:
+        // 1000 g and no line for J1 — that copy never had the draw.
+        Self.elsewhere(&root, "inventory", "S1") {
+            $0["weight"] = .number(1000)
+            $0["usageHistory"] = nil
+        }
+        let outcome = Shop.undoing(undo, in: &root)
+        #expect(Self.weight(root) == 1000, "nothing was taken off this copy, so nothing comes back")
+        #expect(MoveJobTests.string(MoveJobTests.row(root, "printLog", "J1")?["status"]) == "printing")
+        #expect(outcome.notUndone.contains("weight (S1)"), "\(outcome.notUndone)")
+    }
+
     // MARK: - The job
 
     @Test("a phone's edit to an unrelated field of the job survives undo")

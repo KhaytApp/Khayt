@@ -66,6 +66,9 @@ extension Shop {
             let onShelf: Int
             let fromShelf: Int
             let toPrint: Int
+            /// What the platform says the customer was charged for one, when
+            /// it said (a keyed import). Nil otherwise.
+            let unitPrice: Double?
             /// What the customer chose — `Colour: Red` — sorted by name, so a
             /// line reads the same every time it is drawn.
             let options: [(String, String)]
@@ -88,6 +91,8 @@ extension Shop {
                 self.onShelf = Self.int(f["onShelf"])
                 self.fromShelf = Self.int(f["fromShelf"])
                 self.toPrint = Self.int(f["toPrint"])
+                self.unitPrice = { if case .number(let n)? = f["unitPrice"], n.isFinite, n >= 0 { return n }
+                                   return nil }()
                 if case .object(let chosen)? = f["options"] {
                     self.options = chosen.keys.sorted().compactMap { key in
                         if case .string(let value)? = chosen[key] { return (key, value) }
@@ -491,11 +496,28 @@ extension Shop {
 
     /// Each line of the order at its price, by the shared rule — nil only when
     /// the rule could not be asked.
+    /// Product id → the price the store LISTS it at, as last read back from
+    /// Khayt Cloud — what a customer was shown. A re-price the store is holding
+    /// for review (#1705) is in the book and not on the website, so an order
+    /// is priced from this before the book. The held list's `was` fills in for
+    /// a product the last read did not carry.
+    var webStoreListedPrices: [String: Double] {
+        var out: [String: Double] = [:]
+        for change in webStorePricesHeld {
+            if let n = Double(change.was), n.isFinite, n >= 0 { out[change.id] = n }
+        }
+        for (id, text) in webStoreHeld?.prices ?? [:] {
+            if let n = Double(text), n.isFinite, n >= 0 { out[id] = n }
+        }
+        return out
+    }
+
     func onlinePricing(_ order: OnlineOrder) async -> KhaytEngine.WebStorePricing? {
         guard let engine else { return nil }
         let lines: [JSONValue] = order.lines.map { line in
             var row: [String: JSONValue] = ["qty": .number(Double(max(1, line.qty)))]
             if let id = line.productId { row["productId"] = .string(id) }
+            if let paid = line.unitPrice { row["unitPrice"] = .number(paid) }
             return .object(row)
         }
         // What this app's catalogue prices each product at — the fallback for a
@@ -506,7 +528,8 @@ extension Shop {
             computed[row.id] = row.final
         }
         return try? await engine.webStoreLinePrices(lines: lines, products: productRows,
-                                                    settings: settingsValue, computed: computed)
+                                                    settings: settingsValue, computed: computed,
+                                                    listed: webStoreListedPrices)
     }
 
     /// The job this order becomes, COSTED.

@@ -28,6 +28,28 @@ import KhaytCore
 //    overwritten local edit only when it knows the rev this Mac last agreed
 //    with the cloud on, and the Mac never told it.
 
+// MARK: - Files that hold customer records
+
+/// The files this app keeps beside the book that carry whole customer records
+/// — `sync-conflicts/`, `sync-baseline.json`, `restore-pending.json` — are
+/// this user's alone: 0600, in a 0700 folder. Written with the default umask
+/// they were 0644, readable by every account on the Mac.
+enum PrivateFile {
+    static let fileMode: Int = 0o600
+    static let folderMode: Int = 0o700
+
+    static func write(_ data: Data, to url: URL) throws {
+        try data.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: fileMode], ofItemAtPath: url.path)
+    }
+
+    static func makeFolder(_ url: URL) throws {
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: folderMode])
+        try FileManager.default.setAttributes([.posixPermissions: folderMode], ofItemAtPath: url.path)
+    }
+}
+
 // MARK: - Records, by key
 
 /// `collection:id` for every record in a book's array collections.
@@ -89,22 +111,122 @@ enum RestoreGuard {
 
     struct Pending: Codable, Equatable {
         var at: String
-        /// `collection:id` of every record the restore put in the book.
+        /// `collection:id` of every record the restore CHANGED — brought back,
+        /// or put back as it was — not every record in the book.
         var records: [String]
+        /// The cloud's rev of each restored record the first time it was held
+        /// against the cloud; nil until then. The hold prevails only over a
+        /// cloud copy at or below it, so an edit another device makes AFTER
+        /// the restore stands. A record the cloud did not hold then is absent,
+        /// and any copy of it that appears later is somebody's new edit.
+        var cloudRevs: [String: Double]? = nil
+        /// The restored records the cloud had tombstoned at that first hold.
+        var cloudTombstones: [String]? = nil
     }
+
+    /// How long a restore is held against the cloud before the ordinary rule
+    /// takes over again. A Mac whose pushes keep failing used to hold it — and
+    /// override every other device's edits to those records — for ever.
+    static let lifetime: TimeInterval = 7 * 86_400
 
     static func pending(for storeURL: URL) -> Pending? {
         guard let data = try? Data(contentsOf: pendingURL(for: storeURL)) else { return nil }
         return try? JSONDecoder().decode(Pending.self, from: data)
     }
 
+    /// The marker if it is still live. An expired one is removed, and the
+    /// caller is told so it can say so.
+    static func take(for storeURL: URL, now: Date = Date()) -> (pending: Pending?, expired: Bool) {
+        guard let p = pending(for: storeURL) else { return (nil, false) }
+        if let at = markedAt(p.at), now.timeIntervalSince(at) > lifetime {
+            clear(for: storeURL)
+            return (nil, true)
+        }
+        return (p, false)
+    }
+
+    /// `StoreWriter.iso`'s own format, read back.
+    static func markedAt(_ text: String) -> Date? {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+        return f.date(from: text)
+    }
+
     static func markPending(_ keys: Set<String>, for storeURL: URL, now: Date = Date()) throws {
-        let p = Pending(at: StoreWriter.iso(now), records: keys.sorted())
-        try JSONEncoder().encode(p).write(to: pendingURL(for: storeURL), options: .atomic)
+        try save(Pending(at: StoreWriter.iso(now), records: keys.sorted()), for: storeURL)
+    }
+
+    static func save(_ pending: Pending, for storeURL: URL) throws {
+        try PrivateFile.write(try JSONEncoder().encode(pending), to: pendingURL(for: storeURL))
     }
 
     static func clear(for storeURL: URL) {
         try? FileManager.default.removeItem(at: pendingURL(for: storeURL))
+    }
+
+    /// After a pull: a role that can never push (a viewer) can never carry the
+    /// restore up, so its marker would hold for ever. One pull has made it win
+    /// once; from here the ordinary rule applies. True when it was cleared.
+    @discardableResult
+    static func afterPull(canWrite: Bool, storeURL: URL) -> Bool {
+        guard !canWrite, pending(for: storeURL) != nil else { return false }
+        clear(for: storeURL)
+        return true
+    }
+
+    /// The records a restore CHANGED: in the restored book and absent from the
+    /// one it replaced, or there with different content. A record the two
+    /// books agree on was not restored — marking it made this Mac override
+    /// every other device's later edit to it.
+    static func changedKeys(restored: [String: JSONValue],
+                            replaced: [String: JSONValue]?) -> Set<String> {
+        guard let replaced else { return BookRecords.keys(restored) }
+        let theirs = BookRecords.index(replaced)
+        var out = Set<String>()
+        BookRecords.each(restored) { c, id, o in
+            let key = c + ":" + id
+            if let them = theirs[key], BookRecords.content(them) == BookRecords.content(o) { return }
+            out.insert(key)
+        }
+        return out
+    }
+
+    /// The cloud's view of the restored records at the first hold.
+    struct Ceiling: Equatable {
+        var revs: [String: Double]
+        var tombstones: Set<String>
+    }
+
+    /// Hold a pending restore against the CLOUD's copy: the first time, note
+    /// what the cloud holds of each restored record (`cloudRevs`); every time,
+    /// prevail only over cloud copies at or below that. Returns the book and a
+    /// copy of every cloud record it overrode — kept in `sync-conflicts/` by
+    /// the caller like everything else sync takes, which it never was.
+    static func hold(_ book: [String: JSONValue], over cloud: [String: JSONValue],
+                     pending: inout Pending, now: Date = Date())
+    -> (book: [String: JSONValue], overridden: [SyncLoss]) {
+        let restored = Set(pending.records)
+        if pending.cloudRevs == nil {
+            var revs: [String: Double] = [:]
+            BookRecords.each(cloud) { c, id, o in
+                let key = c + ":" + id
+                if restored.contains(key) { revs[key] = BookRecords.rev(o) }
+            }
+            pending.cloudRevs = revs
+            pending.cloudTombstones = BookRecords.tombstoneKeys(cloud).intersection(restored).sorted()
+        }
+        let ceiling = Ceiling(revs: pending.cloudRevs ?? [:],
+                              tombstones: Set(pending.cloudTombstones ?? []))
+        var overridden: [SyncLoss] = []
+        let out = prevail(book, over: cloud, restored: restored, ceiling: ceiling, now: now,
+                          overrode: { c, id, theirs, mine in
+            overridden.append(SyncLoss(kind: .replaced, collection: c, recordId: id,
+                                       record: .object(theirs), replacedBy: .object(mine)))
+        })
+        return (out, overridden)
     }
 
     /// Make the restored records in `book` win over `other` — the book being
@@ -122,13 +244,21 @@ enum RestoreGuard {
     /// Records the restore did not bring are left alone, and so is a restored
     /// record `other` already agrees with — stamping that would push a change
     /// nobody made.
+    ///
+    /// `ceiling`, against the cloud: only a tombstone and a copy the cloud
+    /// already held at the first hold are prevailed over (`hold`).
+    /// `overrode` hears of every record of `other`'s that was stamped over.
     static func prevail(_ book: [String: JSONValue], over other: [String: JSONValue],
-                        restored: Set<String>, now: Date = Date()) -> [String: JSONValue] {
+                        restored: Set<String>, ceiling: Ceiling? = nil, now: Date = Date(),
+                        overrode: ((_ collection: String, _ id: String,
+                                    _ theirs: [String: JSONValue], _ mine: [String: JSONValue]) -> Void)? = nil)
+    -> [String: JSONValue] {
         var out = book
         let present = BookRecords.keys(out)
         // Tombstoned over there, restored here.
         var dead: [JSONValue] = []
         for key in BookRecords.tombstoneKeys(other) where restored.contains(key) && present.contains(key) {
+            if let ceiling, !ceiling.tombstones.contains(key) { continue }
             guard let split = key.firstIndex(of: ":") else { continue }
             dead.append(.object(["collection": .string(String(key[..<split])),
                                  "id": .string(String(key[key.index(after: split)...]))]))
@@ -148,10 +278,14 @@ enum RestoreGuard {
                 guard restored.contains(key), let them = theirs[key] else { continue }
                 let mine = BookRecords.rev(o), their = BookRecords.rev(them)
                 guard their >= mine, BookRecords.content(them) != BookRecords.content(o) else { continue }
+                // Edited over there AFTER the restore was first held: theirs
+                // is a new edit, not the stale copy the restore is replacing.
+                if let ceiling, their > (ceiling.revs[key] ?? 0) { continue }
                 o["rev"] = .number(their + 1)
                 o["updatedAt"] = .string(at)
                 rows[i] = .object(o)
                 changed = true
+                overrode?(collection, id, them, o)
             }
             if changed { out[collection] = .array(rows) }
         }
@@ -205,7 +339,8 @@ struct SyncBaseline: Codable, Equatable {
     }
 
     func save(for storeURL: URL) {
-        try? JSONEncoder().encode(self).write(to: Self.url(for: storeURL), options: .atomic)
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        try? PrivateFile.write(data, to: Self.url(for: storeURL))
     }
 
     /// After an exchange: every record this book and the cloud now hold at
@@ -330,11 +465,45 @@ enum SyncLosses {
     /// not go ahead.
     static func keep(_ losses: [SyncLoss], at url: URL, now: Date = Date()) throws {
         guard !losses.isEmpty else { return }
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
-                                                withIntermediateDirectories: true)
+        let folder = url.deletingLastPathComponent()
+        try PrivateFile.makeFolder(folder)
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(File(at: StoreWriter.iso(now), losses: losses)).write(to: url, options: .atomic)
+        // WHOLE CUSTOMER RECORDS: this user's only.
+        try PrivateFile.write(try enc.encode(File(at: StoreWriter.iso(now), losses: losses)), to: url)
+        prune(folder: folder, now: now, keep: url)
+    }
+
+    /// How long a kept copy stays, and how many are kept at most. Every merge
+    /// that takes something writes a file, and automatic sync merges every
+    /// quarter of an hour: unpruned, the folder only ever grew.
+    static let keepDays: Double = 60
+    static let keepFiles = 200
+
+    /// Drop kept copies older than `keepDays`, then the oldest beyond
+    /// `keepFiles`. `keep` is never dropped — it was just written.
+    static func prune(for storeURL: URL, now: Date = Date()) {
+        prune(folder: directory(for: storeURL), now: now, keep: nil)
+    }
+
+    private static func prune(folder: URL, now: Date, keep: URL?) {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey],
+                                                      options: [.skipsHiddenFiles]) else { return }
+        let files: [(URL, Date)] = names.filter { $0.pathExtension == "json" }.map { url in
+            let at = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? now
+            return (url, at)
+        }.sorted { $0.1 > $1.1 }
+        let oldest = now.addingTimeInterval(-keepDays * 86_400)
+        var kept = 0
+        for (url, at) in files {
+            let isNew = keep.map { $0.standardizedFileURL == url.standardizedFileURL } ?? false
+            if !isNew && (at < oldest || kept >= keepFiles) {
+                try? fm.removeItem(at: url)
+                continue
+            }
+            kept += 1
+        }
     }
 
     static func read(_ url: URL) -> File? {

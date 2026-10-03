@@ -135,6 +135,11 @@
       if (productId) line.productId = productId;
       const options = optionsOf(l.options);
       if (options) line.options = options;
+      // What the platform charged for one, when it said (a keyed import).
+      // Carried so the job is priced at the money that moved
+      // (`KhaytWebstoreOrder.linePrices`), not at the book's price now.
+      const unit = Number(l.unitPrice);
+      if (l.unitPrice != null && l.unitPrice !== '' && Number.isFinite(unit) && unit >= 0) line.unitPrice = unit;
       out.push(line);
     }
     return out;
@@ -235,6 +240,7 @@
       const given = line.productId && known.has(str(line.productId)) ? str(line.productId) : null;
       const productId = given || match(line.name);
       const extra = line.options ? { options: line.options } : {};
+      if (typeof line.unitPrice === 'number') extra.unitPrice = line.unitPrice;
       if (!productId) {
         return { name: line.name, qty: line.qty, productId: null,
                  onShelf: 0, fromShelf: 0, toPrint: line.qty, ...extra };

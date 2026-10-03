@@ -298,4 +298,128 @@ struct SyncSafetyTests {
         #expect(losses.map(\.kind) == [.keptDeleted])
         #expect(losses.first?.title == "Zaid")
     }
+
+    // MARK: - 3. A restore that does not hold on for ever (pre-alpha.58 review)
+
+    @Test("a restore marks only the records it changed, not every record in the book")
+    func markerIsOnlyWhatChanged() async throws {
+        let book = """
+        {"version":10,
+         "printLog":[{"id":"P-1","rev":3,"project":"edited after the backup"}],
+         "clients":[{"id":"C-9","rev":1,"nameEn":"Same in both"}],
+         "settings":{"bizEn":"The Shop"}}
+        """
+        let backup = """
+        {"version":10,"exportedAt":"2026-09-03T10:00:00.000Z",
+         "printLog":[{"id":"P-1","rev":2,"project":"as it was"},{"id":"P-2","rev":1,"project":"new"}],
+         "clients":[{"id":"C-9","rev":1,"nameEn":"Same in both"}],
+         "settings":{"bizEn":"The Shop"}}
+        """
+        let b = try RestoreTests.bench(book: book, backup: backup)
+        defer { try? FileManager.default.removeItem(at: b.dir) }
+        try await RestoreTests.run(b)
+        let pending = try #require(RestoreGuard.pending(for: b.store))
+        #expect(Set(pending.records) == ["printLog:P-1", "printLog:P-2"],
+                "a record the restore did not change must not override other devices: \(pending.records)")
+    }
+
+    @Test("the hold prevails only over cloud copies at or below the rev it first saw, and says what it overrode")
+    func holdIsBoundedByTheFirstCloudRev() async throws {
+        let b = try await Self.restoreOnBench()
+        defer { try? FileManager.default.removeItem(at: b.dir) }
+        var pending = try #require(RestoreGuard.pending(for: b.store))
+        var book = try Self.read(b.store)
+
+        let first = RestoreGuard.hold(book, over: try Self.object(Self.cloud), pending: &pending)
+        book = first.book
+        #expect(pending.cloudRevs?["printLog:P-1"] == 7, "the first hold must remember the cloud's rev")
+        let p1 = try #require(Self.rows(book, "printLog").first { Self.string($0, "id") == "P-1" })
+        #expect(Self.string(p1, "project") == "as it was")
+        #expect(BookRecords.rev(p1) == 8)
+        // What it overrode is kept, like every other record sync takes.
+        let lost = try #require(first.overridden.first { $0.recordId == "P-1" })
+        #expect(lost.kind == .replaced)
+        guard case .object(let theirs) = lost.record else { Issue.record("shape"); return }
+        #expect(Self.string(theirs, "project") == "edited on the phone")
+
+        // A push failed; the phone edits P-1 AFTER the restore. That edit stands.
+        let later = """
+        {"printLog":[{"id":"P-1","rev":9,"project":"edited on the phone after the restore"}],
+         "clients":[], "jobs":[{"id":"J-1","rev":1,"clientId":"C-1"}]}
+        """
+        let second = RestoreGuard.hold(book, over: try Self.object(later), pending: &pending)
+        let again = try #require(Self.rows(second.book, "printLog").first { Self.string($0, "id") == "P-1" })
+        #expect(BookRecords.rev(again) == 8, "a cloud edit made after the restore was overridden")
+        #expect(second.overridden.isEmpty)
+    }
+
+    @Test("a restore marker expires, and is cleared for a role that can never push it")
+    func markerEnds() throws {
+        let dir = try RestoreTests.tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = dir.appending(path: "khayt-store.json")
+        let then = Date().addingTimeInterval(-8 * 86_400)
+        try RestoreGuard.markPending(["printLog:P-1"], for: store, now: then)
+        let taken = RestoreGuard.take(for: store)
+        #expect(taken.pending == nil)
+        #expect(taken.expired)
+        #expect(RestoreGuard.pending(for: store) == nil, "an expired marker stays on disk")
+
+        try RestoreGuard.markPending(["printLog:P-1"], for: store)
+        #expect(RestoreGuard.take(for: store).pending != nil)
+        #expect(!RestoreGuard.afterPull(canWrite: true, storeURL: store))
+        #expect(RestoreGuard.pending(for: store) != nil)
+        #expect(RestoreGuard.afterPull(canWrite: false, storeURL: store))
+        #expect(RestoreGuard.pending(for: store) == nil, "a viewer's marker would hold for ever")
+    }
+
+    // MARK: - 4. The files beside the book hold customer records
+
+    static func mode(_ url: URL) throws -> Int {
+        let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+        return (attrs[.posixPermissions] as? NSNumber)?.intValue ?? -1
+    }
+
+    @Test("sync-conflicts, the baseline and the restore marker are readable by this user only")
+    func sideFilesArePrivate() throws {
+        let dir = try RestoreTests.tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = dir.appending(path: "khayt-store.json")
+        try RestoreGuard.markPending(["clients:C-1"], for: store)
+        #expect(try Self.mode(RestoreGuard.pendingURL(for: store)) == 0o600)
+        SyncBaseline(shopId: "s", revs: ["clients:A": 1]).save(for: store)
+        #expect(try Self.mode(SyncBaseline.url(for: store)) == 0o600)
+        let file = SyncLosses.fileURL(for: store)
+        let loss = SyncLoss(kind: .removed, collection: "clients", recordId: "C-1",
+                            record: .object(["id": .string("C-1"), "phone": .string("0500")]), replacedBy: nil)
+        try SyncLosses.keep([loss], at: file)
+        #expect(try Self.mode(file) == 0o600)
+        #expect(try Self.mode(SyncLosses.directory(for: store)) == 0o700)
+    }
+
+    @Test("sync-conflicts is pruned: nothing older than 60 days, never more than 200 files")
+    func conflictsArePruned() throws {
+        let dir = try RestoreTests.tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = dir.appending(path: "khayt-store.json")
+        let folder = SyncLosses.directory(for: store)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let now = Date()
+        let old = folder.appending(path: "sync-old.json")
+        try Data("{}".utf8).write(to: old)
+        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-61 * 86_400)],
+                                              ofItemAtPath: old.path)
+        for i in 0..<205 {
+            let f = folder.appending(path: String(format: "sync-%03d.json", i))
+            try Data("{}".utf8).write(to: f)
+            try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(Double(i - 300))],
+                                                  ofItemAtPath: f.path)
+        }
+        SyncLosses.prune(for: store, now: now)
+        let left = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+        #expect(left.count == 200)
+        #expect(!left.contains("sync-old.json"))
+        #expect(!left.contains("sync-000.json"), "the oldest go first")
+        #expect(left.contains("sync-204.json"))
+    }
 }

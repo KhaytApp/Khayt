@@ -18,19 +18,41 @@ extension Shop {
     /// `recordingDeletes: false`: moving a restored record to a new id is not
     /// a delete of the old one — the cloud's tombstone already says that — and
     /// the stamping here is the restore's, not an edit's.
+    ///
+    /// Bounded three ways (pre-alpha.58 review): it prevails only over cloud
+    /// copies at or below the rev it first saw (`RestoreGuard.hold`), every
+    /// cloud copy it overrides is kept in `sync-conflicts/` and announced like
+    /// any other sync loss, and a marker older than `RestoreGuard.lifetime` is
+    /// dropped with a notice instead of overriding other devices for ever.
     @discardableResult
     func holdRestore(build: StoreReader.Build, cloud: [String: JSONValue]) async throws -> Bool {
-        guard let pending = RestoreGuard.pending(for: build.storeURL) else { return false }
-        let restored = Set(pending.records)
+        guard var pending = liveRestoreMarker(build) else { return false }
+        let keepAt = SyncLosses.fileURL(for: build.storeURL)
+        var losses: [SyncLoss] = []
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
             recordingDeletes: false
         ) { root in
-            root = RestoreGuard.prevail(root, over: cloud, restored: restored)
+            var held = pending
+            let out = RestoreGuard.hold(root, over: cloud, pending: &held)
+            try SyncLosses.keep(out.overridden, at: keepAt)
+            losses = out.overridden
+            pending = held
+            root = out.book
         }
+        try? RestoreGuard.save(pending, for: build.storeURL)
+        announceSyncLosses(losses, file: keepAt)
         return true
+    }
+
+    /// The restore marker if it is still live; an expired one is dropped and
+    /// the window says the restore is no longer being held.
+    func liveRestoreMarker(_ build: StoreReader.Build) -> RestoreGuard.Pending? {
+        let taken = RestoreGuard.take(for: build.storeURL)
+        if taken.expired { restoreHoldNote = words.callIt("mac.restore_hold_expired") }
+        return taken.pending
     }
 
     /// Nothing to send: the cloud already holds everything here, a pending

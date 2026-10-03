@@ -38,6 +38,19 @@ struct ArchiveImportTests {
     /// A binary STL big enough to pass the shared rule's 84-byte floor.
     static var stl: Data { Data(repeating: 0x20, count: 200) }
 
+    /// tar can run for up to `tarPatience` (ten minutes). Inside
+    /// `Task.detached` that held one of the few cooperative-pool threads every
+    /// async task in the app shares, blocked, for as long — see the memory note
+    /// on swift pool starvation. It runs on its own dispatch queue now and the
+    /// caller waits on a continuation.
+    @Test("tar never blocks a cooperative thread")
+    func tarRunsOffThePool() throws {
+        let src = try QuoteSheetStatusTests.source("ArchiveImport.swift")
+        #expect(!src.contains("Task.detached"), "tar is run inside Task.detached again")
+        #expect(src.contains("withCheckedThrowingContinuation"))
+        #expect(src.contains("tarQueue.async"))
+    }
+
     @Test("a zip of models gives up its models, grouped by the archive's name")
     func expandsModels() async throws {
         let engine = try KhaytEngine()

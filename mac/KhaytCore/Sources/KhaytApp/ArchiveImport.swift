@@ -277,13 +277,25 @@ enum ArchiveImport {
         // OFF THE MAIN ACTOR, both pipes drained (a pack of ten thousand bad
         // members fills stderr), and watched while it runs: a bomb is stopped
         // part way rather than after it has filled the disk.
+        //
+        // ON ITS OWN DISPATCH QUEUE, not in a detached task. `BoundedProcess`
+        // waits on the calling thread for up to `tarPatience` — ten minutes —
+        // and a detached task runs on the cooperative pool every async task in
+        // the app shares (one thread per core). A slow archive held one of
+        // them blocked the whole time; a few at once starved the app. The
+        // caller waits on a continuation instead, which holds no thread.
         let ran: BoundedProcess.Outcome
         do {
-            ran = try await Task.detached {
-                try BoundedProcess.run("/usr/bin/tar", arguments, timeout: Self.tarPatience,
-                                       keepOut: 0, every: 0.4,
-                                       watch: { bytes(under: scratch) > unpackedBudget })
-            }.value
+            ran = try await withCheckedThrowingContinuation {
+                (done: CheckedContinuation<BoundedProcess.Outcome, Error>) in
+                Self.tarQueue.async {
+                    done.resume(with: Result {
+                        try BoundedProcess.run("/usr/bin/tar", arguments, timeout: Self.tarPatience,
+                                               keepOut: 0, every: 0.4,
+                                               watch: { bytes(under: scratch) > unpackedBudget })
+                    })
+                }
+            }
         } catch {
             try? FileManager.default.removeItem(at: scratch)
             throw Failure.unreadable(name, error)
@@ -343,6 +355,12 @@ enum ArchiveImport {
     /// unpacked budget can hold; it exists so an archive that stalls the
     /// reader cannot keep a process (and an import) waiting for ever.
     nonisolated static let tarPatience: TimeInterval = 600
+
+    /// Where tar is waited on: a GCD queue, so the blocking wait never sits on
+    /// a cooperative-pool thread. Concurrent, so two archives do not queue
+    /// behind each other.
+    nonisolated static let tarQueue = DispatchQueue(label: "app.khayt.archive-import.tar",
+                                                    qos: .userInitiated, attributes: .concurrent)
 
     nonisolated static let fileKeys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey]
 

@@ -243,7 +243,12 @@ enum Restore {
         // The marker BEFORE the book: a restored book with no marker is one
         // the next sync can undo, and a marker with the old book still in
         // place only makes records the cloud already agrees with win again.
-        try RestoreGuard.markPending(BookRecords.keys(snapshot), for: storeURL)
+        //
+        // ONLY WHAT THE RESTORE CHANGED. Marking every record made this Mac
+        // override, on every pull until a push got through, other devices'
+        // later edits to records the restore never touched.
+        try RestoreGuard.markPending(RestoreGuard.changedKeys(restored: snapshot, replaced: current),
+                                     for: storeURL)
         do { try StoreWriter.atomicWrite(next, to: storeURL) }
         catch { RestoreGuard.clear(for: storeURL); throw error }
 

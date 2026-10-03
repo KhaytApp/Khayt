@@ -54,6 +54,18 @@
   }
 
   /**
+   * What the customer has to cover for the order to be settled: the gross,
+   * except an order settled before tax on top was owed, which was settled at
+   * its price (`KhaytOrderMoney.orderDueRaw`). What status, owed and cash-due
+   * are judged against; a NEW payment is still clamped to the gross.
+   */
+  function dueOf(order, ctx) {
+    const M = (typeof globalThis !== 'undefined') ? globalThis.KhaytOrderMoney : undefined;
+    if (M && typeof M.orderDueRaw === 'function') return numberOf(M.orderDueRaw(order, ctx));
+    return grossOf(order, ctx);
+  }
+
+  /**
    * What an order is billed, what has already taken it down without cash, and
    * so the most CASH it can still take.
    *
@@ -65,7 +77,7 @@
    * `ctx`: `{ settings }`, for the tax mode. Optional.
    */
   function cashDue(order, ctx) {
-    const gross = grossOf(order, ctx);
+    const gross = dueOf(order, ctx);
     const credited = ((order && order.creditNotes) || [])
       .reduce((s, cn) => s + numberOf(cn && cn.amount), 0);
     const giftCard = numberOf(order && order.giftCardDiscount);
@@ -95,7 +107,7 @@
     if (price === 0) return order.paymentStatus || 'paid';
 
     const credited = (order.creditNotes || []).reduce((s, cn) => s + numberOf(cn && cn.amount), 0);
-    const due = Math.max(0, grossOf(order, ctx) - credited);
+    const due = Math.max(0, dueOf(order, ctx) - credited);
     const paid = numberOf(order.paidAmount) + numberOf(order.giftCardDiscount);
 
     if (due <= 0) return 'paid';
@@ -130,6 +142,11 @@
     const billed = grossOf(order, c);
 
     order.paidAmount = Math.min(Math.max(0, numberOf(p.amount)), billed);
+    // JUDGED AGAINST THE GROSS, and said so on the record. An order settled
+    // before this rule had its payment capped at the price, and is
+    // grandfathered as settled (`KhaytOrderMoney.settledBeforeTaxOnTop`); one
+    // recorded from now on carries this stamp and never is.
+    order.paidGross = true;
     order.paymentMethod = p.method || null;
     order.paidAt = p.paidAt || c.today || null;
     // Derived, never taken from the caller: a stored status that disagrees with
@@ -159,6 +176,7 @@
    */
   function clearPayment(order) {
     order.paidAmount = 0;
+    order.paidGross = true;
     order.paymentMethod = null;
     order.paidAt = null;
     order.paymentStatus = 'unpaid';
