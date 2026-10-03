@@ -42,7 +42,8 @@ import KhaytCore
 /// the phone has always sent the header. The one place `?pin=` is still read
 /// is the queue page's old bookmark, which trades it once for a session
 /// cookie. A PIN shorter than `minimumPin` opens nothing (see `pinGate`).
-/// Ten wrong PINs from one address (or IPv6 /64) lock it out
+/// Ten wrong PINs from one address (or a stranger's IPv6 /64 — see
+/// `throttleKey`) lock it out
 /// for a minute — the rule is `lan-auth`'s, run in JavaScriptCore, so the two
 /// apps cannot come to disagree about what a lockout is. The comparison is
 /// constant-time and in Swift: a primitive, not a rule (see lan-auth.js).

@@ -93,19 +93,23 @@ struct SecurityBatch4Tests {
         #expect(BambuPin.accept("bbbb", key: key, in: store))
     }
 
-    @Test("the pin is kept in the Keychain when there is one")
+    @Test("the pin's Keychain primitives round-trip")
     func bambuPinInKeychain() {
+        // The raw primitives, not the guarded store: the store's one-time
+        // migration marker must not be written into a developer's login
+        // Keychain by a test binary, where the real app could not read it
+        // back. The migration itself is `Alpha58SecurityTests.bambuPinMigratesOnce`.
         let key = BambuPin.key(serial: "TEST-\(UUID().uuidString)", host: "192.168.1.50")
-        defer { BambuPin.Store.keychain.remove(key) }
+        let login = BambuPin.Store.Backend.login
+        defer { login.remove(key) }
         // A CI runner has no login Keychain; there the store falls back to
-        // defaults, which `bambuPinMigratesOnce` covers.
-        guard BambuPin.Store.keychainWrite(key, "probe") else { return }
-        BambuPin.Store.keychain.remove(key)
-        BambuPin.Store.keychain.write(key, "pinned")
-        #expect(BambuPin.Store.keychainRead(key) == "pinned")
+        // defaults, which `bambuPinWithoutKeychain` covers.
+        guard login.write(key, "pinned") else { return }
+        #expect(login.read(key) == "pinned")
         #expect(UserDefaults.standard.string(forKey: key) == nil,
                 "the pin went to a plist any process of this user can rewrite")
-        #expect(!BambuPin.accept("other", key: key, in: .keychain))
+        login.remove(key)
+        #expect(login.read(key) == nil)
     }
 
     @Test("an MQTT packet longer than the cap is refused, not buffered toward")
