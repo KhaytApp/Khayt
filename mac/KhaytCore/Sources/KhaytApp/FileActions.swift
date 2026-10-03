@@ -183,6 +183,14 @@ struct ModelActions: View {
             }
         }
         .disabled(!shop.canWrite)
+        // This model's picture as its group's, from the model itself — where
+        // a shop looking at the picture it wants already is.
+        if let group = file.groupName, shop.thumbnail(for: file) != nil {
+            Button(shop.words.callIt("mac.group_picture_choose")) {
+                Task { await shop.useModelPicture(group, model: file.id) }
+            }
+            .disabled(!shop.canWrite || shop.groupCover(group) == .model(file.id))
+        }
         // To the catalogue: this model — or, when it is one of several
         // selected, all of them, as one product or one each.
         let chosen = picked.contains(file.id) ? shop.selectedFiles : []

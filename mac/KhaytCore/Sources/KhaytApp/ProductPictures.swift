@@ -51,7 +51,8 @@ struct ProductPictureStrip: View {
                                         isPrimary: index == 0,
                                         kind: kindBinding(picture.id),
                                         makePrimary: { promote(picture.id) },
-                                        remove: { drop(picture.id) })
+                                        remove: { drop(picture.id) },
+                                        turn: { by in Task { await turn(picture.id, by: by) } })
                         }
                     }
                     .padding(.bottom, 4)
@@ -118,6 +119,54 @@ struct ProductPictureStrip: View {
         }
     }
 
+    /// Turn one picture a quarter, either way.
+    ///
+    /// Staged like everything else in the strip: the new bytes and thumbnail
+    /// are carried on the picture and written over its file only on Save, so
+    /// Cancel leaves the file exactly as it was. Every turn is made from the
+    /// picture as it was BEFORE the first one (`turnedFrom`) — and turning it
+    /// all the way round puts that back untouched, with nothing to rewrite.
+    func turn(_ id: String, by quarter: Int) async {
+        guard let at = pictures.firstIndex(where: { $0.id == id }) else { return }
+        problem = nil
+        let build = shop.source.build
+        guard var turned = await Self.turning(pictures[at], by: quarter, read: { path in
+            build.flatMap { ProductPhotos.data(path, in: $0) }
+        }) else { problem = shop.words.callIt("mac.rotate_failed"); return }
+        // The strip may have changed while the picture was being turned.
+        guard let now = pictures.firstIndex(where: { $0.id == id }) else { return }
+        turned.kind = pictures[now].kind
+        turned.caption = pictures[now].caption
+        pictures[now] = turned
+    }
+
+    /// `picture` a quarter further round, or nil when it cannot be read.
+    /// Static, and handed its file reader, so a test can hold it to a file.
+    static func turning(_ picture: StagedPicture, by quarter: Int,
+                        read: (String) -> Data?) async -> StagedPicture? {
+        var picture = picture
+        if picture.turnedFrom == nil {
+            guard let had = picture.bytes ?? (picture.path.isEmpty ? nil : read(picture.path)) else { return nil }
+            picture.turnedFrom = (picture.bytes, picture.thumbnail, had)
+        }
+        guard let from = picture.turnedFrom else { return nil }
+        let turns = (((picture.turns + quarter) % 4) + 4) % 4
+        if turns == 0 {
+            // All the way round: exactly what it was, and nothing to rewrite.
+            picture.bytes = from.bytes
+            picture.thumbnail = from.thumbnail
+        } else {
+            let original = from.original
+            guard let made = await ProductPhotos.offMain({
+                ProductPhotos.turn(original, quarterTurns: turns)
+            }) else { return nil }
+            picture.bytes = made.full
+            picture.thumbnail = made.thumb
+        }
+        picture.turns = turns
+        return picture
+    }
+
     private func promote(_ id: String) {
         guard let at = pictures.firstIndex(where: { $0.id == id }), at > 0 else { return }
         pictures.insert(pictures.remove(at: at), at: 0)
@@ -147,7 +196,8 @@ struct ProductPictureStrip: View {
 }
 
 /// One picture: what it looks like, what it is, and what can be done to it.
-private struct PictureCard: View {
+/// Internal rather than private so its snapshot can be drawn.
+struct PictureCard: View {
     let shop: Shop
     let kinds: [KhaytEngine.ProductImageKind]
     let picture: StagedPicture
@@ -155,6 +205,8 @@ private struct PictureCard: View {
     @Binding var kind: String
     let makePrimary: () -> Void
     let remove: () -> Void
+    /// A quarter turn: +1 clockwise (Rotate Right), -1 anticlockwise.
+    var turn: (Int) -> Void = { _ in }
 
     /// ── SIZED TO THE LONGEST WORD, NOT TO THE PICTURE ─────────────────────
     ///
@@ -195,6 +247,7 @@ private struct PictureCard: View {
                 }
             }
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
+            .overlay(alignment: .bottomTrailing) { turnButtons }
 
             Picker("", selection: $kind) {
                 ForEach(kinds) { k in
@@ -211,9 +264,40 @@ private struct PictureCard: View {
             .help(kinds.first { $0.key == kind }?.hint ?? "")
         }
         .contextMenu {
+            Button(shop.words.callIt("mac.rotate_left")) { turn(-1) }
+            Button(shop.words.callIt("mac.rotate_right")) { turn(1) }
+            Divider()
             Button(shop.words.callIt("mac.make_main"), action: makePrimary).disabled(isPrimary)
             Button(shop.words.callIt("mac.remove_picture"), role: .destructive, action: remove)
         }
+    }
+
+    /// ── ON THE PICTURE, NOT ONLY IN THE RIGHT-CLICK ─────────────────────
+    ///
+    /// A sideways photo is the one thing wrong with the card, and the fix
+    /// sits on it: two small buttons in its corner. Physical directions, so
+    /// they are NOT mirrored in Arabic — anticlockwise is anticlockwise in
+    /// either language; only their order follows the layout.
+    private var turnButtons: some View {
+        HStack(spacing: 2) {
+            turnButton("rotate.left", "mac.rotate_left", -1)
+            turnButton("rotate.right", "mac.rotate_right", 1)
+        }
+        .padding(3)
+    }
+
+    private func turnButton(_ symbol: String, _ key: String, _ by: Int) -> some View {
+        Button { turn(by) } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 10, weight: .semibold))
+                .environment(\.layoutDirection, .leftToRight)
+                .frame(width: 20, height: 18)
+                .background(RoundedRectangle(cornerRadius: 4).fill(.regularMaterial))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(shop.words.callIt(key))
+        .accessibilityLabel(shop.words.callIt(key))
     }
 
     /// A `data:image/…;base64,…` thumbnail as the store holds it.

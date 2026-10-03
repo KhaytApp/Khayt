@@ -82,8 +82,12 @@ enum ProductPhotos {
 
         // CGImageSource rather than NSImage: an NSImage of a 6000px photo is a
         // representation the size of the file, and this only ever needs pixels.
+        //
+        // UPRIGHT, NOT AS STORED (`upright`): a phone photo is stored on its
+        // side with a tag saying which way up it goes, and the files written
+        // below carry no tag — so the turn has to be in the pixels.
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+              let image = upright(source) else {
             throw Failure.notAnImage
         }
         guard let thumb = jpeg(image, maxDim: thumbMaxDim, quality: thumbQuality),
@@ -94,12 +98,114 @@ enum ProductPhotos {
                         full: full)
     }
 
+    // MARK: - Which way up
+
+    /// The picture the way it is MEANT to be seen.
+    ///
+    /// ── WHY A SHOP'S PHOTO CAME OUT SIDEWAYS ──────────────────────────────
+    ///
+    /// A phone does not turn the pixels when it is held upright: it stores
+    /// them as the sensor read them and writes an EXIF orientation tag
+    /// (6, "turn a quarter clockwise", for a portrait shot). Every viewer
+    /// honours the tag. `CGImageSourceCreateImageAtIndex` does NOT — it hands
+    /// back the pixels as stored — and `jpeg` then wrote them into a new file
+    /// WITHOUT the tag. So the one thing that said which way up the picture
+    /// went was dropped, and the photo was sideways for good: in the sheet,
+    /// the catalogue, the invoice, the web store and the other app.
+    /// Reported: *"I added a photo to a catalogue product and it turned it
+    /// sideways with no way to fix it."*
+    ///
+    /// The other app never had this: its canvas draws an `<img>`, and a
+    /// browser applies the tag before `drawImage` sees a pixel. Asking ImageIO
+    /// for a full-size "thumbnail" WITH its transform is how this app does
+    /// the same: the turn goes into the pixels, and what is written needs no
+    /// tag to be right anywhere.
+    ///
+    /// `maxPixel` nil keeps every pixel (the scaling is `jpeg`'s, which has to
+    /// round as the canvas does). Nil when the source holds no image.
+    nonisolated static func upright(_ source: CGImageSource, maxPixel: Int? = nil) -> CGImage? {
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let w = (props?[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue ?? 0
+        let h = (props?[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue ?? 0
+        let longest = maxPixel ?? max(w, h)
+        if longest > 0, let turned = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            // From the full image, never the small preview a camera embeds.
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: longest,
+            kCGImageSourceShouldCacheImmediately: true,
+        ] as CFDictionary) {
+            return turned
+        }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+
+    /// The EXIF orientation a file carries — 1 is upright, and so is no tag.
+    nonisolated static func orientation(_ source: CGImageSource) -> Int {
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        return (props?[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+    }
+
+    /// `image` turned by quarter turns: positive is CLOCKWISE (Rotate Right),
+    /// negative anticlockwise (Rotate Left). Lossless — whole pixels moved, no
+    /// resampling — so the only cost of a turn is the one JPEG encode after.
+    nonisolated static func rotated(_ image: CGImage, quarterTurns: Int) -> CGImage? {
+        let turns = ((quarterTurns % 4) + 4) % 4
+        guard turns != 0 else { return image }
+        let w = image.width, h = image.height
+        let (outW, outH) = turns == 2 ? (w, h) : (h, w)
+        guard let context = CGContext(
+            data: nil, width: outW, height: outH, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        // Core Graphics is y-UP, so a positive angle is ANTICLOCKWISE. Each
+        // case rotates the image about the origin and slides it back into the
+        // bitmap.
+        switch turns {
+        case 1:  // clockwise
+            context.translateBy(x: 0, y: CGFloat(outH))
+            context.rotate(by: -.pi / 2)
+        case 2:
+            context.translateBy(x: CGFloat(outW), y: CGFloat(outH))
+            context.rotate(by: .pi)
+        default: // 3: anticlockwise
+            context.translateBy(x: CGFloat(outW), y: 0)
+            context.rotate(by: .pi / 2)
+        }
+        context.interpolationQuality = .none
+        context.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return context.makeImage()
+    }
+
+    /// A product picture's file, turned: the full-size JPEG and the store's
+    /// thumbnail, both made from the same turned pixels so they cannot
+    /// disagree. Read upright first, so a file still carrying a tag is turned
+    /// from the way the shop SEES it.
+    nonisolated static func turn(_ data: Data, quarterTurns: Int) -> (thumb: String, full: Data)? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = upright(source),
+              let turned = rotated(image, quarterTurns: quarterTurns),
+              let thumb = jpeg(turned, maxDim: thumbMaxDim, quality: thumbQuality),
+              let full = jpeg(turned, maxDim: fullMaxDim, quality: fullQuality) else { return nil }
+        return ("data:image/jpeg;base64,\(thumb.base64EncodedString())", full)
+    }
+
+    /// Run blocking image work on a GCD queue and wait for it without holding
+    /// a thread of Swift's cooperative pool — decoding a 12-megapixel photo
+    /// inside `Task.detached` parks one of a handful of threads every other
+    /// task in the app is waiting on.
+    nonisolated static func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { done in
+            DispatchQueue.global(qos: .userInitiated).async { done.resume(returning: work()) }
+        }
+    }
+
     /// Scale to fit `maxDim` on its longest side and encode as JPEG.
     ///
     /// NEVER ENLARGES — `min(1, …)`, as the canvas does. Drawn onto an opaque
     /// white bitmap first, because JPEG carries no alpha and a transparent PNG
     /// encoded directly comes out with a black background.
-    static func jpeg(_ image: CGImage, maxDim: Int, quality: Double) -> Data? {
+    nonisolated static func jpeg(_ image: CGImage, maxDim: Int, quality: Double) -> Data? {
         let longest = max(image.width, image.height)
         let scale = min(1.0, Double(maxDim) / Double(longest))
         let w = max(1, Int((Double(image.width) * scale).rounded()))
@@ -189,6 +295,21 @@ enum ProductPhotos {
         return name
     }
 
+    /// Write a picture's bytes under a name already decided (`target`).
+    @discardableResult
+    static func write(_ data: Data, named name: String, in build: StoreReader.Build) throws -> String {
+        try write(data, named: name, into: folder(build))
+    }
+
+    @discardableResult
+    nonisolated static func write(_ data: Data, named name: String, into dir: URL) throws -> String {
+        let leaf = (name as NSString).lastPathComponent
+        guard !leaf.isEmpty, leaf != ".", leaf != ".." else { throw Failure.couldNotEncode }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try data.write(to: dir.appending(path: leaf), options: .atomic)
+        return leaf
+    }
+
     /// Unlink a picture nobody references any more.
     ///
     /// `basename` again, because this deletes: the path comes off a store
@@ -203,9 +324,41 @@ enum ProductPhotos {
 
     /// Read one back for the screen, where the stored thumbnail is not enough.
     static func load(_ name: String, in build: StoreReader.Build) -> NSImage? {
+        guard let data = data(name, in: build) else { return nil }
+        return NSImage(data: data)
+    }
+
+    /// A picture's bytes as they are on disk, for turning it.
+    static func data(_ name: String, in build: StoreReader.Build) -> Data? {
         let leaf = (name as NSString).lastPathComponent
-        guard !leaf.isEmpty else { return nil }
-        return NSImage(contentsOf: folder(build).appending(path: leaf))
+        guard !leaf.isEmpty, leaf != ".", leaf != ".." else { return nil }
+        return try? Data(contentsOf: folder(build).appending(path: leaf))
+    }
+
+    /// Where a picture's NEW bytes go: over its own file when it has one this
+    /// app can rewrite, else under `main.js`'s name for it.
+    ///
+    /// ── OVER THE SAME FILE, NOT BESIDE IT ─────────────────────────────────
+    ///
+    /// A turned picture is the same picture: its record keeps its id and its
+    /// path, and only the bytes and the thumbnail change. Nothing caches the
+    /// file by its name — the other app reads it into a data URI each time
+    /// (`hub:load-product-image`), and the web store's copy is keyed by the
+    /// file's modification date (`webStoreHeroes`) — so rewriting it in place
+    /// is seen everywhere on the next read. A second name would leave the
+    /// first behind for nobody.
+    ///
+    /// Not over a file whose extension says it is not a JPEG: the bytes are
+    /// JPEG, and the other app names the type from the extension. That picture
+    /// moves to the main.js name, and the old file is handed back to unlink.
+    static func target(existing path: String, productId: String,
+                       imageId: String) -> (name: String, unlink: String?) {
+        let leaf = (path as NSString).lastPathComponent
+        let minted = filename(productId: productId, imageId: imageId)
+        guard !leaf.isEmpty, leaf != ".", leaf != ".." else { return (minted, nil) }
+        let ext = (leaf as NSString).pathExtension.lowercased()
+        if ext == "jpeg" || ext == "jpg" { return (leaf, nil) }
+        return (minted, leaf == minted ? nil : leaf)
     }
 }
 
@@ -232,8 +385,16 @@ struct StagedPicture: Identifiable, Sendable {
     var thumbnail: String
     /// The file beside the book. Empty for a picture picked in this sitting.
     var path: String
-    /// The full-size JPEG, for a picture picked in this sitting only.
+    /// The full-size JPEG, for a picture picked in this sitting — or one
+    /// TURNED in this sitting, whose new bytes replace its file on save.
     var bytes: Data?
+    /// How far the shop has turned it in this sitting, in clockwise quarter
+    /// turns, and what it is being turned FROM: the bytes and thumbnail it
+    /// had when the first turn was asked for. Every turn is made from that
+    /// one starting point, so four presses of Rotate Right cost one JPEG
+    /// encode, not four stacked on each other.
+    var turns: Int = 0
+    var turnedFrom: (bytes: Data?, thumbnail: String, original: Data)?
 
     /// The record shape `lib/product-images.js` reads — the five fields it
     /// keeps, and nothing else. `bytes` is deliberately absent: it is this

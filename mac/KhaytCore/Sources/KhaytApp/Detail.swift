@@ -130,11 +130,14 @@ struct DetailLine: View {
 struct Thumbnail: View {
     let source: ThumbnailSource?
     @State private var image: NSImage?
+    /// A photograph of the screen (`SnapshotTests`) cannot wait for `.task`,
+    /// so there the picture is read on the spot. Never in the running app.
+    @Environment(\.photographFlat) private var photographing
 
     var body: some View {
         ZStack {
             Rectangle().fill(.quaternary)
-            if let image {
+            if let image = image ?? (photographing ? source.flatMap(ThumbnailStore.decode) : nil) {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -165,6 +168,12 @@ actor ThumbnailStore {
 
     func image(for source: ThumbnailSource) -> NSImage? {
         if let hit = cache[source] { return hit }
+        let made = Self.decode(source)
+        if let made { cache[source] = made }
+        return made
+    }
+
+    nonisolated static func decode(_ source: ThumbnailSource) -> NSImage? {
         let made: NSImage?
         switch source {
         case .file(let url):
@@ -178,7 +187,6 @@ actor ThumbnailStore {
             }
             made = NSImage(data: data)
         }
-        if let made { cache[source] = made }
         return made
     }
 }
