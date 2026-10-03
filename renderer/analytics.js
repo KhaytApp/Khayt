@@ -1102,6 +1102,7 @@ function renderCashFlowChart() {
     expenses: expenses || [],
     endMonth: localMonthStr(today),
     months: months.length,
+    settings,   // a tax-added shop collected the tax too
   }, { revenueOf: orderNetRevenueBase, countsForBusiness: _countsForBusiness });
   const revByMonth = {};
   const expByMonth = {};

@@ -1279,7 +1279,13 @@ function openPaymentModal(orderId) {
         input.addEventListener('input', () => {
           const rawVal = input.type === 'number' ? num(input.value, 0) : input.value;
           if (input.dataset.f === 'paidAmount') {
-            draft.paidAmount = Math.min(Math.max(0, rawVal), +order.price || 0);
+            // The most cash the order can take in total: price + tax for a shop
+            // that adds it on top, less any credit or gift card
+            // (lib/order-payment.js cashDue). The field is the TOTAL paid.
+            const cap = (typeof KhaytOrderPayment !== 'undefined' && KhaytOrderPayment.cashDue)
+              ? KhaytOrderPayment.cashDue(order, { settings }).cash
+              : (+order.price || 0);
+            draft.paidAmount = Math.min(Math.max(0, rawVal), cap);
           } else {
             draft[input.dataset.f] = rawVal;
           }
@@ -2148,13 +2154,12 @@ function openOrderEditor(orderId) {
         order.discountPct = draft.discountPct;
         order.priceBeforeDiscount = draft.discountPct > 0 ? +sellingBase.toFixed(2) : null;
         order.shippingCost = draft.shippingCost;
-        // Re-clamp paidAmount in case price was reduced below what was already paid
-        if ((order.paidAmount || 0) > (+order.price || 0)) {
-          order.paidAmount = +order.price || 0;
-          if (order.paidAmount >= +order.price) {
-            order.paymentStatus = 'paid';
-          }
-        }
+        // Re-clamp paidAmount in case the price fell below what was already
+        // paid. Billed, not priced: a shop that adds tax on top can hold
+        // price + tax. The status is the shared rule's, not a guess.
+        const billed = KhaytOrderMoney.orderGrossRaw(order, { settings });
+        if ((order.paidAmount || 0) > billed) order.paidAmount = billed;
+        order.paymentStatus = KhaytOrderPayment.statusOf(order, { settings });
       }
       // A typed total is the last word, after the arithmetic above. The shared
       // rule writes it, how the price was reached, and what follows for the
