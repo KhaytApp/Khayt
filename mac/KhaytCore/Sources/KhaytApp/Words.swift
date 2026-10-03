@@ -3595,6 +3595,8 @@ final class Words {
         "mac.lan_open":      ["en": "Open on a phone on the same Wi‑Fi:",
                               "ar": "افتحه على هاتف متصل بنفس شبكة Wi‑Fi:"],
         "mac.lan_pin_short": ["en": "Use at least {n} characters. The PIN is the only lock on the shop\u{2019}s book over the network.", "ar": "استخدم {n} أحرف على الأقل. الرمز هو القفل الوحيد على دفتر المتجر عبر الشبكة."],
+        "mac.lan_pin_too_short_stored": ["en": "The saved owner PIN is shorter than {n} characters, so the phone app and the queue page are locked until you set a new one. Customer pages keep working.",
+                                         "ar": "رمز PIN المحفوظ للمالك أقصر من {n} أحرف، لذا تطبيق الهاتف وصفحة القائمة مقفلان حتى تعيّن رمزًا جديدًا. صفحات العملاء تبقى تعمل."],
         "mac.lan_pin_missing": ["en": "Set an owner PIN — the queue shows customers' names.",
                                 "ar": "عيّن رمز PIN للمالك — فالقائمة تعرض أسماء العملاء."],
         "mac.lan_failed":    ["en": "The server could not start: {error}",

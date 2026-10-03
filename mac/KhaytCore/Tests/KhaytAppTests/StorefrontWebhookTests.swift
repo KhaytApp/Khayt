@@ -47,7 +47,7 @@ struct StorefrontWebhookTests {
                     "storefront": .object(["stockQty": .object(["PRD-A": .number(12)])]),
                 ]),
             ]
-            var host = LanServer.Host(store: { book.value }, pin: "2468", engine: engine,
+            var host = LanServer.Host(store: { book.value }, pin: "24682468", engine: engine,
                                       now: { StorefrontWebhookTests.start }, nowText: { "09:16" })
             host.storefrontSecrets = secrets
             let writes = self.writes
@@ -240,8 +240,9 @@ struct StorefrontWebhookTests {
         #expect(bench.writes.n == 0)
         // Another channel, and the owner's PIN, are their own buckets.
         #expect(try await bench.deliver("zid", #"{"order":{"reference_id":"ZD-1"}}"#).status == 200)
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(bench.port)/api/queue?pin=2468")!)
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(bench.port)/api/queue")!)
         request.httpMethod = "GET"
+        request.setValue("24682468", forHTTPHeaderField: "x-khayt-pin")
         let (_, response) = try await LanServerTests.NoRedirect.session.data(for: request)
         #expect((response as? HTTPURLResponse)?.statusCode == 200,
                 "a storefront hammering a wrong secret locked the owner out of the queue")

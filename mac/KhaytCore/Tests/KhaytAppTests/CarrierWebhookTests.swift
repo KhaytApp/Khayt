@@ -36,7 +36,7 @@ struct CarrierWebhookTests {
                 ]),
                 "settings": .object(["shipping": .object(["smsa": .object(["enabled": .bool(true)])])]),
             ]
-            var host = LanServer.Host(store: { book.value }, pin: "2468", engine: engine,
+            var host = LanServer.Host(store: { book.value }, pin: "24682468", engine: engine,
                                       now: { CarrierWebhookTests.start }, nowText: { "09:16" })
             host.carrierSecrets = secrets
             host.replayFile = replayFile

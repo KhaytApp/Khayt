@@ -25,7 +25,7 @@ struct BonjourLiveTests {
         let engine = try #require(shop.engine)
         var book = shop.lanBook
         book["settings"] = .object(["shopName": .string("BonjourProbe")])
-        let host = LanServer.Host(store: { book }, pin: "2468", engine: engine,
+        let host = LanServer.Host(store: { book }, pin: "24682468", engine: engine,
                                   now: { Date() }, nowText: { "09:16" },
                                   icon: { LanServer.bundledIcon($0) })
         let server = LanServer(host: host)

@@ -49,7 +49,7 @@ Authorization: Bearer khayt_<random>
 | Mechanism | Details |
 |-----------|---------|
 | Header | `x-khayt-pin: <owner-pin>` (preferred for native clients) |
-| Query | `?pin=<owner-pin>` (used by some PWA links) — **GET only on the native Mac app**: its write routes ignore `?pin=` and take the header |
+| Query | `?pin=<owner-pin>` (used by some PWA links) — **desktop app only**. The native Mac app ignores `?pin=` on every API route, read or write, and takes the header; the one exception is the queue page's old `/?pin=` bookmark, which it trades once for a session cookie |
 
 **Owner PIN** is `settings.lanApi.pin` in the store — same as kiosk / queue API.
 
@@ -58,7 +58,8 @@ Authorization: Bearer khayt_<random>
 - If an owner PIN **is configured**, sensitive `GET` routes and all mutating routes require a matching PIN.
 - If **no** owner PIN is configured, sensitive `GET` routes return **401** (queue/inventory/machines are unavailable until a PIN is set).
 - **Writes** without a configured PIN return **403**.
-- **Brute force:** 10 failed attempts per client IP → **429** for 1 minute.
+- **Brute force:** 10 failed attempts per client IP → **429** for 1 minute (the native Mac app counts an IPv6 client per /64).
+- **Native Mac app:** an owner PIN shorter than 8 characters opens nothing — owner routes answer **401** with `{"reason":"pin-too-short", "error": …}` until the shop sets a new one (clients should key on `reason`, not the sentence). `/calendar.ics` takes the calendar token only, never the owner PIN.
 
 ### Public routes (no owner PIN)
 
