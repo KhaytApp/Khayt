@@ -155,6 +155,37 @@ import Testing
         #expect(try await engine.owedRaw(order: order, settings: Self.vat15) == 0)
     }
 
+    /// ── WHAT THE BOOK ALREADY HOLDS ─────────────────────────────────────
+    ///
+    /// Before alpha.58 a payment was capped at the PRICE, so every order a
+    /// tax-on-top shop settled reads paidAmount == price, paymentStatus 'paid'.
+    /// Judged by the new rule each of them moved into receivables owing the
+    /// tax. They were settled; they stay settled. A payment recorded from now
+    /// on is stamped `paidGross` and judged against price + tax.
+    @Test("an order settled before tax-on-top was owed is still settled; a new payment is not grandfathered")
+    func settledBeforeStaysSettled() async throws {
+        let engine = try KhaytEngine()
+        let old = Self.job("old", price: 100, cost: 10, extra: [
+            "paidAmount": .number(100), "paymentStatus": .string("paid"),
+        ])
+        #expect(try await engine.owedRaw(order: old, settings: Self.salesTax) == 0,
+                "a settled order moved into receivables owing the tax")
+        let figures = try await engine.orderFigures([old], settings: Self.salesTax, clients: [])
+        #expect(figures["old"] == .init(billed: 108.25, net: 100, tax: 8.25, owed: 0))
+        #expect(try await engine.cashDue(order: old, settings: Self.salesTax).cash == 100,
+                "the payment sheet would preview the tax as owed")
+
+        // A payment recorded NOW of the bare price is a partial payment.
+        let fresh = Self.job("new", price: 100, cost: 10, extra: ["paidAmount": .number(0)])
+        let done = try await engine.recordPayment(order: fresh, amount: 100, method: "cash",
+                                                  paidAt: "2026-10-03", today: "2026-10-03",
+                                                  settings: Self.salesTax)
+        guard case .object(let o) = done.order else { Issue.record("no order"); return }
+        #expect(o["paidGross"] == .bool(true))
+        #expect(o["paymentStatus"] == .string("partial"))
+        #expect(try await engine.owedRaw(order: done.order, settings: Self.salesTax) == 8.25)
+    }
+
     // MARK: - 6. a gift card and a plan
 
     @Test("a plan covering price − gift card settles the order once collected")

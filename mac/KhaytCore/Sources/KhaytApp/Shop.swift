@@ -9116,7 +9116,7 @@ final class Shop {
             // A restore not yet carried up wins over the cloud's copy, and the
             // shared rule is told what this Mac last agreed on, so an edit
             // made here and overwritten is reported rather than lost quietly.
-            let restored = RestoreGuard.pending(for: build.storeURL).map { Set($0.records) }
+            var marker = liveRestoreMarker(build)
             await installSyncBaseline(build: build, shopId: connection.shopId, engine: engine)
             let keepAt = SyncLosses.fileURL(for: build.storeURL)
             var report: KhaytEngine.Merged?
@@ -9127,14 +9127,29 @@ final class Shop {
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
                 recordingDeletes: false
             ) { root in
-                if let restored {
-                    root = RestoreGuard.prevail(root, over: folded.store, restored: restored)
+                // What the hold overrides is a loss like any other: before,
+                // `before` was taken AFTER it, so the cloud copies it replaced
+                // never reached sync-conflicts/.
+                var overridden: [SyncLoss] = []
+                if var held = marker {
+                    let out = RestoreGuard.hold(root, over: folded.store, pending: &held)
+                    root = out.book
+                    overridden = out.overridden
+                    marker = held
                 }
                 let before = root
                 let merged = try await engine.mergeFromCloud(local: root, server: folded.store)
-                losses = try Self.keepLosses(before: before, merged: merged, at: keepAt)
+                let taken = SyncLosses.compute(before: before, after: merged.store, conflicts: merged.conflicts)
+                losses = overridden + taken
+                try SyncLosses.keep(losses, at: keepAt)
                 root = merged.store
                 report = merged
+            }
+            if let marker { try? RestoreGuard.save(marker, for: build.storeURL) }
+            // A viewer can never push, so it can never carry the restore up:
+            // held once, and then the ordinary rule.
+            if marker != nil, RestoreGuard.afterPull(canWrite: cloudRoleCanWrite, storeURL: build.storeURL) {
+                restoreHoldNote = words.callIt("mac.restore_hold_read_only")
             }
             cloudPulled = report
             announceSyncLosses(losses, file: keepAt)
@@ -10074,6 +10089,10 @@ final class Shop {
     private(set) var restoreInProgress = false
     /// What the last merges took from this book, kept and not yet looked at.
     var syncLossNotice: SyncLossNotice?
+    /// Why a restore is no longer being held against the cloud — it expired,
+    /// or this Mac's role can never carry it up. Said once, then the ordinary
+    /// sync rule applies to the restored records again.
+    var restoreHoldNote: String?
     var reviewingSyncLosses = false
     /// Kept records already put back, so the sheet stops offering them.
     var syncLossesPutBack: Set<String> = []

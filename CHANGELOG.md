@@ -4,6 +4,36 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Orders you settled before this release stay settled.** On a shop that
+  adds tax on top, earlier releases capped a payment at the price, so every
+  order you had marked paid read as paid at the pre-tax figure. The new tax
+  rule moved all of them into receivables owing the tax, with a balance on
+  the customer portal. An order already recorded as paid that covered its
+  price now counts as settled. Payments recorded from now on are marked as
+  covering price plus tax and are judged that way.
+- **(Mac) Undo no longer gives filament back twice.** If a job was completed
+  on the Mac and then re-opened on a phone or the desktop, which already put
+  the grams back, undoing the completion on the Mac added them again. Undo
+  now leaves a spool's or consumable's stock alone when the job's draw was
+  already settled elsewhere, and says so.
+- **(Mac) A restore from a backup no longer overrides other devices for
+  ever.** It now holds only the records the restore changed, gives way to
+  edits other devices make after the restore, stops after 7 days (or after
+  one sync on a read-only cloud role) with a notice, and keeps a copy of
+  every cloud record it overrides in the sync conflicts folder.
+- **(Mac) Online orders are priced at what the store showed.** A web-store
+  order is priced at the line price the platform sent, or else at the price
+  the store currently lists. Before, it used the book's price, which may be a
+  new price the store is still holding for your review.
+- **(Mac) An automatic web-store update never takes the store offline.** If
+  nothing in the catalogue can be listed, the store is left as it is and you
+  are told. Taking it offline is your decision.
+- **(Mac) Sync conflict copies are private and pruned.** The sync-conflicts
+  folder, the sync baseline and the restore marker hold whole customer
+  records. They are now readable by your user account only, and conflict
+  copies older than 60 days, or beyond the newest 200, are removed.
+- **(Mac) Unpacking a large archive no longer slows the rest of the app.**
+
 - **(Mac) An automatic web-store republish no longer fails as soon as it
   starts.** The republish that follows a catalogue change cancelled its own
   task at the start. Its requests to Khayt Cloud then failed as cancelled, and

@@ -281,3 +281,30 @@ test('paidTotal on a tax-on-top shop is the lines plus the tax the customer paid
   // An explicit total is already the money that moved.
   assert.equal(W.paidTotal({ paidTotal: 100, lines: order.lines }, { settings: salesTax }), 100);
 });
+
+// ── What the customer was SHOWN, not what the book says now ───────────────
+//
+// A re-price the store is holding (#1705) never reached the website, so a
+// customer bought at the old figure. Priced from the book, the job and its
+// "paid" amount disagreed with the money that moved.
+
+test('a line carrying its own price is priced at it', () => {
+  const out = W.linePrices([{ productId: 'P-PUB', qty: 2, unitPrice: 70 }],
+    { products: PRODUCTS, settings: {} });
+  assert.deepEqual(out.lines[0], { productId: 'P-PUB', qty: 2, unit: 70, total: 140, source: 'line' });
+});
+
+test('else the price the store last listed, over a re-price in the book it is holding', () => {
+  const out = W.linePrices([{ productId: 'P-PUB', qty: 1 }, { productId: 'P-TYPED', qty: 1 }],
+    { products: PRODUCTS, settings: {}, listed: { 'P-PUB': '72.5' } });
+  assert.deepEqual(out.lines.map((l) => [l.unit, l.source]), [[72.5, 'listed'], [50, 'typed']]);
+  assert.equal(out.total, 122.5);
+});
+
+test('the shelf reading carries a structured line\'s price through', () => {
+  const r = S.read({ lines: [{ name: 'Vase', qty: 2, productId: 'P-PUB', unitPrice: '70' }] },
+    { products: PRODUCTS, stock: {} });
+  assert.equal(r.lines[0].unitPrice, 70);
+  const bare = S.read({ lines: [{ name: 'Vase', qty: 2, productId: 'P-PUB' }] }, { products: PRODUCTS, stock: {} });
+  assert.equal('unitPrice' in bare.lines[0], false);
+});

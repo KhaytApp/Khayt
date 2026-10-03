@@ -263,8 +263,9 @@ test('gift-card redemption is a tender, NOT a reduction of revenue', () => {
   assert.match(payment, /const paid = numberOf\(order\.paidAmount\) \+ numberOf\(order\.giftCardDiscount\);/,
     'a gift card is cash paid, not a discount');
   // What is due is what was BILLED less credit notes — the price, or on an
-  // exclusive-tax shop the price plus the tax (`grossOf`).
-  assert.match(payment, /const due = Math\.max\(0, grossOf\(order, ctx\) - credited\);/,
+  // exclusive-tax shop the price plus the tax, unless the order was settled
+  // before tax on top was owed (`dueOf` → `orderDueRaw`).
+  assert.match(payment, /const due = Math\.max\(0, dueOf\(order, ctx\) - credited\);/,
     'and a credit note reduces what is DUE — the two sides of the division');
   const P = require('../lib/order-payment.js');
   assert.equal(P.statusOf({ price: 1000, giftCardDiscount: 1000 }), 'paid',

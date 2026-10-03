@@ -1324,7 +1324,9 @@ public actor KhaytEngine {
                 instalments: rows, instalmentBase: base,
                 giftCardDiscount: +o.giftCardDiscount || 0,
                 credited: M.orderCreditedRaw(o),
-                due: M.orderGrossRaw(o, {settings: settings}),
+                // What is DUE, not what was billed: an order settled before tax
+                // on top was owed is settled at its price (`orderDueRaw`).
+                due: M.orderDueRaw(o, {settings: settings}),
               });
             })(ARG0, ARG1, ARG2)
             """, [order, .array(instalments), .object(settings)], as: PlanTotals.self)
@@ -10453,7 +10455,7 @@ public actor KhaytEngine {
         /// Per one. Nil for a line nothing could price.
         public let unit: Double?
         public let total: Double
-        /// `published`, `typed`, `computed` or `none`.
+        /// `line`, `listed`, `published`, `typed`, `computed` or `none`.
         public let source: String
     }
 
@@ -10467,11 +10469,20 @@ public actor KhaytEngine {
     /// Each line at the price the catalogue published for it, times how many.
     /// `computed` is product id → what this app's own price rule makes it, for
     /// a product nothing published.
+    ///
+    /// `listed` is product id → the price the store LISTS it at now, as last
+    /// read back from Khayt Cloud: it wins over the book, whose price may be a
+    /// re-price the store is holding for review. A line's own `unitPrice` wins
+    /// over both.
     public func webStoreLinePrices(lines: [JSONValue], products: [JSONValue], settings: JSONValue,
-                                   computed: [String: Double]) throws -> WebStorePricing {
-        try runtime.call2("KhaytWebstoreOrder.linePrices(ARG0, { products: ARG1, settings: ARG2, computed: ARG3 })",
+                                   computed: [String: Double],
+                                   listed: [String: Double] = [:]) throws -> WebStorePricing {
+        try runtime.call2("""
+            KhaytWebstoreOrder.linePrices(ARG0, { products: ARG1, settings: ARG2, computed: ARG3, listed: ARG4 })
+            """,
                           [.array(lines), .array(products), settings,
-                           .object(computed.mapValues(JSONValue.number))],
+                           .object(computed.mapValues(JSONValue.number)),
+                           .object(listed.mapValues(JSONValue.number))],
                           as: WebStorePricing.self)
     }
 

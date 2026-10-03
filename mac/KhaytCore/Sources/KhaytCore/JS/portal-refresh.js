@@ -178,8 +178,11 @@
     // An outstanding balance on an active order — let the customer pay it from
     // the portal, the way the quote deposit works.
     if (!isQuote && o.status !== 'completed' && o.status !== 'delivered') {
-      // Against the same gross: tax on top is owed too.
-      const balance = billed - (+o.paidAmount || 0);
+      // Against what is DUE: tax on top is owed too — except on an order
+      // settled before it was (`orderDueRaw`), which owes nothing more.
+      const due = (Money && typeof Money.orderDueRaw === 'function')
+        ? (+Money.orderDueRaw(o, { settings }) || 0) : billed;
+      const balance = due - (+o.paidAmount || 0);
       if (balance > 0.005) {
         payload.balanceDue = balance.toFixed(2);
         if (!payload.currency && symbol) payload.currency = symbol;

@@ -23,6 +23,11 @@ import KhaytCore
 /// - a quantity (a spool's grams, a consumable's stock) is put back by the
 ///   inverse DELTA — what the action took is added back to whatever is there
 ///   now — so a delivery or another job's deduction in between survives;
+///   but only while the draw is still this action's to give back: if the
+///   job's deduction marks or the spool's usage line have moved since (a
+///   phone re-opened the job and returned the grams, a sync took another
+///   copy of the spool), the quantity is LEFT and reported — added back
+///   again it counted the same grams twice;
 /// - an array the action appended to (a spool's usage history, a supplier's
 ///   purchase log) has just those entries taken out again.
 ///
@@ -52,6 +57,16 @@ extension Shop {
         "consumables": ["stock"],
     ]
 
+    /// The fields on a JOB that say whether its draw on the shelf stands —
+    /// `lib/order-deduction.js` sets them when it takes stock and clears them
+    /// when `returnForOrder` gives it back.
+    nonisolated static let undoDeductionMarks: Set<String> = [
+        "materialDeducted", "materialDrawn", "packagingDeducted",
+    ]
+
+    /// The collection jobs live in.
+    nonisolated static let undoJobsCollection = "printLog"
+
     /// What an undo did, and what it could not.
     struct UndoOutcome {
         /// What Redo needs — itself a field-level change set.
@@ -80,14 +95,29 @@ extension Shop {
     /// Undo one record's fields. `current` is the record as the book has it
     /// now. Returns the record to write, whether anything changed, and the
     /// fields left alone because someone wrote them since.
+    ///
+    /// `deltasStand: false` means the stock this action moved has already been
+    /// moved back by somebody else (see `deductionStillStands`): a quantity is
+    /// then LEFT and reported, never added back a second time.
     nonisolated static func undoFields(current: [String: JSONValue],
                                        was: [String: JSONValue],
                                        now: [String: JSONValue],
-                                       byDelta: Set<String>)
+                                       byDelta: Set<String>,
+                                       deltasStand: Bool = true)
     -> (record: [String: JSONValue], changed: Bool, kept: [String]) {
         var out = current
         var changed = false
         var kept: [String] = []
+        // ── A QUANTITY IS ONLY PUT BACK WHILE ITS DRAW IS STILL THERE ───────
+        //
+        // The action's usage-history lines are the spool's own record of the
+        // draw. If they have gone (a phone re-opened the job and
+        // `returnForOrder` took them out with the grams), or a line the action
+        // took out is back (somebody re-drew it), the grams have already been
+        // settled elsewhere — and adding the delta again counted them twice.
+        // So did a sync tie that took another machine's copy of the spool,
+        // which never had the draw at all.
+        let historyStands = Self.historyStillStands(current: current, was: was, now: now)
         for key in Set(was.keys).union(now.keys).subtracting(undoBookkeeping).sorted() {
             let before = was[key], after = now[key], present = current[key]
             guard before != after else { continue }
@@ -95,6 +125,7 @@ extension Shop {
             // A quantity: add back what the action took (or take back what it
             // added), onto whatever is there NOW.
             if byDelta.contains(key), let b = number(before), let a = number(after) {
+                guard deltasStand, historyStands else { kept.append(key); continue }
                 guard let c = number(present) else { kept.append(key); continue }
                 let restored = ((c + (b - a)) * 1_000_000).rounded() / 1_000_000
                 if out[key] != .number(restored) {
@@ -135,6 +166,53 @@ extension Shop {
         return (out, changed, kept)
     }
 
+    /// Whether the usage history the action wrote is still as it left it:
+    /// every line it added is still there, and no line it removed is back.
+    /// A record whose history the action did not touch always stands.
+    nonisolated static func historyStillStands(current: [String: JSONValue],
+                                               was: [String: JSONValue],
+                                               now: [String: JSONValue]) -> Bool {
+        let key = "usageHistory"
+        func list(_ v: JSONValue?) -> [JSONValue] {
+            if case .array(let l)? = v { return l }
+            return []
+        }
+        let before = list(was[key]), after = list(now[key]), present = list(current[key])
+        guard before != after else { return true }
+        let added = subtracting(before, from: after)
+        if !added.isEmpty, removing(added, from: present) == nil { return false }
+        let removed = subtracting(after, from: before)
+        if !removed.isEmpty {
+            // Back again as many times as before the action: re-drawn since.
+            var counts: [JSONValue: Int] = [:]
+            for v in present { counts[v, default: 0] += 1 }
+            var had: [JSONValue: Int] = [:]
+            for v in before { had[v, default: 0] += 1 }
+            if removed.contains(where: { (counts[$0] ?? 0) >= (had[$0] ?? 0) }) { return false }
+        }
+        return true
+    }
+
+    /// Whether the stock this change set moved is still this action's to give
+    /// back: every job it changed still holds the deduction marks the action
+    /// wrote. A job whose marks have moved since — re-opened on a phone, its
+    /// material returned through the shared `returnForOrder`, then merged in by
+    /// sync — has had its stock settled ALREADY, and the spool's and the
+    /// consumables' deltas in the same snapshot are left alone.
+    static func deductionStillStands(_ snapshot: [ChangedRecord],
+                                     in root: [String: JSONValue]) -> Bool {
+        let jobs = rows(root, undoJobsCollection)
+        for change in snapshot where change.collection == undoJobsCollection && change.kind == .edited {
+            guard let now = change.now else { continue }
+            let moved = undoDeductionMarks.filter { change.was[$0] != now[$0] }
+            guard !moved.isEmpty else { continue }
+            guard let row = jobs.first(where: { recordId($0) == change.id }),
+                  case .object(let current) = row else { return false }
+            if moved.contains(where: { current[$0] != now[$0] }) { return false }
+        }
+        return true
+    }
+
     /// Undo a whole change set on a book in memory. Pure, so a test can drive
     /// it with a plain book; `restoreMove` runs it inside the write.
     static func undoing(_ snapshot: [ChangedRecord],
@@ -144,6 +222,9 @@ extension Shop {
         // lists its records the same way.
         var order: [String] = []
         for r in snapshot where !order.contains(r.collection) { order.append(r.collection) }
+        // Asked of the book BEFORE anything is put back: the jobs are undone
+        // in the same pass.
+        let deltasStand = deductionStillStands(snapshot, in: root)
 
         for collection in order {
             var records = rows(root, collection)
@@ -184,7 +265,8 @@ extension Shop {
                         continue
                     }
                     var (next, changed, kept) = undoFields(current: current, was: change.was,
-                                                           now: now, byDelta: deltas)
+                                                           now: now, byDelta: deltas,
+                                                           deltasStand: deltasStand)
                     outcome.notUndone += kept.map { label(change.id, $0) }
                     guard changed else { continue }
                     // `rev` carries on from where the record is NOW: a revision

@@ -198,4 +198,20 @@ struct WebStoreFollowTests {
         #expect(shop.automaticGate(sending: catalog, sent: 3, published: .init(live: false)) == .stop)
         #expect(shop.webStoreLive == false)
     }
+
+    @Test("an automatic publish that finds nothing to list keeps the store up and tells the shop")
+    func emptyIsHeldNotUnpublished() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.webStoreLive = true
+        shop.holdEmptyStore()
+        #expect(shop.webStoreLive == true, "an automatic publish took the store offline")
+        #expect(shop.webStoreProblem)
+        #expect(shop.webStoreSaid == shop.words.callIt("mac.ws_empty_held"))
+        #expect(shop.moveNotices.contains(shop.words.callIt("mac.ws_empty_held")))
+        // Once, not on every edit that follows.
+        let count = shop.moveNotices.count
+        shop.holdEmptyStore()
+        #expect(shop.moveNotices.count == count)
+    }
 }

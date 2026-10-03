@@ -155,6 +155,48 @@ struct OnlineOrderReadingTests {
         #expect(order.lines.first?.productId == stocked.0)
     }
 
+    /// ── WHAT THE STORE SHOWED, NOT WHAT THE BOOK SAYS NOW ───────────────
+    ///
+    /// A re-price the store is HOLDING (#1705) is not on the website, so a
+    /// customer bought at the old figure. Priced from the book, the job and
+    /// its "paid" figure disagreed with the money that moved.
+    @Test("an online order is priced at what the store listed, not at a re-price the store is holding")
+    func pricedAtTheListedPrice() async throws {
+        let shop = await Self.shop()
+        let stocked = try #require(Self.stocked(shop).first { $0.2 >= 2 })
+        let order = try await Self.order("• \(stocked.1) × 2", shop: shop)
+        let book = try #require(await shop.onlinePricing(order))
+        let bookUnit = try #require(book.lines.first?.unit)
+        // The store still lists the price it was last published at.
+        let listed = bookUnit + 7
+        shop.webStoreHeld = CatalogPublisher.Held(live: true, prices: [stocked.0: String(listed)])
+        let held = try #require(await shop.onlinePricing(order))
+        #expect(held.lines.first?.unit == listed)
+        #expect(held.lines.first?.source == "listed")
+        #expect(held.total == listed * 2)
+    }
+
+    @Test("a line that carries the price the customer paid is priced at it")
+    func pricedAtTheLinePrice() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let stocked = try #require(Self.stocked(shop).first { $0.2 >= 2 })
+        let payload = JSONValue.object([
+            "title": .string("Store order — W-9"), "source": .string("webstore"),
+            "ref": .string("webstore:W-9"), "name": .string("Nora"),
+            "lines": .array([.object(["name": .string(stocked.1), "qty": .number(2),
+                                      "productId": .string(stocked.0), "unitPrice": .number(33.5)])]),
+        ])
+        let order = Shop.OnlineOrder(
+            item: CloudIntake.Item(id: "13", payload: payload, createdAt: Date()),
+            reading: try await engine.shelfSaleReading(payload: payload, products: shop.productRows,
+                                                       stock: Shop.stockCounts(shop.settingsDict)))
+        let priced = try #require(await shop.onlinePricing(order))
+        #expect(priced.lines.first?.unit == 33.5)
+        #expect(priced.lines.first?.source == "line")
+        #expect(priced.total == 67)
+    }
+
     @Test("an order already in the book is found, by its reference or by its queue item")
     func alreadyInBook() async throws {
         let shop = await Self.shop()
