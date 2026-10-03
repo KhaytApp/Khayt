@@ -85,7 +85,14 @@ public enum CashFlow {
     /// `revenueOf` is per order and comes from `order-money`, which still lives
     /// in JavaScript; the caller works it out once and hands it in, aligned
     /// with `orders`.
+    ///
+    /// `billed` is what each order asked the customer to pay, in its own
+    /// currency — `orderGrossRaw`, the price plus any tax added on top — and is
+    /// the most cash an order can bring in. Without it (or for an order past
+    /// its end) the price is the cap, which is the answer for every inclusive
+    /// and every untaxed shop.
     public static func report(orders: [JSONValue], revenues: [Double],
+                              billed: [Double]? = nil,
                               expenses: [JSONValue], endMonth: String,
                               months: Double = 6,
                               countsForBusiness: (JSONValue) -> Bool = {
@@ -110,8 +117,21 @@ public enum CashFlow {
             // THE SHARE ACTUALLY PAID, not the whole job. `revenueOf` owns the
             // tax and the currency; scaling its answer keeps both rules where
             // they are rather than re-deriving either here.
+            //
+            // CAPPED AT WHAT WAS BILLED, NOT AT THE PRICE. A tax-on-top shop
+            // bills 108.25 on a 100 job at 8.25%, and a customer who paid it
+            // handed over 108.25 — capping at the price counted 100. The share
+            // is still taken against the price, so 108.25 paid reads as 108.25
+            // of a 100 revenue. An inclusive or untaxed shop bills the price,
+            // so nothing changes there.
             let price = num(o["price"])
-            let paid = Swift.min(num(o["paidAmount"]), price)
+            let gross: Double = {
+                // `g > 0 ? g : price` — lib/cash-flow.js `billedOf`, exactly.
+                guard let billed, index < billed.count, billed[index].isFinite,
+                      billed[index] > 0 else { return price }
+                return billed[index]
+            }()
+            let paid = Swift.min(num(o["paidAmount"]), gross)
             guard paid > 0 else { continue }
             let share = price > 0 ? paid / price : 0
             let amount = (index < revenues.count ? revenues[index] : 0) * share

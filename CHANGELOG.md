@@ -51,6 +51,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the customer portal. An order already recorded as paid that covered its
   price now counts as settled. Payments recorded from now on are marked as
   covering price plus tax and are judged that way.
+- **(Mac) Cash flow counts the tax a customer paid on top.** On a shop that
+  adds tax on top of the price, cash flow capped what an order brought in at
+  the pre-tax price, so a customer who paid 108.25 on a 100 job at 8.25% showed
+  100 of cash in. It is now capped at what the order billed, tax included.
+  Shops whose prices include VAT, and shops that charge no tax, read as before,
+  and an order settled at its price before the tax rule changed still counts
+  what was paid.
 - **(Mac) Undo no longer gives filament back twice.** If a job was completed
   on the Mac and then re-opened on a phone or the desktop, which already put
   the grams back, undoing the completion on the Mac added them again. Undo

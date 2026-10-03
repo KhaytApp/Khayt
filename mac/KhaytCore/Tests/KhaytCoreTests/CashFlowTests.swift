@@ -21,11 +21,27 @@ import Testing
     }
 
     static func run(_ engine: KhaytEngine, orders: [JSONValue],
-                    expenses: [JSONValue] = []) async throws -> KhaytEngine.CashFlow {
+                    expenses: [JSONValue] = [],
+                    settings: [String: JSONValue] = [:]) async throws -> KhaytEngine.CashFlow {
         try await engine.cashFlow(orders: orders, expenses: expenses,
                                   endMonth: "2026-09", months: 4,
-                                  settings: [:], clients: [])
+                                  settings: settings, clients: [])
     }
+
+    /// 8.25% sales tax added on top of the price.
+    static let salesTax: [String: JSONValue] = [
+        "currency": .string("USD"),
+        "tax": .object([
+            "name": .string("Sales Tax"), "mode": .string("exclusive"),
+            "rates": .array([.object(["id": .string("st"), "label": .string("Sales tax"),
+                                      "percent": .number(8.25)])]),
+        ]),
+    ]
+
+    /// 15% VAT already inside the price.
+    static let vat15: [String: JSONValue] = [
+        "currency": .string("SAR"), "enableVat": .bool(true), "vatRate": .number(15),
+    ]
 
     @Test("the months come back oldest first, and there are as many as asked for")
     func theWindowIsTheWindow() async throws {
@@ -98,5 +114,57 @@ import Testing
         ], expenses: [.object(["date": .string("2026-08-03"), "amount": .number(500)])])
         #expect(flow.totals.net == 0)
         #expect(flow.totals.anyMovement == true)
+    }
+
+    /// A tax-on-top shop bills 108.25 on a 100 job at 8.25%. Capping what was
+    /// paid at the PRICE counted 100 of the 108.25 that reached the bank.
+    @Test("tax added on top: the tax the customer paid is cash in")
+    func taxOnTopIsCollected() async throws {
+        let engine = try KhaytEngine()
+        let flow = try await Self.run(engine, orders: [
+            Self.order("A", price: 100, paid: 108.25, on: "2026-08-10"),
+        ], settings: Self.salesTax)
+        #expect(abs(flow.totals.collected - 108.25) < 1e-9)
+    }
+
+    @Test("tax added on top: paying more than was billed still counts only the bill")
+    func taxOnTopCapsAtTheBill() async throws {
+        let engine = try KhaytEngine()
+        let flow = try await Self.run(engine, orders: [
+            Self.order("A", price: 100, paid: 150, on: "2026-08-10"),
+        ], settings: Self.salesTax)
+        #expect(abs(flow.totals.collected - 108.25) < 1e-9)
+    }
+
+    /// Settled before #1718: `recordPayment` capped at the price, so the order
+    /// holds `paidAmount == price` and `'paid'`. Cash in is what was paid.
+    @Test("tax added on top: an order settled at its price before the fix counts the price")
+    func settledBeforeTaxOnTopCountsWhatWasPaid() async throws {
+        let engine = try KhaytEngine()
+        guard case .object(var o) = Self.order("A", price: 100, paid: 100, on: "2026-08-10")
+        else { return }
+        o["paymentStatus"] = .string("paid")
+        let flow = try await Self.run(engine, orders: [.object(o)], settings: Self.salesTax)
+        #expect(flow.totals.collected == 100)
+    }
+
+    @Test("VAT inside the price: what was paid is what came in, unchanged")
+    func inclusiveIsUnchanged() async throws {
+        let engine = try KhaytEngine()
+        let flow = try await Self.run(engine, orders: [
+            Self.order("A", price: 115, paid: 115, on: "2026-08-10"),
+            Self.order("B", price: 115, paid: 200, on: "2026-08-11"),
+        ], settings: Self.vat15)
+        #expect(flow.totals.collected == 230)
+    }
+
+    @Test("no tax: an overpayment is still capped at the price")
+    func untaxedIsUnchanged() async throws {
+        let engine = try KhaytEngine()
+        let flow = try await Self.run(engine, orders: [
+            Self.order("A", price: 100, paid: 108.25, on: "2026-08-10"),
+            Self.order("B", price: 100, paid: 40, on: "2026-08-11"),
+        ])
+        #expect(flow.totals.collected == 140)
     }
 }
