@@ -66,7 +66,9 @@ struct LibraryGrid: View {
                             switch entry {
                             case .folder(let name, let path, let count, let cover):
                                 FolderCell(name: name, count: count,
-                                           thumbnail: cover.flatMap { shop.thumbnail(for: $0) },
+                                           // The shop's chosen picture,
+                                           // else the borrowed one.
+                                           thumbnail: shop.groupThumbnail(path, automatic: cover),
                                            words: shop.words,
                                            kind: shop.groupKind(path),
                                            parent: FolderCell.parent(of: path, open: shop.shelf),
@@ -99,6 +101,10 @@ struct LibraryGrid: View {
                                         // prints: what decides how "All
                                         // models" draws it.
                                         GroupKindMenu(shop: shop, path: path)
+                                        // Its own picture, instead of
+                                        // the first model's.
+                                        GroupPictureItems(shop: shop, path: path)
+                                        Divider()
                                         FolderMoveMenu(shop: shop, path: path)
                                         // Every chosen group at once, and a
                                         // new name for this one.
@@ -317,6 +323,10 @@ struct GroupCrumb: View {
                         } else { Text(shop.words.callIt(kind.wordKey)) }
                     }
                 }
+                // The group's picture, from the same place its kind is
+                // changed: the one menu that is about the group itself.
+                Divider()
+                GroupPictureItems(shop: shop, path: group)
             } label: {
                 // IN THE CRUMB'S OWN INK. As a borderless menu its label was
                 // drawn pale grey — the look of a control that is switched

@@ -115,9 +115,13 @@ enum CatalogPublisher {
     /// `resizeImage(blob, HERO_MAX_DIM, HERO_QUALITY)`, through the same scaling
     /// the product editor already uses. nil when the file cannot be read, and
     /// the listing then falls back to its thumbnail.
+    ///
+    /// Read UPRIGHT (`ProductPhotos.upright`): a file that still carries an
+    /// EXIF orientation tag — copied in by hand, or written by an older build
+    /// — is published the way the shop sees it, not as its pixels lie.
     nonisolated static func hero(_ file: URL, maxDim: Int, quality: Double) -> String? {
         guard let source = CGImageSourceCreateWithURL(file as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
+              let image = ProductPhotos.upright(source),
               let jpeg = ProductPhotos.jpeg(image, maxDim: maxDim, quality: quality) else { return nil }
         return "data:image/jpeg;base64," + jpeg.base64EncodedString()
     }
@@ -513,9 +517,9 @@ extension Shop {
                 out[name] = .string(kept.1); continue
             }
             let dim = CatalogPublisher.heroMaxDim, quality = CatalogPublisher.heroQuality
-            let made = await Task.detached(priority: .utility) {
+            let made = await ProductPhotos.offMain {
                 CatalogPublisher.hero(file, maxDim: dim, quality: quality)
-            }.value
+            }
             if let made {
                 webStoreHeroes[name] = (date, made)
                 out[name] = .string(made)

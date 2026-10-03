@@ -139,7 +139,9 @@ enum LibraryMove {
         walk(root).filter { item in
             let parts = item.rel.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
             guard parts.count == 2, let dir = parts.first.map(String.init) else { return false }
-            return recordDirs.contains(dir) || dir.hasPrefix("PF-")
+            // And the groups' chosen pictures (`GroupPictures`): Khayt's own
+            // folder, which a group's setting names inside the library.
+            return recordDirs.contains(dir) || dir.hasPrefix("PF-") || dir == GroupPictures.folderName
         }
     }
 

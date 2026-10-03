@@ -1101,6 +1101,11 @@ final class Words {
         "mac.group_kind_parts": ["en": "One print in parts", "ar": "طباعة واحدة من أجزاء"],
         "mac.group_kind_collection": ["en": "Separate prints", "ar": "طباعات منفصلة"],
         "mac.group_kind_menu": ["en": "This Group Is", "ar": "نوع المجموعة"],
+        // A group's own picture, instead of the first model's.
+        "mac.group_picture_set": ["en": "Set Group Picture…", "ar": "تعيين صورة المجموعة…"],
+        "mac.group_picture_use_model": ["en": "Use a Model’s Picture", "ar": "استخدام صورة نموذج"],
+        "mac.group_picture_remove": ["en": "Remove Group Picture", "ar": "إزالة صورة المجموعة"],
+        "mac.group_picture_choose": ["en": "Use as Group Picture", "ar": "استخدامها صورةً للمجموعة"],
         "mac.group_kind_hint": ["en": "In All models, a print in parts shows as one tile; separate prints show one by one.",
                                 "ar": "في «كل النماذج» تظهر الطباعة ذات الأجزاء بطاقةً واحدة، وتظهر الطباعات المنفصلة كلٌّ على حدة."],
         "mac.open_group":    ["en": "Open the group {name}", "ar": "افتح مجموعة {name}"],
@@ -3414,6 +3419,12 @@ final class Words {
         "mac.no_pictures":   ["en": "No pictures yet", "ar": "لا صور بعد"],
         "mac.make_main":     ["en": "Use as the main picture", "ar": "اجعلها الصورة الرئيسية"],
         "mac.remove_picture": ["en": "Remove Picture", "ar": "إزالة الصورة"],
+        // A quarter turn, for a photo that came out on its side. Physical
+        // directions: anticlockwise is "left" in both languages.
+        "mac.rotate_left":   ["en": "Rotate Left",     "ar": "تدوير لليسار"],
+        "mac.rotate_right":  ["en": "Rotate Right",    "ar": "تدوير لليمين"],
+        "mac.rotate_failed": ["en": "That picture could not be turned — its file could not be read.",
+                              "ar": "تعذّر تدوير الصورة — لم يُقرأ ملفها."],
         // What the first picture IS, which is the thing a shop cannot guess
         // from a strip of thumbnails.
         "mac.main_picture_is": ["en": "The first picture is the one the catalogue, "

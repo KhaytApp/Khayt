@@ -58,6 +58,48 @@ enum GroupKind: String, CaseIterable, Sendable {
     }
 }
 
+/// The picture a group wears, when the shop chose one.
+///
+/// ── KEPT BESIDE THE KIND, NOT IN IT ──────────────────────────────────────
+///
+/// In the same entry as the kind — `settings.libraryGroups[path].cover` — so
+/// everything that already follows a group's PATH follows its picture too:
+/// a folder move carries the entry whole (`GroupKinds.carry`), its undo puts
+/// it back, and `prune` drops it with the group. The picture ITSELF is never
+/// in settings — settings sync to every device and are read on every load —
+/// but a small JPEG in the library vault (`GroupPictures`), named here by its
+/// path inside the vault:
+///
+///     "Saudi Kings": { "kind": "collection",
+///                      "cover": { "image": "group-pictures/Saudi_Kings-mf3k2.jpg" } }
+///
+/// Or by a model in the group, whose own picture it borrows — so a model's
+/// new photo is the group's new picture too, with nothing copied:
+///
+///     "Luffy Card": { "cover": { "model": "PF-mf3k2abc" } }
+enum GroupCover: Equatable, Sendable {
+    case image(String)
+    case model(String)
+
+    init?(_ json: JSONValue?) {
+        guard case .object(let o)? = json else { return nil }
+        if case .string(let rel)? = o["image"], let leaf = GroupPictures.leaf(of: rel) {
+            self = .image(GroupPictures.folderName + "/" + leaf)
+        } else if case .string(let id)? = o["model"], !id.isEmpty {
+            self = .model(id)
+        } else {
+            return nil
+        }
+    }
+
+    var json: JSONValue {
+        switch self {
+        case .image(let rel): .object(["image": .string(rel)])
+        case .model(let id): .object(["model": .string(id)])
+        }
+    }
+}
+
 @MainActor
 enum GroupKinds {
     nonisolated static let settingsKey = "libraryGroups"
@@ -99,6 +141,42 @@ enum GroupKinds {
             map[path] = .object(entry)
         }
         write(map: map, stored: stored, settings: settings, into: &root)
+    }
+
+    // MARK: - A group's own picture
+
+    /// The pictures the shop chose, by group path. An entry with no `cover`,
+    /// or one this cannot read, has none — and its tile borrows one.
+    nonisolated static func covers(_ settings: [String: JSONValue]) -> [String: GroupCover] {
+        guard case .object(let map)? = settings[settingsKey] else { return [:] }
+        var out: [String: GroupCover] = [:]
+        for (path, entry) in map {
+            guard case .object(let fields) = entry, let cover = GroupCover(fields["cover"]) else { continue }
+            out[path] = cover
+        }
+        return out
+    }
+
+    /// Set (or, with nil, take off) one group's picture, in the same
+    /// round-trip write the kinds use: the entry keeps its `kind` and anything
+    /// else beside it, and an entry left with nothing in it goes. Returns the
+    /// cover the entry held before, so a picture file nobody wears any more
+    /// can be put in the Trash.
+    @discardableResult
+    static func setCover(_ cover: GroupCover?, for path: String,
+                         into root: inout [String: JSONValue]) -> GroupCover? {
+        guard !path.isEmpty else { return nil }
+        let settings = Shop.settings(root)
+        let stored = settings[settingsKey]
+        var map: [String: JSONValue] = [:]
+        if case .object(let m)? = stored { map = m }
+        var entry: [String: JSONValue] = [:]
+        if case .object(let e)? = map[path] { entry = e }
+        let had = GroupCover(entry["cover"])
+        entry["cover"] = cover?.json
+        map[path] = entry.isEmpty ? nil : .object(entry)
+        write(map: map, stored: stored, settings: settings, into: &root)
+        return had
     }
 
     /// A folder moved from `path` to `destination`, taking the files `moving`

@@ -45,7 +45,9 @@ enum LibraryPhoto {
         // gives: an NSImage of a 6000px photo is a representation the size of
         // the file, and this only ever needs pixels.
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+              // Upright, for the reason `ProductPhotos.upright` gives: the
+              // JPEG written below carries no orientation tag.
+              let image = ProductPhotos.upright(source) else {
             throw ProductPhotos.Failure.notAnImage
         }
         guard let jpeg = ProductPhotos.jpeg(image, maxDim: maxDim, quality: quality) else {

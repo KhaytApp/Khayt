@@ -585,6 +585,7 @@ final class Shop {
             files = library.items
             skipped += library.skipped
             libraryGroupKinds = GroupKinds.read(Self.settings(root))
+            libraryGroupCovers = GroupKinds.covers(Self.settings(root))
             libraryRoots = next.build.map { build in
                 LibraryLocation.resolveRoots(settings: Self.librarySettings(root),
                                              defaultRoot: LibraryLocation.defaultRoot(for: build))
@@ -1617,6 +1618,8 @@ final class Shop {
     /// The library's group kinds, by path, as the book's settings hold them.
     /// See `GroupKind`.
     private(set) var libraryGroupKinds: [String: GroupKind] = [:]
+    /// The pictures the shop chose for its groups, by path. See `GroupCover`.
+    private(set) var libraryGroupCovers: [String: GroupCover] = [:]
 
     func groupKind(_ path: String) -> GroupKind { GroupKinds.kind(of: path, in: libraryGroupKinds) }
 
@@ -3938,12 +3941,18 @@ final class Shop {
         // if one of the two has to fail, it is this one, first, where the
         // failure can still be reported instead of shipped.
         var staged = pictures
+        // A turned picture is rewritten OVER its own file (`ProductPhotos
+        // .target`); only one whose file is not a JPEG moves, and its old file
+        // is unlinked with the removals — after the record, like them.
+        var removed = removed
         if staged != nil {
             for i in staged!.indices {
                 guard let bytes = staged![i].bytes else { continue }
                 do {
-                    staged![i].path = try ProductPhotos.write(
-                        bytes, productId: product.id, imageId: staged![i].id, in: build)
+                    let target = ProductPhotos.target(existing: staged![i].path,
+                                                      productId: product.id, imageId: staged![i].id)
+                    staged![i].path = try ProductPhotos.write(bytes, named: target.name, in: build)
+                    if let old = target.unlink { removed.append(old) }
                     staged![i].bytes = nil
                 } catch {
                     moveProblem = String(describing: error)

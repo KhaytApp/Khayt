@@ -9,6 +9,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   task at the start. Its requests to Khayt Cloud then failed as cancelled, and
   the store was not updated. Pressing Publish still replaces a pending
   automatic republish.
+- **(Mac) Phone photos stay the right way up, and any photo can be turned.**
+  A photo taken holding the phone upright came out sideways on a catalogue
+  product, with no way to fix it: the Mac read the pixels as the camera stored
+  them and dropped the tag saying which way up they go. New product pictures,
+  model photos and group pictures are now saved upright, and the web store
+  publishes a tagged file upright too. Each picture in the product sheet has
+  Rotate Left and Rotate Right (on the picture and in its right-click), which
+  rewrite its file on Save, so a photo already saved sideways can be fixed. The
+  catalogue, invoices, web store and the desktop app all show the turned file.
+- **(Mac) A group can have its own picture.** Right-click a group tile, or use
+  the menu beside an open group's name: Set Group Picture… picks an image file,
+  Use a Model's Picture borrows one of the group's models, and Remove Group
+  Picture goes back to the first model's picture. The choice moves with the
+  group when its folder moves, and is dropped when the group is.
 
 - **Security: customer names in campaign emails are sent as text.** A
   customer whose name contained HTML (for example `<img …>`) had it read as
