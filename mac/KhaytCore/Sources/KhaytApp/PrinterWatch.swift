@@ -346,15 +346,31 @@ final class PrinterWatch {
     /// copy is how a save made seconds ago is overwritten by a snapshot taken
     /// before it.
     private func persistCompletions(shop: Shop, engine: KhaytEngine) async {
+        guard let mine = try? await engine.completionsToPersist(.object(pollCache)) else { return }
+        // THIS SESSION'S SHEETS SEE IT AT ONCE. The completion sheet reads
+        // `shop.printerCompletions`, which was set only when the book loaded —
+        // so a print that ended a minute ago offered the estimate until the
+        // next reload, whether or not the write below happened.
+        if let seen = try? await engine.mergePersistedCompletions(saved: shop.printerCompletions, mine: mine) {
+            shop.completionsFrozen(seen)
+        }
         guard let build = shop.source.build else { return }
-        guard let saved = try? await engine.completionsToPersist(.object(pollCache)) else { return }
         do {
-            try StoreWriter.update(build) { root in
-                root["printerCompletions"] = saved
+            // MERGED WITH WHAT IS ON DISK, inside the chain. `pollCache` starts
+            // empty on every launch, so writing it as the whole cache replaced
+            // every completion saved before the restart with the one job this
+            // session had seen — the measurement persisting exists to keep.
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                root["printerCompletions"] = try await engine.mergePersistedCompletions(
+                    saved: root["printerCompletions"] ?? .object([:]), mine: mine)
             }
         } catch {
             // NOT SAID OUT LOUD. A shop cannot act on it, the measurement is
-            // still in memory for this session's sheets, and the ordinary
+            // already in this session's sheets (above), and the ordinary
             // reason is the one that is not a fault: Khayt has the book open
             // and is keeping this cache itself.
             return

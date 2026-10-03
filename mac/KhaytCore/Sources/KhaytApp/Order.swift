@@ -272,6 +272,9 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         let material: String
         let qty: Int
         let printWeight: Double
+        /// Grams of support the part prints with, beside `printWeight`. What
+        /// the deduction draws is the two together (`partGramsConsumed`).
+        let supportWeight: Double
         let unitCost: Double
         let colour: String
         /// The library model this part was printed from, when the job was made
@@ -289,7 +292,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         let fileRef: String?
 
         private enum CodingKeys: String, CodingKey {
-            case id, name, material, qty, printWeight, unitCost, colour, printFileId, fileRef
+            case id, name, material, qty, printWeight, supportWeight, unitCost, colour, printFileId, fileRef
         }
 
         init(from decoder: Decoder) throws {
@@ -299,6 +302,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
             material = try c.decodeIfPresent(String.self, forKey: .material) ?? ""
             qty = try c.decodeIfPresent(Int.self, forKey: .qty) ?? 1
             printWeight = try c.decodeIfPresent(Double.self, forKey: .printWeight) ?? 0
+            supportWeight = try c.decodeIfPresent(Double.self, forKey: .supportWeight) ?? 0
             unitCost = try c.decodeIfPresent(Double.self, forKey: .unitCost) ?? 0
             colour = try c.decodeIfPresent(String.self, forKey: .colour) ?? ""
             printFileId = try c.decodeIfPresent(String.self, forKey: .printFileId)

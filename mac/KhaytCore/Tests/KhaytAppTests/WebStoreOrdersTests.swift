@@ -374,4 +374,34 @@ struct WebStoreOrdersTests {
             }
         }
     }
+
+    /// Five on the shelf, seven ordered: five go out of stock and TWO are
+    /// printed. The job used to carry parts for all seven, so the shop
+    /// printed — and the completion deducted filament for — five pieces it
+    /// had already handed out of stock.
+    @Test("a mixed order prints only what the shelf does not cover")
+    func mixedOrderPrintsTheRest() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        var tagged = Self.input
+        tagged["parts"] = .array([.object([
+            "name": .string("Flexi Dragon"), "qty": .number(7),
+            "printWeight": .number(40), "baseCost": .number(210), "unitCost": .number(30),
+            Shop.lineKey: .number(0), Shop.perPieceKey: .number(1),
+        ])])
+        let made = try await Self.put(Self.payload(qty: 7), intakeId: "40", input: tagged,
+                                      into: scratch, engine: engine)
+        guard case .made = made else { Issue.record("nothing was made: \(made)"); return }
+        let book = try scratch.read()
+        let job = try #require(Self.jobs(book).first)
+        guard case .array(let parts)? = job["parts"], case .object(let part)? = parts.first else {
+            Issue.record("the job has no part to print"); return
+        }
+        #expect(part["qty"] == .number(2), "the shelf's five were printed again")
+        #expect(part["baseCost"] == .number(60))
+        #expect(part[Shop.lineKey] == nil && part[Shop.perPieceKey] == nil,
+                "this app's markers reached the book")
+        #expect(Shop.stockCount(of: "PRD-A", in: .object(Shop.settings(book))) == 0)
+    }
 }

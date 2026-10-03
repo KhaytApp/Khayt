@@ -1680,6 +1680,13 @@ final class Shop {
         // three-level project arrives as a three-level project.
         let wanted = Self.folderMoveTargets(path, to: destination,
                                             files: moving.map { ($0.id, $0.groupName) })
+        // A group path is read back through `lib/organise.js normalise`, which
+        // cuts it at 60 UTF-16 units. A move that writes a longer one files the
+        // models under the first 60 characters — which can be ANOTHER folder's
+        // path, and the two merge with nothing said. Refused, by name.
+        guard Self.folderMoveFits(wanted) else {
+            writeProblem = words.callIt("mac.move_path_too_long"); return
+        }
         // The folder's kind, and every kind beneath it, go with it — or a
         // collection moved under a new parent would read as parts there.
         let ids = Set(wanted.keys)
@@ -1699,6 +1706,12 @@ final class Shop {
             wanted[file.id] = destination + (file.group ?? "").dropFirst(path.count)
         }
         return wanted
+    }
+
+    /// Does every path a folder move would write survive `normalise`'s
+    /// 60-unit cut intact?
+    nonisolated static func folderMoveFits(_ wanted: [String: String]) -> Bool {
+        wanted.values.allSatisfy { $0.utf16.count <= 60 }
     }
 
     /// One file's record, moved to where `folderMoveTargets` put it.
@@ -2120,6 +2133,9 @@ final class Shop {
     /// running both gets the measurement.
     private(set) var printerCompletions: JSONValue = .object([:])
 
+    /// The printer watch froze a finished job: what the sheet offers now.
+    func completionsFrozen(_ merged: JSONValue) { printerCompletions = merged }
+
     /// Ask what the printer said, once the sheet is already up.
     func askWhatThePrinterSaid(for id: Order.ID) async {
         guard let engine, let job = orders.first(where: { $0.id == id }) else { return }
@@ -2148,8 +2164,14 @@ final class Shop {
     /// to correct is the number everything downstream compares against. An
     /// order carries no total weight of its own; taking the first part's would
     /// under-quote every multi-part job on this screen.
+    /// What the job was quoted to take off the shelf: print AND support, per
+    /// piece, times the quantity — `order-deduction.partGramsConsumed`.
+    ///
+    /// Support was left out, so a part quoted 100 g + 30 g support pre-filled
+    /// "100" in the completion sheet, and a shop confirming it told the
+    /// deduction the job used 100 of its 130: the shelf kept 30 g it had lost.
     static func quotedGrams(_ job: Order) -> Double {
-        job.parts.reduce(0) { $0 + $1.printWeight * Double(max(1, $1.qty)) }
+        job.parts.reduce(0) { $0 + ($1.printWeight + $1.supportWeight) * Double(max(1, $1.qty)) }
     }
 
     struct PendingHold: Identifiable, Sendable {
@@ -5049,7 +5071,8 @@ final class Shop {
     /// proven rather than a second set written for money.
     func recordPayment(_ id: Order.ID, amount: Double, method: String, paidAt: Date) async {
         var owed: [KhaytEngine.WebhookDelivery] = []
-        await writeToOneOrder(id, named: words.callIt("pay.modal_title")) { order, engine, root in
+        var mail: OrderEmail?
+        let wrote = await writeToOneOrder(id, named: words.callIt("pay.modal_title")) { order, engine, root in
             let settings = Self.settings(root)
             let clients = Self.rows(root, "clients")
             let reaches = (try? await engine.paymentOutbound(
@@ -5092,11 +5115,39 @@ final class Shop {
                     at: ISO8601DateFormatter().string(from: Date()),
                     nowMs: Date().timeIntervalSince1970 * 1000)) ?? []
             }
+            // ── AND THE RECEIPT EMAIL ─────────────────────────────────────
+            //
+            // The refusal above lets a payment through when the shop's email
+            // provider is one this app can send on — and then this sent only
+            // the webhooks, so a shop with "a payment arrives" switched on was
+            // never refused AND its customer was never written to (Oct 2026).
+            // The rule asks for it as an `email` effect; it is built through
+            // the same module a move's email is, from the order as recorded.
+            mail = await Self.paymentEmail(
+                after: done, settings: settings, clients: clients, engine: engine,
+                statusLabel: self.words.callIt("mac.payment_received_label"))
             return OneOrderEdit(order: done.order)
         }
         // After the write, like a move's: a delivery that went out for a
         // payment the book then refused to keep would be a lie told outward.
+        guard wrote else { return }
+        if let mail { await post(mail) }
         if !owed.isEmpty { await fire(owed) }
+    }
+
+    /// The email a recorded payment owes the customer, or nil when it owes
+    /// none — the rule did not ask (nothing was paid), the shop has not switched
+    /// "a payment arrives" on, or the customer has no address.
+    static func paymentEmail(after done: PaymentRecorded, settings: [String: JSONValue],
+                             clients: [JSONValue], engine: KhaytEngine,
+                             statusLabel: String) async -> OrderEmail? {
+        guard done.effects.contains("email") else { return nil }
+        return try? await engine.orderEmail(
+            order: done.order, newStatus: "payment_received",
+            settings: settings, clients: clients,
+            shopName: plainString(settings["bizEn"]) ?? plainString(settings["bizAr"]) ?? "Khayt",
+            clientName: emailClientName(for: asObject(done.order) ?? [:], in: clients),
+            statusLabel: statusLabel)
     }
 
     /// The job being edited.
@@ -5421,13 +5472,39 @@ final class Shop {
     /// every figure that counts finished work. `lib/order-status.js` owns the
     /// rule; this is the same call Khayt makes.
     func markShipped(_ id: Order.ID) async {
-        await writeToOneOrder(id, named: words.callIt("queue.shipped")) { order, engine, _ in
+        var owed: [KhaytEngine.WebhookDelivery] = []
+        let wrote = await writeToOneOrder(id, named: words.callIt("queue.shipped")) { order, engine, root in
             let out = try await engine.markShipped(order: order, now: Date())
             guard out.ok, let changed = out.order else {
                 throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
             }
+            owed = await Self.shippedDeliveries(before: order, after: changed, root: root, engine: engine)
             return OneOrderEdit(order: changed, activity: "\(id) → shipped")
         }
+        if wrote, !owed.isEmpty { await fire(owed) }
+    }
+
+    /// The `order_shipped` webhook a parcel leaving owes, or none.
+    ///
+    /// The Mac shipped jobs and told no subscriber: Khayt's Ship dialog fires
+    /// `order_shipped`, and a shop's fulfilment automation listening for it
+    /// heard nothing from this app (Oct 2026). Only on the edge INTO shipped —
+    /// a job already in the post, re-stamped, is not a second parcel, and a
+    /// consumer counting parcels would count it twice.
+    static func shippedDeliveries(before: JSONValue, after: JSONValue,
+                                  root: [String: JSONValue],
+                                  engine: KhaytEngine) async -> [KhaytEngine.WebhookDelivery] {
+        if case .object(let was) = before, let at = was["shippedAt"], at != .null { return [] }
+        let settings = Self.settings(root)
+        return (try? await engine.webhookDeliveries(
+            order: after,
+            effects: [WebhookEffect(kind: "webhook", event: "order_shipped", newStatus: nil)],
+            settings: settings,
+            shopName: plainString(settings["bizEn"]) ?? plainString(settings["bizAr"]) ?? "Khayt",
+            clientName: emailClientName(for: asObject(after) ?? [:], in: rows(root, "clients")),
+            currency: shopCurrencyOf(settings),
+            at: ISO8601DateFormatter().string(from: Date()),
+            nowMs: Date().timeIntervalSince1970 * 1000)) ?? []
     }
 
     /// Hand a finished job to a carrier: who, which service, and the tracking
@@ -5436,15 +5513,18 @@ final class Shop {
     /// Only a finished job not yet handed over, which is `markShipped`'s gate:
     /// a parcel cannot leave before the thing in it is made.
     func ship(_ id: Order.ID, carrier: String, service: String?, trackingNumber: String) async {
-        await writeToOneOrder(id, named: words.callIt("ship.title")) { order, engine, _ in
+        var owed: [KhaytEngine.WebhookDelivery] = []
+        let wrote = await writeToOneOrder(id, named: words.callIt("ship.title")) { order, engine, root in
             guard case .object(let o) = order, o["status"] == .string("completed"),
                   o["deliveredAt"] == nil || o["deliveredAt"] == .null else {
                 throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
             }
             let shipped = try await engine.shipmentCreate(order: order, carrier: carrier, service: service,
                                                           trackingNumber: trackingNumber, at: Date())
+            owed = await Self.shippedDeliveries(before: order, after: shipped, root: root, engine: engine)
             return OneOrderEdit(order: shipped, activity: "\(id) → shipped")
         }
+        if wrote, !owed.isEmpty { await fire(owed) }
     }
 
     /// A parcel already sent: a corrected tracking number, or a status picked
@@ -5472,16 +5552,19 @@ final class Shop {
 
     /// The shape both money edits share: one order, changed by the shared rules,
     /// written and stamped inside the same swap every other edit uses.
+    /// True when the edit reached the book — what lets a caller send what the
+    /// edit owes outward only for a change that was actually kept.
+    @discardableResult
     private func writeToOneOrder(_ id: Order.ID, named actionName: String,
                                  change: @escaping (JSONValue, KhaytEngine, [String: JSONValue])
-                                 async throws -> OneOrderEdit) async {
+                                 async throws -> OneOrderEdit) async -> Bool {
         moveProblem = nil
         moveNotices = []
         guard let build = source.build else {
-            moveProblem = words.callIt("mac.move_sample"); return
+            moveProblem = words.callIt("mac.move_sample"); return false
         }
         guard let engine else {
-            moveProblem = words.callIt("mac.move_no_engine"); return
+            moveProblem = words.callIt("mac.move_no_engine"); return false
         }
 
         var undo: [ChangedRecord] = []
@@ -5508,10 +5591,13 @@ final class Shop {
             }
             registerMoveUndo(undo, named: actionName)
             await load(source)
+            return true
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
+            return false
         } catch {
             moveProblem = String(describing: error)
+            return false
         }
     }
 
@@ -11976,6 +12062,10 @@ final class Shop {
         //
         // A job leaving QC is asked once, in this sheet, rather than being
         // handed a second dialog for its notes.
+        // A job ALREADY finished — moved back from Shipped or Delivered — is
+        // not being finished again, and the sheet would overwrite what it
+        // really took. The move only takes the stamp off.
+        if to == .completed, job.status == "completed" || job.status == "delivered" { return nil }
         if to == .completed {
             let finishing = PendingCompletion(
                 id: id, project: job.project,
@@ -12540,7 +12630,15 @@ final class Shop {
         // Both figures and their provenance travel together. A record with
         // actuals and no `actualsSource` reads as measured to anything that
         // checks the source only when it is present.
-        if let actuals, case .object(var fields) = target {
+        // Already finished, the record keeps what the job really took: a move
+        // back from Shipped is not a second completion (`order-status.apply`).
+        let alreadyFinished: Bool = {
+            if case .object(let o) = target, case .string(let st)? = o["status"] {
+                return st == "completed" || st == "delivered"
+            }
+            return false
+        }()
+        if let actuals, !(stage == .completed && alreadyFinished), case .object(var fields) = target {
             fields["actualPrintTime"] = .number((actuals.hours * 100).rounded() / 100)
             fields["actualWeight"] = .number((actuals.grams * 10).rounded() / 10)
             fields["actualsSource"] = .object([
@@ -12581,7 +12679,7 @@ final class Shop {
         if !cannotSend.isEmpty {
             throw MoveRefused(sentence: words.outboundRefusal(cannotSend))
         }
-        let telegram = reaches.contains { $0.channel == "telegram" }
+        var telegram = reaches.contains { $0.channel == "telegram" }
             ? try? await engine.telegramMessage(order: target, newStatus: stage.rawValue,
                                                 settings: settings, currency: shopCurrencyOf(settings))
             : nil
@@ -12661,12 +12759,24 @@ final class Shop {
             ],
             now: Date())
 
-        let mail = try? await engine.orderEmail(
+        var mail = try? await engine.orderEmail(
             order: .object(changedOrder), newStatus: stage.rawValue,
             settings: settings, clients: clients,
             shopName: plainString(settings["bizEn"]) ?? plainString(settings["bizAr"]) ?? "Khayt",
             clientName: emailClientName(for: changedOrder, in: clients),
             statusLabel: words.callIt("queue." + stage.rawValue, fallback: stage.rawValue))
+
+        // ── A MOVE THAT ASKED FOR NOTHING OUTWARD SENDS NOTHING ───────────
+        //
+        // The message, the email and the portal refresh above are decided by
+        // the settings; whether THIS move owes them is the rule's. A job moved
+        // back from Shipped to Completed is no completion (`order-status`
+        // returns no outbound effect for it), and the customer was being told
+        // their finished job was finished again.
+        var portalOwed = portal
+        if (move.outbound ?? []).isEmpty {
+            telegram = nil; mail = nil; portalOwed = nil
+        }
 
         var undo: [ChangedRecord] = []
         write(&root, "printLog", changed: [.object(changedOrder)], before: ordersAsFound, into: &undo)
@@ -12679,7 +12789,7 @@ final class Shop {
 
         let notices = (move.notices ?? []).map { words.sentence(for: $0) }
         return MoveOutcome(undo: undo, notices: notices, telegram: telegram,
-                           webhooks: owed, email: mail, portal: portal)
+                           webhooks: owed, email: mail, portal: portalOwed)
     }
 
     // MARK: - Reading and writing rows
@@ -15339,11 +15449,21 @@ final class Shop {
         }
         let contents = (try? FileManager.default.contentsOfDirectory(at: dir,
             includingPropertiesForKeys: nil)) ?? []
-        // Not a `.cloud` sidecar: a model moved to the cloud (by this app or
-        // the other one) leaves only that note behind, and handing the NOTE
-        // back as the model opened a few hundred bytes of JSON in the slicer.
+        return Self.soleModel(in: contents)
+    }
+
+    /// The one model file in a record's folder, or nil when there is none or
+    /// more than one.
+    ///
+    /// ONLY WHAT THE LIBRARY FILES AS A MODEL (`LibraryImport.kinds`). This
+    /// used to be "anything but a picture or a `.cloud` sidecar" — so a folder
+    /// holding a pack's assembly PDF beside a model that had been moved to the
+    /// cloud answered with the PDF, and "Open in slicer" handed the slicer a
+    /// document. A `.cloud` note is a few hundred bytes of JSON, and a partial
+    /// download (`.part-`) is not a file yet.
+    static func soleModel(in contents: [URL]) -> URL? {
         let models = contents.filter {
-            !["jpg", "jpeg", "png", "cloud"].contains($0.pathExtension.lowercased())
+            LibraryImport.kinds.contains($0.pathExtension.lowercased())
                 && !$0.lastPathComponent.contains(".part-")
         }
         return models.count == 1 ? models[0] : nil

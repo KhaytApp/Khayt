@@ -86,7 +86,7 @@ enum LeadTimePublisher {
     /// clock, so the timezone decision is made once — here — rather than smeared
     /// through the arithmetic. A UTC-derived day from a +03:00 shop at 01:00
     /// promises yesterday, and the module's own comment says so.
-    static func localDay(_ now: Date = Date(), calendar: Calendar = .current) -> String {
+    static func localDay(_ now: Date = Date(), calendar: Calendar = .book) -> String {
         let c = calendar.dateComponents([.year, .month, .day], from: now)
         return String(format: "%04d-%02d-%02d", c.year ?? 1970, c.month ?? 1, c.day ?? 1)
     }

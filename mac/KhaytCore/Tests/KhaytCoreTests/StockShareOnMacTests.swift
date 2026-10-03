@@ -13,7 +13,10 @@ struct StockShareOnMacTests {
     @Test("the dashboard tiles apply stockShare, and the P&L is given the inventory")
     func wired() throws {
         let engine = try Self.source()
-        #expect(engine.contains("globalThis.KhaytPnl.stockShare(o, { inventory: ARG6 || [], settings: ARG2 })"))
+        // Through the shared dashboard rule, which applies `stockShare` itself
+        // (`KhaytKpiRows.orderCost`), handed the inventory.
+        #expect(engine.contains("globalThis.KhaytKpiRows.orderCost(o,")
+                && engine.contains("{ settings: ARG2, inventory: ARG6 || [], clients: ARG1 }"))
         #expect(engine.contains("wasteLog: ARG7, inventory: ARG8"))
     }
 

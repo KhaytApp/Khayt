@@ -78,6 +78,33 @@ struct KpiTests {
         #expect(out.outstanding == 1499, "500 still owed on B, plus all 999 of C")
     }
 
+    /// A cancelled job is not an order and is owed by nobody; a costed part
+    /// with no `unitCost` costs what it was costed at; shipping is a cost.
+    /// The Mac counted the first, priced the second at zero and dropped the
+    /// third — Khayt did none of those, so one book showed two margins.
+    @Test("cancelled jobs are not counted, costed parts and shipping are cost")
+    func cancelledAndCost() async throws {
+        let now = Date()
+        var (orders, clients) = Self.book(now: now)
+        orders.append(.object([
+            "id": .string("X"), "status": .string("cancelled"), "date": .string("2026-01-01"),
+            "price": .number(5000), "paidAmount": .number(0), "currency": .string("SAR"),
+        ]))
+        orders.append(.object([
+            "id": .string("D"), "status": .string("completed"), "date": .string("2026-01-02"),
+            "price": .number(100), "paidAmount": .number(100), "currency": .string("SAR"),
+            "shippingCost": .number(15),
+            "parts": .array([.object(["spoolCost": .number(100), "spoolWeight": .number(1000),
+                                      "printWeight": .number(250), "qty": .number(2)])]),
+        ]))
+        let out = try await KhaytEngine().kpis(orders: orders, clients: clients,
+                                               settings: Self.settings, range: "all",
+                                               language: "en")
+        #expect(out.orderCount == 4, "the cancelled job is not an order")
+        #expect(out.outstanding == 1499, "nor is it 5000 owed")
+        #expect(out.cost == 265, "90 + 110 + 2 × 25 g-cost + 15 shipping")
+    }
+
     /// The failure mode this file exists for: every one of these returns a
     /// perfectly valid `Kpis` full of nothing, and no screen says why.
     @Test("an empty book is zeros, and a book outside the range is too")

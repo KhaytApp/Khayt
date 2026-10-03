@@ -72,6 +72,13 @@
     if (event === 'order_delivered') {
       return { orderId: o.id, project: o.project, client: o.client };
     }
+    // A parcel leaving: who carries it and how to follow it. The keys and
+    // their order are the ones Khayt's Ship dialog has always sent
+    // (`renderer/order-flows.js`), so a consumer's parser — and the HMAC over
+    // the bytes — does not change with the app that shipped it.
+    if (event === 'order_shipped') {
+      return { orderId: o.id, project: o.project, carrier: o.carrier, trackingNumber: o.trackingNumber };
+    }
     return { orderId: o.id, project: o.project, newStatus: newStatus, client: o.client };
   }
 

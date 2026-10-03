@@ -334,4 +334,20 @@ struct CostPerKiloTests {
     func notAlwaysAKilo() throws {
         #expect(try Self.spool(cost: 40, weight: 500, original: 500).costPerKilo == 80)
     }
+
+    @Test("the status filter works with nothing typed in the search")
+    func statusFilterWithoutSearch() throws {
+        let cards = try ["G1", "G2", "G3"].map { id -> GiftCard in
+            try JSONDecoder().decode(GiftCard.self, from: Data(#"{"id":"\#(id)","code":"C-\#(id)"}"#.utf8))
+        }
+        let statuses = ["G1": "expired", "G2": "used"]
+        let none: (GiftCard) -> String? = { _ in nil }
+        #expect(GiftCards.filter(cards, search: "", state: "expired", statuses: statuses, holder: none)
+            .map(\.id) == ["G1"], "an empty search showed every card whatever the filter said")
+        #expect(GiftCards.filter(cards, search: "", state: "active", statuses: statuses, holder: none)
+            .map(\.id) == ["G3"])
+        #expect(GiftCards.filter(cards, search: "", state: nil, statuses: statuses, holder: none).count == 3)
+        #expect(GiftCards.filter(cards, search: "c-g2", state: "used", statuses: statuses, holder: none)
+            .map(\.id) == ["G2"])
+    }
 }

@@ -139,3 +139,50 @@ test('a job marked Not business is not counted, as the P&L does not count it', (
   const rows = R.kpiRows({ orders: [personal, sale], from: '', to: '', money, clientName });
   assert.equal(rows.length, 1, 'the personal print is still in the tiles');
 });
+
+test('a cancelled job is not an order, and owes nothing', () => {
+  // `orderCount` is rows.length and `outstanding` is summed over every row, so
+  // a cancelled 400 SAR job still counted as an order and as 400 owed.
+  const rows = R.kpiRows({
+    orders: [
+      { id: 'X', date: '2026-09-02', status: 'cancelled', price: 400, paidAmount: 0 },
+      { id: 'Y', date: '2026-09-03', status: 'printing', price: 100, paidAmount: 0 },
+    ],
+    money,
+  });
+  assert.deepEqual(rows.map((r) => r.productName), ['Y']);
+  assert.equal(R.counts({ status: 'cancelled' }), false);
+});
+
+test('on time is judged on the shop\'s local day, as the On-time card judges it', () => {
+  const was = process.env.TZ;
+  process.env.TZ = 'Asia/Riyadh';
+  try {
+    // Finished at 01:30 Riyadh on the 6th, due the 5th: LATE. The UTC day of
+    // the stamp is the 5th, which called it on time.
+    const late = { status: 'completed', dueDate: '2026-09-05', completedAt: '2026-09-05T22:30:00.000Z' };
+    assert.equal(R.doneOn(late), '2026-09-06');
+    assert.equal(R.onTime(late), false);
+    // A bare day is already local and is read as written.
+    assert.equal(R.doneOn({ completedAt: '2026-09-05' }), '2026-09-05');
+  } finally {
+    if (was === undefined) delete process.env.TZ; else process.env.TZ = was;
+  }
+});
+
+test('a job\'s cost: the parts as costed, stocked share only, plus shipping — one rule for both apps', () => {
+  const settings = { currency: 'SAR', exchangeRates: { USD: 3.75 } };
+  // A part with costing inputs, and a part priced only from a product's unit
+  // cost (the LAN and public-quote paths write those) — the Mac used to count
+  // only the second, and Khayt only the first.
+  const o = {
+    id: 'Z', currency: 'USD', shippingCost: 10,
+    parts: [
+      { spoolCost: 100, spoolWeight: 1000, printWeight: 200, qty: 2 },
+      { unitCost: 5, qty: 3 },
+    ],
+  };
+  const cost = R.orderCost(o, { settings, inventory: [] });
+  // 2 × 20 (material) + 3 × 5 + 10 USD shipping at 3.75 = 55 + 37.5
+  assert.equal(Math.round(cost * 100) / 100, 92.5);
+});

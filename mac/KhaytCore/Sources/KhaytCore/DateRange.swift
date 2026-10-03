@@ -20,13 +20,13 @@ public enum DateRange {
                                 "last_quarter", "year", "custom"]
 
     /// A date as the shop writes a day: `YYYY-MM-DD`, in local time.
-    public static func localDay(_ date: Date, calendar: Calendar = .current) -> String {
+    public static func localDay(_ date: Date, calendar: Calendar = .book) -> String {
         let p = calendar.dateComponents([.year, .month, .day], from: date)
         return pad(p.year ?? 0, 4) + "-" + pad(p.month ?? 0, 2) + "-" + pad(p.day ?? 0, 2)
     }
 
     /// `YYYY-MM`, in local time.
-    public static func localMonth(_ date: Date, calendar: Calendar = .current) -> String {
+    public static func localMonth(_ date: Date, calendar: Calendar = .book) -> String {
         let p = calendar.dateComponents([.year, .month], from: date)
         return pad(p.year ?? 0, 4) + "-" + pad(p.month ?? 0, 2)
     }
@@ -47,7 +47,7 @@ public enum DateRange {
     /// is covered by the module's own parity test.
     public static func inRange(_ date: JSONValue?, range: String?,
                                now: Date = Date(), custom: Custom = Custom(),
-                               calendar: Calendar = .current) -> Bool {
+                               calendar: Calendar = .book) -> Bool {
         let text = JSSemantics.truthy(date) ? JSSemantics.text(date) : nil
         return inRange(text, range: range, now: now, custom: custom, calendar: calendar)
     }
@@ -55,7 +55,7 @@ public enum DateRange {
     /// Does this record's date fall in the period?
     public static func inRange(_ dateStr: String?, range: String?,
                                now: Date = Date(), custom: Custom = Custom(),
-                               calendar: Calendar = .current) -> Bool {
+                               calendar: Calendar = .book) -> Bool {
         guard let range, !range.isEmpty else { return true }
         if range == "all" { return true }
         guard let dateStr, !dateStr.isEmpty else { return false }

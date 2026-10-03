@@ -296,3 +296,21 @@ test('a residual equal to the price derives no wear rate, and the flat one stand
   assert.equal(ratesFor({ machine: Object.assign(perHour({ residual: 6000 }), { wearRate: 2 }) }).wearRate, 2);
   assert.equal(ratesFor({ machine: straight({ residual: 5000 }) }).wearRate, DEFAULTS.wearRate);
 });
+
+test('periodCharges perHour with no purchase date stops at the machine\'s life', () => {
+  // 1000 over 1000 h. 600 h in Q1 and 600 h in Q2 is 1200 h — 200 past the
+  // life — and the hours before Q2 were not counted without a purchase date,
+  // so Q2 charged its full 600 and the machine was depreciated to 1200.
+  const m = { id: 'M9', depreciation: { price: 1000, residual: 0, life: 1000, lifeUnit: 'hours', method: 'perHour' } };
+  const orders = [
+    { id: 'A', status: 'completed', machineId: 'M9', date: '2026-02-01', printTime: 600 },
+    { id: 'B', status: 'completed', machineId: 'M9', date: '2026-05-01', printTime: 600 },
+  ];
+  const out = D.periodCharges([m], orders, [
+    { key: 'Q1', from: '2026-01-01', to: '2026-03-31' },
+    { key: 'Q2', from: '2026-04-01', to: '2026-06-30' },
+  ]);
+  assert.equal(out.Q1.total, 600);
+  assert.equal(out.Q2.total, 400);
+  assert.equal(out.Q1.total + out.Q2.total, 1000);
+});

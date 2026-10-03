@@ -359,6 +359,12 @@ test('the lifted rules and the originals agree on every transition', () => {
     for (const settings of SETTINGS_VARIANTS) {
       for (const o of base) {
         for (const target of STATUSES) {
+          // A SECOND DELIBERATE DIVERGENCE. A finished job moved to `completed`
+          // again was completed again by the original — every webhook, the
+          // Telegram message and the deduction a second time. It is now the
+          // un-stamping of shipped/delivered and nothing outward; pinned by
+          // "a shipped job moved back to completed …" below.
+          if (target === 'completed' && (o.status === 'completed' || o.status === 'delivered')) continue;
           const a = {
             printLog: JSON.parse(JSON.stringify(base)), settings, inventory: INVENTORY,
             calls: [], notices: [],
@@ -1199,4 +1205,34 @@ test('a legacy delivered job is still finished, even though it cannot be moved t
   assert.equal(S.isFinished({ status: 'delivered' }), true);
   assert.ok(S.FINISHED_STATUSES.includes('delivered'));
   assert.ok(S.DERIVED_STAGES.includes('delivered'));
+});
+
+/* ── Moving a job back from Shipped (Oct 2026) ──────────────────────────── */
+
+test('a shipped job moved back to completed is un-shipped, not completed again', () => {
+  const S = require('../lib/order-status.js');
+  const order = {
+    id: 'O-S', status: 'completed', completedAt: '2026-09-01T10:00:00.000Z',
+    shippedAt: '2026-09-02T10:00:00.000Z', materialDeducted: true,
+    actualWeight: 120, parts: [],
+  };
+  const g = S.gate(order, 'completed', {});
+  assert.equal(g.ok, true);
+  assert.equal(g.needsActuals, false, 'a finished job is not asked what it took a second time');
+  const r = S.apply(order, 'completed', { now: Date.parse('2026-09-03T10:00:00.000Z'), inventory: [] });
+  assert.equal(order.shippedAt, undefined, 'the stamp the move undoes');
+  assert.equal(order.completedAt, '2026-09-01T10:00:00.000Z');
+  assert.equal(order.actualWeight, 120);
+  const types = r.effects.map((e) => e.type);
+  for (const t of ['deduct_filament', 'deduct_packaging', 'telegram', 'webhook', 'order_webhook', 'republish_portal', 'email']) {
+    assert.ok(!types.includes(t), `${t} fired again for a job that was already finished`);
+  }
+  assert.ok(types.includes('save'));
+});
+
+test('a job finished and not shipped, moved to completed again, does nothing outward', () => {
+  const S = require('../lib/order-status.js');
+  const order = { id: 'O-C', status: 'completed', completedAt: '2026-09-01T10:00:00.000Z', parts: [] };
+  const r = S.apply(order, 'completed', { now: Date.now(), inventory: [] });
+  assert.ok(!r.effects.some((e) => e.type === 'webhook' || e.type === 'telegram' || e.type === 'deduct_filament'));
 });

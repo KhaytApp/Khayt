@@ -2097,6 +2097,7 @@ final class Words {
         "mac.email_when_completed": ["en": "It is ready to collect", "ar": "عند الجاهزية للاستلام"],
         "mac.email_when_quote": ["en": "A quote is made", "ar": "عند إنشاء عرض سعر"],
         "mac.email_when_payment_received": ["en": "A payment arrives", "ar": "عند استلام دفعة"],
+        "mac.payment_received_label": ["en": "Payment received", "ar": "تم استلام الدفعة"],
         // ── WHAT THE SHOP PAYS EVERY MONTH ────────────────────────────────
         //
         // `an.be_none` on the break-even screen has told shops to add these
@@ -2672,6 +2673,8 @@ final class Words {
         "mac.move_to_top": ["en": "Top level", "ar": "المستوى الأعلى"],
         "mac.move_into_itself": ["en": "A folder cannot be moved inside itself.",
                                  "ar": "لا يمكن نقل مجلد داخل نفسه."],
+        "mac.move_path_too_long": ["en": "That would make a folder path longer than 60 characters, which would merge it with another folder. Move it higher, or shorten a name first.",
+                                   "ar": "سيجعل هذا مسار المجلد أطول من 60 حرفًا فيندمج مع مجلد آخر. انقله إلى مستوى أعلى أو اختصر اسمًا أولًا."],
         "mac.mark_dried": ["en": "Dried today", "ar": "جُفّفت اليوم"],
         "mac.spool_history": ["en": "Where this went", "ar": "أين ذهب هذا"],
         "mac.spool_history_empty": ["en": "Nothing has been printed with this spool yet.",

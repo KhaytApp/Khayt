@@ -134,4 +134,25 @@ struct PaymentOutboundTests {
         #expect(events.contains("payment_received"))
         #expect(!events.contains("paid"), "100 of 500 is not paid, and must not be announced as it")
     }
+
+    /// Letting a payment through on an email provider this app can carry, and
+    /// then not carrying it, is the silent non-send the refusal existed to
+    /// prevent. The receipt is built from the order as recorded.
+    @Test("a payment that owes a receipt email builds one, and an unpaid one does not")
+    func paymentBuildsItsEmail() async throws {
+        let engine = try KhaytEngine()
+        let settings = Self.settings(emailProvider: "sendgrid")
+        let done = try await engine.recordPayment(
+            order: Self.order, amount: 200, method: "cash",
+            paidAt: "2026-09-21", today: "2026-09-21")
+        let mail = await Shop.paymentEmail(after: done, settings: settings, clients: Self.clients,
+                                           engine: engine, statusLabel: "Payment received")
+        #expect(mail?.to == "a@example.test", "the receipt the shop asked for was never built")
+        #expect(mail?.subject.contains("Payment received") == true)
+
+        // The shop has not asked for it: nothing.
+        let quiet = await Shop.paymentEmail(after: done, settings: Self.settings(), clients: Self.clients,
+                                            engine: engine, statusLabel: "Payment received")
+        #expect(quiet == nil)
+    }
 }

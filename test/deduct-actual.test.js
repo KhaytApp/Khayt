@@ -275,3 +275,48 @@ test('a failure that used less than the switch already took draws nothing more',
   assert.equal(out.deducted, 0, 'the shelf is not credited back — the filament is still gone');
   assert.deepEqual(inv.map((s) => s.weight), [1000, 950]);
 });
+
+/* ── Scaling against the WHOLE job (Oct 2026) ───────────────────────────── */
+
+test('a measured total is the whole job: a part with no spool keeps its share', () => {
+  // Two 100 g parts, only one on a spool, 200 g measured. The measurement is
+  // what the WHOLE print used; charging it all to the spooled part took 200 g
+  // off a spool that gave 100.
+  const inv = shelf();
+  const order = { id: 'J3', parts: [
+    { filamentId: 'S1', printWeight: 100, qty: 1 },
+    { printWeight: 100, qty: 1 },
+  ] };
+  D.deductForOrder(order, { settings: { autoDeduct: true }, inventory: inv, today: 'd', actualGrams: 200 });
+  assert.equal(inv[0].weight, 900, 'the spool gave its own part\'s 100 g, not the job\'s 200');
+});
+
+test('grams a spool switch already took are part of the measured total', () => {
+  // The switch took 50 g off another roll mid-print; the printer measured
+  // 200 g for the whole print. 150 more is owed, not 200 — 250 in all.
+  const inv = shelf();
+  const order = { id: 'J4', parts: [
+    { filamentId: 'S1', printWeight: 200, qty: 1, additionalSpools: [{ spoolId: 'S2', weight: 50 }] },
+  ] };
+  D.deductForOrder(order, { settings: { autoDeduct: true }, inventory: inv, today: 'd', actualGrams: 200 });
+  assert.equal(inv[0].weight, 850, '150 more, so the print cost 200 in all');
+});
+
+test('support is in the estimate the measurement is compared against', () => {
+  // 100 g + 30 g support, measured 130: the estimate exactly, all of it.
+  const inv = shelf();
+  const order = { id: 'J5', parts: [{ filamentId: 'S1', printWeight: 100, supportWeight: 30, qty: 1 }] };
+  D.deductForOrder(order, { settings: { autoDeduct: true }, inventory: inv, today: 'd', actualGrams: 130 });
+  assert.equal(inv[0].weight, 870);
+});
+
+test('a failed print with a spool-less part charges the spool only its share', () => {
+  const inv = shelf();
+  const order = { id: 'J6', parts: [
+    { filamentId: 'S1', printWeight: 100, qty: 1 },
+    { printWeight: 100, qty: 1 },
+  ] };
+  const out = D.deductActual(order, 100, { settings: {}, inventory: inv, today: 'd' });
+  assert.equal(out.deducted, 50, 'half the print got through: half of the spooled part');
+  assert.equal(inv[0].weight, 950);
+});
