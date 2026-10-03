@@ -35,6 +35,11 @@ struct PaymentPlanSheet: View {
     /// Whether the "replace this plan" question is up.
     @State private var replacing = false
 
+    /// Whether the "remove this plan" question is up. Remove sat in the footer
+    /// beside Close and dropped every agreed payment in one click — the same
+    /// renegotiation `replacing` already asks about, without the question.
+    @State private var removing = false
+
     /// What the plan has brought in, and what it still asks for.
     private var collected: Double { rows.filter(\.paid).reduce(0) { $0 + $1.amount } }
     private var scheduled: Double { rows.reduce(0) { $0 + $1.amount } }
@@ -67,8 +72,22 @@ struct PaymentPlanSheet: View {
         } footer: {
             HStack {
                 if !rows.isEmpty {
-                    Button(shop.words.callIt("common.remove"), role: .destructive) {
-                        Task { await shop.dropPlan(job.id) }
+                    Button(shop.words.callIt("common.remove") + "\u{2026}", role: .destructive) {
+                        removing = true
+                    }
+                    .confirmationDialog(
+                        shop.words.callIt("mac.remove_plan_q", ["name": .string(current.project)]),
+                        isPresented: $removing, titleVisibility: .visible
+                    ) {
+                        Button(shop.words.callIt("common.remove"), role: .destructive) {
+                            Task { await shop.dropPlan(job.id) }
+                        }
+                        Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+                    } message: {
+                        Text(shop.words.callIt("mac.remove_plan_note",
+                                               ["n": .number(Double(rows.count)),
+                                                "amount": .string(Money.text(scheduled, currency))])
+                             + " " + shop.words.callIt("mac.undo_after"))
                     }
                 }
                 Spacer()

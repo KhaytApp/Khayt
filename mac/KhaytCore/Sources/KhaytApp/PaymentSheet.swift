@@ -24,6 +24,9 @@ struct PaymentSheet: View {
     /// What the order is billed and already paid down without cash, by
     /// `KhaytOrderPayment.cashDue`. Nil until asked, or with no engine.
     @State private var due: KhaytEngine.CashDue?
+    /// "Clear payment" pressed and not yet answered. It wiped what the
+    /// customer paid in one click, from a sheet opened to RECORD a payment.
+    @State private var clearing: Order?
     @FocusState private var focused: Bool
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
@@ -96,10 +99,8 @@ struct PaymentSheet: View {
 
             HStack {
                 if (job?.paidAmount ?? 0) > 0 {
-                    Button(shop.words.callIt("mac.clear_payment"), role: .destructive) {
-                        let id = subject.id
-                        shop.clearQuestion()
-                        Task { await shop.clearPayment(id) }
+                    Button(shop.words.callIt("mac.clear_payment") + "\u{2026}", role: .destructive) {
+                        clearing = job
                     }
                 }
                 Spacer()
@@ -112,6 +113,17 @@ struct PaymentSheet: View {
         .padding(18)
         .frame(width: Self.width)
         .task(id: subject.id) { due = await shop.cashDue(subject.id) }
+        .askFirst($clearing,
+                  title: { shop.words.callIt("mac.clear_payment_q",
+                                             ["amount": .string(Money.text($0.paidAmount, currency)),
+                                              "name": .string($0.project)]) },
+                  message: { _ in shop.words.callIt("mac.clear_payment_note") + " "
+                                  + shop.words.callIt("mac.undo_after") },
+                  confirm: shop.words.callIt("mac.clear_payment"),
+                  cancel: shop.words.callIt("common.cancel")) { chosen in
+            shop.clearQuestion()
+            Task { await shop.clearPayment(chosen.id) }
+        }
         .onAppear {
             guard !started else { return }
             started = true

@@ -169,6 +169,9 @@ struct Waste: View {
     @Bindable var shop: Shop
     @State private var order: [KeyPathComparator<WasteEntry>] = [.init(\.date, order: .reverse)]
     @State private var selection: WasteEntry.ID?
+    /// The row the shop chose Delete on, held until it answers. No undo
+    /// exists for a waste entry, so the one click asks first.
+    @State private var deleting: WasteEntry?
     @SceneStorage("waste.columns") private var columns: TableColumnCustomization<WasteEntry>
 
     private var rows: [WasteEntry] { shop.shownWaste.sorted(using: order) }
@@ -247,10 +250,18 @@ struct Waste: View {
         .scrollContentBackground(.hidden)
         .contextMenu(forSelectionType: WasteEntry.ID.self) { ids in
             if let id = ids.first, shop.canMoveJobs {
-                Button(shop.words.callIt("common.delete"), role: .destructive) {
-                    Task { await shop.deleteWaste(id) }
+                Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                    deleting = rows.first { $0.id == id }
                 }
             }
+        }
+        .askFirst($deleting,
+                  title: { shop.words.callIt("mac.delete_product_q",
+                                             ["name": .string(AskName.waste($0, words: shop.words))]) },
+                  message: { _ in shop.words.callIt("mac.no_undo") },
+                  confirm: shop.words.callIt("common.delete"),
+                  cancel: shop.words.callIt("common.cancel")) { entry in
+            Task { await shop.deleteWaste(entry.id) }
         }
         .overlay {
             if rows.isEmpty {

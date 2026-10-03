@@ -23,6 +23,7 @@ struct TemplateSheet: View {
     /// Not `body` — that is the view.
     @State private var message = ""
     @State private var loaded = false
+    @State private var deleting: MessageTemplate?
     /// The WhatsApp milestone this template speaks for, or empty.
     @State private var milestone = ""
     @State private var lang = ""
@@ -98,9 +99,8 @@ struct TemplateSheet: View {
 
             HStack {
                 if !isNew {
-                    Button(shop.words.callIt("common.delete"), role: .destructive) {
-                        shop.deleteTemplate(template.id)
-                        if shop.writeProblem == nil { shop.editingTemplate = nil }
+                    Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                        deleting = template
                     }
                 }
                 Spacer()
@@ -119,6 +119,15 @@ struct TemplateSheet: View {
         }
         .padding(18)
         .frame(width: 520)
+        // A template has no undo, and its Delete sat beside Save.
+        .askFirst($deleting,
+                  title: { shop.words.callIt("mac.delete_product_q", ["name": .string($0.name)]) },
+                  message: { _ in shop.words.callIt("mac.no_undo") },
+                  confirm: shop.words.callIt("common.delete"),
+                  cancel: shop.words.callIt("common.cancel")) { chosen in
+            shop.deleteTemplate(chosen.id)
+            if shop.writeProblem == nil { shop.editingTemplate = nil }
+        }
         .task {
             guard !loaded else { return }
             loaded = true

@@ -295,6 +295,7 @@ struct BusinessPane: View {
     /// Khayt's own tariff (`KhaytPrintRates.DEFAULTS`), for the hint — read
     /// from the rule, never restated here.
     @State private var defaultElecRate: Double?
+    @State private var askingLogo = false
     @AppStorage("mac.menuBar") private var menuBar = true
     /// The same key AND the same default as `ShopWindow` — both from
     /// `ShellChoice`, because declaring the default twice is how this switch
@@ -351,8 +352,8 @@ struct BusinessPane: View {
                         Button(shop.words.callIt("set.logo_upload")) { shop.pickLogo() }
                             .disabled(!shop.canWrite)
                         if !shop.bizLogo.isEmpty {
-                            Button(shop.words.callIt("set.logo_remove"), role: .destructive) {
-                                shop.clearLogo()
+                            Button(shop.words.callIt("set.logo_remove") + "\u{2026}", role: .destructive) {
+                                askingLogo = true
                             }
                             .disabled(!shop.canWrite)
                         }
@@ -361,6 +362,18 @@ struct BusinessPane: View {
                     Text(shop.words.callIt("mac.logo_accepts"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                // Asked before Remove: no undo, and the file it came from may
+                // be long gone from this Mac.
+                .confirmationDialog(shop.words.callIt("mac.remove_logo_q"),
+                                    isPresented: $askingLogo, titleVisibility: .visible) {
+                    Button(shop.words.callIt("set.logo_remove"), role: .destructive) {
+                        shop.clearLogo()
+                    }
+                    Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+                } message: {
+                    Text(shop.words.callIt("mac.remove_logo_note") + " "
+                         + shop.words.callIt("mac.no_undo"))
                 }
                 // ── THE REDESIGNED WINDOW ─────────────────────────────────
                 //

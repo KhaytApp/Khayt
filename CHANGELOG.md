@@ -217,6 +217,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   removes the actual time and weight recorded with it, undoing a QC failure
   removes its waste row, and undoing a library edit keeps a remeasure or a
   phone's change to the same model.
+- **Mac: removing something asks first.** Deleting a waste entry, a
+  maintenance task, a spool, a consumable, a supplier or a message template,
+  removing a line from a customer's log, clearing what a customer paid,
+  removing a payment plan, removing the shop's logo, unlinking a library
+  folder and marking a product not stocked each happened in one click. They
+  now ask, name what is about to go, and say whether Edit › Undo can bring it
+  back. The buttons read "Delete…" to show a question follows.
+- **Mac: a product is not saved at a price of 0 without asking.** When the
+  parts price to zero (a part with no filament chosen, say), Save now asks
+  "Save at a price of 0?" and shows the price it would replace. Before, the
+  sheet warned and saved anyway on one click or Return.
 
 - **(Mac) A restored backup stays restored.** Restoring used to lose to the
   next cloud sync: a record deleted after the backup was taken was deleted

@@ -51,6 +51,8 @@ struct SuppliersCard: View {
     private struct Row: View {
         @Bindable var shop: Shop
         let supplier: Supplier
+        /// Delete chosen from the menu, not yet answered.
+        @State private var deleting: Supplier?
 
         var body: some View {
             HStack(spacing: 10) {
@@ -94,10 +96,17 @@ struct SuppliersCard: View {
                 }
                 if shop.canMoveJobs {
                     Divider()
-                    Button(shop.words.callIt("common.delete"), role: .destructive) {
-                        Task { await shop.deleteSupplier(supplier.id) }
+                    Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                        deleting = supplier
                     }
                 }
+            }
+            .askFirst($deleting,
+                      title: { shop.words.callIt("mac.delete_product_q", ["name": .string($0.name)]) },
+                      message: { _ in shop.words.callIt("mac.undo_after") },
+                      confirm: shop.words.callIt("common.delete"),
+                      cancel: shop.words.callIt("common.cancel")) { chosen in
+                Task { await shop.deleteSupplier(chosen.id) }
             }
         }
 
@@ -151,6 +160,8 @@ struct SupplierSheet: View {
     @State private var draft: Supplier
     @State private var lead: String
     @State private var problem: String?
+    /// Delete pressed beside Save, not yet answered.
+    @State private var deleting: Supplier?
     @FocusState private var focused: Bool
 
     /// Whether this is a correction or a new one. The ID decides: a supplier
@@ -264,12 +275,8 @@ struct SupplierSheet: View {
         } footer: {
             HStack {
                 if existing {
-                    Button(shop.words.callIt("common.delete"), role: .destructive) {
-                        let id = draft.id
-                        Task {
-                            await shop.deleteSupplier(id)
-                            close()
-                        }
+                    Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                        deleting = draft
                     }
                 }
                 Spacer()
@@ -281,6 +288,17 @@ struct SupplierSheet: View {
             }
         }
         .onAppear { focused = true }
+        .askFirst($deleting,
+                  title: { shop.words.callIt("mac.delete_product_q", ["name": .string($0.name)]) },
+                  message: { _ in shop.words.callIt("mac.undo_after") },
+                  confirm: shop.words.callIt("common.delete"),
+                  cancel: shop.words.callIt("common.cancel")) { chosen in
+            let id = chosen.id
+            Task {
+                await shop.deleteSupplier(id)
+                close()
+            }
+        }
     }
 
     private func close() {

@@ -19,6 +19,8 @@ struct ConsumableSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
+    /// Delete was pressed and not yet answered: it sat beside Save, one click.
+    @State private var deleting: Consumable?
     @State private var stock: Double = 0
     /// Free text, unlike a spool's unit — nothing converts with it. See
     /// `lib/consumable-edit.js` for why this is not a picker.
@@ -111,10 +113,8 @@ struct ConsumableSheet: View {
         } footer: {
             HStack {
                 if !isNew, shop.canMoveJobs {
-                    Button(shop.words.callIt("common.delete"), role: .destructive) {
-                        guard let id = existing?.id else { return }
-                        dismiss()
-                        Task { await shop.deleteConsumable(id) }
+                    Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                        deleting = existing
                     }
                 }
                 Spacer()
@@ -126,6 +126,14 @@ struct ConsumableSheet: View {
             }
         }
         .onAppear(perform: fill)
+        .askFirst($deleting,
+                  title: { shop.words.callIt("mac.delete_product_q", ["name": .string($0.title(shop.words))]) },
+                  message: { _ in shop.words.callIt("mac.undo_after") },
+                  confirm: shop.words.callIt("common.delete"),
+                  cancel: shop.words.callIt("common.cancel")) { chosen in
+            dismiss()
+            Task { await shop.deleteConsumable(chosen.id) }
+        }
         .task { known = await shop.consumableCategorySuggestions() }
     }
 
