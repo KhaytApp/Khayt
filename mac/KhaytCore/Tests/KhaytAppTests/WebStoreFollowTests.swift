@@ -13,9 +13,15 @@ import KhaytCore
 @MainActor
 struct WebStoreFollowTests {
 
-    /// Short enough to wait out. Not compared with how long a load takes: on a
-    /// loaded CI runner the follow may fire before `load` returns.
-    static let delay: Duration = .milliseconds(1500)
+    /// NOTHING HERE WAITS ON THE WALL CLOCK. Each test awaits the republish
+    /// task itself (`webStoreRepublish`), which ends when the follow has fired
+    /// or given up — so a 3-vCPU runner under load is slower, never wrong. A
+    /// wall-clock deadline ("fired within 5 s") failed on CI after 871 s of a
+    /// starved main actor, with the republish still queued behind it.
+    ///
+    /// The wait itself is kept short but real: a debounce of zero would let a
+    /// task that should have been cancelled race the next change.
+    static let delay: Duration = .milliseconds(20)
 
     final class Count { var fired = 0; var sent = 0 }
 
@@ -30,10 +36,9 @@ struct WebStoreFollowTests {
         return shop
     }
 
-    /// Wait until `done`, or give up after `seconds`.
-    static func wait(_ seconds: Double, until done: () -> Bool) async {
-        let end = Date().addingTimeInterval(seconds)
-        while !done(), Date() < end { try? await Task.sleep(for: .milliseconds(50)) }
+    /// The follow scheduled by the last change, run to its end.
+    static func settle(_ shop: Shop) async {
+        await shop.webStoreRepublish?.value
     }
 
     /// What the book was read as before it changed. Any value the load will
@@ -41,16 +46,16 @@ struct WebStoreFollowTests {
     static let before: JSONValue = .object(["products": .array([]), "storefront": .null])
 
     @Test("a change to the book republishes a live store once, after the wait")
-    func changeRepublishes() async {
+    func changeRepublishes() async throws {
         let count = Count()
         let shop = await Self.liveShop(count)
         shop.webStoreSeen = Self.before
         // The book as changed: re-read, as the app does after any write.
         await shop.load(.sample)
         #expect(shop.webStoreLive == true, "the reload forgot the store was live")
-        #expect(shop.webStoreRepublish != nil, "the reload cancelled the follow it had scheduled")
-        await Self.wait(5) { count.fired > 0 }
-        try? await Task.sleep(for: .milliseconds(300))
+        let follow = try #require(shop.webStoreRepublish, "the reload scheduled no follow")
+        #expect(!follow.isCancelled, "the reload cancelled the follow it had scheduled")
+        await follow.value
         #expect(count.fired == 1)
     }
 
@@ -59,12 +64,18 @@ struct WebStoreFollowTests {
         let count = Count()
         let shop = await Self.liveShop(count)
         let settings = shop.settingsDict
+        var follows: [Task<Void, Never>] = []
         for n in 0..<3 {
             shop.webStoreFollow(products: shop.productRows + [.object(["id": .string("NEW\(n)")])],
                                 settings: settings)
+            if let follow = shop.webStoreRepublish { follows.append(follow) }
         }
-        await Self.wait(5) { count.fired > 0 }
-        try? await Task.sleep(for: .milliseconds(300))
+        #expect(follows.count == 3)
+        // Every one of them run to its end, the cancelled ones included, so
+        // none can fire after the count is read.
+        for follow in follows { await follow.value }
+        let superseded = follows.dropLast().filter { $0.isCancelled }.count
+        #expect(superseded == 2, "an earlier change was not superseded")
         #expect(count.fired == 1)
     }
 
@@ -74,7 +85,9 @@ struct WebStoreFollowTests {
         let shop = await Self.liveShop(count)
         await shop.load(.sample)
         #expect(shop.webStoreLive == true)
-        try? await Task.sleep(for: Self.delay + .milliseconds(500))
+        // Nothing was scheduled at all — not merely nothing fired yet.
+        #expect(shop.webStoreRepublish == nil, "a re-read of the same book scheduled a republish")
+        await Self.settle(shop)
         #expect(count.fired == 0)
     }
 
@@ -124,12 +137,46 @@ struct WebStoreFollowTests {
         let notices = shop.moveNotices.count
         shop.webStoreSeen = Self.before
         await shop.load(.sample)
-        await Self.wait(5) { count.fired > 0 }
+        try #require(shop.webStoreRepublish != nil, "the change scheduled no follow")
+        await Self.settle(shop)
         #expect(count.fired == 1)
         #expect(count.sent == 0, "a price nobody set was published")
         #expect(shop.webStorePriceHold.map(\.id) == [id])
         #expect(shop.moveNotices.count == notices + 1)
         #expect(shop.moveNotices.last == shop.words.callIt("mac.ws_prices_held"))
+    }
+
+    @Test("an automatic publish does not cancel itself; a publish somebody presses replaces the waiting one")
+    func automaticDoesNotCancelItself() async throws {
+        final class Seen { var cancelledInside: Bool? }
+        let seen = Seen()
+        let count = Count()
+        let shop = await Self.liveShop(count) { shop in
+            count.fired += 1
+            // The real entry point, from inside the follow's own task. It used
+            // to cancel `webStoreRepublish` — itself — so every request after
+            // that line ran cancelled and the store was never sent.
+            await shop.publishWebStore(automatic: true)
+            seen.cancelledInside = Task.isCancelled
+        }
+        shop.webStoreFollow(products: shop.productRows + [.object(["id": .string("NEW")])],
+                            settings: shop.settingsDict)
+        await Self.settle(shop)
+        #expect(count.fired == 1)
+        #expect(seen.cancelledInside == false, "the automatic publish cancelled its own task")
+
+        // Pressed: the follow waiting behind it is not needed any more.
+        shop.webStoreFollowDelay = .seconds(3600)
+        shop.webStoreFollow(products: shop.productRows + [.object(["id": .string("NEWER")])],
+                            settings: shop.settingsDict)
+        let waiting = try #require(shop.webStoreRepublish)
+        await shop.publishWebStore()
+        await waiting.value
+        #expect(waiting.isCancelled)
+        #expect(count.fired == 1)
+
+        let src = try QuoteSheetStatusTests.source("WebStore.swift")
+        #expect(src.contains("if !automatic { webStoreRepublish?.cancel() }"))
     }
 
     @Test("the gate: a catalogue whose prices are unchanged is sent; an offline store stops; nothing left empties")

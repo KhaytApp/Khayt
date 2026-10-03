@@ -253,8 +253,14 @@ extension Shop {
 
     /// Build the catalogue from the book and send it.
     func publishWebStore(withPhotos: Bool = WebStoreSheet.photosOn, automatic: Bool = false) async {
+        // A publish somebody pressed replaces the one waiting to follow. An
+        // AUTOMATIC one is that waiting task — it runs inside
+        // `webStoreRepublish` — and cancelling it here cancelled itself: every
+        // request after this line ran in a cancelled task, so URLSession threw
+        // and the store was never sent. A newer change still cancels it, from
+        // `webStoreFollow`, and schedules the publish that replaces it.
+        if !automatic { webStoreRepublish?.cancel() }
         guard let engine, let build = source.build else { return }
-        webStoreRepublish?.cancel()
         webStoreBusy = true
         defer { webStoreBusy = false }
         do {
