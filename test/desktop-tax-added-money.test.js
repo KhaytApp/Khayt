@@ -55,7 +55,7 @@ test('every desktop call site passes the settings (#1718 follow-ups)', () => {
   assert.match(r('order-flows.js'), /applyEdit\(order, \{ price: [^\n]*settings \}\)/, 'price edit');
   const flows = r('order-flows.js');
   const ct = flows.slice(flows.indexOf('KhaytPaymentPlan.collectionTotals({'), flows.indexOf('KhaytPaymentPlan.collectionTotals({') + 700);
-  for (const k of ['giftCardDiscount:', 'credited: KhaytOrderMoney.orderCreditedRaw(order)', 'due: KhaytOrderMoney.orderGrossRaw(order, { settings })']) assert.ok(ct.includes(k), k);
+  for (const k of ['giftCardDiscount:', 'credited: KhaytOrderMoney.orderCreditedRaw(order)', 'due: KhaytOrderMoney.orderDueRaw(order, { settings })']) assert.ok(ct.includes(k), k);
   assert.match(r('invoicing.js'), /invoiceSummary\(order, _taxProfile\)\.itemsSubtotal/);
 });
 

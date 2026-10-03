@@ -40,3 +40,14 @@ test('the desktop passes settings to cash flow, caps the payment form by cashDue
   assert.match(f, /const billed = KhaytOrderMoney\.orderGrossRaw\(order, \{ settings \}\);\n\s+if \(\(order\.paidAmount \|\| 0\) > billed\) order\.paidAmount = billed;\n\s+order\.paymentStatus = KhaytOrderPayment\.statusOf\(order, \{ settings \}\);/);
   assert.doesNotMatch(f, /draft\.paidAmount = Math\.min\(Math\.max\(0, rawVal\), \+order\.price \|\| 0\)/);
 });
+
+test('an order settled before tax-on-top keeps its status when its plan is edited', () => {
+  const Plan = require('../lib/payment-plan.js');
+  const M = require('../lib/order-money.js');
+  const old = { id: 'O9', price: 100, paidAmount: 100, paymentStatus: 'paid', paidAt: '2026-09-01' };   // no paidGross stamp
+  const t = Plan.collectionTotals({ price: old.price, paidAmount: old.paidAmount, instalments: [], due: M.orderDueRaw(old, { settings: EXCL }) });
+  assert.equal(t.paymentStatus, 'paid', 'grandfathered: still paid at the pre-tax price');
+  const fresh = { ...old, paidGross: true };
+  const t2 = Plan.collectionTotals({ price: 100, paidAmount: 100, instalments: [], due: M.orderDueRaw(fresh, { settings: EXCL }) });
+  assert.equal(t2.paymentStatus, 'partial', 'a new order owes the tax');
+});

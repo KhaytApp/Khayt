@@ -2121,10 +2121,12 @@ function openOrderEditor(orderId) {
           instalments: draft.instalments,
           instalmentBase: draft.instalmentBase,
           // A gift card and a credit note pay an order down too, and a
-          // tax-added shop is owed price + tax (lib/payment-plan.js).
+          // tax-added shop is owed price + tax, except on an order it settled
+          // before tax-on-top was counted (orderDueRaw, #1730): editing that
+          // order's plan must not flip it back to partial.
           giftCardDiscount: +order.giftCardDiscount || 0,
           credited: KhaytOrderMoney.orderCreditedRaw(order),
-          due: KhaytOrderMoney.orderGrossRaw(order, { settings }),
+          due: KhaytOrderMoney.orderDueRaw(order, { settings }),
         });
         order.paidAmount = totals.paidAmount;
         order.paymentStatus = totals.paymentStatus;
