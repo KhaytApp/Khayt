@@ -316,7 +316,10 @@ private struct NewJobCommand: View {
         Button(Words.upfront("mac.new_job")) { shop.takingAJob = true }
             .keyboardShortcut("n")
             .disabled(!shop.canMoveJobs)
+        // A write, like New Job beside it: on the sample shop or a book another
+        // app holds, the sheet would open and its Save could not land.
         Button(Words.upfront("mac.new_customer")) { shop.editingCustomer = Shop.newCustomer() }
+            .disabled(!shop.canMoveJobs)
         // The catalogue could be read on this Mac and not added to.
         Button(Words.upfront("mac.new_product") + "\u{2026}") {
             shop.editingProduct = shop.newProduct()

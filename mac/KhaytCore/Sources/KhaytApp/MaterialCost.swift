@@ -24,6 +24,14 @@ struct MaterialCostCard: View {
                 .font(.system(size: 10, weight: .semibold))
                 .textCase(.uppercase).tracking(0.6)
                 .foregroundStyle(Khayt.brand)
+            // WHICH PRICE THIS IS. The price-history card below read "What
+            // materials have cost" against this card's "What materials cost",
+            // with different figures and units — two answers to what looked
+            // like one question. This one is the SHELF's: each material's most
+            // recent spool. The other is the purchase LOG's.
+            Text(words.callIt("mac.mc_sub"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             if let report, !report.rows.isEmpty {
                 // The one finding on the card. A shop scanning a column of
@@ -62,10 +70,14 @@ struct MaterialCostCard: View {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(row.material).font(.callout).lineLimit(1)
-                            Text(words.callIt("mac.mc_per", ["unit": .string(row.rate)])
+                            // The unit in the shop's word, and the count as a
+                            // counted word: "3× · kg" drew scrambled in Arabic,
+                            // a Latin unit and a bare × reordered by the line.
+                            Text(words.callIt("mac.mc_per", ["unit": .string(words.unitWord(row.rate))])
+                                 + " · "
                                  + (row.spoolCount < 2
-                                    ? " · " + words.callIt("mac.mc_one_buy")
-                                    : " · \(row.spoolCount)×"))
+                                    ? words.callIt("mac.mc_one_buy")
+                                    : words.counting(row.spoolCount, "mac.mc_spools")))
                                 .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer(minLength: 8)

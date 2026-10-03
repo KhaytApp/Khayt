@@ -101,10 +101,13 @@ struct CapacityCard: View {
             }
             if row.overbooked {
                 let over = days - (row.availableHours / max(row.hoursPerDay, 1))
-                return words.callIt("mac.cap_over", ["n": .number(over.rounded())])
+                // COUNTED, so Arabic gets its number forms: "متأخر 3 يومًا" was
+                // the accusative singular after three, which is wrong from 3 to
+                // 10 — `counting` takes the `_one`/`_two`/`_few` forms.
+                return words.counting(max(1, Int(saturating: over.rounded())), "mac.cap_over")
             }
             if days < 1 { return words.callIt("mac.cap_clear_soon") }
-            return words.callIt("mac.cap_clear_days", ["n": .number(days.rounded())])
+            return words.counting(max(1, Int(saturating: days.rounded())), "mac.cap_clear_days")
         }
 
         /// Fills to the end, then keeps going past it in the warning colour.

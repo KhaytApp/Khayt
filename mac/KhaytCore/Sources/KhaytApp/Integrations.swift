@@ -84,6 +84,14 @@ struct IntegrationsPane: View {
     /// Where the shop sells, as the shared rule reads its book.
     @State private var home: String?
 
+    /// Where this Mac signs in, in the menu's own words, so the hint cannot
+    /// name an item that has been renamed.
+    static func cloudHint(_ words: Words) -> String {
+        let step = words.language == "ar" ? " ◂ " : " ▸ "
+        let place = words.callIt("mac.menu_book") + step + words.callIt("mac.cloud_sign_in") + "\u{2026}"
+        return words.callIt("mac.integ_cloud_hint", ["where": .string(place)])
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Form {
@@ -99,7 +107,10 @@ struct IntegrationsPane: View {
                         // The links are cloud routes and there is nothing to
                         // build one from. Said once, here, rather than as a
                         // disabled button on every row.
-                        Text(shop.words.callIt("integ.cloud_hint"))
+                        // NAMING THE REAL PLACE. The shared hint says
+                        // "Settings → Cloud", which is the other app's pane —
+                        // this Mac has none, and signs in from the Book menu.
+                        Text(Self.cloudHint(shop.words))
                             .font(.callout).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

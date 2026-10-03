@@ -126,7 +126,16 @@ struct CustomersTable: View {
                 if !shop.search.isEmpty {
                     NothingMatched(shop: shop, mark: .clients)
                 } else {
-                    EmptyHere(title: shop.words.callIt("mac.no_customers"), message: shop.words.callIt("mac.no_customers_hint"), mark: .clients)
+                    // The way in, on the screen that is empty — not only in
+                    // File ▸ New Customer, which a shop looking here does not see.
+                    EmptyHere(title: shop.words.callIt("mac.no_customers"),
+                              message: shop.words.callIt("mac.no_customers_hint"), mark: .clients) {
+                        Button(shop.words.callIt("mac.add_customer")) {
+                            shop.editingCustomer = Shop.newCustomer()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!shop.canMoveJobs)
+                    }
                 }
             }
         }

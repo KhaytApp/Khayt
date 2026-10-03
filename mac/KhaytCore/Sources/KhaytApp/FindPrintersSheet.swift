@@ -60,10 +60,18 @@ struct FindPrintersSheet: View {
                             Task { await shop.addFound(printer) }
                         }
                         .disabled(!shop.canMoveJobs)
+                        .help(Shop.findPrintersCaveat(shop) ?? "")
                     }
                     .padding(.vertical, 2)
                 }
                 .frame(height: 200)
+            }
+
+            // Why "Add" is off, where it is off — rather than a row of grey
+            // buttons that look broken.
+            if let why = Shop.findPrintersCaveat(shop) {
+                Text(why).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack {
@@ -87,5 +95,14 @@ struct FindPrintersSheet: View {
         looking = true
         found = await shop.findPrinters()
         looking = false
+    }
+}
+
+extension Shop {
+    /// Why a printer found on the network cannot be added to this book, or nil
+    /// when it can. The search itself always runs — it only looks.
+    @MainActor static func findPrintersCaveat(_ shop: Shop) -> String? {
+        if shop.canMoveJobs { return nil }
+        return shop.words.callIt(shop.source.isReal ? "mac.find_cant_add_locked" : "mac.find_cant_add_sample")
     }
 }

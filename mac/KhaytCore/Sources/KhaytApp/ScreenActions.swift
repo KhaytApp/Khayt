@@ -51,7 +51,8 @@ private struct ScreenToolbar<C: ToolbarContent>: ViewModifier {
 ///
 /// The order follows `ShopWindow.classicScreens`, which is the order the app
 /// decides what to show. Anything not listed simply has no actions: the
-/// Dashboard, the customers, the calculator. (The inventory was on that list
+/// Dashboard and the calculator. (The customers were on that list too, and a
+/// shop could not add one before its first job — see the customers branch.) (The inventory was on that list
 /// and should not have been — see the New Spool item below.)
 struct ScreenActions: View {
     @Bindable var shop: Shop
@@ -88,6 +89,7 @@ struct ScreenActions: View {
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
+                .navyMenu()
                 .help(shop.words.callIt("mac.sort_by"))
                 // GROUP, CATEGORY, WHERE IT CAME FROM. The old shell put these
                 // in the window's toolbar and this shell has none, so a shop on
@@ -102,9 +104,10 @@ struct ScreenActions: View {
                 .foregroundStyle(Role.onNavy2)
                 .menuStyle(.borderlessButton)
                 .fixedSize()
+                .navyMenu()
                 NavyAction(label: shop.words.callIt("mac.import_models"),
                            symbol: "square.and.arrow.down",
-                           enabled: shop.canMoveJobs && !shop.importing) {
+                           enabled: shop.canMoveJobs && !shop.importing, titled: true) {
                     Task { await shop.addModelToLibrary() }
                 }
             } else if shop.showingCatalogue {
@@ -162,6 +165,14 @@ struct ScreenActions: View {
                 plus("waste.add", enabled: shop.canMoveJobs) { shop.loggingWaste = true }
             } else if shop.showingGiftCards {
                 plus("mac.issue_gift_card", enabled: true) { shop.issuingGiftCard = true }
+            } else if shop.showingCustomers {
+                // A CUSTOMER BEFORE THEIR FIRST JOB. The only way in was File ▸
+                // New Customer, and the empty screen said a customer appears
+                // "once a job is billed to them" — so a shop wanting to write
+                // down who it is quoting had no button it could see.
+                plus("mac.new_customer", enabled: shop.canMoveJobs) {
+                    shop.editingCustomer = Shop.newCustomer()
+                }
             } else if shop.showingReports, shop.reportPage == .best {
                 period
             } else if shop.showingReports, shop.reportPage == .profit {
@@ -173,7 +184,7 @@ struct ScreenActions: View {
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
                 // On navy, like the button above: the segmented control's
                 // labels were dark grey on the strip.
-                .environment(\.colorScheme, .dark)
+                .navyMenu()
             }
 
             // THE PANEL'S SWITCH, on every screen that has a panel.
@@ -213,8 +224,10 @@ struct ScreenActions: View {
             && !shop.showingGiftCards && !shop.showingCustomers
     }
 
+    /// The screen's primary action — the one thing it exists to add — which
+    /// says its word on the strip rather than only in a tooltip.
     private func plus(_ key: String, enabled: Bool, act: @escaping () -> Void) -> some View {
-        NavyAction(label: shop.words.callIt(key), symbol: "plus", enabled: enabled, act: act)
+        NavyAction(label: shop.words.callIt(key), symbol: "plus", enabled: enabled, titled: true, act: act)
     }
 
     private var period: some View {
@@ -222,6 +235,7 @@ struct ScreenActions: View {
             .font(TypeScale.body(11.5))
             .foregroundStyle(Role.onNavy2)
             .fixedSize()
+            .navyMenu()
     }
 
     private var layoutSwitch: some View {
@@ -295,25 +309,85 @@ struct WellButtonStyle: ButtonStyle {
 /// a system-bordered control on it draws its own light grey capsule. The word
 /// is not lost with the border — it is the help text AND the accessibility
 /// label, which is what the toolbar item carried too.
-private struct NavyAction: View {
+///
+/// ── THE PRIMARY ACTION SAYS ITS WORD ─────────────────────────────────────
+///
+/// Every action here was a 26×22 symbol, so "New Job", "New product" and
+/// "Import models" were a plus or an arrow a shop had to hover to read. The
+/// one action a screen exists for (`titled`) now draws the word beside its
+/// symbol; the secondary ones stay a symbol with a tooltip. When the window is
+/// too narrow for the word — 900pt in Arabic, with a long title — it falls back
+/// to the symbol alone rather than squeezing the search field or the status.
+struct NavyAction: View {
     let label: String
     let symbol: String
     var enabled = true
+    var titled = false
     let act: () -> Void
+
+    /// The catalogue's "+ Add Printer" carries its own plus; the symbol already
+    /// draws one, so the word drops it.
+    var word: String {
+        let trimmed = label.trimmingCharacters(in: .whitespaces)
+        return trimmed.hasPrefix("+") ? String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)
+                                      : trimmed
+    }
 
     var body: some View {
         Button(action: act) {
-            Image(systemName: symbol)
-                .font(.system(size: 11.5, weight: .semibold))
-                .frame(width: 26, height: 22)
-                .background(Color.white.opacity(0.1), in:
-                                RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
-                .contentShape(Rectangle())
+            if titled {
+                ViewThatFits(in: .horizontal) {
+                    worded
+                    bare
+                }
+            } else {
+                bare
+            }
         }
         .buttonStyle(.plain)
         .foregroundStyle(enabled ? Role.onNavy : Role.onNavy3)
         .disabled(!enabled)
-        .help(label)
-        .accessibilityLabel(label)
+        .help(word)
+        .accessibilityLabel(word)
+    }
+
+    private var bare: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 11.5, weight: .semibold))
+            .frame(width: 26, height: 22)
+            .background(Color.white.opacity(0.1), in:
+                            RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+            .contentShape(Rectangle())
+    }
+
+    private var worded: some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol)
+                .font(.system(size: 10.5, weight: .semibold))
+            Text(word)
+                .font(TypeScale.body(11.5, weight: .medium))
+                .lineLimit(1)
+        }
+        .fixedSize()
+        .padding(.horizontal, 9)
+        .frame(height: 22)
+        .background(Color.white.opacity(0.1), in:
+                        RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        .contentShape(Rectangle())
+    }
+}
+
+extension View {
+    /// A system menu or picker drawn on the navy strip.
+    ///
+    /// A borderless `Menu` ignores `foregroundStyle` for its title and draws
+    /// it in the system's ink for the CURRENT appearance — so in light mode
+    /// "This month", Group, Category and the sort order were dark grey on navy,
+    /// and the Library's Group menu was as good as invisible. The strip is
+    /// navy in both appearances, so its controls are always drawn as on a dark
+    /// ground; `NavyAction` and `WellButtonStyle(onNavy:)` already ink
+    /// themselves with `Role.onNavy*` for the same reason.
+    func navyMenu() -> some View {
+        environment(\.colorScheme, .dark)
     }
 }

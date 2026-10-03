@@ -15,10 +15,26 @@ struct Expenses: View {
     private var rows: [Expense] { shop.shownExpenses.sorted(using: order) }
 
     var body: some View {
-        HSplitView {
-            table
-            Summary(shop: shop).frame(minWidth: 260, idealWidth: 300, maxWidth: 380)
+        Group {
+            // AN EMPTY BOOK IS ONE STATE, NOT THREE PANES. With nothing ever
+            // recorded, the split drew an empty table, a summary of zeros and
+            // a wide gap between them — three panes saying "nothing" in three
+            // ways. The whole screen says it once, with the way in. A filter
+            // that matches nothing still keeps the split: there IS a summary.
+            if shop.expenses.isEmpty {
+                EmptyHere(title: shop.words.callIt("exp.empty"), mark: .expenses) {
+                    Button(shop.words.callIt("exp.add_title")) { shop.addingExpense = true }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!shop.canMoveJobs)
+                }
+            } else {
+                HSplitView {
+                    table
+                    Summary(shop: shop).frame(minWidth: 260, idealWidth: 300, maxWidth: 380)
+                }
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Khayt.ground)
         .screenToolbar { SpendToolbar(shop: shop, add: { shop.addingExpense = true },
                                       addLabel: shop.words.callIt("exp.add_title")) }
@@ -177,10 +193,23 @@ struct Waste: View {
     private var rows: [WasteEntry] { shop.shownWaste.sorted(using: order) }
 
     var body: some View {
-        HSplitView {
-            table
-            Summary(shop: shop).frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
+        Group {
+            // As the expenses screen: a log with nothing in it is one empty
+            // state across the window, not a table, a trend and a gap.
+            if shop.wasteRows.isEmpty {
+                EmptyHere(title: shop.words.callIt("mac.waste_empty"), mark: .waste) {
+                    Button(shop.words.callIt("waste.add")) { shop.loggingWaste = true }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!shop.canMoveJobs)
+                }
+            } else {
+                HSplitView {
+                    table
+                    Summary(shop: shop).frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
+                }
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Khayt.ground)
         .screenToolbar { SpendToolbar(shop: shop, add: { shop.loggingWaste = true },
                                       addLabel: shop.words.callIt("waste.add")) }
