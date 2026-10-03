@@ -5424,6 +5424,48 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.58] - 2026-10-03
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Safety and correctness release: sync and restore keep what they replace, undo puts
+back only what changed, security fixes across the app, and upright photos.
+
+### Changed and fixed
+
+- **(Mac) Fixes from the alpha.58 UI review.**
+  - What sync took from the book stays on screen until you deal with it: the
+    notice is rebuilt from the kept copies each time the book opens, and its
+    ✕ asks first while records are still not put back.
+  - Adding models: the Keep/Move choice in the Add panel is labelled, warns
+    that Move removes files from iCloud Drive or Dropbox on every device, and
+    applies to that import only. Dropped files use Settings › Library. The
+    result line says how many originals went to the Trash.
+  - Web store held prices show as money, leave out an empty old price, and
+    have Edit Product… on each row. The spool-size review lists and counts
+    only products whose price changes, and its banner appears on every
+    screen, including after a spool's size is saved.
+  - When sync stops because Khayt Cloud answered with an older copy, a banner
+    says so in your language, with Trust the Cloud's Older Copy; accepting it
+    syncs straight away.
+  - An open group's menu has Rename and Move into Group, and the window
+    follows the group. Remove and replace Group Picture can be undone; a group
+    moved into one with no picture keeps its picture, and a picture no group
+    uses goes to the Trash.
+  - Turning a product photo writes a new file on Save. The original is left
+    as it was if you cancel, the save fails, or you undo.
+  - Greyed actions on a book this Mac can only read say why. A job's number
+    is hidden rather than clipped when there is no room, and a printer's hash
+    in front of a file name is no longer shown as the title.
+  - In a narrow window the strip shows the app's mark and the Where It Came
+    From menu as icons. Selected group tiles look like selected models. The
+    two price cards share one row layout. Catalogue tiles with a photo are
+    the same width as the rest. Strip actions use title case.
+  - Arabic counts units properly ("4 لفات", "6 حبات").
+  - Screenshots from the snapshot runner use the sample book in every mode
+    unless `KHAYT_SNAPSHOT_REAL=1`.
+
 ## [4.0.0-alpha.57] - 2026-10-02
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
