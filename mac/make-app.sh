@@ -460,7 +460,14 @@ if [ -n "${KHAYT_APPCAST:-}" ] && [ "$SPARKLE_EMBEDDED" = "1" ]; then
   <key>SUScheduledCheckInterval</key><integer>3600</integer>
   <!-- NEVER installed without asking (the shop, Sep 2026). NO here makes
        Sparkle refuse automatic installs whatever this Mac's defaults say. -->
-  <key>SUAllowsAutomaticUpdates</key><false/>"
+  <key>SUAllowsAutomaticUpdates</key><false/>
+  <!-- The archive's EdDSA signature is checked BEFORE it is unpacked, not
+       after: a tampered download is refused without ever being extracted.
+       Every archive is already signed (mac-publish.yml, sign_update), and
+       Sparkle 2.9.6 supports it. SURequireSignedFeed is deliberately NOT here
+       yet: it needs the appcast itself signed first, and an app that demands
+       a signed feed from an unsigned one can never update again. -->
+  <key>SUVerifyUpdateBeforeExtraction</key><true/>"
 fi
 
 # KHAYT'S OWN GOOGLE SIGN-IN, so a shop connects Google Drive with one click

@@ -3139,8 +3139,9 @@ public actor KhaytEngine {
     ///
     /// ── WHAT EARNED WHAT IS STILL SHARED; THE ARITHMETIC IS NOT ──────────
     ///
-    /// `orderNetRevenueBase` is the money chokepoint and stays in JavaScript,
-    /// asked ONCE for the whole list rather than through a callback — a
+    /// `orderEarnedBase` is the money chokepoint and stays in JavaScript —
+    /// NET OF TAX, mode-aware, so a VAT-inclusive shop's forecast is not its
+    /// VAT projected forward as revenue — asked ONCE for the whole list rather than through a callback — a
     /// function cannot cross the bridge, and the alternative is this app
     /// having its own idea of what an order earned. The fitting and the
     /// bucketing are `Forecast`.
@@ -3159,7 +3160,7 @@ public actor KhaytEngine {
           var ctx = { settings: ARG1, clients: ARG2 };
           var M = globalThis.KhaytOrderMoney;
           return (ARG0 || []).map(function (o) {
-            var v = +M.orderNetRevenueBase(o, ctx);
+            var v = +M.orderEarnedBase(o, ctx);
             // `+x || 0` is what the callback's caller applied, kept here so
             // the figures handed over are the ones the rule produced.
             return (v === 0 || v !== v) ? 0 : v;
@@ -5088,7 +5089,7 @@ public actor KhaytEngine {
         (function () {
           var ctx = { settings: ARG1, clients: ARG2 };
           return ARG0.map(function (o) {
-            var n = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
+            var n = Number(globalThis.KhaytOrderMoney.orderEarnedBase(o, ctx));
             return isFinite(n) ? n : 0;
           });
         })()
@@ -5518,7 +5519,7 @@ public actor KhaytEngine {
           var ctx = { settings: ARG2, clients: ARG0 };
           return {
             revenues: ARG1.map(function (o) {
-              var n = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
+              var n = Number(globalThis.KhaytOrderMoney.orderEarnedBase(o, ctx));
               return isFinite(n) ? n : 0;
             }),
             names: ARG0.map(function (c) {
@@ -5670,7 +5671,7 @@ public actor KhaytEngine {
         (function () {
           var ctx = { settings: ARG1, clients: ARG2 };
           return ARG0.map(function (o) {
-            var n = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
+            var n = Number(globalThis.KhaytOrderMoney.orderEarnedBase(o, ctx));
             return isFinite(n) ? n : 0;
           });
         })()
@@ -9659,7 +9660,7 @@ public actor KhaytEngine {
           return globalThis.KhaytClientSources.byClient(
             { clients: ARG0, orders: ARG1 },
             {
-              revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx); },
+              revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderEarnedBase(o, ctx); },
               isFinished: function (o) { return globalThis.KhaytOrderStatus.isFinished(o); },
               countsForBusiness: function (o) {
                 return globalThis.KhaytBusinessScope
@@ -10440,8 +10441,20 @@ public actor KhaytEngine {
     }
 
     /// What the platform says the customer paid, or nil when it did not say.
-    public func webStorePaidTotal(_ payload: JSONValue) throws -> Double? {
-        try runtime.call2("KhaytWebstoreOrder.paidTotal(ARG0)", [payload], as: Double?.self)
+    ///
+    /// `settings` say whether tax is added on top: a line's price is then the
+    /// pre-tax figure, and the customer paid it plus the tax.
+    public func webStorePaidTotal(_ payload: JSONValue,
+                                  settings: [String: JSONValue] = [:]) throws -> Double? {
+        try runtime.call2("KhaytWebstoreOrder.paidTotal(ARG0, {settings: ARG1})",
+                          [payload, .object(settings)], as: Double?.self)
+    }
+
+    /// What the customer is asked to pay for this order, in its own currency —
+    /// `orderGrossRaw`: the price, plus the tax on a shop that adds it on top.
+    public func grossRaw(order: JSONValue, settings: [String: JSONValue]) throws -> Double {
+        try runtime.call2("KhaytOrderMoney.orderGrossRaw(ARG0, {settings: ARG1})",
+                          [order, .object(settings)], as: Double.self)
     }
 
     public func medusaSubscriberPath() throws -> String {

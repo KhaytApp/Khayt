@@ -673,6 +673,10 @@ final class Shop {
             if case .array(let people)? = root["clients"] { clientRows = people } else { clientRows = [] }
             if case .array(let catalog)? = root["products"] { productRows = catalog } else { productRows = [] }
             // A live web store follows the catalogue: see `webStoreFollow`.
+            // Which book this is comes FIRST: a different book forgets the last
+            // one's store before anything is compared, and a re-read of the
+            // same book forgets nothing (see `webStoreBookRead`).
+            let anotherStore = webStoreBookRead(next.build?.storeURL)
             webStoreFollow(products: productRows, settings: Self.settings(root))
             catalogueRows = (try? await engine?.catalogue(
                 productRows, language: words.language, settings: Self.settings(root))) ?? []
@@ -865,8 +869,15 @@ final class Shop {
             // After the key: the launch check seals with it. Never for the
             // sample shop, which is not a book anybody wants back.
             if next.build != nil { startOffsiteBackups() } else { stopOffsiteBackups() }
-            resetWebStore()
-            if next.build != nil { Task { await self.refreshWebStore() } }
+            // NOT `resetWebStore()` here. It ran on every load, so it cancelled
+            // the republish `webStoreFollow` had scheduled a moment earlier in
+            // this same load and forgot the store was live: a live store never
+            // followed a single change. A different book was already forgotten
+            // above; the same book keeps its store, and is asked about it again
+            // only when nothing is known.
+            if next.build != nil, anotherStore || webStoreLive == nil {
+                Task { await self.refreshWebStore() }
+            }
             refreshSyncStatus()
             // Move a service log a Mac alpha wrote under the wrong key. Inside
             // the write chain, because anything that reads and writes the store
@@ -10521,6 +10532,15 @@ final class Shop {
     /// to it can be told apart from a re-read of the same book.
     var webStoreSeen: JSONValue?
     var webStoreRepublish: Task<Void, Never>?
+    /// The book the store state above belongs to (`webStoreBookRead`), and
+    /// whether any book has been read yet — nil is the sample's identity.
+    var webStoreBook: URL?
+    var webStoreBookKnown = false
+    /// How long a change waits before it is republished. A test shortens it.
+    var webStoreFollowDelay: Duration = CatalogPublisher.followDelay
+    /// What a follow runs when it fires. nil is `publishWebStore(automatic:)`;
+    /// a test stands in for the network here.
+    var webStoreAutoPublish: (@MainActor (Shop) async -> Void)?
     /// Prices a live store would have republished on its own that the shop
     /// did not set: held, and shown for review instead (`heldPrices`). Kept
     /// across re-reads of the same book, which `resetWebStore` is not.

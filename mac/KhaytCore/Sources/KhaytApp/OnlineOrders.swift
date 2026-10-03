@@ -387,19 +387,26 @@ extension Shop {
         // says owed. `other`, because the store did not say which card.
         var job: JSONValue = .object(record)
         var webhooks: [KhaytEngine.WebhookDelivery] = []
-        let price = plainNumber(record["price"]) ?? 0
+        let settingsNow = out.settings
         // WHAT THE CUSTOMER PAID, where the platform said — a keyed import
-        // carries each line's price — else the job's own price. The platform's
+        // carries each line's price — else what the job bills. The platform's
         // figure is the money that moved; a job priced differently (a discount
         // the store ran, a price changed since it was published) is left with
         // the honest balance either way rather than recorded as settled.
-        let platformPaid = (try? await engine.webStorePaidTotal(order.item.payload)) ?? nil
-        let amount = platformPaid ?? price
-        let settingsNow = out.settings
+        //
+        // BOTH ARE GROSS. On a shop that adds tax on top, the job's price and a
+        // line's price are the pre-tax figures and the customer paid them plus
+        // the tax: recorded bare, a paid web order read short by the tax and
+        // could never settle. `orderGrossRaw` (and `paidTotal` with the
+        // settings) add it; an inclusive shop's price already holds it.
+        let platformPaid = (try? await engine.webStorePaidTotal(order.item.payload, settings: settingsNow)) ?? nil
+        let billed = (try? await engine.grossRaw(order: job, settings: settingsNow))
+            ?? plainNumber(record["price"]) ?? 0
+        let amount = platformPaid ?? billed
         if paid, amount > 0 {
             let day = localDay(now)
             let done = try await engine.recordPayment(order: job, amount: amount, method: "other",
-                                                      paidAt: day, today: day)
+                                                      paidAt: day, today: day, settings: settingsNow)
             job = done.order
             if let asked = done.webhookEffects, !asked.isEmpty, case .object(let o) = job {
                 webhooks = (try? await engine.webhookDeliveries(

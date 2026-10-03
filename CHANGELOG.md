@@ -82,6 +82,34 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   many grams. Finishing it again takes what it really uses this time. Undo
   after reopening puts the stock back as it was, along with the job. The Mac
   app does the same.
+- **(Mac) A live web store follows your catalogue again.** Each time the book
+  was read, the Mac forgot the store's state and cancelled the automatic
+  republish it had scheduled moments earlier, so new, removed and hidden
+  products, photos and store settings never reached the store unless you
+  pressed Publish. The store's state is now reset only when a different book
+  is opened. A change republishes once, a few seconds later. Reopening the
+  same book publishes nothing. A price the shop did not set (#1705) is still
+  held for review, with a notice.
+- **(Mac) Five more reports count revenue without the tax.** The forecast,
+  customer mix, client value, cost trends and client sources reports counted
+  a VAT-inclusive shop's VAT as revenue. A job charged 115 read 115 where the
+  P&L says 100. They now use the same tax-aware figure as the P&L. A shop that
+  adds tax on top sees no change. Cash flow still includes the tax, because
+  that is cash the shop holds.
+- **Tax added on top: a paid web-store order settles.** On a shop that adds
+  tax on top of its prices, a paid web-store order was recorded at the
+  pre-tax price. It read short by the tax and could never settle. The Mac now
+  records the price plus the tax, or the platform's line prices plus the tax
+  when it sends them. A total the platform states outright is recorded as
+  sent.
+- **Tax added on top: the customer's tracking page shows what is owed.** It
+  showed the pre-tax price ("100.00" while 108.25 was owed), and the balance
+  left to pay was short by the tax. Both apps publish this page. Shops that
+  include VAT in their prices, and shops with no tax, see no change.
+- **(Mac) Updates are verified before they are unpacked.** The app now checks
+  an update's signature before it extracts the download
+  (`SUVerifyUpdateBeforeExtraction`). Every update is already signed. A signed
+  update feed comes later.
 
 - **(iOS) A PIN the Mac finds too short is said as one.** The native Mac now
   refuses an owner PIN shorter than 8 characters (#1713). Pairing with one

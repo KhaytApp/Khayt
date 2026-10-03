@@ -114,7 +114,8 @@ struct WebStorePriceHoldTests {
     @Test("the hold is wired: an automatic publish checks it, the sheet lists it, the catalogue says it, a save marks its price")
     func wired() throws {
         let src = try QuoteSheetStatusTests.source("WebStore.swift")
-        #expect(src.contains("if holdUnsetPrices(sending: catalog, published: now) { return }"))
+        #expect(src.contains("if holdUnsetPrices(sending: catalog, published: now) { return .held }"))
+        #expect(src.contains("case .stop, .held: return"))
         #expect(src.contains("ForEach(shop.webStorePricesHeld)"))
         let catalogue = try QuoteSheetStatusTests.source("Catalogue.swift")
         #expect(catalogue.contains("shop.webStorePricesHeld.isEmpty"))

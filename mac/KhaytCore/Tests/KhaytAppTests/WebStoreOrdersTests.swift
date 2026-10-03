@@ -312,6 +312,56 @@ struct WebStoreOrdersTests {
                 "a job priced above what was paid shows the honest balance")
     }
 
+    /// A book whose shop adds 8.25% sales tax on top of its prices.
+    static func taxOnTopScratch() throws -> Scratch {
+        let scratch = try Self.scratch()
+        var root = try scratch.read()
+        var settings = Shop.settings(root)
+        settings["tax"] = .object([
+            "name": .string("Sales Tax"), "mode": .string("exclusive"),
+            "rates": .array([.object(["id": .string("st"), "label": .string("Sales tax"),
+                                      "percent": .number(8.25)])]),
+        ])
+        root["settings"] = .object(settings)
+        try JSONEncoder().encode(root).write(to: scratch.url)
+        return scratch
+    }
+
+    /// On a shop that adds tax on top, the job's price is the pre-tax figure
+    /// and the customer paid it PLUS the tax. Recorded bare, a paid web order
+    /// read short by the tax and could never settle.
+    @Test("tax on top: a paid web order records the price plus the tax, and is settled")
+    func taxOnTopRecordsGross() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.taxOnTopScratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        var priced = Self.input
+        priced["priceOverride"] = .number(100)
+        _ = try await Self.put(Self.payload(), intakeId: "1", input: priced, into: scratch, engine: engine)
+        let job = try #require(Self.jobs(try scratch.read()).first)
+        #expect(Shop.plainNumber(job["price"]) == 100)
+        #expect(Shop.plainNumber(job["paidAmount"]) == 108.25, "the bare price was recorded")
+        #expect(job["paymentStatus"] == .string("paid"), "a fully paid order could not settle")
+    }
+
+    @Test("tax on top: the platform's line prices are grossed up the same way")
+    func taxOnTopPlatformLines() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.taxOnTopScratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        guard case .object(var payload) = Self.payload(qty: 2) else { return }
+        payload["lines"] = .array([.object([
+            "name": .string("Flexi Dragon"), "qty": .number(2), "productId": .string("PRD-A"),
+            "unitPrice": .number(50),
+        ])])
+        var priced = Self.input
+        priced["priceOverride"] = .number(100)
+        _ = try await Self.put(.object(payload), intakeId: "1", input: priced, into: scratch, engine: engine)
+        let job = try #require(Self.jobs(try scratch.read()).first)
+        #expect(Shop.plainNumber(job["paidAmount"]) == 108.25, "2 × 50, plus 8.25% on top")
+        #expect(job["paymentStatus"] == .string("paid"))
+    }
+
     @Test("an order the store has not said is paid is left for a person")
     func unpaidWaits() async throws {
         let engine = try KhaytEngine()
