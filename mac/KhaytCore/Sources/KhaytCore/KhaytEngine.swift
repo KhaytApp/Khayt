@@ -5616,17 +5616,27 @@ public actor KhaytEngine {
         // so its answer is worked out once, in order, and handed across. The
         // rule about WHICH money is cash, and which month holds it, is
         // `KhaytCore.CashFlow` now.
-        let revenues: [Double] = try runtime.call2(#"""
+        //
+        // `billed` is what the customer was asked to pay, in the order's own
+        // currency (`orderGrossRaw`): the price, plus the tax on a shop that
+        // adds it on top. Cash received is capped at THAT, not at the price —
+        // capping at the price dropped the 8.25 a customer paid on a 100 job
+        // at 8.25%. An order settled before #1718 holds `paidAmount == price`,
+        // so it still counts exactly what was paid.
+        let money: [[Double]] = try runtime.call2(#"""
         (function () {
           var ctx = { settings: ARG1, clients: ARG2 };
+          var M = globalThis.KhaytOrderMoney;
           return ARG0.map(function (o) {
-            var n = Number(globalThis.KhaytOrderMoney.orderNetRevenueBase(o, ctx));
-            return isFinite(n) ? n : 0;
+            var n = Number(M.orderNetRevenueBase(o, ctx));
+            var g = Number(M.orderGrossRaw(o, { settings: ARG1 }));
+            return [isFinite(n) ? n : 0, isFinite(g) ? g : 0];
           });
         })()
-        """#, [.array(orders), .object(settings), .array(clients)], as: [Double].self)
+        """#, [.array(orders), .object(settings), .array(clients)], as: [[Double]].self)
 
-        let report = KhaytCore.CashFlow.report(orders: orders, revenues: revenues,
+        let report = KhaytCore.CashFlow.report(orders: orders, revenues: money.map { $0[0] },
+                                               billed: money.map { $0[1] },
                                                expenses: expenses, endMonth: endMonth,
                                                months: Double(months))
         return CashFlow(

@@ -68,6 +68,67 @@ struct CashFlowParityTests {
         return .object(o)
     }
 
+    /// Whether `lib/cash-flow.js` takes the shop's settings (KhaytApp/Khayt
+    /// #1733). Until it does, the JavaScript still caps at the price and there
+    /// is nothing to compare the tax-on-top rule against; the vectors are
+    /// pinned through the engine in `CashFlowTests` either way.
+    nonisolated static let libTakesSettings: Bool = {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "lib/cash-flow.js")
+        return ((try? String(contentsOf: url, encoding: .utf8)) ?? "").contains("i.settings")
+    }()
+
+    /// 8.25% sales tax added on top of the price.
+    static let salesTax: JSONValue = .object([
+        "currency": .string("USD"),
+        "tax": .object([
+            "name": .string("Sales Tax"), "mode": .string("exclusive"),
+            "rates": .array([.object(["id": .string("st"), "label": .string("Sales tax"),
+                                      "percent": .number(8.25)])]),
+        ]),
+    ])
+    static let vat15: JSONValue = .object([
+        "currency": .string("SAR"), "enableVat": .bool(true), "vatRate": .number(15),
+    ])
+
+    /// THE TAX-ON-TOP CAP, both sides, on the vectors `lib/cash-flow.js` pins
+    /// (test/desktop-cash-flow-tax-added.test.js): what was paid is capped at
+    /// what was BILLED — `orderGrossRaw` — not at the price.
+    @Test("tax on top: cash in is capped at what was billed, the same on both sides",
+          .enabled(if: CashFlowParityTests.libTakesSettings,
+                   "lib/cash-flow.js does not take settings yet (#1733)"))
+    func taxOnTopCap() throws {
+        let js = try JSModule(["tax", "order-money", "business-scope", "cash-flow"])
+        let vectors: [(String, JSONValue, Double, Double, Double)] = [
+            ("100 + 8.25% paid 108.25", Self.salesTax, 100, 108.25, 108.25),
+            ("100 + 8.25% paid 150", Self.salesTax, 100, 150, 108.25),
+            ("100 + 8.25% settled at its price before #1718", Self.salesTax, 100, 100, 100),
+            ("inclusive 115 paid 115", Self.vat15, 115, 115, 115),
+            ("inclusive 115 paid 200", Self.vat15, 115, 200, 115),
+            ("untaxed 100 paid 150", .object([:]), 100, 150, 100),
+        ]
+        for (what, settings, price, paid, want) in vectors {
+            let o = order(price: price, paid: paid, paidAt: .string("2026-09-02"))
+            let billed = JSSemantics.number(try js.value(
+                "globalThis.KhaytOrderMoney.orderGrossRaw(ARG0, { settings: ARG1 })",
+                [o, settings]))
+            let mine = CashFlow.report(orders: [o], revenues: [price], billed: [billed],
+                                       expenses: [], endMonth: "2026-09", months: 1)
+            let v = try js.value("""
+                globalThis.KhaytCashFlow.cashFlow(
+                  { orders: [ARG0], expenses: [], endMonth: '2026-09', months: 1, settings: ARG1 },
+                  { revenueOf: function (o) { return Number(o && o.price); },
+                    countsForBusiness: function () { return true; } }).totals.collected
+                """, [o, settings])
+            let theirs = JSSemantics.number(v)
+            #expect(abs(mine.totals.collected - want) < 1e-9, Comment(rawValue: "\(what): swift \(mine.totals.collected)"))
+            #expect(mine.totals.collected == theirs,
+                    Comment(rawValue: "\(what): swift \(mine.totals.collected) js \(theirs)"))
+        }
+    }
+
     private func expense(_ amount: Double, _ date: JSONValue) -> JSONValue {
         .object(["amount": .number(amount), "date": date])
     }
