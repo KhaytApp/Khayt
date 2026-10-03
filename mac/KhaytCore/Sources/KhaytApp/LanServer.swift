@@ -242,8 +242,8 @@ final class LanServer {
     }
 
     /// One step of a per-visitor rate limit, under the lock, keyed on the
-    /// visitor's `throttleKey` (an IPv6 /64, not one of its billions of
-    /// addresses). False when the visitor is over the limit; true when allowed
+    /// visitor's `throttleKey` (a stranger's IPv6 /64, not one of its billions
+    /// of addresses; a device on the shop's own network by its own address). False when the visitor is over the limit; true when allowed
     /// or when the rule could not be run (as before).
     private func rateStep(_ map: ReferenceWritableKeyPath<LanServer, [String: KhaytEngine.LanFailures]>,
                           _ request: Request, now: Date, limit: Int) async -> Bool {
@@ -325,7 +325,7 @@ final class LanServer {
 
     /// Why a request was not read: too big for its route, or every
     /// large-body slot is taken.
-    enum ReadRefusal: Error { case tooLarge, busy }
+    enum ReadRefusal: Error { case tooLarge, busy, off, unauthorised }
 
     /// Whether this connection holds one of the `maxLargeBodies` slots.
     final class LargeBodySlot { var held = false }
@@ -589,6 +589,10 @@ final class LanServer {
             try? await write(.open(413, #"{"ok":false,"reason":"too-large"}"#), method: "POST", to: connection)
         } catch ReadRefusal.busy {
             try? await write(.open(503, #"{"ok":false,"reason":"busy"}"#), method: "POST", to: connection)
+        } catch ReadRefusal.off {
+            try? await write(.open(403, #"{"ok":false,"reason":"off"}"#), method: "POST", to: connection)
+        } catch ReadRefusal.unauthorised {
+            try? await write(.open(401, #"{"error":"Unauthorized"}"#), method: "POST", to: connection)
         } catch {
             // A client that hung up mid-request, a read that ran out of time,
             // or a listener being stopped.
@@ -629,6 +633,19 @@ final class LanServer {
                 throw URLError(.dataLengthExceedsMaximum)
             }
             guard length <= Self.maxUpload else { throw ReadRefusal.tooLarge }
+            // ── ASKED BEFORE THE BODY, NOT AFTER ──────────────────────────
+            //
+            // The off switch and the visitor's session were checked by the
+            // route — after this function had read up to 32 MB into memory
+            // for a stranger with no session, or for a shop that has quoting
+            // turned off. The head is all either question needs, so they are
+            // answered from it, and the slot and the body are only taken by a
+            // request the route would actually measure. Oct 2026 review.
+            // In the route's order: the session, then the switch.
+            guard await mayUploadLarge(headers: headers, remote: remote) else {
+                throw ReadRefusal.unauthorised
+            }
+            guard Self.quotingIsOn(host.store()) else { throw ReadRefusal.off }
             guard largeBodies < Self.maxLargeBodies else { throw ReadRefusal.busy }
             largeBodies += 1
             slot.held = true
@@ -675,7 +692,8 @@ final class LanServer {
         switch status {
         case 200: "OK"; case 302: "Found"; case 400: "Bad Request"; case 401: "Unauthorized"
         case 404: "Not Found"; case 409: "Conflict"; case 413: "Payload Too Large"
-        case 415: "Unsupported Media Type"; case 429: "Too Many Requests"
+        case 403: "Forbidden"; case 415: "Unsupported Media Type"; case 429: "Too Many Requests"
+        case 503: "Service Unavailable"
         default: "OK"
         }
     }
@@ -1006,6 +1024,17 @@ final class LanServer {
         return true
     }
 
+    /// Would the estimate route let this visitor in — an intake session from
+    /// this address, or the intake token — judged from the HEAD alone, so a
+    /// large body is refused before it is read. The route asks again.
+    func mayUploadLarge(headers: [String: String], remote: String) async -> Bool {
+        let probe = Request(method: "POST", path: "/api/intake/estimate", query: [:],
+                            headers: headers, body: Data(), remote: remote)
+        if hasIntakeToken(probe) { return true }
+        let limits = try? await host.engine.lanIntakeLimits()
+        return hasSession(probe, now: host.now(), sessionMs: limits?.SESSION_MS ?? 14_400_000)
+    }
+
     private func hasIntakeToken(_ request: Request) -> Bool {
         guard !host.intakeToken.isEmpty else { return false }
         let provided = (request.headers["x-khayt-intake-token"] ?? "").trimmingCharacters(in: .whitespaces)
@@ -1242,7 +1271,10 @@ final class LanServer {
     /// The order of the refusals is the Node route's, and the order matters:
     /// the off switch is answered BEFORE a single byte is read, because
     /// accepting 32 MB and then saying no turns an off switch into an upload
-    /// target.
+    /// target. For a body over `maxBody` that promise is kept by
+    /// `readRequest`, which asks the off switch and the session from the head
+    /// before it reads (it did not, until the Oct 2026 review); a body under a
+    /// megabyte is read first, as every route's is, and refused here.
     private func estimate(_ request: Request, store: JSONValue) async -> Response {
         let engine = host.engine
         let now = host.now()
@@ -1783,8 +1815,8 @@ final class LanServer {
         await lockCounters()
         defer { unlockCounters() }
         let now = host.now()
-        // One lockout per IPv6 /64: a phone — or an attacker — has billions of
-        // addresses in its prefix, and a lockout per address was none at all.
+        // One lockout per stranger's IPv6 /64 (billions of addresses in it),
+        // but per ADDRESS on the shop's own network — see `throttleKey`.
         let key = Self.throttleKey(request.remote)
         let record = failures[key]
         if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
@@ -1835,7 +1867,7 @@ final class LanServer {
         return type.trimmingCharacters(in: .whitespaces).lowercased() == "application/json"
     }
 
-    /// Connections open now, in all and per address (or IPv6 /64).
+    /// Connections open now, in all and per `throttleKey`.
     private var open = 0
     private var openBy: [String: Int] = [:]
     nonisolated static let maxConnections = 64
@@ -1920,13 +1952,37 @@ final class LanServer {
         return h == "localhost" || h.hasSuffix(".local")
     }
 
-    /// The key a wrong PIN is counted against: the address, or for IPv6 its
-    /// /64 prefix (an IPv4-mapped address counts as its IPv4 address).
+    /// The key every per-visitor limit counts against — wrong PINs, webhook
+    /// signatures, forms, estimates and open connections: the address, or for
+    /// a GLOBAL IPv6 address from beyond this Mac's own network its /64 (an
+    /// IPv4-mapped address counts as its IPv4 address).
+    ///
+    /// ── A /64 IS ONE ATTACKER ONLY WHEN IT IS SOMEBODY ELSE'S ────────────
+    ///
+    /// The /64 went in so a stranger with a whole prefix of addresses could
+    /// not have a fresh lockout per address. But the shop's OWN network is a
+    /// /64 too: every phone on the Wi-Fi has a link-local `fe80::` address
+    /// (which is what a Bonjour-found Mac is reached over) and a SLAAC address
+    /// in the router's prefix. Keyed by /64, they were all ONE visitor — ten
+    /// wrong PINs from anyone on the Wi-Fi locked the owner's iPhone out with
+    /// the right PIN, and every IPv6 device shared one intake budget and one
+    /// slice of the connection cap. So link-local, unique-local (`fc00::/7`),
+    /// loopback, and any address inside a prefix on one of this Mac's own
+    /// interfaces is keyed by its FULL address. Oct 2026 review.
     nonisolated static func throttleKey(_ remote: String) -> String {
+        throttleKey(remote, onLink: LanOnLink.prefixes())
+    }
+
+    /// `throttleKey` against a given list of this Mac's own prefixes — the
+    /// seam the tests use, so they do not depend on the Wi-Fi they run on.
+    nonisolated static func throttleKey(_ remote: String, onLink: [LanOnLink.Prefix]) -> String {
         let bare = String(remote.split(separator: "%", maxSplits: 1).first ?? "")
         guard bare.contains(":"), let v6 = IPv6Address(bare) else { return bare }
         if let v4 = v6.asIPv4 { return "\(v4)" }
-        return "v6/64:" + v6.rawValue.prefix(8).map { String(format: "%02x", $0) }.joined()
+        let bytes = [UInt8](v6.rawValue)
+        let hex = { (b: ArraySlice<UInt8>) in b.map { String(format: "%02x", $0) }.joined() }
+        if LanOnLink.keyedByFullAddress(bytes, onLink: onLink) { return "v6:" + hex(bytes[...]) }
+        return "v6/64:" + hex(bytes.prefix(8))
     }
 
     /// The map of failed addresses cannot grow without bound — an attacker

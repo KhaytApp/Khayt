@@ -276,10 +276,17 @@ extension CloudReader {
     /// NEW, higher rev. Closing that needs the revision inside the AEAD's
     /// associated data — a format change every client has to make together.
     ///
-    /// Raised by every pull that is accepted and SET by every push the server
-    /// confirms (`confirmed`), because a whole-book push after a cloud reset
-    /// legitimately restarts the count and the server has just told this
-    /// device so in answer to its own write. Kept per cloud address and shop,
+    /// Raised by every pull that is accepted and by every push the server
+    /// confirms (`confirmed`) — and only ever RAISED by either. A push used to
+    /// SET it to whatever the server answered, on the reasoning that a
+    /// whole-book push after a cloud reset legitimately restarts the count.
+    /// But that handed the server the guard: answer a push with `rev: 1`, then
+    /// serve an old base at rev 1, and the check passed. The server's answer
+    /// to a push is always its head plus one (khayt-cloud's api-contract), so
+    /// an answer below the mark is either a reset or a lie, and both are now
+    /// the shop's call: it is recorded as a refusal, and the shop lowers the
+    /// mark with `accept` — "Trust the cloud's older copy". Oct 2026 review.
+    /// Kept per cloud address and shop,
     /// in user defaults (it is a number, not a secret), so a relaunch
     /// remembers it — an in-memory check would be reset by the very restart a
     /// rollback is most likely to be noticed after.
@@ -324,8 +331,13 @@ extension CloudReader {
             set(c, rev)
         }
 
-        /// The server accepted this device's own push and is now at `rev`.
-        public func confirmed(_ c: Connection, rev: Int) { set(c, rev) }
+        /// The server accepted this device's own push and is now at `rev`:
+        /// raise the mark, never lower it. An answer BELOW the mark is held as
+        /// a refusal, for the shop to accept or not — see the type's comment.
+        public func confirmed(_ c: Connection, rev: Int) {
+            if let seen = highest(c), rev < seen { refused(c, rev: rev); return }
+            set(c, rev)
+        }
 
         func refused(_ c: Connection, rev: Int) {
             let k = Self.key(c)

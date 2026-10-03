@@ -23,15 +23,21 @@ struct ClientSecurityTests {
     @Test("a plug is spoken to only on this network — the printer's guard, not a looser one")
     func plugHost() async throws {
         let engine = try KhaytEngine()
+        // Names resolve through a fake: a name is judged by where it points
+        // (Alpha58SecurityTests.plugNamesResolve), and a Nabu Casa remote URL
+        // points at the public internet, so it is refused like 8.8.8.8 is.
+        let dns: @Sendable (String) async -> [String] = { name in
+            ["homeassistant.local": ["192.168.1.30"], "ha.example.ui.nabu.casa": ["35.157.1.2"]][name] ?? []
+        }
         for ok in ["http://192.168.1.40/relay/0", "http://10.0.0.7/cm?cmnd=Power",
-                   "http://homeassistant.local:8123/api/states/switch.x",
-                   "https://ha.example.ui.nabu.casa/api/states/switch.x"] {
-            #expect(await SmartPlug.allowed(URL(string: ok)!, engine: engine), Comment(rawValue: ok))
+                   "http://homeassistant.local:8123/api/states/switch.x"] {
+            #expect(await SmartPlug.allowed(URL(string: ok)!, engine: engine, resolve: dns), Comment(rawValue: ok))
         }
         for bad in ["http://8.8.8.8/relay/0", "http://127.0.0.1:8123/api", "http://localhost/relay/0",
                     "http://169.254.169.254/latest/meta-data/", "http://2130706433/relay/0",
-                    "http://user:pw@192.168.1.40/relay/0", "file:///etc/passwd"] {
-            #expect(!(await SmartPlug.allowed(URL(string: bad)!, engine: engine)), Comment(rawValue: bad))
+                    "http://user:pw@192.168.1.40/relay/0", "file:///etc/passwd",
+                    "https://ha.example.ui.nabu.casa/api/states/switch.x"] {
+            #expect(!(await SmartPlug.allowed(URL(string: bad)!, engine: engine, resolve: dns)), Comment(rawValue: bad))
         }
     }
 
@@ -44,10 +50,10 @@ struct ClientSecurityTests {
         let request = try #require(try await engine.plugRequest(machine: machine, action: "status"))
         var sent = false
         await #expect(throws: SmartPlug.Failure.self) {
-            _ = try await SmartPlug.send(request, engine: engine) { r in
+            _ = try await SmartPlug.send(request, engine: engine, fetch: { r in
                 sent = true
                 return (Data(), HTTPURLResponse(url: r.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
-            }
+            })
         }
         #expect(!sent, "the request went out before the host was checked")
         #expect(request.headers["Authorization"] == "Bearer SECRET", "the fixture carries no token to protect")

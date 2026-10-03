@@ -144,7 +144,7 @@ public enum CloudWriter {
         guard let reply = try? JSONDecoder().decode(Reply.self, from: data), let rev = reply.rev else {
             throw Failure.malformed("it carried no revision")
         }
-        memory?.confirmed(connection, rev: rev)
+        try confirm(connection, rev: rev, baseRev: baseRev, memory: memory)
         return Sent(rev: rev, deltas: payload.deltas.count, tombstones: payload.tombstones.count)
     }
 
@@ -194,8 +194,25 @@ public enum CloudWriter {
         guard let reply = try? JSONDecoder().decode(Reply.self, from: data), let rev = reply.rev else {
             throw Failure.malformed("it carried no revision")
         }
-        memory?.confirmed(connection, rev: rev)
+        try confirm(connection, rev: rev, baseRev: baseRev, memory: memory)
         return Sent(rev: rev, deltas: 0, tombstones: 0, wholeStore: true)
+    }
+
+    /// A push was accepted: check the revision the server answered, then
+    /// raise the rollback mark with it.
+    ///
+    /// The server's new head is always the `baseRev` this push was sent at
+    /// plus one — a delta appends after it, a whole store replaces it — so an
+    /// answer at or below `baseRev` is not an answer khayt-cloud gives. It is
+    /// refused rather than remembered: it is exactly the number a cloud would
+    /// send to lower this device's guard before serving it an old copy.
+    /// Oct 2026 review.
+    static func confirm(_ connection: CloudReader.Connection, rev: Int, baseRev: Int,
+                        memory: CloudReader.RevisionMemory?) throws {
+        guard rev > baseRev else {
+            throw Failure.malformed("it answered revision \(rev) to a change sent at revision \(baseRev)")
+        }
+        memory?.confirmed(connection, rev: rev)
     }
 
     private struct Body: Encodable {

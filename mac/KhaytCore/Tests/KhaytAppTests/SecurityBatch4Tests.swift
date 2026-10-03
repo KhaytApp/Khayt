@@ -93,19 +93,18 @@ struct SecurityBatch4Tests {
         #expect(BambuPin.accept("bbbb", key: key, in: store))
     }
 
-    @Test("the pin is kept in the Keychain, and an old defaults pin is moved there")
+    @Test("the pin is kept in the Keychain when there is one")
     func bambuPinInKeychain() {
         let key = BambuPin.key(serial: "TEST-\(UUID().uuidString)", host: "192.168.1.50")
         defer { BambuPin.Store.keychain.remove(key) }
         // A CI runner has no login Keychain; there the store falls back to
-        // defaults, which the pin test above already covers.
+        // defaults, which `bambuPinMigratesOnce` covers.
         guard BambuPin.Store.keychainWrite(key, "probe") else { return }
         BambuPin.Store.keychain.remove(key)
-        UserDefaults.standard.set("legacy", forKey: key)
-        #expect(BambuPin.Store.keychain.read(key) == "legacy")
+        BambuPin.Store.keychain.write(key, "pinned")
+        #expect(BambuPin.Store.keychainRead(key) == "pinned")
         #expect(UserDefaults.standard.string(forKey: key) == nil,
-                "the pin stayed in a plist any process of this user can rewrite")
-        #expect(BambuPin.Store.keychainRead(key) == "legacy")
+                "the pin went to a plist any process of this user can rewrite")
         #expect(!BambuPin.accept("other", key: key, in: .keychain))
     }
 

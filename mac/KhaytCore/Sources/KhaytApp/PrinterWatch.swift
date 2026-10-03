@@ -976,7 +976,11 @@ final class PrinterWatch {
     /// No cache: a printer's status is the one thing that must never come from
     /// one, and a poll every ten seconds would otherwise fill a cache with
     /// answers that were already stale when they were written.
-    private static let session: URLSession = {
+    ///
+    /// Also what the machine sheet's Test button and camera probe use: they
+    /// carry the same API key to the same printer, and `URLSession.shared`
+    /// follows a redirect — key and all — wherever the printer points it.
+    static let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         config.urlCache = nil
