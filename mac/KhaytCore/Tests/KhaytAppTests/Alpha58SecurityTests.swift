@@ -1,4 +1,6 @@
+import CoreGraphics
 import Foundation
+import ImageIO
 import Network
 import Testing
 import KhaytCore
@@ -330,5 +332,144 @@ struct Alpha58SecurityTests {
         // The real file itself still imports.
         _ = try await LibraryImportEndToEndTests.run(real, bench, keepOriginal: true)
         #expect(try LibraryImportEndToEndTests.printFiles(in: bench).count == 1)
+    }
+}
+
+// MARK: 8 — a picture is never decoded whole, nor absurd
+
+@MainActor
+struct Alpha58PictureTests {
+
+    /// A real grey PNG of `w` × `h`, every pixel black: a hundred kilobytes
+    /// on disk and `w × h` bytes decoded — a decompression bomb in miniature.
+    /// ImageIO reports no size for a PNG whose data is truncated, so the data
+    /// is all there: the rows are zeros, deflated.
+    static func declaredPNG(width w: UInt32, height h: UInt32) throws -> Data {
+        func crc(_ bytes: [UInt8]) -> UInt32 {
+            var c: UInt32 = 0xffff_ffff
+            for b in bytes {
+                c ^= UInt32(b)
+                for _ in 0..<8 { c = (c & 1) != 0 ? 0xedb8_8320 ^ (c >> 1) : c >> 1 }
+            }
+            return ~c
+        }
+        func be(_ v: UInt32) -> [UInt8] { [UInt8(v >> 24), UInt8((v >> 16) & 0xff), UInt8((v >> 8) & 0xff), UInt8(v & 0xff)] }
+        func chunk(_ type: String, _ body: [UInt8]) -> [UInt8] {
+            let t = Array(type.utf8)
+            return be(UInt32(body.count)) + t + body + be(crc(t + body))
+        }
+        // Each row: filter byte 0, then w zero bytes. Raw DEFLATE wrapped as
+        // zlib: header, the stream, and the Adler-32 of n zeros (a=1, b=n).
+        let n = Int(w + 1) * Int(h)
+        let deflated = try (Data(count: n) as NSData).compressed(using: .zlib) as Data
+        let adler = (UInt32(n % 65521) << 16) | 1
+        let idat = [0x78, 0x9c] + [UInt8](deflated) + be(adler)
+        var out: [UInt8] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+        out += chunk("IHDR", be(w) + be(h) + [8, 0, 0, 0, 0])
+        out += chunk("IDAT", idat)
+        out += chunk("IEND", [])
+        return Data(out)
+    }
+
+    static func jpegOf(width: Int, height: Int) throws -> Data {
+        let ctx = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                         space: CGColorSpaceCreateDeviceRGB(),
+                                         bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        ctx.setFillColor(CGColor(red: 0.2, green: 0.5, blue: 0.8, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let image = try #require(ctx.makeImage())
+        return try #require(ProductPhotos.jpeg(image, maxDim: max(width, height), quality: 0.8))
+    }
+
+    @Test("a picture declaring absurd dimensions is refused before a pixel is decoded")
+    func absurdDimensionsRefused() throws {
+        let bomb = try Self.declaredPNG(width: 11_000, height: 11_000)   // 121 MP
+        let source = try #require(CGImageSourceCreateWithData(bomb as CFData, nil))
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        #expect((props?[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue == 11_000,
+                "the fixture does not declare what it is meant to")
+        #expect(ProductPhotos.upright(source) == nil)
+        #expect(ProductPhotos.upright(source, maxPixel: 600) == nil)
+        let dir = FileManager.default.temporaryDirectory.appending(path: "bomb-\(UUID().uuidString).png")
+        try bomb.write(to: dir)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        #expect(throws: ProductPhotos.Failure.self) { _ = try ProductPhotos.prepare(dir) }
+        #expect(throws: ProductPhotos.Failure.self) { _ = try GroupPictures.encode(dir) }
+        #expect(throws: ProductPhotos.Failure.self) { _ = try LibraryPhoto.dataURI(of: dir) }
+        #expect(!ProductPhotos.sensiblePixels(width: 0, height: 10))
+        #expect(!ProductPhotos.sensiblePixels(width: 200_000, height: 1))
+        #expect(ProductPhotos.sensiblePixels(width: 12_000, height: 9_000), "a 108 MP phone photo")
+    }
+
+    @Test("the decode is never larger than asked, nor than 4096 when nothing is asked")
+    func decodeIsCapped() throws {
+        let big = try Self.jpegOf(width: 5000, height: 2500)
+        let source = try #require(CGImageSourceCreateWithData(big as CFData, nil))
+        let capped = try #require(ProductPhotos.upright(source, maxPixel: 600))
+        #expect(max(capped.width, capped.height) == 600)
+        let unasked = try #require(ProductPhotos.upright(source))
+        #expect(max(unasked.width, unasked.height) == ProductPhotos.maxDecodeDim)
+        let small = try Self.jpegOf(width: 300, height: 200)
+        let smallSource = try #require(CGImageSourceCreateWithData(small as CFData, nil))
+        let s = try #require(ProductPhotos.upright(smallSource, maxPixel: 600))
+        #expect(s.width == 300 && s.height == 200, "never enlarged")
+        let group = try { () throws -> Data in
+            let url = FileManager.default.temporaryDirectory.appending(path: "g-\(UUID().uuidString).jpg")
+            try big.write(to: url)
+            defer { try? FileManager.default.removeItem(at: url) }
+            return try GroupPictures.encode(url)
+        }()
+        let groupSource = try #require(CGImageSourceCreateWithData(group as CFData, nil))
+        let g = try #require(CGImageSourceCreateImageAtIndex(groupSource, 0, nil))
+        #expect(max(g.width, g.height) == GroupPictures.maxDim)
+    }
+
+    // MARK: 9 — turning a picture touches only this product's own file
+
+    @Test("a turned picture is rewritten over its own file, never over another product's")
+    func turnTargetIsConfined() {
+        // Its own file: in place.
+        #expect(ProductPhotos.target(existing: "P1-PIMG-P1-0.jpeg", productId: "P1", imageId: "PIMG-P1-0")
+                == ("P1-PIMG-P1-0.jpeg", nil))
+        // A synced record naming ANOTHER product's file: neither rewritten nor unlinked.
+        let theirs = ProductPhotos.target(existing: "P2-PIMG-P2-0.jpeg", productId: "P1", imageId: "PIMG-P1-0",
+                                          othersUse: ["P2-PIMG-P2-0.jpeg"])
+        #expect(theirs.name == "P1-PIMG-P1-0.jpeg")
+        #expect(theirs.unlink == nil)
+        // Named like this product's but another product names it too: left alone.
+        let shared = ProductPhotos.target(existing: "P1-shared.jpeg", productId: "P1", imageId: "PIMG-P1-0",
+                                          othersUse: ["P1-shared.jpeg"])
+        #expect(shared.name == "P1-PIMG-P1-0.jpeg" && shared.unlink == nil)
+        // A path aimed outside the folder is only ever a leaf, and not ours.
+        let escape = ProductPhotos.target(existing: "../../book.jpeg", productId: "P1", imageId: "PIMG-P1-0")
+        #expect(escape.name == "P1-PIMG-P1-0.jpeg" && escape.unlink == nil)
+        // Its own PNG moves to the minted name and the old one is unlinked, as before.
+        #expect(ProductPhotos.target(existing: "P1-PIMG-P1-0.png", productId: "P1", imageId: "PIMG-P1-0")
+                == ("P1-PIMG-P1-0.jpeg", "P1-PIMG-P1-0.png"))
+        #expect(ProductPhotos.belongs("P1.jpeg", toProduct: "P1"))
+        #expect(!ProductPhotos.belongs("P10-x.jpeg", toProduct: "P1"))
+        #expect(!ProductPhotos.belongs("other.jpeg", toProduct: "P1"))
+    }
+
+    @Test("what a save or a delete must leave alone: every file another product names")
+    func otherProductsFiles() throws {
+        let rows: [JSONValue] = [
+            .object(["id": .string("P1"), "imagePath": .string("P1.jpeg"),
+                     "images": .array([.object(["id": .string("a"), "path": .string("P2-PIMG-P2-0.jpeg")])])]),
+            .object(["id": .string("P2"), "imagePath": .string("products/P2-PIMG-P2-0.jpeg"),
+                     "images": .array([.object(["id": .string("b"), "path": .string("P2-PIMG-P2-0.jpeg")]),
+                                       .object(["id": .string("c"), "path": .string("P1-stolen.jpeg")])])]),
+        ]
+        let others = Shop.pictureFiles(in: rows, except: "P1")
+        #expect(others == ["P2-PIMG-P2-0.jpeg", "P1-stolen.jpeg"])
+        #expect(!ProductPhotos.mayTouch("P2-PIMG-P2-0.jpeg", productId: "P1", othersUse: others))
+        #expect(!ProductPhotos.mayTouch("P1-stolen.jpeg", productId: "P1", othersUse: others),
+                "named like P1's, but P2 holds it")
+        #expect(ProductPhotos.mayTouch("P1.jpeg", productId: "P1", othersUse: others))
+        // The save and the delete both go through it.
+        let shop = try ClientSecurityTests.source("Shop.swift")
+        #expect(shop.contains("othersUse: othersUse)"))
+        #expect(shop.components(separatedBy: "ProductPhotos.mayTouch(").count - 1 >= 2,
+                "a product save or delete unlinks a picture without asking whose it is")
     }
 }
