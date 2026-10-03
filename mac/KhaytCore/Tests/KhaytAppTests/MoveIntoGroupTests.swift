@@ -110,6 +110,48 @@ struct MoveIntoGroupTests {
         #expect(GroupsReadClearlyTests.kinds(root)["Blue"] == .parts)
     }
 
+    @Test("Undo of a group move is field-level: it puts back the paths, and keeps what was written since")
+    func undoIsFieldLevel() throws {
+        var root = Self.book(["pose 1": 2, "pose 2": 1], kinds: ["pose 1": "collection"])
+        let plan = Shop.planGroupMove(["pose 1", "pose 2"], under: "Baby Grendizer", files: Self.files(root))
+        let undo = Self.apply(plan, to: &root)
+        // Since the move: another machine renames a moved model, and the shop
+        // switches the moved group's kind.
+        guard case .array(var rows)? = root["printFiles"] else { Issue.record("no rows"); return }
+        for i in rows.indices {
+            guard case .object(var r) = rows[i], r["id"] == .string("pose 1#1") else { continue }
+            r["name"] = .string("Renamed on the phone")
+            rows[i] = .object(r)
+        }
+        root["printFiles"] = .array(rows)
+        GroupKinds.write(["Baby Grendizer/pose 1": .parts], into: &root)
+
+        let redo = Shop.applyRestore(&root, undo)
+        #expect(Self.groupOf(root, "pose 1#1") == "pose 1")
+        #expect(Self.groupOf(root, "pose 2#1") == "pose 2")
+        let renamed = Shop.rows(root, "printFiles").first { row in
+            if case .object(let r) = row { return r["id"] == .string("pose 1#1") } else { return false }
+        }
+        if case .object(let r)? = renamed {
+            #expect(r["name"] == .string("Renamed on the phone"), "Undo wrote back a field the move never changed")
+        }
+        // The group's own kind comes back; the kind the shop set on the moved
+        // path since is not overwritten blind — it is reported as not undone.
+        #expect(GroupsReadClearlyTests.kinds(root)["pose 1"] == .collection)
+        #expect(redo.notUndone.contains("Baby Grendizer/pose 1"), Comment(rawValue: "\(redo.notUndone)"))
+    }
+
+    @Test("Move into Group and Move Folder refuse at the same length")
+    func oneLimit() {
+        let root = Self.book(["eyes": 1])
+        for n in [54, 55, 56] {
+            let parent = String(repeating: "x", count: n)
+            let plan = Shop.planGroupMove(["eyes"], under: parent, files: Self.files(root))
+            #expect(plan.canMove == Shop.folderMoveFits(plan.wanted), "the two rules disagree at \(n)")
+            #expect(plan.canMove == (n + 5 <= Shop.groupPathLimit))
+        }
+    }
+
     @Test("two chosen groups with one name are refused, not mixed")
     func twoChosenWithOneName() {
         let root = Self.book(["Helmet/Blue": 1, "Kit/Blue": 1])

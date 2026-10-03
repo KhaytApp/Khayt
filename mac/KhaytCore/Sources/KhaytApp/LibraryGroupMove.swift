@@ -86,7 +86,8 @@ extension Shop {
     /// A group path survives `lib/organise.js normalise` only up to 60 UTF-16
     /// units (`ImportGrouping.fitting` explains the cut). Longer, and the
     /// models are filed under the first 60 characters — possibly ANOTHER
-    /// group's path — so a move that would write one is refused.
+    /// group's path — so a move that would write one is refused. The ONE
+    /// number both Move Folder (`folderMoveFits`) and Move into Group read.
     nonisolated static let groupPathLimit = 60
 
     /// Moving `paths` under `parent` (nil: to the top level), against the
@@ -146,7 +147,10 @@ extension Shop {
             .init(from: m.from, to: m.to, ids: m.ids,
                   joins: staying.contains { isUnder($0, m.to) })
         }
-        if let long = plan.wanted.values.sorted().first(where: { $0.utf16.count > groupPathLimit }) {
+        // The rule Move Folder refuses by (`folderMoveFits`); the path that
+        // breaks it is named, so the shop knows which name to shorten.
+        if !folderMoveFits(plan.wanted),
+           let long = plan.wanted.values.sorted().first(where: { !folderMoveFits(["": $0]) }) {
             plan.refusal = .tooLong(long)
         }
         return plan

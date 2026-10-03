@@ -1735,9 +1735,10 @@ final class Shop {
     }
 
     /// Does every path a folder move would write survive `normalise`'s
-    /// 60-unit cut intact?
+    /// 60-unit cut intact? (`groupPathLimit`; "Move into Group…" asks the
+    /// same question of every group it moves — `planGroupMove`.)
     nonisolated static func folderMoveFits(_ wanted: [String: String]) -> Bool {
-        wanted.values.allSatisfy { $0.utf16.count <= 60 }
+        wanted.values.allSatisfy { $0.utf16.count <= groupPathLimit }
     }
 
     /// One file's record, moved to where `folderMoveTargets` put it.
