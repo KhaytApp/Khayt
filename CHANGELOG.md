@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) An automatic web-store republish no longer fails as soon as it
+  starts.** The republish that follows a catalogue change cancelled its own
+  task at the start. Its requests to Khayt Cloud then failed as cancelled, and
+  the store was not updated. Pressing Publish still replaces a pending
+  automatic republish.
+
 - **Security: customer names in campaign emails are sent as text.** A
   customer whose name contained HTML (for example `<img …>`) had it read as
   part of the email's markup. Names and the other filled-in values are now
