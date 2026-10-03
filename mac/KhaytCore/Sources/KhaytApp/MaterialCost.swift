@@ -67,39 +67,21 @@ struct MaterialCostCard: View {
             let words = shop.words
             VStack(spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(row.material).font(.callout).lineLimit(1)
-                            // The unit in the shop's word, and the count as a
-                            // counted word: "3× · kg" drew scrambled in Arabic,
-                            // a Latin unit and a bare × reordered by the line.
-                            Text(words.callIt("mac.mc_per", ["unit": .string(words.unitWord(row.rate))])
-                                 + " · "
-                                 + (row.spoolCount < 2
-                                    ? words.callIt("mac.mc_one_buy")
-                                    : words.counting(row.spoolCount, "mac.mc_spools")))
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        Spacer(minLength: 8)
-                        Text(Money.text(row.perUnit, shop.currency))
-                            .font(.callout.weight(.medium)).monospacedDigit()
-                        // The change, or nothing. An arrow rather than a sign,
-                        // because a "+" on a cost is good news everywhere else
-                        // on this screen and here it is the opposite.
-                        Text(change(row))
-                            .font(.caption).monospacedDigit()
-                            .foregroundStyle(tint(row))
-                            .frame(width: 56, alignment: .trailing)
-                    }
-                    .padding(.vertical, 6)
+                    // The unit in the shop's word, and the count as a
+                    // counted word: "3× · kg" drew scrambled in Arabic, a
+                    // Latin unit and a bare × reordered by the line.
+                    PriceRow(title: row.material,
+                             detail: words.callIt("mac.mc_per", ["unit": .string(words.unitWord(row.rate))])
+                                + " · "
+                                + (row.spoolCount < 2
+                                   ? words.callIt("mac.mc_one_buy")
+                                   : words.counting(row.spoolCount, "mac.mc_spools")),
+                             figure: Money.text(row.perUnit, shop.currency),
+                             change: PriceRow.change(row.changePct, atLeast: 1),
+                             changeTint: tint(row))
                     if index < rows.count - 1 { Divider().opacity(0.5) }
                 }
             }
-        }
-
-        private func change(_ row: KhaytEngine.MaterialCost.Row) -> String {
-            guard let pct = row.changePct, abs(pct) >= 1 else { return "" }
-            return (pct > 0 ? "▲ " : "▼ ") + Money.quantity(abs(pct), decimals: 0) + "%"
         }
 
         /// Red for dearer, and nothing at all for cheaper — a shop paying less

@@ -30,7 +30,7 @@ struct SupplierPricesCard: View {
             VStack(spacing: 0) {
                 ForEach(groups) { group in
                     Row(shop: shop, group: group)
-                    if group.id != groups.last?.id { Divider() }
+                    if group.id != groups.last?.id { Divider().opacity(0.5) }
                 }
             }
         }
@@ -41,34 +41,21 @@ struct SupplierPricesCard: View {
         let group: KhaytEngine.PriceGroup
 
         var body: some View {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
-                        Text(group.material).lineLimit(1)
-                        // THE UNIT IS PART OF THE NAME HERE. Two cards reading
-                        // "PLA" with different figures would look like a bug;
-                        // "PLA per kg" and "PLA per spool" are two honest
-                        // answers. Said the way the shelf's card says it, in
-                        // the shop's word for the unit.
-                        Text(shop.words.callIt("mac.mc_per", ["unit": .string(shop.words.unitWord(group.unit))]))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Text(said).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Spacer(minLength: 8)
-                if let move = group.pctChange, abs(move) >= 5 {
-                    // Five percent, which is the other app's threshold: a
-                    // badge on every one-riyal wobble is a badge nobody reads.
-                    Text((move > 0 ? "▲" : "▼") + Money.quantity(abs(move)) + "%")
-                        .font(.caption).monospacedDigit()
-                        .foregroundStyle(move > 0 ? Khayt.late : Khayt.done)
-                }
-                if let latest = group.latest {
-                    Text(Money.text(latest.price, shop.currency))
-                        .font(.callout).monospacedDigit()
-                }
-            }
-            .padding(.vertical, 7)
+            // THE UNIT IS PART OF THE NAME HERE. Two rows reading "PLA" with
+            // different figures would look like a bug; "per kg" and "per
+            // spool" under them are two honest answers. Said the way the
+            // shelf's card says it, in the shop's word for the unit — and in
+            // the shelf card's row (`PriceRow`).
+            //
+            // Five percent before a move is shown, which is the other app's
+            // threshold: a badge on every one-riyal wobble is a badge nobody
+            // reads.
+            PriceRow(title: group.material,
+                     detail: shop.words.callIt("mac.mc_per", ["unit": .string(shop.words.unitWord(group.unit))])
+                        + " · " + said,
+                     figure: group.latest.map { Money.text($0.price, shop.currency) } ?? "\u{2014}",
+                     change: PriceRow.change(group.pctChange, atLeast: 5),
+                     changeTint: (group.pctChange ?? 0) > 0 ? Khayt.late : Khayt.done)
         }
 
         /// The second line: how many purchases are behind the figure, who sold

@@ -26,16 +26,13 @@ struct SpoolRepairSheet: View {
             Divider()
             Group {
                 if let changes {
-                    List(changes) { change in
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(verbatim: change.name.isEmpty ? change.id : change.name)
-                                .lineLimit(1)
-                            Spacer(minLength: 8)
-                            Text(verbatim: Self.figure(change.priceWas, shop.currency)
-                                 + " \u{2192} " + Self.figure(change.priceNow, shop.currency))
-                                .monospacedDigit()
-                                .foregroundStyle(change.priceWas == change.priceNow ? .secondary : .primary)
-                        }
+                    // ONLY THE PRICES THAT MOVE. A product whose figure comes
+                    // out the same ("48 → 48") was listed and counted as
+                    // though it were being re-priced; it is still re-costed
+                    // with the rest, and said so in one line underneath.
+                    VStack(spacing: 0) {
+                        List(Self.repriced(changes)) { Self.row($0, currency: shop.currency) }
+                        Self.sameNote(changes, words: shop.words)
                     }
                 } else {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -48,7 +45,7 @@ struct SpoolRepairSheet: View {
                 Spacer()
                 Button(shop.words.callIt("common.cancel")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button(shop.words.counting(changes?.count ?? 0, "mac.spool_repair_apply")) {
+                Button(Self.applyLabel(changes ?? [], words: shop.words)) {
                     guard let changes else { return }
                     working = true
                     Task {
@@ -64,6 +61,44 @@ struct SpoolRepairSheet: View {
         }
         .frame(minWidth: 460, idealWidth: 520, minHeight: 320, idealHeight: 420)
         .task(id: shop.productRows) { changes = await shop.spoolRepairPreview() }
+    }
+
+    /// One product, what it is listed at and what it would be.
+    static func row(_ change: Shop.SpoolRepairChange, currency: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(verbatim: change.name.isEmpty ? change.id : change.name)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Text(verbatim: figure(change.priceWas, currency)
+                 + " \u{2192} " + figure(change.priceNow, currency))
+                .monospacedDigit()
+        }
+    }
+
+    /// The products the repair re-costs without moving their price, in one
+    /// line rather than as rows reading "48 → 48".
+    @ViewBuilder @MainActor
+    static func sameNote(_ changes: [Shop.SpoolRepairChange], words: Words) -> some View {
+        let same = changes.count - repriced(changes).count
+        if same > 0 {
+            Text(words.counting(same, "mac.spool_repair_same_price"))
+                .font(.caption).foregroundStyle(.secondary)
+                .padding(.horizontal).padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// The rows whose price would actually change.
+    static func repriced(_ changes: [Shop.SpoolRepairChange]) -> [Shop.SpoolRepairChange] {
+        changes.filter { $0.priceWas != $0.priceNow }
+    }
+
+    /// "Re-price 3 products" counts what is re-PRICED; a repair that moves
+    /// no price at all only re-costs, and says that instead.
+    @MainActor static func applyLabel(_ changes: [Shop.SpoolRepairChange], words: Words) -> String {
+        let moved = repriced(changes).count
+        return moved > 0 ? words.counting(moved, "mac.spool_repair_apply")
+                         : words.callIt("mac.spool_repair_apply_costs")
     }
 
     static func figure(_ value: Double?, _ currency: String) -> String {

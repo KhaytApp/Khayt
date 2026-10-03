@@ -436,6 +436,9 @@ enum LibraryImport {
         var addedIds: [String] = []
         var duplicates = 0
         var failures: [String] = []
+        /// The sources that went to the Trash once their copy was checked —
+        /// so the window can say so, rather than leave a shop to find out.
+        var trashed: [URL] = []
         /// True when the caller asked it to stop and it did.
         var stopped = false
         var total: Int { moved + duplicates + failures.count }
@@ -520,6 +523,7 @@ enum LibraryImport {
                                           owns: owns, whoHasIt: whoHasIt)
                 report.moved += 1
                 report.addedIds.append(added.id)
+                if added.movedIn { report.trashed.append(file.url) }
                 if let hash = added.contentHash { known.insert(hash) }
             } catch Failure.alreadyHere {
                 report.duplicates += 1

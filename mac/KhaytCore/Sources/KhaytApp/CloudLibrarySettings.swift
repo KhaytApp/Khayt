@@ -505,30 +505,8 @@ struct CloudLibrarySettings: View {
     }
 
     /// Moved models the cloud no longer has — `Shop.verifyCloudCopies`.
-    @ViewBuilder private var missingBlock: some View {
-        if !shop.cloudMissing.isEmpty {
-            VStack(alignment: .leading, spacing: Space.xs) {
-                Label(shop.words.callIt("mac.cloudlib_missing", ["n": .number(Double(shop.cloudMissing.count))]),
-                      systemImage: "exclamationmark.icloud")
-                    .foregroundStyle(Khayt.attention)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(verbatim: CloudLibrary.firstNames(shop.cloudMissing.map(\.name)) {
-                    shop.words.callIt("mac.cloudlib_and_more", ["n": .number(Double($0))])
-                })
-                .font(.caption).foregroundStyle(Role.text2)
-                .fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    if shop.cloudMissing.contains(where: \.inTrash) {
-                        Button(shop.words.callIt("mac.cloudlib_restore_trash")) {
-                            Task { await shop.restoreMissingFromDriveTrash(); await refresh() }
-                        }
-                    }
-                    Button(shop.words.callIt("mac.cloudlib_check_again")) { Task { await shop.verifyCloudCopies() } }
-                    Spacer()
-                }
-                .disabled(locked)
-            }
-        }
+    private var missingBlock: some View {
+        CloudMissingBlock(shop: shop, locked: locked) { await refresh() }
     }
 
     /// A few plain lengths, plus whatever the shop already has.
@@ -633,5 +611,39 @@ struct CloudLibrarySettings: View {
                                     typedSecret: draft.secret.trimmingCharacters(in: .whitespaces))
         reload(reset: shop.cloudLibraryProblem == nil)
         await refresh()
+    }
+}
+
+/// Moved models the cloud no longer has, and the two ways back — its own view
+/// so a snapshot can photograph it (`Alpha58SnapshotTests`).
+struct CloudMissingBlock: View {
+    let shop: Shop
+    var locked = false
+    var refresh: () async -> Void = {}
+
+    var body: some View {
+        if !shop.cloudMissing.isEmpty {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Label(shop.words.callIt("mac.cloudlib_missing", ["n": .number(Double(shop.cloudMissing.count))]),
+                      systemImage: "exclamationmark.icloud")
+                    .foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: CloudLibrary.firstNames(shop.cloudMissing.map(\.name)) {
+                    shop.words.callIt("mac.cloudlib_and_more", ["n": .number(Double($0))])
+                })
+                .font(.caption).foregroundStyle(Role.text2)
+                .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    if shop.cloudMissing.contains(where: \.inTrash) {
+                        Button(shop.words.callIt("mac.cloudlib_restore_trash")) {
+                            Task { await shop.restoreMissingFromDriveTrash(); await refresh() }
+                        }
+                    }
+                    Button(shop.words.callIt("mac.cloudlib_check_again")) { Task { await shop.verifyCloudCopies() } }
+                    Spacer()
+                }
+                .disabled(locked)
+            }
+        }
     }
 }

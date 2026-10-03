@@ -562,6 +562,9 @@ struct WindowSheets: ViewModifier {
             .sheet(isPresented: $shop.planningBatch) { BatchSheet(shop: shop) }
             .sheet(isPresented: $shop.reviewingDeposits) { DepositAuditSheet(shop: shop) }
             .sheet(isPresented: $shop.reviewingSyncLosses) { SyncLossesSheet(shop: shop) }
+            // Reached from a banner on every screen, so it is the window's —
+            // not the catalogue's, where it used to be the only way in.
+            .sheet(isPresented: $shop.showingSpoolRepair) { SpoolRepairSheet(shop: shop) }
             .sheet(item: $shop.receivingGoods) { ReceiveSheet(shop: shop, order: $0) }
             .sheet(item: $shop.editingCustomer) { CustomerSheet(shop: shop, existing: $0) }
             .sheet(item: $shop.editingProduct) { ProductSheet(shop: shop, existing: $0) }

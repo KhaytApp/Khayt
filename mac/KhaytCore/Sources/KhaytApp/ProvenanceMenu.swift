@@ -26,6 +26,7 @@ struct ProvenanceMenu: View {
     @Bindable var shop: Shop
     @State private var typing = false
     @State private var typed = ""
+    @Environment(\.stripCompact) private var compact
 
     private var count: Int { shop.selectedIds.count }
 
@@ -65,7 +66,14 @@ struct ProvenanceMenu: View {
                 }
             }
         } label: {
-            Label(shop.words.callIt("plib.provenance"), systemImage: "signature")
+            // Its symbol alone when the strip is narrow — the words are on
+            // the hover, and the title and status beside it keep theirs.
+            if compact {
+                Label(shop.words.callIt("plib.provenance"), systemImage: "signature")
+                    .labelStyle(.iconOnly)
+            } else {
+                Label(shop.words.callIt("plib.provenance"), systemImage: "signature")
+            }
         }
         .disabled(!shop.canWrite || count == 0)
         .help(shop.canWrite

@@ -359,42 +359,45 @@ enum ProductPhotos {
         return try? Data(contentsOf: folder(build).appending(path: leaf))
     }
 
-    /// Where a picture's NEW bytes go: over its own file when it has one this
-    /// app can rewrite, else under `main.js`'s name for it.
+    /// Where a picture's NEW bytes go: a NEW file, always — and the file it
+    /// replaces, handed back to be put in the Trash once the record names the
+    /// new one.
     ///
-    /// ── OVER THE SAME FILE, NOT BESIDE IT ─────────────────────────────────
+    /// ── NEVER OVER ITS OWN FILE ───────────────────────────────────────────
     ///
-    /// A turned picture is the same picture: its record keeps its id and its
-    /// path, and only the bytes and the thumbnail change. Nothing caches the
-    /// file by its name — the other app reads it into a data URI each time
-    /// (`hub:load-product-image`), and the web store's copy is keyed by the
-    /// file's modification date (`webStoreHeroes`) — so rewriting it in place
-    /// is seen everywhere on the next read. A second name would leave the
-    /// first behind for nobody.
+    /// The first version rewrote a turned picture over its own file, before
+    /// the product record was saved. The bytes went down first by design (a
+    /// record naming a file never written is a broken picture), so a save
+    /// that then FAILED left the original photo turned on disk with nothing
+    /// in the book saying so, and Undo on the product put the record back
+    /// over bytes that had already changed. A new name means the original is
+    /// untouched until the one write that switches the record to the new file
+    /// has succeeded; Cancel, a failed save and Undo all leave it as it was.
     ///
-    /// Not over a file whose extension says it is not a JPEG: the bytes are
-    /// JPEG, and the other app names the type from the extension. That picture
-    /// moves to the main.js name, and the old file is handed back to unlink.
+    /// The name is `main.js`'s for a picture with no file yet. For one that
+    /// has a file it is that name with the moment after it, so two turns in a
+    /// day are two names and nothing that drew the old file by its URL shows
+    /// it again.
     ///
     /// ── ONLY EVER THIS PRODUCT'S OWN FILE ─────────────────────────────────
     ///
     /// The path comes off the product's record, and a record can arrive from a
     /// sync with anything in it — including the name of ANOTHER product's
-    /// picture. Rewritten in place, turning this product's photo overwrote
-    /// that one's; moved, the old name was unlinked from under it. So a file
-    /// is rewritten or unlinked only when its name is one this product's own
-    /// pictures are given (`belongs`) and no other product in the book names
-    /// it (`othersUse`). Anything else is left exactly where it is, and the
-    /// turned bytes go to this picture's own minted name. Oct 2026 review.
+    /// picture. So the old file is handed back to be trashed only when its
+    /// name is one this product's own pictures are given (`belongs`) and no
+    /// other product in the book names it (`othersUse`). Anything else is left
+    /// exactly where it is. The new name is always this product's own.
     static func target(existing path: String, productId: String,
-                       imageId: String, othersUse: Set<String> = []) -> (name: String, unlink: String?) {
+                       imageId: String, othersUse: Set<String> = [],
+                       at now: Date = Date()) -> (name: String, unlink: String?) {
         let leaf = (path as NSString).lastPathComponent
         let minted = filename(productId: productId, imageId: imageId)
         guard !leaf.isEmpty, leaf != ".", leaf != ".." else { return (minted, nil) }
+        let stamp = String(Int(now.timeIntervalSince1970 * 1000), radix: 36)
+        var name = (minted as NSString).deletingPathExtension + "-" + stamp + ".jpeg"
+        if name == leaf { name = (minted as NSString).deletingPathExtension + "-" + stamp + "b.jpeg" }
         let ours = mayTouch(leaf, productId: productId, othersUse: othersUse)
-        let ext = (leaf as NSString).pathExtension.lowercased()
-        if ours, ext == "jpeg" || ext == "jpg" { return (leaf, nil) }
-        return (minted, ours && leaf != minted ? leaf : nil)
+        return (name, ours ? leaf : nil)
     }
 
     /// Is `name` a file this product's pictures are named — `<id>.jpeg`, or
@@ -412,6 +415,46 @@ enum ProductPhotos {
     nonisolated static func mayTouch(_ name: String, productId: String, othersUse: Set<String>) -> Bool {
         let leaf = (name as NSString).lastPathComponent
         return belongs(leaf, toProduct: productId) && !othersUse.contains(leaf)
+    }
+
+    /// A picture file sent to the Trash, and where it landed — so an Undo
+    /// can bring it back beside the record that names it again.
+    struct Trashed: Sendable, Equatable {
+        let name: String
+        let at: URL
+    }
+
+    /// To the Trash, saying where it went. Nil when there was nothing there,
+    /// or the Trash would not take it.
+    static func trash(_ name: String, in build: StoreReader.Build) -> Trashed? {
+        let leaf = (name as NSString).lastPathComponent
+        guard !leaf.isEmpty, leaf != ".", leaf != ".." else { return nil }
+        var landed: NSURL?
+        do {
+            try FileManager.default.trashItem(at: folder(build).appending(path: leaf), resultingItemURL: &landed)
+        } catch { return nil }
+        return (landed as URL?).map { Trashed(name: leaf, at: $0) }
+    }
+
+    /// Out of the Trash again, for an Undo — only where nothing has taken
+    /// the name since. Returns the names put back.
+    static func putBack(_ trashed: [Trashed], in build: StoreReader.Build) -> [String] {
+        var back: [String] = []
+        for item in trashed {
+            let home = folder(build).appending(path: item.name)
+            guard !FileManager.default.fileExists(atPath: home.path),
+                  (try? FileManager.default.moveItem(at: item.at, to: home)) != nil else { continue }
+            back.append(item.name)
+        }
+        return back
+    }
+
+    /// Take away a file THIS save wrote, when the save did not go through —
+    /// no record names it, and the original it was to replace is untouched.
+    static func discard(_ name: String, in build: StoreReader.Build) {
+        let leaf = (name as NSString).lastPathComponent
+        guard !leaf.isEmpty, leaf != ".", leaf != ".." else { return }
+        try? FileManager.default.removeItem(at: folder(build).appending(path: leaf))
     }
 }
 
@@ -499,5 +542,26 @@ extension ProductPhotos {
         var fields: [String: JSONValue] = [:]
         for key in ["images", "imagePath", "thumbnail"] { fields[key] = applied[key] ?? .string("") }
         return fields
+    }
+}
+
+extension Shop {
+    /// Undo on a product save brings back the picture files the save put in
+    /// the Trash — registered right after the record's own undo, so the two
+    /// are one Undo. Redo sends them back to the Trash.
+    func registerPicturesPutBack(_ trashed: [ProductPhotos.Trashed], in build: StoreReader.Build) {
+        guard let undoManager, !trashed.isEmpty else { return }
+        undoManager.registerUndo(withTarget: self) { shop in
+            let back = ProductPhotos.putBack(trashed, in: build)
+            shop.registerPicturesTrashAgain(back, in: build)
+        }
+    }
+
+    private func registerPicturesTrashAgain(_ names: [String], in build: StoreReader.Build) {
+        guard let undoManager, !names.isEmpty else { return }
+        undoManager.registerUndo(withTarget: self) { shop in
+            let again = names.compactMap { ProductPhotos.trash($0, in: build) }
+            shop.registerPicturesPutBack(again, in: build)
+        }
     }
 }

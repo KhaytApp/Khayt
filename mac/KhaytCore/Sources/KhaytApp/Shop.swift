@@ -905,6 +905,9 @@ final class Shop {
             // without the shop seeing a single new price.
             spoolRepairPending = next.build != nil
                 ? Self.spoolRepairCount(products: productRows, sizes: spoolSizes) : 0
+            // What sync took and nobody has reviewed, from the copies on
+            // disk — a relaunch does not count as having looked.
+            reloadSyncLosses(for: next.build)
             await readSlicers()
             remeasureIfDue()
             createRecurringIfDue()
@@ -1627,8 +1630,14 @@ final class Shop {
     func setGroupKind(_ path: String, _ kind: GroupKind) async {
         guard let build = source.build, !path.isEmpty, groupKind(path) != kind else { return }
         do {
-            try StoreWriter.update(build) { root in GroupKinds.write([path: kind], into: &root) }
+            var covers = GroupCoverChange()
+            try StoreWriter.update(build) { root in
+                covers.before = GroupKinds.covers(Self.settings(root))
+                GroupKinds.write([path: kind], into: &root)
+                covers.after = GroupKinds.covers(Self.settings(root))
+            }
             writeProblem = nil
+            settleGroupPictures(covers)
             await load(source)
         } catch {
             writeProblem = String(describing: error)
@@ -1876,11 +1885,15 @@ final class Shop {
                            change: @escaping (inout [String: JSONValue]) -> Void) -> Bool {
         guard let build = source.build, !ids.isEmpty else { return false }
         var undo = LibraryUndo()
+        var covers = GroupCoverChange()
         do {
             try StoreWriter.update(build) { root in
+                covers.before = GroupKinds.covers(Self.settings(root))
                 undo = Self.applyFileEdit(&root, ids: ids, alsoRoot: alsoRoot, change: change)
+                covers.after = GroupKinds.covers(Self.settings(root))
             }
             writeProblem = nil
+            settleGroupPictures(covers)
             registerUndo(of: undo, named: actionName)
             Task { await load(source) }
             return true
@@ -1891,7 +1904,7 @@ final class Shop {
     }
 
     /// Put those records back exactly as they were, and make THAT undoable too.
-    private func registerUndo(of before: LibraryUndo, named actionName: String) {
+    func registerUndo(of before: LibraryUndo, named actionName: String) {
         guard let undoManager, !before.isEmpty else { return }
         undoManager.setActionName(actionName)
         undoManager.registerUndo(withTarget: self) { shop in
@@ -1902,10 +1915,16 @@ final class Shop {
     private func restore(_ snapshot: LibraryUndo, named actionName: String) {
         guard let build = source.build else { return }
         var redo = LibraryUndo()
+        var covers = GroupCoverChange()
         do {
             try StoreWriter.update(build) { root in
+                covers.before = GroupKinds.covers(Self.settings(root))
                 redo = Self.applyRestore(&root, snapshot)
+                covers.after = GroupKinds.covers(Self.settings(root))
             }
+            // A picture an undone change had sent to the Trash comes back
+            // with the entry that names it.
+            settleGroupPictures(covers)
             writeProblem = Self.partialUndoSentence(redo.notUndone, words: words)
             registerUndo(of: redo, named: actionName)
             Task { await load(source) }
@@ -3966,15 +3985,18 @@ final class Shop {
         // if one of the two has to fail, it is this one, first, where the
         // failure can still be reported instead of shipped.
         var staged = pictures
-        // A turned picture is rewritten OVER its own file (`ProductPhotos
-        // .target`); only one whose file is not a JPEG moves, and its old file
-        // is unlinked with the removals — after the record, like them.
-        // Only this product's own files are rewritten or unlinked — never a
-        // file another product's record names (`ProductPhotos.target`).
+        // A turned picture goes to a NEW file (`ProductPhotos.target`) and
+        // the record switches to it in the write below; the file it replaces
+        // goes to the Trash with the removals — after the record, like them.
+        // So until that write succeeds the original is exactly as it was.
+        // Only this product's own files are ever trashed — never a file
+        // another product's record names (`ProductPhotos.target`).
         let othersUse = pictureFilesOfOtherProducts(than: product.id)
         var removed = removed.filter {
             ProductPhotos.mayTouch($0, productId: product.id, othersUse: othersUse)
         }
+        // What this save put on disk, to take away again if it fails.
+        var written: [String] = []
         if staged != nil {
             for i in staged!.indices {
                 guard let bytes = staged![i].bytes else { continue }
@@ -3983,9 +4005,11 @@ final class Shop {
                                                       productId: product.id, imageId: staged![i].id,
                                                       othersUse: othersUse)
                     staged![i].path = try ProductPhotos.write(bytes, named: target.name, in: build)
+                    written.append(staged![i].path)
                     if let old = target.unlink { removed.append(old) }
                     staged![i].bytes = nil
                 } catch {
+                    for name in written { ProductPhotos.discard(name, in: build) }
                     moveProblem = String(describing: error)
                     return
                 }
@@ -4093,9 +4117,12 @@ final class Shop {
             // ONLY NOW. A file unlinked before the record is written is a file
             // the shop cannot get back if the write fails — and one unlinked
             // when the sheet was cancelled is one it never asked to lose.
-            for path in removed where !path.isEmpty {
-                ProductPhotos.delete(path, in: build)
-            }
+            // To the Trash, remembering where: Undo on the product brings the
+            // record back AND its pictures (`registerPicturesPutBack`, in the
+            // same undo group as the record's).
+            let trashed = removed.filter { !$0.isEmpty && !written.contains($0) }
+                .compactMap { ProductPhotos.trash($0, in: build) }
+            if !undo.isEmpty { registerPicturesPutBack(trashed, in: build) }
             for name in droppedDocs where !name.isEmpty {
                 ProductDocs.delete(name, in: build)
             }
@@ -4105,6 +4132,8 @@ final class Shop {
             // store may follow it (see `CatalogPublisher.heldPrices`).
             noteExplicitPrice(product.id)
         } catch {
+            // The record still names the original; the new files are nobody's.
+            for name in written { ProductPhotos.discard(name, in: build) }
             moveProblem = String(describing: error)
         }
     }
@@ -8914,7 +8943,7 @@ final class Shop {
             cloudSettingsStay = (try? await engine.changesToSend(local: mine, server: folded.store))?
                 .settingsDiffer ?? false
         } catch let failure as CloudReader.Failure {
-            cloudProblem = failure.description
+            cloudProblem = words.cloudFailure(failure)
         } catch let failure as SyncCrypto.Failure {
             cloudProblem = failure.description
         } catch let locked as Secrets.Failure {
@@ -9076,7 +9105,7 @@ final class Shop {
             // rather than leave a table that no longer describes anything.
             if case .moved = failure { cloudCheck = nil }
         } catch let failure as CloudReader.Failure {
-            cloudProblem = failure.description
+            cloudProblem = words.cloudFailure(failure)
         } catch let failure as SyncCrypto.Failure {
             cloudProblem = failure.description
         } catch let locked as Secrets.Failure {
@@ -9199,7 +9228,7 @@ final class Shop {
         } catch let refusal as StoreWriter.Refusal {
             cloudProblem = refusal.description
         } catch let failure as CloudReader.Failure {
-            cloudProblem = failure.description
+            cloudProblem = words.cloudFailure(failure)
         } catch let failure as SyncCrypto.Failure {
             cloudProblem = failure.description
         } catch let locked as Secrets.Failure {
@@ -9420,19 +9449,17 @@ final class Shop {
         // slicer, and a panel that will open nothing is worse than one that
         // opens too much.
         panel.allowsOtherFileTypes = true
-        // WHAT HAPPENS TO THE ORIGINALS, asked in the same panel and
-        // remembered — see `importMovesOriginals`. Keeping them is the default.
-        let choice = NSPopUpButton(frame: NSRect(x: 12, y: 5, width: 420, height: 24), pullsDown: false)
-        choice.addItems(withTitles: [words.callIt("mac.import_keep_originals"),
-                                     words.callIt("mac.import_move_originals")])
-        choice.selectItem(at: importMovesOriginals ? 1 : 0)
-        let holder = NSView(frame: NSRect(x: 0, y: 0, width: 444, height: 34))
-        holder.addSubview(choice)
-        panel.accessoryView = holder
+        // WHAT HAPPENS TO THE ORIGINALS, asked in the same panel, LABELLED,
+        // and warning about iCloud Drive and Dropbox when Move is chosen —
+        // see `ImportOriginalsChoice`. It starts at Settings › Library's
+        // answer and applies to THIS import only: it used to be remembered,
+        // and a Move chosen here once then silently trashed the originals
+        // of every folder dragged onto the library afterwards.
+        let choice = ImportOriginalsChoice(words: words, moves: importMovesOriginals)
+        panel.accessoryView = choice.view
+        panel.isAccessoryViewDisclosed = true
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
-        let moves = choice.indexOfSelectedItem == 1
-        UserDefaults.standard.set(moves, forKey: Self.importMovesOriginalsKey)
-        await addModelsToLibrary(panel.urls, movesOriginals: moves)
+        await addModelsToLibrary(panel.urls, movesOriginals: choice.moves)
     }
 
     /// Where the shop's answer to "keep my original files?" is remembered —
@@ -9614,7 +9641,7 @@ final class Shop {
             "moved": .number(Double(report.moved)),
             "duplicates": .number(Double(report.duplicates)),
             "failed": .number(Double(report.failures.count)),
-        ])
+        ]) + Self.trashedNote(report.trashed, scratches: scratches, words: words)
         if !report.failures.isEmpty {
             importProblem = report.failures.prefix(10).joined(separator: "\n")
                 + (report.failures.count > 10

@@ -542,11 +542,26 @@ final class Activator: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// KHAYT_BOOK=sample pins the whole run to the invented book. The runner
-    /// deliberately swaps back to the shop's real book for some screens, which
-    /// is right for reviewing a build and wrong for anything published.
-    static var forcedSample: Bool {
-        ProcessInfo.processInfo.environment["KHAYT_BOOK"] == "sample"
+    /// Every snapshot run photographs the invented book — unless it was
+    /// asked for the shop's own with KHAYT_SNAPSHOT_REAL=1.
+    ///
+    /// ── WHY IT IS NO LONGER OPT-IN ────────────────────────────────────────
+    ///
+    /// `KHAYT_BOOK=sample` used to be the only thing that pinned the run, so
+    /// a run without it opened this Mac's real book and swapped back to it for
+    /// several screens. #1108 fixed the dark run to load the sample; alpha.58's
+    /// review found `KHAYT_SNAPSHOT_DARK=1` photographing the REAL book again,
+    /// because the launch itself still opened it. Pictures of a shop's real
+    /// customers and figures are not design review material, and they are one
+    /// upload away from a public page. So the default is the sample, for every
+    /// mode, and the real book is the one that has to be asked for.
+    /// (`KHAYT_BOOK=sample` still means what it did, outside a snapshot too.)
+    static var forcedSample: Bool { usesSample(ProcessInfo.processInfo.environment) }
+
+    nonisolated static func usesSample(_ env: [String: String]) -> Bool {
+        if env["KHAYT_BOOK"] == "sample" { return true }
+        guard let dir = env["KHAYT_SNAPSHOT_DIR"], !dir.isEmpty else { return false }
+        return env["KHAYT_SNAPSHOT_REAL"] != "1"
     }
 
     /// Which parts of the run KHAYT_SNAPSHOT_SKIP asks to leave out.

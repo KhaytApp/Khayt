@@ -780,13 +780,15 @@ struct WebStoreSheet: View {
                 if !shop.webStorePricesHeld.isEmpty {
                     Section {
                         ForEach(shop.webStorePricesHeld) { change in
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle").foregroundStyle(Khayt.attention)
-                                Text(verbatim: change.name).font(.callout.weight(.medium))
-                                Spacer(minLength: 8)
-                                Text(verbatim: change.was + " \u{2192} " + change.now)
-                                    .font(.callout.monospacedDigit())
-                                    .environment(\.layoutDirection, .leftToRight)
+                            HeldPriceRow(shop: shop, change: change) {
+                                // The way to settle it the shop's own way: set
+                                // the price it wants, which a live store then
+                                // follows (`noteExplicitPrice`).
+                                Task {
+                                    guard let product = await shop.productForEditing(change.id) else { return }
+                                    dismiss()
+                                    shop.editingProduct = product
+                                }
                             }
                         }
                         Text(shop.words.callIt("mac.ws_prices_held_hint"))
@@ -1003,5 +1005,49 @@ struct WebStoreSheet: View {
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .padding([.horizontal, .top])
         .accessibilityIdentifier("webstore-outcome")
+    }
+}
+
+/// One price a live store held back: the product, what customers see now and
+/// what it would become, as MONEY — and the way to set it by hand.
+///
+/// The two figures were the catalogue's bare strings ("50" → "48.5"), with no
+/// currency and no grouping, beside nothing to do about them but publish.
+struct HeldPriceRow: View {
+    let shop: Shop
+    let change: WebStorePriceChange
+    var edit: () -> Void = {}
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(Khayt.attention)
+            Text(verbatim: change.name).font(.callout.weight(.medium)).lineLimit(1)
+            Spacer(minLength: 8)
+            Text(verbatim: Self.figures(change, currency: shop.currency))
+                .font(.callout.monospacedDigit())
+            Button(shop.words.callIt("mac.edit_product") + "\u{2026}", action: edit)
+                .controlSize(.small)
+                .disabled(!shop.canMoveJobs)
+        }
+    }
+
+    /// "SAR 50.00 → SAR 48.50", or just the new figure when the store had
+    /// none to show (a "was" of nothing is not a price, and "→ 48.50" with a
+    /// blank in front of it reads as a fault).
+    static func figures(_ change: WebStorePriceChange, currency: String) -> String {
+        let now = money(change.now, currency)
+        guard let was = money(change.was, currency), !change.was.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return now ?? change.now
+        }
+        // Old to new, left to right, in either language: figures read left
+        // to right in Arabic too, and the line is held in that order (a
+        // left-to-right isolate) so the arrow always points at the new one.
+        return "\u{2066}" + was + " \u{2192} " + (now ?? change.now) + "\u{2069}"
+    }
+
+    static func money(_ text: String, _ currency: String) -> String? {
+        let t = text.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, let n = Double(t) else { return t.isEmpty ? nil : t }
+        return Money.text(n, currency)
     }
 }

@@ -42,9 +42,11 @@ enum JobTitle {
         for part in parts {
             // The file as the printer knows it, without the folder it sat in
             // on the printer or the slicer's extension.
+            // And without a hash the printer put IN FRONT of the slicer's
+            // name (`withoutHashPrefix`).
             if let ref = usable(part.fileRef) {
                 let leaf = (ref as NSString).lastPathComponent
-                let bare = Self.dropExtension(leaf)
+                let bare = Self.withoutHashPrefix(Self.dropExtension(leaf))
                 if let name = usable(bare) { return name }
             }
         }
@@ -52,6 +54,22 @@ enum JobTitle {
             if let name = usable(part.name) { return name }
         }
         return untitled
+    }
+
+    /// `<32 hex>_PLA_4h29m` → `PLA_4h29m`: a printer that names its uploads
+    /// by hash puts the hash IN FRONT of the slicer's name, and "d0de11…"
+    /// leading a title is no better than the bare hash. Only a whole 32, 40
+    /// or 64-digit run followed by a separator is taken off; anything that
+    /// merely starts with hex letters ("cafe_stand") is a name.
+    static func withoutHashPrefix(_ name: String) -> String {
+        for length in [64, 40, 32] where name.count > length {
+            let head = name.prefix(length)
+            let next = name[name.index(name.startIndex, offsetBy: length)]
+            guard head.allSatisfy(\.isHexDigit), "_- ".contains(next) else { continue }
+            let rest = name.dropFirst(length).drop { "_- ".contains($0) }
+            return String(rest).trimmingCharacters(in: .whitespaces)
+        }
+        return name
     }
 
     /// `Benchy.gcode.3mf` → `Benchy`: a sliced plate often carries two.

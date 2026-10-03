@@ -152,15 +152,9 @@ struct OnlinePane: View {
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 220)
                     }
-                    if draft.pinTooShort {
-                        Label(shop.words.callIt("mac.lan_pin_short", ["n": .number(Double(Draft.minimumPin))]),
-                              systemImage: "exclamationmark.triangle")
-                            .font(.caption).foregroundStyle(Khayt.attention)
-                    }
-                    if draft.enabled, !draft.pinStored, draft.pin.trimmingCharacters(in: .whitespaces).isEmpty {
-                        Label(shop.words.callIt("mac.lan_pin_missing"), systemImage: "exclamationmark.triangle")
-                            .font(.caption).foregroundStyle(Khayt.attention)
-                    }
+                    LanPinNotes(words: shop.words, tooShort: draft.pinTooShort,
+                                missing: draft.enabled && !draft.pinStored
+                                    && draft.pin.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 // ── ALERTS ON THE SHOP'S IPHONES ───────────────────────
                 //
@@ -481,6 +475,27 @@ struct OnlinePane: View {
         draft = original
         Task {
             if presetRates.isEmpty, let defaults = await shop.printRateDefaults() { presetRates = defaults }
+        }
+    }
+}
+
+/// What the owner PIN field says under itself: too short, or not set at all.
+/// Its own view so a snapshot can photograph it — the pane is a `Form`, which
+/// `ImageRenderer` draws blank.
+struct LanPinNotes: View {
+    let words: Words
+    let tooShort: Bool
+    let missing: Bool
+
+    var body: some View {
+        if tooShort {
+            Label(words.callIt("mac.lan_pin_short", ["n": .number(Double(OnlinePane.Draft.minimumPin))]),
+                  systemImage: "exclamationmark.triangle")
+                .font(.caption).foregroundStyle(Khayt.attention)
+        }
+        if missing {
+            Label(words.callIt("mac.lan_pin_missing"), systemImage: "exclamationmark.triangle")
+                .font(.caption).foregroundStyle(Khayt.attention)
         }
     }
 }

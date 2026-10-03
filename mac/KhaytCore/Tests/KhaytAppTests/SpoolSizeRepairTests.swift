@@ -33,9 +33,9 @@ struct SpoolSizeRepairTests {
         // open counts, and the catalogue offers a review.
         #expect(!shop.contains("repairSpoolSizes"))
         #expect(shop.contains("Self.spoolRepairCount(products: productRows, sizes: spoolSizes)"))
-        let catalogue = try QuoteSheetStatusTests.source("Catalogue.swift")
-        #expect(catalogue.contains("SpoolRepairSheet(shop: shop)"))
-        #expect(catalogue.contains("shop.showingSpoolRepair = true"))
+        // The window offers it now, on every screen (alpha.58 review).
+        #expect(try QuoteSheetStatusTests.source("ShopWindow.swift").contains("SpoolRepairSheet(shop: shop)"))
+        #expect(try QuoteSheetStatusTests.source("BannerParts.swift").contains("shop.showingSpoolRepair = true"))
         let sheetSrc = try QuoteSheetStatusTests.source("SpoolRepairSheet.swift")
         #expect(sheetSrc.contains("await shop.spoolRepairPreview()"))
         #expect(sheetSrc.contains("await shop.applySpoolRepair(changes)"))

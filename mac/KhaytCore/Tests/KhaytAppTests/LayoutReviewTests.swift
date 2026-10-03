@@ -66,7 +66,9 @@ struct LayoutReviewTests {
         }
         // The first word capitalised and no other, bar the P&L's own ampersand
         // name and the screen name "Jobs".
-        for key in ["mac.issue_gift_card", "mac.gift_card_code", "mac.failure_category",
+        // ("Issue Gift Card" is a strip action, and those are Title Case —
+        // `Alpha58ReviewTests.stripCasing`.)
+        for key in ["mac.gift_card_code", "mac.failure_category",
                     "mac.add_supplier", "mac.edit_supplier"] {
             let words = (Words.own[key]?["en"] ?? "").split(separator: " ").dropFirst()
             #expect(words.allSatisfy { $0.first?.isLowercase == true }, "\(key) is Title Case")

@@ -184,7 +184,7 @@ struct PhotoOrientationTests {
         #expect(ProductPhotos.rotated(image, quarterTurns: 4) === image)
     }
 
-    @Test("turning a picture on disk rewrites ITS file and updates its record")
+    @Test("turning a picture on disk writes a NEW file, leaves the original, and the record moves to it")
     func turnRewritesFileAndRecord() async throws {
         // A sideways picture already in the book, as this app wrote them
         // before the fix: the pixels as stored, no tag.
@@ -207,27 +207,34 @@ struct PhotoOrientationTests {
         Self.expectUpright(Self.stored(try #require(Self.decodeURI(turned.thumbnail))), "the new thumbnail")
         let bytes = try #require(turned.bytes)
 
-        // Saved: over its own file, nothing else to unlink.
-        let target = ProductPhotos.target(existing: turned.path, productId: "PROD-1", imageId: turned.id)
-        #expect(target.name == name && target.unlink == nil)
+        // Saved: to a NEW file, and the old one handed back for the Trash —
+        // never over the original before the record names the new one.
+        let at = Date(timeIntervalSince1970: 1_790_000_000)
+        let target = ProductPhotos.target(existing: turned.path, productId: "PROD-1", imageId: turned.id, at: at)
+        #expect(target.name != name, "a turned picture was written over its original")
+        #expect(target.unlink == name)
+        let original = try Data(contentsOf: dir.appending(path: name))
         try ProductPhotos.write(bytes, named: target.name, into: dir)
-        Self.expectUpright(Self.stored(try Data(contentsOf: dir.appending(path: name))), "the file on disk")
+        #expect(try Data(contentsOf: dir.appending(path: name)) == original,
+                "the original changed before any record was saved")
+        Self.expectUpright(Self.stored(try Data(contentsOf: dir.appending(path: target.name))), "the file on disk")
 
         // And the record the rule writes: the new thumbnail, the same path,
         // the kind and caption kept, and the legacy view following images[0].
         var saved = turned
         saved.bytes = nil
+        saved.path = target.name
         let engine = try KhaytEngine()
         let fields = await Shop.pictureFields([saved], productId: "PROD-1", engine: engine)
         guard case .array(let images)? = fields["images"], case .object(let first)? = images.first else {
             Issue.record("no images written"); return
         }
         #expect(first["thumbnail"] == .string(turned.thumbnail))
-        #expect(first["path"] == .string(name))
+        #expect(first["path"] == .string(target.name), "the record still names the file it replaced")
         #expect(first["kind"] == .string("print"))
         #expect(first["caption"] == .string("the real one"))
         #expect(fields["thumbnail"] == .string(turned.thumbnail), "the storefront would still read the old one")
-        #expect(fields["imagePath"] == .string(name))
+        #expect(fields["imagePath"] == .string(target.name))
     }
 
     @Test("Rotate Left then Rotate Right is no change at all, and nothing to rewrite")
@@ -265,15 +272,23 @@ struct PhotoOrientationTests {
         #expect(await ProductPictureStrip.turning(hollow, by: 1, read: { _ in nil }) == nil)
     }
 
-    @Test("a turned picture whose file is not a JPEG moves to a JPEG name, and its old file goes")
+    @Test("a turned picture always moves to a new JPEG name, and its old file goes")
     func turnNonJpeg() {
-        let target = ProductPhotos.target(existing: "PROD-1.png", productId: "PROD-1", imageId: "IMG-c")
-        #expect(target.name == "PROD-1-IMG-c.jpeg")
+        let at = Date(timeIntervalSince1970: 1_790_000_000)
+        let stamp = String(Int(at.timeIntervalSince1970 * 1000), radix: 36)
+        let target = ProductPhotos.target(existing: "PROD-1.png", productId: "PROD-1", imageId: "IMG-c", at: at)
+        #expect(target.name == "PROD-1-IMG-c-\(stamp).jpeg")
         #expect(target.unlink == "PROD-1.png")
+        // A JPEG too: a new name, never its own.
+        let jpeg = ProductPhotos.target(existing: "PROD-1-IMG-c.jpeg", productId: "PROD-1", imageId: "IMG-c", at: at)
+        #expect(jpeg.name == "PROD-1-IMG-c-\(stamp).jpeg" && jpeg.unlink == "PROD-1-IMG-c.jpeg")
+        // Turned twice in one millisecond still does not land on itself.
+        let again = ProductPhotos.target(existing: jpeg.name, productId: "PROD-1", imageId: "IMG-c", at: at)
+        #expect(again.name != jpeg.name && again.unlink == jpeg.name)
         // A path off a synced record cannot reach outside the folder — nor
         // name a file that is not this product's (Alpha58PictureTests).
-        let odd = ProductPhotos.target(existing: "../../etc/x.jpeg", productId: "PROD-1", imageId: "i")
-        #expect(odd.name == "PROD-1-i.jpeg" && odd.unlink == nil)
+        let odd = ProductPhotos.target(existing: "../../etc/x.jpeg", productId: "PROD-1", imageId: "i", at: at)
+        #expect(!odd.name.contains("/") && ProductPhotos.belongs(odd.name, toProduct: "PROD-1") && odd.unlink == nil)
     }
 
     @Test("an untouched save writes the pictures back exactly as the book holds them (#1676)")

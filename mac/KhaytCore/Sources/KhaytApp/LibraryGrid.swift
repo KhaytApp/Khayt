@@ -327,6 +327,11 @@ struct GroupCrumb: View {
                 // changed: the one menu that is about the group itself.
                 Divider()
                 GroupPictureItems(shop: shop, path: group)
+                // And moving or renaming the group you are IN — the tile's
+                // right-click had them, and from inside the group there is no
+                // tile to right-click.
+                Divider()
+                GroupTileActions(shop: shop, path: group)
             } label: {
                 // IN THE CRUMB'S OWN INK. As a borderless menu its label was
                 // drawn pale grey — the look of a control that is switched
@@ -422,8 +427,7 @@ struct FolderCell: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(6)
-        .background(selected ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
-                    in: RoundedRectangle(cornerRadius: 8))
+        .tileSelection(selected)
         .contentShape(RoundedRectangle(cornerRadius: 8))
         // One element that says what it is: a group, its name, how many.
         .accessibilityElement(children: .ignore)
@@ -619,8 +623,7 @@ struct Cell: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(6)
-        .background(selected ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
-                    in: RoundedRectangle(cornerRadius: 8))
+        .tileSelection(selected)
         .contentShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -803,5 +806,26 @@ enum TitleBreaks {
             }
         }
         return out
+    }
+}
+
+extension View {
+    /// A chosen tile — ONE look for a model and a group.
+    ///
+    /// Both drew `.selection` behind the tile, and on a group it was a faint
+    /// wash: its picture and the cards behind it are opaque on the window's
+    /// ground, so the fill showed only in the margin around them, while a
+    /// model's thumbnail let it through. The border is what makes a chosen
+    /// group read as chosen; a model wears the same, so the two cannot be
+    /// told apart by how they are selected.
+    func tileSelection(_ selected: Bool) -> some View {
+        background(selected ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
+                   in: RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                if selected {
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.accentColor, lineWidth: 2)
+                }
+            }
     }
 }

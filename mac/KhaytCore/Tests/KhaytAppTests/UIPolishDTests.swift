@@ -43,7 +43,7 @@ struct UIPolishDTests {
         #expect(primary.word == "Add Printer", "the word repeats the symbol's plus")
         #expect(NavyAction(label: "New Job", symbol: "plus") {}.word == "New Job")
         let src = MenuCoverageTests.source("ScreenActions.swift")
-        #expect(src.contains("NavyAction(label: shop.words.callIt(key), symbol: \"plus\", enabled: enabled, titled: true, act: act)"))
+        #expect(src.contains("NavyAction(label: shop.words.callIt(key), symbol: \"plus\", enabled: enabled, titled: true,"))
         #expect(src.contains("ViewThatFits(in: .horizontal)"), "a narrow window has no way to drop the word")
     }
 
