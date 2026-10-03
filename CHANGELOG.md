@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Tax added on top: the payment box, price edits, payment plans and cash
+  flow all use the full amount.** The payment box would not take more than
+  the pre-tax price, so $108.25 could not be recorded on a $100 job. Editing
+  the price rewrote the job as paid by guesswork. Cash flow left out the tax
+  collected. And editing the payment plan of a job you had already settled
+  before this change could make it "partial" again. All four now agree:
+  jobs settled before tax-on-top was counted stay settled, and new ones are
+  paid at price plus tax.
+
 - **Orders you settled before this release stay settled.** On a shop that
   adds tax on top, earlier releases capped a payment at the price, so every
   order you had marked paid read as paid at the pre-tax figure. The new tax
