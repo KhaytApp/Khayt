@@ -342,6 +342,7 @@ final class Words {
     /// words, and two literals would agree today and drift by the third change.
     nonisolated static let own: [String: [String: String]] =
         base.merging(PrintFactLines.ownWords) { mine, _ in mine }
+            .merging(ReviewWords.alpha58) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // Shelves
@@ -614,7 +615,7 @@ final class Words {
         // says "Issue Gift Card", "Gift Card Code", "Failure Category" and
         // "+ Add Supplier"; those strings are the Electron app's, so the Mac
         // asks for its own rather than recasing nine languages under it.
-        "mac.issue_gift_card": ["en": "Issue gift card", "ar": "إصدار بطاقة هدية"],
+        "mac.issue_gift_card": ["en": "Issue Gift Card", "ar": "إصدار بطاقة هدية"],
         "mac.gift_card_code":  ["en": "Gift card code",  "ar": "رمز بطاقة الهدية"],
         "mac.failure_category": ["en": "Failure category", "ar": "فئة الفشل"],
         "mac.add_supplier":    ["en": "Add supplier",    "ar": "إضافة مورد"],
@@ -907,7 +908,7 @@ final class Words {
                               "ar": "حُفظ {name} لـ {target}، وأُضيف إلى المكتبة."],
         "mac.no_customers_hint": ["en": "Add one now, or they appear here once a job is billed to them.",
                                   "ar": "أضف عميلًا الآن، أو يظهر هنا بعد أن يُحرَّر له حساب على عمل."],
-        "mac.add_customer":  ["en": "Add customer", "ar": "إضافة عميل"],
+        "mac.add_customer":  ["en": "Add Customer", "ar": "إضافة عميل"],
         "mac.integ_cloud_hint": ["en": "Sign in to Khayt Cloud ({where}) to get import and feed links for these storefronts.",
                                  "ar": "سجّل الدخول إلى سحابة خيط ({where}) للحصول على روابط الاستيراد والخلاصة لهذه المتاجر."],
         "mac.past_due":      ["en": "Past due",        "ar": "متأخر السداد"],
@@ -3085,7 +3086,7 @@ final class Words {
         // Writing a product down. The catalogue could be read on this Mac and
         // not added to, so a shop wanting a new product had to go to the other
         // app for it.
-        "mac.new_product":   ["en": "New product",  "ar": "منتج جديد"],
+        "mac.new_product":   ["en": "New Product",  "ar": "منتج جديد"],
         // Making a product FROM a model. Mac-only: the other app's catalogue
         // has no route from the library at all, only a `fileRef` field a shop
         // types a filename into.
@@ -3179,7 +3180,7 @@ final class Words {
         // IMPORT, said as a shop would look for it. The menu item is called
         // "Add model" and is in the Book menu; somebody with a folder of
         // downloads searches for "import", so the toolbar button says that.
-        "mac.import_models": ["en": "Import models", "ar": "استيراد مجسمات"],
+        "mac.import_models": ["en": "Import Models", "ar": "استيراد مجسمات"],
         "mac.import_models_hint": ["en": "Add models from a folder — or drag them onto the library.",
                                    "ar": "أضف مجسمات من مجلد — أو اسحبها إلى المكتبة."],
         // Khayt's own help. macOS supplies an empty Help menu; an app that
@@ -3902,7 +3903,42 @@ extension Words {
     func amount(_ figure: String, _ storedUnit: String) -> String {
         let unit = unitWord(storedUnit)
         guard !unit.isEmpty else { return figure }
+        // ARABIC COUNTS A COUNTABLE UNIT: "4 لفة" is "four roll". Two is the
+        // dual and carries no numeral (as `counting` says it); three to ten
+        // take the plural. Only for a unit this app knows and a whole count —
+        // "2.5 كغ" is a measure, not a number of things.
+        if let counted = countedUnit(figure, storedUnit) {
+            return "\u{2068}" + counted + "\u{2069}"
+        }
         return "\u{2068}" + figure + " " + unit + "\u{2069}"
+    }
+
+    /// The count and its unit in Arabic's own form for that count, or nil
+    /// when the plain "figure unit" is right (any other language, a unit with
+    /// no forms given, a figure that is not a whole number).
+    func countedUnit(_ figure: String, _ storedUnit: String) -> String? {
+        guard language == "ar",
+              let key = Self.unitKeys[storedUnit.trimmingCharacters(in: .whitespaces).lowercased()],
+              let n = Self.wholeCount(figure) else { return nil }
+        if n == 2, let dual = Self.own[key + "_two"]?["ar"], !dual.isEmpty { return dual }
+        if (3...10).contains(n % 100), let few = Self.own[key + "_few"]?["ar"], !few.isEmpty {
+            return figure + " " + few
+        }
+        return nil
+    }
+
+    /// A figure as a whole number, in either set of digits, grouping marks
+    /// and all; nil for a fraction or anything that is not a number.
+    nonisolated static func wholeCount(_ figure: String) -> Int? {
+        let arabicIndic = Array("٠١٢٣٤٥٦٧٨٩")
+        var digits = ""
+        for ch in figure.trimmingCharacters(in: .whitespaces) {
+            if let i = arabicIndic.firstIndex(of: ch) { digits.append(Character(String(i))) }
+            else if ch.isASCII, ch.isNumber { digits.append(ch) }
+            else if ch == "," || ch == "٬" || ch == "\u{00A0}" || ch == "\u{202F}" { continue }
+            else { return nil }
+        }
+        return digits.isEmpty ? nil : Int(digits)
     }
 
     /// A consumable shelf (its category) as this shop reads it. The common

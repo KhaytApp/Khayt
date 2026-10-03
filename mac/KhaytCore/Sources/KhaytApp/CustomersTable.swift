@@ -135,6 +135,10 @@ struct CustomersTable: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(!shop.canMoveJobs)
+                        .help(shop.canMoveJobs ? "" : shop.lockedReason)
+                        // Said, not only hovered: a greyed button with no
+                        // reason reads as the app being broken.
+                        WhyLockedNote(shop: shop)
                     }
                 }
             }

@@ -131,7 +131,7 @@ struct ScreenActions: View {
                     shop.forgetSchedule()
                     shop.schedulingWork = true
                 }
-                plus("mach.add", enabled: shop.canMoveJobs) { shop.addingMachine = true }
+                plus("mac.add_printer", enabled: shop.canMoveJobs) { shop.addingMachine = true }
             } else if shop.showingInventory {
                 // THE SHELF HAD NO WAY TO PUT ANYTHING ON IT.
                 //
@@ -227,7 +227,8 @@ struct ScreenActions: View {
     /// The screen's primary action — the one thing it exists to add — which
     /// says its word on the strip rather than only in a tooltip.
     private func plus(_ key: String, enabled: Bool, act: @escaping () -> Void) -> some View {
-        NavyAction(label: shop.words.callIt(key), symbol: "plus", enabled: enabled, titled: true, act: act)
+        NavyAction(label: shop.words.callIt(key), symbol: "plus", enabled: enabled, titled: true,
+                   whyNot: shop.lockedReason, act: act)
     }
 
     private var period: some View {
@@ -323,6 +324,9 @@ struct NavyAction: View {
     let symbol: String
     var enabled = true
     var titled = false
+    /// Why it is off, said on hover — a greyed "New Customer" on a book this
+    /// Mac may only read gave no reason at all.
+    var whyNot: String? = nil
     let act: () -> Void
 
     /// The catalogue's "+ Add Printer" carries its own plus; the symbol already
@@ -347,8 +351,9 @@ struct NavyAction: View {
         .buttonStyle(.plain)
         .foregroundStyle(enabled ? Role.onNavy : Role.onNavy3)
         .disabled(!enabled)
-        .help(word)
+        .help(enabled ? word : (whyNot.map { word + " \u{2014} " + $0 } ?? word))
         .accessibilityLabel(word)
+        .accessibilityHint(enabled ? "" : (whyNot ?? ""))
     }
 
     private var bare: some View {

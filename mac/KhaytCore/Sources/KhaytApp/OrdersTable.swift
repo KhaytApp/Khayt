@@ -221,9 +221,17 @@ struct JobTitleCell: View {
                     .lineLimit(1).fixedSize()
                     .help(shop.words.callIt("oe.non_business"))
             }
-            Text(job.id)
-                .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
-                .layoutPriority(-1).lineLimit(1)
+            // THE ID WHOLE OR NOT AT ALL. Squeezed by the "Own print" tag it
+            // was clipped to its first letter — a "C" that is nobody's job
+            // number. A reference is either readable or left out; the row
+            // still opens the job either way.
+            ViewThatFits(in: .horizontal) {
+                Text(job.id)
+                    .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+                    .lineLimit(1).fixedSize()
+                Color.clear.frame(width: 0, height: 0)
+            }
+            .layoutPriority(-1)
             // The colours it was printed in, as WORDS — the shop's own,
             // which is how it would be asked for over the counter. Not
             // swatches: nothing here maps "sand" to a colour, and a

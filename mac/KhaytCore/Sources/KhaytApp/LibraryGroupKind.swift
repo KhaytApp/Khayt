@@ -238,14 +238,34 @@ enum GroupKinds {
                 targets.insert(destination + key.dropFirst(path.count))
             }
             for target in targets {
+                let source = path + target.dropFirst(destination.count)
                 if staying.contains(where: { Shop.isUnder($0, target) }) {
-                    map[target] = original[target]
+                    // An existing group keeps what it is — its kind, and its
+                    // picture when it has one. When it has NONE, the moving
+                    // group's picture comes with it rather than being lost:
+                    // the shop chose that picture, and the group it chose it
+                    // for is now this one.
+                    map[target] = Self.joining(original[target], picture: original[source])
                 } else {
-                    map[target] = original[path + target.dropFirst(destination.count)]
+                    map[target] = original[source]
                 }
             }
         }
         write(map: map, stored: stored, settings: settings, into: &root)
+    }
+
+    /// An existing group's entry, with the joining group's picture added when
+    /// it has none of its own. Nothing else of the joiner's is taken.
+    nonisolated static func joining(_ existing: JSONValue?, picture joiner: JSONValue?) -> JSONValue? {
+        guard case .object(let theirs)? = joiner, let cover = theirs["cover"],
+              GroupCover(cover) != nil else { return existing }
+        var entry: [String: JSONValue] = [:]
+        if case .object(let mine)? = existing {
+            if GroupCover(mine["cover"]) != nil { return existing }
+            entry = mine
+        }
+        entry["cover"] = cover
+        return .object(entry)
     }
 
     /// The map as a book holds it, entry by entry — what `Shop.editFiles`

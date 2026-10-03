@@ -4,6 +4,53 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Fixes from the alpha.58 UI review.**
+  - What sync took from the book stays on screen until you deal with it: the
+    notice is rebuilt from the kept copies each time the book opens, and its
+    ✕ asks first while records are still not put back.
+  - Adding models: the Keep/Move choice in the Add panel is labelled, warns
+    that Move removes files from iCloud Drive or Dropbox on every device, and
+    applies to that import only. Dropped files use Settings › Library. The
+    result line says how many originals went to the Trash.
+  - Web store held prices show as money, leave out an empty old price, and
+    have Edit Product… on each row. The spool-size review lists and counts
+    only products whose price changes, and its banner appears on every
+    screen, including after a spool's size is saved.
+  - When sync stops because Khayt Cloud answered with an older copy, a banner
+    says so in your language, with Trust the Cloud's Older Copy; accepting it
+    syncs straight away.
+  - An open group's menu has Rename and Move into Group, and the window
+    follows the group. Remove and replace Group Picture can be undone; a group
+    moved into one with no picture keeps its picture, and a picture no group
+    uses goes to the Trash.
+  - Turning a product photo writes a new file on Save. The original is left
+    as it was if you cancel, the save fails, or you undo.
+  - Greyed actions on a book this Mac can only read say why. A job's number
+    is hidden rather than clipped when there is no room, and a printer's hash
+    in front of a file name is no longer shown as the title.
+  - In a narrow window the strip shows the app's mark and the Where It Came
+    From menu as icons. Selected group tiles look like selected models. The
+    two price cards share one row layout. Catalogue tiles with a photo are
+    the same width as the rest. Strip actions use title case.
+  - Arabic counts units properly ("4 لفات", "6 حبات").
+  - Screenshots from the snapshot runner use the sample book in every mode
+    unless `KHAYT_SNAPSHOT_REAL=1`.
+- **Tax added on top: the payment box, price edits, payment plans and cash
+  flow all use the full amount.** The payment box would not take more than
+  the pre-tax price, so $108.25 could not be recorded on a $100 job. Editing
+  the price rewrote the job as paid by guesswork. Cash flow left out the tax
+  collected. And editing the payment plan of a job you had already settled
+  before this change could make it "partial" again. All four now agree:
+  jobs settled before tax-on-top was counted stay settled, and new ones are
+  paid at price plus tax.
+
+- **Orders you settled before this release stay settled.** On a shop that
+  adds tax on top, earlier releases capped a payment at the price, so every
+  order you had marked paid read as paid at the pre-tax figure. The new tax
+  rule moved all of them into receivables owing the tax, with a balance on
+  the customer portal. An order already recorded as paid that covered its
+  price now counts as settled. Payments recorded from now on are marked as
+  covering price plus tax and are judged that way.
 - **(Mac) Undo no longer gives filament back twice.** If a job was completed
   on the Mac and then re-opened on a phone or the desktop, which already put
   the grams back, undoing the completion on the Mac added them again. Undo
@@ -81,7 +128,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   model photos and group pictures are now saved upright, and the web store
   publishes a tagged file upright too. Each picture in the product sheet has
   Rotate Left and Rotate Right (on the picture and in its right-click), which
-  rewrite its file on Save, so a photo already saved sideways can be fixed. The
+  save a turned copy on Save, so a photo already saved sideways can be fixed. The
   catalogue, invoices, web store and the desktop app all show the turned file.
 
 - **(Mac) A group can have its own picture.** Right-click a group tile, or use

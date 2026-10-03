@@ -169,6 +169,15 @@ extension Shop {
         }
     }
 
+    /// Where an open group is after a plan's moves: the same depth below
+    /// the moved group's new path, or nil when it did not move.
+    nonisolated static func followed(_ open: String, by plan: GroupMovePlan) -> String? {
+        for move in plan.moves where isUnder(open, move.from) {
+            return move.to + open.dropFirst(move.from.count)
+        }
+        return nil
+    }
+
     /// A typed destination, as the group it names: an existing group spelled
     /// the shop's way when it matches one ignoring case and runs of spaces —
     /// "baby  grendizer" is "Baby Grendizer", never a second group beside it
@@ -305,7 +314,15 @@ extension Shop {
                               alsoRoot: Self.groupMoveRoot(plan, newKinds: newKinds)) { record in
             Self.moveRecord(&record, wanted: wanted)
         }
-        if wrote { groupSelection = []; groupAnchor = nil }
+        if wrote {
+            groupSelection = []; groupAnchor = nil
+            // The group on screen moved or was renamed (from the crumb above
+            // it): follow it, rather than leave the window showing a path
+            // that no longer holds anything.
+            if case .library(let open?) = shelf, let followed = Self.followed(open, by: plan) {
+                shelf = .library(followed)
+            }
+        }
         return wrote
     }
 }

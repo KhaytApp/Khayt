@@ -38,7 +38,7 @@ struct CloudCheckSheet: View {
                 // restored the cloud itself, so only the shop can say go on.
                 if shop.cloudRollbackRefused != nil {
                     Button(shop.words.callIt("mac.cloud_accept_rollback")) {
-                        shop.acceptCloudRollback()
+                        shop.acceptCloudRollbackAndSync()
                     }
                     .disabled(shop.cloudBusy)
                 }

@@ -432,26 +432,27 @@ struct Alpha58PictureTests {
 
     // MARK: 9 — turning a picture touches only this product's own file
 
-    @Test("a turned picture is rewritten over its own file, never over another product's")
+    @Test("a turned picture goes to a new file of its own, and only its own old file is let go")
     func turnTargetIsConfined() {
-        // Its own file: in place.
-        #expect(ProductPhotos.target(existing: "P1-PIMG-P1-0.jpeg", productId: "P1", imageId: "PIMG-P1-0")
-                == ("P1-PIMG-P1-0.jpeg", nil))
-        // A synced record naming ANOTHER product's file: neither rewritten nor unlinked.
+        let mine = { (t: (name: String, unlink: String?)) in
+            ProductPhotos.belongs(t.name, toProduct: "P1") && t.name.hasPrefix("P1-PIMG-P1-0-") }
+        // Its own file: a new name, and the old one handed back for the Trash.
+        let own = ProductPhotos.target(existing: "P1-PIMG-P1-0.jpeg", productId: "P1", imageId: "PIMG-P1-0")
+        #expect(mine(own) && own.unlink == "P1-PIMG-P1-0.jpeg")
+        // A synced record naming ANOTHER product's file: never let go.
         let theirs = ProductPhotos.target(existing: "P2-PIMG-P2-0.jpeg", productId: "P1", imageId: "PIMG-P1-0",
                                           othersUse: ["P2-PIMG-P2-0.jpeg"])
-        #expect(theirs.name == "P1-PIMG-P1-0.jpeg")
-        #expect(theirs.unlink == nil)
+        #expect(mine(theirs) && theirs.unlink == nil)
         // Named like this product's but another product names it too: left alone.
         let shared = ProductPhotos.target(existing: "P1-shared.jpeg", productId: "P1", imageId: "PIMG-P1-0",
                                           othersUse: ["P1-shared.jpeg"])
-        #expect(shared.name == "P1-PIMG-P1-0.jpeg" && shared.unlink == nil)
+        #expect(mine(shared) && shared.unlink == nil)
         // A path aimed outside the folder is only ever a leaf, and not ours.
         let escape = ProductPhotos.target(existing: "../../book.jpeg", productId: "P1", imageId: "PIMG-P1-0")
-        #expect(escape.name == "P1-PIMG-P1-0.jpeg" && escape.unlink == nil)
-        // Its own PNG moves to the minted name and the old one is unlinked, as before.
-        #expect(ProductPhotos.target(existing: "P1-PIMG-P1-0.png", productId: "P1", imageId: "PIMG-P1-0")
-                == ("P1-PIMG-P1-0.jpeg", "P1-PIMG-P1-0.png"))
+        #expect(mine(escape) && escape.unlink == nil)
+        // Its own PNG: a new JPEG name, and the PNG let go.
+        let png = ProductPhotos.target(existing: "P1-PIMG-P1-0.png", productId: "P1", imageId: "PIMG-P1-0")
+        #expect(mine(png) && png.unlink == "P1-PIMG-P1-0.png")
         #expect(ProductPhotos.belongs("P1.jpeg", toProduct: "P1"))
         #expect(!ProductPhotos.belongs("P10-x.jpeg", toProduct: "P1"))
         #expect(!ProductPhotos.belongs("other.jpeg", toProduct: "P1"))

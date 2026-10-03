@@ -176,25 +176,84 @@ extension Shop {
     }
 
     private func writeGroupCover(_ cover: GroupCover?, for path: String, in build: StoreReader.Build) async {
-        var had: GroupCover?
-        var left: [String: GroupCover] = [:]
+        var covers = GroupCoverChange()
+        var undo = LibraryUndo()
         do {
             try StoreWriter.update(build) { root in
-                had = GroupKinds.setCover(cover, for: path, into: &root)
-                left = GroupKinds.covers(Self.settings(root))
+                let entriesBefore = GroupKinds.entries(root)
+                covers.before = GroupKinds.covers(Self.settings(root))
+                GroupKinds.setCover(cover, for: path, into: &root)
+                covers.after = GroupKinds.covers(Self.settings(root))
+                let entriesAfter = GroupKinds.entries(root)
+                undo.groupEntries = Self.groupEntriesChanged(from: entriesBefore, to: entriesAfter)
+                for key in undo.groupEntries.keys { undo.groupAfter[key] = .some(entriesAfter[key]) }
             }
         } catch {
             writeProblem = String(describing: error); return
         }
-        // The picture it wore before, to the Trash — only when it was a file
-        // and no other group wears it (a folder moved and moved back can
-        // leave two entries naming one file).
-        if case .image(let old)? = had, cover != .image(old),
-           !left.values.contains(.image(old)),
-           let roots = libraryRoots?.roots, let url = GroupPictures.url(of: old, roots: roots) {
-            try? Self.trash(url)
-        }
+        // The picture it wore before, to the Trash — only when no group
+        // wears it any more (a folder moved and moved back can leave two
+        // entries naming one file) — and Undo puts both back: the entry
+        // through `LibraryUndo`, the file through `settleGroupPictures`.
+        settleGroupPictures(covers)
+        registerUndo(of: undo, named: words.callIt(cover == nil ? "mac.group_picture_remove"
+                                                                : "mac.group_picture_set"))
         await load(source)
+    }
+
+    /// After any write of the group map: a picture file no entry names any
+    /// more goes to the Trash, and one an entry names again (an Undo) comes
+    /// back out of it.
+    ///
+    /// ── WHY EVERY WRITE, NOT ONLY "REMOVE PICTURE" ────────────────────────
+    ///
+    /// The map is pruned on every write (`GroupKinds.prune`), and a move into
+    /// an existing group settles two entries into one. Each of those can drop
+    /// a cover, and a dropped cover's file used to stay in `group-pictures/`
+    /// for nobody. A file is only ever trashed when NO entry names it, and
+    /// the Trash is the Finder's own way back.
+    func settleGroupPictures(_ change: GroupCoverChange) {
+        guard let roots = libraryRoots else { return }
+        GroupPictures.settle(change, roots: roots.roots, primary: roots.primary)
+    }
+}
+
+/// The group map's pictures either side of one write.
+struct GroupCoverChange {
+    var before: [String: GroupCover] = [:]
+    var after: [String: GroupCover] = [:]
+
+    static func images(_ covers: [String: GroupCover]) -> Set<String> {
+        Set(covers.values.compactMap { if case .image(let rel) = $0 { return rel } else { return nil } })
+    }
+
+    /// Picture files no entry names after the write.
+    var dropped: Set<String> { Self.images(before).subtracting(Self.images(after)) }
+}
+
+extension GroupPictures {
+    /// Where each picture this run put in the Trash went, by its vault path,
+    /// so an Undo can bring it back. This Mac's run only: a picture trashed
+    /// before a relaunch is brought back from the Finder, like any other.
+    @MainActor static var inTrash: [String: URL] = [:]
+
+    @MainActor static func settle(_ change: GroupCoverChange, roots: [String], primary: String) {
+        for rel in change.dropped {
+            guard let url = url(of: rel, roots: roots) else { continue }
+            var landed: NSURL?
+            if (try? FileManager.default.trashItem(at: url, resultingItemURL: &landed)) != nil,
+               let landed = landed as URL? {
+                inTrash[rel] = landed
+            }
+        }
+        for rel in GroupCoverChange.images(change.after) where url(of: rel, roots: roots) == nil {
+            guard let from = inTrash[rel], let leaf = leaf(of: rel) else { continue }
+            let dir = URL(fileURLWithPath: primary).appending(path: folderName)
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            if (try? FileManager.default.moveItem(at: from, to: dir.appending(path: leaf))) != nil {
+                inTrash[rel] = nil
+            }
+        }
     }
 }
 

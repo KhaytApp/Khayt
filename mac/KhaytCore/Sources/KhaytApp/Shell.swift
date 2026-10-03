@@ -91,6 +91,8 @@ struct ShellTitleBar: View {
     @Bindable var shop: Shop
     /// The menu bar's request for the caret, passed down from the window.
     @Binding var searchWanted: Bool
+    /// How wide the strip is, measured — see `StripWidth`.
+    @State private var width: CGFloat = 0
 
     var body: some View {
         HStack(spacing: Space.lg) {
@@ -103,6 +105,8 @@ struct ShellTitleBar: View {
                 .font(TypeScale.title(12, weight: .semibold))
                 .foregroundStyle(Role.onNavy)
                 .lineLimit(1)
+                // Before the field and the spacers give way, not after.
+                .layoutPriority(1)
 
             Spacer(minLength: Space.md)
 
@@ -118,17 +122,28 @@ struct ShellTitleBar: View {
             // wordmark is mush — and not a literal either: an Arabic shop sees
             // خيط, and the tracking that opens up Latin capitals would pull an
             // Arabic word apart at the joins, so it is applied to neither.
-            Text(shop.words.callIt("app.title"))
-                .font(TypeScale.label(10))
-                .tracking(shop.words.language == "ar" ? 0 : 2.4)
-                .foregroundStyle(Role.onNavy3)
-                .lineLimit(1)
-                .fixedSize()
+            // In a narrow window, the app's own mark instead: at 900 points
+            // the library's strip cut its title and its sync status, and the
+            // wordmark is the one thing on it that is decoration.
+            if StripWidth.compact(width) {
+                Drawn(mark: .nozzle, size: 13)
+                    .foregroundStyle(Role.onNavy3)
+                    .help(shop.words.callIt("app.title"))
+                    .accessibilityLabel(shop.words.callIt("app.title"))
+            } else {
+                Text(shop.words.callIt("app.title"))
+                    .font(TypeScale.label(10))
+                    .tracking(shop.words.language == "ar" ? 0 : 2.4)
+                    .foregroundStyle(Role.onNavy3)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
 
             // What this screen can do. The window has no title bar to put a
             // toolbar in any more, so the items its screens used to declare are
             // here — see `ScreenActions`.
             ScreenActions(shop: shop)
+                .environment(\.stripCompact, StripWidth.compact(width))
 
             // What the book is doing. Two `Text`s, never one string — see §5.
             //
@@ -157,6 +172,31 @@ struct ShellTitleBar: View {
         .frame(height: 40)
         .frame(maxWidth: .infinity)
         .background(Role.navy)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+    }
+}
+
+/// When the strip is too narrow for every word on it.
+///
+/// A width rather than `ViewThatFits`: the strip's pieces share one row with
+/// two spacers and a field that gives way, so whether "a piece fits" depends
+/// on what every other piece was offered — the measurement is the window's,
+/// and one number makes the switch the same on every screen. The library's
+/// strip at 900 points is the case it was set by (alpha.58 review).
+enum StripWidth {
+    static let compactBelow: CGFloat = 1180
+
+    /// Zero is "not measured yet", which is not narrow.
+    static func compact(_ width: CGFloat) -> Bool { width > 0 && width < compactBelow }
+}
+
+private struct StripCompactKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    /// The strip is narrow: a menu that can say itself with its symbol does.
+    var stripCompact: Bool {
+        get { self[StripCompactKey.self] }
+        set { self[StripCompactKey.self] = newValue }
     }
 }
 

@@ -39,7 +39,6 @@ struct Catalogue: View {
         content
             .sheet(isPresented: $shop.showingOnlineOrders) { OnlineOrdersSheet(shop: shop) }
             .sheet(isPresented: $shop.showingWebStore) { WebStoreSheet(shop: shop) }
-            .sheet(isPresented: $shop.showingSpoolRepair) { SpoolRepairSheet(shop: shop) }
             .screenToolbar {
                 ToolbarItem {
                     Picker("", selection: $layout) {
@@ -109,22 +108,8 @@ struct Catalogue: View {
             // costed on a spool size that has since changed, and a live store
             // about to publish a price the shop did not set. Neither is done
             // on its own any more; each is said here, with the way to review.
-            if shop.spoolRepairPending > 0 && shop.canMoveJobs {
-                Banner(text: shop.words.counting(shop.spoolRepairPending, "mac.spool_repair_pending"),
-                       symbol: "scalemass", tint: Khayt.attention) {
-                    Button(shop.words.callIt("mac.spool_repair_review") + "\u{2026}") {
-                        shop.showingSpoolRepair = true
-                    }
-                }
-            }
-            if !shop.webStorePricesHeld.isEmpty {
-                Banner(text: shop.words.callIt("mac.ws_prices_held"),
-                       symbol: "storefront", tint: Khayt.attention) {
-                    Button(shop.words.callIt("mac.spool_repair_review") + "\u{2026}") {
-                        shop.showingWebStore = true
-                    }
-                }
-            }
+            // (The spool-size one is the window's now — `SpoolRepairBanner`.)
+            PriceHoldBanner(shop: shop)
             CatalogueFilterBar(shop: shop)
             switch layout {
             case .table: table
@@ -479,22 +464,29 @@ private struct ProductCell: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(.quaternary.opacity(0.4))
-                if let image = Self.picture(row.thumbnail) {
-                    Image(nsImage: image)
-                        .resizable().scaledToFill()
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                } else {
-                    // Not a broken-image glyph: a product with no photo is the
-                    // ordinary case in a shop that has not got round to it, and
-                    // drawing it as a fault makes the whole grid look wrong.
-                    Image(systemName: "shippingbox")
-                        .font(.system(size: 28)).foregroundStyle(.tertiary)
+            // THE SQUARE DECIDES THE SIZE, NEVER THE PHOTO. A `scaledToFill`
+            // image inside the stack reported the size it FILLED, so a tile
+            // with a landscape photo came out wider than its neighbours and
+            // pushed the row out of line. The photo is an overlay on a square
+            // that takes the column's width, and is clipped to it.
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(.quaternary.opacity(0.4))
+                .aspectRatio(1, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .overlay {
+                    if let image = Self.picture(row.thumbnail) {
+                        Image(nsImage: image)
+                            .resizable().scaledToFill()
+                    } else {
+                        // Not a broken-image glyph: a product with no photo is
+                        // the ordinary case in a shop that has not got round
+                        // to it, and drawing it as a fault makes the whole
+                        // grid look wrong.
+                        Image(systemName: "shippingbox")
+                            .font(.system(size: 28)).foregroundStyle(.tertiary)
+                    }
                 }
-            }
-            .aspectRatio(1, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 3)

@@ -65,17 +65,14 @@ struct MoveBanners: View {
         // WHAT SYNC TOOK FROM THIS BOOK. Automatic sync merges the cloud in on
         // its own, and a record it replaced or removed used to be gone with
         // nothing on screen. A copy of each is kept; this offers them back.
-        if let lost = shop.syncLossNotice {
-            Banner(text: shop.words.callIt("mac.losses_banner",
-                                           ["replaced": .number(Double(lost.replaced + lost.keptDeleted)),
-                                            "removed": .number(Double(lost.removed))]),
-                   symbol: "arrow.triangle.2.circlepath", tint: Khayt.attention) {
-                Button(shop.words.callIt("mac.review") + "\u{2026}") {
-                    shop.reviewingSyncLosses = true
-                }
-                BannerClose(words: shop.words) { shop.dismissSyncLosses() }
-            }
-        }
+        if let lost = shop.syncLossNotice { SyncLossBanner(shop: shop, lost: lost) }
+        // SYNC REFUSED FOR GOING BACKWARDS, with the one way on — which lived
+        // only in Check Cloud, behind the passphrase.
+        WentBackwardsBanner(shop: shop)
+        // PRODUCTS COSTED ON A SPOOL SIZE THAT HAS CHANGED. On every screen,
+        // not only the catalogue: the edit that causes it is a spool's size,
+        // saved on the shelf.
+        SpoolRepairBanner(shop: shop)
         // A RESTORE NO LONGER HELD against the cloud: other devices' edits to
         // the restored records win again from here, and the shop is told.
         if let note = shop.restoreHoldNote {

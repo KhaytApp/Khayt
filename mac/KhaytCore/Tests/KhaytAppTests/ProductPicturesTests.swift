@@ -368,7 +368,7 @@ struct ProductPictureWiringTests {
         // after the write and not in the sheet at all.
         let shop = try Self.source("Shop.swift")
         let writeAt = try #require(shop.range(of: "registerMoveUndo(undo, named: words.callIt(\"mac.edit_product\"))")?.lowerBound)
-        let unlinkAt = try #require(shop.range(of: "ProductPhotos.delete(path, in: build)")?.lowerBound,
+        let unlinkAt = try #require(shop.range(of: ".compactMap { ProductPhotos.trash($0, in: build) }")?.lowerBound,
                                     "nothing ever unlinks a removed picture")
         #expect(writeAt < unlinkAt, "pictures are unlinked before the record is safely written")
         #expect(!(try Self.source("ProductPictures.swift").contains("ProductPhotos.delete")),
