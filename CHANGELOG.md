@@ -4,44 +4,34 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Tax added on top: the payment box, price edits, payment plans and cash
-  flow all use the full amount.** The payment box would not take more than
-  the pre-tax price, so $108.25 could not be recorded on a $100 job. Editing
-  the price rewrote the job as paid by guesswork. Cash flow left out the tax
-  collected. And editing the payment plan of a job you had already settled
-  before this change could make it "partial" again. All four now agree:
-  jobs settled before tax-on-top was counted stay settled, and new ones are
-  paid at price plus tax.
-
-- **Orders you settled before this release stay settled.** On a shop that
-  adds tax on top, earlier releases capped a payment at the price, so every
-  order you had marked paid read as paid at the pre-tax figure. The new tax
-  rule moved all of them into receivables owing the tax, with a balance on
-  the customer portal. An order already recorded as paid that covered its
-  price now counts as settled. Payments recorded from now on are marked as
-  covering price plus tax and are judged that way.
 - **(Mac) Undo no longer gives filament back twice.** If a job was completed
   on the Mac and then re-opened on a phone or the desktop, which already put
   the grams back, undoing the completion on the Mac added them again. Undo
   now leaves a spool's or consumable's stock alone when the job's draw was
   already settled elsewhere, and says so.
+
 - **(Mac) A restore from a backup no longer overrides other devices for
   ever.** It now holds only the records the restore changed, gives way to
   edits other devices make after the restore, stops after 7 days (or after
   one sync on a read-only cloud role) with a notice, and keeps a copy of
   every cloud record it overrides in the sync conflicts folder.
+
 - **(Mac) Online orders are priced at what the store showed.** A web-store
   order is priced at the line price the platform sent, or else at the price
   the store currently lists. Before, it used the book's price, which may be a
   new price the store is still holding for your review.
+
 - **(Mac) An automatic web-store update never takes the store offline.** If
   nothing in the catalogue can be listed, the store is left as it is and you
   are told. Taking it offline is your decision.
+
 - **(Mac) Sync conflict copies are private and pruned.** The sync-conflicts
   folder, the sync baseline and the restore marker hold whole customer
   records. They are now readable by your user account only, and conflict
   copies older than 60 days, or beyond the newest 200, are removed.
+
 - **(Mac) Unpacking a large archive no longer slows the rest of the app.**
+
 - **(Mac) Security fixes before alpha.58.**
   - **Phones on your own Wi-Fi are now counted separately.** The LAN server
     grouped every IPv6 address in the same /64 as one visitor. Your network
@@ -83,6 +73,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   task at the start. Its requests to Khayt Cloud then failed as cancelled, and
   the store was not updated. Pressing Publish still replaces a pending
   automatic republish.
+
 - **(Mac) Phone photos stay the right way up, and any photo can be turned.**
   A photo taken holding the phone upright came out sideways on a catalogue
   product, with no way to fix it: the Mac read the pixels as the camera stored
@@ -92,76 +83,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Rotate Left and Rotate Right (on the picture and in its right-click), which
   rewrite its file on Save, so a photo already saved sideways can be fixed. The
   catalogue, invoices, web store and the desktop app all show the turned file.
+
 - **(Mac) A group can have its own picture.** Right-click a group tile, or use
   the menu beside an open group's name: Set Group Picture… picks an image file,
   Use a Model's Picture borrows one of the group's models, and Remove Group
   Picture goes back to the first model's picture. The choice moves with the
   group when its folder moves, and is dropped when the group is.
-- **Marking a job shipped tells your webhooks.** The Mark shipped button on
-  the board never sent the `order_shipped` event that the Ship dialog does,
-  so an automation listening for parcels missed those jobs. Both now send
-  the same event with the same contents, as the Mac app does.
-- **The weight estimate in the "what did it really use" box includes
-  supports.** It counted the model only, so a print with supports looked
-  over its estimate.
-- **The executive summary costs a job the way the Mac does,** so its margin
-  matches the dashboard on both apps.
-- **Finished-print records are kept when two places save them.** Saving
-  wrote this session's list over what was there, so a record saved by the
-  Mac app or another window could be lost. They are merged now.
 
-- **Security: customer names in campaign emails are sent as text.** A
-  customer whose name contained HTML (for example `<img …>`) had it read as
-  part of the email's markup. Names and the other filled-in values are now
-  escaped in emails. WhatsApp and SMS messages are unchanged.
-
-- **Shops that add tax on top are paid on the right amount.** If your prices
-  are before tax, a $100 job with 8.25% tax is $108.25. Khayt already showed
-  $108.25 owed, but capped a payment at $100 and called the job paid at
-  $100. Now a payment can cover the tax, a job is paid when the tax is paid,
-  and editing the price or restoring a deposit keeps that true. The customer
-  portal agrees.
-- **Profit no longer counts the tax you collect.** Machine profit, product
-  profit and break-even counted VAT as money the shop made, so a job charged
-  115 that cost 80 showed 35 profit instead of 20. They now use what the job
-  earned, as the P&L already did. So do the forecast, customer mix, client
-  value, cost trends and client sources reports. Cash flow and the revenue
-  totals still show what customers were charged.
-- **A gift card plus a payment plan can reach "paid".** Such a job stayed
-  "partial" after its last instalment, because the plan ignored the gift card
-  and any credit note.
-- **The invoice Subtotal line uses the same rule as the Mac.** It is the
-  items before any discount, so Subtotal, Rush, Shipping and Total add up.
-- **Dates, stock and the dashboard: a correctness sweep.**
-  - **(Mac) A Mac set to the Hijri calendar keeps its figures.** "This month",
-    the masthead's net/gross/COGS, Reports by month/quarter/year and the
-    storefront lead time read the Mac's own calendar, so on Umm al-Qura the
-    month was "1448-04" and matched nothing. They read the book's Gregorian
-    calendar now; a test fails on any `Calendar.current` default.
-  - **(Mac) "A payment arrives" emails are sent.** Recording a payment let it
-    through for SendGrid, Mailgun or SMTP and then sent only the webhooks.
-  - **A measured weight is the whole print.** Completing with a measured
-    weight charged it all to the parts that have a spool, and added it to
-    what a mid-print spool switch had already taken. Each part now takes its
-    own share, less its switch. The Mac's completion sheet also counts
-    support in the weight it suggests.
-  - **(Mac) A web-store order that is partly on the shelf prints only the
-    rest**, instead of printing the shelf's pieces again.
-  - **Moving a job back from Shipped to Completed un-ships it.** It used to
-    complete the job a second time: the webhooks, Telegram and the order
-    email went out again and the Mac asked for the actuals again.
-  - **Printer measurements survive a restart.** After a relaunch, the first
-    finished print replaced the saved history. A job whose file matches no
-    print no longer gets another print's figures.
-  - **Depreciation by the hour stops at the machine's life**, with or without
-    a purchase date.
-  - **The dashboard leaves out cancelled jobs** from the order count and
-    what is owed, and judges on-time by your own day. The Mac's cost of goods
-    now matches the desktop's (costed parts and shipping).
-  - QC waste is dated by your own day. (Mac) The gift card status filter
-    works with an empty search, shipping fires `order_shipped`, "Open in
-    slicer" never opens a PDF, and moving a folder refuses a path past 60
-    characters, which would have merged it with another folder.
 - **(Mac) Eleven fixes from the screen-by-screen review.** Customers has a
   "New customer" button on the strip and an "Add customer" button on the empty
   screen (and File ▸ New Customer is off on a book this Mac cannot change).
@@ -194,17 +122,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   chosen groups with the same name, or a path past 60 characters, are
   refused. It is one change, so one Undo puts everything back. "Rename
   Group…" on a group tile renames it the same way.
+
 - **(Mac) "Free up space now" decides by the desktop's own rule.** Which
   models count as recently used, and which an unfinished job still needs,
   is now worked out on the Mac by the same shared code the desktop uses,
   instead of a separate Mac copy that could drift from it.
 
-- **Reopening a finished job puts its filament back on the shelf.** Move a
-  finished job back (to fix it, re-check it or put it on hold) and the
-  filament and packaging it used go back into stock, with a note saying how
-  many grams. Finishing it again takes what it really uses this time. Undo
-  after reopening puts the stock back as it was, along with the job. The Mac
-  app does the same.
 - **(Mac) A live web store follows your catalogue again.** Each time the book
   was read, the Mac forgot the store's state and cancelled the automatic
   republish it had scheduled moments earlier, so new, removed and hidden
@@ -213,22 +136,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   is opened. A change republishes once, a few seconds later. Reopening the
   same book publishes nothing. A price the shop did not set (#1705) is still
   held for review, with a notice.
+
 - **(Mac) Five more reports count revenue without the tax.** The forecast,
   customer mix, client value, cost trends and client sources reports counted
   a VAT-inclusive shop's VAT as revenue. A job charged 115 read 115 where the
   P&L says 100. They now use the same tax-aware figure as the P&L. A shop that
   adds tax on top sees no change. Cash flow still includes the tax, because
   that is cash the shop holds.
+
 - **Tax added on top: a paid web-store order settles.** On a shop that adds
   tax on top of its prices, a paid web-store order was recorded at the
   pre-tax price. It read short by the tax and could never settle. The Mac now
   records the price plus the tax, or the platform's line prices plus the tax
   when it sends them. A total the platform states outright is recorded as
   sent.
-- **Tax added on top: the customer's tracking page shows what is owed.** It
-  showed the pre-tax price ("100.00" while 108.25 was owed), and the balance
-  left to pay was short by the tax. Both apps publish this page. Shops that
-  include VAT in their prices, and shops with no tax, see no change.
+
 - **(Mac) Updates are verified before they are unpacked.** The app now checks
   an update's signature before it extracts the download
   (`SUVerifyUpdateBeforeExtraction`). Every update is already signed. A signed
@@ -241,39 +163,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   phone already paired says the same in its connection strip. The phone
   does not enforce the minimum itself: the Electron desktop has none, and a
   shop there with a short PIN would be locked out for nothing.
-- **Security: your book file is readable only by you.** On macOS and Linux,
-  each save wrote your data file so that any other account on the same
-  computer could read it, with every customer and price in it. The book and
-  its previous copy are now readable by your account only. The Mac app does
-  the same.
-- **Security: webhooks can no longer be redirected into your network, and can
-  be checked against replays.** Khayt checked a webhook's address and then
-  looked the name up again to send it, so a server that answered differently
-  the second time could reach a computer inside your network. It now sends to
-  the address it checked. That covers order webhooks, the event subscriptions
-  and accounting sync. Every signed webhook also carries `X-Khayt-Timestamp`
-  and `X-Khayt-Signature-V2`, so a receiver can refuse an old copy sent
-  again. The original `X-Khayt-Signature` is unchanged, so existing
-  integrations keep working. The Mac app sends the same headers.
-  **Accounting sync now needs an `https://` address.** It sends your secret
-  with every push, and plain `http://` let anyone between you and the
-  server read it. If yours starts with `http://`, change it in Settings ›
-  Accounting sync. Until you do, each paid order shows why it was not sent.
-- **Security: an older copy of your cloud data is not applied without you.**
-  Your cloud data is encrypted, so the server cannot change it, but a broken
-  or compromised server could still send back an older copy. Khayt would
-  have merged it as if it were current. It now remembers the newest version
-  it has seen for your shop and refuses an older one, showing why. If you
-  restored the cloud on purpose, **Trust the cloud's older copy** in
-  Settings › Khayt Cloud takes it, and changes made on this computer are
-  merged back in. The Mac app does the same.
-- **Freeing up space keeps the models you still need.** When old models were
-  moved off this computer to save space, "old" meant the file's own date. A
-  model downloaded years ago but imported last week counted as unused, and so
-  did one an unfinished job was waiting for. Now a model counts as used when
-  it was imported, last printed or last named in a job. A model an unfinished
-  job needs is never moved, and the settings say how many were kept for that
-  reason. The Mac app does the same.
+
 - **(Mac) Profit no longer counts VAT as money earned.** On a shop whose
   prices include VAT, the machine profit, product profit, profit per hour,
   break-even and Ledger margin figures counted the VAT as revenue: a job
@@ -281,33 +171,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   P&L showed 20 (20%). They now take the tax out first, the same way the P&L
   does. Shops that add tax on top, and shops with no tax set up, see no
   change.
-- **Tax added on top is now part of what a customer owes.** For a shop whose
-  tax is added on top of the price (US sales tax, for example), a $100 job at
-  8.25% is billed $108.25. Recording a $108.25 payment saved only $100, and
-  the job showed as settled at $100. Payments, the amount owed and the
-  paid/partial status now use the billed total. Prices that include tax are
-  unaffected.
-- **A gift card and a payment plan now settle a job.** A plan covers the price
-  minus the gift card. Once every payment in it was collected, the job still
-  showed as partly paid, as if the gift card had never been used. Restoring a
-  lost deposit had the same problem. The Mac payment sheet's "Owed" preview
-  now also counts gift cards and credit notes.
+
 - **(Mac) Invoice totals add up.** A 280 job made of 225 goods, 25 rush and 30
   shipping printed Subtotal 280, Rush 25, Shipping 30, Total 280. The
   Subtotal now shows the goods (225), as the desktop invoice does.
+
 - **(Mac) Invoices use the customer's currency.** A job with no currency of
   its own is now invoiced in the customer's currency, then the shop's, as the
   desktop does. Before, the Mac skipped the customer and used the shop's
   currency.
+
 - **(Mac) "Owed" is in the job's own currency.** The job inspector, the jobs
   table, the board and the customer's job list showed the amount owed in the
   shop's currency beside the job's currency sign. A 100 USD job on a riyal
   shop read "Owed 375.00 USD". These now show the amount in the job's own
   currency, like the price beside it.
+
 - **The ZATCA QR code includes the time.** The Mac stamped an invoice's QR
   code with the date alone. It now uses the full date and time in the format
   ZATCA requires (for example 2026-07-02T14:32:05Z). A job with no recorded
   time is stamped at midday on its date.
+
 - **(Mac) Network clients, security review.** Smart plugs are now held to
   the same rule as printers: a public IP address, loopback or a malformed host
   is refused before anything is sent (so a Home Assistant token or Tasmota
@@ -325,13 +209,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   `X-Khayt-Signature`. A Bambu printer's certificate pin moves to the login
   Keychain, and an MQTT packet over 4 MB is refused.
 
-- **A model moved to Google Drive to save space comes back.** When old models
-  were moved off this computer to free space, the desktop recorded every one
-  as going to your bucket, even when it went to Google Drive, and only ever
-  looked in the storage you use now. A model moved to Drive, or moved before
-  you switched between Drive and a bucket, could fail to open. The desktop
-  now records where each model really went, looks there first, then tries
-  the other storage you have connected. The Mac app does the same.
 - **(Mac) Security: imported files, the slicer and the book file.** A model
   pack can no longer slip in a link dressed as a model: a `dragon.stl` inside a
   RAR, 7-Zip or tgz pack that pointed at the shop's own book, an SSH key or
@@ -403,16 +280,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   shelf had since stopped covering was marked done with nothing printed. It
   is now counted again at the moment it is written, and whatever the shelf no
   longer holds goes to a machine.
-- **Moving a finished job back no longer takes its filament twice.** Finished
-  → QC → finished took a 200 g job's filament off the spool twice (1000 g to
-  600 g), in both apps, and the same with Move back or a drag. On the Mac,
-  leaving Completed now puts back exactly what finishing it took — each
-  spool's grams, and the glue and parts it used — and finishing again takes
-  one print's worth. In the desktop app the first deduction stands and
-  finishing again takes nothing more. A print that failed inspection is still
-  booked as waste, so a job re-opened, failed and reprinted takes two prints,
-  as it should. Jobs finished before this update are not charged again either.
-  Cancelling a finished job gives nothing back: the piece was made.
+
 - **(Mac) Undo no longer throws away what was written since.** Undo used to
   put back the whole record as it was before the action, so anything changed
   in between was lost: a delivery received onto a spool, a payment taken on the
@@ -424,6 +292,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   removes the actual time and weight recorded with it, undoing a QC failure
   removes its waste row, and undoing a library edit keeps a remeasure or a
   phone's change to the same model.
+
 - **Mac: removing something asks first.** Deleting a waste entry, a
   maintenance task, a spool, a consumable, a supplier or a message template,
   removing a line from a customer's log, clearing what a customer paid,
@@ -431,6 +300,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   folder and marking a product not stocked each happened in one click. They
   now ask, name what is about to go, and say whether Edit › Undo can bring it
   back. The buttons read "Delete…" to show a question follows.
+
 - **Mac: a product is not saved at a price of 0 without asking.** When the
   parts price to zero (a part with no filament chosen, say), Save now asks
   "Save at a price of 0?" and shows the price it would replace. Before, the
@@ -453,17 +323,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   for each. The Mac now remembers what it last agreed with the cloud on, so an
   overwritten local edit is actually detected.
 
-- **The shop's electricity price takes a real figure in every currency.** It
-  was capped at 100 per kWh, so a shop pricing in won or naira had its real
-  ~250 saved as 100 without a word. The ceiling is now 10,000 per kWh, and
-  every place that reads the price uses that one figure: a higher stored
-  value is costed at the ceiling, and a blank, negative or non-numeric one is
-  still ignored.
-- **A blank electricity figure on a calculator preset no longer means free
-  electricity.** A tariff field holding only spaces was costed at 0 per kWh in
-  a job's costing while the online quote ignored it. Both now treat it as not
-  set, so the shop's own price applies. The same goes for the preset's other
-  rates and a machine's power draw and wear rate.
 - **(Mac) LAN server security fixes.** The calendar feed (`/calendar.ics`)
   now opens only with its own subscription token. It used to accept the owner
   PIN with no lockout, so anyone on the shop's Wi-Fi could guess the PIN there
@@ -4563,6 +4422,137 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.4] - 2026-10-03
+
+Money that adds up for shops that add tax on top, since 3.11.3. Individual
+entries are kept below; this is what changed for you.
+
+**If your prices are before tax, Khayt now bills, records and reports the
+tax.** A $100 job at 8.25% is $108.25: the payment box takes it, the job is
+paid when the tax is paid, payment plans and price edits agree, the
+customer's tracking page shows what is owed, and cash flow counts the tax
+you collected. **Orders you settled before this release stay settled.**
+Shops whose prices include tax, or that charge none, see no change.
+
+**Profit no longer counts the tax you collect.** Machine and product profit,
+break-even, the forecast and the client reports count what a job earned.
+
+**Customer names in campaign emails are sent as text.** Marking a job
+shipped tells your webhooks. Supports count in the weight estimate.
+Finished-print records are not lost when two places save them.
+
+### Security
+
+- **Security: customer names in campaign emails are sent as text.** A
+  customer whose name contained HTML (for example `<img …>`) had it read as
+  part of the email's markup. Names and the other filled-in values are now
+  escaped in emails. WhatsApp and SMS messages are unchanged.
+
+### Fixed
+
+- **Tax added on top: the payment box, price edits, payment plans and cash
+  flow all use the full amount.** The payment box would not take more than
+  the pre-tax price, so $108.25 could not be recorded on a $100 job. Editing
+  the price rewrote the job as paid by guesswork. Cash flow left out the tax
+  collected. And editing the payment plan of a job you had already settled
+  before this change could make it "partial" again. All four now agree:
+  jobs settled before tax-on-top was counted stay settled, and new ones are
+  paid at price plus tax.
+
+- **Orders you settled before this release stay settled.** On a shop that
+  adds tax on top, earlier releases capped a payment at the price, so every
+  order you had marked paid read as paid at the pre-tax figure. The new tax
+  rule moved all of them into receivables owing the tax, with a balance on
+  the customer portal. An order already recorded as paid that covered its
+  price now counts as settled. Payments recorded from now on are marked as
+  covering price plus tax and are judged that way.
+
+- **Marking a job shipped tells your webhooks.** The Mark shipped button on
+  the board never sent the `order_shipped` event that the Ship dialog does,
+  so an automation listening for parcels missed those jobs. Both now send
+  the same event with the same contents, as the Mac app does.
+
+- **The weight estimate in the "what did it really use" box includes
+  supports.** It counted the model only, so a print with supports looked
+  over its estimate.
+
+- **The executive summary costs a job the way the Mac does,** so its margin
+  matches the dashboard on both apps.
+
+- **Finished-print records are kept when two places save them.** Saving
+  wrote this session's list over what was there, so a record saved by the
+  Mac app or another window could be lost. They are merged now.
+
+- **Shops that add tax on top are paid on the right amount.** If your prices
+  are before tax, a $100 job with 8.25% tax is $108.25. Khayt already showed
+  $108.25 owed, but capped a payment at $100 and called the job paid at
+  $100. Now a payment can cover the tax, a job is paid when the tax is paid,
+  and editing the price or restoring a deposit keeps that true. The customer
+  portal agrees.
+
+- **Profit no longer counts the tax you collect.** Machine profit, product
+  profit and break-even counted VAT as money the shop made, so a job charged
+  115 that cost 80 showed 35 profit instead of 20. They now use what the job
+  earned, as the P&L already did. So do the forecast, customer mix, client
+  value, cost trends and client sources reports. Cash flow and the revenue
+  totals still show what customers were charged.
+
+- **A gift card plus a payment plan can reach "paid".** Such a job stayed
+  "partial" after its last instalment, because the plan ignored the gift card
+  and any credit note.
+
+- **The invoice Subtotal line uses the same rule as the Mac.** It is the
+  items before any discount, so Subtotal, Rush, Shipping and Total add up.
+
+- **Dates, stock and the dashboard: a correctness sweep.**
+  - **(Mac) A Mac set to the Hijri calendar keeps its figures.** "This month",
+    the masthead's net/gross/COGS, Reports by month/quarter/year and the
+    storefront lead time read the Mac's own calendar, so on Umm al-Qura the
+    month was "1448-04" and matched nothing. They read the book's Gregorian
+    calendar now; a test fails on any `Calendar.current` default.
+  - **(Mac) "A payment arrives" emails are sent.** Recording a payment let it
+    through for SendGrid, Mailgun or SMTP and then sent only the webhooks.
+  - **A measured weight is the whole print.** Completing with a measured
+    weight charged it all to the parts that have a spool, and added it to
+    what a mid-print spool switch had already taken. Each part now takes its
+    own share, less its switch. The Mac's completion sheet also counts
+    support in the weight it suggests.
+  - **(Mac) A web-store order that is partly on the shelf prints only the
+    rest**, instead of printing the shelf's pieces again.
+  - **Moving a job back from Shipped to Completed un-ships it.** It used to
+    complete the job a second time: the webhooks, Telegram and the order
+    email went out again and the Mac asked for the actuals again.
+  - **Printer measurements survive a restart.** After a relaunch, the first
+    finished print replaced the saved history. A job whose file matches no
+    print no longer gets another print's figures.
+  - **Depreciation by the hour stops at the machine's life**, with or without
+    a purchase date.
+  - **The dashboard leaves out cancelled jobs** from the order count and
+    what is owed, and judges on-time by your own day. The Mac's cost of goods
+    now matches the desktop's (costed parts and shipping).
+  - QC waste is dated by your own day. (Mac) The gift card status filter
+    works with an empty search, shipping fires `order_shipped`, "Open in
+    slicer" never opens a PDF, and moving a folder refuses a path past 60
+    characters, which would have merged it with another folder.
+
+- **Tax added on top: the customer's tracking page shows what is owed.** It
+  showed the pre-tax price ("100.00" while 108.25 was owed), and the balance
+  left to pay was short by the tax. Both apps publish this page. Shops that
+  include VAT in their prices, and shops with no tax, see no change.
+
+- **Tax added on top is now part of what a customer owes.** For a shop whose
+  tax is added on top of the price (US sales tax, for example), a $100 job at
+  8.25% is billed $108.25. Recording a $108.25 payment saved only $100, and
+  the job showed as settled at $100. Payments, the amount owed and the
+  paid/partial status now use the billed total. Prices that include tax are
+  unaffected.
+
+- **A gift card and a payment plan now settle a job.** A plan covers the price
+  minus the gift card. Once every payment in it was collected, the job still
+  showed as partly paid, as if the gift card had never been used. Restoring a
+  lost deposit had the same problem. The Mac payment sheet's "Owed" preview
+  now also counts gift cards and credit notes.
 
 ## [3.11.3] - 2026-10-02
 
