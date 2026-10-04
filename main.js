@@ -865,6 +865,33 @@ function writePreUpgradeBackup(raw, diskVersion) {
 }
 
 /**
+ * Copy the book aside the first time a different APP version opens it — see
+ * lib/upgrade-backup.js needsAppVersionBackup. Same contract as the schema
+ * backup above: verbatim raw bytes, before anything in this build touches them,
+ * and best-effort (the caller logs a failure; a shop must still open its app).
+ * The marker is written only after the copy is safely on disk, so a failed copy
+ * is tried again next launch rather than forgotten.
+ */
+const LAST_APP_VERSION_FILE = 'last-app-version';
+function writeAppVersionBackup(raw) {
+  const userData = app.getPath('userData');
+  const markerPath = path.join(userData, LAST_APP_VERSION_FILE);
+  const current = app.getVersion();
+  let last = null;
+  try { last = fs.readFileSync(markerPath, 'utf8').trim() || null; } catch (_) { /* never recorded */ }
+  if (!upgradeBackup.needsAppVersionBackup(last, current, !!raw)) return null;
+  const dir = backupsDir();
+  let fullPath = null;
+  if (!upgradeBackup.hasBackupForVersion(fs.readdirSync(dir), current)) {
+    fullPath = path.join(dir, upgradeBackup.appVersionBackupName(last, current, new Date().toISOString()));
+    fs.writeFileSync(fullPath, JSON.stringify(encryptForDisk(raw)), 'utf8');
+    console.warn(`app ${last || 'unknown'} → ${current}: kept a backup at ${fullPath}`);
+  }
+  fs.writeFileSync(markerPath, current + '\n', 'utf8');
+  return fullPath;
+}
+
+/**
  * The one copy of the book a full wipe keeps: written, then read back, before
  * the wipe is scheduled. Throws if it cannot be both — the caller then deletes
  * nothing. Returns null when there is no book to keep (a fresh install).
@@ -1449,7 +1476,12 @@ ipcMain.handle('hub:load-store', async (event) => {
     // on empty state and then overwrite the good file on the next save.
     const rec = recoverStoreRaw(MAX_STORE_BYTES);
     if (!rec.data) {
-      if (!rec.existed) return null; // genuinely a fresh install
+      if (!rec.existed) {
+        // Genuinely a fresh install. Record the version now, or the second
+        // launch would read "never recorded" as an upgrade and copy a new book.
+        try { fs.writeFileSync(path.join(app.getPath('userData'), LAST_APP_VERSION_FILE), app.getVersion() + '\n', 'utf8'); } catch (_) { /* best-effort */ }
+        return null;
+      }
       console.error('hub:load-store: store unreadable; quarantined to', rec.quarantined);
       return { __corrupt: true, error: 'Store unreadable', quarantined: rec.quarantined };
     }
@@ -1463,6 +1495,8 @@ ipcMain.handle('hub:load-store', async (event) => {
     // the backups directory is unwritable, so a failure here is logged, not fatal.
     try { writePreUpgradeBackup(rec.data, _diskStoreVersion); }
     catch (e) { console.error('hub:load-store: pre-upgrade backup failed:', e && e.message || e); }
+    try { writeAppVersionBackup(rec.data); }
+    catch (e) { console.error('hub:load-store: app-version backup failed:', e && e.message || e); }
     syncLanServerStoreFromDisk();
     const { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
     if (!normalized) {

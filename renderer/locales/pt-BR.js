@@ -2434,6 +2434,7 @@
   "mach.last_service": "Horas na última manutenção",
   "mach.dep_title": "Depreciação",
   "mach.dep_hint": "Quanto a máquina custou e quanto tempo dura. Isso define a taxa de desgaste nos orçamentos e conta o desgaste no DRE uma única vez, como depreciação. Deixe o preço vazio para não contar.",
+  "mach.dep_hint_maker": "Quanto a impressora custou e quanto tempo dura. A calculadora usa isso para o desgaste por hora. Deixe o preço vazio para manter a taxa de desgaste fixa.",
   "mach.dep_price": "Preço de compra",
   "mach.dep_date": "Data de compra",
   "mach.dep_life": "Vida útil",

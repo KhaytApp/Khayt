@@ -2433,6 +2433,7 @@
   "mach.last_service": "Horas en el último servicio",
   "mach.dep_title": "Depreciación",
   "mach.dep_hint": "Lo que costó la máquina y cuánto dura. Fija su tasa de desgaste para presupuestos y cuenta su desgaste en la cuenta de resultados una sola vez, como depreciación. Deja el precio vacío si no quieres.",
+  "mach.dep_hint_maker": "Lo que costó la impresora y cuánto dura. La calculadora lo usa para el desgaste por hora. Deja el precio vacío para mantener la tasa de desgaste fija.",
   "mach.dep_price": "Precio de compra",
   "mach.dep_date": "Fecha de compra",
   "mach.dep_life": "Vida útil",

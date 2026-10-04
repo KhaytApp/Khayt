@@ -2433,6 +2433,7 @@
   "mach.last_service": "Son bakımdaki saat",
   "mach.dep_title": "Amortisman",
   "mach.dep_hint": "Makinenin maliyeti ve ne kadar dayandığı. Tekliflerdeki aşınma oranını belirler ve aşınmayı kâr-zarar tablosunda bir kez, amortisman olarak sayar. İstemiyorsanız fiyatı boş bırakın.",
+  "mach.dep_hint_maker": "Yazıcının maliyeti ve ne kadar dayandığı. Hesaplayıcı bunu saatlik aşınma için kullanır. Sabit aşınma oranını korumak için fiyatı boş bırakın.",
   "mach.dep_price": "Satın alma fiyatı",
   "mach.dep_date": "Satın alma tarihi",
   "mach.dep_life": "Kullanım ömrü",

@@ -2433,6 +2433,7 @@
   "mach.last_service": "上次维护时的工时",
   "mach.dep_title": "折旧",
   "mach.dep_hint": "设备的价格和使用寿命。它决定报价中的磨损费率，并在损益表中以折旧的形式只计算一次磨损。不需要时请将价格留空。",
+  "mach.dep_hint_maker": "打印机的价格和使用寿命。计算器用它来计算每小时的磨损费。将价格留空可保留固定磨损费率。",
   "mach.dep_price": "购买价格",
   "mach.dep_date": "购买日期",
   "mach.dep_life": "使用寿命",

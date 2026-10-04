@@ -2433,6 +2433,7 @@
   "mach.last_service": "Heures au dernier entretien",
   "mach.dep_title": "Amortissement",
   "mach.dep_hint": "Ce que la machine a coûté et sa durée de vie. Cela fixe son taux d’usure pour les devis et compte son usure une seule fois dans le compte de résultat, comme amortissement. Laissez le prix vide pour ne rien compter.",
+  "mach.dep_hint_maker": "Ce que l’imprimante a coûté et sa durée de vie. Le calculateur s’en sert pour l’usure par heure. Laissez le prix vide pour garder le taux d’usure fixe.",
   "mach.dep_price": "Prix d’achat",
   "mach.dep_date": "Date d’achat",
   "mach.dep_life": "Durée d’utilisation",

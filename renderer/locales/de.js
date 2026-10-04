@@ -2433,6 +2433,7 @@
   "mach.last_service": "Stunden bei letztem Service",
   "mach.dep_title": "Abschreibung",
   "mach.dep_hint": "Was die Maschine gekostet hat und wie lange sie hält. Daraus ergibt sich ihr Verschleißsatz für Angebote, und ihr Verschleiß erscheint in der GuV einmal, als Abschreibung. Preis leer lassen für keine.",
+  "mach.dep_hint_maker": "Was der Drucker gekostet hat und wie lange er hält. Der Rechner nutzt das für den Verschleiß pro Stunde. Preis leer lassen, um den festen Verschleißsatz zu behalten.",
   "mach.dep_price": "Kaufpreis",
   "mach.dep_date": "Kaufdatum",
   "mach.dep_life": "Nutzungsdauer",

@@ -2434,6 +2434,7 @@
   "mach.last_service": "Hours at last service",
   "mach.dep_title": "Depreciation",
   "mach.dep_hint": "What the machine cost and how long it lasts. It sets the machine's wear rate for quotes, and counts its wear in the P&L once, as depreciation. Leave the price empty for none.",
+  "mach.dep_hint_maker": "What the printer cost and how long it lasts. The calculator uses it for the printer's wear per hour. Leave the price empty to keep the flat wear rate.",
   "mach.dep_price": "Purchase price",
   "mach.dep_date": "Purchase date",
   "mach.dep_life": "Useful life",

@@ -327,6 +327,49 @@
       const img = document.querySelector(`.pf-card[data-id="${CSS.escape(id)}"] .pf-thumb`);
       if (img && img.tagName === 'IMG') img.src = safeImageSrc(src);
     }
+    /* A preview the record names and the disk does not have. Previews live
+     * beside the model now, not in the book, so a backup restored onto another
+     * computer — or after a wipe — brings back records whose pictures stayed
+     * behind, and each card sat on an empty <img> forever. The picture was only
+     * ever made FROM the model file, so where the model is here it is made
+     * again; where it is not, the card says so instead of showing a blank. */
+    for (const w of wanted) {
+      if (got && Object.prototype.hasOwnProperty.call(got, w.id)) continue;
+      const rec = (printFiles || []).find((r) => r && r.id === w.id);
+      if (rec && rec.thumbFile === w.file) rebuildThumb(rec);
+    }
+  }
+
+  const _thumbRebuilding = new Set();
+  async function rebuildThumb(rec) {
+    if (!rec || _thumbRebuilding.has(rec.id)) return;
+    _thumbRebuilding.add(rec.id);
+    try {
+      const hub = api(); if (!hub) return;
+      delete rec.thumbFile;
+      const ext = String((rec.sourceFile && rec.sourceFile.ext) || '').toLowerCase();
+      const full = rec.sourceFile ? await resolveModelPath(rec) : null;
+      if (full) {
+        if ((ext === 'gcode' || ext === 'gco' || ext === '3mf') && hub.extractThumbnail) {
+          const th = await hub.extractThumbnail(full);
+          if (th && th.pngBase64) await setThumb(rec, await resizeDataUrl('data:image/png;base64,' + th.pngBase64, 280, 0.82), 'embedded');
+        } else if (ext === 'stl' && hub.printLibReadBytes && typeof KhaytStl !== 'undefined' && typeof KhaytStlThumb !== 'undefined') {
+          const rb = await hub.printLibReadBytes(full);
+          if (rb && rb.ok && rb.b64) {
+            const g = KhaytStl.parseStl(base64ToArrayBuffer(rb.b64), { keepTriangles: true });
+            if (g.triangles && g.triangles.length) {
+              const r = KhaytStlThumb.renderStlThumbnail(g.triangles, { size: 300 });
+              if (r.ok && r.dataUrl) await setThumb(rec, r.dataUrl, 'render');
+            }
+          }
+        }
+      }
+      // Where the picture lives is this computer's business, not an edit to the
+      // print, so updatedAt is left alone and nothing re-syncs over it.
+      saveAll();
+      renderPrintFiles();
+    } catch (_) { /* a card with the icon is fine; a thrown handler is not */ }
+    finally { _thumbRebuilding.delete(rec.id); }
   }
 
   function thumbHtml(rec) {
