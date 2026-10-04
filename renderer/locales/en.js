@@ -2128,6 +2128,7 @@
   "set.supplier_ph": "+966 5x xxx xxxx",
   "inv.browse_catalog": "🔍 Browse Manufacturer Catalog",
   "inv.catalog_title": "Browse Filament Catalog",
+  "inv.catalog_more": "{n} more — type a brand or colour to narrow",
   "inv.catalog_search_ph": "Search brand, color, type…",
   "inv.catalog_all_brands": "All brands",
   "inv.catalog_all_types": "All types",

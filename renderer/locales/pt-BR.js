@@ -2128,6 +2128,7 @@
   "set.supplier_ph": "+55 11 9xxxx-xxxx",
   "inv.browse_catalog": "🔍 Navegar no catálogo do fabricante",
   "inv.catalog_title": "Navegar no catálogo de filamentos",
+  "inv.catalog_more": "Mais {n} — digite uma marca ou cor para filtrar",
   "inv.catalog_search_ph": "Buscar marca, cor, tipo…",
   "inv.catalog_all_brands": "Todas as marcas",
   "inv.catalog_all_types": "Todos os tipos",

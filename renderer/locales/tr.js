@@ -2127,6 +2127,7 @@
   "set.supplier_ph": "+966 5x xxx xxxx",
   "inv.browse_catalog": "🔍 Üretici Kataloğuna Göz At",
   "inv.catalog_title": "Filament Kataloğuna Göz At",
+  "inv.catalog_more": "{n} tane daha — daraltmak için bir marka veya renk yazın",
   "inv.catalog_search_ph": "Marka, renk, tür ara…",
   "inv.catalog_all_brands": "Tüm markalar",
   "inv.catalog_all_types": "Tüm türler",

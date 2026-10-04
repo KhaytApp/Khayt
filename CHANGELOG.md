@@ -12,6 +12,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   they are priced, and taken off the shelf when the job is finished. A print
   file can carry its own "Consumables per print", which come with it into the
   calculator and into products made from it. Reported by a tester.
+- **Browse catalog has about 2,100 filaments and 16,000 colours.** The
+  desktop's filament catalogue was a short hand-made list, and its Bambu
+  matte colours were made up. It now uses the same catalogue as the Mac app,
+  built from the Open Filament Database, SpoolmanDB and Bambu Lab's own
+  colours. Typing several words narrows to the filament you mean, for
+  example "bambu pla matte".
 
 - **(Mac) Calculator: several filaments, purge and consumables.**
   - Add filament / colour puts a second, third… spool on one print, each with

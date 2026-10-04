@@ -2127,6 +2127,7 @@
   "set.supplier_ph": "+966 5x xxx xxxx",
   "inv.browse_catalog": "🔍 Katalog durchsuchen",
   "inv.catalog_title": "Filamentkatalog durchsuchen",
+  "inv.catalog_more": "{n} weitere — Marke oder Farbe eingeben, um einzugrenzen",
   "inv.catalog_search_ph": "Marke, Farbe, Typ suchen…",
   "inv.catalog_all_brands": "Alle Marken",
   "inv.catalog_all_types": "Alle Typen",

@@ -2127,6 +2127,7 @@
   "set.supplier_ph": "+966 5x xxx xxxx",
   "inv.browse_catalog": "🔍 浏览品牌目录",
   "inv.catalog_title": "浏览耗材目录",
+  "inv.catalog_more": "还有 {n} 个 — 输入品牌或颜色以缩小范围",
   "inv.catalog_search_ph": "搜索品牌、颜色、类型…",
   "inv.catalog_all_brands": "所有品牌",
   "inv.catalog_all_types": "所有类型",

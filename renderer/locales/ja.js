@@ -2127,6 +2127,7 @@
   "set.supplier_ph": "+966 5x xxx xxxx",
   "inv.browse_catalog": "🔍 メーカーカタログを閲覧",
   "inv.catalog_title": "フィラメントカタログを閲覧",
+  "inv.catalog_more": "他に {n} 件 — ブランドや色を入力して絞り込みます",
   "inv.catalog_search_ph": "ブランド、カラー、タイプで検索…",
   "inv.catalog_all_brands": "全ブランド",
   "inv.catalog_all_types": "全タイプ",
