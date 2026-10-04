@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A job's margin counts its components.** The margin shown on each job in
+  Orders, sorting by margin, and the calculator's AI price suggestion left
+  out a product's components, so a job with magnets or hardware looked more
+  profitable than it was. They now include them, as the Mac app does. Your
+  P&L is unchanged: buying components is already counted as an expense.
+
 - **A quote from a product with components shows its full price.** Taking a
   job from a catalogue product that has components (magnets, hardware), the
   calculator's total left them out, while the job was saved with them. A
