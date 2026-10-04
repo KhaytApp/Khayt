@@ -398,6 +398,33 @@ function wireEvents() {
     return { nozzleDiameter: m.nozzleDiameter, bed: m.bed };
   }
 
+  /**
+   * A project sliced as two or more plates: quote the whole project (the
+   * default, every plate added up) or one plate. Hidden for anything else.
+   */
+  function showPlatePicker(res, wholeG, wholeH) {
+    const box = $('#calcPlatePick');
+    const sel = $('#calcPlateSelect');
+    if (!box || !sel) return;
+    const plates = (res && Array.isArray(res.plates) && res.plates.length >= 2) ? res.plates : null;
+    if (!plates) { box.style.display = 'none'; sel.innerHTML = ''; sel.onchange = null; return; }
+    const fmt = (g, mins) => [mins != null ? (Math.round(mins / 6) / 10) + ' h' : '', g != null ? (Math.round(g * 10) / 10) + ' g' : ''].filter(Boolean).join(' · ');
+    sel.innerHTML = `<option value="all">${escapeHtml(t('calc.plate_whole', { n: String(plates.length) }) || `Whole project (${plates.length} plates)`)}</option>`
+      + plates.map((pl, i) => {
+        const label = (t('plib.plate', { n: String(pl.index || i + 1) }) || `Plate ${pl.index || i + 1}`) + (pl.name ? ' · ' + pl.name : '');
+        return `<option value="${i}">${escapeHtml(label + ' — ' + fmt(pl.filamentGrams, pl.printTimeMins))}</option>`;
+      }).join('');
+    sel.value = 'all';
+    sel.onchange = () => {
+      if (sel.value === 'all') { fillWeightTime(wholeG, wholeH); return; }
+      const pl = plates[+sel.value];
+      if (pl) fillWeightTime(pl.filamentGrams != null ? pl.filamentGrams : null, pl.printTimeMins != null ? pl.printTimeMins / 60 : null);
+    };
+    box.style.display = '';
+  }
+  // A new part starts with no file, so no plates to choose from.
+  document.addEventListener('khayt:calc-part-added', () => { const b = $('#calcPlatePick'); if (b) b.style.display = 'none'; });
+
   function applyIntake(res, filename, { quiet = false } = {}) {
     const over = {
       machineId: $('#partMachineId')?.value || $('#machineAssign')?.value || null,
@@ -424,6 +451,7 @@ function wireEvents() {
     lastEstimate = view.mode === 'estimate' ? { res, filename } : null;
 
     fillWeightTime(view.weightG, view.timeH);
+    showPlatePicker(res, view.weightG, view.timeH);
     setModelNote(view.note.map((line) => {
       const vars = Object.assign({}, line.vars);
       // A missing slicer name reads better as "your slicer" than as a blank.

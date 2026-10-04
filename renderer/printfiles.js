@@ -371,6 +371,55 @@
     return `<div class="pf-colors">${dots}${swap}</div>`;
   }
 
+  /** What a parse says, as a record keeps it: the totals, and for a project of
+   *  two or more plates each plate's own time and grams (#1742). */
+  const PLATE_SCAN = 1;   // bump to re-read every 3MF once more
+  function platesParsed(p) {
+    const out = { printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams, filamentType: p.filamentType, slicer: p.slicer, plateScan: PLATE_SCAN };
+    out.plates = Array.isArray(p.plates) && p.plates.length >= 2 ? p.plates : undefined;
+    out.filaments = Array.isArray(p.filaments) && p.filaments.length ? p.filaments : undefined;
+    return out;
+  }
+
+  /** "3 plates", opened to each plate's name, time and grams. */
+  function platesHtml(rec) {
+    const plates = rec.parsed && Array.isArray(rec.parsed.plates) ? rec.parsed.plates : [];
+    if (plates.length < 2) return '';
+    const rows = plates.map((pl, i) => {
+      const label = (t('plib.plate', { n: String(pl.index || i + 1) }) || `Plate ${pl.index || i + 1}`) + (pl.name ? ' · ' + pl.name : '');
+      const bits = [fmtTime(pl.printTimeMins), pl.filamentGrams ? Math.round(pl.filamentGrams * 10) / 10 + ' g' : '', pl.filamentType || ''].filter(Boolean).join(' · ');
+      return `<div class="pf-plate-row"><span>${escapeHtml(label)}</span><span class="pf-plate-figs">${escapeHtml(bits)}</span></div>`;
+    }).join('');
+    return `<details class="pf-plates"><summary>${escapeHtml(t('plib.plates_n', { n: String(plates.length) }) || `${plates.length} plates`)}</summary>${rows}</details>`;
+  }
+
+  /**
+   * Re-read every 3MF imported before the plate readers learned to add plates
+   * up (#1742): such a file's time and grams were the first plate's alone.
+   * Once per session, one file at a time, after the library is on screen, and
+   * marked so it is never read twice.
+   */
+  let _plateRescanDone = false;
+  async function rescanOldPlates() {
+    if (_plateRescanDone) return;
+    _plateRescanDone = true;
+    const hub = api(); if (!hub || !hub.parsePrintFile || !hub.printLibList) return;
+    const stale = (printFiles || []).filter((r) => r && /^3mf$/i.test(String(r.sourceFile && r.sourceFile.ext || ''))
+      && !(r.parsed && r.parsed.plateScan >= PLATE_SCAN));
+    let changed = 0;
+    for (const rec of stale) {
+      try {
+        const fullPath = await resolveModelPath(rec);
+        if (!fullPath) continue;
+        const p = await hub.parsePrintFile(fullPath);
+        if (!p || p.ok === false) continue;
+        rec.parsed = Object.assign({}, rec.parsed, platesParsed(p));
+        changed++;
+      } catch (_) { /* one unreadable file does not stop the rest */ }
+    }
+    if (changed) { saveAll(); renderPrintFiles(); }
+  }
+
   function metaChips(rec) {
     const p = rec.parsed || {};
     const chips = [];
@@ -675,6 +724,7 @@
         <div class="pf-body">
           <div class="pf-name" title="${escapeHtml(rec.originalName || rec.name)}">${escapeHtml(rec.name || rec.originalName || 'Untitled')}</div>
           <div class="pf-chips">${metaChips(rec)}</div>
+          ${platesHtml(rec)}
           ${partsListHtml(rec)}
           ${colorDotsHtml(rec)}
           ${prof ? `<div class="pf-prof">${_bi('nozzle', '🛠')}${escapeHtml(prof.name)}</div>` : ''}
@@ -929,6 +979,8 @@
   function resetPage() { _page = PAGE; growThumbCache(PAGE); }
 
   function renderPrintFiles() {
+    // Older multi-plate 3MFs get their corrected totals, once, after the library shows.
+    if (!_plateRescanDone) setTimeout(rescanOldPlates, 3000);
     const el = document.getElementById('printfiles-tab');
     if (!el) return;
     wirePfDrop();
@@ -1929,7 +1981,7 @@
             // outside the directories it will read. That refusal was silent too.
             else problem = problem || p.error || '';
           }
-          if (p && p.ok !== false) rec.parsed = Object.assign({}, rec.parsed, { printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams, filamentType: p.filamentType, slicer: p.slicer });
+          if (p && p.ok !== false) rec.parsed = Object.assign({}, rec.parsed, platesParsed(p));
           // A g-code file has no mesh, so it used to get no geometryKey at all —
           // and its contentHash changes on every re-slice, so the same model came
           // back a stranger and per-file calibration never reached MIN_JOBS. The
