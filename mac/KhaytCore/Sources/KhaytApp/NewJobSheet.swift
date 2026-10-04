@@ -140,7 +140,7 @@ struct NewJobSheet: View {
             // nil, so every part over a kilo arrived as nothing.
             row.grams = Money.fieldValue(Shop.plainNumber(o["printWeight"]))
             row.hours = Money.fieldValue(Shop.plainNumber(o["printTime"]))
-            row.qty = max(1, Int(Shop.plainNumber(o["qty"]) ?? 1))
+            row.qty = max(1, min(999, Int(saturating: Shop.plainNumber(o["qty"]) ?? 1)))
             return row
         }
     }
@@ -152,6 +152,37 @@ struct NewJobSheet: View {
     /// What the product's components add (magnets, a box) — priced with the
     /// cart at cost plus margin, as the shared rule saves the job.
     @State private var componentsCost: Double = 0
+    /// How many assemblies the job makes: what the components are counted
+    /// by (`lib/order-new.js`, `qtyPerUnit × assemblyQty`). Starts at the
+    /// product's own, and the paper's Components line can change it.
+    @State private var assemblyQty: Int = 1
+
+    /// A filled-in sheet without the async fill — for the snapshot harness,
+    /// which cannot wait for `onAppear`'s engine calls.
+    struct Seed {
+        var project = ""
+        var parts: [Draft] = []
+        var product: Product?
+        var componentsCost: Double = 0
+        var assemblyQty = 1
+    }
+
+    init(shop: Shop, seed: Seed? = nil) {
+        self.shop = shop
+        if let seed {
+            _project = State(initialValue: seed.project)
+            _parts = State(initialValue: seed.parts)
+            _product = State(initialValue: seed.product)
+            _componentsCost = State(initialValue: seed.componentsCost)
+            _assemblyQty = State(initialValue: seed.assemblyQty)
+        }
+    }
+
+    /// The product's components, when it has any.
+    private var hasComponents: Bool {
+        guard let product, case .array(let list)? = product.rest["components"] else { return false }
+        return list.contains { if case .object(let o) = $0, o["consumableId"] != nil { return true }; return false }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -195,11 +226,18 @@ struct NewJobSheet: View {
                 // is asked once per part, so the cart fills in a beat later
                 // than the name — and the total with it.
                 Task { parts = await shop.jobParts(from: taken) }
-                Task { componentsCost = await shop.jobComponentsCost(of: taken) }
+                assemblyQty = Shop.assemblyQty(of: taken)
+                Task { componentsCost = await shop.jobComponentsCost(of: taken, assemblyQty: Double(assemblyQty)) }
             }
             focused = true
         }
         .task(id: signature) { await reprice() }
+        // Recounted when the number of assemblies moves — the components are
+        // counted by it, so the line and the total follow.
+        .onChange(of: assemblyQty) { _, qty in
+            guard let product else { return }
+            Task { componentsCost = await shop.jobComponentsCost(of: product, assemblyQty: Double(qty)) }
+        }
         .onChange(of: clientId) { _, chosen in Task { await customerChosen(chosen) } }
     }
 
@@ -293,6 +331,8 @@ struct NewJobSheet: View {
                 .padding(.vertical, 2)
             }
 
+            if hasComponents { componentsLine }
+
             // ABOVE the form it fills, not below it. Below, a shop types a
             // description and has to look UP to watch grams and hours appear —
             // the order on screen has to be the order of the work: say what it
@@ -300,6 +340,28 @@ struct NewJobSheet: View {
             describeBox
             partForm
         }
+    }
+
+    /// The product's components, on the paper with the parts: the total
+    /// includes them (the shared rule prices them at cost plus margin), so a
+    /// total with no line for them did not add up to what was shown.
+    private var componentsLine: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 8) {
+                Text(shop.words.callIt("mac.job_components")).lineLimit(1)
+                Stepper(value: $assemblyQty, in: 1...999) {
+                    Text("×" + Words.plain(.number(Double(assemblyQty))))
+                        .foregroundStyle(.secondary).monospacedDigit()
+                }
+                .fixedSize()
+                Spacer()
+                Text(Money.figure(componentsCost)).monospacedDigit().foregroundStyle(.secondary)
+            }
+            Text(shop.words.callIt("mac.job_components_hint"))
+                .font(.caption).foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 2)
     }
 
     /// Describe the job in words and let the assistant fill the part.
@@ -864,7 +926,9 @@ struct NewJobSheet: View {
             part.spoolId.flatMap { id in shop.spools.first { $0.id == id }?.material }
         }.first ?? ""
         guard let raw = await shop.priceComparablesRaw(material: material) else { return }
-        let cost = parts.reduce(0.0) { $0 + $1.cost * Double($1.qty) }
+        // What the job costs, components included: the margin advised is
+        // measured against everything the price has to cover.
+        let cost = parts.reduce(0.0) { $0 + $1.cost * Double($1.qty) } + componentsCost
         let grams = parts.reduce(0.0) { $0 + (Double($1.grams) ?? 0) * Double($1.qty) }
         let hours = parts.reduce(0.0) { $0 + (Double($1.hours) ?? 0) * Double($1.qty) }
         switch await shop.recommendMargin(comparables: c, raw: raw, cost: cost,
@@ -896,6 +960,7 @@ struct NewJobSheet: View {
             parts: parts, project: project, clientId: clientId,
             margin: margin, discountPct: discountPct, shippingCost: shippingCost,
             deposit: deposit, rush: rush, asQuote: asQuote, fromProduct: product,
+            assemblyQty: hasComponents ? Double(assemblyQty) : nil,
             rule: rule, extraLines: extraLines))
         if shop.moveProblem == nil { shop.takingAJob = false } else { problem = shop.moveProblem }
     }

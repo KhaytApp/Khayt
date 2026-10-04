@@ -47,7 +47,9 @@ jobs:
         run: npm ci
 
       - name: Fetch the catalogue
-        run: python3 scripts/fetch-filament-catalog.py
+        # `--latest` moves the pinned commits to each repository's head and
+        # records them in the file, so the PR names exactly what it takes.
+        run: python3 scripts/fetch-filament-catalog.py --latest
 
       # The Mac app carries its own copy and a guard in the suite fails if the
       # two drift, so syncing here is what makes the PR able to pass its own
