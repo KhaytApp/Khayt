@@ -5252,3 +5252,9 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
   transform: none;
   filter: none;
 }
+
+/* A multi-plate project's plates, under its chips (renderer/printfiles.js platesHtml). */
+.pf-plates { margin-top: 4px; font-size: 12px; color: var(--text-muted); }
+.pf-plates summary { cursor: pointer; }
+.pf-plate-row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.pf-plate-figs { font-variant-numeric: tabular-nums; white-space: nowrap; }

@@ -45,6 +45,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     "Matte Beige" and "Black".
   - (Mac) The spool sheet no longer reads the catalogue file on every
     keystroke. It reads it once per engine.
+- **Bambu PLA Matte colours are Bambu's own.** The colour list had twelve
+  made-up matte names ("Matte White", "Matte Mint"), filed Charcoal, Scarlet
+  Red and Lemon Yellow under PLA Basic, listed a matte "Dark Gray" that does
+  not exist, and gave Basic Pink the colour of Matte Sakura Pink. It now has
+  Bambu's 25 PLA Matte colours with their real names and colours. Reported by
+  a tester.
+- **A 3MF with several plates shows every plate.** Print Files shows how many
+  plates a project has and each plate's time and filament, and the
+  calculator lets you quote the whole project or a single plate. Projects
+  you imported before now get their full totals, read again once in the
+  background. They used to show the first plate's figures. Reported by a
+  tester.
 
 - **A multi-plate 3MF counts every plate, and Bambu PLA Matte colours are
   right.** Reported by a tester.
