@@ -87,7 +87,7 @@ struct SlicerFiguresTests {
         // rounded once — 39284 + 39154 s is 1307 min.
         #expect(parsed["printTimeMins"] == .number(1307), "BOTH plates' time, not the first plate's")
         #expect(parsed["filamentGrams"] == .number(286.4), "grams to 0.1 g, the shared rule's")
-        #expect(parsed["platesRead"] == .bool(true))
+        #expect(parsed["platesRead"] == .number(Shop.platesReadVersion))
         guard case .array(let plates)? = parsed["plates"], plates.count == 2,
               case .object(let p2) = plates[1] else { Issue.record("no plates"); return }
         #expect(p2["index"] == .number(2) && p2["printTimeMins"] == .number(653) && p2["filamentGrams"] == .number(143.0))
@@ -99,7 +99,10 @@ struct SlicerFiguresTests {
         #expect(Shop.slicerFiguresDue(.object([:]), ext: "gcode"))
         #expect(Shop.slicerFiguresDue(.object(["printTimeMins": .number(5)]), ext: "3mf"))
         #expect(!Shop.slicerFiguresDue(.object(["printTimeMins": .number(5)]), ext: "gcode"))
-        #expect(!Shop.slicerFiguresDue(.object(["printTimeMins": .number(5), "platesRead": .bool(true)]), ext: "3mf"))
+        #expect(!Shop.slicerFiguresDue(.object(["printTimeMins": .number(5), "platesRead": .number(2)]), ext: "3mf"))
+        // Read before plates carried their names and per-spool grams (Oct 2026):
+        // once more, so the data already on disk gets them.
+        #expect(Shop.slicerFiguresDue(.object(["printTimeMins": .number(5), "platesRead": .bool(true)]), ext: "3mf"))
     }
 
     @Test("a Bambu print file carrying plate 1's G-code is still read plate by plate")
@@ -121,6 +124,72 @@ struct SlicerFiguresTests {
 
     @Test("an unsliced 3MF says nothing — and is marked read, so it is not opened every launch")
     func unslicedMarked() {
-        #expect(!Shop.slicerFiguresDue(.object(["platesRead": .bool(true)]), ext: "3mf"))
+        #expect(!Shop.slicerFiguresDue(.object(["platesRead": .number(Shop.platesReadVersion)]), ext: "3mf"))
+    }
+
+    /// The fixture both apps' tests read — test/fixtures/two-plate-bambu.gcode.3mf,
+    /// written by test/fixtures/make-two-plate-3mf.js. Every figure here is the
+    /// one test/extract-meta-plates.test.js asserts for lib/model-intake.js, so
+    /// the two readers are held to one answer for the same bytes.
+    static let twoPlateFixture = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .appending(path: "test/fixtures/two-plate-bambu.gcode.3mf")
+
+    @Test("a real-shaped two-plate project: totals, plate names and each spool over both plates")
+    func twoPlateFixture() async throws {
+        let parsed = try #require(await SlicerFigures.read(Self.twoPlateFixture, engine: try KhaytEngine()))
+        #expect(parsed["printTimeMins"] == .number(213), "90 + 123 min, not plate_1.gcode's 90")
+        #expect(parsed["filamentGrams"] == .number(67.5), "34.75 + 32.75 g, not plate 1's")
+        guard case .array(let plates)? = parsed["plates"], plates.count == 2,
+              case .object(let p1) = plates[0], case .object(let p2) = plates[1] else {
+            Issue.record("no plates"); return
+        }
+        #expect(p1["name"] == .string("Body") && p1["printTimeMins"] == .number(90) && p1["filamentGrams"] == .number(34.8))
+        #expect(p2["name"] == .string("Lid") && p2["printTimeMins"] == .number(123) && p2["filamentGrams"] == .number(32.8))
+        guard case .array(let spools)? = parsed["filaments"] else { Issue.record("no filaments"); return }
+        let bySlot = spools.compactMap { v -> (String, Double)? in
+            guard case .object(let f) = v, case .string(let id)? = f["id"], case .number(let g)? = f["grams"] else { return nil }
+            return (id, g)
+        }
+        #expect(bySlot.map(\.0) == ["1", "2", "3"])
+        #expect(bySlot.map(\.1) == [42.5, 4.25, 20.75], "slot 1 over both plates")
+
+        // The colour list, through the same rule the import uses: each colour
+        // carries the whole project's grams, adding up to the same 67.5 g.
+        let engine = try KhaytEngine()
+        let text = { (name: String) throws -> String in
+            guard let e = try Zip.entries(of: Self.twoPlateFixture).first(where: { $0.name == name }) else { return "" }
+            return String(decoding: try Zip.data(of: e, in: Self.twoPlateFixture), as: UTF8.self)
+        }
+        let found = try await engine.coloursFromConfigs(sliceInfo: try text("Metadata/slice_info.config"),
+                                                       projectSettings: "", modelSettings: "", prusa: "")
+        let grams = found.colors.compactMap { v -> Double? in
+            if case .object(let c) = v, case .number(let g)? = c["grams"] { return g }; return nil
+        }
+        #expect(grams == [42.5, 4.25, 20.75])
+    }
+
+    @Test("a colour list written with plate 1's grams is repaired from the per-spool totals")
+    func colourRepair() {
+        let colours: JSONValue = .array([
+            .object(["hex": .string("#000000"), "grams": .number(30.5), "label": .string("Filament 1")]),
+            .object(["hex": .string("#FFFFFF"), "grams": .number(4.25)]),
+            .object(["hex": .string("#123456"), "grams": .number(1)]),
+        ])
+        let spools: JSONValue = .array([
+            .object(["id": .string("1"), "color": .string("#000000"), "grams": .number(42.5)]),
+            .object(["id": .string("2"), "color": .string("#ffffff"), "grams": .number(4.25)]),
+        ])
+        guard case .array(let out)? = Shop.coloursWithProjectGrams(colours, filaments: spools),
+              case .object(let black) = out[0], case .object(let other) = out[2] else {
+            Issue.record("nothing repaired"); return
+        }
+        #expect(black["grams"] == .number(42.5))
+        #expect(black["label"] == .string("Filament 1"), "everything else on the colour is kept")
+        #expect(other["grams"] == .number(1), "a colour the slicer did not list keeps its grams")
+        // Already right: nothing to write.
+        #expect(Shop.coloursWithProjectGrams(.array([.object(["hex": .string("#000000"), "grams": .number(42.5)])]),
+                                            filaments: spools) == nil)
     }
 }

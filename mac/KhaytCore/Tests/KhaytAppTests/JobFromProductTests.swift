@@ -117,6 +117,41 @@ struct JobFromProductTests {
         #expect(components.count == 1)
     }
 
+    @Test("a job from a product with components sells at the catalogue price")
+    func componentsArePriced() async throws {
+        // The catalogue folds the components into the product's cost before
+        // the margin; a job that left them out sold for less, every time.
+        let engine = try KhaytEngine()
+        let consumables: [JSONValue] = [
+            .object(["id": .string("C2"), "cost": .number(1.5)]),
+        ]
+        let components: JSONValue = .array([.object(["consumableId": .string("C2"),
+                                                     "qtyPerUnit": .number(4)])])
+        let part: [String: JSONValue] = ["name": .string("Base"), "spoolCost": .number(90),
+                                         "spoolWeight": .number(1000), "printWeight": .number(120),
+                                         "printTime": .number(3.5), "qty": .number(1)]
+        let catalogue = try await engine.priceProduct(
+            .object(["defaultMargin": .number(35), "parts": .array([.object(part)]),
+                     "components": components]),
+            inventory: [], settings: [:], consumables: consumables)
+        var costed = part
+        costed["baseCost"] = .number(catalogue.cost - 6)   // the part alone: 4 × 1.5 is the components
+        let out = try await engine.newOrder(
+            ["parts": .array([.object(costed)]), "margin": .number(35),
+             "components": components, "assemblyQty": .number(1)],
+            orders: [], settings: [:], now: Date(),
+            tokens: (tracking: Array(repeating: 7, count: 16),
+                     quoteApproval: Array(repeating: 9, count: 16)),
+            consumables: consumables)
+        guard case .object(let order) = out.order else { Issue.record("no order"); return }
+        #expect(order["price"] == .number(catalogue.price),
+                Comment(rawValue: "job \(String(describing: order["price"])) vs catalogue \(catalogue.price)"))
+        #expect(order["componentsCost"] == .number(6))
+        let preview = try await engine.jobComponentsCost(components, assemblyQty: 1,
+                                                         consumables: consumables)
+        #expect(preview == 6, "the sheet previews the figure the job is saved with")
+    }
+
     // MARK: - The tiers
 
     @Test("a product's named margins are read, and the unusable ones are not")

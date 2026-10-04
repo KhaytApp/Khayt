@@ -149,6 +149,10 @@ struct NewJobSheet: View {
     /// offer its tiers and the saved order can name it.
     @State private var product: Product?
 
+    /// What the product's components add (magnets, a box) — priced with the
+    /// cart at cost plus margin, as the shared rule saves the job.
+    @State private var componentsCost: Double = 0
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
@@ -191,6 +195,7 @@ struct NewJobSheet: View {
                 // is asked once per part, so the cart fills in a beat later
                 // than the name — and the total with it.
                 Task { parts = await shop.jobParts(from: taken) }
+                Task { componentsCost = await shop.jobComponentsCost(of: taken) }
             }
             focused = true
         }
@@ -776,13 +781,14 @@ struct NewJobSheet: View {
     /// Everything the price depends on, so the preview re-runs when any of it
     /// moves and not on every keystroke in the job's name.
     private var signature: String {
-        "\(parts.map { "\($0.cost)x\($0.qty)@\($0.agreedPrice ?? -1)" }.joined())|\(margin)|\(discountPct)|\(shippingCost)|\(rush)|\(rule.step)|\(rule.mode)|\(rule.override ?? -1)"
+        "\(parts.map { "\($0.cost)x\($0.qty)@\($0.agreedPrice ?? -1)" }.joined())|\(margin)|\(discountPct)|\(shippingCost)|\(rush)|\(rule.step)|\(rule.mode)|\(rule.override ?? -1)|\(componentsCost)"
     }
 
     /// The cart in two halves, the way the rule takes it: what is priced at
     /// cost plus margin, and what the customer has already agreed.
     private var costedBase: Double {
         parts.filter { $0.agreedPrice == nil }.reduce(0) { $0 + $1.cost * Double($1.qty) }
+            + componentsCost
     }
     private var agreedAmount: Double {
         parts.reduce(0) { $0 + ($1.agreedPrice ?? 0) * Double($1.qty) }
