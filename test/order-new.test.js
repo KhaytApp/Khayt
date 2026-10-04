@@ -16,6 +16,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 require('../lib/pricing.js');
 require('../lib/working-week.js');
+require('../lib/calculator-cost.js');
 const N = require('../lib/order-new.js');
 
 const NOW = new Date('2026-09-04T09:15:00.000Z');
@@ -469,4 +470,52 @@ test('a legacy `delivered` row is not queued work', () => {
   const order = N.newOrder(base(), ctx(settings, queue));
   // 20 queued + 4 this job = 24 hours ÷ 8 a day = 3 days.
   assert.equal(order.dueDate, '2026-09-07');
+});
+
+/* ── A job from a product prices like the product (components) ──────────────
+   The catalogue folds a product's bought-in components into its cost before
+   the margin (lib/product-pricing.js). A job taken from it left them out, so
+   it was under-priced by exactly their cost plus margin. */
+
+test('a job from a product with components prices exactly as the catalogue does', () => {
+  const CC = require('../lib/calculator-cost.js');
+  require('../lib/product-price.js');
+  const PP = require('../lib/product-pricing.js');
+  const consumables = [{ id: 'mag', cost: 0.35 }, { id: 'box', cost: 4.2 }];
+  const inventory = [{ id: 'S1', materialType: 'filament' }];
+  const product = {
+    defaultMargin: 40,
+    parts: [
+      { name: 'Base', filamentId: 'S1', spoolCost: 90, spoolWeight: 1000, printWeight: 120, printTime: 3.5, wearRate: 0.5 },
+      { name: 'Lid', spoolCost: 90, spoolWeight: 1000, printWeight: 40, printTime: 1 },
+    ],
+    components: [{ consumableId: 'mag', qtyPerUnit: 4 }, { consumableId: 'box', qtyPerUnit: 1 }],
+  };
+  const costCtx = { inventory, settings: {} };
+  const catalogue = PP.priceProduct(product, { ...costCtx, consumables });
+  const job = (extra) => N.newOrder({
+    parts: product.parts.map(p => ({ ...p, baseCost: CC.partTotalCost(p, costCtx) })),
+    components: product.components, assemblyQty: 1, margin: product.defaultMargin, ...extra,
+  }, { settings: {}, orders: [], now: NOW, tokens: TOKENS, consumables });
+
+  const plain = job();
+  assert.equal(plain.price, catalogue.price, 'the job sells for the catalogue price');
+  assert.equal(plain.componentsCost, 5.6, '4 × 0.35 + 4.2, frozen beside the price');
+  const partsCost = plain.parts.reduce((s, p) => s + p.baseCost, 0);
+  assert.equal(+(partsCost + plain.componentsCost).toFixed(2), catalogue.cost, 'and costs what the catalogue says');
+
+  // Rounded the way the product is rounded: still the catalogue's figure.
+  const rounded = { ...product, priceRound: { step: 5, mode: 'up' } };
+  assert.equal(job({ priceRound: rounded.priceRound }).price, PP.priceProduct(rounded, { ...costCtx, consumables }).price);
+
+  // A typed price is the price; the components' cost is still recorded.
+  const typed = job({ priceOverride: 99 });
+  assert.equal(typed.price, 99);
+  assert.equal(typed.componentsCost, 5.6);
+
+  // Three assemblies draw three sets of components, and are costed for them.
+  assert.equal(job({ assemblyQty: 3 }).componentsCost, 16.8);
+
+  // No components: nothing new on the record.
+  assert.equal('componentsCost' in job({ components: [] }), false);
 });
