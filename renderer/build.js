@@ -14,6 +14,13 @@ let currentExtraLines = [];
 let lastQuote = null;
 // Extra material rows for the current part being configured
 let currentExtraMaterials = [];
+// Multicolour and bought-in pieces for the part in the form (from a tester's
+// report; the shapes are the Mac's, #1743). Extra colour lines beyond the main
+// filament: [{filamentId, grams}]. Purge grams shared over the colours by
+// weight. Consumables per printed piece: [{consumableId, qty}].
+let currentColourLines = [];
+let currentPurgeGrams = 0;
+let currentConsumableLines = [];
 // BOM: non-printed components + assembly count carried from a product into the order.
 let currentComponents = [];
 let currentAssemblyQty = 1;
@@ -280,13 +287,62 @@ function updateFailureRateHint() {
 
 /* computePartBaseCost, getActivePriceTier, computePartBreakdown — lib/calculator-cost.js */
 
+/** A spool's price per gram, on its full weight (not what is left on it). */
+function spoolCostPerGram(it) {
+  return it ? (+it.cost || 0) / Math.max(1, +it.weightTotal || +it.weight || 1000) : 0;
+}
+
+/**
+ * The colours, purge and consumables on the form, applied to a part-shaped
+ * object, the same way for the live price, the total and the saved part.
+ *
+ * With extra colour lines the part becomes the blended shape lib already
+ * prices and deducts (`part.colours` [{filamentId, hex, grams, cost}], with a
+ * pre-summed spoolCost/spoolWeight): the main filament at the form's spool
+ * price, each extra line at its own spool's, and the purge shared over them by
+ * weight. With one filament the purge is charged as support weight.
+ */
+function applyPartExtras(snap) {
+  const shelf = (typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : [];
+  snap.consumables = currentConsumableLines.filter((c) => c.consumableId && +c.qty > 0).map((c) => {
+    const row = shelf.find((x) => x && x.id === c.consumableId);
+    return { consumableId: c.consumableId, qty: +c.qty, unitCost: row ? (+row.cost || 0) : (+c.unitCost || 0), name: row ? (row.name || '') : (c.name || '') };
+  });
+  const purge = Math.max(0, +currentPurgeGrams || 0);
+  const lines = currentColourLines.filter((l) => l.filamentId && +l.grams > 0);
+  if (!lines.length) {
+    if (purge) snap.supportWeight = Math.max(0, +snap.supportWeight || 0) + purge;
+    return snap;
+  }
+  const inv = Array.isArray(inventory) ? inventory : [];
+  const mainSpool = inv.find((i) => i.id === snap.filamentId);
+  const parts = [{
+    filamentId: snap.filamentId || '', hex: (mainSpool && mainSpool.color) || '',
+    grams: Math.max(0, +snap.printWeight || 0),
+    perGram: Math.max(0, +snap.spoolCost || 0) / Math.max(1, +snap.spoolWeight || 1),
+  }].concat(lines.map((l) => {
+    const it = inv.find((i) => i.id === l.filamentId);
+    return { filamentId: l.filamentId, hex: (it && it.color) || '', grams: +l.grams, perGram: spoolCostPerGram(it) };
+  })).filter((c) => c.grams > 0);
+  const total = parts.reduce((t, c) => t + c.grams, 0);
+  const colours = parts.map((c) => {
+    const g = c.grams + (total > 0 ? purge * c.grams / total : 0);
+    return { filamentId: c.filamentId, hex: c.hex, grams: Math.round(g * 10) / 10, cost: c.perGram * g };
+  });
+  snap.colours = colours;
+  snap.spoolCost = colours.reduce((t, c) => t + c.cost, 0);
+  snap.spoolWeight = Math.max(1, colours.reduce((t, c) => t + c.grams, 0));
+  snap.printWeight = colours.reduce((t, c) => t + c.grams, 0);
+  return snap;
+}
+
 function calculateLivePartCost() {
   // Snapshot the DOM into a part-shaped object and reuse the pure helper.
   // qty and filamentId MUST be included or the live preview disagrees with the cart:
   // packaging is divided by qty (so a 20-unit part previewed at 17.00 and landed in the
   // cart at 7.50), and filamentId selects the resin per-kg cost branch, so a resin part
   // silently changed price on being added.
-  return computePartBaseCost({
+  return computePartBaseCost(applyPartExtras({
     qty:           $('#partQty')?.value || 1,
     filamentId:    $('#filamentSelect')?.value || '',
     spoolCost:     $('#spoolCost').value,
@@ -302,7 +358,7 @@ function calculateLivePartCost() {
     laborRate:     $('#laborRate').value,
     failureRate:   $('#failureRate').value,
     extraMaterials: currentExtraMaterials.filter(m => m.material && m.weight > 0),
-  });
+  }));
 }
 
 /** AI price assist: recommend a margin from the shop's realized history for the
@@ -398,7 +454,9 @@ function updateGrandTotal() {
     failureRate: $('#failureRate').value,
     filamentId: $('#filamentSelect')?.value || '',
     extraMaterials: currentExtraMaterials.filter(m => m.material && m.weight > 0),
+    qty: $('#partQty')?.value || 1,
   };
+  applyPartExtras(snap);
   const bd = computePartBreakdown(snap);
   const liveBase = bd.material + bd.machine + bd.labor + bd.buffer;
   const qty = Math.max(1, Math.round(num($('#partQty').value, 1)));
@@ -620,6 +678,10 @@ function updateGrandTotal() {
 }
 
 function snapshotPartFromForm() {
+  return applyPartExtras(snapshotPartFromFormRaw());
+}
+
+function snapshotPartFromFormRaw() {
   const filamentSelect = $('#filamentSelect');
   const opt = filamentSelect.options[filamentSelect.selectedIndex];
   const qty = Math.max(1, Math.round(num($('#partQty').value, 1)));
@@ -672,6 +734,10 @@ function snapshotPartFromForm() {
     extraMaterials: currentExtraMaterials.filter(m => m.material && m.weight > 0).map(m => ({ ...m })),
     priceTiers:  currentPriceTiers.filter(ti => ti.minQty > 0 && ti.pricePerUnit > 0).map(ti => ({ ...ti })),
     spoolId:     $('#spoolIdPicker')?.value || null,
+    // The lines as typed, so editing the part brings them back.
+    mainWeight:   clampPositive($('#printWeight').value),
+    colourLines:  currentColourLines.filter((l) => l.filamentId && +l.grams > 0).map((l) => ({ ...l })),
+    purgeGrams:   Math.max(0, +currentPurgeGrams || 0),
   };
 }
 
@@ -722,7 +788,12 @@ function addPart() {
   if ($('#partPrintFile')) { $('#partPrintFile').value = ''; $('#partPrintFile').dispatchEvent(new Event('change', { bubbles: true })); }
   currentExtraMaterials = [];
   currentPriceTiers = [];
+  currentColourLines = [];
+  currentPurgeGrams = 0;
+  currentConsumableLines = [];
   renderExtraMaterials();
+  renderColourLines();
+  renderConsumableLines();
   renderPriceTiers();
   const addBtn = $('#btnAddPart');
   if (addBtn && addBtn.dataset.editing) {
@@ -789,6 +860,18 @@ function editPart(index) {
   // Restore extra materials
   currentExtraMaterials = (part.extraMaterials || []).map(m => ({ ...m }));
   renderExtraMaterials();
+  // Colours, purge and consumables. A blended part shows its MAIN grams in the
+  // weight field (its printWeight is the blended total).
+  currentColourLines = (part.colourLines || []).map((l) => ({ ...l }));
+  currentPurgeGrams = +part.purgeGrams || 0;
+  if (part.mainWeight != null && currentColourLines.length) $('#printWeight').value = part.mainWeight || '';
+  if (part.purgeGrams && !currentColourLines.length) {
+    // One filament: the purge was charged as support, so take it back out.
+    $('#supportWeight') && ($('#supportWeight').value = Math.max(0, (+part.supportWeight || 0) - (+part.purgeGrams || 0)) || '');
+  }
+  currentConsumableLines = (part.consumables || []).map((c) => ({ consumableId: c.consumableId, qty: c.qty, unitCost: c.unitCost, name: c.name }));
+  renderColourLines();
+  renderConsumableLines();
 
   // Feature 5: Restore price tiers
   currentPriceTiers = (part.priceTiers || []).map(ti => ({ ...ti }));
@@ -929,6 +1012,60 @@ function renderExtraLines() {
 }
 
 /* ── Extra materials for current part (Feature 8) ─────────────── */
+/** The extra colour lines: a spool and its grams each, plus the shared purge. */
+function renderColourLines() {
+  const el = $('#colourLinesList');
+  if (!el) return;
+  const inv = Array.isArray(inventory) ? inventory : [];
+  const label = (it) => [it.material, it.colourVariant].filter(Boolean).join(' — ') || it.id;
+  el.innerHTML = currentColourLines.map((l, i) => `
+    <div class="colour-line-row" style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
+      <span class="cs-swatch" style="background:${safeCssColor((inv.find((it) => it.id === l.filamentId) || {}).color, 'transparent')};width:14px;height:14px;border-radius:3px;flex:none;"></span>
+      <select class="cl-spool" data-cli="${i}" style="flex:2; font-size:12.5px;">
+        <option value="">${escapeHtml(t('calc.colour_spool') || 'Spool')}</option>
+        ${inv.map((it) => `<option value="${escapeHtml(it.id)}"${it.id === l.filamentId ? ' selected' : ''}>${escapeHtml(label(it))}</option>`).join('')}
+      </select>
+      <input type="number" class="cl-grams" data-cli="${i}" value="${l.grams || ''}" min="0" step="0.1" placeholder="g" style="width:80px; font-size:12.5px;">
+      <button class="btn danger small cl-rm" data-cli="${i}" aria-label="${escapeHtml(t('common.remove') || 'Remove')}" title="${escapeHtml(t('common.remove') || 'Remove')}">×</button>
+    </div>`).join('');
+  el.querySelectorAll('.cl-spool').forEach((sel) => sel.addEventListener('change', () => {
+    currentColourLines[+sel.dataset.cli].filamentId = sel.value; renderColourLines(); updateGrandTotal();
+  }));
+  el.querySelectorAll('.cl-grams').forEach((inp) => inp.addEventListener('input', () => {
+    currentColourLines[+inp.dataset.cli].grams = Math.max(0, +inp.value || 0); updateGrandTotal();
+  }));
+  el.querySelectorAll('.cl-rm').forEach((b) => b.addEventListener('click', () => {
+    currentColourLines.splice(+b.dataset.cli, 1); renderColourLines(); updateGrandTotal();
+  }));
+  const purge = $('#purgeGrams');
+  if (purge && document.activeElement !== purge) purge.value = currentPurgeGrams || '';
+}
+
+/** Bought-in pieces per printed part: magnets, inserts, screws. */
+function renderConsumableLines() {
+  const el = $('#consumableLinesList');
+  if (!el) return;
+  const shelf = (typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : [];
+  el.innerHTML = currentConsumableLines.map((c, i) => `
+    <div class="consumable-line-row" style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
+      <select class="cn-item" data-cni="${i}" style="flex:2; font-size:12.5px;">
+        <option value="">${escapeHtml(t('calc.consumable_pick') || 'Consumable')}</option>
+        ${shelf.map((x) => `<option value="${escapeHtml(x.id)}"${x.id === c.consumableId ? ' selected' : ''}>${escapeHtml(x.name || x.id)}</option>`).join('')}
+      </select>
+      <input type="number" class="cn-qty" data-cni="${i}" value="${c.qty || ''}" min="0" step="1" placeholder="${escapeHtml(t('calc.consumable_qty') || 'Per piece')}" style="width:80px; font-size:12.5px;">
+      <button class="btn danger small cn-rm" data-cni="${i}" aria-label="${escapeHtml(t('common.remove') || 'Remove')}" title="${escapeHtml(t('common.remove') || 'Remove')}">×</button>
+    </div>`).join('');
+  el.querySelectorAll('.cn-item').forEach((sel) => sel.addEventListener('change', () => {
+    currentConsumableLines[+sel.dataset.cni].consumableId = sel.value; updateGrandTotal();
+  }));
+  el.querySelectorAll('.cn-qty').forEach((inp) => inp.addEventListener('input', () => {
+    currentConsumableLines[+inp.dataset.cni].qty = Math.max(0, +inp.value || 0); updateGrandTotal();
+  }));
+  el.querySelectorAll('.cn-rm').forEach((b) => b.addEventListener('click', () => {
+    currentConsumableLines.splice(+b.dataset.cni, 1); renderConsumableLines(); updateGrandTotal();
+  }));
+}
+
 function renderExtraMaterials() {
   const el = $('#extraMaterialsList');
   if (!el) return;
@@ -1647,6 +1784,9 @@ function updateResinFieldsVisibility() {
 
   const api = {
     formHasPendingPart,
+    renderColourLines,
+    renderConsumableLines,
+    applyPartExtras,
     shopRateDefaults,
     seedCalcElecRate,
     saveBuildDraft,

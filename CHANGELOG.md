@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Quote a multicolour print and its magnets in the calculator.** Add a line
+  for each extra filament or colour, with its own spool and grams, and a
+  purge figure shared across the colours by weight. Each colour is charged
+  at its own spool's price, and finishing the job takes each colour off its
+  own spool. Add consumables (magnets, inserts, screws) per printed piece;
+  they are priced, and taken off the shelf when the job is finished. A print
+  file can carry its own "Consumables per print", which come with it into the
+  calculator and into products made from it. Reported by a tester.
+
 - **(Mac) Calculator: several filaments, purge and consumables.**
   - Add filament / colour puts a second, third… spool on one print, each with
     its own grams and its own spool's price. A purge / waste figure (flush and
