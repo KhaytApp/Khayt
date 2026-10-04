@@ -4,6 +4,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A multi-plate 3MF counts every plate, and Bambu PLA Matte colours are
+  right.** Reported by a tester.
+  - A Bambu Studio or Orca file sliced as several plates was read as plate 1
+    only. The weight and time came from the first plate's G-code, and each
+    colour kept plate 1's grams. Both now cover the whole project, and each
+    plate's name, time and grams per spool are kept (shared reader, so the
+    desktop app's import and calculator get the same totals).
+  - (Mac) A model's page shows what the slicer said: the project's time and
+    weight, then each plate with its spools. Models already in the library
+    are read again once, and their colour grams are corrected.
+  - (Mac) The calculator can fill weight and time from a library model. A
+    multi-plate model starts on the whole project; you can pick one plate.
+  - The filament catalogue's Bambu PLA Matte line now uses Bambu's official
+    names and colours (Nardo Gray, Lilac Purple, Dark Chocolate, Plum,
+    Terracotta), and a bad empty-spool weight on Grass Green is removed. The
+    fixes sit in an overrides file that the monthly catalogue refresh applies.
+
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its

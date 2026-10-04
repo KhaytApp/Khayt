@@ -6072,7 +6072,7 @@ public actor KhaytEngine {
         let members = JSONValue.array(configs.map { .object(["name": .string($0.key), "data": .string($0.value)]) })
         let answer = try runtime.call2(#"""
             (function (members, gtext) {
-              var mark = function (o) { o.source = 'slicer'; o.platesRead = true; return o; };
+              var mark = function (o) { o.source = 'slicer'; o.platesRead = 2; return o; };
               // THE SHARED RULE FIRST: `KhaytMfConvert.extractMeta` reads a
               // Bambu/Orca/Snapmaker slice_info plate by plate (#1602) — every
               // plate's time and filament, and the plates themselves when there
@@ -6085,6 +6085,9 @@ public actor KhaytEngine {
                 var out = { printTimeMins: meta.printMinutes, filamentGrams: meta.totalGrams,
                             filamentType: t ? t[1] : '', slicer: 'Bambu/Orca' };
                 if (Array.isArray(meta.plates) && meta.plates.length >= 2) out.plates = meta.plates;
+                // Each spool's grams over the whole project, by slot — the
+                // library's colour list is repaired from these (Oct 2026).
+                if (Array.isArray(meta.filaments) && meta.filaments.length) out.filaments = meta.filaments;
                 return mark(out);
               }
               if (gtext) {
