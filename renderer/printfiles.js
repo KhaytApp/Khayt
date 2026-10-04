@@ -2329,6 +2329,9 @@
             </select>
           </div>
         </div>
+        <label style="margin-top:10px;">${escapeHtml(t('plib.consumables_per_print') || 'Consumables per print')}</label>
+        <div id="pfConsumables"></div>
+        <button type="button" class="btn ghost small" id="pfAddConsumable" style="margin-top:4px;font-size:12px;">${escapeHtml(t('calc.add_consumable') || '+ Add consumable')}</button>
         <label style="margin-top:10px;">${escapeHtml(t('plib.tested_notes') || 'Tested settings / notes')}</label>
         <textarea id="pfNotes" rows="3">${escapeHtml(rec.testedNotes || '')}</textarea>
         <label style="margin-top:10px;">${escapeHtml(t('plib.photo') || 'Photo (optional)')}</label>
@@ -2367,11 +2370,41 @@
         const clr = modal.querySelector('#pfPhotoClear');
         if (clr) clr.addEventListener('click', () => { stagedPhoto = null; cleared = true; if (prev) prev.style.display = 'none'; });
         modal._getPhoto = () => ({ stagedPhoto, cleared });
+
+        // Consumables per print: magnets, inserts, screws one print of this
+        // model uses. Carried into the calculator and into products from it.
+        const shelf = (typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : [];
+        let lines = (Array.isArray(rec.consumables) ? rec.consumables : []).map((c) => ({ ...c }));
+        const box = modal.querySelector('#pfConsumables');
+        const draw = () => {
+          box.innerHTML = lines.map((c, i) => `
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+              <select data-pfc="${i}" class="pfc-item" style="flex:2;font-size:12.5px;">
+                <option value="">${escapeHtml(t('calc.consumable_pick') || 'Consumable')}</option>
+                ${shelf.map((x) => `<option value="${escapeHtml(x.id)}"${x.id === c.consumableId ? ' selected' : ''}>${escapeHtml(x.name || x.id)}</option>`).join('')}
+              </select>
+              <input type="number" data-pfc="${i}" class="pfc-qty" value="${c.qty || ''}" min="0" step="1" style="width:80px;font-size:12.5px;" placeholder="${escapeHtml(t('calc.consumable_qty') || 'Per piece')}">
+              <button type="button" class="btn danger small pfc-rm" data-pfc="${i}" aria-label="${escapeHtml(t('common.remove') || 'Remove')}" title="${escapeHtml(t('common.remove') || 'Remove')}">×</button>
+            </div>`).join('');
+          box.querySelectorAll('.pfc-item').forEach((s) => s.addEventListener('change', () => { lines[+s.dataset.pfc].consumableId = s.value; }));
+          box.querySelectorAll('.pfc-qty').forEach((s) => s.addEventListener('input', () => { lines[+s.dataset.pfc].qty = Math.max(0, +s.value || 0); }));
+          box.querySelectorAll('.pfc-rm').forEach((b) => b.addEventListener('click', () => { lines.splice(+b.dataset.pfc, 1); draw(); }));
+        };
+        draw();
+        modal.querySelector('#pfAddConsumable').addEventListener('click', () => { lines.push({ consumableId: '', qty: 1 }); draw(); });
+        modal._getConsumables = () => lines.filter((c) => c.consumableId && +c.qty > 0).map((c) => {
+          const row = shelf.find((x) => x && x.id === c.consumableId);
+          return { consumableId: c.consumableId, qty: +c.qty, unitCost: row ? (+row.cost || 0) : (+c.unitCost || 0), name: row ? (row.name || '') : (c.name || '') };
+        });
       },
       onSave(modal) {
         const name = modal.querySelector('#pfName').value.trim();
         if (!name) { toast(t('plib.name_required') || 'Enter a name', 'error'); return false; }
         rec.name = name;
+        if (modal._getConsumables) {
+          const cons = modal._getConsumables();
+          if (cons.length) rec.consumables = cons; else delete rec.consumables;
+        }
         rec.material = modal.querySelector('#pfMaterial').value.trim();
         rec.slicerProfileId = modal.querySelector('#pfProfile').value || null;
         /* Reconciled against what the shop already uses, so typing "Resin" where

@@ -267,6 +267,15 @@ function wireEvents() {
   });
 
   // Extra materials (Feature 8)
+  $('#btnAddColourLine')?.addEventListener('click', () => {
+    currentColourLines.push({ filamentId: '', grams: 0 }); renderColourLines();
+  });
+  $('#purgeGrams')?.addEventListener('input', (e) => {
+    currentPurgeGrams = Math.max(0, +e.target.value || 0); updateGrandTotal();
+  });
+  $('#btnAddConsumableLine')?.addEventListener('click', () => {
+    currentConsumableLines.push({ consumableId: '', qty: 1 }); renderConsumableLines();
+  });
   $('#btnAddExtraMaterial')?.addEventListener('click', () => {
     currentExtraMaterials.push({ material: '', weight: 0 });
     renderExtraMaterials();
@@ -736,6 +745,13 @@ function wireEvents() {
       .find((f) => f.id === $('#partPrintFile').value);
     const ref = $('#partFileRef');
     if (rec && ref && !ref.value) ref.value = rec.originalName || rec.name || '';
+    // The model's consumables per print come with it, unless the part already
+    // has its own.
+    if (rec && Array.isArray(rec.consumables) && rec.consumables.length && !currentConsumableLines.length) {
+      currentConsumableLines = rec.consumables.map((c) => ({ consumableId: c.consumableId, qty: c.qty, unitCost: c.unitCost, name: c.name }));
+      renderConsumableLines();
+      updateGrandTotal();
+    }
   });
   $('#partSetup')?.addEventListener('change', fillSetupPicker);
   document.addEventListener('khayt:printfiles-changed', fillPrintFilePicker);
