@@ -41,6 +41,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - Variable layer height files converted for the Snapmaker U1 now slice:
     the prime tower is turned off and tree supports become normal supports,
     which Snapmaker Orca requires, and the change is listed in the report.
+  - HueForge 3MFs for the Snapmaker U1 follow the 3MF standard: each model
+    part now has the build element the standard requires, so strict readers
+    no longer refuse the file with "Build item not found".
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its

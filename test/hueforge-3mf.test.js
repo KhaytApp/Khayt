@@ -256,3 +256,23 @@ test('bad input returns null, never throws', () => {
   assert.strictEqual(HF3.buildU1_3mf({ triangles: [], bands: OPT_BANDS }), null);
   assert.strictEqual(HF3.buildU1_3mf({ triangles: OPT_TRIS, bands: [] }), null);
 });
+
+test('the geometry part carries the <build/> the 3MF core spec requires', () => {
+  // lib3mf refuses a model part without one, and reports it one level up as "Build item not
+  // found" on the root. Ported from bedready.io, which found it validating against lib3mf.
+  const z = openZip(buildOpts());
+  const part = z.file('3D/Objects/object_1.model').toString();
+  assert.match(part, /<\/resources><build\/><\/model>$/);
+  // …and it is an EMPTY build: the part places nothing; the root still does all the placing.
+  assert.doesNotMatch(part, /<item\b/);
+  assert.match(z.file('3D/3dmodel.model').toString(), /<build><item objectid="2"/);
+});
+
+test('our own readers still find the whole relief through the root', () => {
+  const buf = buildOpts();
+  const mf = require('../lib/mf-convert');
+  const members = mf.readMembers(buf);
+  const parsed = (openZip(buf).file('3D/Objects/object_1.model').toString().match(/<triangle /g) || []).length;
+  assert.equal(require('../lib/mf-mesh').extractMeshFromMembers(members).triangleCount, parsed);
+  assert.ok(mf.computeBounds(members), 'the footprint still resolves through the root build item');
+});
