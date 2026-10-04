@@ -16330,24 +16330,38 @@ final class Shop {
     /// where this target's resources are.
     func filamentSearch(_ query: String, limit: Int = 8) async -> [KhaytEngine.FilamentHit] {
         guard let engine, query.trimmingCharacters(in: .whitespaces).count >= 2 else { return [] }
-        guard let json = AppResources.filamentCatalogJSON else { return [] }
-        guard (try? await engine.useFilamentCatalog(json)) != nil else { return [] }
+        guard await handFilamentCatalog(to: engine) else { return [] }
         return (try? await engine.filamentSearch(query, limit: limit)) ?? []
+    }
+
+    /// Which engine already holds the catalogue.
+    ///
+    /// Checked BEFORE the file is read. The spool sheet searches on every
+    /// keystroke, and reading the resource is ~0.9 MB of UTF-8 decoding on the
+    /// main actor — which the engine then threw away, because it had parsed the
+    /// catalogue on the first keystroke. An engine, not a flag: a new engine
+    /// starts without it.
+    @ObservationIgnored private var filamentCatalogEngine: ObjectIdentifier?
+
+    private func handFilamentCatalog(to engine: KhaytEngine) async -> Bool {
+        if filamentCatalogEngine == ObjectIdentifier(engine) { return true }
+        guard let json = AppResources.filamentCatalogJSON else { return false }
+        guard (try? await engine.useFilamentCatalog(json)) != nil else { return false }
+        filamentCatalogEngine = ObjectIdentifier(engine)
+        return true
     }
 
     /// The spool fields a catalogue entry can speak for — and only those.
     func filamentFields(brand: String, name: String, colour: String,
                         weight: Double?) async -> [String: JSONValue] {
-        guard let engine, let json = AppResources.filamentCatalogJSON else { return [:] }
-        guard (try? await engine.useFilamentCatalog(json)) != nil else { return [:] }
+        guard let engine, await handFilamentCatalog(to: engine) else { return [:] }
         return (try? await engine.filamentAsSpool(brand: brand, name: name,
                                                   colour: colour, weight: weight)) ?? [:]
     }
 
     /// How old the bundled catalogue is, in days.
     func filamentCatalogAge() async -> Double? {
-        guard let engine, let json = AppResources.filamentCatalogJSON else { return nil }
-        guard (try? await engine.useFilamentCatalog(json)) != nil else { return nil }
+        guard let engine, await handFilamentCatalog(to: engine) else { return nil }
         return (try? await engine.filamentCatalogAge()) ?? nil
     }
 

@@ -13,7 +13,7 @@ import Foundation
 public actor KhaytEngine {
     private let runtime: JSRuntime
 
-    /// The filament catalogue is 0.78 MB of JSON and a search runs on every
+    /// The filament catalogue is 0.9 MB of JSON and a search runs on every
     /// keystroke. It is read into the context once and kept — immutable data
     /// from the app bundle, so there is nothing to invalidate.
     private var filamentCatalogLoaded = false
@@ -2247,7 +2247,7 @@ public actor KhaytEngine {
 
     /// Search the bundled catalogue.
     ///
-    /// THE CATALOGUE IS LOADED ONCE AND KEPT. It is 0.78 MB of JSON and a
+    /// THE CATALOGUE IS LOADED ONCE AND KEPT. It is 0.9 MB of JSON and a
     /// search runs on every keystroke; parsing it per call would be a fifth of
     /// a second of work repeated for no reason. It is immutable data read from
     /// the app bundle, so there is nothing to invalidate.
@@ -2328,7 +2328,7 @@ public actor KhaytEngine {
     /// text instead puts the lookup in the layer that owns the file and leaves
     /// this one with the rule.
     ///
-    /// Idempotent: the first call parses 0.78 MB, the rest return immediately.
+    /// Idempotent: the first call parses 0.9 MB, the rest return immediately.
     public func useFilamentCatalog(_ json: String) throws {
         guard !filamentCatalogLoaded else { return }
         // An IIFE, not two statements: `call2` evaluates an EXPRESSION, so a

@@ -28,6 +28,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   `calculator-cost` (shelf price, else the written `unitCost`), drawn and
   returned by `order-deduction`, and counted by `consumable-reorder`. Parts
   without it are unchanged.
+- **The filament catalogue lists more brands and colours, and Bambu Lab's own
+  names and colours win.** It had 1,945 filaments and 14,500 colours. It now has
+  2,110 filaments and 16,477 colours from 172 brands.
+  - The Open Filament Database (MIT) is now merged with SpoolmanDB (MIT) and with
+    Bambu Lab's own colour list. Only the facts are taken from Bambu's list: the
+    product line, the colour name and the hex. New are R3D, Siraya Tech, more
+    eSUN, Polymaker (Panchroma, PolyFlex, Fiberon), Creality Hyper RFID, Inland,
+    extrudr and 3DXTech lines, and 129 more Bambu Lab colours (286 → 415). Bambu
+    PLA Matte keeps its 25 official colours.
+  - Each product appears once and each colour once. A row records which source
+    it came from. The sources and their licences are listed in
+    THIRD-PARTY-NOTICES.md and inside the file itself.
+  - Search: words that only a colour name matched must match the same colour.
+    "bambu pla matte black" no longer lands on PLA Lite because it sells
+    "Matte Beige" and "Black".
+  - (Mac) The spool sheet no longer reads the catalogue file on every
+    keystroke. It reads it once per engine.
+
 - **A multi-plate 3MF counts every plate, and Bambu PLA Matte colours are
   right.** Reported by a tester.
   - A Bambu Studio or Orca file sliced as several plates was read as plate 1

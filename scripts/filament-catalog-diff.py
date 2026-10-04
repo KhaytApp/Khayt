@@ -2,7 +2,7 @@
 """Say what changed between the committed filament catalogue and the new one.
 
 Used by `.github/workflows/filament-catalog.yml` to write the body of the
-monthly refresh PR. A 0.78 MB single-line JSON diff is unreadable — GitHub will
+monthly refresh PR. A 0.9 MB single-line JSON diff is unreadable — GitHub will
 show it as one changed line — so the reviewer needs the summary or they are
 approving a file they cannot see.
 
@@ -26,7 +26,9 @@ PROVENANCE = (
     "Opened by `.github/workflows/filament-catalog.yml`, which rebuilds the "
     "snapshot with `scripts/fetch-filament-catalog.py` from the "
     "[Open Filament Database](https://github.com/OpenFilamentCollective/open-filament-database)"
-    " (MIT).\n\n"
+    " (MIT), [SpoolmanDB](https://github.com/Donkie/SpoolmanDB) (MIT) and Bambu Lab's own "
+    "colour list (facts only; see THIRD-PARTY-NOTICES.md), with "
+    "`scripts/filament-catalog-overrides.json` applied last.\n\n"
     "The build is deterministic, so this diff is real change rather than churn. "
     "Nothing here touches a rule — only the data the lookup searches."
 )
