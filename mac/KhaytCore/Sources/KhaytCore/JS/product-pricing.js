@@ -72,7 +72,7 @@ function priceProduct(product, opts) {
    * A product's part is costed with whatever rates it carries. Where it carries
    * none, those terms are zero — which is what the shop has been charging.
    */
-  const ctx = { inventory: opts.inventory || [], settings: opts.settings || {} };
+  const ctx = { inventory: opts.inventory || [], settings: opts.settings || {}, consumables: opts.consumables || [] };
 
   const partsCost = list.reduce((sum, p) => {
     if (CC && typeof CC.computePartBaseCost === 'function') {

@@ -550,3 +550,23 @@ test('a shop with no packaging in stock is left unflagged, so it deducts once it
   assert.equal(stocked[0].stock, 2);
   assert.equal(order.packagingDeducted, true);
 });
+
+test('a part draws its own consumables, per printed piece, and gives them back on re-open', () => {
+  const consumables = [
+    { id: 'mag', name: 'Magnet 6x3', stock: 50, minStock: 5 },
+    { id: 'ins', name: 'M3 insert', stock: 10, minStock: 0 },
+  ];
+  const order = {
+    id: 'o1',
+    parts: [
+      { name: 'Lid', qty: 3, consumables: [{ consumableId: 'mag', qty: 4 }, { consumableId: 'gone', qty: 2 }] },
+      { name: 'Base', consumables: [{ consumableId: 'ins', qty: 2 }, { consumableId: 'mag', qty: 0 }] },
+    ],
+  };
+  D.deductForOrder(order, { settings: { autoDeduct: true }, consumables, today: TODAY });
+  assert.equal(consumables[0].stock, 38, '4 magnets × 3 lids');
+  assert.equal(consumables[1].stock, 8, '2 inserts × 1 base');
+  D.returnForOrder(order, { consumables });
+  assert.equal(consumables[0].stock, 50);
+  assert.equal(consumables[1].stock, 10);
+});

@@ -3024,6 +3024,7 @@
   },
   {
    "id": "PF-sample-dallah",
+   "consumables": [{"consumableId": "CONS-07", "qty": 4, "unitCost": 0.35, "name": "Neodymium magnet 6×3 mm"}],
    "name": "Coffee dallah stand",
    "originalName": "dallah-stand-v3.3mf",
    "updatedAt": "2026-08-22T14:00:00.000Z",
@@ -3035,7 +3036,7 @@
     "kind": "model"
    },
    "parsed": {
-    "printTimeMins": null,
+    "printTimeMins": 412,
     "filamentGrams": null,
     "filamentType": null,
     "slicer": null
@@ -3043,17 +3044,17 @@
    "colors": [
     {
      "hex": "#0F5257",
-     "grams": null,
+     "grams": 96.4,
      "label": "Filament 1"
     },
     {
      "hex": "#7FB2AD",
-     "grams": null,
+     "grams": 38.2,
      "label": "Filament 2"
     },
     {
      "hex": "#E8D8B0",
-     "grams": null,
+     "grams": 11.7,
      "label": "Filament 3"
     }
    ],
@@ -5642,7 +5643,8 @@
    "unit": "L",
    "minStock": 2,
    "category": "Cleaning",
-   "unitCost": 18
+   "unitCost": 18,
+   "cost": 18
   },
   {
    "id": "CONS-02",
@@ -5652,7 +5654,8 @@
    "minStock": 40,
    "category": "Packaging",
    "isPackaging": true,
-   "unitCost": 0.6
+   "unitCost": 0.6,
+   "cost": 0.6
   },
   {
    "id": "CONS-03",
@@ -5661,7 +5664,8 @@
    "unit": "roll",
    "category": "Packaging",
    "isPackaging": true,
-   "unitCost": 22
+   "unitCost": 22,
+   "cost": 22
   },
   {
    "id": "CONS-04",
@@ -5670,14 +5674,16 @@
    "unit": "each",
    "minStock": 6,
    "category": "Spares",
-   "unitCost": 9
+   "unitCost": 9,
+   "cost": 9
   },
   {
    "id": "CONS-05",
    "name": "Kapton tape",
    "stock": 0,
    "unit": "roll",
-   "unitCost": 14
+   "unitCost": 14,
+   "cost": 14
   },
   {
    "id": "CONS-06",
@@ -5685,7 +5691,17 @@
    "stock": 400,
    "unit": "each",
    "minStock": 100,
-   "unitCost": 0.15
+   "unitCost": 0.15,
+   "cost": 0.15
+  },
+  {
+   "id": "CONS-07",
+   "name": "Neodymium magnet 6×3 mm",
+   "stock": 180,
+   "unit": "each",
+   "minStock": 40,
+   "category": "Spares",
+   "cost": 0.35
   }
  ],
  "machMaintLog": [

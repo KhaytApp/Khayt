@@ -1362,6 +1362,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             // there is a weight, and until now nobody had ever seen that.
             setenv("KHAYT_SNAPSHOT_PART", "180", 1)
             setenv("KHAYT_SNAPSHOT_HOURS", "4.5", 1)
+            setenv("KHAYT_SNAPSHOT_MULTI", "1", 1)
             shop.shelf = .dashboard
             await settle()
             shop.shelf = .calculator
@@ -1370,6 +1371,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             capture(named: "28b-calculator-priced", into: dir)
             unsetenv("KHAYT_SNAPSHOT_PART")
             unsetenv("KHAYT_SNAPSHOT_HOURS")
+            unsetenv("KHAYT_SNAPSHOT_MULTI")
 
             shop.shelf = .catalogue
             await settle()
