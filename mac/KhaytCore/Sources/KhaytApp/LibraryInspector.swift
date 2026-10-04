@@ -23,6 +23,10 @@ struct LibraryInspector: View {
                     creatorAndCopies(file)
                     LayerRule()
                     theFile(file)
+                    if let sliced = slicedSection(file) {
+                        LayerRule()
+                        sliced
+                    }
                     if !file.palette.isEmpty {
                         LayerRule()
                         filament(file)
@@ -246,6 +250,53 @@ struct LibraryInspector: View {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.not_found"), warn: true)
             }
         }
+    }
+
+    /// What the SLICER said: the whole project's time and weight, and — for a
+    /// file sliced as several plates — each plate's own, with what it takes of
+    /// each spool.
+    ///
+    /// A tester (Oct 2026): "I uploaded a multi plate 3mf and it only shows the
+    /// filament data and time for one". This screen showed no slicer figures at
+    /// all — only a per-colour list that carried plate 1's grams — so a
+    /// two-plate project read as one plate's worth of plastic.
+    private func slicedSection(_ file: LibraryFile) -> AnyView? {
+        let mins = file.parsed?.printTimeMins ?? 0, grams = file.parsed?.filamentGrams ?? 0
+        guard mins > 0 || grams > 0 else { return nil }
+        let plates = shop.plates(of: file)
+        let w = shop.words
+        func hours(_ m: Double) -> String {
+            Money.quantity((m / 60 * 100).rounded() / 100) + " " + w.callIt("common.hours")
+        }
+        func g(_ n: Double) -> String { Money.grams(n) + " " + w.callIt("common.grams") }
+        return AnyView(DetailSection(w.callIt(plates.isEmpty ? "mac.sliced_title" : "mac.sliced_project",
+                                              ["n": .number(Double(plates.count))])) {
+            if mins > 0 { DetailLine(w.callIt("mac.est_time"), hours(mins), strong: true) }
+            if grams > 0 { DetailLine(w.callIt("mac.est_filament"), g(grams), strong: true) }
+            ForEach(plates, id: \.index) { plate in
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        Text(plate.name.map { w.callIt("mac.plate_named", ["n": .number(Double(plate.index)), "name": .string($0)]) }
+                             ?? w.callIt("mac.plate_n", ["n": .number(Double(plate.index))]))
+                            .font(.callout.weight(.medium)).lineLimit(1)
+                        Spacer(minLength: 8)
+                        Text(hours(plate.minutes) + " · " + g(plate.grams))
+                            .font(.callout).monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    ForEach(Array(plate.filaments.enumerated()), id: \.offset) { _, f in
+                        HStack(spacing: 6) {
+                            Swatch(rgb: Swatch.rgb(fromHex: f.hex), size: 10)
+                            Text(f.material.isEmpty ? w.callIt("mac.filament_n", ["n": .string(f.slot)]) : f.material)
+                                .font(.caption).foregroundStyle(.secondary)
+                            Spacer(minLength: 8)
+                            Text(g(f.grams)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        .padding(.leading, 12)
+                    }
+                }
+                .padding(.top, 4)
+            }
+        })
     }
 
     private func filament(_ file: LibraryFile) -> some View {

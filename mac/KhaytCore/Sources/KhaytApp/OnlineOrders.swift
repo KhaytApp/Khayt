@@ -352,7 +352,8 @@ extension Shop {
 
         let out = try await engine.newOrder(
             input, orders: orders, settings: settings(root), now: now,
-            tokens: (tracking: randomBytes(16), quoteApproval: randomBytes(16)))
+            tokens: (tracking: randomBytes(16), quoteApproval: randomBytes(16)),
+            consumables: rows(root, "consumables"))
         guard case .object(var record) = out.order,
               case .string(let jobId)? = record["id"] else {
             return PutOnline(recorded: .alreadyThere)
