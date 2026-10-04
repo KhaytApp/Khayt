@@ -29,7 +29,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - Band-swap checks each plate on its own. A multi-plate file whose plates
     change colour at different heights used to get one plate's pause heights
     written into the file for all of them; it is now left without pauses and
-    the reason names the plates. Plates that agree keep their plan.
+    the reason names the plates. So is a file whose plates change colour at
+    the same heights but in different colours. Plates that agree on both
+    keep their plan.
   - Full Spectrum files keep their mixes when opened in Snapmaker Orca. The
     mix settings are now marked as changed from the printer's preset, so
     Orca no longer resets them to stock. Mixed areas also get extra support

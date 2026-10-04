@@ -61,8 +61,18 @@ test('two cleanly banded plates are no longer blamed for sharing layers', () => 
   assert.equal(whole.banded, false, 'guard: the combined file really does look unbanded');
   assert.match(whole.reason, /share layers/);
   const r = detectColorBandsForMesh(m, 1);
-  assert.equal(r.banded, true);
   assert.doesNotMatch(r.reason, /share layers/);
+});
+
+test('plates that swap at the same height but in different colours are refused', () => {
+  // A: red→blue at 10 mm. B: green→yellow at 10 mm. Same heights, and one plan would carry
+  // only A's colours — B's would be sent to whatever head A's plan left them.
+  const r = detectColorBandsForMesh(plated(part(10, 20, 1, 2), part(10, 20, 3, 4)), 1);
+  assert.equal(r.banded, false);
+  assert.deepEqual(r.bands, []);
+  assert.match(r.reason, /different colours/);
+  // Opposite order of the same two colours is a different plan too.
+  assert.equal(detectColorBandsForMesh(plated(part(10, 20, 1, 2), part(10, 20, 2, 1)), 1).banded, false);
 });
 
 test('plates needing different swap heights are refused, not averaged', () => {
@@ -143,6 +153,13 @@ test('a real two-plate file with different swap heights is refused by the analys
   assert.match(r.reason, /Small/);
 });
 
+test('a real two-plate file whose plates differ only in colour is refused, and gets no pauses', () => {
+  const r = convert(twoPlates([10, 20, 1, 2, 30], [10, 20, 2, 1, 30]), { targetId: 'snapmaker-u1', bandSwap: true });
+  assert.notEqual(r.report.bandSwap, true);
+  assert.equal(openZip(r.buffer).file('Metadata/custom_gcode_per_layer.xml'), null);
+  assert.match(analyzeColorBands(twoPlates([10, 20, 1, 2, 30], [10, 20, 2, 1, 30])).reason, /different colours/);
+});
+
 test('…and the converter writes no pauses at one plate\'s heights for both', () => {
   const r = convert(twoPlates([10, 20, 1, 2, 120], [4, 20, 1, 2, 4]), { targetId: 'snapmaker-u1', bandSwap: true });
   assert.equal(r.ok, true);
@@ -151,7 +168,7 @@ test('…and the converter writes no pauses at one plate\'s heights for both', (
 });
 
 test('a real two-plate file whose plates agree still gets its swap plan', () => {
-  const r = analyzeColorBands(twoPlates([10, 20, 1, 2, 30], [10, 20, 2, 1, 30]));
+  const r = analyzeColorBands(twoPlates([10, 20, 1, 2, 30], [10, 20, 1, 2, 30]));
   assert.equal(r.banded, true);
   assert.deepEqual(r.changeHeights.map((h) => Math.round(h)), [10]);
 });
