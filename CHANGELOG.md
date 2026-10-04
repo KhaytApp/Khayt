@@ -4,6 +4,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Bed Ready) Browse, download from and publish to the MakerRun catalogue.**
+  - **Browse MakerRun** (a new home card, and a button in the MakerRun library
+    panel) searches the public makerrun.com catalogue without signing in:
+    filter by category, material, verified profiles and free or for sale, and
+    open a design to see its licence and whether prints may be sold, how it was
+    verified, its files with sizes and its print profiles. A design that is for
+    sale links to its page on makerrun.com, where the designer takes payment.
+  - **Download** names the licence on the button you press, needs your MakerRun
+    account, and adds the file to Print files as a new record that keeps the
+    design's page, its licence and its creator. Designs synced from your saved
+    library now keep the same details.
+  - **Publish to MakerRun** in a print file's ⋯ menu creates a free listing
+    under your MakerRun account: title, description, category, material,
+    licence (taken from the file when MakerRun offers it, otherwise you choose),
+    18+ flag and, if you opt in, the file's photo or preview. It asks before
+    anything becomes public, shows each step, and then the result of MakerRun's
+    profile check and "Pending review" — MakerRun reviews every new listing.
+    **Check status** asks MakerRun on demand; if a step fails you can finish the
+    upload or delete the half-created listing. Maintenance, rate limits,
+    two-factor sign-in and 18+ confirmation each say what to do next.
+  - A `.stp` file downloaded from MakerRun is now saved as `.step`; it used to
+    get a `.3mf` name.
+
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its
