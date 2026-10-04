@@ -35,6 +35,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     widths and layer heights to suit it. A 0.6 mm file converted for a 0.4 mm
     printer used to ask for 0.63 mm lines. Settings taken from your installed
     slicer's own preset are left as they are.
+  - Files made in Creality Print and other slicers now open in Snapmaker Orca
+    as full projects with their colours and plates. Before, Orca loaded only
+    the shape.
+  - Variable layer height files converted for the Snapmaker U1 now slice:
+    the prime tower is turned off and tree supports become normal supports,
+    which Snapmaker Orca requires, and the change is listed in the report.
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its

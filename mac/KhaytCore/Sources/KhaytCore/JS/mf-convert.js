@@ -1549,6 +1549,80 @@
     return true;
   }
 
+  // ── WHO WROTE THE FILE ───────────────────────────────────────────────────────────────────────
+  // Snapmaker Orca, like mainline OrcaSlicer and Bambu Studio, imports a 3MF as a full project —
+  // colours, painting, plates, object assignments — only when the root model's
+  // <metadata name="Application"> starts with a producer it trusts. Anything else ("Creality_Print
+  // V6…", Cura, …) loads as "geometry data only", every colour dropped, even when the configs this
+  // converter just wrote are perfect. Rewriting the producer to an OrcaSlicer- string makes Orca
+  // trust the project. Ported from bedready.io (forceOrcaGenerator, verified there against
+  // OrcaSlicer/CrealityPrint Format/bbs_3mf.cpp).
+  const ORCA_GENERATOR = 'OrcaSlicer-2.1.1';
+  const TRUSTED_GENERATORS = /^(BambuStudio-|OrcaSlicer-|SnapmakerOrca-)/;
+  const APPLICATION_RE = /(<metadata\s+name="Application"[^>]*>)([^<]*)(<\/metadata>)/;
+
+  /**
+   * The root model with an Orca-trusted producer, as `{ text, from }`, or null when it already
+   * has one, has none, or never crossed into this process (a host passing the mesh by name). Only
+   * the head of the file is searched — the producer sits in the opening metadata — so a large
+   * mesh is not turned into one enormous string just to be told it is fine.
+   */
+  function forceOrcaGenerator(member) {
+    if (!member || member.data == null) return null;
+    const head = typeof member.data === 'string' ? member.data.slice(0, 65536)
+      : member.data.subarray(0, 65536).toString('utf8');
+    const m = APPLICATION_RE.exec(head);
+    if (!m || TRUSTED_GENERATORS.test(m[2].trim())) return null;
+    let text;
+    try { text = member.data.toString('utf8'); } catch (_) { return null; } // past V8's string limit: leave it
+    return { text: text.replace(APPLICATION_RE, (_a, open, _old, close) => open + ORCA_GENERATOR + close), from: m[2].trim() };
+  }
+
+  // ── VARIABLE LAYER HEIGHT ON THE U1 ─────────────────────────────────────────────────────────
+  /** A Snapmaker-Orca target: the built-in U1, or a profile resolved from its machine catalogue. */
+  function isSnapmakerOrca(target) {
+    return target.flavour === 'orca' && (!!target.supportsMixedFilament || /snapmaker/i.test(String(target.orcaMachine || target.printerModel || '')));
+  }
+
+  /**
+   * Pin print-preset keys in different_settings_to_system[0] so Orca KEEPS these overrides on
+   * import instead of rebuilding the named system preset and reverting them, merged with whatever
+   * the file already declared. Format: a (filament count + 2) array, index 0 the print-preset list.
+   * Ported from bedready.io pinProcessKeys.
+   */
+  function pinProcessKeys(obj, keys) {
+    if (!keys.length) return;
+    const filCount = Array.isArray(obj.filament_colour) ? obj.filament_colour.length : 4;
+    const prev = Array.isArray(obj.different_settings_to_system) ? obj.different_settings_to_system : [];
+    const merged = [...new Set(String(prev[0] || '').split(';').filter(Boolean).concat(keys))].sort();
+    const dss = new Array(Math.max(filCount + 2, prev.length)).fill('');
+    for (let i = 1; i < prev.length; i++) dss[i] = prev[i] || '';
+    dss[0] = merged.join(';');
+    obj.different_settings_to_system = dss;
+  }
+
+  /**
+   * Snapmaker Orca refuses to slice variable layer height with a prime tower or tree supports, so a
+   * VLH file converted for it came out unsliceable. Tower off, tree → normal (keeping the
+   * (auto)/(manual) suffix), both pinned or Orca puts the tower straight back on import. The VLH
+   * profile itself is kept. `keepPrimeTowerVlh` skips this. Ported from bedready.io applyVlhGuard.
+   */
+  function applyVlhGuard(obj, report) {
+    const pins = [];
+    if (String(obj.enable_prime_tower) !== '0') { obj.enable_prime_tower = '0'; pins.push('enable_prime_tower'); }
+    if (typeof obj.support_type === 'string' && obj.support_type.startsWith('tree')) {
+      obj.support_type = obj.support_type.replace(/^tree/, 'normal');
+      pins.push('support_type');
+    }
+    if (!pins.length) return;
+    pinProcessKeys(obj, pins);
+    if (report) {
+      report.vlhGuard = true;
+      report.fieldsChanged.push(...pins);
+      report.warnings.push('This model uses variable layer height, which Snapmaker Orca cannot slice with a prime tower or tree supports — the prime tower was turned off and tree supports switched to normal.');
+    }
+  }
+
   // ── NOZZLE REFIT ─────────────────────────────────────────────────────────────────────────────
   // A retarget writes the target's nozzle_diameter, but line widths and layer heights are process
   // settings and arrive from the source untouched. So a 0.6-nozzle file converted for a 0.4 printer
@@ -1741,6 +1815,8 @@
       // object's own filament" and stays 0 — the object's extruder is remapped instead.
       const plainMap = paintPlan ? null : (mergePlan ? mergePlan.map : slotMap);
       const plainMoves = !!plainMap && plainMap.some((t, i) => t !== i);
+      // Variable layer height travels as one of these two members; see applyVlhGuard.
+      const hasVLH = members.some((mm) => /(^|\/)(layer_config_ranges\.xml|layer_heights_profile\.txt)$/i.test(mm.name));
       const plainStateMap = plainMoves ? (s) => (s >= 1 && s <= n && Number.isInteger(plainMap[s - 1]) ? plainMap[s - 1] + 1 : s) : null;
       let paintLeftAlone = false;
 
@@ -1833,6 +1909,7 @@
             if (/project_settings\.config$/i.test(m.name) && target.flavour === 'orca') {
               applyOrcaValueSafety(obj, report);
               applyOrcaFilaments(obj, opts, report); // real Orca filament presets (+ per-slot picks)
+              if (hasVLH && isSnapmakerOrca(target) && !opts.keepPrimeTowerVlh) applyVlhGuard(obj, report);
             }
             return { name: m.name, data: JSON.stringify(obj, null, 4) };
           }
@@ -1896,6 +1973,17 @@
         }
         return m;
       });
+
+      // A foreign producer string makes Orca load geometry only — see forceOrcaGenerator.
+      if (reprofile && target.flavour === 'orca') {
+        const ri = out.findIndex((mm) => /(^|\/)3D\/3dmodel\.model$/i.test(mm.name));
+        const fixed = ri >= 0 ? forceOrcaGenerator(out[ri]) : null;
+        if (fixed) {
+          out[ri] = { name: out[ri].name, data: fixed.text };
+          report.producerRewritten = fixed.from;
+          report.fieldsChanged.push('Application');
+        }
+      }
 
       // Re-tile the multi-plate object layout when the target bed size differs from the source's, so
       // plates stay centred instead of drifting to the edge. Operates on the already-rewritten output.
