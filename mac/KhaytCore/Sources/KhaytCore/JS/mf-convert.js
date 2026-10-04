@@ -1117,15 +1117,194 @@
     return out;
   }
 
-  // Reorder every filament_* array of length === n inside a parsed settings object.
-  function remapJsonSettings(obj, map, n) {
+  // ── MOVING A FILAMENT MEANS MOVING EVERYTHING THAT BELONGS TO IT ─────────────────────────────
+  //
+  // A slot map, a merge, Full Spectrum and band-swap all move filaments between positions. Each
+  // position's colour, material, temperatures and fan settings belong together — and so do the
+  // settings that NAME a filament by its number (support_filament = 2) and the purge matrix
+  // indexed by filament pairs. Reindexing only `^filament_` keys left nozzle_temperature, the
+  // plate temperatures and the fans in source order (after a 6→4 merge nozzle_temperature still
+  // had six entries), so a slot printed one filament's colour at another's temperature.
+  //
+  // Which arrays are per-filament is decided by NAME, never by length alone: printable_area has
+  // four corners and a four-filament file has four filaments, and a length test once turned the
+  // bed into a bow-tie. On a toolchanger the per-EXTRUDER arrays (nozzle_diameter, retraction,
+  // z-hop, extruder_offset) have the same length again; those stay with the physical head and
+  // are deliberately absent here. Names from Orca / Bambu Studio's filament option set, as they
+  // appear in a real U1 export (bedready.io's u1-profile.json).
+  const PER_FILAMENT_JSON = new Set([
+    'activate_air_filtration', 'activate_chamber_temp_control', 'adaptive_pressure_advance',
+    'adaptive_pressure_advance_bridges', 'adaptive_pressure_advance_model', 'adaptive_pressure_advance_overhangs',
+    'additional_cooling_fan_speed', 'chamber_temperature', 'chamber_temperatures', 'close_fan_the_first_x_layers',
+    'complete_print_exhaust_fan_speed', 'cool_plate_temp', 'cool_plate_temp_initial_layer', 'default_filament_colour',
+    'dont_slow_down_outer_wall', 'during_print_exhaust_fan_speed', 'enable_overhang_bridge_fan', 'enable_pressure_advance',
+    'eng_plate_temp', 'eng_plate_temp_initial_layer', 'fan_cooling_layer_time', 'fan_max_speed', 'fan_min_speed',
+    'full_fan_speed_layer', 'graphic_effect_plate_temp', 'graphic_effect_plate_temp_initial_layer', 'hot_plate_temp',
+    'hot_plate_temp_initial_layer', 'idle_temperature', 'internal_bridge_fan_speed', 'ironing_fan_speed',
+    'nozzle_temperature', 'nozzle_temperature_initial_layer', 'nozzle_temperature_range_high', 'nozzle_temperature_range_low',
+    'overhang_fan_speed', 'overhang_fan_threshold', 'pellet_flow_coefficient', 'pressure_advance',
+    'reduce_fan_stop_start_freq', 'required_nozzle_HRC', 'slow_down_for_layer_cooling', 'slow_down_layer_time',
+    'slow_down_min_speed', 'supertack_plate_temp', 'supertack_plate_temp_initial_layer',
+    'support_material_interface_fan_speed', 'temperature_vitrification', 'textured_cool_plate_temp',
+    'textured_cool_plate_temp_initial_layer', 'textured_plate_temp', 'textured_plate_temp_initial_layer',
+  ]);
+  const isPerFilamentJson = (k) => /^filament_/i.test(k) || PER_FILAMENT_JSON.has(k);
+  // Settings whose VALUE is a 1-based filament number; 0 means "the default" and stays 0.
+  const FILAMENT_INDEX_JSON = ['support_filament', 'support_interface_filament', 'wipe_tower_filament',
+    'wall_filament', 'sparse_infill_filament', 'solid_infill_filament'];
+  const FILAMENT_INDEX_PRUSA = ['perimeter_extruder', 'infill_extruder', 'solid_infill_extruder',
+    'support_material_extruder', 'support_material_interface_extruder', 'wipe_tower_extruder'];
+  // The same, as per-object / per-part metadata in model_settings.config and Slic3r_PE_model.config.
+  const FILAMENT_INDEX_META = new Set(['extruder'].concat(FILAMENT_INDEX_JSON, FILAMENT_INDEX_PRUSA));
+
+  /**
+   * Output position → source position for a slot map, with permute()'s semantics exactly: slot
+   * map[i] takes source i, and a slot nobody maps to keeps its own. Everything that reindexes
+   * under a slot map goes through this, so the colour and its settings cannot part company.
+   */
+  function srcOfSlotMap(map, n) {
+    const src = [];
+    for (let j = 0; j < n; j++) src.push(j);
+    map.forEach((t, i) => { if (Number.isInteger(t) && t >= 0 && t < n) src[t] = i; });
+    return src;
+  }
+
+  /** A 1-based filament number through a 0-based source→slot map. 0 and unknowns stay. */
+  function remapIndexValue(v, map) {
+    const k = parseInt(v, 10);
+    if (!(k >= 1 && k <= map.length) || !Number.isInteger(map[k - 1])) return v;
+    const nv = map[k - 1] + 1;
+    return typeof v === 'number' ? nv : String(nv);
+  }
+
+  /** An n×n matrix (or e stacked ones), flattened, reindexed on both axes. Null if not that shape. */
+  function reshapeSquare(arr, srcOf, n) {
+    const blk = n * n;
+    if (!arr.length || arr.length % blk) return null;
+    const out = [];
+    for (let b = 0; b < arr.length / blk; b++) {
+      for (const i of srcOf) for (const j of srcOf) out.push(arr[b * blk + i * n + j]);
+    }
+    return out;
+  }
+
+  /** A per-filament list of PAIRS (Bambu's flush_volumes_vector: unload, load per filament). */
+  function reshapePairs(arr, srcOf, n) {
+    if (arr.length !== 2 * n) return null;
+    const out = [];
+    for (const i of srcOf) out.push(arr[2 * i], arr[2 * i + 1]);
+    return out;
+  }
+
+  /**
+   * Reindex a Bambu/Orca JSON config from `n` source filaments to `srcOf.length` output ones:
+   * every named per-filament array of length n, the flush matrix and vector, the per-filament
+   * entries of different_settings_to_system / inherits_group ([print, f1..fn, printer]), and —
+   * when `idxMap` is given — every setting whose value is a filament number. Returns how many
+   * keys moved.
+   */
+  function reindexFilamentJson(obj, srcOf, n, idxMap) {
     let changed = 0;
     for (const k of Object.keys(obj)) {
-      if (!/^filament_/i.test(k)) continue;
       const v = obj[k];
-      if (Array.isArray(v) && v.length === n) { obj[k] = permute(v, map); changed++; }
+      if (!Array.isArray(v)) continue;
+      let next = null;
+      if (isPerFilamentJson(k) && v.length === n) next = srcOf.map((i) => (v[i] != null ? v[i] : v[0]));
+      else if (k === 'flush_volumes_matrix') next = reshapeSquare(v, srcOf, n);
+      else if (k === 'flush_volumes_vector') next = reshapePairs(v, srcOf, n);
+      else if ((k === 'different_settings_to_system' || k === 'inherits_group') && v.length === n + 2) {
+        next = [v[0]].concat(srcOf.map((i) => v[i + 1]), [v[n + 1]]);
+      }
+      if (next) { obj[k] = next; changed++; }
+    }
+    if (idxMap) {
+      for (const k of FILAMENT_INDEX_JSON) {
+        if (!(k in obj)) continue;
+        const before = JSON.stringify(obj[k]);
+        obj[k] = Array.isArray(obj[k]) ? obj[k].map((x) => remapIndexValue(x, idxMap)) : remapIndexValue(obj[k], idxMap);
+        if (before !== JSON.stringify(obj[k])) changed++;
+      }
     }
     return changed;
+  }
+
+  /**
+   * Remap every filament-number metadata (`extruder`, `support_filament`, Prusa's
+   * `perimeter_extruder`…) in model_settings.config / Slic3r_PE_model.config XML, and the
+   * `extruder` of colour changes and layer ranges, through a 0-based source→slot map.
+   */
+  function remapIndexText(text, map) {
+    return text
+      .replace(/(key="([A-Za-z_]+)"\s+value=")(\d+)(")/g, (all, pre, key, num, post) =>
+        (FILAMENT_INDEX_META.has(key) ? pre + remapIndexValue(num, map) + post : all))
+      .replace(/(<(?:code|layer)\b[^>]*\bextruder=")(\d+)(")/g, (_a, pre, num, post) => pre + remapIndexValue(num, map) + post)
+      .replace(/(opt_key="extruder"\s*>)(\d+)(<)/g, (_a, pre, num, post) => pre + remapIndexValue(num, map) + post);
+  }
+
+  // PrusaSlicer's per-filament options (its "filament" option set; one value per extruder in a
+  // project) plus extruder_colour, which is what PrusaSlicer shows a painted region in. The
+  // physical extruder's own options — nozzle_diameter, retract_*, extruder_offset, wipe — stay.
+  const PER_FILAMENT_PRUSA = new Set([
+    'temperature', 'first_layer_temperature', 'bed_temperature', 'first_layer_bed_temperature', 'idle_temperature',
+    'chamber_temperature', 'chamber_minimal_temperature', 'fan_always_on', 'cooling', 'min_fan_speed', 'max_fan_speed',
+    'bridge_fan_speed', 'disable_fan_first_layers', 'full_fan_speed_layer', 'fan_below_layer_time',
+    'slowdown_below_layer_time', 'min_print_speed', 'start_filament_gcode', 'end_filament_gcode', 'extrusion_multiplier',
+    'enable_dynamic_fan_speeds', 'overhang_fan_speed_0', 'overhang_fan_speed_1', 'overhang_fan_speed_2',
+    'overhang_fan_speed_3', 'compatible_printers_condition_cummulative', 'compatible_prints_condition_cummulative',
+    'inherits_cummulative', 'extruder_colour',
+  ]);
+  const isPerFilamentPrusa = (k) => /^filament_/i.test(k) || PER_FILAMENT_PRUSA.has(k);
+
+  /**
+   * Split a PrusaSlicer vector value into its raw tokens, or null when it cannot be done safely.
+   * Strings are `"a";"b"` with backslash escapes (G-code holds `;` inside the quotes), colours
+   * `#a;#b`, numbers and bools `1,2`. Tokens keep their exact text so a rejoin changes nothing
+   * but the order.
+   */
+  function splitIniVector(raw) {
+    const v = raw.trim();
+    if (v.indexOf('"') >= 0) {
+      const parts = [];
+      let i = 0;
+      while (i < v.length) {
+        if (v[i] !== '"') return null;
+        let j = i + 1;
+        while (j < v.length && v[j] !== '"') j += v[j] === '\\' ? 2 : 1;
+        if (j >= v.length) return null;
+        parts.push(v.slice(i, j + 1));
+        i = j + 1;
+        if (i < v.length) { if (v[i] !== ';') return null; i++; }
+      }
+      return { parts, sep: ';' };
+    }
+    if (v.indexOf(';') >= 0) return { parts: v.split(';'), sep: ';' };
+    return { parts: v.split(','), sep: ',' };
+  }
+
+  /**
+   * Reindex a PrusaSlicer config the same way. `ok` is false — and the text must then be left
+   * alone — when a per-filament value holds a number of entries other than 1 (one value for all)
+   * or n, because then there is no way to move it with its colour. Wiping volumes are reshaped
+   * like Bambu's flush matrix, and the *_extruder settings follow `idxMap`.
+   */
+  function reindexPrusaConfig(text, srcOf, n, idxMap) {
+    let bad = null;
+    const out = text.replace(/^([ \t]*;?[ \t]*)([A-Za-z0-9_]+)([ \t]*=[ \t]*)([^\r\n]*)$/gm, (all, pre, key, eq, val) => {
+      if (bad) return all;
+      if (key === 'wiping_volumes_matrix' || key === 'wiping_volumes_extruders') {
+        const a = val.trim().split(',');
+        const r = key === 'wiping_volumes_matrix' ? reshapeSquare(a, srcOf, n) : reshapePairs(a, srcOf, n);
+        return r ? pre + key + eq + r.join(',') : all;
+      }
+      if (idxMap && FILAMENT_INDEX_PRUSA.includes(key)) return pre + key + eq + remapIndexValue(val.trim(), idxMap);
+      if (!isPerFilamentPrusa(key) || !val.trim()) return all;
+      const sp = splitIniVector(val);
+      if (!sp) { bad = key; return all; }
+      if (sp.parts.length === 1) return all; // one value applies to every filament — nothing to move
+      if (sp.parts.length !== n) { bad = key; return all; }
+      return pre + key + eq + srcOf.map((i) => sp.parts[i]).join(sp.sep);
+    });
+    return bad ? { ok: false, bad, text } : { ok: true, text: out };
   }
 
   /** Parse the max X/Y of a printable_area polygon (["0x0","256x0",…]) → { x, y } bed size, or null. */
@@ -1340,31 +1519,15 @@
    * keys (that's Full Spectrum) — the M600 custom_gcode member carries the swaps instead.
    */
   function applyBandSwapConfig(obj, plan, srcCount, report) {
-    for (const k of Object.keys(obj)) {
-      // ONLY per-filament arrays. Reindexing every array whose length happens to equal the
-      // filament count corrupted unrelated config: a 4-filament model matches the FOUR
-      // CORNERS of printable_area, turning the bed rectangle into a self-intersecting
-      // bow-tie. remapJsonSettings (:474) already filters on ^filament_; this loop and
-      // applyFullSpectrumConfig did not.
-      if (!/^filament_/i.test(k)) continue;
-      const v = obj[k];
-      if (Array.isArray(v) && v.length === srcCount) obj[k] = plan.headSrcIdx.map((oldI) => (v[oldI] != null ? v[oldI] : v[0]));
-    }
+    // Per-filament settings by NAME (see reindexFilamentJson): a length test alone once matched
+    // printable_area's four corners on a four-filament model and turned the bed into a bow-tie.
+    reindexFilamentJson(obj, plan.headSrcIdx, srcCount, null);
     obj.filament_colour = plan.headColors.slice();
     if (report) {
       report.bandSwap = true;
       report.bandSwaps = plan.instructions.length;
       report.fieldsChanged.push('filament_colour', 'custom_gcode_per_layer');
     }
-  }
-
-  /** Remap `key="extruder" value="N"` (1-based) through a 0-based source→slot map. */
-  function remapExtruders(text, map) {
-    return text.replace(/(key="extruder"\s+value=")(\d+)(")/g, (_a, pre, num, post) => {
-      const old = parseInt(num, 10);
-      const ni = old >= 1 && old <= map.length && Number.isInteger(map[old - 1]) ? map[old - 1] + 1 : old;
-      return `${pre}${ni}${post}`;
-    });
   }
 
   /**
@@ -1382,13 +1545,20 @@
     if (!(slots >= 1) || filaments.length <= slots) return null;
     const colors = filaments.map((f) => f.color);
     if (colors.some((c) => !c)) return null;
+    // The palette must be the config's own: a palette read from slice_info or a full-spectrum
+    // JSON is a different length from the arrays this would reindex, and merging it would leave
+    // the config's colours, temperatures and paint describing different filaments.
+    const proj = tryJson(memberText(members, /project_settings\.config$/i));
+    if (!proj || !Array.isArray(proj.filament_colour) || proj.filament_colour.length !== colors.length) return null;
     const usage = tallyPaintUsage(members, colors.length);
     const r = fullSpectrum.reduceColors(colors, usage.some((u) => u > 0) ? usage : undefined, undefined, slots);
     // One group per slot; the clamp is belt and braces, as in the reference.
     const map = r.map.map((g) => Math.min(g, slots - 1));
-    // Each slot loads the filament settings of the first source colour folded into it.
-    const slotSrc = r.colors.map((_, s) => Math.max(0, map.indexOf(s)));
-    return { map, colors: r.colors.map(normHex), slotSrc };
+    // Each slot keeps the colour of the source that survived into it — and so its temperatures,
+    // fans and material too. (It used to take the lowest-numbered member's settings, which is not
+    // the colour it kept whenever a higher-numbered colour survived.)
+    const slotSrc = r.reps.slice();
+    return { map, colors: slotSrc.map((i) => normHex(colors[i])), slotSrc };
   }
 
   /**
@@ -1397,11 +1567,7 @@
    * are stamped. Per-filament arrays only, for the reason applyBandSwapConfig gives.
    */
   function applyMergeConfig(obj, plan, srcCount, report) {
-    for (const k of Object.keys(obj)) {
-      if (!/^filament_/i.test(k)) continue;
-      const v = obj[k];
-      if (Array.isArray(v) && v.length === srcCount) obj[k] = plan.slotSrc.map((oldI) => (v[oldI] != null ? v[oldI] : v[0]));
-    }
+    reindexFilamentJson(obj, plan.slotSrc, srcCount, plan.map);
     obj.filament_colour = plan.colors.slice();
     if (report) {
       report.colorsMerged = { from: srcCount, to: plan.colors.length };
@@ -1417,14 +1583,7 @@
   function applyFullSpectrumConfig(obj, plan, srcCount, report, opts) {
     opts = opts || {};
     const keep = plan.physical; // 0-based source indices, length = slots
-    for (const k of Object.keys(obj)) {
-      // Per-filament arrays only — same reason as applyBandSwapConfig above: an unrelated
-      // array that happens to be srcCount long (printable_area's four corners) would be
-      // permuted into nonsense.
-      if (!/^filament_/i.test(k)) continue;
-      const v = obj[k];
-      if (Array.isArray(v) && v.length === srcCount) obj[k] = keep.map((oldI) => (v[oldI] != null ? v[oldI] : v[0]));
-    }
+    reindexFilamentJson(obj, keep, srcCount, null); // per-filament settings by name, as above
     obj.filament_colour = plan.physicalHex.slice();
     obj.mixed_filament_definitions = fullSpectrum.serializeMixedDefs(plan.mixDefs);
     for (const [k, val] of Object.entries(fullSpectrum.MIXED_DITHERING_DEFAULTS)) obj[k] = val;
@@ -1785,7 +1944,29 @@
     } else {
       // Retarget: rewrite the JSON/text settings for the target printer + optional remap.
       const n = filaments.length;
-      const slotMap = Array.isArray(opts.slotMap) && opts.slotMap.length === n ? opts.slotMap : null;
+      let slotMap = Array.isArray(opts.slotMap) && opts.slotMap.length === n ? opts.slotMap : null;
+      // A slot past the file's own filaments has no colour, material or temperature to give it —
+      // the picker offers the printer's slots, which can outnumber the file's colours. Moving paint
+      // there wrote states and extruders past the end of filament_colour; growing every
+      // per-filament array to fit would mean inventing a filament. Nothing is moved instead, and
+      // the maker is told to place it in the slicer.
+      if (slotMap && slotMap.some((t) => !Number.isInteger(t) || t < 0 || t >= n)) {
+        const far = Math.max(...slotMap.filter(Number.isInteger)) + 1;
+        report.warnings.push(`The colour assignment uses slot ${far}, but this file has only ${n} filament${n === 1 ? '' : 's'}, so colours were left in their original slots. Reassign them in your slicer.`);
+        slotMap = null;
+      }
+      // PrusaSlicer's config can only move as a whole: every per-filament value has to split into
+      // exactly one entry per filament. Worked out before anything is rewritten, so a config that
+      // cannot move leaves the paint where it is too.
+      let prusaReindexed = null;
+      if (slotMap && flavour === 'prusa') {
+        const r = reindexPrusaConfig(memberText(members, CFG_PRUSA) || '', srcOfSlotMap(slotMap, n), n, slotMap);
+        if (r.ok) prusaReindexed = r.text;
+        else {
+          report.warnings.push(`Colours were left in their original slots: this PrusaSlicer project's "${r.bad}" setting could not be matched to its ${n} filaments. Reassign the colours in PrusaSlicer.`);
+          slotMap = null;
+        }
+      }
 
       // Band-swap: a cleanly vertically-banded painted model keeps ALL colours exactly by mapping each to a
       // physical head + M600 pauses (opt-in, U1 only). When active it supersedes Full Spectrum — the two are
@@ -1803,7 +1984,7 @@
       // nearest-looking neighbour until they fit (fullSpectrum.reduceColors, ported from
       // bedready.io). Only for a same-family Bambu/Orca file — the JSON config is the one this
       // can reindex — and never under a manual slot map, which is the maker's own decision.
-      const mergePlan = planMerge(members, filaments, target, opts, paintPlan || slotMap, flavour);
+      let mergePlan = planMerge(members, filaments, target, opts, paintPlan || slotMap, flavour);
 
       // ── THE PLAIN COLOUR → SLOT MAP REACHES THE PAINT TOO ─────────────────────────────
       // A slot map used to reorder the filament_* arrays and nothing else. On a PAINTED model
@@ -1813,12 +1994,41 @@
       // somebody else's slot. bedready.io's retargetThreeMF remaps all three with one map
       // (remapPaintCode / remapExtruders / stateMap, its #39); so does this now. 0 is "the
       // object's own filament" and stays 0 — the object's extruder is remapped instead.
-      const plainMap = paintPlan ? null : (mergePlan ? mergePlan.map : slotMap);
-      const plainMoves = !!plainMap && plainMap.some((t, i) => t !== i);
+      let plainMap = paintPlan ? null : (mergePlan ? mergePlan.map : slotMap);
       // Variable layer height travels as one of these two members; see applyVlhGuard.
       const hasVLH = members.some((mm) => /(^|\/)(layer_config_ranges\.xml|layer_heights_profile\.txt)$/i.test(mm.name));
-      const plainStateMap = plainMoves ? (s) => (s >= 1 && s <= n && Number.isInteger(plainMap[s - 1]) ? plainMap[s - 1] + 1 : s) : null;
-      let paintLeftAlone = false;
+
+      // ── ALL OF THE PAINT MOVES, OR NONE OF IT ─────────────────────────────────────────
+      // The mesh's paint, each object's extruder and the colour changes are rewritten together
+      // or not at all, and decided BEFORE anything is written: a file whose model_settings moved
+      // while its mesh could not (a host passing the mesh by name, a paint code that would not
+      // re-encode, a palette that is not the config's) says two different things about the same
+      // object. When the paint cannot move, it stays exactly as it was — the behaviour before
+      // paint moved at all — and the maker is told.
+      let paintRewrites = null, paintBlocked = null;
+      if (plainMap && plainMap.some((t, i) => t !== i)) {
+        const proj = tryJson(memberText(members, /project_settings\.config$/i));
+        const projCount = proj && Array.isArray(proj.filament_colour) ? proj.filament_colour.length : null;
+        if (flavour !== 'prusa' && projCount !== n) paintBlocked = 'palette';
+        else if (members.some((mm) => /\.model$/i.test(mm.name) && mm.data == null)) paintBlocked = 'mesh';
+        else {
+          const stateMap = (st) => (st >= 1 && st <= n ? plainMap[st - 1] + 1 : st);
+          paintRewrites = new Map();
+          try {
+            for (const mm of members) {
+              if (!/\.model$/i.test(mm.name)) continue;
+              const text = mm.data.toString('utf8');
+              // Unpainted geometry is left as it was, still compressed — byte-identical.
+              if (/(paint_color|mmu_segmentation)="/.test(text)) paintRewrites.set(mm.name, remapModelPaint(text, { stateMap }));
+            }
+          } catch (_) { paintBlocked = 'encode'; paintRewrites = null; } // a slot past the paint encoding, or text past V8's limit
+        }
+      }
+      // A merge cannot leave the paint behind: states past the new slot count would point at
+      // nothing. So a merge whose paint cannot move does not happen at all.
+      let mergeDropped = false;
+      if (paintBlocked && mergePlan) { mergePlan = null; plainMap = null; mergeDropped = true; }
+      const plainMoves = !!paintRewrites;
 
       // Re-profiling only makes sense within one config family (Bambu/Orca share a JSON
       // dialect; Prusa is separate). Across families we can't produce a coherent file by
@@ -1846,21 +2056,14 @@
             (_a, pre, num, post) => { const old = parseInt(num, 10); const ni = old >= 1 && old <= paintPlan.map.length ? paintPlan.map[old - 1] + 1 : old; return `${pre}${ni}${post}`; });
           return { name: m.name, data: text };
         }
-        if (plainStateMap && /\.model$/i.test(m.name)) {
-          // A host that passes the mesh by NAME (the Mac app, past its inline limit) has given
-          // us nothing to rewrite. Say so rather than write a file whose paint points at the
-          // old slots under a palette that moved.
-          if (m.data == null) { paintLeftAlone = true; return m; }
-          const text = m.data.toString('utf8');
-          // Unpainted geometry is left as it was, still compressed — byte-identical.
-          if (!/(paint_color|mmu_segmentation)="/.test(text)) return m;
-          try { return { name: m.name, data: remapModelPaint(text, { stateMap: plainStateMap }) }; }
-          catch (_) { paintLeftAlone = true; return m; } // a slot past the 3MF paint encoding
-        }
-        if (plainMoves && /(model_settings|Slic3r_PE_model)\.config$/i.test(m.name) && m.data != null && !tryJson(m.data.toString('utf8'))) {
+        if (plainMoves && paintRewrites.has(m.name)) return { name: m.name, data: paintRewrites.get(m.name) };
+        if (plainMoves && m.data != null && (/custom_gcode_per_(layer|print_z)\.xml$/i.test(m.name) || /layer_config_ranges\.xml$/i.test(m.name)
+          || (/(model_settings|Slic3r_PE_model)\.config$/i.test(m.name) && !tryJson(m.data.toString('utf8'))))) {
           // Bambu model_settings.config / Prusa Slic3r_PE_model.config are XML: each object's and
-          // part's <metadata key="extruder" value="N"/> (1-based) follows the same map.
-          return { name: m.name, data: remapExtruders(m.data.toString('utf8'), plainMap) };
+          // part's extruder and filament settings (1-based) follow the same map, and so do the
+          // colour changes and layer ranges that name an extruder.
+          const before = m.data.toString('utf8'), after = remapIndexText(before, plainMap);
+          return after === before ? m : { name: m.name, data: after };
         }
         if (/project_settings\.config$/i.test(m.name) || /model_settings\.config$/i.test(m.name)) {
           const text = m.data.toString('utf8');
@@ -1903,7 +2106,8 @@
             } else if (mergePlan && /project_settings\.config$/i.test(m.name)) {
               applyMergeConfig(obj, mergePlan, n, report);
             } else if (slotMap && !paintPlan) {
-              report.colorsRemapped += remapJsonSettings(obj, slotMap, n);
+              // Every per-filament setting and every filament number moves with its colour.
+              report.colorsRemapped += reindexFilamentJson(obj, srcOfSlotMap(slotMap, n), n, slotMap);
             }
             // Snapmaker Orca rejects a few Bambu enum spellings — normalise them so it opens clean.
             if (/project_settings\.config$/i.test(m.name) && target.flavour === 'orca') {
@@ -1964,15 +2168,12 @@
               if (z) set('max_print_height', String(z), 'max_print_height');
             }
           }
-          if (slotMap) {
-            let remapped = false;
-            set('filament_colou?r', (val) => {
-              const cols = val.split(/;/).map((s) => s.trim()).filter(Boolean);
-              if (cols.length !== n) return val;
-              remapped = true;
-              return permute(cols, slotMap).join(';');
-            });
-            if (remapped) report.colorsRemapped += 1;
+          if (slotMap && prusaReindexed != null) {
+            // Every per-filament option, extruder_colour, the wiping volumes and the *_extruder
+            // settings, together (reindexPrusaConfig). Checked on the source up front; the
+            // re-profile above touched only printer and process keys, so it still holds here.
+            const r = reindexPrusaConfig(text, srcOfSlotMap(slotMap, n), n, slotMap);
+            if (r.ok && r.text !== text) { text = r.text; report.colorsRemapped += 1; }
           }
           return { name: m.name, data: text };
         }
@@ -2028,8 +2229,12 @@
       } else if (target.maxColors && n > target.maxColors) {
         report.warnings.push(`Source uses ${n} colours but ${target.name} supports ${target.maxColors}. Extra colours will need manual mapping in your slicer.`);
       }
-      if (paintLeftAlone) {
-        report.warnings.push('The model\'s painted colours could not be moved to their new slots here, so painted areas may print in the wrong colour. Convert it in Khayt, or reassign the colours in your slicer.');
+      if (mergeDropped) {
+        report.warnings.push(`Colours were not merged: ${paintBlocked === 'mesh' ? 'this app could not read the model\'s paint' : 'the model\'s paint could not be moved with them'}, and merging without it would leave painted areas pointing at slots that no longer exist. ${target.name} supports ${target.maxColors} colours — map the extra ones in your slicer.`);
+      } else if (paintBlocked) {
+        report.warnings.push(paintBlocked === 'mesh'
+          ? 'The model\'s painted colours could not be moved to their new slots here, so painted areas may print in the wrong colour. Convert it in Khayt, or reassign the colours in your slicer.'
+          : 'The model\'s painted colours could not be moved to their new slots, so painted areas may print in the wrong colour. Reassign the colours in your slicer.');
       }
       const bounds = computeBounds(members);
       if (bounds) { report.bounds = bounds; for (const w of fitWarnings(bounds, target)) report.warnings.push(w); }

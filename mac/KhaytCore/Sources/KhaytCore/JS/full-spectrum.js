@@ -232,7 +232,8 @@
    * never did — a file with more colours than slots used to convert with a warning and nothing
    * merged at all.
    *
-   * @returns {{ colors:string[], map:number[] }} map: source index → 0-based slot.
+   * @returns {{ colors:string[], map:number[], reps:number[] }} map: source index → 0-based slot;
+   *   reps: slot → the source index whose colour (and settings) it keeps.
    */
   function reduceColors(hexes, usage, pinned, target) {
     var pinSet = new Set(pinned || []);
@@ -273,7 +274,10 @@
     }
     var map = new Array(hexes.length);
     groups.forEach(function (g, gi2) { g.members.forEach(function (m) { map[m] = gi2; }); });
-    return { colors: groups.map(function (g) { return g.rep; }), map: map };
+    // `reps`: the source index whose colour each slot keeps (a group's first member is the one
+    // that survived). A caller reindexing per-filament settings must take them from HERE, not from
+    // the lowest-numbered member, or a slot gets one colour and another filament's temperatures.
+    return { colors: groups.map(function (g) { return g.rep; }), map: map, reps: groups.map(function (g) { return g.members[0]; }) };
   }
 
   // ---------- paint-code remap ----------
