@@ -156,6 +156,10 @@ contextBridge.exposeInMainWorld('hubAPI', {
   mfAnalyze:  (p)     => ipcRenderer.invoke('hub:mf-analyze', { path: p }),
   mfConvert:  (opts)  => ipcRenderer.invoke('hub:mf-convert', opts),
   fsPlan:     (opts)  => ipcRenderer.invoke('hub:fs-plan', opts),
+  // One plate of a multi-plate project: list them, split one out to convert, or save one.
+  mfPlates:      (p)        => ipcRenderer.invoke('hub:mf-plates', { path: p }),
+  mfPlateExtract:(p, plate) => ipcRenderer.invoke('hub:mf-plate-extract', { path: p, plate }),
+  mfPlateSave:   (p, plate) => ipcRenderer.invoke('hub:mf-plate-extract', { path: p, plate, save: true }),
   mfBands:    (p, opts) => ipcRenderer.invoke('hub:mf-bands', { path: p, heads: opts && opts.heads, pauseGcode: opts && opts.pauseGcode }),
   orcaFilaments: ()   => ipcRenderer.invoke('hub:orca-filaments'),
   orcaPrinters:  ()   => ipcRenderer.invoke('hub:orca-printers'),

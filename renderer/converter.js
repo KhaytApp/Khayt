@@ -431,13 +431,129 @@
     });
   }
 
+  /* ---------------- One plate of a multi-plate project (lib/plates.js) ----------------
+   * A Bambu/Orca project with several plates gets a picker: each plate's thumbnail, name,
+   * object count and colours, with "Convert this plate" (split it out, then run this same
+   * converter on the split file) and "Save this plate as a 3MF". The whole-file conversion
+   * below it is unchanged. Splitting happens in the main process; this only asks.
+   */
+  function platesOf(src) {
+    const h = hub();
+    if (!h || !h.mfPlates || src.fromPlate) return Promise.resolve(null);
+    return h.mfPlates(src.path)
+      .then((r) => (r && r.ok && Array.isArray(r.plates) && r.plates.length > 1 ? r.plates : null))
+      .catch(() => null);
+  }
+
+  function plateLabel(p) {
+    const n = tf('conv.plate_n', 'Plate {n}').replace('{n}', p.index);
+    return p.name ? `${n} · ${p.name}` : n;
+  }
+
+  function platePickerHtml(plates) {
+    const cards = plates.map((p) => {
+      const thumb = p.thumbnail && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(p.thumbnail)
+        ? `<img class="conv-pp-thumb" alt="" src="${p.thumbnail}">`
+        : `<div class="conv-pp-thumb conv-pp-nothumb">${_emoI('cube', '📦', 22)}</div>`;
+      const cols = (p.colors || []).map((c) => swatch(c, 12)).join('');
+      const approx = p.colorsApprox && cols
+        ? `<span class="conv-pp-approx" title="${escapeHtml(tf('conv.plate_colours_approx', 'Read from object settings — painted colours may be missing.'))}">≈</span>` : '';
+      const why = p.problem
+        ? `<div class="conv-pp-why">${escapeHtml(p.problem.code === 'shared-object'
+          ? tf('conv.plate_shared', 'This plate shares an object with another plate, so it can’t be split out on its own.')
+          : tf('conv.plate_cannot', 'This plate can’t be split out on its own.'))}</div>` : '';
+      const dis = p.splittable ? '' : ' disabled';
+      return `<div class="conv-pp-card" data-plate="${p.index}">
+        ${thumb}
+        <div class="conv-pp-body">
+          <div class="conv-pp-name">${escapeHtml(plateLabel(p))}</div>
+          <div class="conv-pp-meta">${escapeHtml(tf('conv.plate_objects', 'Objects: {n}').replace('{n}', p.objectCount))}<span class="conv-pp-cols">${cols}${approx}</span></div>
+          ${why}
+          <div class="conv-pp-act">
+            <button type="button" class="btn small" data-pp="convert" data-plate="${p.index}"${dis}>${escapeHtml(tf('conv.plate_convert', 'Convert this plate'))}</button>
+            <button type="button" class="btn small ghost" data-pp="save" data-plate="${p.index}"${dis}>${escapeHtml(tf('conv.plate_save', 'Save this plate as a 3MF'))}</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="conv-pp">
+      <div class="conv-pp-head">${escapeHtml(tf('conv.plates_title', '{n} plates — convert or save one on its own').replace('{n}', plates.length))}</div>
+      <p class="conv-pp-hint">${escapeHtml(tf('conv.plates_hint', 'Each plate becomes a 3MF of its own, with just its objects and the project’s colours.'))}</p>
+      <div class="conv-pp-grid">${cards}</div>
+    </div>`;
+  }
+
+  /** Wire a rendered picker. `leave()` closes whatever modal it sits in before the next one opens. */
+  function wirePlatePicker(root, src, plates, leave) {
+    if (!root) return;
+    const reset = () => root.querySelectorAll('[data-pp]').forEach((b) => {
+      const q = plates.find((x) => x.index === parseInt(b.dataset.plate, 10));
+      b.disabled = !(q && q.splittable);
+    });
+    const fail = (r) => {
+      toast(r && r.code === 'shared-object'
+        ? tf('conv.plate_shared', 'This plate shares an object with another plate, so it can’t be split out on its own.')
+        : tf('conv.plate_cannot', 'This plate can’t be split out on its own.'), 'error', 5600);
+      if (r && r.error) try { console.warn('[converter] plate split refused:', r.code, r.error); } catch (_) {}
+    };
+    root.querySelectorAll('[data-pp]').forEach((btn) => btn.addEventListener('click', async () => {
+      const index = parseInt(btn.dataset.plate, 10);
+      if (!plates.some((x) => x.index === index)) return;
+      const h = hub();
+      root.querySelectorAll('[data-pp]').forEach((b) => { b.disabled = true; });
+      toast(tf('conv.plate_extracting', 'Splitting out plate {n}…').replace('{n}', index), 'info', 1600);
+      try {
+        if (btn.dataset.pp === 'save') {
+          const r = await h.mfPlateSave(src.path, index);
+          if (r && r.ok) toast(tf('conv.plate_saved', 'Plate {n} saved as its own 3MF.').replace('{n}', index), 'success', 3200);
+          else if (!(r && r.canceled)) fail(r);
+        } else {
+          const r = await h.mfPlateExtract(src.path, index);
+          if (r && r.ok) {
+            if (typeof leave === 'function') leave();
+            openConverter({ path: r.path, name: r.name, recordId: src.recordId, fromPlate: index });
+            return;
+          }
+          fail(r);
+        }
+      } catch (e) { toast(String((e && e.message) || e), 'error'); }
+      reset();
+    }));
+  }
+
+  /** The file could not be analysed whole, but it has plates: offer those on their own. */
+  function openPlatePicker(src, plates, note) {
+    openFormModal({
+      title: `${_titleIco}${tf('conv.plate_pick_title', 'Pick a plate')}`,
+      bodyHtml: `<div class="conv-src"><div class="conv-src-name">${_emoI('cube', '📦')}${escapeHtml(src.name || 'model.3mf')}</div>${note ? `<div class="conv-pp-note">${escapeHtml(note)}</div>` : ''}</div>${platePickerHtml(plates)}`,
+      noSave: true,
+      onMount(modal) {
+        const leave = () => { const c = modal.querySelector('[data-act="cancel"]'); if (c) c.click(); };
+        wirePlatePicker(modal, src, plates, leave);
+      },
+    });
+  }
+
+  /** A refusal from the engine, in the maker's language where we have it. */
+  function convertErrorText(r) {
+    if (r && r.code === 'too_large') return tf('conv.plate_too_large', 'This file is too large to convert in one piece. If it has several plates, pick one in the plate list to convert or save it on its own.');
+    return (r && r.error) || (t('conv.failed') || 'Conversion failed.');
+  }
+  /* ---------------- end one plate ---------------- */
+
   async function openConverter(src) {
     const h = hub();
     if (!h || !h.mfAnalyze) { toast(t('conv.desktop_only') || 'The converter is available in the desktop app.', 'error'); return; }
     toast(t('conv.analyzing') || 'Analyzing 3MF…', 'info', 1400);
+    const platesP = platesOf(src);
     let a;
     try { a = await h.mfAnalyze(src.path); } catch (e) { toast(String((e && e.message) || e), 'error'); return; }
-    if (!a || !a.ok) { toast((a && a.error) || (t('conv.analyze_failed') || 'Could not read that 3MF.'), 'error'); return; }
+    if (!a || !a.ok) {
+      const plates = await platesP;
+      if (plates) { openPlatePicker(src, plates, (a && a.error) || ''); return; }
+      toast((a && a.error) || (t('conv.analyze_failed') || 'Could not read that 3MF.'), 'error');
+      return;
+    }
 
     const P = profiles();
     const filaments = a.filaments || [];
@@ -452,6 +568,7 @@
     const canPreview = typeof mountMeshViewer === 'function' && !!h.convertMesh;
     const body = `
       ${metaCardHtml(src, a)}
+      <div id="convPlatesWrap"></div>
       ${canPreview ? `
       <div id="convPreview" class="conv-preview">
         <canvas id="convPreviewCanvas" width="300" height="300" class="conv-preview-canvas" aria-label="3D preview"></canvas>
@@ -481,6 +598,13 @@
       bodyHtml: body,
       saveLabel: t('conv.convert') || 'Convert & save…',
       onMount(modal) {
+        // Multi-plate project: the plate picker sits above the whole-file options.
+        platesP.then((plates) => {
+          const box = plates && modal.isConnected ? modal.querySelector('#convPlatesWrap') : null;
+          if (!box) return;
+          box.innerHTML = platePickerHtml(plates);
+          wirePlatePicker(box, src, plates, () => { const c = modal.querySelector('[data-act="cancel"]'); if (c) c.click(); });
+        });
         const sel = modal.querySelector('#convTarget');
         const wrap = modal.querySelector('#convRemapWrap');
         const chg = modal.querySelector('#convChanges');
@@ -817,7 +941,7 @@
           r = await hub().mfConvert({ path: src.path, targetId, mode, slotMap, intoVaultId, targetProfile, fullSpectrum: fsOn, bandSwap: bandOn, filaments, process });
         } catch (e) { toast(String((e && e.message) || e), 'error'); if (btn) { btn.disabled = false; } return false; }
         if (r && r.canceled) { if (btn) { btn.disabled = false; btn.textContent = t('conv.convert') || 'Convert & save…'; } return false; }
-        if (!r || !r.ok) { toast((r && r.error) || (t('conv.failed') || 'Conversion failed.'), 'error'); if (btn) { btn.disabled = false; } return false; }
+        if (!r || !r.ok) { toast(convertErrorText(r), 'error', r && r.code === 'too_large' ? 7000 : undefined); if (btn) { btn.disabled = false; } return false; }
         const rep = r.report || {};
         for (const w of (rep.warnings || [])) toast((_bdr ? '' : '⚠ ') + w, 'warning', 5200);
 

@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Converter: convert or save one plate of a multi-plate project.** Opening a
+  Bambu Studio or Orca project with several plates now shows a plate list —
+  each plate's picture, name, object count and colours — with "Convert this
+  plate" and "Save this plate as a 3MF". The plate becomes a 3MF of its own
+  with only its objects, its settings and its thumbnails, moved onto the bed
+  exactly where it sat on its plate; the filament list is unchanged, so painted
+  colours stay right. Converting the whole file works as before. A file too
+  large to convert in one piece now points to the plate list instead of telling
+  you to convert one plate at a time with no way to do it. A plate that shares
+  an object with another plate is refused rather than split wrongly. Also
+  available from a print file's Convert action in the library.
 - **Converter fixes from bedready.io.**
   - PrusaSlicer files are read and rewritten for real. PrusaSlicer writes its
     settings as `; key = value`, and the converter only understood the bare

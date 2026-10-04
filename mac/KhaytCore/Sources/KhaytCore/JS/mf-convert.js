@@ -1975,11 +1975,15 @@
     // description of the damage rather than its cause.
     if (members.truncated) {
       const mb = Math.round(members.truncated.bytes / (1024 * 1024));
+      // `code` lets the converter UI say this in the maker's language and point at
+      // its plate picker (lib/plates.js), which splits a plate out without reading
+      // the rest of the project.
       return {
         ok: false,
+        code: 'too_large',
         error: `This 3MF is too large to convert in one piece — ${members.truncated.members} part(s)`
           + (mb >= 1 ? `, about ${mb} MB,` : '') + ' would be left out. '
-          + 'Split it into fewer objects per file, or convert one plate at a time.',
+          + 'If it has several plates, pick one in the converter\'s plate list to convert or save it on its own.',
       };
     }
     if (!members.some((m) => /\.model$/i.test(m.name))) {

@@ -3600,6 +3600,52 @@ ipcMain.handle('hub:mf-convert', async (_e, { path: srcPath, targetId, mode, slo
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 
+// ── one plate of a multi-plate 3MF (lib/plates.js) ─────────────────────────
+// Same gates as convert: the source must be one the converter may read, and the
+// only path that leaves this process for writing is the one the save dialog
+// returns. A plate split out to CONVERT goes to a folder of our own under temp,
+// named after its source ("poster-plate6.3mf") so the converter, and the save
+// dialog after it, show a name the maker recognises. That file is then a source
+// like any picked one, and the folders are cleared on quit.
+const mfPlateDirs = new Set();
+function mfPlateIndex(plate) {
+  const n = Number(plate);
+  return Number.isInteger(n) && n >= 1 && n <= 10000 ? n : null;
+}
+ipcMain.handle('hub:mf-plates', async (_e, { path: srcPath } = {}) => {
+  try {
+    if (!srcPath || !mfReadAllowed(srcPath)) return { ok: false, error: 'Source file is outside an allowed folder.' };
+    return await mfRun('plates', { src: srcPath, maxBytes: MF_MAX_BYTES });
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+ipcMain.handle('hub:mf-plate-extract', async (_e, { path: srcPath, plate, save } = {}) => {
+  try {
+    if (!srcPath || !mfReadAllowed(srcPath)) return { ok: false, error: 'Source file is outside an allowed folder.' };
+    const index = mfPlateIndex(plate);
+    if (!index) return { ok: false, error: 'No such plate.' };
+    const name = require('./lib/plates').plateFileName(path.basename(String(srcPath)), index);
+    const tmp = mfTempPath('3mf');
+    const r = await mfRun('extractPlate', { src: srcPath, maxBytes: MF_MAX_BYTES, plate: index, tmpOut: tmp });
+    if (!r.ok) { await mfDiscard(tmp); return r; }
+    if (save) {
+      const finalPath = await mfAskWhereToSave(_e.sender, { defaultPath: name, filters: [{ name: '3MF model', extensions: ['3mf'] }] });
+      if (!finalPath) { await mfDiscard(r.tmpPath); return { ok: false, canceled: true }; }
+      await mfFinalize(r.tmpPath, finalPath);
+      return { ok: true, outPath: finalPath, plate: r.plate, report: r.report };
+    }
+    const dir = await fs.promises.mkdtemp(path.join(app.getPath('temp'), 'khayt-plate-'));
+    mfPlateDirs.add(dir);
+    const dest = path.join(dir, name);
+    await mfFinalize(r.tmpPath, dest);
+    approvedConvertSources.add(path.resolve(dest));
+    return { ok: true, path: dest, name, plate: r.plate, report: r.report };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+app.on('will-quit', () => {
+  for (const d of mfPlateDirs) { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} }
+});
+// ── end one plate ───────────────────────────────────────────────────────────
+
 // Filament presets from the maker's installed Snapmaker Orca / OrcaSlicer, for the converter's
 // per-slot "what's loaded" picker. Empty list → the converter falls back to "Generic <type>".
 ipcMain.handle('hub:orca-filaments', async () => {
