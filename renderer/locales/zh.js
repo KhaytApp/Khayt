@@ -894,6 +894,7 @@
   "calc.quote.cart": "此项目的零件",
   "calc.quote.empty": "购物车中暂无零件。下方实时预览反映当前表单内容。",
   "calc.pending_included": "包含表单中的零件",
+  "calc.components_included": "包含组件 {amount}",
   "plib.plate": "板 {n}",
   "plib.plates_n": "{n} 个板",
   "calc.plate_whole": "整个项目（{n} 个板）",

@@ -894,6 +894,7 @@
   "calc.quote.cart": "このプロジェクトのパーツ",
   "calc.quote.empty": "カートにパーツがありません。下のライブプレビューは現在のフォームを反映しています。",
   "calc.pending_included": "フォームの部品を含みます",
+  "calc.components_included": "部品 {amount} を含みます",
   "plib.plate": "プレート {n}",
   "plib.plates_n": "{n} 枚のプレート",
   "calc.plate_whole": "プロジェクト全体（{n} 枚のプレート）",

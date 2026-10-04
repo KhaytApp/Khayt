@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A quote from a product with components shows its full price.** Taking a
+  job from a catalogue product that has components (magnets, hardware), the
+  calculator's total left them out, while the job was saved with them. A
+  product that showed 144.49 was saved at 153.49. The total now includes the
+  components, marked up like the rest, and says how much they add.
+
 - **Quote a multicolour print and its magnets in the calculator.** Add a line
   for each extra filament or colour, with its own spool and grams, and a
   purge figure shared across the colours by weight. Each colour is charged
