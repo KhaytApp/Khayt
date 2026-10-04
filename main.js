@@ -3555,7 +3555,7 @@ ipcMain.handle('hub:convert-mesh', async (_e, { path: srcPath } = {}) => {
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 
-ipcMain.handle('hub:mf-convert', async (_e, { path: srcPath, targetId, mode, slotMap, outPath, intoVaultId, targetProfile, fullSpectrum, fsPhysical, fsPhysicalHex, filaments, process, bandSwap, mergeToSlots } = {}) => {
+ipcMain.handle('hub:mf-convert', async (_e, { path: srcPath, targetId, mode, slotMap, outPath, intoVaultId, targetProfile, fullSpectrum, fsPhysical, fsPhysicalHex, filaments, process, bandSwap, mergeToSlots, colorMix } = {}) => {
   try {
     if (!srcPath || !mfReadAllowed(srcPath)) return { ok: false, error: 'Source file is outside an allowed folder.' };
     // The converted file lands in temp first. The save dialog can only be answered after
@@ -3564,7 +3564,7 @@ ipcMain.handle('hub:mf-convert', async (_e, { path: srcPath, targetId, mode, slo
     const tmp = mfTempPath('3mf');
     const r = await mfRun('convert', {
       src: srcPath, maxBytes: MF_MAX_BYTES, tmpOut: tmp,
-      opts: { targetId, mode, slotMap, targetProfile, fullSpectrum, fsPhysical, fsPhysicalHex, filaments, process, bandSwap, mergeToSlots: !!mergeToSlots },
+      opts: { targetId, mode, slotMap, targetProfile, fullSpectrum, fsPhysical, fsPhysicalHex, filaments, process, bandSwap, mergeToSlots: !!mergeToSlots, colorMix: !!colorMix },
     });
     if (!r.ok) { await mfDiscard(tmp); return r; }
 
@@ -3631,6 +3631,15 @@ ipcMain.handle('hub:fs-plan', async (_e, { path: srcPath, targetId, targetProfil
   try {
     if (!srcPath || !mfReadAllowed(srcPath)) return { available: false, error: 'Source file is outside an allowed folder.' };
     return await mfRun('fsPlan', { src: srcPath, maxBytes: MF_MAX_BYTES, opts: { targetId, targetProfile, fsPhysical, fsPhysicalHex } });
+  } catch (e) { return { available: false, error: String((e && e.message) || e) }; }
+});
+
+// Bambu/Orca → PrusaSlicer project plan (lib/prusa-project.js): which tool each colour lands on,
+// merges, ColorMix blends and warnings — or why the file cannot be converted. Read-only.
+ipcMain.handle('hub:prusa-plan', async (_e, { path: srcPath, targetId, targetProfile, slotMap, colorMix } = {}) => {
+  try {
+    if (!srcPath || !mfReadAllowed(srcPath)) return { available: false, error: 'Source file is outside an allowed folder.' };
+    return await mfRun('prusaPlan', { src: srcPath, maxBytes: MF_MAX_BYTES, opts: { targetId, targetProfile, slotMap, colorMix: !!colorMix } });
   } catch (e) { return { available: false, error: String((e && e.message) || e) }; }
 });
 
