@@ -1945,6 +1945,11 @@
           };
           if (reprofile) {
             if (target.printerModel) set('printer_model', target.printerModel, 'printer_model');
+            // The exact preset name and its variant, when the profile carries them — for the
+            // reason the Bambu branch writes printer_settings_id: PrusaSlicer matches a project to
+            // an installed printer by name, and a stale "Original Prusa MK3S" keeps the old one.
+            if (target.printerSettingsId) set('printer_settings_id', target.printerSettingsId, 'printer_settings_id');
+            if (target.printerVariant) set('printer_variant', target.printerVariant, 'printer_variant');
             // One value PER EXTRUDER, as many as the line already had: PrusaSlicer counts a
             // project's extruders from this list, so writing a single `0.4` over an MMU's
             // `0.4,0.4,0.4,0.4,0.4` would quietly turn a five-colour project into one.

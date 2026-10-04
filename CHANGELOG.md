@@ -44,6 +44,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - HueForge 3MFs for the Snapmaker U1 follow the 3MF standard: each model
     part now has the build element the standard requires, so strict readers
     no longer refuse the file with "Build item not found".
+  - New converter targets: Prusa MK4S + MMU3, and Prusa CORE One INDX with 8
+    or 4 toolheads. Converting for a Prusa MMU3 or INDX printer now also
+    writes the exact PrusaSlicer printer preset name and nozzle variant, so
+    PrusaSlicer matches the project to the right installed printer.
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its
