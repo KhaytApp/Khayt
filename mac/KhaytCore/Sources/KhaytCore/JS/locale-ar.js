@@ -2160,6 +2160,7 @@
   "set.supplier_ph": "+966 5x xxx xxxx",
   "inv.browse_catalog": "🔍 تصفح كتالوج المصنّعين",
   "inv.catalog_title": "تصفح كتالوج الخيوط",
+  "inv.catalog_more": "{n} أخرى — اكتب علامة تجارية أو لونًا للتضييق",
   "inv.catalog_search_ph": "ابحث بالماركة، اللون، النوع…",
   "inv.catalog_all_brands": "كل الماركات",
   "inv.catalog_all_types": "كل الأنواع",

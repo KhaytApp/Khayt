@@ -2127,6 +2127,7 @@
   "set.supplier_ph": "+966 5x xxx xxxx",
   "inv.browse_catalog": "🔍 Ver catálogo",
   "inv.catalog_title": "Explorar catálogo de filamentos",
+  "inv.catalog_more": "{n} más — escribe una marca o un color para acotar",
   "inv.catalog_search_ph": "Buscar marca, color, tipo…",
   "inv.catalog_all_brands": "Todas las marcas",
   "inv.catalog_all_types": "Todos los tipos",
