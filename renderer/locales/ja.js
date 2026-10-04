@@ -203,6 +203,7 @@
   "conv.spool_refused_bad": "この割り当ては適用できません。",
   "conv.spool_applies_map": "変換ではこのスロット割り当てを使用します。",
   "conv.spool_applies_merge": "このファイルは {k} スロットに対して {n} 色あります。変換時に装填済みスプールへ統合します。",
+  "conv.spool_applies_grow": "このファイルは {n} 色です。変換時にスロット {k} までを追加し、そこに装填されたスプール用に、ファイルのフィラメントをスプールの色で複製します。",
   "conv.spool_none": "すべての色はすでにそのスプールのスロットにあります。移動するものはありません。",
   "conv.detected": "検出",
   "conv.preview_loading": "3Dプレビューを読み込み中…",

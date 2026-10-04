@@ -203,6 +203,7 @@
   "conv.spool_refused_bad": "This match cannot be applied.",
   "conv.spool_applies_map": "Converting will use this slot assignment.",
   "conv.spool_applies_merge": "This file has {n} colours for {k} slots: converting merges them onto the loaded spools.",
+  "conv.spool_applies_grow": "This file has {n} colours; converting adds slots up to slot {k} for the spools loaded there, each a copy of one of the file's filaments in the spool's colour.",
   "conv.spool_none": "Every colour is already in the slot of its spool — nothing to move.",
   "conv.detected": "Detected",
   "conv.preview_loading": "Loading 3D preview…",

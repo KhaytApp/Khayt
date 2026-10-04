@@ -203,6 +203,7 @@
   "conv.spool_refused_bad": "Diese Zuordnung kann nicht angewendet werden.",
   "conv.spool_applies_map": "Die Konvertierung verwendet diese Slot-Zuordnung.",
   "conv.spool_applies_merge": "Diese Datei hat {n} Farben für {k} Slots: Die Konvertierung führt sie auf die geladenen Spulen zusammen.",
+  "conv.spool_applies_grow": "Diese Datei hat {n} Farben; die Konvertierung fügt Slots bis Slot {k} für die dort geladenen Spulen hinzu, jeweils als Kopie eines Filaments der Datei in der Farbe der Spule.",
   "conv.spool_none": "Jede Farbe liegt bereits im Slot ihrer Spule — nichts zu verschieben.",
   "conv.detected": "Erkannt",
   "conv.preview_loading": "3D-Vorschau wird geladen…",

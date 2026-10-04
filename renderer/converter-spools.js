@@ -162,6 +162,7 @@
       if (st.refused) status = `<p class="conv-spools-refused" role="alert">${esc(st.refused)}</p>`;
       else if (req.kind === 'refused') status = `<p class="conv-spools-refused" role="alert">${esc(refusalText(req.refusal))}</p>`;
       else if (req.kind === 'merge') status = `<p class="conv-spools-ok" role="status">${esc(tr('conv.spool_applies_merge', 'This file has {n} colours for {k} slots: converting merges them onto the loaded spools.', { n: p.rows.length, k: p.slots.hexes.length }))}</p>`;
+      else if (req.kind === 'grow') status = `<p class="conv-spools-ok" role="status">${esc(tr('conv.spool_applies_grow', 'This file has {n} colours; converting adds slots up to slot {k} for the spools loaded there, each a copy of one of the file\'s filaments in the spool\'s colour.', { n: p.rows.length, k: Math.max.apply(null, p.map) + 1 }))}</p>`;
       else if (req.kind === 'slotMap') status = `<p class="conv-spools-ok" role="status">${esc(tr('conv.spool_applies_map', 'Converting will use this slot assignment.'))}</p>`;
       else status = `<p class="conv-spools-ok" role="status">${esc(tr('conv.spool_none', 'Every colour is already in the slot of its spool — nothing to move.'))}</p>`;
       const warns = p.warnings.filter((w) => w.code !== 'far').map(warningText).filter(Boolean);
@@ -228,7 +229,8 @@
       if (!p || !p.ok) return { active: true, refusal: p ? p.warnings.map(warningText).filter(Boolean).join(' ') : '' };
       if (p.request.kind === 'refused') { render(); return { active: true, refusal: refusalText(p.request.refusal) }; }
       if (p.request.kind === 'none') return { active: true, request: null };
-      return { active: true, request: { slotMap: p.request.slotMap || null, mergeToSlots: !!p.request.mergeToSlots, spoolMerge: p.request.spoolMerge || null, spoolStrict: true } };
+      return { active: true, request: { slotMap: p.request.slotMap || null, mergeToSlots: !!p.request.mergeToSlots, spoolMerge: p.request.spoolMerge || null,
+        growToSlots: p.request.growToSlots || null, slotSpools: p.request.slotSpools || null, spoolStrict: true } };
     };
     // The converter refused the match after all (a model it could not read, settings it cannot
     // reorder): say so here, next to the table, as well as in the toast.

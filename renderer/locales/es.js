@@ -203,6 +203,7 @@
   "conv.spool_refused_bad": "Esta asignación no se puede aplicar.",
   "conv.spool_applies_map": "La conversión usará esta asignación de ranuras.",
   "conv.spool_applies_merge": "Este archivo tiene {n} colores para {k} ranuras: la conversión los fusiona en las bobinas cargadas.",
+  "conv.spool_applies_grow": "Este archivo tiene {n} colores; la conversión añade ranuras hasta la ranura {k} para las bobinas cargadas allí, cada una copia de un filamento del archivo con el color de la bobina.",
   "conv.spool_none": "Cada color ya está en la ranura de su bobina: no hay nada que mover.",
   "conv.detected": "Detectado",
   "conv.preview_loading": "Cargando vista 3D…",

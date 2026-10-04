@@ -122,11 +122,16 @@ test('the slot map is 0-based, one entry per file colour — the shape mf-conver
   assert.equal(toRequest([0, 1], { n: 2, slotCount: 4 }).kind, 'none', 'identity is no remap');
 });
 
-test('a slot past the file\'s own filaments is refused up front, as the converter would', () => {
-  const r = toRequest([3, 0], { n: 2, slotCount: 4, flavour: 'bambu' });
-  assert.equal(r.kind, 'refused');
-  assert.deepEqual(r.refusal, { code: 'slot-past-end', slot: 4, n: 2 });
-  // And the converter agrees: that map moves nothing.
+test('a spool past the file\'s own filaments asks the converter to grow the file to that slot', () => {
+  const r = toRequest([3, 2], { n: 2, slotCount: 4, flavour: 'bambu', slotHexes: ['#FFFFFF', '#FFFFFF', '#00FF00', '#FF0000'], usable: [false, false, true, true], slotMaterials: ['', '', 'PLA', 'PETG'] });
+  assert.equal(r.kind, 'grow');
+  assert.deepEqual(r.slotMap, [3, 2]);
+  assert.equal(r.growToSlots, 4);
+  assert.deepEqual(r.slotSpools, [null, null, { colour: '#00FF00', material: 'PLA' }, { colour: '#FF0000', material: 'PETG' }]);
+  // A file the converter cannot grow is refused up front, with the converter's reason.
+  const g = toRequest([3, 0], { n: 2, slotCount: 4, flavour: 'generic' });
+  assert.deepEqual(g.refusal, { code: 'slot-past-end', slot: 4, n: 2 });
+  // And without growToSlots the converter still refuses that map.
   const c = convert(bambu(['#FF0000', '#00FF00'], [1, 2]), { targetId: 'bambu-x1c', slotMap: [3, 0] });
   assert.ok(c.report.warnings.some((w) => /uses slot 4/.test(w)));
 });
@@ -320,4 +325,124 @@ test('strict: a malformed spool merge is refused rather than replaced by reduceC
 test('without spoolStrict nothing about an ordinary slot map changes', () => {
   const r = convert(bambu(['#FF0000', '#00FF00'], [1, 2]), { targetId: 'bambu-x1c', slotMap: [3, 0] });
   assert.equal(r.ok, true);
+});
+
+// ── growing the file to the slots the spools are in ──────────────────────────
+
+const AMS = [{ slot: 2, hex: '#E01010', material: 'PLA Basic' }, { slot: 3, hex: '#10E010', material: 'PLA Matte' }];
+
+test('end to end: a 2-colour file onto slots 3 and 4 of a 4-slot X1C grows every per-filament array to 4', () => {
+  const states = [1, 2, 2, 1, 0];
+  const buf = bambu(['#FF0000', '#00FF00'], states);
+  const a = analyze(buf);
+  const plan = planSpoolMatch(a.filaments, AMS, { slotCount: 4, flavour: a.flavour });
+  assert.equal(plan.request.kind, 'grow');
+  assert.deepEqual(plan.request.slotMap, [2, 3]);
+  const r = convert(buf, { targetId: 'bambu-x1c', slotMap: plan.request.slotMap, growToSlots: plan.request.growToSlots, slotSpools: plan.request.slotSpools, spoolStrict: true });
+  assert.equal(r.ok, true, r.error);
+  const c = cfgOf(r.buffer);
+  assert.equal(c.filament_colour.length, 4);
+  assert.equal(c.flush_volumes_matrix.length, 16);
+  const src = assertConsistent(c);
+  assert.deepEqual(src, [0, 1, 0, 1], 'slots 3/4 are full copies of the filaments mapped to them; 1/2 keep their own');
+  assert.deepEqual(c.filament_colour, ['#FF0000', '#00FF00', '#E01010', '#10E010'], 'new slots take the loaded spools\' colours');
+  for (let a2 = 0; a2 < 4; a2++) assert.equal(c.flush_volumes_matrix[a2 * 4 + a2], String(src[a2] * 11), 'diagonal is the copied filament\'s own (0 in a real file)');
+  assert.deepEqual(statesOf(zipText(r.buffer, '3D/3dmodel.model')), states.map((st) => (st ? st + 2 : 0)), 'paint on slots 3 and 4');
+  assert.match(zipText(r.buffer, 'Metadata/model_settings.config'), /key="extruder" value="3"[\s\S]*key="extruder" value="4"/);
+  assert.equal(c.wall_filament, '4', 'filament 2 → slot 4');
+  assert.equal(r.report.verified, true);
+  assert.ok(r.report.warnings.some((w) => /Added slots 3, 4/.test(w)));
+});
+
+test('growth: a slot nothing maps to between two loaded ones copies the first filament', () => {
+  const buf = bambu(['#FF0000', '#00FF00'], [1, 2]);
+  const r = convert(buf, { targetId: 'bambu-x1c', slotMap: [3, 0], growToSlots: 4, slotSpools: [null, null, null, { colour: '#AA0000', material: 'PLA' }], spoolStrict: true });
+  assert.equal(r.ok, true, r.error);
+  const c = cfgOf(r.buffer);
+  const src = assertConsistent(c);
+  assert.deepEqual(src, [1, 1, 0, 0]);
+  assert.equal(c.filament_colour[3], '#AA0000');
+  assert.deepEqual(statesOf(zipText(r.buffer, '3D/3dmodel.model')), [4, 1]);
+});
+
+test('growth: a spool of another material keeps the copied type, with a warning', () => {
+  const buf = bambu(['#FF0000', '#00FF00'], [1, 2], ['PLA', 'PLA']);
+  const r = convert(buf, { targetId: 'bambu-x1c', slotMap: [2, 1], growToSlots: 4, slotSpools: [null, null, { colour: '#FF0000', material: 'PETG HF' }], spoolStrict: true });
+  assert.equal(r.ok, true, r.error);
+  assert.equal(cfgOf(r.buffer).filament_type[2], 'PLA');
+  assert.ok(r.report.warnings.some((w) => /slot 3 holds PETG but takes PLA settings/.test(w)));
+});
+
+test('growth still refuses a mesh passed by name', () => {
+  const members = [
+    { name: '3D/3dmodel.model', size: 1 << 30 },
+    { name: 'Metadata/project_settings.config', data: JSON.stringify(settings(['#FF0000', '#00FF00'])) },
+    { name: 'Metadata/model_settings.config', data: OBJ },
+  ];
+  const r = convertMembers(members, { targetId: 'bambu-x1c', slotMap: [2, 3], growToSlots: 4, slotSpools: [], spoolStrict: true });
+  assert.equal(r.ok, false);
+  assert.equal(r.refused, 'spool-match');
+  assert.match(r.error, /could not read the model/);
+});
+
+test('growth still refuses k×n per-variant arrays, and a slot past the printer', () => {
+  const s2 = settings(['#FF0000', '#00FF00']);
+  s2.filament_flow_ratio = ['0.98', '0.98', '0.95', '0.95'];
+  const buf = writeZip([
+    { name: '3D/3dmodel.model', data: meshXml([1, 2]) },
+    { name: 'Metadata/project_settings.config', data: JSON.stringify(s2) },
+    { name: 'Metadata/model_settings.config', data: OBJ },
+  ]);
+  const r = convert(buf, { targetId: 'bambu-x1c', slotMap: [2, 3], growToSlots: 4, spoolStrict: true });
+  assert.equal(r.ok, false);
+  const r2 = convert(bambu(['#FF0000', '#00FF00'], [1, 2]), { targetId: 'bambu-x1c', slotMap: [5, 0], growToSlots: 4, spoolStrict: true });
+  assert.equal(r2.ok, false, 'slot 6 of a 4-slot printer is not grown to');
+});
+
+// Prusa MMU: the same growth through the INI config, extruder vectors and wiping volumes included.
+const PRUSA2 = [
+  '; printer_model = MK4SMMU3',
+  '; nozzle_diameter = 0.4,0.4',
+  '; extruder_colour = #FF0000;#00FF00',
+  '; filament_colour = #FF0000;#00FF00',
+  '; filament_type = PLA;PETG',
+  '; filament_settings_id = "Prusament PLA";"Prusament PETG"',
+  '; temperature = 215,240',
+  '; retract_length = 0.8,0.9',
+  '; wiping_volumes_matrix = 0,1,10,0',
+  '; wiping_volumes_extruders = u0,l0,u1,l1',
+  '; perimeter_extruder = 2',
+  '; bed_shape = 0x0,250x0,250x210,0x210',
+  '',
+].join('\n');
+const prusaIni = (text, k) => (new RegExp(`^; ${k} = (.*)$`, 'm').exec(text) || [])[1];
+
+test('end to end: a 2-colour PrusaSlicer project grows onto slots 3 and 4 of an MK4S MMU3', () => {
+  const buf = writeZip([
+    { name: '3D/3dmodel.model', data: meshXml([1, 2, 0]).replace(/paint_color=/g, 'slic3rpe:mmu_segmentation=') },
+    { name: 'Metadata/Slic3r_PE.config', data: PRUSA2 },
+  ]);
+  const a = analyze(buf);
+  assert.equal(a.flavour, 'prusa');
+  const plan = planSpoolMatch(a.filaments, AMS, { slotCount: 5, flavour: a.flavour });
+  assert.equal(plan.request.kind, 'grow');
+  const r = convert(buf, { targetId: 'prusa-mk4s-mmu3', slotMap: plan.request.slotMap, growToSlots: plan.request.growToSlots, slotSpools: plan.request.slotSpools, spoolStrict: true });
+  assert.equal(r.ok, true, r.error);
+  const t = zipText(r.buffer, 'Metadata/Slic3r_PE.config');
+  assert.equal(prusaIni(t, 'filament_colour'), '#FF0000;#00FF00;#E01010;#10E010');
+  assert.equal(prusaIni(t, 'extruder_colour'), '#FF0000;#00FF00;#E01010;#10E010');
+  assert.equal(prusaIni(t, 'filament_type'), 'PLA;PETG;PLA;PETG');
+  assert.equal(prusaIni(t, 'filament_settings_id'), '"Prusament PLA";"Prusament PETG";"Prusament PLA";"Prusament PETG"');
+  assert.equal(prusaIni(t, 'temperature'), '215,240,215,240');
+  assert.equal(prusaIni(t, 'nozzle_diameter'), '0.4,0.4,0.4,0.4', 'one extruder per filament on an MMU project');
+  assert.equal(prusaIni(t, 'retract_length'), '0.8,0.9,0.8,0.9');
+  assert.equal(prusaIni(t, 'wiping_volumes_matrix').split(',').length, 16);
+  assert.equal(prusaIni(t, 'wiping_volumes_extruders'), 'u0,l0,u1,l1,u0,l0,u1,l1');
+  assert.equal(prusaIni(t, 'perimeter_extruder'), '4');
+  assert.equal(prusaIni(t, 'bed_shape'), '0x0,250x0,250x210,0x210', 'never grown by length alone');
+  const st = [...zipText(r.buffer, '3D/3dmodel.model').matchAll(/<triangle\b[^>]*>/g)].map((m) => {
+    const pc = /mmu_segmentation="([0-9A-Fa-f]+)"/.exec(m[0]); return pc ? dominantState(pc[1]) : 0;
+  });
+  assert.deepEqual(st, [3, 4, 0]);
+  assert.ok(r.report.warnings.some((w) => /slot 4 holds PLA but takes PETG settings/.test(w)));
 });

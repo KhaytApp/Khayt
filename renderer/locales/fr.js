@@ -203,6 +203,7 @@
   "conv.spool_refused_bad": "Cette association ne peut pas être appliquée.",
   "conv.spool_applies_map": "La conversion utilisera cette attribution des emplacements.",
   "conv.spool_applies_merge": "Ce fichier a {n} couleurs pour {k} emplacements : la conversion les fusionne sur les bobines chargées.",
+  "conv.spool_applies_grow": "Ce fichier a {n} couleurs ; la conversion ajoute des emplacements jusqu'à l'emplacement {k} pour les bobines qui y sont chargées, chacun copiant un filament du fichier dans la couleur de la bobine.",
   "conv.spool_none": "Chaque couleur est déjà dans l'emplacement de sa bobine — rien à déplacer.",
   "conv.detected": "Détecté",
   "conv.preview_loading": "Chargement de l’aperçu 3D…",

@@ -203,6 +203,7 @@
   "conv.spool_refused_bad": "Esta combinação não pode ser aplicada.",
   "conv.spool_applies_map": "A conversão usará esta atribuição de slots.",
   "conv.spool_applies_merge": "Este arquivo tem {n} cores para {k} slots: a conversão as mescla nos carretéis carregados.",
+  "conv.spool_applies_grow": "Este arquivo tem {n} cores; a conversão adiciona slots até o slot {k} para os carretéis carregados ali, cada um uma cópia de um filamento do arquivo na cor do carretel.",
   "conv.spool_none": "Cada cor já está no slot do seu carretel — nada a mover.",
   "conv.detected": "Detectado",
   "conv.preview_loading": "Carregando prévia 3D…",

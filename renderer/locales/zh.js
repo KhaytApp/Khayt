@@ -203,6 +203,7 @@
   "conv.spool_refused_bad": "无法应用此匹配。",
   "conv.spool_applies_map": "转换将使用此插槽分配。",
   "conv.spool_applies_merge": "此文件有 {n} 种颜色，打印机有 {k} 个插槽：转换时会合并到已装载的耗材上。",
+  "conv.spool_applies_grow": "此文件有 {n} 种颜色；转换时会为装在那里的耗材添加插槽直到插槽 {k}，每个都是文件中某个耗材按该耗材卷颜色的副本。",
   "conv.spool_none": "每种颜色都已在其耗材所在的插槽中——无需移动。",
   "conv.detected": "已检测",
   "conv.preview_loading": "正在加载 3D 预览…",

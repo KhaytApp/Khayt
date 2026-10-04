@@ -1981,6 +1981,136 @@
     return changed;
   }
 
+  // ── SPOOL MATCH: GROW THE FILAMENT LIST TO THE SLOTS THE SPOOLS ARE IN ─────────────────
+  //
+  // A slot map past the file's own filaments is refused because growing every per-filament
+  // array would mean inventing a filament. "Match to loaded spools" is the one caller that
+  // knows what is in those slots, so it may ask for the growth (growToSlots: the printer's
+  // slot count, slotSpools: [{ colour, material }] per slot). Each new slot is a FULL copy of
+  // one source filament — the one mapped to it, else the first — made with the same
+  // reindexers a slot map uses (srcOf longer than n), so the purge matrix, the pairs vector,
+  // different_settings_to_system / inherits_group and Prusa's wiping volumes and per-extruder
+  // vectors all grow with it. Then the ordinary slot map runs on the grown file, strictly:
+  // every refusal it can make (mesh by name, settings that will not split, paint that will
+  // not re-encode) still refuses. Only the new slots' colours become the spools'; a spool of
+  // another material family keeps the copied filament's type and says so.
+  //
+  // Returns null — and the caller carries on as before — when no growth is asked for, the
+  // map fits already, it points past the printer's slots, the palette is not the config's,
+  // or the config holds k×n per-variant arrays: each of those keeps its existing refusal.
+  const PER_EXTRUDER_PRUSA = /^(nozzle_diameter|nozzle_high_flow|nozzle_type|extruder_offset|extruder_type|max_layer_height|min_layer_height|wipe|retract_[a-z_]+|deretract_speed|travel_[a-z_]+)$/;
+  function growPrusaConfig(text, srcOf, n) {
+    let bad = null;
+    const out = text.replace(/^([ \t]*;?[ \t]*)([A-Za-z0-9_]+)([ \t]*=[ \t]*)([^\r\n]*)$/gm, (all, pre, key, eq, val) => {
+      if (bad) return all;
+      if (key === 'wiping_volumes_matrix' || key === 'wiping_volumes_extruders') {
+        const a = val.trim().split(',');
+        const r = key === 'wiping_volumes_matrix' ? reshapeSquare(a, srcOf, n) : reshapePairs(a, srcOf, n);
+        if (!r) { bad = key; return all; }
+        return pre + key + eq + r.join(',');
+      }
+      const perFil = isPerFilamentPrusa(key);
+      if ((!perFil && !PER_EXTRUDER_PRUSA.test(key)) || !val.trim()) return all;
+      const sp = splitIniVector(val);
+      if (!sp) { if (perFil) bad = key; return all; }
+      if (sp.parts.length === n) return pre + key + eq + srcOf.map((i) => sp.parts[i]).join(sp.sep);
+      if (sp.parts.length === 1) return all; // one value for every filament / the one extruder
+      if (perFil) bad = key;
+      return all;
+    });
+    return bad ? { ok: false, bad } : { ok: true, text: out };
+  }
+
+  function setIniEntries(text, key, entries) {
+    const re = new RegExp('^([ \\t]*;?[ \\t]*' + key + '[ \\t]*=[ \\t]*)([^\\r\\n]*)$', 'm');
+    return text.replace(re, (all, head, val) => {
+      const sp = splitIniVector(val);
+      if (!sp) return all;
+      for (const [j, v] of entries) if (j < sp.parts.length) sp.parts[j] = v;
+      return head + sp.parts.join(sp.sep);
+    });
+  }
+
+  function growForSpools(members, opts, flavour) {
+    const map = opts.slotMap;
+    const filaments = extractFilaments(members);
+    const n = filaments.length;
+    const limit = Number(opts.growToSlots);
+    if (!Array.isArray(map) || map.length !== n || !n || map.some((t) => !Number.isInteger(t) || t < 0)) return null;
+    const top = Math.max(...map);
+    if (top < n || !(top < limit)) return null;
+    const m = top + 1;
+    const srcOf = [];
+    for (let j = 0; j < m; j++) {
+      if (j < n) { srcOf.push(j); continue; }
+      const i = map.indexOf(j);
+      srcOf.push(i >= 0 ? i : 0);
+    }
+    const fam = (x) => {
+      const u = String(x || '').toUpperCase();
+      const f = ['PETG', 'PCTG', 'PLA', 'ABS', 'ASA', 'TPU', 'PET', 'PVA', 'HIPS', 'PC', 'PA', 'PP'].find((k) => new RegExp('(^|[^A-Z])' + k + '($|[^A-Z])').test(u));
+      return f || '';
+    };
+    const spools = Array.isArray(opts.slotSpools) ? opts.slotSpools : [];
+    const newColour = (j) => normHex(spools[j] && (spools[j].colour || spools[j].color || spools[j].hex));
+    let grownMembers = null, family = profiles.configFamily(flavour), copiedTypes = null;
+    if (family === 'bbl') {
+      const pm = members.find((mm) => /project_settings\.config$/i.test(mm.name));
+      const proj = pm && pm.data != null ? tryJson(pm.data.toString('utf8')) : null;
+      if (!proj || !Array.isArray(proj.filament_colour) || proj.filament_colour.length !== n) return null;
+      if (hasVariantArrays(proj, n)) return null;
+      reindexFilamentJson(proj, srcOf, n);
+      if (!Array.isArray(proj.filament_colour) || proj.filament_colour.length !== m) return null;
+      copiedTypes = Array.isArray(proj.filament_type) ? proj.filament_type.slice() : null;
+      grownMembers = members.map((mm) => (mm === pm ? { name: mm.name, data: JSON.stringify(proj) } : mm));
+    } else if (family === 'prusa') {
+      const pm = members.find((mm) => CFG_PRUSA.test(mm.name));
+      if (!pm || pm.data == null) return null;
+      const g = growPrusaConfig(pm.data.toString('utf8'), srcOf, n);
+      if (!g.ok) return null;
+      const tl = iniValue(g.text, 'filament_type');
+      copiedTypes = tl ? (splitIniVector(tl) || { parts: [] }).parts.map((x) => x.replace(/^"|"$/g, '')) : null;
+      grownMembers = members.map((mm) => (mm === pm ? { name: mm.name, data: g.text } : mm));
+    } else return null;
+    if (extractFilaments(grownMembers).length !== m) return null;
+
+    const ext = map.slice();
+    for (let j = n; j < m; j++) ext.push(j);
+    const inner = convertMembers(grownMembers, Object.assign({}, opts, { slotMap: ext, growToSlots: null, slotSpools: null, spoolStrict: true }));
+    if (!inner.ok) return inner;
+
+    // The new slots take the colour of the spool loaded in them.
+    const stamps = [], typeWarn = [];
+    for (let j = n; j < m; j++) {
+      const c = newColour(j);
+      if (c) stamps.push([j, c]);
+      const sf = fam(spools[j] && spools[j].material), cf = fam(copiedTypes && copiedTypes[j]);
+      if (sf && cf && sf !== cf) typeWarn.push(`slot ${j + 1} holds ${sf} but takes ${cf} settings from filament ${srcOf[j] + 1}`);
+    }
+    const out = inner.members.map((mm) => {
+      if (!stamps.length || mm.data == null) return mm;
+      if (family === 'bbl' && /project_settings\.config$/i.test(mm.name)) {
+        const o = tryJson(mm.data.toString('utf8'));
+        if (!o || !Array.isArray(o.filament_colour)) return mm;
+        for (const [j, c] of stamps) if (j < o.filament_colour.length) o.filament_colour[j] = c;
+        return { name: mm.name, data: JSON.stringify(o) };
+      }
+      if (family === 'prusa' && CFG_PRUSA.test(mm.name)) {
+        let t = mm.data.toString('utf8');
+        t = setIniEntries(t, 'filament_colour', stamps);
+        t = setIniEntries(t, 'extruder_colour', stamps);
+        return { name: mm.name, data: t };
+      }
+      return mm;
+    });
+    const report = inner.report;
+    report.colorsGrown = { from: n, to: m };
+    report.warnings.push(`Added slot${m - n === 1 ? '' : 's'} ${Array.from({ length: m - n }, (_, k) => n + k + 1).join(', ')} for the spools loaded there: each copies one of the file's filaments, in the loaded spool's colour.`);
+    if (typeWarn.length) report.warnings.push(`Check the material: ${typeWarn.join('; ')}.`);
+    return { ok: true, members: out, report };
+  }
+  // ── end SPOOL MATCH ──
+
   /**
    * Convert a 3MF for a target printer.
    * @param {Buffer} buf source 3MF
@@ -2036,6 +2166,11 @@
       ? profiles.customProfile(opts.targetProfile) : null;
     const target = custom || profiles.getProfile(opts.targetId) || profiles.GENERIC;
     const mode = opts.mode === 'normalize' || target.id === profiles.GENERIC.id ? 'normalize' : 'retarget';
+    // SPOOL MATCH: a loaded spool in a slot past the file's own filaments — see growForSpools.
+    if (mode === 'retarget' && opts.growToSlots) {
+      const grown = growForSpools(members, opts, flavour);
+      if (grown) return grown;
+    }
     const filaments = extractFilaments(members);
     const report = { flavour, target: target.id, targetName: target.name, mode, fieldsChanged: [], colorsRemapped: 0, warnings: [] };
 
@@ -2415,7 +2550,8 @@
       // Full Spectrum / band-swap reduce the palette to the physical heads (FS mixes are virtual; band-swap
       // folds colours onto heads), so the round-trip colour count is the target's slot count, not the source's.
       const expectColours = (report.fullSpectrum || report.bandSwap) ? (target.maxColors || filaments.length)
-        : report.colorsMerged ? report.colorsMerged.to : filaments.length;
+        : report.colorsMerged ? report.colorsMerged.to
+        : report.colorsGrown ? report.colorsGrown.to : filaments.length; // colorsGrown: SPOOL MATCH
       const coloursOk = mode === 'normalize' ? true : back.colorCount === expectColours;
       report.verified = !!(back && back.ok && back.hasGeometry && coloursOk);
     } catch (_) { report.verified = false; }

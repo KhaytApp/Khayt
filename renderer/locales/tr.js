@@ -203,6 +203,7 @@
   "conv.spool_refused_bad": "Bu eşleştirme uygulanamaz.",
   "conv.spool_applies_map": "Dönüştürme bu yuva atamasını kullanacak.",
   "conv.spool_applies_merge": "Bu dosyada {k} yuva için {n} renk var: dönüştürme bunları takılı makaralarda birleştirir.",
+  "conv.spool_applies_grow": "Bu dosyada {n} renk var; dönüştürme, oraya takılı makaralar için {k}. yuvaya kadar yuva ekler; her biri dosyadaki bir filamentin makara rengindeki kopyasıdır.",
   "conv.spool_none": "Her renk zaten kendi makarasının yuvasında — taşınacak bir şey yok.",
   "conv.detected": "Algılandı",
   "conv.preview_loading": "3B önizleme yükleniyor…",
