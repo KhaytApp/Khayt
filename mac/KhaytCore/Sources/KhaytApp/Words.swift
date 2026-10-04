@@ -2645,6 +2645,28 @@ final class Words {
         "mac.calc_no_filament": [
             "en": "No filament chosen, so the plastic is not counted in this price.",
             "ar": "لم يُختر خيط، لذا لا تشمل هذه التسعيرة تكلفة المادة."],
+        "mac.calc_add_filament": ["en": "Add filament / colour", "ar": "أضف خيطًا / لونًا"],
+        "mac.calc_colour_n":    ["en": "Colour {n}", "ar": "اللون {n}"],
+        "mac.calc_purge":       ["en": "Purge / waste", "ar": "هدر التنظيف"],
+        "mac.calc_multicolour_note": [
+            "en": "{n} filaments, {g} g in all. Each is charged at its own spool's price; purge is shared across them by weight.",
+            "ar": "{n} خيوط، {g} غ إجمالًا. يُحسب كل منها بسعر بكرته، ويُوزَّع هدر التنظيف عليها حسب الوزن."],
+        "mac.calc_purge_note": [
+            "en": "{g} g in all, purge included — charged at this spool's price.",
+            "ar": "{g} غ إجمالًا مع هدر التنظيف — بسعر هذه البكرة."],
+        "mac.calc_consumables": ["en": "Consumables", "ar": "المستهلكات"],
+        "mac.calc_consumable":  ["en": "Consumable", "ar": "مستهلك"],
+        "mac.calc_add_consumable": ["en": "Add consumable", "ar": "أضف مستهلكًا"],
+        "mac.calc_no_consumables": [
+            "en": "Nothing on the Consumables shelf yet. Add magnets, inserts or screws there and they can be priced into a print here.",
+            "ar": "لا شيء في رف المستهلكات بعد. أضف المغناطيس أو الحشوات أو البراغي هناك لتُحتسب في تكلفة الطباعة هنا."],
+        "mac.calc_consumables_note": [
+            "en": "Per printed piece, at each item's cost on the shelf. Included in the cost above.",
+            "ar": "لكل قطعة مطبوعة، بتكلفة كل صنف على الرف. مشمولة في التكلفة أعلاه."],
+        "mac.model_consumables": ["en": "Consumables per print", "ar": "المستهلكات لكل طباعة"],
+        "mac.model_consumables_hint": [
+            "en": "Bought-in pieces each print uses — magnets, inserts, screws. Priced in the calculator and on a product made from this model, and taken off the shelf when its job completes.",
+            "ar": "القطع المشتراة التي تستهلكها كل طباعة — مغناطيس، حشوات، براغي. تُحتسب في الحاسبة وفي المنتج المصنوع من هذا النموذج، وتُخصم من الرف عند اكتمال المهمة."],
         "mac.export_accounting": ["en": "Export for the Accountant",
                                   "ar": "تصدير للمحاسب"],
         // "Export all data (CSV)" is what the other app calls it; said the
