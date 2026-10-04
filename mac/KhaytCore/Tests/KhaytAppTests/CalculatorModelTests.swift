@@ -83,6 +83,10 @@ struct CalculatorModelTests {
         two.addFilament(spools: shop.spools)
         #expect(two.lines.count == 2)
         #expect(two.lines[1].spoolId != two.lines[0].spoolId, "the new line opens on a different spool")
+        // Adding the colour split the 120 typed (alpha.59 review); this part
+        // is 120 g of one colour and 60 g of the other.
+        #expect(two.gramsValue == 120, "split, not added")
+        two.lines[0].grams = "120"
         two.lines[1].grams = "60"
         #expect(two.isMulticolour)
         await two.recompute(shop)

@@ -1,6 +1,7 @@
 # Keep the bundled filament catalogue from going stale.
 #
-# `assets/filament-catalog.json` is a snapshot of the Open Filament Database,
+# `assets/filament-catalog.json` is a snapshot of the Open Filament Database
+# merged with SpoolmanDB and Bambu Lab's colour list,
 # taken by hand when the lookup shipped. A snapshot ages: a shop that buys a
 # filament released last month searches for it, finds nothing, and concludes
 # Khayt does not have it. The app can say how old the list is, which is honest
@@ -46,7 +47,9 @@ jobs:
         run: npm ci
 
       - name: Fetch the catalogue
-        run: python3 scripts/fetch-filament-catalog.py
+        # `--latest` moves the pinned commits to each repository's head and
+        # records them in the file, so the PR names exactly what it takes.
+        run: python3 scripts/fetch-filament-catalog.py --latest
 
       # The Mac app carries its own copy and a guard in the suite fails if the
       # two drift, so syncing here is what makes the PR able to pass its own
@@ -73,7 +76,7 @@ jobs:
             echo "The catalogue is unchanged since the last refresh."
           else
             echo "changed=yes" >> "$GITHUB_OUTPUT"
-            # A 0.78 MB single-line JSON diff renders as one changed line, so
+            # A 0.9 MB single-line JSON diff renders as one changed line, so
             # the summary is the only thing a reviewer can actually read.
             {
               echo 'summary<<KHAYT_EOF'

@@ -13,7 +13,7 @@ import Foundation
 public actor KhaytEngine {
     private let runtime: JSRuntime
 
-    /// The filament catalogue is 0.78 MB of JSON and a search runs on every
+    /// The filament catalogue is 0.9 MB of JSON and a search runs on every
     /// keystroke. It is read into the context once and kept — immutable data
     /// from the app bundle, so there is nothing to invalidate.
     private var filamentCatalogLoaded = false
@@ -2251,7 +2251,7 @@ public actor KhaytEngine {
 
     /// Search the bundled catalogue.
     ///
-    /// THE CATALOGUE IS LOADED ONCE AND KEPT. It is 0.78 MB of JSON and a
+    /// THE CATALOGUE IS LOADED ONCE AND KEPT. It is 0.9 MB of JSON and a
     /// search runs on every keystroke; parsing it per call would be a fifth of
     /// a second of work repeated for no reason. It is immutable data read from
     /// the app bundle, so there is nothing to invalidate.
@@ -2332,7 +2332,7 @@ public actor KhaytEngine {
     /// text instead puts the lookup in the layer that owns the file and leaves
     /// this one with the rule.
     ///
-    /// Idempotent: the first call parses 0.78 MB, the rest return immediately.
+    /// Idempotent: the first call parses 0.9 MB, the rest return immediately.
     public func useFilamentCatalog(_ json: String) throws {
         guard !filamentCatalogLoaded else { return }
         // An IIFE, not two statements: `call2` evaluates an EXPRESSION, so a
@@ -3049,14 +3049,16 @@ public actor KhaytEngine {
     /// renderer makes, from the same module.
     public func kpis(orders: [JSONValue], clients: [JSONValue],
                      settings: [String: JSONValue], range: String,
-                     language: String, inventory: [JSONValue] = []) throws -> Kpis {
+                     language: String, inventory: [JSONValue] = [],
+                     consumables: [JSONValue] = []) throws -> Kpis {
         // `kpi-rows` still runs in JavaScript: it reads `order-money`,
         // `order-payment` and `content-languages`, none of which have moved
         // yet, and the money function it takes cannot cross the bridge. Adding
         // the rows up is `KhaytCore.Kpi` now.
         let rows: [JSONValue] = try runtime.call2(
             KPI_SCRIPT, [.array(orders), .array(clients), .object(settings),
-                         .string(range), .string("\u{2014}"), .string(language), .array(inventory)],
+                         .string(range), .string("\u{2014}"), .string(language), .array(inventory),
+                         .array(consumables)],
             as: [JSONValue].self)
         let summary = Kpi.compute(Kpi.rows(rows))
         return Kpis(orderCount: summary.orderCount, completedCount: summary.completedCount,
@@ -6073,9 +6075,18 @@ public actor KhaytEngine {
     /// The Mac imported models without this until Sep 2026, so a sliced 3MF
     /// that says 4 h 37 min was priced at a geometry guess of 0.97 h.
     public func slicerFigures(configs: [String: String], gcodeText: String?) throws -> [String: JSONValue]? {
+        try slicerFigures(configs: configs, gcodeTexts: gcodeText.map { [$0] } ?? [])
+    }
+
+    /// The same, for a 3MF carrying SEVERAL embedded G-codes — one per plate,
+    /// as "export all sliced plates" writes them. With no `slice_info` to list
+    /// the plates, their figures are ADDED, as `lib/model-intake.js` adds them;
+    /// taking the first was one plate's hours and grams for the whole project.
+    /// Each text is a G-code's head and tail window, not the whole file.
+    public func slicerFigures(configs: [String: String], gcodeTexts: [String]) throws -> [String: JSONValue]? {
         let members = JSONValue.array(configs.map { .object(["name": .string($0.key), "data": .string($0.value)]) })
         let answer = try runtime.call2(#"""
-            (function (members, gtext) {
+            (function (members, gtexts) {
               var mark = function (o) { o.source = 'slicer'; o.platesRead = 2; return o; };
               // THE SHARED RULE FIRST: `KhaytMfConvert.extractMeta` reads a
               // Bambu/Orca/Snapmaker slice_info plate by plate (#1602) — every
@@ -6094,12 +6105,29 @@ public actor KhaytEngine {
                 if (Array.isArray(meta.filaments) && meta.filaments.length) out.filaments = meta.filaments;
                 return mark(out);
               }
-              if (gtext) {
-                var p = globalThis.KhaytGcodeParse.parseGcodeText(gtext);
-                if (p && p.printTimeMins > 0 && p.filamentGrams > 0)
-                  return mark({ printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams,
-                                filamentType: p.filamentType || '', filamentCost: p.filamentCost || null,
-                                slicer: p.slicer || '' });
+              var usable = [];
+              for (var k = 0; k < gtexts.length; k++) {
+                var p = globalThis.KhaytGcodeParse.parseGcodeText(gtexts[k]);
+                if (p && p.printTimeMins > 0 && p.filamentGrams > 0) usable.push(p);
+              }
+              if (usable.length === 1) {
+                var one = usable[0];
+                return mark({ printTimeMins: one.printTimeMins, filamentGrams: one.filamentGrams,
+                              filamentType: one.filamentType || '', filamentCost: one.filamentCost || null,
+                              slicer: one.slicer || '' });
+              }
+              if (usable.length > 1) {
+                var sum = function (key) {
+                  var t = 0;
+                  for (var j = 0; j < usable.length; j++) t += Number(usable[j][key]) || 0;
+                  return Math.round(t * 100) / 100;
+                };
+                var typed = usable.find(function (g) { return g.filamentType; });
+                var costed = usable.every(function (g) { return g.filamentCost != null && isFinite(g.filamentCost); });
+                return mark({ printTimeMins: sum('printTimeMins'), filamentGrams: sum('filamentGrams'),
+                              filamentType: typed ? typed.filamentType : '',
+                              filamentCost: costed ? sum('filamentCost') : null,
+                              slicer: usable[0].slicer || '' });
               }
               for (var i = 0; i < members.length; i++) {
                 if (!/\.(config|txt)$/i.test(members[i].name)) continue;
@@ -6111,7 +6139,7 @@ public actor KhaytEngine {
               }
               return null;
             })(ARG0, ARG1)
-            """#, [members, gcodeText.map(JSONValue.string) ?? .null], as: JSONValue.self)
+            """#, [members, .array(gcodeTexts.map(JSONValue.string))], as: JSONValue.self)
         guard case .object(let o) = answer else { return nil }
         return o
     }
@@ -11579,8 +11607,11 @@ private let KPI_SCRIPT = """
         // dashboard is to use too. This summed `unitCost × qty` — which only
         // a line priced from a product carries — and left shipping out, so a
         // costed job cost nothing here and the margin disagreed with Khayt's.
+        // `consumables`: the shelf a part's magnets are priced from. Without
+        // it this host priced them at the cost written on the line while the
+        // desktop, which has the shelf as a global, priced them at today's.
         cost: globalThis.KhaytKpiRows.orderCost(o,
-          { settings: ARG2, inventory: ARG6 || [], clients: ARG1 }),
+          { settings: ARG2, inventory: ARG6 || [], clients: ARG1, consumables: ARG7 || [] }),
         outstanding: M.orderOwedBase(o, ctx)
       };
     },

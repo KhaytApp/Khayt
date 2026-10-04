@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 
 const { search, coloursOf, toSpool, ageInDays } = require('../lib/filament-catalog');
 
-/** A small catalogue with the shapes that matter, rather than the real 0.78 MB. */
+/** A small catalogue with the shapes that matter, rather than the real 0.9 MB. */
 const CAT = {
   generatedAt: '2026-09-11T00:00:00.000Z',
   filaments: [
@@ -87,6 +87,25 @@ test('the BRAND is never the word that gets dropped', () => {
   // printed on it.
   const rows = search(CAT, 'bambu matte black');
   assert.ok(rows.every((r) => r.filament.b === 'Bambu Lab'));
+});
+
+test('words only colours answered must be answered by ONE colour', () => {
+  // Bambu's PLA Lite sells "Matte Beige" and "Black". Neither is a matte black,
+  // so "bambu pla matte black" must not land on it by splitting the two words
+  // across two spools — it falls back to PLA Matte, saying "black" was dropped.
+  const lite = { b: 'Bambu Lab', n: 'PLA Lite', m: 'PLA', d: 1.24, t: [190, 230],
+    c: [['Matte Beige', '#ECC3B2', [1000], 212, 1.75], ['Black', '#000000', [1000], 212, 1.75]] };
+  const cat = Object.assign({}, CAT, { filaments: CAT.filaments.concat([lite]) });
+  const rows = search(cat, 'bambu pla matte black');
+  assert.equal(named(rows)[0], 'Bambu Lab PLA Matte');
+  // PLA Lite may still come back for "bambu pla matte", but never as a match
+  // for "black" too.
+  assert.ok(rows.every((r) => r.unmatched.includes('black')), named(rows).join(', '));
+  // One colour carrying both words still matches, and is the colour offered.
+  lite.c.push(['Matte Black', '#111111', [1000], 212, 1.75]);
+  const hit = search(cat, 'bambu pla matte black').find((r) => r.filament.n === 'PLA Lite');
+  assert.ok(hit);
+  assert.deepEqual(hit.colours.map((c) => c.name), ['Matte Black']);
 });
 
 test('a full match reports nothing unmatched', () => {
