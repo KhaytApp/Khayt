@@ -310,6 +310,18 @@
    * layer height, per-filament grams, total grams and print time. Never throws — a field we
    * can't find is simply omitted.
    */
+  // SPOOL MATCH: per-filament material names (filament_type), when they line up with the palette.
+  function filamentTypes(members, n) {
+    const proj = tryJson(memberText(members, /project_settings\.config$/i));
+    let t = proj && Array.isArray(proj.filament_type) ? proj.filament_type : null;
+    if (!t) {
+      const prusa = memberText(members, CFG_PRUSA);
+      const line = prusa ? iniValue(prusa, 'filament_type') : null;
+      if (line) t = line.split(';').map((x) => x.trim().replace(/^"|"$/g, ''));
+    }
+    return t && t.length === n ? t.map((x) => String(x || '')) : null;
+  }
+
   function extractMeta(members) {
     const meta = { printerModel: null, nozzle: null, layerHeight: null, bed: null, grams: [], totalGrams: 0, printMinutes: null };
     const projText = memberText(members, /project_settings\.config$/i) || memberText(members, /model_settings\.config$/i);
@@ -1088,6 +1100,9 @@
     const filaments = extractFilaments(members);
     const meta = extractMeta(members);
     if (meta.grams.length) filaments.forEach((f, i) => { if (meta.grams[i] != null) f.grams = meta.grams[i]; });
+    // SPOOL MATCH: each filament's material, so a PETG colour matched to a PLA spool is warned.
+    const types = filamentTypes(members, filaments.length);
+    if (types) filaments.forEach((f, i) => { if (types[i]) f.type = types[i]; });
     return {
       ok: true,
       flavour: detectFlavour(members),
@@ -1592,6 +1607,15 @@
     // the config's colours, temperatures and paint describing different filaments.
     const proj = tryJson(memberText(members, /project_settings\.config$/i));
     if (!proj || !Array.isArray(proj.filament_colour) || proj.filament_colour.length !== colors.length) return null;
+    // ── SPOOL MATCH (lib/spool-match.js) ─────────────────────────────────────────────
+    // "Match to loaded spools" hands over its own groups: each colour onto the loaded spool
+    // that looks most like it, and per slot the source whose settings it keeps. The rest of
+    // the merge (config, paint, extruders, all-or-nothing) is this same path, unchanged.
+    if (opts.spoolMerge) {
+      const sm = explicitSpoolMerge(opts.spoolMerge, colors.length, slots);
+      return sm ? { map: sm.map, colors: sm.reps.map((i) => normHex(colors[i])), slotSrc: sm.reps, spool: true } : null;
+    }
+    // ── end SPOOL MATCH ──
     const usage = tallyPaintUsage(members, colors.length);
     const r = fullSpectrum.reduceColors(colors, usage.some((u) => u > 0) ? usage : undefined, undefined, slots);
     // One group per slot; the clamp is belt and braces, as in the reference.
@@ -1602,6 +1626,28 @@
     const slotSrc = r.reps.slice();
     return { map, colors: slotSrc.map((i) => normHex(colors[i])), slotSrc };
   }
+
+  // ── SPOOL MATCH (lib/spool-match.js) ─────────────────────────────────────────────────
+  /**
+   * A spool-match merge, checked rather than trusted: `map` sends each of the n colours to a
+   * 0-based slot below the target's slot count, and `reps[s]` names the colour whose settings
+   * slot s keeps — one that maps to s, or any colour for a slot nothing maps to (an empty
+   * spool between two loaded ones). Anything else is not a merge this can write: null.
+   */
+  function explicitSpoolMerge(sm, n, slots) {
+    const map = sm && sm.map, reps = sm && sm.reps;
+    if (!Array.isArray(map) || map.length !== n || !Array.isArray(reps)) return null;
+    if (map.some((t) => !Number.isInteger(t) || t < 0 || t >= slots)) return null;
+    const k = Math.max(...map) + 1;
+    if (reps.length !== k) return null;
+    for (let s = 0; s < k; s++) {
+      const r = reps[s];
+      if (!Number.isInteger(r) || r < 0 || r >= n) return null;
+      if (map.includes(s) && map[r] !== s) return null;
+    }
+    return { map: map.slice(), reps: reps.slice() };
+  }
+  // ── end SPOOL MATCH ──
 
   /**
    * Apply a merge plan to project_settings.config: every per-filament array goes from the source
@@ -2299,6 +2345,8 @@
           (sw ? ` with ${sw} manual filament swap(s) — M600 pauses were added at the swap heights. Load the head colours shown and swap the spool when ${target.name} pauses.` : ' — no manual swaps needed (fits the heads).'));
       } else if (fsPlan) {
         report.warnings.push(`Full Spectrum: kept ${target.maxColors} filaments physical and reproduced ${n - target.maxColors} extra colour(s) as ${fsPlan.mixDefs.length} dithered mix(es). Load the ${target.maxColors} head colours shown; ${target.name} prints the rest by mixing.`);
+      } else if (mergePlan && mergePlan.spool) { // SPOOL MATCH
+        report.warnings.push(`Matched ${n} colours to the spools loaded in ${mergePlan.colors.length} slot${mergePlan.colors.length === 1 ? '' : 's'} of ${target.name}. Check the colours in your slicer before printing.`);
       } else if (mergePlan) {
         report.warnings.push(`Merged ${n} colours into the nearest ${mergePlan.colors.length} for ${target.name}: the least-used colours now print in the closest-looking slot. Check the colours in your slicer before printing.`);
       } else if (target.maxColors && n > target.maxColors) {
@@ -2315,6 +2363,22 @@
         if (mergeDropped) report.warnings.push(`Colours were not merged: ${why}. ${target.name} supports ${target.maxColors} colours — map the extra ones in your slicer.`);
         if (slotMapDropped) report.warnings.push(`Colours were left in their original slots: ${why}. Reassign them in your slicer${paintBlocked === 'mesh' ? ', or convert the file in Khayt' : ''}.`);
       }
+      // ── SPOOL MATCH: a match the maker asked for applies whole, or nothing is written ──
+      // Every reason above that leaves the colours where they were (a slot past the file's
+      // filaments, a Prusa setting that would not split, paint that could not move, a file
+      // whose palette is not its config's) still leaves a file — which is right for a hand-made
+      // slot map and wrong for "print with what's loaded", where the maker would load the
+      // spools the screen showed and print the colours in the wrong slots. So that request
+      // (spoolStrict) is refused, with the converter's own reasons, and the screen shows them.
+      if (opts.spoolStrict && !paintPlan) {
+        const askedMerge = !!opts.spoolMerge;
+        const askedMap = Array.isArray(opts.slotMap) && opts.slotMap.some((t, i) => t !== i);
+        if ((askedMerge && !mergePlan) || (!askedMerge && askedMap && !slotMap)) {
+          return { ok: false, refused: 'spool-match', warnings: report.warnings.slice(),
+            error: `The spool match was not applied, so nothing was converted. ${report.warnings.join(' ')}`.trim() };
+        }
+      }
+      // ── end SPOOL MATCH ──
       const bounds = computeBounds(members);
       if (bounds) { report.bounds = bounds; for (const w of fitWarnings(bounds, target)) report.warnings.push(w); }
       report.fieldsChanged = [...new Set(report.fieldsChanged)];

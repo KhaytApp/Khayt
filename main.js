@@ -3555,7 +3555,7 @@ ipcMain.handle('hub:convert-mesh', async (_e, { path: srcPath } = {}) => {
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 
-ipcMain.handle('hub:mf-convert', async (_e, { path: srcPath, targetId, mode, slotMap, outPath, intoVaultId, targetProfile, fullSpectrum, fsPhysical, fsPhysicalHex, filaments, process, bandSwap, mergeToSlots } = {}) => {
+ipcMain.handle('hub:mf-convert', async (_e, { path: srcPath, targetId, mode, slotMap, outPath, intoVaultId, targetProfile, fullSpectrum, fsPhysical, fsPhysicalHex, filaments, process, bandSwap, mergeToSlots, spoolMerge, spoolStrict } = {}) => {
   try {
     if (!srcPath || !mfReadAllowed(srcPath)) return { ok: false, error: 'Source file is outside an allowed folder.' };
     // The converted file lands in temp first. The save dialog can only be answered after
@@ -3564,7 +3564,10 @@ ipcMain.handle('hub:mf-convert', async (_e, { path: srcPath, targetId, mode, slo
     const tmp = mfTempPath('3mf');
     const r = await mfRun('convert', {
       src: srcPath, maxBytes: MF_MAX_BYTES, tmpOut: tmp,
-      opts: { targetId, mode, slotMap, targetProfile, fullSpectrum, fsPhysical, fsPhysicalHex, filaments, process, bandSwap, mergeToSlots: !!mergeToSlots },
+      opts: { targetId, mode, slotMap, targetProfile, fullSpectrum, fsPhysical, fsPhysicalHex, filaments, process, bandSwap, mergeToSlots: !!mergeToSlots,
+        // "Match to loaded spools" (lib/spool-match.js): an explicit merge, checked again in
+        // mf-convert, and the flag that refuses rather than writing a file nothing moved in.
+        spoolMerge: spoolMerge || null, spoolStrict: !!spoolStrict },
     });
     if (!r.ok) { await mfDiscard(tmp); return r; }
 

@@ -4,6 +4,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Converter: match a file's colours to the spools you have loaded.** When
+  the printer is already set up, "Match to loaded spools" sends every colour
+  in the file to the loaded spool that looks most like it (ported from
+  bedready.io), using what one of your machines reports or what you entered
+  for it, or spools you pick from your filament inventory per slot. Several
+  colours may share a spool; empty slots are never used. A table shows each
+  colour, the spool it goes to and how close the match is, warns when a
+  colour has no close spool or its material differs from the spool's (PETG
+  onto PLA), and lets you change any row. A file with more colours than the
+  printer has slots is merged onto the loaded spools. If the converter cannot
+  apply the match whole (a slot past the file's own colours, a model it could
+  not read, settings it cannot reorder), it stops and says why instead of
+  saving a file in which nothing moved.
 - **Converter fixes from bedready.io.**
   - PrusaSlicer files are read and rewritten for real. PrusaSlicer writes its
     settings as `; key = value`, and the converter only understood the bare
