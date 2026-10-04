@@ -10,6 +10,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     form, so a Prusa→Prusa conversion changed nothing while listing the
     printer, nozzle and bed as changed, and the source printer showed blank.
     An MMU project keeps one nozzle per extruder.
+  - Small hostile 3MFs can no longer freeze or exhaust the app: a triangle
+    tag that never closes is read in linear time, a component graph that
+    doubles per level stops at a fixed budget in the preview, measuring and
+    STL export, and a mesh whose zip header claims a size of zero is charged
+    what it really inflates to.
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its

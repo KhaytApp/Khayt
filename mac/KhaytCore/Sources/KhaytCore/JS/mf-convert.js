@@ -57,6 +57,13 @@
 
   const MESH_MEMBER = /\.model$/i;
 
+  // Component-graph nodes one mesh walk may visit — the same ceiling lib/mf-mesh.js puts on the
+  // preview's walk, and for the same hostile file. Read from there so the two cannot drift.
+  const MAX_WALK_VISITS = (mfMesh && mfMesh.MAX_WALK_VISITS) || 4000000;
+  // Triangles one extraction may BUILD after component instancing — mf-mesh's HARD_CAP, the
+  // count past which it will not even decode a model. See the count in _extractCore.
+  const MAX_BUILT_TRIANGLES = (mfMesh && mfMesh.HARD_CAP) || 30000000;
+
   /**
    * Read every member of a 3MF into { name, data:Buffer }. Returns [] on a bad file.
    *
@@ -111,6 +118,33 @@
         if (total + declared > MEMBERS_TOTAL_BUDGET) { dropped++; droppedBytes += declared; continue; }
 
         const src = zip.rawOf(e);
+        // ── A MEMBER THAT DECLARES NOTHING ──────────────────────────────────
+        // The declared size is only a fair charge when zip-read holds the inflate to it.
+        // It does for a member that declares a size (size + 1 KB), but one declaring
+        // `size: 0` may inflate to zip-read's full per-member ceiling (MAX_INFLATED, 400
+        // MB) while being charged its compressed size here — a kilobyte. A few hundred
+        // such members in a small archive were "within budget" and could inflate to
+        // terabytes the moment anything read their lazy `data`. So a deflated member
+        // that declares nothing is read now, like a config, its inflate held to what is
+        // left of the budget, and charged what it really inflated to — or, when it would
+        // not fit, the whole allowance it was given, so a run of them cannot each cost
+        // the full ceiling in work while costing the budget nothing.
+        const undeclared = e.size === 0 && e.method === 8;
+        if (undeclared) {
+          const allowance = Math.min(zipRead.MAX_INFLATED || MEMBERS_TOTAL_BUDGET, MEMBERS_TOTAL_BUDGET - total);
+          // readEntry caps an inflate at `size + 1 KB`; this asks it for the allowance.
+          const data = allowance > 1024 ? zipRead.readEntry(buf, Object.assign({}, e, { size: allowance - 1024 })) : null;
+          if (!data) {
+            total += Math.max(0, allowance);
+            // Past the budget it is a part left out, and the convert must say so. A member
+            // that fails within zip-read's own ceiling is corrupt, and is skipped as before.
+            if (allowance < (zipRead.MAX_INFLATED || 0)) { dropped++; droppedBytes += Math.max(0, allowance); }
+            continue;
+          }
+          total += data.length;
+          out.push({ name: e.name, size: data.length, data, src });
+          continue;
+        }
         if (wantMesh) {
           const member = { name: e.name, size: e.size, src };
           let cached;
@@ -127,6 +161,9 @@
         } else {
           const data = zip.entryData(e);
           if (!data) continue;
+          // Charged on what it REALLY inflated to, and checked again: the check above
+          // used the declared size, which for an undeclared member is not a bound.
+          if (total + data.length > MEMBERS_TOTAL_BUDGET) { dropped++; droppedBytes += data.length; continue; }
           total += data.length;
           out.push({ name: e.name, size: data.length, data, src });
         }
@@ -563,6 +600,34 @@
     const buildBlock = (/<build\b[^>]*>([\s\S]*?)<\/build>/i.exec(rootText || '') || [])[1];
     const items = [];
     if (buildBlock) { const itRe = /<item\b([^>]*?)\/?>/g; let im; while ((im = itRe.exec(buildBlock))) items.push(im[1]); }
+    // COUNT BEFORE BUILDING. resolve() memoises each object, but its OUTPUT still multiplies:
+    // an object referencing the next one twice, thirty levels deep over one triangle, is 2^30
+    // triangles of nested arrays, and the process dies of memory long before it finishes. The
+    // same count, memoised as numbers, costs one pass over the objects — so a model that would
+    // come out past the ceiling mf-mesh already treats as impractical to even decode is refused
+    // here, before anything is built. Below the ceiling nothing changes.
+    const tally = {};
+    const countOf = (key, depth) => {
+      if (tally[key] != null) return tally[key];
+      const o = objs[key];
+      if (!o || depth > 64) return 0;
+      tally[key] = 0; // a cycle counts as nothing, as resolve() drops it
+      let n = o.tris.length;
+      for (const cp of o.comps) n += countOf(cp.path + '#' + cp.ref, depth + 1);
+      return (tally[key] = n);
+    };
+    let produced = 0;
+    if (items.length) {
+      for (const it of items) {
+        const oid = (/\bobjectid="([^"]+)"/i.exec(it) || [])[1];
+        const pp = (/\b(?:p:)?path="([^"]+)"/i.exec(it) || [])[1];
+        if (oid) produced += countOf((pp ? norm(pp) : rootKey) + '#' + oid, 0);
+      }
+    } else {
+      for (const k in objs) produced += countOf(k, 0);
+    }
+    if (produced > MAX_BUILT_TRIANGLES) return null;
+
     const soup = [], paintOut = [], objOut = [];
     // `oid` — the top-level (build-item) object id each facet belongs to, so the preview can
     // group triangles into build plates. Only tracked when wantPaint (the rich-preview path).
@@ -914,7 +979,14 @@
       P[slot] = x * scale; P[slot + 1] = y * scale; P[slot + 2] = z * scale;
     };
 
+    // A total visit budget, for the reason lib/mf-mesh.js `walk` gives: `seen` stops a cycle
+    // but not fan-out, and a component graph that doubles per level is 2^depth visits in a few
+    // hundred bytes (24 levels took over five seconds here). Past the budget the measurement is
+    // abandoned — null, "could not measure", the same answer as a model with no geometry.
+    let visits = 0, overBudget = false;
     const walk = (key, chain, seen) => {
+      if (overBudget) return false;
+      if (++visits > MAX_WALK_VISITS) { overBudget = true; return false; }
       const o = objs[key];
       if (!o || (seen && seen.has(key))) return false;
       for (let i = 0; i < o.nt; i++) {
@@ -967,7 +1039,7 @@
         }
       }
     }
-    if (!count) return null;
+    if (overBudget || !count) return null;
     const b = largestPlate(plateBoxes);
     return {
       triangleCount: count,
