@@ -31,45 +31,22 @@ struct Calculator: View {
 
     /// ── THE ONE SCREEN THAT ONLY EXISTS FILLED IN ────────────────────────
     ///
-    /// Empty, this screen is two fields and a sentence. Everything it is FOR —
-    /// the cost breakdown, what to charge, the margin the shop would actually
-    /// make — appears only once there is a weight or a time in it, and the
-    /// snapshot runner had never put one there. So the highest-stakes screen in
-    /// the app had been photographed exactly once, in the state where it does
-    /// nothing.
+    /// `KHAYT_SNAPSHOT_PART` / `_HOURS` fill it for the snapshot runner only —
+    /// an environment variable this app is never launched with otherwise.
     ///
-    /// `KHAYT_SNAPSHOT_PART` fills it, and only in the runner: an environment
-    /// variable this app is never launched with otherwise.
-    @State private var grams = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_PART"] ?? ""
-    @State private var hours = ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_HOURS"] ?? ""
-    @State private var qty = 1
-    /// Which spool, and it starts on a real one.
-    ///
-    /// NOT nil. Without a spool there is no cost per gram, so the material
-    /// bucket comes out at zero — and material is the largest part of most
-    /// prints. A calculator that opens quoting a job with no plastic in it
-    /// gives a confidently wrong answer to the one question it exists for.
-    @State private var spoolId: String?
-    @State private var machineId: String?
-    /// Which saved preset the figures start from. Nil is Khayt's own openers.
-    @State private var presetId: String?
-    /// The seven figures, as typed. Seeded from the preset and the machine,
-    /// and sent as part of the PART — where `costPart` lets them win over
-    /// everything, which is the rule's own documented order.
-    @State private var rates: [String: String] = [:]
-    /// What the preset and machine resolve to, for seeding and for Reset.
-    @State private var resolved: [String: Double] = [:]
+    /// Everything typed lives in `CalculatorModel`, so a test can move each
+    /// input and watch the total move through the same calls this screen
+    /// makes. The spool starts on a real one (see `onAppear`): without one
+    /// there is no cost per gram and the material bucket comes out at zero.
+    @State private var model = CalculatorModel.fromEnvironment()
     @State private var showRates = false
     @State private var newPresetName = ""
-    @State private var margin = 30.0
-    @State private var discount = 0.0
-    @State private var rush = false
 
-    @State private var costed: KhaytEngine.CostedPart?
-    @State private var quoted: QuoteTotal?
-
-    private var gramsValue: Double { Double(grams.replacingOccurrences(of: ",", with: ".")) ?? 0 }
-    private var hoursValue: Double { Double(hours.replacingOccurrences(of: ",", with: ".")) ?? 0 }
+    private var costed: KhaytEngine.CostedPart? { model.costed }
+    private var quoted: QuoteTotal? { model.quoted }
+    private var qty: Int { model.qty }
+    private var machineId: String? { model.machineId }
+    private var gramsValue: Double { model.gramsValue }
     /// Nothing to price until there is something to print.
     /// ── WHAT IT IS BEING COSTED AT, AND HOW TO CHANGE IT ────────────────
     ///
@@ -101,16 +78,16 @@ struct Calculator: View {
                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                     VStack(alignment: .leading, spacing: 2) {
                         FailureHint(shop: shop, machineId: machineId,
-                                    material: shop.spools.first { $0.id == spoolId }?.material,
-                                    current: Double(rates["failureRate"] ?? "")) { pct in
-                            rates["failureRate"] = Words.plain(.number(pct))
+                                    material: shop.spools.first { $0.id == model.lines.first?.spoolId }?.material,
+                                    current: Double(model.rates["failureRate"] ?? "")) { pct in
+                            model.rates["failureRate"] = Words.plain(.number(pct))
                         }
                     }
                 }
             }
             .padding(.top, 6)
             HStack(spacing: 8) {
-                Button(shop.words.callIt("mac.calc_rates_reset")) { seedRates() }
+                Button(shop.words.callIt("mac.calc_rates_reset")) { model.seedRates() }
                     .disabled(!ratesEdited)
                 Spacer(minLength: 0)
                 // Keeping them is the difference between answering today's
@@ -120,9 +97,9 @@ struct Calculator: View {
                 Button(shop.words.callIt("calc.machine.save_preset")) {
                     Task {
                         var out: [String: Double] = [:]
-                        for key in Shop.Preset.rateKeys { out[key] = typed(key) }
+                        for key in Shop.Preset.rateKeys { out[key] = model.typed(key) }
                         if let id = await shop.savePreset(name: newPresetName, rates: out) {
-                            presetId = id
+                            model.presetId = id
                             newPresetName = ""
                         }
                     }
@@ -146,8 +123,8 @@ struct Calculator: View {
             Text(shop.words.callIt(key)).gridColumnAlignment(.trailing)
                 .font(.caption).foregroundStyle(.secondary)
             HStack(spacing: 4) {
-                TextField("", text: Binding(get: { rates[field] ?? "" },
-                                            set: { rates[field] = $0 }))
+                TextField("", text: Binding(get: { model.rates[field] ?? "" },
+                                            set: { model.rates[field] = $0 }))
                     .textFieldStyle(.roundedBorder).frame(width: 70).monospacedDigit()
                 Text(unit).font(.caption2).foregroundStyle(.tertiary)
                 Spacer()
@@ -155,33 +132,8 @@ struct Calculator: View {
         }
     }
 
-    /// One typed figure, or what the preset and machine resolved to.
-    private func typed(_ key: String) -> Double {
-        let said = (rates[key] ?? "").replacingOccurrences(of: ",", with: "")
-            .trimmingCharacters(in: .whitespaces)
-        if said.isEmpty { return resolved[key] ?? 0 }
-        return max(0, Double(said) ?? 0)
-    }
-
-    /// Whether anything differs from what the preset and machine say. Drives
-    /// the Reset button and the word beside the heading, so a shop can see at
-    /// a glance that this quote is not on its standing rates.
-    private var ratesEdited: Bool {
-        Shop.Preset.rateKeys.contains { key in
-            abs(typed(key) - (resolved[key] ?? 0)) > 0.0001
-        }
-    }
-
-    /// Fill the fields from the rule's own answer for this preset and machine.
-    private func seedRates() {
-        var out: [String: String] = [:]
-        for (key, value) in resolved {
-            out[key] = value == value.rounded() ? String(Int(value)) : String(value)
-        }
-        rates = out
-    }
-
-    private var hasInput: Bool { gramsValue > 0 || hoursValue > 0 }
+    private var ratesEdited: Bool { model.ratesEdited }
+    private var hasInput: Bool { model.hasInput }
 
     var body: some View {
         ScrollView {
@@ -190,11 +142,11 @@ struct Calculator: View {
                               accent: Khayt.brand, symbol: "wrench.and.screwdriver.fill") {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 10) {
-                            field(shop.words.callIt("mac.calc_weight"), $grams,
+                            field(shop.words.callIt("mac.calc_weight"), $model.lines[0].grams,
                                   unit: shop.words.callIt("common.grams"))
-                            field(shop.words.callIt("mac.calc_time"), $hours,
+                            field(shop.words.callIt("mac.calc_time"), $model.hours,
                                   unit: shop.words.callIt("common.hours"))
-                            Stepper(value: $qty, in: 1...9999) {
+                            Stepper(value: $model.qty, in: 1...9999) {
                                 HStack(spacing: 6) {
                                     Text(shop.words.callIt("calc.part.qty"))
                                         .foregroundStyle(.secondary)
@@ -207,31 +159,24 @@ struct Calculator: View {
                         }
                         // Weight and time from a library model — the whole
                         // project, or one plate of it. See CalculatorFromModel.
-                        CalculatorFromModel(shop: shop, grams: $grams, hours: $hours)
+                        CalculatorFromModel(shop: shop, calc: model)
                         LayerRule()
                         HStack(spacing: 10) {
                             // The spool decides the material cost per gram, and
                             // the machine decides the wear and the electricity.
                             // Both are the book's own rows, so the answer is
                             // this shop's, not a worked example.
-                            Picker(shop.words.callIt("calc.part.filament"),
-                                   selection: $spoolId) {
-                                Text(shop.words.callIt("mac.any_filament")).tag(String?.none)
-                                ForEach(shop.spools) { spool in
-                                    Text(spool.material).tag(String?.some(spool.id))
-                                }
-                            }
-                            Picker(shop.words.callIt("mac.calc_printer"), selection: $machineId) {
+                            spoolPicker(shop.words.callIt("calc.part.filament"), $model.lines[0].spoolId)
+                            Picker(shop.words.callIt("mac.calc_printer"), selection: $model.machineId) {
                                 Text(shop.words.callIt("mac.any_machine")).tag(String?.none)
                                 ForEach(shop.machines) { machine in
                                     Text(machine.name).tag(String?.some(machine.id))
                                 }
                             }
                             // The shop's own rates. A machine carries two of
-                            // the seven; a preset carries all of them, and
-                            // until now this screen asked for neither.
+                            // the seven; a preset carries all of them.
                             if !shop.presets.isEmpty {
-                                Picker(shop.words.callIt("calc.machine.preset"), selection: $presetId) {
+                                Picker(shop.words.callIt("calc.machine.preset"), selection: $model.presetId) {
                                     Text(shop.words.callIt("mac.calc_rates_default")).tag(String?.none)
                                     ForEach(shop.presets) { preset in
                                         Text(preset.name).tag(String?.some(preset.id))
@@ -240,10 +185,12 @@ struct Calculator: View {
                             }
                             Spacer(minLength: 0)
                         }
+                        filamentLines
                         ratesSection
                     }
                     .card()
                 }
+                consumablesSection
 
                 // ── NOT BEFORE THERE IS SOMETHING TO PRICE ────────────────
                 //
@@ -264,9 +211,9 @@ struct Calculator: View {
                     DetailSection(shop.words.callIt("mac.calc_rates")) {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack(spacing: 14) {
-                                slider(shop.words.callIt("calc.quote.margin"), $margin, 0...300)
-                                slider(shop.words.callIt("calc.quote.discount"), $discount, 0...90)
-                                Toggle(shop.words.callIt("calc.rush_fee"), isOn: $rush).fixedSize()
+                                slider(shop.words.callIt("calc.quote.margin"), $model.margin, 0...300)
+                                slider(shop.words.callIt("calc.quote.discount"), $model.discount, 0...90)
+                                Toggle(shop.words.callIt("calc.rush_fee"), isOn: $model.rush).fixedSize()
                                 Spacer(minLength: 0)
                             }
                             // ── WHAT "MARGIN" MEANS HERE, IN THE ARITHMETIC ──
@@ -313,22 +260,37 @@ struct Calculator: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(Khayt.ground)
-        .task(id: recomputeKey) { await recompute() }
+        .task(id: model.key) { await model.recompute(shop) }
         // The rule's own answer for this preset and machine. Re-asked when
         // either moves, and the fields follow UNLESS the shop has typed over
         // them — overwriting a typed labour rate because a machine was picked
         // would throw away the thing they came here to change.
-        .task(id: "\(presetId ?? "")|\(machineId ?? "")") {
-            let edited = ratesEdited
-            resolved = await shop.resolvedRates(presetId: presetId, machineId: machineId)
-            if !edited { seedRates() }
+        .task(id: "\(model.presetId ?? "")|\(model.machineId ?? "")") {
+            let edited = model.ratesEdited
+            model.resolved = await shop.resolvedRates(presetId: model.presetId, machineId: model.machineId)
+            if !edited { model.seedRates() }
         }
         // The book may not have loaded when this screen first appears, so the
         // default is chosen when the spools arrive rather than at init.
         .onChange(of: shop.spools.map(\.id)) { _, ids in
-            if spoolId == nil, let first = ids.first { spoolId = first }
+            if model.lines[0].spoolId == nil, let first = ids.first { model.lines[0].spoolId = first }
         }
-        .onAppear { if spoolId == nil { spoolId = shop.spools.first?.id } }
+        .onAppear {
+            if model.lines[0].spoolId == nil { model.lines[0].spoolId = shop.spools.first?.id }
+            // The runner's picture of the whole screen: a second colour, a
+            // purge and a consumable. Never set outside the runner.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_MULTI"] == "1", model.lines.count == 1 {
+                model.addFilament(spools: shop.spools)
+                model.lines[1].grams = "64"
+                model.purge = "18"
+                if !shop.consumables.isEmpty {
+                    model.addConsumable(shop.consumables)
+                    model.consumableLines[0].consumableId =
+                        (shop.consumables.first { $0.id == "CONS-07" } ?? shop.consumables[0]).id
+                    model.consumableLines[0].qty = 4
+                }
+            }
+        }
     }
 
     /// What the price is, and where it went.
@@ -361,7 +323,7 @@ struct Calculator: View {
                 // no spool there is no cost per gram, the material bucket is
                 // zero, and the price looks like a price. Said in words rather
                 // than left for somebody to notice in the breakdown.
-                if spoolId == nil && gramsValue > 0 {
+                if model.lines.contains(where: { $0.spoolId == nil && CalculatorModel.number($0.grams) > 0 }) {
                     Label(shop.words.callIt("mac.calc_no_filament"),
                           systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
@@ -461,31 +423,113 @@ struct Calculator: View {
         }
     }
 
-    /// Everything the answer depends on, in one value, so the recompute runs
-    /// when any of it moves and not once per keystroke per field.
-    private var recomputeKey: String {
-        // The typed rates are in here too, so changing a labour rate moves
-        // the answer the same way changing the weight does.
-        let typedRates = Shop.Preset.rateKeys.map { "\($0):\(rates[$0] ?? "")" }.joined(separator: ",")
-        return "\(grams)|\(hours)|\(qty)|\(spoolId ?? "")|\(machineId ?? "")|"
-             + "\(presetId ?? "")|\(margin)|\(discount)|\(rush)|\(typedRates)"
+    private func spoolPicker(_ label: String, _ selection: Binding<String?>) -> some View {
+        Picker(label, selection: selection) {
+            Text(shop.words.callIt("mac.any_filament")).tag(String?.none)
+            // Material AND colour: a multicolour print is several spools of the
+            // same material, and "PLA, PLA, PLA" is not a choice.
+            ForEach(shop.spools) { spool in
+                Text(shop.spoolName(spool)).tag(String?.some(spool.id))
+            }
+        }
     }
 
-    private func recompute() async {
-        guard hasInput else { costed = nil; quoted = nil; return }
-        // Only the figures actually typed travel with the part. Sending all
-        // seven every time would make every quote look edited, and would beat
-        // a machine's own power draw with a copy of it.
-        var extra: [String: JSONValue] = [:]
-        for key in Shop.Preset.rateKeys where !(rates[key] ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
-            extra[key] = .number(typed(key))
+    // MARK: - Several filaments
+
+    /// The second and later colours, the way to add one, and the purge.
+    @ViewBuilder private var filamentLines: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(model.lines.enumerated()).dropFirst(), id: \.element.id) { index, line in
+                HStack(spacing: 8) {
+                    if let hex = line.hex, let rgb = CalculatorModel.rgb(hex) {
+                        Circle().fill(Color(red: rgb.0 / 255, green: rgb.1 / 255, blue: rgb.2 / 255))
+                            .overlay(Circle().stroke(Khayt.hairline))
+                            .frame(width: 10, height: 10)
+                    }
+                    spoolPicker(shop.words.callIt("mac.calc_colour_n", ["n": .number(Double(index + 1))]),
+                                $model.lines[index].spoolId)
+                    TextField("", text: $model.lines[index].grams)
+                        .labelsHidden().monospacedDigit().frame(width: 74)
+                    Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(.tertiary)
+                    Button(role: .destructive) { model.removeFilament(line.id) } label: {
+                        Image(systemName: "minus.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(shop.words.callIt("common.delete"))
+                    Spacer(minLength: 0)
+                }
+            }
+            HStack(spacing: 12) {
+                Button { model.addFilament(spools: shop.spools) } label: {
+                    Label(shop.words.callIt("mac.calc_add_filament"), systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
+                Spacer(minLength: 0)
+                Text(shop.words.callIt("mac.calc_purge")).font(.caption).foregroundStyle(.secondary)
+                TextField("", text: $model.purge)
+                    .labelsHidden().monospacedDigit().frame(width: 60)
+                Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(.tertiary)
+            }
+            if model.isMulticolour || model.purgeValue > 0 {
+                Text(shop.words.callIt(model.isMulticolour ? "mac.calc_multicolour_note" : "mac.calc_purge_note",
+                                       ["g": .string(Money.figure(model.gramsValue + model.purgeValue)),
+                                        "n": .number(Double(model.lines.filter { CalculatorModel.number($0.grams) > 0 }.count))]))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        let part = await shop.costedPart(spoolId: spoolId, grams: gramsValue,
-                                         hours: hoursValue, qty: qty, machineId: machineId,
-                                         presetId: presetId, extra: extra)
-        costed = part
-        quoted = await shop.previewQuote(baseCost: (part?.cost ?? 0) * Double(qty),
-                                         margin: margin, discountPct: discount,
-                                         shippingCost: 0, rush: rush)
+    }
+
+    // MARK: - Consumables
+
+    /// Magnets, inserts, screws — off the Consumables shelf, per printed piece.
+    private var consumablesSection: some View {
+        DetailSection(shop.words.callIt("mac.calc_consumables"), symbol: "shippingbox") {
+            VStack(alignment: .leading, spacing: 8) {
+                if shop.consumables.isEmpty {
+                    Text(shop.words.callIt("mac.calc_no_consumables"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ForEach(Array(model.consumableLines.enumerated()), id: \.element.id) { index, line in
+                        HStack(spacing: 8) {
+                            Picker(shop.words.callIt("mac.calc_consumable"),
+                                   selection: $model.consumableLines[index].consumableId) {
+                                ForEach(shop.consumables) { item in
+                                    Text(item.title(shop.words)).tag(String?.some(item.id))
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(maxWidth: 240)
+                            Stepper(value: $model.consumableLines[index].qty, in: 0...9999, step: 1) {
+                                Text("× " + Words.plain(.number(line.qty))).monospacedDigit()
+                            }
+                            .fixedSize()
+                            if let id = line.consumableId,
+                               let item = shop.consumables.first(where: { $0.id == id }) {
+                                Text(Money.short((item.cost ?? 0) * line.qty, shop.currency))
+                                    .monospacedDigit().foregroundStyle(.secondary)
+                            }
+                            Button(role: .destructive) {
+                                model.consumableLines.removeAll { $0.id == line.id }
+                            } label: { Image(systemName: "minus.circle") }
+                                .buttonStyle(.borderless)
+                                .help(shop.words.callIt("common.delete"))
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    Button { model.addConsumable(shop.consumables) } label: {
+                        Label(shop.words.callIt("mac.calc_add_consumable"), systemImage: "plus.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    if !model.consumableLines.isEmpty {
+                        Text(shop.words.callIt("mac.calc_consumables_note"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .card()
+        }
     }
 }

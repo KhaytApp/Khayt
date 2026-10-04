@@ -13,12 +13,13 @@ import KhaytCore
 /// A project sliced as several plates starts on the WHOLE project — every
 /// plate's time and plastic — and any one plate can be costed instead.
 ///
-/// Kept in its own view so the calculator's own arithmetic is untouched: this
-/// only writes the two fields a shop would otherwise have typed.
+/// The grams and time are always `partFields`' figures. On top of them,
+/// `CalculatorModel.fill` splits the grams into one filament line per colour
+/// the slicer weighed (each on the colour planner's spool, else the closest
+/// colour on the shelf) and brings the model's consumables.
 struct CalculatorFromModel: View {
     @Bindable var shop: Shop
-    @Binding var grams: String
-    @Binding var hours: String
+    let calc: CalculatorModel
 
     @State private var picking = false
     @State private var model: LibraryFile?
@@ -73,7 +74,6 @@ struct CalculatorFromModel: View {
         let g = Shop.plainNumber(made.part["printWeight"]) ?? 0
         let h = Shop.plainNumber(made.part["printTime"]) ?? 0
         guard g > 0 || h > 0 else { problem = shop.words.callIt("mac.calc_model_none"); return }
-        grams = g > 0 ? Words.plain(.number((g * 100).rounded() / 100)) : ""
-        hours = h > 0 ? Words.plain(.number((h * 100).rounded() / 100)) : ""
+        calc.fill(from: model, plate: plate, grams: g, hours: h, shop: shop)
     }
 }
