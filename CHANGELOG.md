@@ -22,6 +22,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     with more colours than the printer has slots used to convert with a
     warning and nothing merged. The least-used colours now go to the
     closest-looking slot, paint included.
+  - Band-swap checks each plate on its own. A multi-plate file whose plates
+    change colour at different heights used to get one plate's pause heights
+    written into the file for all of them; it is now left without pauses and
+    the reason names the plates. Plates that agree keep their plan.
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its

@@ -1313,7 +1313,10 @@
     try { mesh = mfMesh.extractMeshFromMembers(members); } catch (_) { return null; }
     if (!mesh || !mesh.faceState || !mesh.faceState.length) return null;
     const baseState = mesh.baseState >= 1 ? mesh.baseState : 1;
-    const bp = colorBands.detectColorBands(mesh.positions, mesh.faceState, baseState);
+    // Per plate, not per file: plates all stand at z=0, and slicing them together either hides a
+    // real banding or — worse — returns one plate's swap heights for all of them, which this then
+    // writes into the output as pauses. See lib/color-bands.js detectColorBandsForMesh.
+    const bp = colorBands.detectColorBandsForMesh(mesh, baseState);
     if (!bp.banded || bp.bands.length <= 1) return null;
     const meta = extractMeta(members);
     const layerHeight = meta && meta.layerHeight ? meta.layerHeight : undefined;
@@ -1896,7 +1899,7 @@
     try { mesh = mfMesh.extractMeshFromMembers(members); } catch (_) { return { available: false }; }
     if (!mesh || !mesh.faceState || !mesh.faceState.length) return { available: false };
     const baseState = mesh.baseState >= 1 ? mesh.baseState : 1;
-    const plan = colorBands.detectColorBands(mesh.positions, mesh.faceState, baseState);
+    const plan = colorBands.detectColorBandsForMesh(mesh, baseState); // per plate — see planBandSwap
     const palette = Array.isArray(mesh.palette) ? mesh.palette.slice() : [];
     const base = {
       available: true,
