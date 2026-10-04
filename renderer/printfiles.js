@@ -414,6 +414,55 @@
     return `<div class="pf-colors">${dots}${swap}</div>`;
   }
 
+  /** What a parse says, as a record keeps it: the totals, and for a project of
+   *  two or more plates each plate's own time and grams (#1742). */
+  const PLATE_SCAN = 1;   // bump to re-read every 3MF once more
+  function platesParsed(p) {
+    const out = { printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams, filamentType: p.filamentType, slicer: p.slicer, plateScan: PLATE_SCAN };
+    out.plates = Array.isArray(p.plates) && p.plates.length >= 2 ? p.plates : undefined;
+    out.filaments = Array.isArray(p.filaments) && p.filaments.length ? p.filaments : undefined;
+    return out;
+  }
+
+  /** "3 plates", opened to each plate's name, time and grams. */
+  function platesHtml(rec) {
+    const plates = rec.parsed && Array.isArray(rec.parsed.plates) ? rec.parsed.plates : [];
+    if (plates.length < 2) return '';
+    const rows = plates.map((pl, i) => {
+      const label = (t('plib.plate', { n: String(pl.index || i + 1) }) || `Plate ${pl.index || i + 1}`) + (pl.name ? ' · ' + pl.name : '');
+      const bits = [fmtTime(pl.printTimeMins), pl.filamentGrams ? Math.round(pl.filamentGrams * 10) / 10 + ' g' : '', pl.filamentType || ''].filter(Boolean).join(' · ');
+      return `<div class="pf-plate-row"><span>${escapeHtml(label)}</span><span class="pf-plate-figs">${escapeHtml(bits)}</span></div>`;
+    }).join('');
+    return `<details class="pf-plates"><summary>${escapeHtml(t('plib.plates_n', { n: String(plates.length) }) || `${plates.length} plates`)}</summary>${rows}</details>`;
+  }
+
+  /**
+   * Re-read every 3MF imported before the plate readers learned to add plates
+   * up (#1742): such a file's time and grams were the first plate's alone.
+   * Once per session, one file at a time, after the library is on screen, and
+   * marked so it is never read twice.
+   */
+  let _plateRescanDone = false;
+  async function rescanOldPlates() {
+    if (_plateRescanDone) return;
+    _plateRescanDone = true;
+    const hub = api(); if (!hub || !hub.parsePrintFile || !hub.printLibList) return;
+    const stale = (printFiles || []).filter((r) => r && /^3mf$/i.test(String(r.sourceFile && r.sourceFile.ext || ''))
+      && !(r.parsed && r.parsed.plateScan >= PLATE_SCAN));
+    let changed = 0;
+    for (const rec of stale) {
+      try {
+        const fullPath = await resolveModelPath(rec);
+        if (!fullPath) continue;
+        const p = await hub.parsePrintFile(fullPath);
+        if (!p || p.ok === false) continue;
+        rec.parsed = Object.assign({}, rec.parsed, platesParsed(p));
+        changed++;
+      } catch (_) { /* one unreadable file does not stop the rest */ }
+    }
+    if (changed) { saveAll(); renderPrintFiles(); }
+  }
+
   function metaChips(rec) {
     const p = rec.parsed || {};
     const chips = [];
@@ -718,6 +767,7 @@
         <div class="pf-body">
           <div class="pf-name" title="${escapeHtml(rec.originalName || rec.name)}">${escapeHtml(rec.name || rec.originalName || 'Untitled')}</div>
           <div class="pf-chips">${metaChips(rec)}</div>
+          ${platesHtml(rec)}
           ${partsListHtml(rec)}
           ${colorDotsHtml(rec)}
           ${prof ? `<div class="pf-prof">${_bi('nozzle', '🛠')}${escapeHtml(prof.name)}</div>` : ''}
@@ -972,6 +1022,8 @@
   function resetPage() { _page = PAGE; growThumbCache(PAGE); }
 
   function renderPrintFiles() {
+    // Older multi-plate 3MFs get their corrected totals, once, after the library shows.
+    if (!_plateRescanDone) setTimeout(rescanOldPlates, 3000);
     const el = document.getElementById('printfiles-tab');
     if (!el) return;
     wirePfDrop();
@@ -1972,7 +2024,7 @@
             // outside the directories it will read. That refusal was silent too.
             else problem = problem || p.error || '';
           }
-          if (p && p.ok !== false) rec.parsed = Object.assign({}, rec.parsed, { printTimeMins: p.printTimeMins, filamentGrams: p.filamentGrams, filamentType: p.filamentType, slicer: p.slicer });
+          if (p && p.ok !== false) rec.parsed = Object.assign({}, rec.parsed, platesParsed(p));
           // A g-code file has no mesh, so it used to get no geometryKey at all —
           // and its contentHash changes on every re-slice, so the same model came
           // back a stranger and per-file calibration never reached MIN_JOBS. The
@@ -2320,6 +2372,9 @@
             </select>
           </div>
         </div>
+        <label style="margin-top:10px;">${escapeHtml(t('plib.consumables_per_print') || 'Consumables per print')}</label>
+        <div id="pfConsumables"></div>
+        <button type="button" class="btn ghost small" id="pfAddConsumable" style="margin-top:4px;font-size:12px;">${escapeHtml(t('calc.add_consumable') || '+ Add consumable')}</button>
         <label style="margin-top:10px;">${escapeHtml(t('plib.tested_notes') || 'Tested settings / notes')}</label>
         <textarea id="pfNotes" rows="3">${escapeHtml(rec.testedNotes || '')}</textarea>
         <label style="margin-top:10px;">${escapeHtml(t('plib.photo') || 'Photo (optional)')}</label>
@@ -2358,11 +2413,41 @@
         const clr = modal.querySelector('#pfPhotoClear');
         if (clr) clr.addEventListener('click', () => { stagedPhoto = null; cleared = true; if (prev) prev.style.display = 'none'; });
         modal._getPhoto = () => ({ stagedPhoto, cleared });
+
+        // Consumables per print: magnets, inserts, screws one print of this
+        // model uses. Carried into the calculator and into products from it.
+        const shelf = (typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : [];
+        let lines = (Array.isArray(rec.consumables) ? rec.consumables : []).map((c) => ({ ...c }));
+        const box = modal.querySelector('#pfConsumables');
+        const draw = () => {
+          box.innerHTML = lines.map((c, i) => `
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+              <select data-pfc="${i}" class="pfc-item" style="flex:2;font-size:12.5px;">
+                <option value="">${escapeHtml(t('calc.consumable_pick') || 'Consumable')}</option>
+                ${shelf.map((x) => `<option value="${escapeHtml(x.id)}"${x.id === c.consumableId ? ' selected' : ''}>${escapeHtml(x.name || x.id)}</option>`).join('')}
+              </select>
+              <input type="number" data-pfc="${i}" class="pfc-qty" value="${c.qty || ''}" min="0" step="1" style="width:80px;font-size:12.5px;" placeholder="${escapeHtml(t('calc.consumable_qty') || 'Per piece')}">
+              <button type="button" class="btn danger small pfc-rm" data-pfc="${i}" aria-label="${escapeHtml(t('common.remove') || 'Remove')}" title="${escapeHtml(t('common.remove') || 'Remove')}">×</button>
+            </div>`).join('');
+          box.querySelectorAll('.pfc-item').forEach((s) => s.addEventListener('change', () => { lines[+s.dataset.pfc].consumableId = s.value; }));
+          box.querySelectorAll('.pfc-qty').forEach((s) => s.addEventListener('input', () => { lines[+s.dataset.pfc].qty = Math.max(0, +s.value || 0); }));
+          box.querySelectorAll('.pfc-rm').forEach((b) => b.addEventListener('click', () => { lines.splice(+b.dataset.pfc, 1); draw(); }));
+        };
+        draw();
+        modal.querySelector('#pfAddConsumable').addEventListener('click', () => { lines.push({ consumableId: '', qty: 1 }); draw(); });
+        modal._getConsumables = () => lines.filter((c) => c.consumableId && +c.qty > 0).map((c) => {
+          const row = shelf.find((x) => x && x.id === c.consumableId);
+          return { consumableId: c.consumableId, qty: +c.qty, unitCost: row ? (+row.cost || 0) : (+c.unitCost || 0), name: row ? (row.name || '') : (c.name || '') };
+        });
       },
       onSave(modal) {
         const name = modal.querySelector('#pfName').value.trim();
         if (!name) { toast(t('plib.name_required') || 'Enter a name', 'error'); return false; }
         rec.name = name;
+        if (modal._getConsumables) {
+          const cons = modal._getConsumables();
+          if (cons.length) rec.consumables = cons; else delete rec.consumables;
+        }
         rec.material = modal.querySelector('#pfMaterial').value.trim();
         rec.slicerProfileId = modal.querySelector('#pfProfile').value || null;
         /* Reconciled against what the shop already uses, so typing "Resin" where

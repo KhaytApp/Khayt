@@ -41,6 +41,18 @@ struct Calculator: View {
     @State private var model = CalculatorModel.fromEnvironment()
     @State private var showRates = false
     @State private var newPresetName = ""
+    /// The model the From a model row starts on — the snapshot harness's.
+    private var pickedModel: (file: LibraryFile, plate: Int?)?
+
+    init(shop: Shop) { self.shop = shop }
+
+    /// Filled in from outside, for the snapshot harness: `ImageRenderer`
+    /// cannot type into the fields or wait for the From a model sheet.
+    init(shop: Shop, model: CalculatorModel, picked: (file: LibraryFile, plate: Int?)? = nil) {
+        self.shop = shop
+        _model = State(initialValue: model)
+        pickedModel = picked
+    }
 
     private var costed: KhaytEngine.CostedPart? { model.costed }
     private var quoted: QuoteTotal? { model.quoted }
@@ -136,14 +148,52 @@ struct Calculator: View {
     private var hasInput: Bool { model.hasInput }
 
     var body: some View {
-        ScrollView {
+        ScrollView { content }
+        .background(Khayt.ground)
+        .task(id: model.key) { await model.recompute(shop) }
+        // The rule's own answer for this preset and machine. Re-asked when
+        // either moves, and the fields follow UNLESS the shop has typed over
+        // them — overwriting a typed labour rate because a machine was picked
+        // would throw away the thing they came here to change.
+        .task(id: "\(model.presetId ?? "")|\(model.machineId ?? "")") {
+            let edited = model.ratesEdited
+            model.resolved = await shop.resolvedRates(presetId: model.presetId, machineId: model.machineId)
+            if !edited { model.seedRates() }
+        }
+        // The book may not have loaded when this screen first appears, so the
+        // default is chosen when the spools arrive rather than at init.
+        .onChange(of: shop.spools.map(\.id)) { _, ids in
+            if !model.lines.isEmpty, model.lines[0].spoolId == nil, let first = ids.first { model.lines[0].spoolId = first }
+        }
+        .onAppear {
+            if !model.lines.isEmpty, model.lines[0].spoolId == nil { model.lines[0].spoolId = shop.spools.first?.id }
+            // The runner's picture of the whole screen: a second colour, a
+            // purge and a consumable. Never set outside the runner.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_MULTI"] == "1", model.lines.count == 1 {
+                model.addFilament(spools: shop.spools)
+                model.lines[0].grams = "116"
+                model.lines[1].grams = "64"
+                model.splitFrom = nil
+                model.purge = "18"
+                if !shop.consumables.isEmpty {
+                    model.addConsumable(shop.consumables)
+                    model.consumableLines[0].consumableId =
+                        (shop.consumables.first { $0.id == "CONS-07" } ?? shop.consumables[0]).id
+                    model.consumableLines[0].qty = 4
+                }
+            }
+        }
+    }
+
+    /// The screen without its ScrollView, which `ImageRenderer` draws as an
+    /// empty page — the snapshot tests photograph this.
+    var content: some View {
             VStack(alignment: .leading, spacing: 22) {
                 DetailSection(shop.words.callIt("mac.calc_part"),
                               accent: Khayt.brand, symbol: "wrench.and.screwdriver.fill") {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 10) {
-                            field(shop.words.callIt("mac.calc_weight"), $model.lines[0].grams,
-                                  unit: shop.words.callIt("common.grams"))
+                            firstLineField
                             field(shop.words.callIt("mac.calc_time"), $model.hours,
                                   unit: shop.words.callIt("common.hours"))
                             Stepper(value: $model.qty, in: 1...9999) {
@@ -159,14 +209,16 @@ struct Calculator: View {
                         }
                         // Weight and time from a library model — the whole
                         // project, or one plate of it. See CalculatorFromModel.
-                        CalculatorFromModel(shop: shop, calc: model)
+                        CalculatorFromModel(shop: shop, calc: model,
+                                            model: pickedModel?.file, plate: pickedModel?.plate)
                         LayerRule()
                         HStack(spacing: 10) {
                             // The spool decides the material cost per gram, and
                             // the machine decides the wear and the electricity.
                             // Both are the book's own rows, so the answer is
                             // this shop's, not a worked example.
-                            spoolPicker(shop.words.callIt("calc.part.filament"), $model.lines[0].spoolId)
+                            spoolPicker(shop.words.callIt("calc.part.filament"),
+                                        model.firstLineID.map(model.spoolBinding) ?? .constant(nil))
                             Picker(shop.words.callIt("mac.calc_printer"), selection: $model.machineId) {
                                 Text(shop.words.callIt("mac.any_machine")).tag(String?.none)
                                 ForEach(shop.machines) { machine in
@@ -258,39 +310,6 @@ struct Calculator: View {
             // one before it and the row stopped reading as a row.
             .frame(maxWidth: 720, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .background(Khayt.ground)
-        .task(id: model.key) { await model.recompute(shop) }
-        // The rule's own answer for this preset and machine. Re-asked when
-        // either moves, and the fields follow UNLESS the shop has typed over
-        // them — overwriting a typed labour rate because a machine was picked
-        // would throw away the thing they came here to change.
-        .task(id: "\(model.presetId ?? "")|\(model.machineId ?? "")") {
-            let edited = model.ratesEdited
-            model.resolved = await shop.resolvedRates(presetId: model.presetId, machineId: model.machineId)
-            if !edited { model.seedRates() }
-        }
-        // The book may not have loaded when this screen first appears, so the
-        // default is chosen when the spools arrive rather than at init.
-        .onChange(of: shop.spools.map(\.id)) { _, ids in
-            if model.lines[0].spoolId == nil, let first = ids.first { model.lines[0].spoolId = first }
-        }
-        .onAppear {
-            if model.lines[0].spoolId == nil { model.lines[0].spoolId = shop.spools.first?.id }
-            // The runner's picture of the whole screen: a second colour, a
-            // purge and a consumable. Never set outside the runner.
-            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_MULTI"] == "1", model.lines.count == 1 {
-                model.addFilament(spools: shop.spools)
-                model.lines[1].grams = "64"
-                model.purge = "18"
-                if !shop.consumables.isEmpty {
-                    model.addConsumable(shop.consumables)
-                    model.consumableLines[0].consumableId =
-                        (shop.consumables.first { $0.id == "CONS-07" } ?? shop.consumables[0]).id
-                    model.consumableLines[0].qty = 4
-                }
-            }
-        }
     }
 
     /// What the price is, and where it went.
@@ -436,19 +455,55 @@ struct Calculator: View {
 
     // MARK: - Several filaments
 
+    /// The first line's grams: the print's Weight while there is one
+    /// filament, and plainly "Colour 1" — with its swatch, and the total
+    /// beside it — once there are more. The same box meant the whole print
+    /// and then, silently, one colour of it.
+    @ViewBuilder private var firstLineField: some View {
+        let id = model.firstLineID
+        let grams = id.map(model.gramsBinding) ?? .constant("")
+        if model.lines.count > 1, let first = model.lines.first {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    colourDot(first.hex ?? shop.spools.first { $0.id == first.spoolId }?.color)
+                    Text(shop.words.callIt("mac.calc_colour_n", ["n": .number(1)]))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 4) {
+                    TextField("", text: grams).labelsHidden().monospacedDigit().frame(width: 74)
+                    Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(.tertiary)
+                    Text(shop.words.callIt("mac.calc_total_grams",
+                                           ["g": .string(Money.grams(model.gramsValue))]))
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        .fixedSize()
+                }
+            }
+        } else {
+            field(shop.words.callIt("mac.calc_weight"), grams, unit: shop.words.callIt("common.grams"))
+        }
+    }
+
+    @ViewBuilder private func colourDot(_ hex: String?) -> some View {
+        if let rgb = CalculatorModel.rgb(hex) {
+            Circle().fill(Color(red: rgb.0 / 255, green: rgb.1 / 255, blue: rgb.2 / 255))
+                .overlay(Circle().stroke(Khayt.hairline))
+                .frame(width: 10, height: 10)
+        }
+    }
+
     /// The second and later colours, the way to add one, and the purge.
+    ///
+    /// Bound BY ID (`CalculatorModel.gramsBinding`): an enumerated index
+    /// binding trapped when a line was removed or From a model shrank the list.
     @ViewBuilder private var filamentLines: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(model.lines.enumerated()).dropFirst(), id: \.element.id) { index, line in
+            ForEach(model.lines.dropFirst()) { line in
+                let n = (model.lines.firstIndex { $0.id == line.id } ?? 0) + 1
                 HStack(spacing: 8) {
-                    if let hex = line.hex, let rgb = CalculatorModel.rgb(hex) {
-                        Circle().fill(Color(red: rgb.0 / 255, green: rgb.1 / 255, blue: rgb.2 / 255))
-                            .overlay(Circle().stroke(Khayt.hairline))
-                            .frame(width: 10, height: 10)
-                    }
-                    spoolPicker(shop.words.callIt("mac.calc_colour_n", ["n": .number(Double(index + 1))]),
-                                $model.lines[index].spoolId)
-                    TextField("", text: $model.lines[index].grams)
+                    colourDot(line.hex ?? shop.spools.first { $0.id == line.spoolId }?.color)
+                    spoolPicker(shop.words.callIt("mac.calc_colour_n", ["n": .number(Double(n))]),
+                                model.spoolBinding(line.id))
+                    TextField("", text: model.gramsBinding(line.id))
                         .labelsHidden().monospacedDigit().frame(width: 74)
                     Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(.tertiary)
                     Button(role: .destructive) { model.removeFilament(line.id) } label: {
@@ -470,9 +525,16 @@ struct Calculator: View {
                     .labelsHidden().monospacedDigit().frame(width: 60)
                 Text(shop.words.callIt("common.grams")).font(.caption).foregroundStyle(.tertiary)
             }
+            // Said once, when adding a colour divided the weight already typed
+            // rather than adding to it.
+            if let split = model.splitFrom {
+                Text(shop.words.callIt("mac.calc_split_note", ["g": .string(Money.grams(split))]))
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if model.isMulticolour || model.purgeValue > 0 {
                 Text(shop.words.callIt(model.isMulticolour ? "mac.calc_multicolour_note" : "mac.calc_purge_note",
-                                       ["g": .string(Money.figure(model.gramsValue + model.purgeValue)),
+                                       ["g": .string(Money.grams(model.gramsValue + model.purgeValue)),
                                         "n": .number(Double(model.lines.filter { CalculatorModel.number($0.grams) > 0 }.count))]))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -491,17 +553,20 @@ struct Calculator: View {
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
-                    ForEach(Array(model.consumableLines.enumerated()), id: \.element.id) { index, line in
+                    // By id, for the reason `filamentLines` gives.
+                    ForEach(model.consumableLines) { line in
                         HStack(spacing: 8) {
                             Picker(shop.words.callIt("mac.calc_consumable"),
-                                   selection: $model.consumableLines[index].consumableId) {
+                                   selection: model.consumableBinding(line.id)) {
                                 ForEach(shop.consumables) { item in
                                     Text(item.title(shop.words)).tag(String?.some(item.id))
                                 }
                             }
                             .labelsHidden()
                             .frame(maxWidth: 240)
-                            Stepper(value: $model.consumableLines[index].qty, in: 0...9999, step: 1) {
+                            // From 1, as on the model page: a line of none is
+                            // removed with its button, not stepped to zero.
+                            Stepper(value: model.consumableQtyBinding(line.id), in: 1...9999, step: 1) {
                                 Text("× " + Words.plain(.number(line.qty))).monospacedDigit()
                             }
                             .fixedSize()
@@ -511,7 +576,7 @@ struct Calculator: View {
                                     .monospacedDigit().foregroundStyle(.secondary)
                             }
                             Button(role: .destructive) {
-                                model.consumableLines.removeAll { $0.id == line.id }
+                                model.removeConsumable(line.id)
                             } label: { Image(systemName: "minus.circle") }
                                 .buttonStyle(.borderless)
                                 .help(shop.words.callIt("common.delete"))

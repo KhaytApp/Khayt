@@ -90,27 +90,38 @@ struct SpoolSheet: View {
                         // this shop's OWN materials — a shop reaching for what
                         // it already stocks should not have to scroll past a
                         // thousand it does not.
-                        if !catalogue.isEmpty {
-                            Menu {
-                                ForEach(catalogue) { hit in
-                                    Menu("\(hit.brand) \(hit.name)") {
-                                        ForEach(hit.colours) { colour in
-                                            Button(colour.name) {
-                                                Task { await take(hit, colour) }
-                                            }
+                        // ALWAYS there. It used to appear only once two
+                        // letters had matched something, so a shop that had
+                        // not typed yet had no way to know a catalogue
+                        // existed; empty, it says what to type.
+                        Menu {
+                            if catalogue.isEmpty {
+                                Text(shop.words.callIt(
+                                    material.trimmingCharacters(in: .whitespaces).count < 2
+                                        ? "mac.filament_catalog_hint" : "mac.filament_catalog_none"))
+                            }
+                            ForEach(Self.catalogueGroups(catalogue), id: \.brand) { group in
+                                if group.hits.count > 1 {
+                                    // Several lines of one brand: under the
+                                    // brand, each named without it.
+                                    Menu(group.brand) {
+                                        ForEach(group.hits) { hit in
+                                            Menu(Self.catalogueName(hit, underBrand: true)) { colourItems(hit) }
                                         }
                                     }
+                                } else if let hit = group.hits.first {
+                                    Menu(Self.catalogueName(hit, underBrand: false)) { colourItems(hit) }
                                 }
-                                if let missed = catalogue.first?.unmatched, !missed.isEmpty {
-                                    Divider()
-                                    // Say which word found nothing, rather than
-                                    // presenting a near-miss as the answer.
-                                    Text(missed.joined(separator: ", "))
-                                }
-                            } label: { Image(systemName: "magnifyingglass") }
-                                .menuStyle(.borderlessButton).fixedSize()
-                                .help(shop.words.callIt("mac.filament_catalog"))
-                        }
+                            }
+                            if let missed = catalogue.first?.unmatched, !missed.isEmpty {
+                                Divider()
+                                // Say which word found nothing, rather than
+                                // presenting a near-miss as the answer.
+                                Text(missed.joined(separator: ", "))
+                            }
+                        } label: { Image(systemName: "magnifyingglass") }
+                            .menuStyle(.borderlessButton).fixedSize()
+                            .help(shop.words.callIt("mac.filament_catalog"))
                     }
                 }
                 GridRow {
@@ -347,7 +358,7 @@ struct SpoolSheet: View {
         }
         .task { units = await shop.inventoryUnitChoices() }
         .task(id: material) { await loadColours() }
-        .task(id: material) { catalogue = await shop.filamentSearch(material) }
+        .task(id: material) { catalogue = await shop.filamentSearch(material, limit: 30) }
     }
 
     /// The word after the quantity field, in the unit being chosen. Falls back
@@ -475,6 +486,45 @@ struct SpoolSheet: View {
     /// weight, because a new spool is a full one. Editing an existing spool
     /// leaves what is on it alone: a shop correcting the brand of a half-used
     /// roll has not just refilled it.
+    /// One catalogue line's colours, each with its swatch.
+    @ViewBuilder private func colourItems(_ hit: KhaytEngine.FilamentHit) -> some View {
+        ForEach(hit.colours) { colour in
+            Button { Task { await take(hit, colour) } } label: {
+                if let image = Swatch.menuImage(hex: colour.hex) {
+                    Label { Text(colour.name) } icon: { Image(nsImage: image) }
+                } else {
+                    Text(colour.name)
+                }
+            }
+        }
+    }
+
+    /// The hits by brand, in the order the search ranked them.
+    static func catalogueGroups(_ hits: [KhaytEngine.FilamentHit]) -> [(brand: String, hits: [KhaytEngine.FilamentHit])] {
+        var order: [String] = []
+        var by: [String: [KhaytEngine.FilamentHit]] = [:]
+        for hit in hits {
+            if by[hit.brand] == nil { order.append(hit.brand) }
+            by[hit.brand, default: []].append(hit)
+        }
+        return order.map { ($0, by[$0] ?? []) }
+    }
+
+    /// A line's name as the menu shows it. The catalogue spells some names
+    /// with their brand already in them ("123-3D Filament PLA" from 123-3D),
+    /// which read "123-3D 123-3D Filament PLA" with the brand in front; the
+    /// repeat is dropped. Under its brand's submenu the brand is left out.
+    static func catalogueName(_ hit: KhaytEngine.FilamentHit, underBrand: Bool) -> String {
+        let brand = hit.brand.trimmingCharacters(in: .whitespaces)
+        var name = hit.name.trimmingCharacters(in: .whitespaces)
+        if !brand.isEmpty, name.lowercased().hasPrefix(brand.lowercased()) {
+            let rest = name.dropFirst(brand.count).trimmingCharacters(in: CharacterSet(charactersIn: " -–—·:"))
+            if !rest.isEmpty { name = rest }
+        }
+        if underBrand || brand.isEmpty { return name }
+        return brand + " " + name
+    }
+
     private func take(_ hit: KhaytEngine.FilamentHit,
                       _ colour: KhaytEngine.FilamentHit.Colour) async {
         let fields = await shop.filamentFields(brand: hit.brand, name: hit.name,

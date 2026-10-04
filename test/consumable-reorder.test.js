@@ -211,7 +211,35 @@ test('qtyLabel omits a unit that was never set', () => {
 test('a part\'s own consumables count as usage', () => {
   const { consumptionByConsumable: rate } = require('../lib/consumable-reorder.js');
   const rows = [c({ id: 'mag' })];
-  const done = order({ materialDeducted: true, parts: [{ qty: 3, consumables: [{ consumableId: 'mag', qty: 2 }] }] });
+  const done = order({ materialDeducted: true,
+    materialDrawn: { spools: [], consumables: [{ consumableId: 'mag', qty: 6 }] },
+    parts: [{ qty: 3, consumables: [{ consumableId: 'mag', qty: 2 }] }] });
   const r = rate(rows, [done], { now: NOW, windowDays: 30 });
   assert.ok(Math.abs(r.mag - 6 / 30) < 1e-9, JSON.stringify(r));
+});
+
+test('a job an older build finished counts no part consumables: it never drew them', () => {
+  const { consumptionByConsumable: rate } = require('../lib/consumable-reorder.js');
+  const rows = [c({ id: 'mag' })];
+  // materialDeducted, but no draw record naming the magnet: completed before
+  // part consumables were drawn at all.
+  const old = order({ materialDeducted: true, parts: [{ qty: 3, consumables: [{ consumableId: 'mag', qty: 2 }] }] });
+  const otherDrawn = order({ materialDeducted: true,
+    materialDrawn: { spools: [], consumables: [{ consumableId: 'box', qty: 1 }] },
+    parts: [{ qty: 3, consumables: [{ consumableId: 'mag', qty: 2 }] }] });
+  const r = rate(rows, [old, otherDrawn], { now: NOW, windowDays: 30 });
+  assert.equal(r.mag, undefined, JSON.stringify(r));
+});
+
+test('a part consumable with a negative or absurd quantity cannot drive the rate', () => {
+  const { consumptionByConsumable: rate } = require('../lib/consumable-reorder.js');
+  const rows = [c({ id: 'mag' })];
+  const drawn = { spools: [], consumables: [{ consumableId: 'mag', qty: 1 }] };
+  const neg = order({ materialDeducted: true, materialDrawn: drawn,
+    parts: [{ qty: 3, consumables: [{ consumableId: 'mag', qty: -4 }] }] });
+  const huge = order({ materialDeducted: true, materialDrawn: drawn,
+    parts: [{ qty: 1e308, consumables: [{ consumableId: 'mag', qty: 1e308 }] }] });
+  const r = rate(rows, [neg, huge], { now: NOW, windowDays: 30 });
+  assert.ok(Number.isFinite(r.mag), JSON.stringify(r));
+  assert.ok(Math.abs(r.mag - (9999 * 9999) / 30) < 1e-6, JSON.stringify(r));
 });

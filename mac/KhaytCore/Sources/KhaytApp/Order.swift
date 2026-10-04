@@ -42,6 +42,12 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     let nonBusiness: Bool?
     let paidAmount: Double
     let costBasis: Double
+    /// What the product's components (a box, magnets) cost when the job was
+    /// taken — `lib/order-new.js` prices them into the job and freezes this
+    /// beside the price. Not part of `costBasis`, which is the parts alone and
+    /// what the P&L's cost of goods is built from; a job's OWN margin adds it
+    /// (`jobCost`). 0 on every job without components.
+    let componentsCost: Double
     let paymentStatus: String
     /// How the last payment arrived. Optional because an unpaid job has no
     /// answer, and "cash" is a claim rather than a default.
@@ -99,7 +105,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     let instalmentBase: Double?
 
     private enum CodingKeys: String, CodingKey {
-        case id, date, status, project, client, currency, price, paidAmount, costBasis
+        case id, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
         case machineId, clientId, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
         case carrier, trackingNumber, shippingService, shippingStatus
@@ -195,6 +201,10 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         price = try c.decodeIfPresent(Double.self, forKey: .price) ?? 0
         paidAmount = try c.decodeIfPresent(Double.self, forKey: .paidAmount) ?? 0
         costBasis = try c.decodeIfPresent(Double.self, forKey: .costBasis) ?? 0
+        // Lenient and finite: a stray value must not take the job list down,
+        // nor make a margin read NaN.
+        let components = (try? c.decodeIfPresent(Double.self, forKey: .componentsCost)) ?? nil
+        componentsCost = components.map { $0.isFinite ? max(0, $0) : 0 } ?? 0
         paymentStatus = try c.decodeIfPresent(String.self, forKey: .paymentStatus) ?? ""
         paymentMethod = try c.decodeIfPresent(String.self, forKey: .paymentMethod)
         printTime = try c.decodeIfPresent(Double.self, forKey: .printTime) ?? 0

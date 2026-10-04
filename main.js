@@ -4121,6 +4121,11 @@ ipcMain.handle('hub:intake-model-bytes', async (_e, payload) => {
         : null,
       risk: r.risk,
       warnings: r.warnings,
+      // A project sliced as two or more plates: each plate's own figures, and
+      // the filament per slot summed over them (lib/mf-convert.js extractMeta).
+      // The totals above already add every plate.
+      plates: r.plates,
+      filaments: r.filaments,
     };
   } catch (e) {
     return { ok: false, error: 'Could not read that file' };
@@ -4280,6 +4285,8 @@ ipcMain.handle('hub:parse-print-file', async (_e, arg) => {
         : null;
       result.risk = r.risk;
       result.warnings = r.warnings;
+      result.plates = r.plates;
+      result.filaments = r.filaments;
 
       /* The deferred half. `mesh-deferred` means the file carried no slicer
        * summary, so its numbers can only come from the mesh — the case where a

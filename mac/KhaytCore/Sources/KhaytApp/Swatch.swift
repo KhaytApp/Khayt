@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// A filament colour, drawn so it can be seen.
 ///
@@ -33,6 +34,25 @@ struct Swatch: View {
     /// way HAD a colour and the shelf drew it as the grey disc of "nobody
     /// said" — the one thing this reading exists to prevent. The alpha is
     /// dropped: a filament is not see-through on a shelf card.
+    /// A swatch for a menu item. NOT a template image, so the menu draws the
+    /// colour rather than tinting it to the text colour; outlined by the fill,
+    /// as the view is. Nil when the hex says no colour.
+    static func menuImage(hex: String?, size: CGFloat = 12) -> NSImage? {
+        guard let c = rgb(fromHex: hex) else { return nil }
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 2.5, yRadius: 2.5)
+            NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 1).setFill()
+            path.fill()
+            let light = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b > 0.6
+            (light ? NSColor(white: 0, alpha: 0.35) : NSColor(white: 1, alpha: 0.35)).setStroke()
+            path.lineWidth = 1
+            path.stroke()
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
     static func rgb(fromHex hex: String?) -> (r: Double, g: Double, b: Double)? {
         guard var s = hex?.trimmingCharacters(in: .whitespaces), !s.isEmpty else { return nil }
         if s.hasPrefix("#") { s.removeFirst() }
