@@ -1229,14 +1229,48 @@
   }
 
   /**
+   * A paint plan's source → slot map restricted to PHYSICAL filaments: Full Spectrum maps the
+   * colours it mixes to virtual slots past the heads, which an object may print in but a
+   * support or wall filament setting may not. Those go to the head with the largest share of
+   * the mix; `clamped` lists the source indices that were moved that way. A band-swap plan is
+   * all heads already, so it comes back unchanged.
+   */
+  function physicalIndexMap(plan) {
+    const heads = plan.physical ? plan.physical.length : Infinity;
+    const clamped = new Set();
+    const map = plan.map.map((t, i) => {
+      if (t < heads) return t;
+      clamped.add(i);
+      const e = (plan.extras || []).find((x) => x.src === i);
+      if (!e || !e.recipe || !e.recipe.ids || !e.recipe.ids.length) return 0;
+      let best = 0;
+      e.recipe.weights.forEach((w, k) => { if (w > e.recipe.weights[best]) best = k; });
+      return Math.min(heads - 1, Math.max(0, e.recipe.ids[best] - 1));
+    });
+    return { map, clamped };
+  }
+
+  /**
+   * True when a per-filament setting holds k>1 values per filament — Bambu's H2D writes some
+   * per nozzle variant, n × variants long. Their layout is not verified against a real project,
+   * so rather than reindex filament_colour and leave those behind, a slot map or merge refuses.
+   */
+  function hasVariantArrays(obj, n) {
+    if (!(n >= 2)) return false;
+    return Object.keys(obj).some((k) => isPerFilamentJson(k) && Array.isArray(obj[k]) && obj[k].length > n && obj[k].length % n === 0);
+  }
+
+  /**
    * Remap every filament-number metadata (`extruder`, `support_filament`, Prusa's
    * `perimeter_extruder`…) in model_settings.config / Slic3r_PE_model.config XML, and the
    * `extruder` of colour changes and layer ranges, through a 0-based source→slot map.
    */
-  function remapIndexText(text, map) {
+  function remapIndexText(text, map, extruderMap) {
+    // `extruderMap`, when given, is for the objects' own `extruder` alone — under Full Spectrum
+    // an object may print in a mixed (virtual) filament, while a support filament may not.
     return text
       .replace(/(key="([A-Za-z_]+)"\s+value=")(\d+)(")/g, (all, pre, key, num, post) =>
-        (FILAMENT_INDEX_META.has(key) ? pre + remapIndexValue(num, map) + post : all))
+        (FILAMENT_INDEX_META.has(key) ? pre + remapIndexValue(num, key === 'extruder' && extruderMap ? extruderMap : map) + post : all))
       .replace(/(<(?:code|layer)\b[^>]*\bextruder=")(\d+)(")/g, (_a, pre, num, post) => pre + remapIndexValue(num, map) + post)
       .replace(/(opt_key="extruder"\s*>)(\d+)(<)/g, (_a, pre, num, post) => pre + remapIndexValue(num, map) + post);
   }
@@ -1257,28 +1291,35 @@
 
   /**
    * Split a PrusaSlicer vector value into its raw tokens, or null when it cannot be done safely.
-   * Strings are `"a";"b"` with backslash escapes (G-code holds `;` inside the quotes), colours
-   * `#a;#b`, numbers and bools `1,2`. Tokens keep their exact text so a rejoin changes nothing
-   * but the order.
+   *
+   * A string vector is `;`-separated and PrusaSlicer quotes an entry only when it has to: an
+   * empty entry is written bare, so `"Prusament PETG";;;;` is five entries and `"A";` is two.
+   * Each entry is either a quoted string (backslash escapes, `;` allowed inside — G-code) or
+   * bare text up to the next `;`; empty entries count, trailing ones included. Without quotes
+   * or `;` it is a numeric/bool vector, `,`-separated. Tokens keep their exact text so a rejoin
+   * changes nothing but the order.
    */
   function splitIniVector(raw) {
     const v = raw.trim();
-    if (v.indexOf('"') >= 0) {
-      const parts = [];
-      let i = 0;
-      while (i < v.length) {
-        if (v[i] !== '"') return null;
-        let j = i + 1;
+    if (v.indexOf('"') < 0 && v.indexOf(';') < 0) return { parts: v.split(','), sep: ',' };
+    const parts = [];
+    let i = 0;
+    for (;;) {
+      let j = i;
+      if (v[i] === '"') {
+        j = i + 1;
         while (j < v.length && v[j] !== '"') j += v[j] === '\\' ? 2 : 1;
-        if (j >= v.length) return null;
-        parts.push(v.slice(i, j + 1));
-        i = j + 1;
-        if (i < v.length) { if (v[i] !== ';') return null; i++; }
+        if (j >= v.length) return null; // an unterminated quote
+        j++;
+        if (j < v.length && v[j] !== ';') return null; // text after a closing quote
+      } else {
+        while (j < v.length && v[j] !== ';') { if (v[j] === '"') return null; j++; }
       }
-      return { parts, sep: ';' };
+      parts.push(v.slice(i, j));
+      if (j >= v.length) break;
+      i = j + 1; // past the ';' — and an entry follows it, even an empty last one
     }
-    if (v.indexOf(';') >= 0) return { parts: v.split(';'), sep: ';' };
-    return { parts: v.split(','), sep: ',' };
+    return { parts, sep: ';' };
   }
 
   /**
@@ -1521,7 +1562,8 @@
   function applyBandSwapConfig(obj, plan, srcCount, report) {
     // Per-filament settings by NAME (see reindexFilamentJson): a length test alone once matched
     // printable_area's four corners on a four-filament model and turned the bed into a bow-tie.
-    reindexFilamentJson(obj, plan.headSrcIdx, srcCount, null);
+    // Filament numbers (support_filament…) follow each colour to its head, like the paint.
+    reindexFilamentJson(obj, plan.headSrcIdx, srcCount, plan.map);
     obj.filament_colour = plan.headColors.slice();
     if (report) {
       report.bandSwap = true;
@@ -1583,7 +1625,15 @@
   function applyFullSpectrumConfig(obj, plan, srcCount, report, opts) {
     opts = opts || {};
     const keep = plan.physical; // 0-based source indices, length = slots
-    reindexFilamentJson(obj, keep, srcCount, null); // per-filament settings by name, as above
+    // Per-filament settings by name, as above, and filament numbers through the physical map:
+    // a support or wall filament that Full Spectrum turned into a mix has no filament of its
+    // own any more, so it goes to the head that carries most of that mix — and the maker is told.
+    const phys = physicalIndexMap(plan);
+    const mixedRefs = FILAMENT_INDEX_JSON.filter((k) => [].concat(obj[k]).some((v) => phys.clamped.has(parseInt(v, 10) - 1)));
+    reindexFilamentJson(obj, keep, srcCount, phys.map);
+    if (mixedRefs.length && report) {
+      report.warnings.push(`Full Spectrum mixes a colour that ${mixedRefs.join(', ')} used, so ${mixedRefs.length === 1 ? 'it now uses' : 'they now use'} the head that carries most of that mix. Check those settings in your slicer.`);
+    }
     obj.filament_colour = plan.physicalHex.slice();
     obj.mixed_filament_definitions = fullSpectrum.serializeMixedDefs(plan.mixDefs);
     for (const [k, val] of Object.entries(fullSpectrum.MIXED_DITHERING_DEFAULTS)) obj[k] = val;
@@ -2017,13 +2067,20 @@
       // or not at all, and decided BEFORE anything is written: a file whose model_settings moved
       // while its mesh could not (a host passing the mesh by name, a paint code that would not
       // re-encode, a palette that is not the config's) says two different things about the same
-      // object. When the paint cannot move, it stays exactly as it was — the behaviour before
-      // paint moved at all — and the maker is told.
+      // object.
+      //
+      // And when they cannot move, NOTHING moves — the config included. Reindexing the palette
+      // and its temperatures while an object stays on extruder 1 prints that object in another
+      // filament's colour at another filament's temperature (red PLA at 220 became green PETG at
+      // 250), which is worse than not reassigning at all. The one safe exception is a file shown
+      // to have no paint: then the config and the objects' extruders move together. A mesh that
+      // never crossed into this process cannot be shown to have none, so that is refused too.
       let paintRewrites = null, paintBlocked = null;
       if (plainMap && plainMap.some((t, i) => t !== i)) {
         const proj = tryJson(memberText(members, /project_settings\.config$/i));
         const projCount = proj && Array.isArray(proj.filament_colour) ? proj.filament_colour.length : null;
         if (flavour !== 'prusa' && projCount !== n) paintBlocked = 'palette';
+        else if (proj && hasVariantArrays(proj, n)) paintBlocked = 'variants';
         else if (members.some((mm) => /\.model$/i.test(mm.name) && mm.data == null)) paintBlocked = 'mesh';
         else {
           const stateMap = (st) => (st >= 1 && st <= n ? plainMap[st - 1] + 1 : st);
@@ -2040,8 +2097,9 @@
       }
       // A merge cannot leave the paint behind: states past the new slot count would point at
       // nothing. So a merge whose paint cannot move does not happen at all.
-      let mergeDropped = false;
+      let mergeDropped = false, slotMapDropped = false;
       if (paintBlocked && mergePlan) { mergePlan = null; plainMap = null; mergeDropped = true; }
+      if (paintBlocked && slotMap) { slotMap = null; prusaReindexed = null; plainMap = null; slotMapDropped = true; }
       const plainMoves = !!paintRewrites;
 
       // Re-profiling only makes sense within one config family (Bambu/Orca share a JSON
@@ -2065,9 +2123,9 @@
         }
         if (paintPlan && /model_settings\.config$/i.test(m.name) && !tryJson(m.data.toString('utf8'))) {
           // Bambu model_settings.config is XML: <metadata key="extruder" value="N"/> (1-based).
-          const text = m.data.toString('utf8').replace(
-            /(key="extruder"\s+value=")(\d+)(")/g,
-            (_a, pre, num, post) => { const old = parseInt(num, 10); const ni = old >= 1 && old <= paintPlan.map.length ? paintPlan.map[old - 1] + 1 : old; return `${pre}${ni}${post}`; });
+          // Each object's extruder through the plan (a mixed filament is a valid object colour);
+          // its support / wall filament numbers through the plan's PHYSICAL map.
+          const text = remapIndexText(m.data.toString('utf8'), physicalIndexMap(paintPlan).map, paintPlan.map);
           return { name: m.name, data: text };
         }
         if (plainMoves && paintRewrites.has(m.name)) return { name: m.name, data: paintRewrites.get(m.name) };
@@ -2246,12 +2304,16 @@
       } else if (target.maxColors && n > target.maxColors) {
         report.warnings.push(`Source uses ${n} colours but ${target.name} supports ${target.maxColors}. Extra colours will need manual mapping in your slicer.`);
       }
-      if (mergeDropped) {
-        report.warnings.push(`Colours were not merged: ${paintBlocked === 'mesh' ? 'this app could not read the model\'s paint' : 'the model\'s paint could not be moved with them'}, and merging without it would leave painted areas pointing at slots that no longer exist. ${target.name} supports ${target.maxColors} colours — map the extra ones in your slicer.`);
-      } else if (paintBlocked) {
-        report.warnings.push(paintBlocked === 'mesh'
-          ? 'The model\'s painted colours could not be moved to their new slots here, so painted areas may print in the wrong colour. Convert it in Khayt, or reassign the colours in your slicer.'
-          : 'The model\'s painted colours could not be moved to their new slots, so painted areas may print in the wrong colour. Reassign the colours in your slicer.');
+      if (paintBlocked) {
+        // Why, in words that fit a file whether it is painted or coloured per object.
+        const why = {
+          mesh: 'this app could not read the model to move its colours with them',
+          palette: 'the file\'s colour list does not match its filament settings',
+          variants: 'this file keeps several values per filament (one per nozzle type), which this converter does not reorder yet',
+          encode: 'the model\'s colour data could not be rewritten for the new slots',
+        }[paintBlocked];
+        if (mergeDropped) report.warnings.push(`Colours were not merged: ${why}. ${target.name} supports ${target.maxColors} colours — map the extra ones in your slicer.`);
+        if (slotMapDropped) report.warnings.push(`Colours were left in their original slots: ${why}. Reassign them in your slicer${paintBlocked === 'mesh' ? ', or convert the file in Khayt' : ''}.`);
       }
       const bounds = computeBounds(members);
       if (bounds) { report.bounds = bounds; for (const w of fitWarnings(bounds, target)) report.warnings.push(w); }

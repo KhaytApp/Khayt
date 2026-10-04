@@ -170,16 +170,70 @@ test('a merge whose paint cannot be read does not happen', () => {
   assert.ok(r.report.warnings.some((w) => /Colours were not merged/.test(w)));
 });
 
-test('when the mesh cannot move, the objects\' extruders do not move without it', () => {
+test('when the mesh cannot be read, nothing moves — not the objects, not the config', () => {
+  // The Mac app passes any model over 4 MB by name. Reindexing the palette while the object
+  // stays on extruder 1 printed red PLA at 220 as green PETG at 250.
+  const settings = bambuSettings(['#FF0000', '#00FF00'], { filament_type: ['PLA', 'PETG'], nozzle_temperature: ['220', '250'] });
   const members = [
     { name: '3D/3dmodel.model', size: 1 << 30 },
-    { name: 'Metadata/project_settings.config', data: JSON.stringify(bambuSettings(['#FF0000', '#00FF00'])) },
+    { name: 'Metadata/project_settings.config', data: JSON.stringify(settings) },
     { name: 'Metadata/model_settings.config', data: OBJ_SETTINGS(2) },
   ];
   const r = convertMembers(members, { targetId: 'bambu-p1s', slotMap: [1, 0] });
-  const ms = r.members.find((m) => /model_settings/.test(m.name));
-  assert.equal(String(ms.data), OBJ_SETTINGS(2), 'model_settings moved while the paint stayed');
-  assert.ok(r.report.warnings.some((w) => /could not be moved/.test(w)));
+  assert.equal(String(r.members.find((m) => /model_settings/.test(m.name)).data), OBJ_SETTINGS(2));
+  const c = JSON.parse(r.members.find((m) => /project_settings/.test(m.name)).data);
+  assert.deepEqual([c.filament_colour, c.filament_type, c.nozzle_temperature], [['#FF0000', '#00FF00'], ['PLA', 'PETG'], ['220', '250']],
+    'the config was reordered under an object that stayed put');
+  const w = r.report.warnings.find((x) => /left in their original slots/.test(x));
+  assert.ok(w);
+  assert.doesNotMatch(w, /painted/, 'an object-coloured file is not "painted"');
+});
+
+test('a palette that is not the config\'s own moves nothing either', () => {
+  // filament_colour lists 2, but slice_info (which extractFilaments falls back to) says 3.
+  const members = [
+    { name: '3D/3dmodel.model', data: meshXml([1, 2, 3]) },
+    { name: 'Metadata/project_settings.config', data: JSON.stringify({ printer_model: 'X1C', filament_colour: [] }) },
+    { name: 'Metadata/slice_info.config', data: '<config><plate><filament id="1" color="#FF0000"/><filament id="2" color="#00FF00"/><filament id="3" color="#0000FF"/></plate></config>' },
+    { name: 'Metadata/model_settings.config', data: OBJ_SETTINGS(3) },
+  ];
+  const r = convertMembers(members, { targetId: 'bambu-p1s', slotMap: [2, 0, 1] });
+  assert.match(String(r.members.find((m) => /slice_info/.test(m.name)).data), /id="1" color="#FF0000"/);
+  assert.equal(String(r.members.find((m) => /model_settings/.test(m.name)).data), OBJ_SETTINGS(3));
+  assert.ok(r.report.warnings.some((x) => /colour list does not match its filament settings/.test(x)));
+});
+
+test('per-nozzle-variant arrays (n × k) refuse the slot map and the merge instead of half-moving', () => {
+  // Bambu's H2D keeps some per-filament settings once per nozzle type. Unverified layout: refuse.
+  const colours = ['#FF0000', '#00FF00', '#0000FF', '#FFFFFF', '#000000', '#888888'];
+  const extra = { nozzle_temperature: colours.flatMap((_, i) => [String(200 + i), String(300 + i)]) };
+  const r = convert(bambu(colours.slice(0, 2), [1, 2], { nozzle_temperature: ['200', '300', '201', '301'] }), { targetId: 'bambu-x1c', slotMap: [1, 0] });
+  assert.deepEqual(cfgOf(r.buffer).filament_colour, ['#FF0000', '#00FF00']);
+  assert.deepEqual(statesOf(zipText(r.buffer, '3D/3dmodel.model')), [1, 2]);
+  assert.ok(r.report.warnings.some((w) => /several values per filament/.test(w)));
+  const m = convert(bambu(colours, [1, 2, 3, 4, 5, 6], extra), { targetId: 'snapmaker-u1', mergeToSlots: true });
+  assert.equal(m.report.colorsMerged, undefined);
+  assert.equal(cfgOf(m.buffer).filament_colour.length, 6);
+  assert.ok(m.report.warnings.some((w) => /Colours were not merged: this file keeps several values per filament/.test(w)));
+});
+
+// ── band-swap and Full Spectrum: filament numbers too ───────────────────────
+
+test('Full Spectrum moves filament numbers to physical heads, never past them', () => {
+  const fs5 = ['#FF0000', '#00AA00', '#0000FF', '#FFFF00', '#FF8000'];
+  const buf = bambu(fs5, [1, 2, 3, 4, 5, 1, 2, 3], { support_filament: '5', wall_filament: '1', wipe_tower_filament: '0' });
+  const r = convert(buf, { targetId: 'snapmaker-u1', fullSpectrum: true });
+  assert.equal(r.report.fullSpectrum, true);
+  const c = cfgOf(r.buffer);
+  for (const k of ['support_filament', 'wall_filament']) assert.ok(+c[k] >= 1 && +c[k] <= 4, `${k} = ${c[k]} is not a head`);
+  assert.equal(c.wipe_tower_filament, '0');
+  const pv = require('../lib/mf-convert').fsPreview(buf, { targetId: 'snapmaker-u1' });
+  const heads = pv.heads.map((h) => h.srcIndex);
+  if (heads.includes(4)) assert.equal(c.support_filament, String(heads.indexOf(4) + 1));
+  const mixed = pv.mixes.some((mx) => mx.srcHex === '#FF8000');
+  assert.equal(r.report.warnings.some((w) => /Full Spectrum mixes a colour that [^.]*support_filament/.test(w)), mixed,
+    'warned exactly when the support filament became a mix');
+  for (const kv of metaOf(r.buffer).filter((x) => x.startsWith('support_filament'))) assert.ok(+kv.split('=')[1] <= 4, kv);
 });
 
 // ── Prusa ────────────────────────────────────────────────────────────────────
@@ -241,4 +295,48 @@ test('a Prusa config that cannot be matched to its filaments moves nothing', () 
   assert.equal(ini(t, 'filament_colour'), '#FF0000;#00FF00;#0000FF');
   assert.deepEqual(statesOf(zipText(r.buffer, '3D/3dmodel.model')), [1, 2, 3]);
   assert.ok(r.report.warnings.some((w) => /"temperature" setting could not be matched/.test(w)));
+});
+
+test('band-swap sends filament numbers to the head their colour prints on', () => {
+  const colours = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF'];
+  const v = [], t = [];
+  colours.forEach((_, i) => {
+    v.push(`<vertex x="0" y="0" z="${i * 10}"/>`, `<vertex x="10" y="0" z="${i * 10}"/>`, `<vertex x="0" y="0" z="${i * 10 + 10}"/>`);
+    t.push(`<triangle v1="${i * 3}" v2="${i * 3 + 1}" v3="${i * 3 + 2}" paint_color="${encodeSolidPaint(i + 1)}"/>`);
+  });
+  const model = `<?xml version="1.0"?><model unit="millimeter"><resources><object id="1" type="model"><mesh><vertices>${v.join('')}</vertices>`
+    + `<triangles>${t.join('')}</triangles></mesh></object></resources><build><item objectid="1"/></build></model>`;
+  const buf = writeZip([
+    { name: '3D/3dmodel.model', data: model },
+    { name: 'Metadata/project_settings.config', data: JSON.stringify(bambuSettings(colours, { layer_height: '0.2', support_filament: '5', wall_filament: '0' })) },
+  ]);
+  const r = convert(buf, { targetId: 'snapmaker-u1', bandSwap: true });
+  assert.equal(r.report.bandSwap, true);
+  const head = require('../lib/mf-convert').analyzeColorBands(buf).headOf.find((h) => h.state === 5).head;
+  assert.equal(cfgOf(r.buffer).support_filament, String(head + 1));
+  assert.equal(cfgOf(r.buffer).wall_filament, '0');
+});
+
+test('PrusaSlicer\'s bare empty entries split, so the slot map applies', () => {
+  // PrusaSlicer quotes an entry only when it must, and writes an empty one bare: this is ordinary
+  // output, and it used to refuse the whole slot map.
+  const fixed = PRUSA_CFG + [
+    '; inherits_cummulative = "Prusament PETG";;',
+    '; filament_notes = "keep dry";;',
+    '; compatible_prints_condition_cummulative = ;"nozzle_diameter[0]!=0.8";',
+    '',
+  ].join('\n');
+  const r = convert(prusa(fixed), { targetId: 'prusa-mk3s-mmu2s', slotMap: [2, 0, 1] });
+  const t = zipText(r.buffer, 'Metadata/Slic3r_PE.config');
+  assert.ok(!r.report.warnings.some((w) => /could not be matched/.test(w)), r.report.warnings.join(' | '));
+  assert.equal(ini(t, 'filament_colour'), '#00FF00;#0000FF;#FF0000');
+  assert.equal(ini(t, 'inherits_cummulative'), ';;"Prusament PETG"');
+  assert.equal(ini(t, 'filament_notes'), ';;"keep dry"');
+  assert.equal(ini(t, 'compatible_prints_condition_cummulative'), '"nozzle_diameter[0]!=0.8";;');
+});
+
+test('a trailing bare empty entry is counted: `"A";` is two entries', () => {
+  // Two entries for a three-filament project cannot be matched — refused by name, not misread as one.
+  const r = convert(prusa(PRUSA_CFG + '; filament_notes = "A";\n'), { targetId: 'prusa-mk3s-mmu2s', slotMap: [2, 0, 1] });
+  assert.ok(r.report.warnings.some((w) => /"filament_notes" setting could not be matched/.test(w)));
 });

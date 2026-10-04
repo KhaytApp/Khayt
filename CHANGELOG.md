@@ -21,7 +21,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     temperatures, fan settings and purge volumes move with its colour, and
     settings such as the support filament follow it. A slot beyond the
     file's own colours is not applied; you are told to place it in your
-    slicer.
+    slicer. When the colours cannot be moved together with the model (for
+    example a large model in the Mac app), nothing is reassigned and the
+    report says why. Full Spectrum and band-swap also move the support and
+    wall filament settings to the right head.
   - "Merge to the nearest {n} slots" in batch conversion now merges. A file
     with more colours than the printer has slots used to convert with a
     warning and nothing merged. The least-used colours now go to the

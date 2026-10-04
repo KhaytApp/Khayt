@@ -101,7 +101,7 @@ test('a host that passes the mesh by name gets a warning, not a crash', () => {
   ];
   const r = convertMembers(members, { targetId: 'bambu-p1s', slotMap: [1, 0] });
   assert.equal(r.ok, true);
-  assert.ok(r.report.warnings.some((w) => /painted colours could not be moved/.test(w)));
+  assert.ok(r.report.warnings.some((w) => /left in their original slots: this app could not read the model/.test(w)));
 });
 
 // ── merge to the nearest slots ──────────────────────────────────────────────
