@@ -26,6 +26,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     change colour at different heights used to get one plate's pause heights
     written into the file for all of them; it is now left without pauses and
     the reason names the plates. Plates that agree keep their plan.
+  - Full Spectrum files keep their mixes when opened in Snapmaker Orca. The
+    mix settings are now marked as changed from the printer's preset, so
+    Orca no longer resets them to stock. Mixed areas also get extra support
+    clearance, and their purge goes to the wipe tower instead of into the
+    model and supports.
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its
