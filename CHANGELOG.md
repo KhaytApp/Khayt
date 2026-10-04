@@ -40,7 +40,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - Converting for a printer with a different nozzle size also adjusts line
     widths and layer heights to suit it. A 0.6 mm file converted for a 0.4 mm
     printer used to ask for 0.63 mm lines. Settings taken from your installed
-    slicer's own preset are left as they are.
+    slicer's own process preset are left as they are; when only its printer
+    profile is found, line widths are still adjusted. PrusaSlicer files also
+    get their minimum and maximum layer heights adjusted.
   - Files made in Creality Print and other slicers now open in Snapmaker Orca
     as full projects with their colours and plates. Before, Orca loaded only
     the shape.

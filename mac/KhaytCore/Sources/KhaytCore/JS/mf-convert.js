@@ -1705,7 +1705,11 @@
     if (machine.printer_model) obj.printer_model = machine.printer_model;
     if (procName) { obj.print_settings_id = procName; if (report) report.processPreset = procName; }
     if (report) { report.fieldsChanged.push('printer_gcode', 'process_settings'); report.u1Native = true; }
-    return true;
+    // What was overlaid, for the nozzle refit: a resolved PROCESS preset brings widths and layer
+    // heights already made for the target nozzle; the machine alone brings only its limits. It
+    // used to answer "yes" either way, so a machine without a process preset skipped the refit
+    // and kept the source nozzle's widths.
+    return proc && Object.keys(proc).length ? 'process' : 'machine';
   }
 
   // ── WHO WROTE THE FILE ───────────────────────────────────────────────────────────────────────
@@ -1824,8 +1828,9 @@
   }
 
   /** Refit a Bambu/Orca JSON config in place from nozzle `from` to `to`. */
-  function applyNozzleFit(obj, from, to, report) {
+  function applyNozzleFit(obj, from, to, report, fitOpts) {
     if (!(from > 0) || !(to > 0) || Math.abs(from - to) < 0.001) return;
+    const limits = !fitOpts || fitOpts.limits !== false;
     const note = (k, a, b) => { if (report) { (report.nozzleFit = report.nozzleFit || []).push({ key: k, from: String(a), to: String(b) }); report.fieldsChanged.push(k); } };
     for (const k of NOZZLE_FIT_KEYS) {
       const next = refitValue(k, obj[k], from, to);
@@ -1833,7 +1838,7 @@
       note(k, obj[k], next);
       obj[k] = typeof obj[k] === 'string' ? String(next) : next;
     }
-    for (const k of NOZZLE_LIMIT_KEYS) {
+    for (const k of limits ? NOZZLE_LIMIT_KEYS : []) {
       if (!(k in obj)) continue;
       const fit = (v) => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? (typeof v === 'string' ? String(Math.round(n * (to / from) * 100) / 100) : Math.round(n * (to / from) * 100) / 100) : v; };
       const before = JSON.stringify(obj[k]);
@@ -1853,6 +1858,15 @@
         return String(next);
       });
       text = r.text;
+    }
+    // The per-extruder limits too, entry by entry and by the same ratio — a 0.6 profile's 0.45 mm
+    // ceiling is not a 0.4 nozzle's. `0` (no limit) stays.
+    for (const k of NOZZLE_LIMIT_KEYS) {
+      text = iniSet(text, k, (old) => {
+        const next = old.split(',').map((v) => { const x = parseFloat(v); return Number.isFinite(x) && x > 0 ? String(Math.round(x * (to / from) * 100) / 100) : v.trim(); }).join(',');
+        if (next !== old && report) { (report.nozzleFit = report.nozzleFit || []).push({ key: k, from: old, to: next }); report.fieldsChanged.push(k); }
+        return next;
+      }).text;
     }
     return text;
   }
@@ -2096,7 +2110,10 @@
             const native = /project_settings\.config$/i.test(m.name) && target.flavour === 'orca' && applyOrcaNative(obj, opts, target, report);
             // Widths and layer heights follow a changed nozzle — unless the installed slicer's
             // process preset was just overlaid, which is already the target nozzle's own.
-            if (reprofile && !native && target.nozzle && /project_settings\.config$/i.test(m.name)) applyNozzleFit(obj, srcNozzle, Number(target.nozzle), report);
+            if (reprofile && native !== 'process' && target.nozzle && /project_settings\.config$/i.test(m.name)) {
+              // With the machine overlaid, max/min_layer_height are already the target machine's own.
+              applyNozzleFit(obj, srcNozzle, Number(target.nozzle), report, { limits: native !== 'machine' });
+            }
             // Band-swap / Full Spectrum own the colour mapping (only meaningful on project_settings, which
             // holds the filament palette + mixed-filament keys); otherwise apply the plain colour→slot remap.
             if (bandPlan && /project_settings\.config$/i.test(m.name)) {

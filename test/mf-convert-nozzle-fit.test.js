@@ -77,3 +77,13 @@ test('a PrusaSlicer config is refitted too, keeping its `; ` prefix', () => {
   assert.match(text, /^; perimeter_extrusion_width = 0$/m, '0 is "auto" and stays auto');
   assert.match(text, /^; infill_extrusion_width = 110%$/m);
 });
+
+test('a PrusaSlicer refit scales the per-extruder layer-height limits too', () => {
+  const cfg = ['; printer_model = MK3S', '; nozzle_diameter = 0.6,0.6', '; max_layer_height = 0.45,0',
+    '; min_layer_height = 0.15,0.15', '; filament_colour = #FF0000;#00FF00', ''].join('\n');
+  const r = convert(writeZip([{ name: '3D/3dmodel.model', data: MODEL }, { name: 'Metadata/Slic3r_PE.config', data: cfg }]),
+    { targetId: 'prusa-xl-5t' });
+  const text = openZip(r.buffer).file('Metadata/Slic3r_PE.config').toString('utf8');
+  assert.match(text, /^; max_layer_height = 0.3,0$/m, '0 is "no limit" and stays');
+  assert.match(text, /^; min_layer_height = 0.1,0.1$/m);
+});
