@@ -207,3 +207,11 @@ test('qtyLabel omits a unit that was never set', () => {
   assert.equal(qtyLabel(4, null), '4');
   assert.equal(qtyLabel(null, 'pcs'), '');
 });
+
+test('a part\'s own consumables count as usage', () => {
+  const { consumptionByConsumable: rate } = require('../lib/consumable-reorder.js');
+  const rows = [c({ id: 'mag' })];
+  const done = order({ materialDeducted: true, parts: [{ qty: 3, consumables: [{ consumableId: 'mag', qty: 2 }] }] });
+  const r = rate(rows, [done], { now: NOW, windowDays: 30 });
+  assert.ok(Math.abs(r.mag - 6 / 30) < 1e-9, JSON.stringify(r));
+});

@@ -118,3 +118,20 @@ test('a 100-unit line is not priced as one unit (the duplicate-order defect)', (
   assert.ok(right > wrong * 50, 'line total must scale with quantity');
   assert.equal(right / wrong, 100);
 });
+
+test('a part costs its consumables, at the shelf price, else the price it was written with', () => {
+  const part = {
+    spoolCost: 0, spoolWeight: 1000, printWeight: 0, printTime: 0, qty: 2,
+    consumables: [{ consumableId: 'mag', qty: 4, unitCost: 0.5 }, { consumableId: 'gone', qty: 1, unitCost: 2 }],
+  };
+  const ctx = { inventory: [], settings: {}, consumables: [{ id: 'mag', cost: 0.25 }] };
+  // 4 × 0.25 (shelf) + 1 × 2 (written) = 3 per piece; qty multiplies only in partTotalCost.
+  assert.equal(computePartBaseCost(part, ctx), 3);
+  assert.equal(partTotalCost(part, ctx), 6);
+  // No consumables in reach: every line at its own unitCost.
+  assert.equal(computePartBaseCost(part, { inventory: [], settings: {} }), 4);
+  const b = computePartBreakdown(part, ctx);
+  assert.equal(b.material, 3, 'folded into the material bucket, so the buckets still add up');
+  // Untouched parts are unchanged.
+  assert.equal(computePartBaseCost({ spoolCost: 100, spoolWeight: 1000, printWeight: 50 }, ctx), 5);
+});

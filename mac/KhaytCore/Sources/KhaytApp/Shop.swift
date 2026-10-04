@@ -3277,6 +3277,15 @@ final class Shop {
         for key in await allLanguageKeys() {
             product.names[key.language] = file.title
         }
+        // What one print of the model uses — magnets, inserts — rides on the
+        // first part, so the product counts them once per copy and a job
+        // taken from it costs and draws them.
+        let uses = CalculatorModel.consumableRows(
+            consumablesUsed(by: file.id).map { ($0.consumableId, $0.qty) }, shelf: consumables)
+        if !uses.isEmpty, case .object(var first)? = parts.first {
+            first["consumables"] = .array(uses)
+            parts[0] = .object(first)
+        }
         product.rest["parts"] = .array(parts)
         productNote = note
         return product
@@ -4347,7 +4356,8 @@ final class Shop {
                                                   hours: hours, qty: qty, extra: extra),
                                           inventory: inventoryRows, settings: settingsDict,
                                           machine: machineRow(machineId),
-                                          preset: presetRow(presetId))
+                                          preset: presetRow(presetId),
+                                          consumables: consumableRows)
     }
 
     /// A saved preset as the book holds it.
@@ -4356,6 +4366,8 @@ final class Shop {
     /// shop's own labour rate, electricity and failure allowance were saved,
     /// listed, and then ignored by the one screen they are for — a part was
     /// costed at Khayt's opening figures whatever the shop had written down.
+    func presetRowFor(_ id: String?) -> JSONValue? { presetRow(id) }
+
     private func presetRow(_ id: String?) -> JSONValue? {
         guard let id, !id.isEmpty else { return nil }
         return presetRows.first {
@@ -4628,6 +4640,12 @@ final class Shop {
             // instead of cost plus margin, and measures the margin against
             // what it really cost. See lib/price-agreements.js.
             if let agreed = p.agreedPrice { row["agreedPrice"] = .number(agreed) }
+            // The bought-in pieces the part uses (a product's magnets), so the
+            // job is costed with them and completing it draws them off the
+            // shelf. See `ModelConsumables.swift`.
+            if case .array(let uses)? = p.raw["consumables"], !uses.isEmpty {
+                row["consumables"] = .array(uses)
+            }
             // The rates this part was costed at, written down beside the cost.
             //
             // Not bookkeeping. `renderer/build.js` reads them straight back into
