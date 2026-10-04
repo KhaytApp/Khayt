@@ -105,7 +105,13 @@ function ORIGINAL_parse3mfColors(zip) {
     const h = normHexForProof(hex);
     if (!h) return;
     if (seen.has(h)) {
-      if (grams != null) { const e = colors.find((c) => c.hex === h); if (e && e.grams == null) e.grams = grams; }
+      // One deliberate change since the split (Oct 2026): a colour met again —
+      // the same spool on a later plate — ADDS its grams instead of keeping
+      // the first plate's. See the multi-plate test below.
+      if (grams != null) {
+        const e = colors.find((c) => c.hex === h);
+        if (e) e.grams = e.grams == null ? grams : Math.round((e.grams + grams) * 100) / 100;
+      }
       return;
     }
     seen.add(h);

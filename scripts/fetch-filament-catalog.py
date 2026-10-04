@@ -32,7 +32,23 @@ then filament, then colour, then weight.
 Discontinued filaments and colours are dropped. A shop cannot buy them, and
 they are a third of the file.
 
-    python3 scripts/fetch-filament-catalog.py
+── AND WHY IT IS CORRECTED ─────────────────────────────────────────────────
+
+The upstream is community-typed, and a manufacturer's own list beats it where
+the two disagree: Bambu Lab's PLA Matte had "Nardo Grey" for Nardo Gray, four
+hexes that were not Bambu's, and a GTIN typed into an empty-spool weight. A
+tester printing mostly in Bambu matte read that as "the Bambu profiles are
+dated". `finish()` applies `scripts/filament-catalog-overrides.json` (and a
+plausibility check on empty-spool weights) after every build, so the monthly
+refresh cannot quietly undo a correction.
+
+    python3 scripts/fetch-filament-catalog.py                    # rebuild from upstream
+    python3 scripts/fetch-filament-catalog.py --overrides-only   # re-apply corrections
+                                                                 # to the committed file
+
+`--overrides-only` touches nothing but what the overrides say, so a correction
+can ship without dragging a month of unrelated upstream change in with it. It is
+idempotent: applying it to its own output changes nothing.
 """
 import json
 import os
@@ -41,6 +57,13 @@ import urllib.request
 
 SOURCE = "https://api.openfilamentdatabase.org/json/all.json"
 OUT = os.path.join(os.path.dirname(__file__), "..", "assets", "filament-catalog.json")
+OVERRIDES = os.path.join(os.path.dirname(__file__), "filament-catalog-overrides.json")
+
+# Heavier than any real empty spool (cardboard or plastic, 1–3 kg reels are
+# 150–1000 g). Above it the figure is a typo — Bambu's PLA Matte Grass Green
+# carried 6975337030119, a barcode — and a scale reading minus a barcode is a
+# negative spool.
+MAX_EMPTY_SPOOL_G = 2000
 
 
 def fetch(url):
@@ -95,10 +118,96 @@ def build(d):
     return out
 
 
+def _key(name):
+    return " ".join(str(name or "").split()).lower()
+
+
+def apply_overrides(rows, overrides):
+    """Put the manufacturer's own names and hexes over the upstream's.
+
+    Rows are changed in place. Returns a list of what changed, for the log.
+    """
+    log = []
+    for o in overrides.get("filaments", []):
+        brand, name = o["brand"], o["filament"]
+        target = next((r for r in rows if r["b"] == brand and r["n"] == name), None)
+        if target is None:
+            log.append(f"override target missing upstream: {brand} {name}")
+            continue
+        wanted = o.get("colours", [])
+        names = set()
+        for w in wanted:
+            names.add(_key(w["name"]))
+            names.update(_key(a) for a in w.get("aka", []))
+
+        # A colour misfiled under a sibling line is removed from it. The row is
+        # not moved across: its name and hex are the wrong line's, and the
+        # entry below already says what the right one is.
+        for sib in o.get("notIn", []):
+            for r in rows:
+                if r["b"] != brand or r["n"] != sib:
+                    continue
+                kept = [c for c in r["c"] if _key(c[0]) not in names]
+                for c in r["c"]:
+                    if _key(c[0]) in names:
+                        log.append(f"{brand} {sib}: removed misfiled {c[0]!r}")
+                r["c"] = kept
+
+        added = o.get("added", {})
+        for w in wanted:
+            keys = {_key(w["name"])} | {_key(a) for a in w.get("aka", [])}
+            row = next((c for c in target["c"] if _key(c[0]) in keys), None)
+            if row is None:
+                target["c"].append([w["name"], w["hex"], list(added.get("weights", [])),
+                                    None, added.get("diameter")])
+                log.append(f"{brand} {name}: added {w['name']!r}")
+                continue
+            if row[0] != w["name"]:
+                log.append(f"{brand} {name}: renamed {row[0]!r} -> {w['name']!r}")
+                row[0] = w["name"]
+            if row[1].upper() != w["hex"].upper():
+                log.append(f"{brand} {name} {w['name']}: hex {row[1]} -> {w['hex']}")
+                row[1] = w["hex"]
+    return log
+
+
+def finish(rows):
+    """Everything applied after the upstream rows are built, in both modes."""
+    log = []
+    for r in rows:
+        for c in r["c"]:
+            if c[3] is not None and c[3] > MAX_EMPTY_SPOOL_G:
+                log.append(f"{r['b']} {r['n']} {c[0]}: dropped empty spool weight {c[3]}")
+                c[3] = None
+    with open(OVERRIDES) as fh:
+        log += apply_overrides(rows, json.load(fh))
+    for line in log:
+        print(f"  {line}", file=sys.stderr)
+    return rows
+
+
+def write(catalog):
+    blob = json.dumps(catalog, separators=(",", ":"), ensure_ascii=False)
+    with open(OUT, "w") as fh:
+        fh.write(blob + "\n")
+    return blob
+
+
+def overrides_only():
+    with open(OUT) as fh:
+        catalog = json.load(fh)
+    finish(catalog["filaments"])
+    write(catalog)
+    print("overrides applied -> assets/filament-catalog.json", file=sys.stderr)
+
+
 def main():
+    if "--overrides-only" in sys.argv:
+        overrides_only()
+        return
     print(f"fetching {SOURCE} …", file=sys.stderr)
     d = fetch(SOURCE)
-    rows = build(d)
+    rows = finish(build(d))
     catalog = {
         "source": "https://github.com/OpenFilamentCollective/open-filament-database",
         "licence": "MIT",
@@ -113,9 +222,7 @@ def main():
         },
         "filaments": rows,
     }
-    blob = json.dumps(catalog, separators=(",", ":"), ensure_ascii=False)
-    with open(OUT, "w") as fh:
-        fh.write(blob + "\n")
+    blob = write(catalog)
     colours = sum(len(r["c"]) for r in rows)
     print(f"{len(rows)} filaments, {colours} colours, "
           f"{round(len(blob.encode()) / 1e6, 2)} MB -> assets/filament-catalog.json",

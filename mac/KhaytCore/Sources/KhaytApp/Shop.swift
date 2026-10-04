@@ -1218,9 +1218,48 @@ final class Shop {
     /// marker written into the book.
     /// Should this record's slicer figures be (re)read? When it has none; or,
     /// for a 3MF, when they were read before plates were read one by one.
+    ///
+    /// `platesRead` is a VERSION, not a flag. `true` (Sep 2026) was plates
+    /// summed; 2 (Oct 2026) adds each plate's name and filaments and each
+    /// spool's grams over the whole project — which the library's colour list
+    /// was missing: it kept plate 1's grams per colour (a tester: "it only
+    /// shows the filament data and time for one"). A record read at 1 is read
+    /// once more so the data already on disk gets them too.
+    nonisolated static let platesReadVersion = 2.0
+
     nonisolated static func slicerFiguresDue(_ parsed: JSONValue?, ext: String) -> Bool {
         guard case .object(let o)? = parsed, !o.isEmpty else { return true }
-        return ext == "3mf" && o["platesRead"] == nil
+        guard ext == "3mf" else { return false }
+        if case .number(let v)? = o["platesRead"] { return v < platesReadVersion }
+        return true
+    }
+
+    /// The record's colour list with each colour's grams taken from the
+    /// slicer's per-spool totals (`parsed.filaments`, summed over every plate),
+    /// matched by colour. Nil when there is nothing to change. A colour the
+    /// slicer did not list keeps what it had.
+    nonisolated static func coloursWithProjectGrams(_ colours: JSONValue?, filaments: JSONValue?) -> JSONValue? {
+        guard case .array(let list)? = colours, !list.isEmpty,
+              case .array(let spools)? = filaments, !spools.isEmpty else { return nil }
+        func key(_ v: JSONValue?) -> String? {
+            guard case .string(let h)? = v else { return nil }
+            let t = h.trimmingCharacters(in: .whitespaces).uppercased()
+            let bare = t.hasPrefix("#") ? String(t.dropFirst()) : t
+            return bare.count >= 6 ? String(bare.prefix(6)) : nil
+        }
+        var grams: [String: Double] = [:]
+        for case .object(let f) in spools {
+            guard let k = key(f["color"]), case .number(let g)? = f["grams"] else { continue }
+            grams[k, default: 0] += g
+        }
+        var changed = false
+        let out: [JSONValue] = list.map { v in
+            guard case .object(var c) = v, let k = key(c["hex"]), let g = grams[k] else { return v }
+            let rounded = (g * 100).rounded() / 100
+            if c["grams"] != .number(rounded) { c["grams"] = .number(rounded); changed = true }
+            return .object(c)
+        }
+        return changed ? .array(out) : nil
     }
 
     /// The books whose linked folders this launch has already rescanned.
@@ -1272,7 +1311,7 @@ final class Shop {
                 // Nothing read (an unsliced 3MF, or a file this reader cannot
                 // open): only the mark, so it is not opened again every launch
                 // — merged below, so figures already there are KEPT.
-                else if item.ext == "3mf" { found[item.id] = ["platesRead": .bool(true)] }
+                else if item.ext == "3mf" { found[item.id] = ["platesRead": .number(Self.platesReadVersion)] }
             }
             guard let self, !found.isEmpty else { return }
             do {
@@ -1291,8 +1330,14 @@ final class Shop {
                         let readSomething = (Self.plainNumber(parsed["printTimeMins"]) ?? 0) > 0
                             || (Self.plainNumber(parsed["filamentGrams"]) ?? 0) > 0
                         if readSomething { for (k, v) in parsed { merged[k] = v } }
-                        else { merged["platesRead"] = .bool(true) }
+                        else { merged["platesRead"] = .number(Self.platesReadVersion) }
                         r["parsed"] = .object(merged)
+                        // The colour list was written at import with plate 1's
+                        // grams per colour; the per-spool totals fix it here,
+                        // on the data already on disk.
+                        if let fixed = Self.coloursWithProjectGrams(r["colors"], filaments: parsed["filaments"]) {
+                            r["colors"] = fixed
+                        }
                         StoreWriter.stamp(&r)
                         rows[i] = .object(r)
                     }
@@ -3107,7 +3152,8 @@ final class Shop {
             let orders = Self.rows(root, "printLog")
             let out = try await engine.newOrder(
                 input, orders: orders, settings: Self.settings(root), now: Date(),
-                tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)))
+                tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)),
+                consumables: Self.rows(root, "consumables"))
             guard case .object(var record) = out.order else { return }
 
             // ALREADY DONE. Nothing about this waits on a machine, so it never
@@ -3256,6 +3302,17 @@ final class Shop {
         let minutes: Double
         let grams: Double
         let material: String
+        /// The shop's name for it in the slicer, when it typed one.
+        var name: String? = nil
+        /// What it uses of each spool, as the slicer recorded it.
+        var filaments: [PlateFilament] = []
+    }
+
+    struct PlateFilament: Equatable, Sendable {
+        let slot: String
+        let material: String
+        let hex: String?
+        let grams: Double
     }
 
     /// The plates a model's file carries — two or more, or none.
@@ -3264,9 +3321,20 @@ final class Shop {
               case .array(let rows)? = parsed["plates"] else { return [] }
         let out = rows.compactMap { v -> Plate? in
             guard case .object(let o) = v, let i = Self.plainNumber(o["index"]) else { return nil }
+            var filaments: [PlateFilament] = []
+            if case .array(let fs)? = o["filaments"] {
+                for case .object(let f) in fs {
+                    filaments.append(PlateFilament(slot: Self.plainString(f["id"]) ?? "",
+                                                   material: Self.plainString(f["type"]) ?? "",
+                                                   hex: Self.plainString(f["color"]),
+                                                   grams: Self.plainNumber(f["grams"]) ?? 0))
+                }
+            }
+            let name = Self.plainString(o["name"]).flatMap { $0.isEmpty ? nil : $0 }
             return Plate(index: Int(i), minutes: Self.plainNumber(o["printTimeMins"]) ?? 0,
                          grams: Self.plainNumber(o["filamentGrams"]) ?? 0,
-                         material: Self.plainString(o["filamentType"]) ?? "")
+                         material: Self.plainString(o["filamentType"]) ?? "",
+                         name: name, filaments: filaments)
         }
         guard out.count > 1 else { return [] }
         // Only while they add up to the file's own totals: a file re-read by
@@ -4582,6 +4650,16 @@ final class Shop {
         return rows
     }
 
+    /// What a product's components add to a job taken from it — the figure
+    /// `lib/order-new.js` folds into the saved price, so the sheet's preview
+    /// shows the price the job is saved at. Zero for a product with none.
+    func jobComponentsCost(of product: Product) async -> Double {
+        guard let engine, let components = product.rest["components"] else { return 0 }
+        let qty = Self.plainNumber(product.rest["assemblyQty"]).map { max(1, $0) } ?? 1
+        return (try? await engine.jobComponentsCost(components, assemblyQty: qty,
+                                                    consumables: consumableRows)) ?? 0
+    }
+
     func newJobInput(parts: [NewJobSheet.Draft], project: String, clientId: String?,
                      margin: Double, discountPct: Double, shippingCost: Double,
                      deposit: Double, rush: Bool, asQuote: Bool,
@@ -5069,9 +5147,12 @@ final class Shop {
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
                 let orders = Self.rows(root, "printLog")
+                // The shelf the product's components are costed from — the
+                // catalogue prices them, so the job has to.
                 let out = try await engine.newOrder(
                     input, orders: orders, settings: Self.settings(root), now: Date(),
-                    tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)))
+                    tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)),
+                    consumables: Self.rows(root, "consumables"))
 
                 guard case .object(let record) = out.order,
                       case .string(let id)? = record["id"] else {

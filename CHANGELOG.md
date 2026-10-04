@@ -59,6 +59,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     or 4 toolheads. Converting for a Prusa MMU3 or INDX printer now also
     writes the exact PrusaSlicer printer preset name and nozzle variant, so
     PrusaSlicer matches the project to the right installed printer.
+- **A multi-plate 3MF counts every plate, and Bambu PLA Matte colours are
+  right.** Reported by a tester.
+  - A Bambu Studio or Orca file sliced as several plates was read as plate 1
+    only. The weight and time came from the first plate's G-code, and each
+    colour kept plate 1's grams. Both now cover the whole project, and each
+    plate's name, time and grams per spool are kept (shared reader, so the
+    desktop app's import and calculator get the same totals).
+  - (Mac) A model's page shows what the slicer said: the project's time and
+    weight, then each plate with its spools. Models already in the library
+    are read again once, and their colour grams are corrected.
+  - (Mac) The calculator can fill weight and time from a library model. A
+    multi-plate model starts on the whole project; you can pick one plate.
+  - The filament catalogue's Bambu PLA Matte line now uses Bambu's official
+    names and colours (Nardo Gray, Lilac Purple, Dark Chocolate, Plum,
+    Terracotta), and a bad empty-spool weight on Grass Green is removed. The
+    fixes sit in an overrides file that the monthly catalogue refresh applies.
+- **A job taken from a product now sells at the catalogue price when the
+  product has components.** The catalogue counts a product's bought-in
+  components (magnets, screws, a box) in its cost before the margin; a job
+  made from that product left them out and was under-priced by their cost
+  plus margin. The job's price now includes them the same way (times the
+  number of assemblies), a typed price still wins, and the components' cost
+  is saved on the job as `componentsCost`. On the Mac, the New Job sheet's
+  total includes them too.
+
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its
