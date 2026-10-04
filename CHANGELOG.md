@@ -4,6 +4,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A part's magnets and inserts are no longer counted twice in the P&L.** A
+  part's own consumables are priced into its material cost, and that material
+  is what the P&L counts as cost of goods — but buying consumables is already
+  booked as an expense. So each magnet was paid for twice. Cost of goods now
+  leaves a part's consumables out (the P&L, the dashboard's cost and margin,
+  and the machine P&L), as it already did for a product's components. They
+  still count in each job's own cost: the job margin, profit per product and
+  per hour, and the quote. A job with no consumables is unchanged.
+- **A quote from a product with components shows its full price.** Taking a
+  job from a catalogue product that has components (magnets, hardware), the
+  calculator's total left them out, while the job was saved with them. A
+  product that showed 144.49 was saved at 153.49. The total now includes the
+  components, marked up like the rest, and says how much they add.
 - **alpha.59 review fixes (Mac + shared lib).**
   - Security: a 3MF with a crafted plate index (1e20, "inf", "nan") no longer
     crashes the Mac every time the model is viewed — the index is checked and
