@@ -509,11 +509,17 @@ final class Words {
         "mac.plate_part": ["en": "{name} — plate {n}", "ar": "{name} — اللوح {n}"],
         "mac.plates": ["en": "Plates", "ar": "الألواح"],
         "mac.sliced_title": ["en": "As sliced", "ar": "حسب التقطيع"],
-        "mac.sliced_project": ["en": "As sliced — {n} plates", "ar": "حسب التقطيع — {n} ألواح"],
+        // `{plates}` is `words.counting(n, "mac.n_plates")`: Arabic says two
+        // plates, three to ten plates and eleven plates three different ways.
+        "mac.sliced_project": ["en": "As sliced — {plates}", "ar": "حسب التقطيع — {plates}"],
+        "mac.n_plates":       ["en": "{n} plates", "ar": "{n} لوحًا"],
+        "mac.n_plates_one":   ["en": "{n} plate", "ar": "لوح واحد"],
+        "mac.n_plates_two":   ["en": "{n} plates", "ar": "لوحان"],
+        "mac.n_plates_few":   ["en": "{n} plates", "ar": "{n} ألواح"],
         "mac.plate_n": ["en": "Plate {n}", "ar": "اللوح {n}"],
         "mac.plate_named": ["en": "Plate {n} — {name}", "ar": "اللوح {n} — {name}"],
         "mac.calc_from_model": ["en": "From a model…", "ar": "من نموذج…"],
-        "mac.calc_whole_project": ["en": "Whole project ({n} plates)", "ar": "المشروع كاملًا ({n} ألواح)"],
+        "mac.calc_whole_project": ["en": "Whole project ({plates})", "ar": "المشروع كاملًا ({plates})"],
         "mac.calc_model_none": ["en": "This model has no weight or time to fill in.", "ar": "لا يحمل هذا النموذج وزنًا أو زمنًا لتعبئته."],
         "mac.plates_all": ["en": "All", "ar": "الكل"],
         "mac.plate_chip": ["en": "{n} · {time} · {grams} g", "ar": "{n} · {time} · {grams} غ"],
@@ -2233,6 +2239,10 @@ final class Words {
         // as against `known` above, which is this shop's own materials.
         "mac.filament_catalog": ["en": "Search the filament catalogue",
                                  "ar": "البحث في دليل الخيوط"],
+        "mac.filament_catalog_hint": ["en": "Type a brand or material above — e.g. “bambu pla matte” — to search the catalogue.",
+                                      "ar": "اكتب علامة أو مادة في الحقل أعلاه — مثل «bambu pla matte» — للبحث في الدليل."],
+        "mac.filament_catalog_none": ["en": "Nothing in the catalogue matches that.",
+                                      "ar": "لا شيء في الدليل يطابق ذلك."],
         "mac.new_spool":     ["en": "New Spool",    "ar": "بكرة جديدة"],
         // The storefront promise, which reported only to stderr.
         "mac.lead_time_last": ["en": "Lead time last", "ar": "آخر مدة تسليم"],
@@ -2647,6 +2657,14 @@ final class Words {
             "ar": "لم يُختر خيط، لذا لا تشمل هذه التسعيرة تكلفة المادة."],
         "mac.calc_add_filament": ["en": "Add filament / colour", "ar": "أضف خيطًا / لونًا"],
         "mac.calc_colour_n":    ["en": "Colour {n}", "ar": "اللون {n}"],
+        "mac.calc_total_grams": ["en": "{g} g in all", "ar": "{g} غ إجمالًا"],
+        "mac.job_components": ["en": "Components", "ar": "المكوّنات"],
+        "mac.job_components_hint": [
+            "en": "The product's bought-in pieces — magnets, screws, a box — for this many assemblies, priced at cost plus margin with the parts and drawn from the shelf when the job completes.",
+            "ar": "القطع المشتراة للمنتج — مغناطيس، براغٍ، علبة — لهذا العدد من التجميعات، تُسعَّر بالتكلفة مع الهامش مع الأجزاء وتُخصم من الرف عند اكتمال المهمة."],
+        "mac.calc_split_note": [
+            "en": "The {g} g already typed was split between the two colours, not added to. Set each colour's own grams.",
+            "ar": "قُسِّمت الـ{g} غ المكتوبة بين اللونين ولم تُضَف إليها. اكتب غرامات كل لون."],
         "mac.calc_purge":       ["en": "Purge / waste", "ar": "هدر التنظيف"],
         "mac.calc_multicolour_note": [
             "en": "{n} filaments, {g} g in all. Each is charged at its own spool's price; purge is shared across them by weight.",
@@ -2664,6 +2682,9 @@ final class Words {
             "en": "Per printed piece, at each item's cost on the shelf. Included in the cost above.",
             "ar": "لكل قطعة مطبوعة، بتكلفة كل صنف على الرف. مشمولة في التكلفة أعلاه."],
         "mac.model_consumables": ["en": "Consumables per print", "ar": "المستهلكات لكل طباعة"],
+        "mac.model_consumables_empty_shelf": [
+            "en": "Nothing on the Consumables shelf yet. Add magnets, inserts or screws there, then list here what each print of this model uses.",
+            "ar": "لا شيء في رف المستهلكات بعد. أضف المغناطيس أو الحشوات أو البراغي هناك، ثم اذكر هنا ما تستهلكه كل طباعة لهذا النموذج."],
         "mac.model_consumables_hint": [
             "en": "Bought-in pieces each print uses — magnets, inserts, screws. Priced in the calculator and on a product made from this model, and taken off the shelf when its job completes.",
             "ar": "القطع المشتراة التي تستهلكها كل طباعة — مغناطيس، حشوات، براغي. تُحتسب في الحاسبة وفي المنتج المصنوع من هذا النموذج، وتُخصم من الرف عند اكتمال المهمة."],

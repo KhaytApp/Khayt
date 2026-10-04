@@ -262,7 +262,7 @@ struct LibraryInspector: View {
     /// filament data and time for one". This screen showed no slicer figures at
     /// all — only a per-colour list that carried plate 1's grams — so a
     /// two-plate project read as one plate's worth of plastic.
-    private func slicedSection(_ file: LibraryFile) -> AnyView? {
+    func slicedSection(_ file: LibraryFile) -> AnyView? {
         let mins = file.parsed?.printTimeMins ?? 0, grams = file.parsed?.filamentGrams ?? 0
         guard mins > 0 || grams > 0 else { return nil }
         let plates = shop.plates(of: file)
@@ -272,7 +272,7 @@ struct LibraryInspector: View {
         }
         func g(_ n: Double) -> String { Money.grams(n) + " " + w.callIt("common.grams") }
         return AnyView(DetailSection(w.callIt(plates.isEmpty ? "mac.sliced_title" : "mac.sliced_project",
-                                              ["n": .number(Double(plates.count))])) {
+                                              ["plates": .string(w.counting(plates.count, "mac.n_plates"))])) {
             if mins > 0 { DetailLine(w.callIt("mac.est_time"), hours(mins), strong: true) }
             if grams > 0 { DetailLine(w.callIt("mac.est_filament"), g(grams), strong: true) }
             ForEach(plates, id: \.index) { plate in
@@ -288,8 +288,8 @@ struct LibraryInspector: View {
                     ForEach(Array(plate.filaments.enumerated()), id: \.offset) { _, f in
                         HStack(spacing: 6) {
                             Swatch(rgb: Swatch.rgb(fromHex: f.hex), size: 10)
-                            Text(f.material.isEmpty ? w.callIt("mac.filament_n", ["n": .string(f.slot)]) : f.material)
-                                .font(.caption).foregroundStyle(.secondary)
+                            Text(Self.slotLabel(f, words: w))
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             Spacer(minLength: 8)
                             Text(g(f.grams)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
                         }
@@ -299,6 +299,25 @@ struct LibraryInspector: View {
                 .padding(.top, 4)
             }
         })
+    }
+
+    /// "Filament 2 · PLA": which spool slot it is AND what is in it. The
+    /// material alone read "PLA, PLA" for a two-colour plate, and the slot
+    /// alone said nothing about what to load. The number goes through the
+    /// shop's numerals (`.number`), not the file's text.
+    static func slotLabel(_ f: Shop.PlateFilament, words: Words) -> String {
+        let slot: String = {
+            if let n = Double(f.slot), n.isFinite, n >= 0, n < 1_000_000, n == n.rounded() {
+                return words.callIt("mac.filament_n", ["n": .number(n)])
+            }
+            return f.slot.isEmpty ? "" : words.callIt("mac.filament_n", ["n": .string(f.slot)])
+        }()
+        switch (slot.isEmpty, f.material.isEmpty) {
+        case (false, false): return slot + " · " + f.material
+        case (false, true): return slot
+        case (true, false): return f.material
+        case (true, true): return words.callIt("mac.filament")
+        }
     }
 
     private func filament(_ file: LibraryFile) -> some View {

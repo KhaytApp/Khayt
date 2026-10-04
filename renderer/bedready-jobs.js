@@ -121,7 +121,8 @@
     // An empty cart means the maker filled the part fields and pressed the button without
     // pressing "Add part" — do what they meant, exactly as order-flows.js does.
     if (typeof currentBuild === 'undefined' || !Array.isArray(currentBuild)) return;
-    if (currentBuild.length === 0) {
+    const pending = (typeof formHasPendingPart === 'function') && formHasPendingPart();
+    if (currentBuild.length === 0 || pending) {
       const before = currentBuild.length;
       if (typeof addPart === 'function') { try { addPart(); } catch (_) {} }
       if (currentBuild.length === before) return; // addPart already explained why

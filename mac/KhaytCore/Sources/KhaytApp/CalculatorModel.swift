@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 import KhaytCore
 
 /// Everything the calculator screen is holding, and the one call that turns it
@@ -115,7 +116,11 @@ final class CalculatorModel {
     func seedRates() {
         var out: [String: String] = [:]
         for (key, value) in resolved {
-            out[key] = value == value.rounded() ? String(Int(value)) : String(value)
+            // `Int(_:)` traps on NaN, infinity and anything past Int.max — and
+            // a preset is a row in the book another app or a hand edit wrote.
+            guard value.isFinite else { continue }
+            out[key] = value == value.rounded() && abs(value) < 1e15
+                ? String(Int(saturating: value)) : String(value)
         }
         rates = out
     }
@@ -132,22 +137,107 @@ final class CalculatorModel {
 
     // MARK: - Lines
 
+    /// Add a colour.
+    ///
+    /// ── A TOTAL TYPED FIRST IS NOT CHARGED TWICE ─────────────────────────
+    ///
+    /// With one line the field is the print's WEIGHT, and a shop types the
+    /// slicer's total into it. Adding a second colour used to leave that
+    /// total on colour 1 and open colour 2 empty — so the colour-2 grams the
+    /// shop then typed were charged ON TOP of a total that already held them.
+    /// The first colour added SPLITS what was typed between the two lines, so
+    /// the total does not move until the shop says how it divides; the note
+    /// under the lines says so (`splitFrom`).
     func addFilament(spools: [Spool]) {
         // The next spool not already on a line, so a second colour does not
         // open on the first colour's spool.
         let used = Set(lines.compactMap(\.spoolId))
-        lines.append(FilamentLine(spoolId: spools.first { !used.contains($0.id) }?.id ?? spools.first?.id))
+        var line = FilamentLine(spoolId: spools.first { !used.contains($0.id) }?.id ?? spools.first?.id)
+        if lines.count == 1, let typed = lines.first.map({ Self.number($0.grams) }), typed > 0 {
+            let half = (typed / 2 * 100).rounded() / 100
+            lines[0].grams = Self.figure(typed - half)
+            line.grams = Self.figure(half)
+            splitFrom = typed
+        }
+        lines.append(line)
     }
+
+    /// The total a colour added was split from, so the screen can say the
+    /// grams were divided rather than added. Cleared once a line is typed in.
+    var splitFrom: Double?
 
     func removeFilament(_ id: FilamentLine.ID) {
         guard lines.count > 1 else { return }
         lines.removeAll { $0.id == id }
+        if lines.count == 1 { splitFrom = nil }
     }
 
     func addConsumable(_ consumables: [Consumable]) {
         let used = Set(consumableLines.compactMap(\.consumableId))
         consumableLines.append(ConsumableLine(
             consumableId: consumables.first { !used.contains($0.id) }?.id ?? consumables.first?.id))
+    }
+
+    func removeConsumable(_ id: ConsumableLine.ID) {
+        consumableLines.removeAll { $0.id == id }
+    }
+
+    static func figure(_ grams: Double) -> String {
+        Words.plain(.number((grams * 100).rounded() / 100))
+    }
+
+    // MARK: - Bindings by id
+
+    /// ── BY ID, NEVER BY POSITION ─────────────────────────────────────────
+    ///
+    /// The lines were bound as `$model.lines[index]` from an enumerated
+    /// `ForEach`. Removing a line, or `fill` replacing three colours with
+    /// one, left SwiftUI holding a binding to an index that no longer
+    /// existed, and the next read trapped: index out of range. A binding
+    /// here finds its line by id each time; a line that has gone reads as
+    /// empty and a write to it is dropped.
+    func gramsBinding(_ id: FilamentLine.ID) -> Binding<String> {
+        Binding(get: { [weak self] in self?.lines.first { $0.id == id }?.grams ?? "" },
+                set: { [weak self] value in
+                    guard let self, let i = self.lines.firstIndex(where: { $0.id == id }) else { return }
+                    self.lines[i].grams = value
+                    self.splitFrom = nil
+                })
+    }
+
+    func spoolBinding(_ id: FilamentLine.ID) -> Binding<String?> {
+        Binding(get: { [weak self] in self?.lines.first { $0.id == id }?.spoolId },
+                set: { [weak self] value in
+                    guard let self, let i = self.lines.firstIndex(where: { $0.id == id }) else { return }
+                    self.lines[i].spoolId = value
+                })
+    }
+
+    func consumableBinding(_ id: ConsumableLine.ID) -> Binding<String?> {
+        Binding(get: { [weak self] in self?.consumableLines.first { $0.id == id }?.consumableId },
+                set: { [weak self] value in
+                    guard let self, let i = self.consumableLines.firstIndex(where: { $0.id == id }) else { return }
+                    self.consumableLines[i].consumableId = value
+                })
+    }
+
+    func consumableQtyBinding(_ id: ConsumableLine.ID) -> Binding<Double> {
+        Binding(get: { [weak self] in self?.consumableLines.first { $0.id == id }?.qty ?? 1 },
+                set: { [weak self] value in
+                    guard let self, let i = self.consumableLines.firstIndex(where: { $0.id == id }) else { return }
+                    self.consumableLines[i].qty = Self.consumableQty(value)
+                })
+    }
+
+    /// The first line — the screen's Weight, or Colour 1 — by id too.
+    var firstLineID: FilamentLine.ID? { lines.first?.id }
+
+    /// A consumable count as a finite 1…9999 — the stepper's range, and what
+    /// `lib/calculator-cost.js` will price. Not finite is 1, never `inf`,
+    /// which JSONEncoder refuses and would make the book unwritable.
+    static func consumableQty(_ q: Double) -> Double {
+        guard q.isFinite else { return 1 }
+        return Swift.min(9999, Swift.max(1, q.rounded()))
     }
 
     // MARK: - The part
@@ -217,10 +307,14 @@ final class CalculatorModel {
     /// what it cost, never at nothing; `name` so the other app can show it.
     static func consumableRows(_ uses: [(id: String, qty: Double)], shelf: [Consumable]) -> [JSONValue] {
         uses.compactMap { use in
-            guard !use.id.isEmpty, use.qty > 0 else { return nil }
-            var row: [String: JSONValue] = ["consumableId": .string(use.id), "qty": .number(use.qty)]
+            // Finite and at most 9,999: `.number(inf)` makes JSONEncoder
+            // throw, and the whole book write with it.
+            guard !use.id.isEmpty, use.qty.isFinite, use.qty > 0 else { return nil }
+            var row: [String: JSONValue] = ["consumableId": .string(use.id),
+                                            "qty": .number(Swift.min(9999, use.qty))]
             if let item = shelf.first(where: { $0.id == use.id }) {
-                row["unitCost"] = .number(max(0, item.cost ?? 0))
+                let cost = item.cost ?? 0
+                row["unitCost"] = .number(cost.isFinite ? max(0, cost) : 0)
                 if let name = item.name, !name.isEmpty { row["name"] = .string(name) }
             }
             return .object(row)
@@ -231,7 +325,9 @@ final class CalculatorModel {
     func consumablesCost(_ shelf: [Consumable]) -> Double {
         consumableLines.reduce(0) { sum, line in
             guard let id = line.consumableId, let item = shelf.first(where: { $0.id == id }) else { return sum }
-            return sum + max(0, item.cost ?? 0) * max(0, line.qty)
+            let cost = item.cost ?? 0
+            guard cost.isFinite, line.qty.isFinite else { return sum }
+            return sum + max(0, cost) * min(9999, max(0, line.qty))
         }
     }
 
@@ -297,6 +393,7 @@ final class CalculatorModel {
             next = [FilamentLine(spoolId: lines.first?.spoolId, grams: grams > 0 ? fmt(grams) : "")]
         }
         lines = next
+        splitFrom = nil
         self.hours = hours > 0 ? fmt(hours) : ""
         purge = ""
         consumableLines = shop.consumablesUsed(by: file.id).map {
