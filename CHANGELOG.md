@@ -4,6 +4,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Bambu and Orca files convert to a real PrusaSlicer project for the Prusa
+  MK4 / MK4S + MMU3 and the CORE One INDX 8T / 4T.** Before, picking one of
+  these printers saved a Generic 3MF and told you to set the printer up in
+  PrusaSlicer yourself. Now the file opens in PrusaSlicer as a project for
+  that printer, with every colour on the tool the converter shows, including
+  parts that were coloured by object rather than painted. A file with more
+  colours than the printer has tools merges the least-used ones into the
+  closest tool. On the INDX you can tick ColorMix to print those colours as
+  a blend of two or three loaded tools instead. The converter shows which
+  colour goes on which tool, and any blends, before you save. A file it
+  cannot convert cleanly (for example, colours and materials that don't
+  match up) is refused with the reason instead of being saved half-right.
 - **Converter fixes from bedready.io.**
   - PrusaSlicer files are read and rewritten for real. PrusaSlicer writes its
     settings as `; key = value`, and the converter only understood the bare
