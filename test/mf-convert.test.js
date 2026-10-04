@@ -147,8 +147,10 @@ test('convert output passes the self-check (report.verified)', () => {
 });
 
 test('cross-family retarget (Bambu → Prusa) warns and does NOT rewrite the printer model', () => {
+  // The XL has no verified PrusaSlicer preset name here, so it is not a Prusa-project target
+  // (test/prusa-project.test.js covers the ones that are) and keeps the cross-family warning.
   const src = makeBambu3mf();
-  const r = convert(src, { targetId: 'prusa-mk4-mmu3' }); // prusa family ≠ bambu
+  const r = convert(src, { targetId: 'prusa-xl-5t' }); // prusa family ≠ bambu
   assert.equal(r.ok, true);
   assert.equal(r.report.crossFamily, true);
   assert.ok(r.report.warnings.some((w) => /different slicer format|Generic/i.test(w)));

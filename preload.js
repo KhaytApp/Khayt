@@ -160,6 +160,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   mfPlates:      (p)        => ipcRenderer.invoke('hub:mf-plates', { path: p }),
   mfPlateExtract:(p, plate) => ipcRenderer.invoke('hub:mf-plate-extract', { path: p, plate }),
   mfPlateSave:   (p, plate) => ipcRenderer.invoke('hub:mf-plate-extract', { path: p, plate, save: true }),
+  prusaPlan:  (opts)  => ipcRenderer.invoke('hub:prusa-plan', opts),
   mfBands:    (p, opts) => ipcRenderer.invoke('hub:mf-bands', { path: p, heads: opts && opts.heads, pauseGcode: opts && opts.pauseGcode }),
   orcaFilaments: ()   => ipcRenderer.invoke('hub:orca-filaments'),
   orcaPrinters:  ()   => ipcRenderer.invoke('hub:orca-printers'),
