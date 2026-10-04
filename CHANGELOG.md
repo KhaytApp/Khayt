@@ -102,6 +102,30 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     or 4 toolheads. Converting for a Prusa MMU3 or INDX printer now also
     writes the exact PrusaSlicer printer preset name and nozzle variant, so
     PrusaSlicer matches the project to the right installed printer.
+- **(Mac) Calculator: several filaments, purge and consumables.**
+  - Add filament / colour puts a second, third… spool on one print, each with
+    its own grams and its own spool's price. A purge / waste figure (flush and
+    prime tower) is charged too, shared across the colours by weight, and a
+    job carrying it draws each colour's share off its own spool.
+  - From a model fills the calculator from a library model: one line per
+    colour the slicer weighed, the print time, and the model's consumables.
+    The spool for each colour is the one the colour planner chose, else the
+    closest colour on the shelf.
+  - Consumables (magnets, inserts, screws) can be added to the calculator
+    from the Consumables shelf, per printed piece, and to a library model as
+    Consumables per print. A product made from the model carries them, a job
+    taken from that product is costed with them, and completing the job takes
+    them off the shelf (and putting the job back returns them).
+  - The calculator's figures now live in one model with a test that moves
+    labour, print time, grams, spool and margin and checks the total moves
+    each time. The spool menus name the colour as well as the material.
+  - The sample book's consumables carry their cost under the field Khayt
+    reads (`cost`), so they were priced at nothing before.
+- **(shared lib) A part's own consumables.** `part.consumables`
+  (`[{consumableId, qty, unitCost}]`, per printed piece) is costed by
+  `calculator-cost` (shelf price, else the written `unitCost`), drawn and
+  returned by `order-deduction`, and counted by `consumable-reorder`. Parts
+  without it are unchanged.
 - **A multi-plate 3MF counts every plate, and Bambu PLA Matte colours are
   right.** Reported by a tester.
   - A Bambu Studio or Orca file sliced as several plates was read as plate 1

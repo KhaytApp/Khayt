@@ -69,6 +69,8 @@ struct LibraryInspector: View {
                         SetupsSection(setups: setups, shop: shop)
                     }
                     LayerRule()
+                    ModelConsumablesSection(shop: shop, file: file)
+                    LayerRule()
                     PhotoSection(shop: shop, file: file)
                     provenance(file)
                     guides(file)

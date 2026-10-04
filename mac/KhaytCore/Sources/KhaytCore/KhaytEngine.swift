@@ -9928,17 +9928,21 @@ public actor KhaytEngine {
             as: FailureSuggestion.self)
     }
 
+    /// `consumables` is the shelf of bought-in pieces, so a part's own
+    /// consumable lines (magnets, inserts) are priced at today's cost. Left
+    /// empty, each line is priced at the `unitCost` it was written with.
     public func costPart(_ part: JSONValue, inventory: [JSONValue],
                          settings: [String: JSONValue],
-                         machine: JSONValue? = nil, preset: JSONValue? = nil) throws -> CostedPart {
+                         machine: JSONValue? = nil, preset: JSONValue? = nil,
+                         consumables: [JSONValue] = []) throws -> CostedPart {
         try runtime.call2("""
-            (function (part, inventory, settings, machine, preset) {
+            (function (part, inventory, settings, machine, preset, consumables) {
               var rates = KhaytPrintRates.ratesFor({ machine: machine, preset: preset, settings: settings });
               // The part's own values beat the rates, and this merged object is
               // what BOTH the figure and the record are made from — so what gets
               // written down is what was charged, not a second guess at it.
               var costed = Object.assign({}, rates, part);
-              var ctx = { inventory: inventory, settings: settings };
+              var ctx = { inventory: inventory, settings: settings, consumables: consumables };
               return {
                 cost: KhaytCalculatorCost.computePartBaseCost(costed, ctx),
                 parts: KhaytCalculatorCost.computePartBreakdown(costed, ctx),
@@ -9949,10 +9953,10 @@ public actor KhaytEngine {
                   failureRate: +costed.failureRate || 0
                 }
               };
-            })(ARG0, ARG1, ARG2, ARG3, ARG4)
+            })(ARG0, ARG1, ARG2, ARG3, ARG4, ARG5)
             """,
                           [part, .array(inventory), .object(settings),
-                           machine ?? .null, preset ?? .null], as: CostedPart.self)
+                           machine ?? .null, preset ?? .null, .array(consumables)], as: CostedPart.self)
     }
 
     public struct CostedPart: Decodable, Sendable, Hashable {
