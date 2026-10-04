@@ -40,6 +40,34 @@ struct StockShareOnMacTests {
         #expect(abs((q3.cogs ?? 0) - 40 * 10.0 / 21.0) < 0.05)
     }
 
+    @Test("a part's own consumables are not cost of goods — bought as an expense, as the node rule says")
+    func partConsumablesAreNotStock() async throws {
+        let engine = try KhaytEngine()
+        // 100 g of a 100-a-kilo spool = 10.00, plus 4 magnets at 2.00 = 8.00:
+        // the job cost 18, the P&L's cost of goods is the 10 of filament.
+        func job(_ magnets: Bool) -> JSONValue {
+            var part: [String: JSONValue] = [
+                "qty": .number(1), "printWeight": .number(100), "spoolCost": .number(100),
+                "spoolWeight": .number(1000), "baseCost": .number(magnets ? 18 : 10),
+            ]
+            if magnets {
+                part["consumables"] = .array([.object(["consumableId": .string("mag"),
+                                                       "qty": .number(4), "unitCost": .number(2)])])
+            }
+            return .object([
+                "id": .string("J1"), "status": .string("completed"), "date": .string("2026-09-10"),
+                "price": .number(50), "costBasis": .number(magnets ? 18 : 10), "parts": .array([.object(part)]),
+            ])
+        }
+        for magnets in [true, false] {
+            let rows = try await engine.pnlByPeriod(orders: [job(magnets)], expenses: [], settings: [:], clients: [],
+                                                    currencies: [:], now: Date(timeIntervalSince1970: 1_790_000_000),
+                                                    inventory: [])
+            let q3 = try #require(rows.first { $0.period == "2026-Q3" })
+            #expect(abs((q3.cogs ?? 0) - 10) < 0.005, "magnets: \(magnets)")
+        }
+    }
+
     @Test("the machine P&L splits what was stocked with the shelf, as Reports' P&L does")
     func machinePLHasTheShelf() async throws {
         let engine = try KhaytEngine()
