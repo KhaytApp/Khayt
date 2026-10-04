@@ -68,6 +68,7 @@ refresh cannot quietly undo a correction.
 can ship without dragging a month of unrelated upstream change in with it. It is
 idempotent: applying it to its own output changes nothing.
 """
+import hashlib
 import io
 import json
 import os
@@ -133,13 +134,66 @@ MIT_NOTICE = (
 )
 
 OFD_URL = "https://api.openfilamentdatabase.org/json/all.json"
-SPOOLMAN_URL = "https://codeload.github.com/Donkie/SpoolmanDB/tar.gz/refs/heads/main"
-BAMBU_URL = ("https://raw.githubusercontent.com/bambulab/BambuStudio/master/"
-             "resources/profiles/BBL/filament/filaments_color_codes.json")
+
+# ── PINNED, NOT A MOVING BRANCH ─────────────────────────────────────────────
+#
+# Both GitHub sources are fetched at a COMMIT, never at `main`/`master`: a push
+# to either repository (or to an account that took one over) would otherwise
+# flow straight into a file two app bundles ship, on the next monthly run. The
+# commit and the SHA-256 of what was fetched are written into the catalogue's
+# `sources`, so any snapshot can be traced to the exact bytes it came from.
+#
+# The monthly refresh moves the pins on purpose: `--latest` resolves each
+# repository's current head ONCE, fetches that commit, and records it — so the
+# PR it opens names the commits a reviewer is being asked to take. A plain run
+# rebuilds from the pins below, byte for byte where the OFD has not moved.
+#
+# The OFD is an API snapshot with no commits to pin; its SHA-256 is recorded.
+SPOOLMAN_REPO = "Donkie/SpoolmanDB"
+SPOOLMAN_BRANCH = "main"
+SPOOLMAN_SHA = "8f1a99f9cda7a58ca3118d6bd28c707647caa3db"   # 2026-09-12
+BAMBU_REPO = "bambulab/BambuStudio"
+BAMBU_BRANCH = "master"
+BAMBU_SHA = "da8b44ee34dd349f2ae0df3f1cbae366df482354"      # 2026-09-28
+BAMBU_PATH = "resources/profiles/BBL/filament/filaments_color_codes.json"
+
+
+def spoolman_url(sha):
+    return f"https://codeload.github.com/{SPOOLMAN_REPO}/tar.gz/{sha}"
+
+
+def bambu_url(sha):
+    return f"https://raw.githubusercontent.com/{BAMBU_REPO}/{sha}/{BAMBU_PATH}"
+
+
+# The most any one download may be. The OFD's all.json is ~14 MB and the
+# others are a fraction of that; past these a response is not the file it
+# claims to be, and is refused rather than read into memory.
+MAX_BYTES = {"ofd-all.json": 64 << 20}
+DEFAULT_MAX_BYTES = 16 << 20
+# One SpoolmanDB manufacturer file, inflated. The largest is well under 1 MB.
+MAX_TAR_MEMBER = 8 << 20
 
 # A directory to keep the raw downloads in, so a build can be re-run offline
 # and two runs can be compared on the same inputs. Unset: always download.
 CACHE = os.environ.get("KHAYT_CATALOG_CACHE")
+
+
+def sha256(blob):
+    return hashlib.sha256(blob).hexdigest()
+
+
+def head_commit(repo, branch):
+    """The commit a branch points at now — for `--latest` only."""
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{repo}/commits/{branch}",
+        headers={"User-Agent": "Khayt/filament-catalog (+https://khaytapp.com)",
+                 "Accept": "application/vnd.github.sha"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        sha = r.read(128).decode("ascii", "replace").strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise SystemExit(f"{repo}@{branch}: not a commit ({sha!r})")
+    return sha
 
 
 def fetch_bytes(url, name):
@@ -153,8 +207,14 @@ def fetch_bytes(url, name):
     req = urllib.request.Request(url, headers={
         "User-Agent": "Khayt/filament-catalog (+https://khaytapp.com)",
     })
+    limit = MAX_BYTES.get(name, DEFAULT_MAX_BYTES)
     with urllib.request.urlopen(req, timeout=120) as r:
-        blob = r.read()
+        declared = r.headers.get("Content-Length")
+        if declared and declared.isdigit() and int(declared) > limit:
+            raise SystemExit(f"{url}: {declared} bytes is past the {limit}-byte cap")
+        blob = r.read(limit + 1)
+    if len(blob) > limit:
+        raise SystemExit(f"{url}: past the {limit}-byte cap")
     if path:
         os.makedirs(CACHE, exist_ok=True)
         with open(path, "wb") as fh:
@@ -308,6 +368,8 @@ def from_spoolman(tar_bytes):
                           if re.search(r"/filaments/[^/]+\.json$", m.name)),
                          key=lambda m: m.name.lower())
         for m in members:
+            if not m.isfile() or m.size > MAX_TAR_MEMBER:
+                continue
             d = json.load(tar.extractfile(m))
             brand = d.get("manufacturer", "")
             for f in d.get("filaments", []):
@@ -609,10 +671,20 @@ def main():
     if "--overrides-only" in sys.argv:
         overrides_only()
         return
-    ofd = json.loads(fetch_bytes(OFD_URL, "ofd-all.json"))
-    spoolman = fetch_bytes(SPOOLMAN_URL, "spoolmandb.tar.gz")
-    bambu = json.loads(fetch_bytes(BAMBU_URL, "bambu-filaments_color_codes.json"))
+    spoolman_sha, bambu_sha = SPOOLMAN_SHA, BAMBU_SHA
+    if "--latest" in sys.argv:
+        spoolman_sha = head_commit(SPOOLMAN_REPO, SPOOLMAN_BRANCH)
+        bambu_sha = head_commit(BAMBU_REPO, BAMBU_BRANCH)
+    ofd_blob = fetch_bytes(OFD_URL, "ofd-all.json")
+    ofd = json.loads(ofd_blob)
+    spoolman = fetch_bytes(spoolman_url(spoolman_sha), f"spoolmandb-{spoolman_sha}.tar.gz")
+    bambu_blob = fetch_bytes(bambu_url(bambu_sha), f"bambu-{bambu_sha}.json")
+    bambu = json.loads(bambu_blob)
     rows = finish(build(ofd, spoolman, bambu))
+    sources = json.loads(json.dumps(SOURCES))
+    sources["o"]["sha256"] = sha256(ofd_blob)
+    sources["s"].update({"commit": spoolman_sha, "sha256": sha256(spoolman)})
+    sources["b"].update({"commit": bambu_sha, "sha256": sha256(bambu_blob)})
     catalog = {
         # `source` and `licence` predate `sources` and name the base list; the
         # app reads neither, but older tooling did.
@@ -620,7 +692,7 @@ def main():
         "licence": "MIT (Open Filament Database, SpoolmanDB); see sources",
         "generatedAt": ofd.get("generated_at", ""),
         "version": ofd.get("version", ""),
-        "sources": SOURCES,
+        "sources": sources,
         "mitNotice": MIT_NOTICE,
         # Positional rows keep the file small; this says what the positions are,
         # so the shape is readable without reading the parser.

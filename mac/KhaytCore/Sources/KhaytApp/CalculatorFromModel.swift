@@ -25,6 +25,13 @@ struct CalculatorFromModel: View {
     @State private var model: LibraryFile?
     /// Nil is the whole project.
     @State private var plate: Int?
+
+    init(shop: Shop, calc: CalculatorModel, model: LibraryFile? = nil, plate: Int? = nil) {
+        self.shop = shop
+        self.calc = calc
+        _model = State(initialValue: model)
+        _plate = State(initialValue: plate)
+    }
     @State private var problem: String?
 
     var body: some View {
@@ -36,7 +43,8 @@ struct CalculatorFromModel: View {
                 let plates = shop.plates(of: model)
                 if !plates.isEmpty {
                     Picker("", selection: $plate) {
-                        Text(shop.words.callIt("mac.calc_whole_project", ["n": .number(Double(plates.count))]))
+                        Text(shop.words.callIt("mac.calc_whole_project",
+                                               ["plates": .string(shop.words.counting(plates.count, "mac.n_plates"))]))
                             .tag(Int?.none)
                         ForEach(plates, id: \.index) { p in
                             Text(p.name.map { shop.words.callIt("mac.plate_named", ["n": .number(Double(p.index)), "name": .string($0)]) }

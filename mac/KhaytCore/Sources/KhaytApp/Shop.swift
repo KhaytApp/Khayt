@@ -1085,7 +1085,8 @@ final class Shop {
         thisMonthRevenue = (try? await engine.kpis(orders: orders, clients: clients,
                                                    settings: settings, range: "month",
                                                    language: words.language,
-                                                   inventory: Self.rows(root, "inventory")))?.revenue ?? 0
+                                                   inventory: Self.rows(root, "inventory"),
+                                                   consumables: Self.rows(root, "consumables")))?.revenue ?? 0
         kpiOrders = orders
         kpiClients = clients
         kpiSettings = settings
@@ -1112,7 +1113,8 @@ final class Shop {
         guard let engine, !kpiOrders.isEmpty else { kpis = nil; return }
         kpis = try? await engine.kpis(orders: kpiOrders, clients: kpiClients,
                                       settings: kpiSettings, range: kpiRange,
-                                      language: words.language, inventory: inventoryRows)
+                                      language: words.language, inventory: inventoryRows,
+                                      consumables: consumableRows)
     }
 
     enum Failure: Error { case missingSample }
@@ -1262,6 +1264,55 @@ final class Shop {
         return changed ? .array(out) : nil
     }
 
+    /// Write what the slicer said onto the records it was read for.
+    ///
+    /// ── A RE-READ IS NOT AN EDIT ─────────────────────────────────────────
+    ///
+    /// `platesReadVersion` 2 re-read every 3MF already in the library, and
+    /// each one was STAMPED — a new `rev` and `updatedAt` on every model. With
+    /// sync merging whole records last-writer-wins, that re-read could beat an
+    /// edit another machine had made to the same model (a rename, a price)
+    /// and not yet pulled here: the newer stamp won and the edit was lost, for
+    /// figures the other machine works out for itself from the same file.
+    ///
+    /// So only a FIRST read is stamped — a record that had no slicer figures
+    /// before, where the figures are new facts worth sending. A re-read writes
+    /// its derived fields (plates, per-spool grams, the colour list's grams)
+    /// with `rev` and `updatedAt` untouched: each machine re-reads by version
+    /// on its own, and an edit made elsewhere still wins the merge.
+    static func applySlicerFigures(_ found: [String: [String: JSONValue]],
+                                   extOf: [String: String],
+                                   to root: inout [String: JSONValue]) {
+        guard case .array(var rows)? = root["printFiles"] else { return }
+        for i in rows.indices {
+            guard case .object(var r) = rows[i], case .string(let id)? = r["id"],
+                  let parsed = found[id] else { continue }
+            guard slicerFiguresDue(r["parsed"], ext: extOf[id] ?? "") else { continue }
+            // MERGED, never replaced. A re-read that found figures
+            // wins where it has them; one that found nothing adds
+            // only its mark. Keys this reader does not write (a
+            // cost another app recorded) stay as they were.
+            var merged: [String: JSONValue] = [:]
+            if case .object(let had)? = r["parsed"] { merged = had }
+            let hadFigures = (plainNumber(merged["printTimeMins"]) ?? 0) > 0
+                || (plainNumber(merged["filamentGrams"]) ?? 0) > 0
+            let readSomething = (plainNumber(parsed["printTimeMins"]) ?? 0) > 0
+                || (plainNumber(parsed["filamentGrams"]) ?? 0) > 0
+            if readSomething { for (k, v) in parsed { merged[k] = v } }
+            else { merged["platesRead"] = .number(platesReadVersion) }
+            r["parsed"] = .object(merged)
+            // The colour list was written at import with plate 1's
+            // grams per colour; the per-spool totals fix it here,
+            // on the data already on disk.
+            if let fixed = coloursWithProjectGrams(r["colors"], filaments: parsed["filaments"]) {
+                r["colors"] = fixed
+            }
+            if !hadFigures && readSomething { StoreWriter.stamp(&r) }
+            rows[i] = .object(r)
+        }
+        root["printFiles"] = .array(rows)
+    }
+
     /// The books whose linked folders this launch has already rescanned.
     private var linkedScannedBooks: Set<String> = []
 
@@ -1315,33 +1366,10 @@ final class Shop {
             }
             guard let self, !found.isEmpty else { return }
             do {
-                try StoreWriter.update(build) { root in
-                    guard case .array(var rows)? = root["printFiles"] else { return }
-                    for i in rows.indices {
-                        guard case .object(var r) = rows[i], case .string(let id)? = r["id"],
-                              let parsed = found[id] else { continue }
-                        guard Self.slicerFiguresDue(r["parsed"], ext: extOf[id] ?? "") else { continue }
-                        // MERGED, never replaced. A re-read that found figures
-                        // wins where it has them; one that found nothing adds
-                        // only its mark. Keys this reader does not write (a
-                        // cost another app recorded) stay as they were.
-                        var merged: [String: JSONValue] = [:]
-                        if case .object(let had)? = r["parsed"] { merged = had }
-                        let readSomething = (Self.plainNumber(parsed["printTimeMins"]) ?? 0) > 0
-                            || (Self.plainNumber(parsed["filamentGrams"]) ?? 0) > 0
-                        if readSomething { for (k, v) in parsed { merged[k] = v } }
-                        else { merged["platesRead"] = .number(Self.platesReadVersion) }
-                        r["parsed"] = .object(merged)
-                        // The colour list was written at import with plate 1's
-                        // grams per colour; the per-spool totals fix it here,
-                        // on the data already on disk.
-                        if let fixed = Self.coloursWithProjectGrams(r["colors"], filaments: parsed["filaments"]) {
-                            r["colors"] = fixed
-                        }
-                        StoreWriter.stamp(&r)
-                        rows[i] = .object(r)
-                    }
-                    root["printFiles"] = .array(rows)
+                // `recordingDeletes: false`: nothing is deleted here, and the
+                // automatic stamp must not run — see `applySlicerFigures`.
+                try StoreWriter.update(build, recordingDeletes: false) { root in
+                    Self.applySlicerFigures(found, extOf: extOf, to: &root)
                 }
                 await self.load(self.source)
                 FileHandle.standardError.write(Data("slicer figures: \(found.count) model(s) filled\n".utf8))
@@ -3326,24 +3354,63 @@ final class Shop {
 
     /// The plates a model's file carries — two or more, or none.
     func plates(of file: LibraryFile) -> [Plate] {
-        guard case .object(let r)? = row(for: file.id), case .object(let parsed)? = r["parsed"],
-              case .array(let rows)? = parsed["plates"] else { return [] }
-        let out = rows.compactMap { v -> Plate? in
-            guard case .object(let o) = v, let i = Self.plainNumber(o["index"]) else { return nil }
+        guard case .object(let r)? = row(for: file.id), case .object(let parsed)? = r["parsed"] else { return [] }
+        return Self.plates(parsed: parsed)
+    }
+
+    /// The most plates, and filaments on one plate, this reads off a record.
+    /// Far above anything a slicer writes; see `lib/mf-convert.js` MAX_PLATES.
+    nonisolated static let maxPlates = 256
+    nonisolated static let maxPlateFilaments = 64
+
+    /// A figure off the book, as a finite number in `0…max` — or 0.
+    ///
+    /// `plainNumber` reads strings too, so `"inf"`, `"nan"` and `"1e400"` all
+    /// come back as Doubles a crafted file can put in the book.
+    static func sane(_ value: JSONValue?, max: Double) -> Double {
+        guard let n = plainNumber(value), n.isFinite, n > 0 else { return 0 }
+        return Swift.min(n, max)
+    }
+
+    /// A shop's text off the book, trimmed and cut to `max` characters.
+    static func shortText(_ value: JSONValue?, max: Int) -> String? {
+        guard let s = plainString(value)?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty
+        else { return nil }
+        return String(s.prefix(max))
+    }
+
+    /// The plates a record's `parsed` carries.
+    ///
+    /// ── A CRAFTED INDEX MUST NOT TAKE THE APP DOWN ───────────────────────
+    ///
+    /// `Int(i)` trapped on a `slice_info` index of 1e20, "inf" or "nan" — and
+    /// the value is SAVED in the book, so every later view of the model (the
+    /// library inspector, the calculator's From a model, the product sheet)
+    /// crashed the app again. An index that is not a whole number in
+    /// 1…999,999, or that repeats one already read, is skipped; the figures
+    /// are clamped finite; names and materials are cut short.
+    static func plates(parsed: [String: JSONValue]) -> [Plate] {
+        guard case .array(let rows)? = parsed["plates"] else { return [] }
+        var seen = Set<Int>()
+        var out: [Plate] = []
+        for v in rows.prefix(maxPlates) {
+            guard case .object(let o) = v, let i = plainNumber(o["index"]), i.isFinite,
+                  i >= 1, i < 1_000_000, i == i.rounded() else { continue }
+            let index = Int(saturating: i)
+            guard seen.insert(index).inserted else { continue }
             var filaments: [PlateFilament] = []
             if case .array(let fs)? = o["filaments"] {
-                for case .object(let f) in fs {
-                    filaments.append(PlateFilament(slot: Self.plainString(f["id"]) ?? "",
-                                                   material: Self.plainString(f["type"]) ?? "",
-                                                   hex: Self.plainString(f["color"]),
-                                                   grams: Self.plainNumber(f["grams"]) ?? 0))
+                for case .object(let f) in fs.prefix(maxPlateFilaments) {
+                    filaments.append(PlateFilament(slot: shortText(f["id"], max: 16) ?? "",
+                                                   material: shortText(f["type"], max: 40) ?? "",
+                                                   hex: shortText(f["color"], max: 16),
+                                                   grams: sane(f["grams"], max: 100_000)))
                 }
             }
-            let name = Self.plainString(o["name"]).flatMap { $0.isEmpty ? nil : $0 }
-            return Plate(index: Int(i), minutes: Self.plainNumber(o["printTimeMins"]) ?? 0,
-                         grams: Self.plainNumber(o["filamentGrams"]) ?? 0,
-                         material: Self.plainString(o["filamentType"]) ?? "",
-                         name: name, filaments: filaments)
+            out.append(Plate(index: index, minutes: sane(o["printTimeMins"], max: 525_600),
+                             grams: sane(o["filamentGrams"], max: 100_000),
+                             material: shortText(o["filamentType"], max: 40) ?? "",
+                             name: shortText(o["name"], max: 80), filaments: filaments))
         }
         guard out.count > 1 else { return [] }
         // Only while they add up to the file's own totals: a file re-read by
@@ -3889,7 +3956,7 @@ final class Shop {
                 notes = list.compactMap(Self.plainString)
             }
             return .filled(DraftedPart(
-                qty: Int(Self.plainNumber(part["qty"]) ?? 1),
+                qty: max(1, min(9999, Int(saturating: Self.plainNumber(part["qty"]) ?? 1))),
                 grams: Self.plainNumber(part["printWeight"]) ?? 0,
                 hours: Self.plainNumber(part["printTime"]) ?? 0,
                 spoolId: Self.plainString(part["filamentId"]),
@@ -4671,17 +4738,24 @@ final class Shop {
     /// What a product's components add to a job taken from it — the figure
     /// `lib/order-new.js` folds into the saved price, so the sheet's preview
     /// shows the price the job is saved at. Zero for a product with none.
-    func jobComponentsCost(of product: Product) async -> Double {
+    func jobComponentsCost(of product: Product, assemblyQty: Double? = nil) async -> Double {
         guard let engine, let components = product.rest["components"] else { return 0 }
-        let qty = Self.plainNumber(product.rest["assemblyQty"]).map { max(1, $0) } ?? 1
-        return (try? await engine.jobComponentsCost(components, assemblyQty: qty,
+        let qty = assemblyQty ?? Double(Self.assemblyQty(of: product))
+        return (try? await engine.jobComponentsCost(components, assemblyQty: max(1, qty),
                                                     consumables: consumableRows)) ?? 0
+    }
+
+    /// How many assemblies a product's job makes, as a whole 1…999.
+    static func assemblyQty(of product: Product) -> Int {
+        guard let n = plainNumber(product.rest["assemblyQty"]), n.isFinite, n >= 1 else { return 1 }
+        return min(999, Int(saturating: n.rounded()))
     }
 
     func newJobInput(parts: [NewJobSheet.Draft], project: String, clientId: String?,
                      margin: Double, discountPct: Double, shippingCost: Double,
                      deposit: Double, rush: Bool, asQuote: Bool,
                      fromProduct product: Product? = nil,
+                     assemblyQty: Double? = nil,
                      rule: PriceRule = PriceRule(),
                      extraLines: [ExtraLine] = []) -> [String: JSONValue] {
         var input: [String: JSONValue] = [
@@ -4715,6 +4789,8 @@ final class Shop {
             input["productId"] = .string(product.id)
             if let components = product.rest["components"] { input["components"] = components }
             if let qty = product.rest["assemblyQty"] { input["assemblyQty"] = qty }
+            // The sheet's own count wins: it is what the shop saw priced.
+            if let assemblyQty { input["assemblyQty"] = .number(assemblyQty) }
         }
         return input
     }
