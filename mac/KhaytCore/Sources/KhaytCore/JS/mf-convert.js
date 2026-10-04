@@ -310,6 +310,18 @@
    * layer height, per-filament grams, total grams and print time. Never throws — a field we
    * can't find is simply omitted.
    */
+  // SPOOL MATCH: per-filament material names (filament_type), when they line up with the palette.
+  function filamentTypes(members, n) {
+    const proj = tryJson(memberText(members, /project_settings\.config$/i));
+    let t = proj && Array.isArray(proj.filament_type) ? proj.filament_type : null;
+    if (!t) {
+      const prusa = memberText(members, CFG_PRUSA);
+      const line = prusa ? iniValue(prusa, 'filament_type') : null;
+      if (line) t = line.split(';').map((x) => x.trim().replace(/^"|"$/g, ''));
+    }
+    return t && t.length === n ? t.map((x) => String(x || '')) : null;
+  }
+
   function extractMeta(members) {
     const meta = { printerModel: null, nozzle: null, layerHeight: null, bed: null, grams: [], totalGrams: 0, printMinutes: null };
     const projText = memberText(members, /project_settings\.config$/i) || memberText(members, /model_settings\.config$/i);
@@ -1088,6 +1100,9 @@
     const filaments = extractFilaments(members);
     const meta = extractMeta(members);
     if (meta.grams.length) filaments.forEach((f, i) => { if (meta.grams[i] != null) f.grams = meta.grams[i]; });
+    // SPOOL MATCH: each filament's material, so a PETG colour matched to a PLA spool is warned.
+    const types = filamentTypes(members, filaments.length);
+    if (types) filaments.forEach((f, i) => { if (types[i]) f.type = types[i]; });
     return {
       ok: true,
       flavour: detectFlavour(members),
@@ -1592,6 +1607,15 @@
     // the config's colours, temperatures and paint describing different filaments.
     const proj = tryJson(memberText(members, /project_settings\.config$/i));
     if (!proj || !Array.isArray(proj.filament_colour) || proj.filament_colour.length !== colors.length) return null;
+    // ── SPOOL MATCH (lib/spool-match.js) ─────────────────────────────────────────────
+    // "Match to loaded spools" hands over its own groups: each colour onto the loaded spool
+    // that looks most like it, and per slot the source whose settings it keeps. The rest of
+    // the merge (config, paint, extruders, all-or-nothing) is this same path, unchanged.
+    if (opts.spoolMerge) {
+      const sm = explicitSpoolMerge(opts.spoolMerge, colors.length, slots);
+      return sm ? { map: sm.map, colors: sm.reps.map((i) => normHex(colors[i])), slotSrc: sm.reps, spool: true } : null;
+    }
+    // ── end SPOOL MATCH ──
     const usage = tallyPaintUsage(members, colors.length);
     const r = fullSpectrum.reduceColors(colors, usage.some((u) => u > 0) ? usage : undefined, undefined, slots);
     // One group per slot; the clamp is belt and braces, as in the reference.
@@ -1602,6 +1626,28 @@
     const slotSrc = r.reps.slice();
     return { map, colors: slotSrc.map((i) => normHex(colors[i])), slotSrc };
   }
+
+  // ── SPOOL MATCH (lib/spool-match.js) ─────────────────────────────────────────────────
+  /**
+   * A spool-match merge, checked rather than trusted: `map` sends each of the n colours to a
+   * 0-based slot below the target's slot count, and `reps[s]` names the colour whose settings
+   * slot s keeps — one that maps to s, or any colour for a slot nothing maps to (an empty
+   * spool between two loaded ones). Anything else is not a merge this can write: null.
+   */
+  function explicitSpoolMerge(sm, n, slots) {
+    const map = sm && sm.map, reps = sm && sm.reps;
+    if (!Array.isArray(map) || map.length !== n || !Array.isArray(reps)) return null;
+    if (map.some((t) => !Number.isInteger(t) || t < 0 || t >= slots)) return null;
+    const k = Math.max(...map) + 1;
+    if (reps.length !== k) return null;
+    for (let s = 0; s < k; s++) {
+      const r = reps[s];
+      if (!Number.isInteger(r) || r < 0 || r >= n) return null;
+      if (map.includes(s) && map[r] !== s) return null;
+    }
+    return { map: map.slice(), reps: reps.slice() };
+  }
+  // ── end SPOOL MATCH ──
 
   /**
    * Apply a merge plan to project_settings.config: every per-filament array goes from the source
@@ -1935,6 +1981,136 @@
     return changed;
   }
 
+  // ── SPOOL MATCH: GROW THE FILAMENT LIST TO THE SLOTS THE SPOOLS ARE IN ─────────────────
+  //
+  // A slot map past the file's own filaments is refused because growing every per-filament
+  // array would mean inventing a filament. "Match to loaded spools" is the one caller that
+  // knows what is in those slots, so it may ask for the growth (growToSlots: the printer's
+  // slot count, slotSpools: [{ colour, material }] per slot). Each new slot is a FULL copy of
+  // one source filament — the one mapped to it, else the first — made with the same
+  // reindexers a slot map uses (srcOf longer than n), so the purge matrix, the pairs vector,
+  // different_settings_to_system / inherits_group and Prusa's wiping volumes and per-extruder
+  // vectors all grow with it. Then the ordinary slot map runs on the grown file, strictly:
+  // every refusal it can make (mesh by name, settings that will not split, paint that will
+  // not re-encode) still refuses. Only the new slots' colours become the spools'; a spool of
+  // another material family keeps the copied filament's type and says so.
+  //
+  // Returns null — and the caller carries on as before — when no growth is asked for, the
+  // map fits already, it points past the printer's slots, the palette is not the config's,
+  // or the config holds k×n per-variant arrays: each of those keeps its existing refusal.
+  const PER_EXTRUDER_PRUSA = /^(nozzle_diameter|nozzle_high_flow|nozzle_type|extruder_offset|extruder_type|max_layer_height|min_layer_height|wipe|retract_[a-z_]+|deretract_speed|travel_[a-z_]+)$/;
+  function growPrusaConfig(text, srcOf, n) {
+    let bad = null;
+    const out = text.replace(/^([ \t]*;?[ \t]*)([A-Za-z0-9_]+)([ \t]*=[ \t]*)([^\r\n]*)$/gm, (all, pre, key, eq, val) => {
+      if (bad) return all;
+      if (key === 'wiping_volumes_matrix' || key === 'wiping_volumes_extruders') {
+        const a = val.trim().split(',');
+        const r = key === 'wiping_volumes_matrix' ? reshapeSquare(a, srcOf, n) : reshapePairs(a, srcOf, n);
+        if (!r) { bad = key; return all; }
+        return pre + key + eq + r.join(',');
+      }
+      const perFil = isPerFilamentPrusa(key);
+      if ((!perFil && !PER_EXTRUDER_PRUSA.test(key)) || !val.trim()) return all;
+      const sp = splitIniVector(val);
+      if (!sp) { if (perFil) bad = key; return all; }
+      if (sp.parts.length === n) return pre + key + eq + srcOf.map((i) => sp.parts[i]).join(sp.sep);
+      if (sp.parts.length === 1) return all; // one value for every filament / the one extruder
+      if (perFil) bad = key;
+      return all;
+    });
+    return bad ? { ok: false, bad } : { ok: true, text: out };
+  }
+
+  function setIniEntries(text, key, entries) {
+    const re = new RegExp('^([ \\t]*;?[ \\t]*' + key + '[ \\t]*=[ \\t]*)([^\\r\\n]*)$', 'm');
+    return text.replace(re, (all, head, val) => {
+      const sp = splitIniVector(val);
+      if (!sp) return all;
+      for (const [j, v] of entries) if (j < sp.parts.length) sp.parts[j] = v;
+      return head + sp.parts.join(sp.sep);
+    });
+  }
+
+  function growForSpools(members, opts, flavour) {
+    const map = opts.slotMap;
+    const filaments = extractFilaments(members);
+    const n = filaments.length;
+    const limit = Number(opts.growToSlots);
+    if (!Array.isArray(map) || map.length !== n || !n || map.some((t) => !Number.isInteger(t) || t < 0)) return null;
+    const top = Math.max(...map);
+    if (top < n || !(top < limit)) return null;
+    const m = top + 1;
+    const srcOf = [];
+    for (let j = 0; j < m; j++) {
+      if (j < n) { srcOf.push(j); continue; }
+      const i = map.indexOf(j);
+      srcOf.push(i >= 0 ? i : 0);
+    }
+    const fam = (x) => {
+      const u = String(x || '').toUpperCase();
+      const f = ['PETG', 'PCTG', 'PLA', 'ABS', 'ASA', 'TPU', 'PET', 'PVA', 'HIPS', 'PC', 'PA', 'PP'].find((k) => new RegExp('(^|[^A-Z])' + k + '($|[^A-Z])').test(u));
+      return f || '';
+    };
+    const spools = Array.isArray(opts.slotSpools) ? opts.slotSpools : [];
+    const newColour = (j) => normHex(spools[j] && (spools[j].colour || spools[j].color || spools[j].hex));
+    let grownMembers = null, family = profiles.configFamily(flavour), copiedTypes = null;
+    if (family === 'bbl') {
+      const pm = members.find((mm) => /project_settings\.config$/i.test(mm.name));
+      const proj = pm && pm.data != null ? tryJson(pm.data.toString('utf8')) : null;
+      if (!proj || !Array.isArray(proj.filament_colour) || proj.filament_colour.length !== n) return null;
+      if (hasVariantArrays(proj, n)) return null;
+      reindexFilamentJson(proj, srcOf, n);
+      if (!Array.isArray(proj.filament_colour) || proj.filament_colour.length !== m) return null;
+      copiedTypes = Array.isArray(proj.filament_type) ? proj.filament_type.slice() : null;
+      grownMembers = members.map((mm) => (mm === pm ? { name: mm.name, data: JSON.stringify(proj) } : mm));
+    } else if (family === 'prusa') {
+      const pm = members.find((mm) => CFG_PRUSA.test(mm.name));
+      if (!pm || pm.data == null) return null;
+      const g = growPrusaConfig(pm.data.toString('utf8'), srcOf, n);
+      if (!g.ok) return null;
+      const tl = iniValue(g.text, 'filament_type');
+      copiedTypes = tl ? (splitIniVector(tl) || { parts: [] }).parts.map((x) => x.replace(/^"|"$/g, '')) : null;
+      grownMembers = members.map((mm) => (mm === pm ? { name: mm.name, data: g.text } : mm));
+    } else return null;
+    if (extractFilaments(grownMembers).length !== m) return null;
+
+    const ext = map.slice();
+    for (let j = n; j < m; j++) ext.push(j);
+    const inner = convertMembers(grownMembers, Object.assign({}, opts, { slotMap: ext, growToSlots: null, slotSpools: null, spoolStrict: true }));
+    if (!inner.ok) return inner;
+
+    // The new slots take the colour of the spool loaded in them.
+    const stamps = [], typeWarn = [];
+    for (let j = n; j < m; j++) {
+      const c = newColour(j);
+      if (c) stamps.push([j, c]);
+      const sf = fam(spools[j] && spools[j].material), cf = fam(copiedTypes && copiedTypes[j]);
+      if (sf && cf && sf !== cf) typeWarn.push(`slot ${j + 1} holds ${sf} but takes ${cf} settings from filament ${srcOf[j] + 1}`);
+    }
+    const out = inner.members.map((mm) => {
+      if (!stamps.length || mm.data == null) return mm;
+      if (family === 'bbl' && /project_settings\.config$/i.test(mm.name)) {
+        const o = tryJson(mm.data.toString('utf8'));
+        if (!o || !Array.isArray(o.filament_colour)) return mm;
+        for (const [j, c] of stamps) if (j < o.filament_colour.length) o.filament_colour[j] = c;
+        return { name: mm.name, data: JSON.stringify(o) };
+      }
+      if (family === 'prusa' && CFG_PRUSA.test(mm.name)) {
+        let t = mm.data.toString('utf8');
+        t = setIniEntries(t, 'filament_colour', stamps);
+        t = setIniEntries(t, 'extruder_colour', stamps);
+        return { name: mm.name, data: t };
+      }
+      return mm;
+    });
+    const report = inner.report;
+    report.colorsGrown = { from: n, to: m };
+    report.warnings.push(`Added slot${m - n === 1 ? '' : 's'} ${Array.from({ length: m - n }, (_, k) => n + k + 1).join(', ')} for the spools loaded there: each copies one of the file's filaments, in the loaded spool's colour.`);
+    if (typeWarn.length) report.warnings.push(`Check the material: ${typeWarn.join('; ')}.`);
+    return { ok: true, members: out, report };
+  }
+  // ── end SPOOL MATCH ──
+
   /**
    * Convert a 3MF for a target printer.
    * @param {Buffer} buf source 3MF
@@ -1994,6 +2170,11 @@
       ? profiles.customProfile(opts.targetProfile) : null;
     const target = custom || profiles.getProfile(opts.targetId) || profiles.GENERIC;
     const mode = opts.mode === 'normalize' || target.id === profiles.GENERIC.id ? 'normalize' : 'retarget';
+    // SPOOL MATCH: a loaded spool in a slot past the file's own filaments — see growForSpools.
+    if (mode === 'retarget' && opts.growToSlots) {
+      const grown = growForSpools(members, opts, flavour);
+      if (grown) return grown;
+    }
     const filaments = extractFilaments(members);
     const report = { flavour, target: target.id, targetName: target.name, mode, fieldsChanged: [], colorsRemapped: 0, warnings: [] };
 
@@ -2303,6 +2484,8 @@
           (sw ? ` with ${sw} manual filament swap(s) — M600 pauses were added at the swap heights. Load the head colours shown and swap the spool when ${target.name} pauses.` : ' — no manual swaps needed (fits the heads).'));
       } else if (fsPlan) {
         report.warnings.push(`Full Spectrum: kept ${target.maxColors} filaments physical and reproduced ${n - target.maxColors} extra colour(s) as ${fsPlan.mixDefs.length} dithered mix(es). Load the ${target.maxColors} head colours shown; ${target.name} prints the rest by mixing.`);
+      } else if (mergePlan && mergePlan.spool) { // SPOOL MATCH
+        report.warnings.push(`Matched ${n} colours to the spools loaded in ${mergePlan.colors.length} slot${mergePlan.colors.length === 1 ? '' : 's'} of ${target.name}. Check the colours in your slicer before printing.`);
       } else if (mergePlan) {
         report.warnings.push(`Merged ${n} colours into the nearest ${mergePlan.colors.length} for ${target.name}: the least-used colours now print in the closest-looking slot. Check the colours in your slicer before printing.`);
       } else if (target.maxColors && n > target.maxColors) {
@@ -2319,6 +2502,22 @@
         if (mergeDropped) report.warnings.push(`Colours were not merged: ${why}. ${target.name} supports ${target.maxColors} colours — map the extra ones in your slicer.`);
         if (slotMapDropped) report.warnings.push(`Colours were left in their original slots: ${why}. Reassign them in your slicer${paintBlocked === 'mesh' ? ', or convert the file in Khayt' : ''}.`);
       }
+      // ── SPOOL MATCH: a match the maker asked for applies whole, or nothing is written ──
+      // Every reason above that leaves the colours where they were (a slot past the file's
+      // filaments, a Prusa setting that would not split, paint that could not move, a file
+      // whose palette is not its config's) still leaves a file — which is right for a hand-made
+      // slot map and wrong for "print with what's loaded", where the maker would load the
+      // spools the screen showed and print the colours in the wrong slots. So that request
+      // (spoolStrict) is refused, with the converter's own reasons, and the screen shows them.
+      if (opts.spoolStrict && !paintPlan) {
+        const askedMerge = !!opts.spoolMerge;
+        const askedMap = Array.isArray(opts.slotMap) && opts.slotMap.some((t, i) => t !== i);
+        if ((askedMerge && !mergePlan) || (!askedMerge && askedMap && !slotMap)) {
+          return { ok: false, refused: 'spool-match', warnings: report.warnings.slice(),
+            error: `The spool match was not applied, so nothing was converted. ${report.warnings.join(' ')}`.trim() };
+        }
+      }
+      // ── end SPOOL MATCH ──
       const bounds = computeBounds(members);
       if (bounds) { report.bounds = bounds; for (const w of fitWarnings(bounds, target)) report.warnings.push(w); }
       report.fieldsChanged = [...new Set(report.fieldsChanged)];
@@ -2355,7 +2554,8 @@
       // Full Spectrum / band-swap reduce the palette to the physical heads (FS mixes are virtual; band-swap
       // folds colours onto heads), so the round-trip colour count is the target's slot count, not the source's.
       const expectColours = (report.fullSpectrum || report.bandSwap) ? (target.maxColors || filaments.length)
-        : report.colorsMerged ? report.colorsMerged.to : filaments.length;
+        : report.colorsMerged ? report.colorsMerged.to
+        : report.colorsGrown ? report.colorsGrown.to : filaments.length; // colorsGrown: SPOOL MATCH
       const coloursOk = mode === 'normalize' ? true : back.colorCount === expectColours;
       report.verified = !!(back && back.ok && back.hasGeometry && coloursOk);
     } catch (_) { report.verified = false; }
