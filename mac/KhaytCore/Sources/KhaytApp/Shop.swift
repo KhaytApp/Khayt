@@ -3152,7 +3152,8 @@ final class Shop {
             let orders = Self.rows(root, "printLog")
             let out = try await engine.newOrder(
                 input, orders: orders, settings: Self.settings(root), now: Date(),
-                tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)))
+                tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)),
+                consumables: Self.rows(root, "consumables"))
             guard case .object(var record) = out.order else { return }
 
             // ALREADY DONE. Nothing about this waits on a machine, so it never
@@ -4649,6 +4650,16 @@ final class Shop {
         return rows
     }
 
+    /// What a product's components add to a job taken from it — the figure
+    /// `lib/order-new.js` folds into the saved price, so the sheet's preview
+    /// shows the price the job is saved at. Zero for a product with none.
+    func jobComponentsCost(of product: Product) async -> Double {
+        guard let engine, let components = product.rest["components"] else { return 0 }
+        let qty = Self.plainNumber(product.rest["assemblyQty"]).map { max(1, $0) } ?? 1
+        return (try? await engine.jobComponentsCost(components, assemblyQty: qty,
+                                                    consumables: consumableRows)) ?? 0
+    }
+
     func newJobInput(parts: [NewJobSheet.Draft], project: String, clientId: String?,
                      margin: Double, discountPct: Double, shippingCost: Double,
                      deposit: Double, rush: Bool, asQuote: Bool,
@@ -5136,9 +5147,12 @@ final class Shop {
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
                 let orders = Self.rows(root, "printLog")
+                // The shelf the product's components are costed from — the
+                // catalogue prices them, so the job has to.
                 let out = try await engine.newOrder(
                     input, orders: orders, settings: Self.settings(root), now: Date(),
-                    tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)))
+                    tokens: (tracking: Self.randomBytes(16), quoteApproval: Self.randomBytes(16)),
+                    consumables: Self.rows(root, "consumables"))
 
                 guard case .object(let record) = out.order,
                       case .string(let id)? = record["id"] else {
