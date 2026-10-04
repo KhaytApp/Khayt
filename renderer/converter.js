@@ -841,9 +841,14 @@
             slotMap = Array.from(modal.querySelectorAll('.conv-slot')).map((s) => parseInt(s.value, 10) || 0);
             if (slotMap.every((v, i) => v === i)) slotMap = null;
           }
+          // SPOOL MATCH: an active match is what the convert will send, so the preview asks with it.
+          const spool = typeof modal._spoolState === 'function' ? modal._spoolState() : { active: false };
+          const spoolReq = spool.active && spool.request ? spool.request : null;
           let r = null;
           try {
-            r = await hub().prusaPlan({ path: src.path, targetId, targetProfile: isCustomId(targetId) ? getProfileById(targetId) : null, slotMap, colorMix: prusaMix });
+            r = await hub().prusaPlan({ path: src.path, targetId, targetProfile: isCustomId(targetId) ? getProfileById(targetId) : null,
+              slotMap: spoolReq ? spoolReq.slotMap : slotMap, colorMix: prusaMix,
+              spoolMerge: spoolReq ? spoolReq.spoolMerge : null, slotSpools: spoolReq ? spoolReq.slotSpools : null, spoolStrict: !!spoolReq });
           } catch (e) { r = { available: true, ok: false, error: String((e && e.message) || e) }; }
           if (seq !== prusaSeq) return; // a newer target / map won
           prusaPlanData = r && r.available ? r : null;
@@ -960,6 +965,7 @@
           KhaytConvSpools.mount(modal, {
             filaments, flavour: a.flavour, targetId: () => targetId, profile: getProfileById,
             skip: () => (P && targetId === P.GENERIC.id) || isCrossEcosystem(a.flavour, targetId),
+            onChange: () => { if (isPrusaProject(a.flavour, targetId)) loadPrusaPlan(); },
           });
         }
         if (isPrusaProject(a.flavour, targetId)) loadPrusaPlan();

@@ -2000,7 +2000,27 @@
   // Returns null — and the caller carries on as before — when no growth is asked for, the
   // map fits already, it points past the printer's slots, the palette is not the config's,
   // or the config holds k×n per-variant arrays: each of those keeps its existing refusal.
-  const PER_EXTRUDER_PRUSA = /^(nozzle_diameter|nozzle_high_flow|nozzle_type|extruder_offset|extruder_type|max_layer_height|min_layer_height|wipe|retract_[a-z_]+|deretract_speed|travel_[a-z_]+)$/;
+  // PrusaSlicer's per-extruder options (PrintConfig.cpp, the extruder option keys): one value per
+  // extruder, which on an MMU project is one per filament. Named, never matched by pattern — a
+  // `travel_.*` pattern once caught travel_speed, a single printer value, and turned it into a vector.
+  const PER_EXTRUDER_PRUSA = new Set([
+    'nozzle_diameter', 'nozzle_high_flow', 'extruder_offset', 'min_layer_height', 'max_layer_height',
+    'retract_length', 'retract_lift', 'retract_lift_above', 'retract_lift_below', 'retract_speed',
+    'deretract_speed', 'retract_restart_extra', 'retract_before_travel', 'retract_layer_change',
+    'retract_length_toolchange', 'retract_restart_extra_toolchange', 'retract_before_wipe', 'wipe',
+    'travel_ramping_lift', 'travel_max_lift', 'travel_slope', 'travel_lift_before_obstacle',
+    'default_filament_profile',
+  ]);
+  // Vectors of STRINGS, which PrusaSlicer separates with ';' (numbers and bools use ','). A grown
+  // single value has no separator in it to copy, so the type decides.
+  const STRING_VECTOR_PRUSA = new Set([
+    'extruder_colour', 'filament_colour', 'filament_type', 'filament_settings_id', 'filament_vendor',
+    'filament_notes', 'filament_ramming_parameters', 'filament_custom_variables', 'start_filament_gcode',
+    'end_filament_gcode', 'compatible_printers_condition_cummulative', 'compatible_prints_condition_cummulative',
+    'inherits_cummulative', 'default_filament_profile',
+  ]);
+  // Colour and material vectors never hold a comma, so one written with commas was mis-separated.
+  const NO_COMMA_PRUSA = new Set(['extruder_colour', 'filament_colour', 'filament_type']);
   function growPrusaConfig(text, srcOf, n) {
     let bad = null;
     const out = text.replace(/^([ \t]*;?[ \t]*)([A-Za-z0-9_]+)([ \t]*=[ \t]*)([^\r\n]*)$/gm, (all, pre, key, eq, val) => {
@@ -2012,15 +2032,40 @@
         return pre + key + eq + r.join(',');
       }
       const perFil = isPerFilamentPrusa(key);
-      if ((!perFil && !PER_EXTRUDER_PRUSA.test(key)) || !val.trim()) return all;
+      if ((!perFil && !PER_EXTRUDER_PRUSA.has(key)) || !val.trim()) return all;
       const sp = splitIniVector(val);
       if (!sp) { if (perFil) bad = key; return all; }
-      if (sp.parts.length === n) return pre + key + eq + srcOf.map((i) => sp.parts[i]).join(sp.sep);
+      const sep = STRING_VECTOR_PRUSA.has(key) ? ';' : (sp.parts.length > 1 ? sp.sep : ',');
+      if (sp.parts.length === n) return pre + key + eq + srcOf.map((i) => sp.parts[i]).join(sep);
       if (sp.parts.length === 1) return all; // one value for every filament / the one extruder
       if (perFil) bad = key;
       return all;
     });
     return bad ? { ok: false, bad } : { ok: true, text: out };
+  }
+
+  /**
+   * The first per-filament or per-extruder vector in a PrusaSlicer config that does not hold one
+   * value or exactly one per filament, or a colour/material vector separated with commas — a
+   * project PrusaSlicer would read with a different extruder count per option. Null when sound.
+   */
+  function prusaVectorProblem(text) {
+    const fc = iniValue(text, 'filament_colou?r');
+    const fsp = fc ? splitIniVector(fc) : null;
+    const m = fsp ? fsp.parts.length : 0;
+    if (!m) return null;
+    let bad = null;
+    for (const mm of text.matchAll(/^[ \t]*;?[ \t]*([A-Za-z0-9_]+)[ \t]*=[ \t]*([^\r\n]*)$/gm)) {
+      const key = mm[1], val = mm[2].trim();
+      if (!val) continue;
+      if (NO_COMMA_PRUSA.has(key) && val.indexOf(',') >= 0 && val.indexOf(';') < 0 && val.indexOf('"') < 0) { bad = key; break; }
+      if (key === 'wiping_volumes_matrix' && m > 1 && val.split(',').length !== m * m) { bad = key; break; }
+      if (key === 'wiping_volumes_extruders' && m > 1 && val.split(',').length !== 2 * m) { bad = key; break; }
+      if (!isPerFilamentPrusa(key) && !PER_EXTRUDER_PRUSA.has(key)) continue;
+      const sp = splitIniVector(val);
+      if (!sp || (sp.parts.length !== 1 && sp.parts.length !== m)) { bad = key; break; }
+    }
+    return bad;
   }
 
   function setIniEntries(text, key, entries) {
@@ -2173,7 +2218,9 @@
     const target = custom || profiles.getProfile(opts.targetId) || profiles.GENERIC;
     const mode = opts.mode === 'normalize' || target.id === profiles.GENERIC.id ? 'normalize' : 'retarget';
     // SPOOL MATCH: a loaded spool in a slot past the file's own filaments — see growForSpools.
-    if (mode === 'retarget' && opts.growToSlots) {
+    // Not for a Bambu/Orca → PrusaSlicer project: that writes its own config, and its plan already
+    // takes any slot below the tool count, the spool colours included (prusa-project plan).
+    if (mode === 'retarget' && opts.growToSlots && !(prusaProject && prusaProject.applies(flavour, target, members))) {
       const grown = growForSpools(members, opts, flavour);
       if (grown) return grown;
     }
@@ -2192,7 +2239,7 @@
       out = out.filter((m) => GEOMETRY.test(m.name) || /thumbnail.*\.png$/i.test(m.name) || /\.png$/i.test(m.name));
       report.fieldsChanged.push(`stripped ${before - out.length} slicer config member(s)`);
       if (target.id !== profiles.GENERIC.id) report.warnings.push('Normalized to a generic 3MF (target-specific settings not written).');
-    } else if (prusaProject && prusaProject.applies(flavour, target)) {
+    } else if (prusaProject && prusaProject.applies(flavour, target, members)) {
       return prusaProjectBlock(members, target, opts, report);
     } else {
       // Retarget: rewrite the JSON/text settings for the target printer + optional remap.
@@ -2543,7 +2590,7 @@
   }
   function prusaProjectBlock(members, target, opts, report) {
     const r = prusaProject.convertMembers(members, target, opts, prusaProjectCtx(members));
-    if (!r.ok) return r;
+    if (!r.ok) return opts.spoolStrict ? Object.assign({ refused: 'spool-match' }, r) : r;
     Object.assign(report, r.report, { reprofile: false, warnings: report.warnings.concat(r.report.warnings) });
     const bounds = computeBounds(members);
     if (bounds) { report.bounds = bounds; for (const w of fitWarnings(bounds, target)) report.warnings.push(w); }
@@ -2560,7 +2607,7 @@
     const custom = opts.targetProfile && typeof opts.targetProfile === 'object' && opts.targetProfile.id
       ? profiles.customProfile(opts.targetProfile) : null;
     const target = custom || profiles.getProfile(opts.targetId) || profiles.GENERIC;
-    if (!prusaProject || !prusaProject.applies(detectFlavour(members), target)) return { available: false };
+    if (!prusaProject || !prusaProject.applies(detectFlavour(members), target, members)) return { available: false };
     const p = prusaProject.plan(members, target, opts, prusaProjectCtx(members));
     if (!p.ok) return { available: true, ok: false, error: p.error, targetName: target.name };
     return {
@@ -2575,6 +2622,15 @@
     const planned = convertMembers(members, opts);
     if (!planned.ok) return planned;
     const { members: out, report } = planned;
+    // A PrusaSlicer config this conversion rewrote must still hold one value (or one per filament)
+    // in every per-filament and per-extruder option, colours separated the way PrusaSlicer reads
+    // them. A file that fails that is not "converted with a warning"; it is not written.
+    {
+      const outCfg = out.find((m) => CFG_PRUSA.test(m.name) && m.data != null);
+      const t = outCfg ? (typeof outCfg.data === 'string' ? outCfg.data : outCfg.data.toString('utf8')) : null;
+      const bad = t != null && t !== memberText(members, CFG_PRUSA) ? prusaVectorProblem(t) : null;
+      if (bad) return { ok: false, error: `The PrusaSlicer settings this conversion would write do not agree with each other ("${bad}" does not hold one value per filament), so nothing was converted.` };
+    }
     // The self-check below needs the target and the source's colours. The
     // target is worked out the SAME WAY the conversion did, not looked up by
     // the id in the report: a caller can hand in a whole custom profile, and

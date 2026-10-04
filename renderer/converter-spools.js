@@ -193,6 +193,8 @@
         ${tableHtml()}`;
     }
 
+    // The converter's own previews that depend on the match (the PrusaSlicer project plan).
+    const changed = () => { if (typeof ctx.onChange === 'function') { try { ctx.onChange(); } catch (_) { /* preview only */ } } };
     host.addEventListener('change', (e) => {
       const el = e.target;
       const kind = el && el.getAttribute('data-spool');
@@ -208,6 +210,7 @@
         st.edits[i] = parseInt(el.value, 10);
         render();
       }
+      changed();
     });
     host.addEventListener('click', (e) => {
       const b = e.target && e.target.closest && e.target.closest('[data-spool]');
@@ -215,6 +218,7 @@
       st.refused = null;
       if (b.getAttribute('data-spool') === 'match') { st.active = true; st.edits = null; render(); }
       else if (b.getAttribute('data-spool') === 'clear') { st.active = false; st.plan = null; st.edits = null; render(); }
+      changed();
     });
     // The target decides the slot count; the converter re-renders its own table on change,
     // and a catalogue printer's profile arrives a moment later — follow both.
@@ -228,7 +232,7 @@
       const p = st.plan;
       if (!p || !p.ok) return { active: true, refusal: p ? p.warnings.map(warningText).filter(Boolean).join(' ') : '' };
       if (p.request.kind === 'refused') { render(); return { active: true, refusal: refusalText(p.request.refusal) }; }
-      if (p.request.kind === 'none') return { active: true, request: null };
+      if (p.request.kind === 'none') return { active: true, request: p.request.slotSpools ? { slotMap: null, slotSpools: p.request.slotSpools, spoolStrict: true } : null };
       return { active: true, request: { slotMap: p.request.slotMap || null, mergeToSlots: !!p.request.mergeToSlots, spoolMerge: p.request.spoolMerge || null,
         growToSlots: p.request.growToSlots || null, slotSpools: p.request.slotSpools || null, spoolStrict: true } };
     };

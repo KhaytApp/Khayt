@@ -351,10 +351,57 @@
    * names that preset, and a guessed name resolves to nothing. Everything else keeps the converter's
    * old cross-family behaviour.
    */
-  function applies(flavour, target) {
-    return !!(target && profiles && profiles.configFamily(flavour) === 'bbl' && profiles.configFamily(target.flavour) === 'prusa'
-      && target.printerSettingsId && target.bed && target.bed.x && target.bed.y && (target.maxColors || 0) >= 1);
+  function applies(flavour, target, members) {
+    if (!(target && profiles && profiles.configFamily(flavour) === 'bbl' && profiles.configFamily(target.flavour) === 'prusa'
+      && target.printerSettingsId && target.bed && target.bed.x && target.bed.y && (target.maxColors || 0) >= 1)) return false;
+    // A mesh this process never saw (the Mac app passes a model over 4 MB by name) cannot be
+    // repainted for the tools, so such a file keeps the converter's previous cross-family path
+    // — the file it always wrote, with its warning — rather than being refused outright.
+    if (Array.isArray(members) && members.some((m) => /\.model$/i.test(m.name) && m.data == null)) return false;
+    return true;
   }
+
+  /**
+   * Bambu/Orca part types that are not printed geometry: modifiers, negative volumes, support
+   * blockers/enforcers. They live only in model_settings.config, which this project drops, so
+   * PrusaSlicer would load each as a solid part and print it. Returns the subtypes found.
+   */
+  function nonPrintingParts(members) {
+    const m = members.find((mm) => /model_settings\.config$/i.test(mm.name));
+    const xml = m ? textOf(m) : null;
+    if (!xml) return [];
+    const kinds = new Set();
+    for (const pm of xml.matchAll(/<part\b[^>]*\bsubtype="([^"]+)"/g)) if (pm[1] !== 'normal_part') kinds.add(pm[1]);
+    return [...kinds];
+  }
+
+  // ── SPOOL MATCH (lib/spool-match.js) ─────────────────────────────────────────────────────────
+  // "Match to loaded spools" decides the tool of every colour itself: a merge (spoolMerge: map +
+  // the colour whose material each tool keeps) or a plain slot map, plus what is loaded in each
+  // slot (slotSpools). Checked, never second-guessed by reduceColors; an invalid one refuses.
+  function spoolMergeFor(sm, n, tools) {
+    const map = sm && sm.map, reps = sm && sm.reps;
+    if (!Array.isArray(map) || map.length !== n || !Array.isArray(reps)) return null;
+    if (map.some((t) => !Number.isInteger(t) || t < 0 || t >= tools)) return null;
+    const k = Math.max(...map) + 1;
+    if (reps.length !== k) return null;
+    for (let s = 0; s < k; s++) {
+      const r = reps[s];
+      if (!Number.isInteger(r) || r < 0 || r >= n) return null;
+      if (map.includes(s) && map[r] !== s) return null;
+    }
+    return { map: map.slice(), reps: reps.slice() };
+  }
+  const FAMILIES = ['PETG', 'PCTG', 'PLA', 'ABS', 'ASA', 'TPU', 'PET', 'PVA', 'HIPS', 'PC', 'PA', 'PP'];
+  const familyOf = (x) => {
+    const u = String(x || '').toUpperCase();
+    return FAMILIES.find((k) => new RegExp('(^|[^A-Z])' + k + '($|[^A-Z])').test(u)) || '';
+  };
+  const spoolHex = (sp) => {
+    const m = /^#?([0-9a-fA-F]{6})/.exec(String((sp && (sp.colour || sp.color || sp.hex)) || '').trim());
+    return m ? '#' + m[1].toUpperCase() : null;
+  };
+  // ── end SPOOL MATCH ──
 
   const refuse = (error) => ({ ok: false, error });
 
@@ -373,6 +420,10 @@
     const name = target.name;
     if (members.some((m) => /\.model$/i.test(m.name) && m.data == null)) {
       return refuse(`This app could not read the model to move its colours onto ${name}'s tools. Convert the file in the desktop app, or pick Generic 3MF.`);
+    }
+    const odd = nonPrintingParts(members);
+    if (odd.length) {
+      return refuse(`This file has ${odd.join(', ')} parts. A PrusaSlicer project made from it would print them as solid geometry, so nothing was converted. Pick Generic 3MF and set those parts up again in PrusaSlicer.`);
     }
     const ps = members.find((m) => /project_settings\.config$/i.test(m.name));
     const proj = ps ? tryJson(textOf(ps)) : null;
@@ -404,11 +455,20 @@
     let merged = false;
     let reps = null;
     const manual = Array.isArray(opts.slotMap) && opts.slotMap.length ? opts.slotMap : null;
-    if (manual) {
+    const spooled = !!(opts.spoolMerge || opts.spoolStrict); // SPOOL MATCH
+    if (opts.spoolMerge) {
+      const sm = spoolMergeFor(opts.spoolMerge, n, tools);
+      if (!sm) return refuse(`The spool match does not fit this file's ${n} colours and ${name}'s ${tools} tools, so nothing was converted.`);
+      map = sm.map;
+      reps = sm.reps;
+      merged = true;
+    } else if (manual) {
       if (manual.length !== n) return refuse(`The colour assignment covers ${manual.length} colours, but this file has ${n}. Nothing was converted.`);
       const far = manual.find((t) => !Number.isInteger(t) || t < 0 || t >= tools);
       if (far !== undefined) return refuse(`The colour assignment uses slot ${Number.isInteger(far) ? far + 1 : '?'}, but ${name} has ${tools} tool${tools === 1 ? '' : 's'}. Choose a slot from 1 to ${tools}.`);
       if (!manual.every((t, i) => t === i)) map = manual.slice();
+    } else if (n > tools && spooled) {
+      return refuse(`This file has ${n} colours for ${name}'s ${tools} tools, and the spool match did not say how to merge them. Nothing was converted.`);
     } else if (n > tools) {
       const usage = ctx.tallyUsage ? ctx.tallyUsage(n) : [];
       const r = fullSpectrum.reduceColors(srcColours, usage && usage.some((u) => u > 0) ? usage : undefined, undefined, tools);
@@ -426,6 +486,23 @@
     const colours = repOf.map((i) => (i >= 0 ? srcColours[i] : '#FFFFFF'));
     const types = repOf.map((i) => (i >= 0 ? srcTypes[i] : 'PLA'));
     const usable = repOf.map((i) => i >= 0);
+    // SPOOL MATCH: each tool carries the colour of the spool loaded in it. A used tool keeps the
+    // material of the colour it prints (and says so when the spool's family differs); an unused
+    // tool with a spool in it is described as that spool.
+    if (spooled && Array.isArray(opts.slotSpools)) {
+      const off = [];
+      for (let s = 0; s < tools; s++) {
+        const sp = opts.slotSpools[s];
+        const hex = spoolHex(sp);
+        if (!hex) continue;
+        colours[s] = hex;
+        const sf = familyOf(sp.material);
+        if (repOf[s] < 0) { if (sf) types[s] = sf; continue; }
+        const cf = familyOf(types[s]);
+        if (sf && cf && sf !== cf) off.push(`tool ${s + 1} holds ${sf} but prints colour ${repOf[s] + 1} in ${types[s]} settings`);
+      }
+      if (off.length) warnings.push(`Check the material: ${off.join('; ')}.`);
+    }
 
     // A tool carrying two materials prints one of them in the other's settings — say which.
     const mixedTools = [];
@@ -439,7 +516,9 @@
     if (mixedTools.length) {
       warnings.push(`Different materials now share a tool: ${mixedTools.join(', ')}. Each prints with that tool's material settings; check the filaments in PrusaSlicer.`);
     }
-    if (merged) {
+    if (merged && spooled) {
+      warnings.push(`Matched ${n} colours to the spools loaded in ${name}'s tools.`);
+    } else if (merged) {
       warnings.push(`Merged ${n} colours into ${tools} for ${name}: the least-used colours now print with the closest-looking tool.`);
     }
 
@@ -451,7 +530,11 @@
     let blends = [];
     let predicted = null;
     let colorMix = false;
-    if (opts.colorMix && target.prusaColorMix) {
+    // A spool match has already chosen a tool for every colour; blending some of them as well would
+    // print colours on tools the match did not pick, so ColorMix steps aside (SPOOL MATCH).
+    if (opts.colorMix && spooled) {
+      warnings.push('ColorMix was not used: the spool match already placed every colour on a loaded tool.');
+    } else if (opts.colorMix && target.prusaColorMix) {
       colorMix = true;
       const cm = planColorMix(srcColours, colours, tools, usable, types);
       predicted = cm.predicted;
@@ -483,6 +566,7 @@
       predicted,
       merged,
       manual: !!map && !!manual,
+      spool: spooled,
       colorMix,
       toolsUsed: [...new Set(finalMap.filter((t) => t < tools))].sort((a, b) => a - b).map((t) => t + 1),
       warnings,
@@ -529,7 +613,7 @@
 
   const api = {
     FULL_SPECTRUM_FILE, CONFIG_FILE, MAX_BLENDS,
-    planColorMix, fullSpectrumJson, prusaProjectConfig, toPrusaProject, applies, plan, convertMembers,
+    planColorMix, fullSpectrumJson, prusaProjectConfig, toPrusaProject, applies, plan, convertMembers, nonPrintingParts,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') global.KhaytPrusaProject = api;

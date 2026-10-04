@@ -3687,10 +3687,12 @@ ipcMain.handle('hub:fs-plan', async (_e, { path: srcPath, targetId, targetProfil
 
 // Bambu/Orca → PrusaSlicer project plan (lib/prusa-project.js): which tool each colour lands on,
 // merges, ColorMix blends and warnings — or why the file cannot be converted. Read-only.
-ipcMain.handle('hub:prusa-plan', async (_e, { path: srcPath, targetId, targetProfile, slotMap, colorMix } = {}) => {
+ipcMain.handle('hub:prusa-plan', async (_e, { path: srcPath, targetId, targetProfile, slotMap, colorMix, spoolMerge, slotSpools, spoolStrict } = {}) => {
   try {
     if (!srcPath || !mfReadAllowed(srcPath)) return { available: false, error: 'Source file is outside an allowed folder.' };
-    return await mfRun('prusaPlan', { src: srcPath, maxBytes: MF_MAX_BYTES, opts: { targetId, targetProfile, slotMap, colorMix: !!colorMix } });
+    return await mfRun('prusaPlan', { src: srcPath, maxBytes: MF_MAX_BYTES, opts: { targetId, targetProfile, slotMap, colorMix: !!colorMix,
+      // The spool match the convert will send (lib/spool-match.js), so the preview is the output.
+      spoolMerge: spoolMerge || null, slotSpools: Array.isArray(slotSpools) ? slotSpools : null, spoolStrict: !!spoolStrict } });
   } catch (e) { return { available: false, error: String((e && e.message) || e) }; }
 });
 

@@ -315,12 +315,14 @@ test('refuses when there is no colour list to place on the tools', () => {
   assert.match(r.error, /colour list could not be read/);
 });
 
-test('refuses (Mac app) when the mesh never crossed into this process', () => {
+test('the Mac app\'s mesh-by-name keeps the old cross-family path instead of refusing', () => {
   const members = mf.readMembers(zipOf(fixture()));
   const byName = members.map((m) => (/\.model$/.test(m.name) ? { name: m.name, size: m.size, data: null } : m));
   const r = mf.convertMembers(byName, { targetId: 'prusa-core-one-indx-8t' });
-  assert.equal(r.ok, false);
-  assert.match(r.error, /could not read the model/);
+  assert.equal(r.ok, true);
+  assert.equal(r.report.crossFamily, true);
+  assert.equal(r.report.prusaProject, undefined);
+  assert.equal(PP.plan(byName, INDX8, {}, {}).ok, false, 'plan() itself still refuses an unseen mesh');
 });
 
 test('without a material list every tool is PLA, and the report says so', () => {
