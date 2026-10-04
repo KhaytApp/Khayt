@@ -893,6 +893,7 @@
   "calc.quote.title": "4. 构建购物车与报价",
   "calc.quote.cart": "此项目的零件",
   "calc.quote.empty": "购物车中暂无零件。下方实时预览反映当前表单内容。",
+  "calc.pending_included": "包含表单中的零件",
   "calc.quote.live": "零件实时价值",
   "calc.quote.add_part": "+ 将零件添加到购物车",
   "calc.cart.edit": "编辑此零件",

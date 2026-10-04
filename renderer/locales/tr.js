@@ -893,6 +893,7 @@
   "calc.quote.title": "4. Sepeti Oluştur ve Teklif Ver",
   "calc.quote.cart": "Bu projedeki parçalar",
   "calc.quote.empty": "Sepette henüz parça yok. Aşağıdaki canlı önizleme mevcut formu yansıtır.",
+  "calc.pending_included": "Formdaki parça dahil",
   "calc.quote.live": "Canlı parça değeri",
   "calc.quote.add_part": "+ Sepete parça ekle",
   "calc.cart.edit": "Bu parçayı düzenle",
