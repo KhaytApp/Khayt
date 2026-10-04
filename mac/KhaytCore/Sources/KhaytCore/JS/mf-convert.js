@@ -1355,6 +1355,57 @@
     }
   }
 
+  /** Remap `key="extruder" value="N"` (1-based) through a 0-based source→slot map. */
+  function remapExtruders(text, map) {
+    return text.replace(/(key="extruder"\s+value=")(\d+)(")/g, (_a, pre, num, post) => {
+      const old = parseInt(num, 10);
+      const ni = old >= 1 && old <= map.length && Number.isInteger(map[old - 1]) ? map[old - 1] + 1 : old;
+      return `${pre}${ni}${post}`;
+    });
+  }
+
+  /**
+   * The merge plan for "Merge to the nearest {n} slots", or null when it does not apply: not
+   * asked for, another colour plan or a manual slot map already owns the colours, the file fits,
+   * a colour is unknown, or the file is not the Bambu/Orca JSON dialect this can reindex.
+   * Usage comes from the same mesh tally Full Spectrum uses, so the most-painted colours keep
+   * their own slot; with no usage at all it falls back to merging the nearest pair.
+   */
+  function planMerge(members, filaments, target, opts, otherPlan, flavour) {
+    if (!opts || !opts.mergeToSlots || otherPlan) return null;
+    if (!fullSpectrum || !fullSpectrum.reduceColors) return null;
+    if (profiles.configFamily(flavour) !== 'bbl' || profiles.configFamily(target.flavour) !== 'bbl') return null;
+    const slots = target.maxColors;
+    if (!(slots >= 1) || filaments.length <= slots) return null;
+    const colors = filaments.map((f) => f.color);
+    if (colors.some((c) => !c)) return null;
+    const usage = tallyPaintUsage(members, colors.length);
+    const r = fullSpectrum.reduceColors(colors, usage.some((u) => u > 0) ? usage : undefined, undefined, slots);
+    // One group per slot; the clamp is belt and braces, as in the reference.
+    const map = r.map.map((g) => Math.min(g, slots - 1));
+    // Each slot loads the filament settings of the first source colour folded into it.
+    const slotSrc = r.colors.map((_, s) => Math.max(0, map.indexOf(s)));
+    return { map, colors: r.colors.map(normHex), slotSrc };
+  }
+
+  /**
+   * Apply a merge plan to project_settings.config: every per-filament array goes from the source
+   * count to the slot count (each slot taking its first member's value), and the merged colours
+   * are stamped. Per-filament arrays only, for the reason applyBandSwapConfig gives.
+   */
+  function applyMergeConfig(obj, plan, srcCount, report) {
+    for (const k of Object.keys(obj)) {
+      if (!/^filament_/i.test(k)) continue;
+      const v = obj[k];
+      if (Array.isArray(v) && v.length === srcCount) obj[k] = plan.slotSrc.map((oldI) => (v[oldI] != null ? v[oldI] : v[0]));
+    }
+    obj.filament_colour = plan.colors.slice();
+    if (report) {
+      report.colorsMerged = { from: srcCount, to: plan.colors.length };
+      report.fieldsChanged.push('filament_colour');
+    }
+  }
+
   /**
    * Turn a source Bambu/Orca project_settings.config into a Full Spectrum U1 config: keep only the 4
    * physical filaments (reindex every per-filament array to them), stamp the loaded head colours, and
@@ -1550,6 +1601,26 @@
       // The active paint plan (band-swap or Full Spectrum) — both expose stateMap + map with the same shape.
       const paintPlan = bandPlan || fsPlan;
 
+      // "Merge to the nearest {n} slots" (opts.mergeToSlots): more colours than the target has
+      // slots, and no mixing or swapping asked for. Folds the least-used colours into their
+      // nearest-looking neighbour until they fit (fullSpectrum.reduceColors, ported from
+      // bedready.io). Only for a same-family Bambu/Orca file — the JSON config is the one this
+      // can reindex — and never under a manual slot map, which is the maker's own decision.
+      const mergePlan = planMerge(members, filaments, target, opts, paintPlan || slotMap, flavour);
+
+      // ── THE PLAIN COLOUR → SLOT MAP REACHES THE PAINT TOO ─────────────────────────────
+      // A slot map used to reorder the filament_* arrays and nothing else. On a PAINTED model
+      // the colours live in the mesh — each triangle's paint code names a filament by number —
+      // and on an object-coloured one in each object's `extruder`. Neither was touched, so the
+      // palette moved and the paint still pointed at the old numbers: every colour landed on
+      // somebody else's slot. bedready.io's retargetThreeMF remaps all three with one map
+      // (remapPaintCode / remapExtruders / stateMap, its #39); so does this now. 0 is "the
+      // object's own filament" and stays 0 — the object's extruder is remapped instead.
+      const plainMap = paintPlan ? null : (mergePlan ? mergePlan.map : slotMap);
+      const plainMoves = !!plainMap && plainMap.some((t, i) => t !== i);
+      const plainStateMap = plainMoves ? (s) => (s >= 1 && s <= n && Number.isInteger(plainMap[s - 1]) ? plainMap[s - 1] + 1 : s) : null;
+      let paintLeftAlone = false;
+
       // Re-profiling only makes sense within one config family (Bambu/Orca share a JSON
       // dialect; Prusa is separate). Across families we can't produce a coherent file by
       // rewriting metadata, so we keep the colour remap but DON'T write a foreign printer
@@ -1575,6 +1646,22 @@
             /(key="extruder"\s+value=")(\d+)(")/g,
             (_a, pre, num, post) => { const old = parseInt(num, 10); const ni = old >= 1 && old <= paintPlan.map.length ? paintPlan.map[old - 1] + 1 : old; return `${pre}${ni}${post}`; });
           return { name: m.name, data: text };
+        }
+        if (plainStateMap && /\.model$/i.test(m.name)) {
+          // A host that passes the mesh by NAME (the Mac app, past its inline limit) has given
+          // us nothing to rewrite. Say so rather than write a file whose paint points at the
+          // old slots under a palette that moved.
+          if (m.data == null) { paintLeftAlone = true; return m; }
+          const text = m.data.toString('utf8');
+          // Unpainted geometry is left as it was, still compressed — byte-identical.
+          if (!/(paint_color|mmu_segmentation)="/.test(text)) return m;
+          try { return { name: m.name, data: remapModelPaint(text, { stateMap: plainStateMap }) }; }
+          catch (_) { paintLeftAlone = true; return m; } // a slot past the 3MF paint encoding
+        }
+        if (plainMoves && /(model_settings|Slic3r_PE_model)\.config$/i.test(m.name) && m.data != null && !tryJson(m.data.toString('utf8'))) {
+          // Bambu model_settings.config / Prusa Slic3r_PE_model.config are XML: each object's and
+          // part's <metadata key="extruder" value="N"/> (1-based) follows the same map.
+          return { name: m.name, data: remapExtruders(m.data.toString('utf8'), plainMap) };
         }
         if (/project_settings\.config$/i.test(m.name) || /model_settings\.config$/i.test(m.name)) {
           const text = m.data.toString('utf8');
@@ -1609,6 +1696,8 @@
               applyBandSwapConfig(obj, bandPlan, n, report);
             } else if (fsPlan && /project_settings\.config$/i.test(m.name)) {
               applyFullSpectrumConfig(obj, fsPlan, n, report);
+            } else if (mergePlan && /project_settings\.config$/i.test(m.name)) {
+              applyMergeConfig(obj, mergePlan, n, report);
             } else if (slotMap && !paintPlan) {
               report.colorsRemapped += remapJsonSettings(obj, slotMap, n);
             }
@@ -1709,8 +1798,13 @@
           (sw ? ` with ${sw} manual filament swap(s) — M600 pauses were added at the swap heights. Load the head colours shown and swap the spool when ${target.name} pauses.` : ' — no manual swaps needed (fits the heads).'));
       } else if (fsPlan) {
         report.warnings.push(`Full Spectrum: kept ${target.maxColors} filaments physical and reproduced ${n - target.maxColors} extra colour(s) as ${fsPlan.mixDefs.length} dithered mix(es). Load the ${target.maxColors} head colours shown; ${target.name} prints the rest by mixing.`);
+      } else if (mergePlan) {
+        report.warnings.push(`Merged ${n} colours into the nearest ${mergePlan.colors.length} for ${target.name}: the least-used colours now print in the closest-looking slot. Check the colours in your slicer before printing.`);
       } else if (target.maxColors && n > target.maxColors) {
         report.warnings.push(`Source uses ${n} colours but ${target.name} supports ${target.maxColors}. Extra colours will need manual mapping in your slicer.`);
+      }
+      if (paintLeftAlone) {
+        report.warnings.push('The model\'s painted colours could not be moved to their new slots here, so painted areas may print in the wrong colour. Convert it in Khayt, or reassign the colours in your slicer.');
       }
       const bounds = computeBounds(members);
       if (bounds) { report.bounds = bounds; for (const w of fitWarnings(bounds, target)) report.warnings.push(w); }
@@ -1747,7 +1841,8 @@
       const back = analyze(zipped);
       // Full Spectrum / band-swap reduce the palette to the physical heads (FS mixes are virtual; band-swap
       // folds colours onto heads), so the round-trip colour count is the target's slot count, not the source's.
-      const expectColours = (report.fullSpectrum || report.bandSwap) ? (target.maxColors || filaments.length) : filaments.length;
+      const expectColours = (report.fullSpectrum || report.bandSwap) ? (target.maxColors || filaments.length)
+        : report.colorsMerged ? report.colorsMerged.to : filaments.length;
       const coloursOk = mode === 'normalize' ? true : back.colorCount === expectColours;
       report.verified = !!(back && back.ok && back.hasGeometry && coloursOk);
     } catch (_) { report.verified = false; }

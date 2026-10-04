@@ -858,6 +858,10 @@
     const colourCapable = !isGeneric && !!(tp && tp.supportsMixedFilament && tp.maxColors >= 2);
     const fullSpectrum = colourCapable && batchColorMode === 'fs';
     const bandSwap = colourCapable && batchColorMode === 'band';
+    // "Merge to the nearest {n} slots" is a real engine option now, not just the absence of the
+    // other two: before, a file with more colours than slots converted with a warning and
+    // nothing merged.
+    const mergeToSlots = colourCapable && batchColorMode === 'merge';
     const dest = (el.querySelector('input[name="convBatchDest"]:checked') || {}).value || 'library';
 
     let outdir = null;
@@ -897,7 +901,7 @@
       const bandThis = bandSwap && !perGeneric;
       let r;
       try {
-        r = await hub().mfConvert({ path: f.path, targetId, mode: perGeneric ? 'normalize' : 'retarget', intoVaultId, outPath, targetProfile: perGeneric ? null : targetProfile, fullSpectrum: fsThis, bandSwap: bandThis });
+        r = await hub().mfConvert({ path: f.path, targetId, mode: perGeneric ? 'normalize' : 'retarget', intoVaultId, outPath, targetProfile: perGeneric ? null : targetProfile, fullSpectrum: fsThis, bandSwap: bandThis, mergeToSlots: mergeToSlots && !perGeneric });
       } catch (e) { r = { ok: false, error: String((e && e.message) || e) }; }
       if (r && r.ok) {
         ok++;

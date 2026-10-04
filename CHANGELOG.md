@@ -15,6 +15,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     doubles per level stops at a fixed budget in the preview, measuring and
     STL export, and a mesh whose zip header claims a size of zero is charged
     what it really inflates to.
+  - Reassigning colours to slots now moves a painted model's paint and each
+    object's colour with them. Before, only the palette moved, so every
+    painted area printed in another slot's colour.
+  - "Merge to the nearest {n} slots" in batch conversion now merges. A file
+    with more colours than the printer has slots used to convert with a
+    warning and nothing merged. The least-used colours now go to the
+    closest-looking slot, paint included.
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its
