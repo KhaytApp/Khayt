@@ -746,6 +746,13 @@
         paintFs();
         paintFilaments();
         loadBandPlan();
+        // ── SPOOL MATCH (renderer/converter-spools.js): "Match to loaded spools" ──
+        if (typeof KhaytConvSpools !== 'undefined') {
+          KhaytConvSpools.mount(modal, {
+            filaments, flavour: a.flavour, targetId: () => targetId, profile: getProfileById,
+            skip: () => (P && targetId === P.GENERIC.id) || isCrossEcosystem(a.flavour, targetId),
+          });
+        }
 
         // Apply a saved preset: set the target and, when the slot map fits this file's colours, the mapping.
         const applySel = modal.querySelector('#convPresetApply');
@@ -785,9 +792,14 @@
         const fsState = (typeof modal._fsState === 'function') ? modal._fsState() : { enabled: false };
         // Band-swap and Full Spectrum are mutually exclusive; band-swap wins if somehow both are set.
         const fsOn = !isGeneric && !bandOn && fsState.enabled && !!fsState.plan;
+        // ── SPOOL MATCH: a match the maker asked for replaces the slot table, or stops here ──
+        const spool = (!isGeneric && !fsOn && !bandOn && typeof modal._spoolState === 'function') ? modal._spoolState() : { active: false };
+        if (spool.active && spool.refusal) { toast(spool.refusal, 'error', 6400); return false; }
+        const spoolOpts = spool.active ? (spool.request || { slotMap: null }) : null;
+        // ── end SPOOL MATCH ──
         let slotMap = null;
         // Band-swap / Full Spectrum handle all colours themselves — the manual slot map doesn't apply.
-        if (!isGeneric && !fsOn && !bandOn && filaments.length) {
+        if (!spoolOpts && !isGeneric && !fsOn && !bandOn && filaments.length) {
           slotMap = Array.from(modal.querySelectorAll('.conv-slot')).map((s) => parseInt(s.value, 10) || 0);
           if (slotMap.every((v, i) => v === i)) slotMap = null; // identity → no remap
           if (slotMap && new Set(slotMap).size !== slotMap.length) {
@@ -814,8 +826,9 @@
             ? Array.from({ length: Math.max(...Object.keys(picksMap).map((k) => +k + 1)) }, (_, i) => picksMap[i] || null)
             : null;
           const process = (typeof modal._procPick === 'function') ? modal._procPick() : null;
-          r = await hub().mfConvert({ path: src.path, targetId, mode, slotMap, intoVaultId, targetProfile, fullSpectrum: fsOn, bandSwap: bandOn, filaments, process });
+          r = await hub().mfConvert({ path: src.path, targetId, mode, slotMap, intoVaultId, targetProfile, fullSpectrum: fsOn, bandSwap: bandOn, filaments, process, ...(spoolOpts || {}) });
         } catch (e) { toast(String((e && e.message) || e), 'error'); if (btn) { btn.disabled = false; } return false; }
+        if (r && r.refused === 'spool-match' && typeof modal._spoolRefused === 'function') modal._spoolRefused(r.error); // SPOOL MATCH
         if (r && r.canceled) { if (btn) { btn.disabled = false; btn.textContent = t('conv.convert') || 'Convert & save…'; } return false; }
         if (!r || !r.ok) { toast((r && r.error) || (t('conv.failed') || 'Conversion failed.'), 'error'); if (btn) { btn.disabled = false; } return false; }
         const rep = r.report || {};
