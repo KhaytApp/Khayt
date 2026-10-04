@@ -119,8 +119,11 @@ struct CalculatorRatesTests {
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytApp/Calculator.swift")
         let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-        #expect(!text.isEmpty, "Calculator.swift was not read — this would pass vacuously")
-        #expect(text.contains("presetId: presetId"),
+        // The costing call moved into the screen's model (CalculatorModel).
+        let model = (try? String(contentsOf: url.deletingLastPathComponent()
+            .appending(path: "CalculatorModel.swift"), encoding: .utf8)) ?? ""
+        #expect(!text.isEmpty && !model.isEmpty, "the calculator was not read — this would pass vacuously")
+        #expect(model.contains("presetId: presetId"),
                 "the calculator costs its part without the preset the shop picked")
         #expect(text.contains("shop.resolvedRates("),
                 "the rate fields are not seeded from the rule's own answer")

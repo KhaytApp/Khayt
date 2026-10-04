@@ -78,6 +78,7 @@ function isLow(c) {
  *   1. hourly   `usagePerHour × order.printTime`   (deductMaterial)
  *   2. packaging one unit per completed order      (deductPackagingConsumables)
  *   3. BOM      `qtyPerUnit × assemblyQty`         (order.components)
+ *   4. per part `line.qty × part.qty`              (part.consumables)
  *
  * Each source is counted only for orders that actually ran it, by reading the
  * same `materialDeducted` / `packagingDeducted` flags the deduction guards on.
@@ -121,6 +122,15 @@ function consumptionByConsumable(consumables, orders, opts) {
       for (const comp of (Array.isArray(order.components) ? order.components : [])) {
         if (!comp || !comp.consumableId) continue;
         add(comp.consumableId, (num(comp.qtyPerUnit) || 0) * aq);
+      }
+      // 4. a part's own consumables, `qty × part.qty` (deductForOrder).
+      for (const part of (Array.isArray(order.parts) ? order.parts : [])) {
+        if (!part || !Array.isArray(part.consumables)) continue;
+        const pq = Math.max(1, num(part.qty) || 1);
+        for (const line of part.consumables) {
+          if (!line || !line.consumableId) continue;
+          add(line.consumableId, (num(line.qty) || 0) * pq);
+        }
       }
     }
 
