@@ -20,6 +20,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     names and colours (Nardo Gray, Lilac Purple, Dark Chocolate, Plum,
     Terracotta), and a bad empty-spool weight on Grass Green is removed. The
     fixes sit in an overrides file that the monthly catalogue refresh applies.
+- **A job taken from a product now sells at the catalogue price when the
+  product has components.** The catalogue counts a product's bought-in
+  components (magnets, screws, a box) in its cost before the margin; a job
+  made from that product left them out and was under-priced by their cost
+  plus margin. The job's price now includes them the same way (times the
+  number of assemblies), a typed price still wins, and the components' cost
+  is saved on the job as `componentsCost`. On the Mac, the New Job sheet's
+  total includes them too.
 
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the

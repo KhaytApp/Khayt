@@ -38,6 +38,7 @@
   const positive = (v) => Math.max(0, num(v, 0));
 
   const pricing = () => (typeof globalThis !== 'undefined' ? globalThis.KhaytPricing : undefined);
+  const calculatorCost = () => (typeof globalThis !== 'undefined' ? globalThis.KhaytCalculatorCost : undefined);
   const workingWeek = () => (typeof globalThis !== 'undefined' ? globalThis.KhaytWorkingWeek : undefined);
 
   /** `YYYY-MM-DD` in the shop's own timezone — a due date is a local day. */
@@ -129,6 +130,33 @@
     return Number.isFinite(n) && n >= 0;
   }
 
+  /**
+   * What a job's bought-in components cost: the catalogue's own figure for one
+   * assembly (`computeComponentsCost`, the helper `lib/product-pricing.js`
+   * prices a product with) times how many assemblies the job makes.
+   *
+   * The catalogue folds components into a product's cost before the margin;
+   * a job taken from that product left them out, so it sold for less than the
+   * catalogue said by exactly their cost plus margin. Times `assemblyQty`
+   * because that is what the job DRAWS from the shelf
+   * (`lib/order-deduction.js`: `qtyPerUnit × assemblyQty`) — one assembly is
+   * the catalogue's figure exactly.
+   *
+   * `consumables` omitted reads the renderer's global shelf, as the helper
+   * always has; the Mac passes its rows explicitly.
+   */
+  function componentsCost(components, assemblyQty, consumables) {
+    const list = arrayOf(components).filter(x => x && x.consumableId);
+    if (!list.length) return 0;
+    const CC = calculatorCost();
+    if (!CC || typeof CC.computeComponentsCost !== 'function') {
+      throw new Error('KhaytOrderNew needs KhaytCalculatorCost to price components');
+    }
+    const each = +CC.computeComponentsCost(list, Array.isArray(consumables) ? consumables : undefined) || 0;
+    const aq = num(assemblyQty, 0) > 0 ? num(assemblyQty, 1) : 1;
+    return +(each * aq).toFixed(4);
+  }
+
   /** `srv`-style hex from the bytes the caller supplies. */
   function hex(bytes) {
     return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -156,7 +184,11 @@
    * measured against, and an agreed price that overwrote it would report the
    * part as sold at cost.
    *
-   * `ctx`: `{ settings, orders, now, tokens }`. `tokens` is
+   * Components are costed from `ctx.consumables` (see `componentsCost`) and
+   * priced at cost plus margin with the rest of the cart, as the catalogue
+   * prices them; their cost is frozen on the record as `componentsCost`.
+   *
+   * `ctx`: `{ settings, orders, now, tokens, consumables }`. `tokens` is
    * `{ tracking, quoteApproval }`, each 16 bytes.
    */
   function newOrder(input, ctx) {
@@ -179,7 +211,12 @@
     // what is priced at cost plus margin.
     const agreedAmount = parts.reduce((s, p) => s + (isAgreed(p)
       ? positive(p.agreedPrice) * Math.max(1, num(p.qty, 1)) : 0), 0);
-    const costedBase = parts.reduce((s, p) => s + (isAgreed(p) ? 0 : num(p.baseCost, 0)), 0);
+    // The components ride with the costed half: the catalogue prices them at
+    // cost plus margin, and no customer agreement names them.
+    const components = arrayOf(i.components).filter(x => x && x.consumableId).map(x => Object.assign({}, x));
+    const assemblyQty = num(i.assemblyQty, 0) > 0 ? num(i.assemblyQty, 1) : 1;
+    const compCost = componentsCost(components, assemblyQty, c.consumables);
+    const costedBase = parts.reduce((s, p) => s + (isAgreed(p) ? 0 : num(p.baseCost, 0)), 0) + compCost;
 
     const P = pricing();
     if (!P) throw new Error('KhaytOrderNew needs KhaytPricing');
@@ -300,8 +337,12 @@
       priority: false,
       printPhotos: [],
       parts,
-      components: arrayOf(i.components).filter(x => x && x.consumableId).map(x => Object.assign({}, x)),
-      assemblyQty: num(i.assemblyQty, 0) > 0 ? num(i.assemblyQty, 1) : 1,
+      components,
+      assemblyQty,
+      // What the components cost when the job was taken, frozen like a part's
+      // `baseCost` — the price above includes them, so the cost beside it has
+      // to. ABSENT on a job with none, so every other record keeps its shape.
+      ...(compCost > 0 ? { componentsCost: +compCost.toFixed(2) } : {}),
       actualPrintTime: null,
       actualWeight: null,
       quoteSentAt: asQuote ? localDateStr(now) : null,
@@ -324,7 +365,7 @@
   const api = {
     TOKEN_BYTES,
     allocateInvoiceNumber, allocateQuoteSeq, avgDailyWorkingHours,
-    estimateDueDate, newOrder,
+    estimateDueDate, newOrder, componentsCost,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderNew = api;

@@ -9996,16 +9996,32 @@ public actor KhaytEngine {
     /// `settings` COMES BACK CHANGED: allocating an invoice number and a quote
     /// sequence advances counters the shop owns, and an allocation nobody
     /// writes down hands the same number to the next job. Write both.
+    ///
+    /// `consumables` is the shelf a product's components are costed from —
+    /// the same rows the catalogue prices them with. Left empty, a job with
+    /// components is priced and costed as if they were free.
     public func newOrder(_ input: [String: JSONValue], orders: [JSONValue],
                          settings: [String: JSONValue], now: Date,
-                         tokens: (tracking: [UInt8], quoteApproval: [UInt8])) throws -> NewOrder {
+                         tokens: (tracking: [UInt8], quoteApproval: [UInt8]),
+                         consumables: [JSONValue] = []) throws -> NewOrder {
         let bytes = { (b: [UInt8]) in JSONValue.array(b.map { .number(Double($0)) }) }
         return try runtime.call2(NEW_ORDER_SCRIPT,
                                  [.object(input), .array(orders), .object(settings),
                                   .number(now.timeIntervalSince1970 * 1000),
                                   .object(["tracking": bytes(tokens.tracking),
-                                           "quoteApproval": bytes(tokens.quoteApproval)])],
+                                           "quoteApproval": bytes(tokens.quoteApproval)]),
+                                  .array(consumables)],
                                  as: NewOrder.self)
+    }
+
+    /// What a job's components cost — `lib/order-new.js componentsCost`, the
+    /// figure `newOrder` adds to the cart, so a screen previewing the price
+    /// adds the same one.
+    public func jobComponentsCost(_ components: JSONValue, assemblyQty: Double,
+                                  consumables: [JSONValue]) throws -> Double {
+        try runtime.call2("KhaytOrderNew.componentsCost(ARG0, ARG1, ARG2)",
+                          [components, .number(assemblyQty), .array(consumables)],
+                          as: Double.self)
     }
 
     // MARK: - Several prints that are one object
@@ -11348,7 +11364,7 @@ private let NEW_ORDER_SCRIPT = """
 (function () {
   var settings = ARG2;
   var order = KhaytOrderNew.newOrder(ARG0,
-    { settings: settings, orders: ARG1, now: ARG3, tokens: ARG4 });
+    { settings: settings, orders: ARG1, now: ARG3, tokens: ARG4, consumables: ARG5 });
   return { order: order, settings: settings };
 })()
 """
