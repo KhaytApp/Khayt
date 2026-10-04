@@ -136,6 +136,22 @@ test('PrusaSlicer spells the same ideas differently', () => {
   assert.deepEqual(f.materials, ['PETG']);
 });
 
+test('a real PrusaSlicer 3MF comments its settings out, and they still read', () => {
+  // `; key = value` is what PrusaSlicer actually writes into Slic3r_PE.config.
+  const prusa = [
+    '; physical_printer_settings_id = ',
+    '; printer_model = MK4S',
+    '; layer_height = 0.2',
+    '; fill_density = 15%',
+    '; filament_type = PLA;PETG',
+  ].join('\n');
+  const f = printFacts({ prusa });
+  assert.equal(f.printer, 'MK4S');
+  assert.equal(f.layerHeight, 0.2);
+  assert.equal(f.infill, '15%');
+  assert.deepEqual(f.materials, ['PLA', 'PETG']);
+});
+
 test('a multi-material Prusa file separates with a semicolon', () => {
   const f = printFacts({ prusa: 'filament_type = PLA;PETG;PLA\nnozzle_diameter = 0.4;0.4' });
   assert.deepEqual(f.materials, ['PLA', 'PETG']);

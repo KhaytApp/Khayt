@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Converter fixes from bedready.io.**
+  - PrusaSlicer files are read and rewritten for real. PrusaSlicer writes its
+    settings as `; key = value`, and the converter only understood the bare
+    form, so a Prusa→Prusa conversion changed nothing while listing the
+    printer, nozzle and bed as changed, and the source printer showed blank.
+    An MMU project keeps one nozzle per extruder.
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its
