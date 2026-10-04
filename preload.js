@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   makerrunPublishFile:   (slug, vaultId, filename) => ipcRenderer.invoke('hub:makerrun-publish-file', { slug, vaultId, filename }),
   makerrunPublishImages: (opts) => ipcRenderer.invoke('hub:makerrun-publish-images', opts || {}),
   makerrunStatus:        (slug) => ipcRenderer.invoke('hub:makerrun-status', { slug }),
+  makerrunFindRecent:    (title) => ipcRenderer.invoke('hub:makerrun-find-recent', { title }),
   makerrunDelete:        (slug) => ipcRenderer.invoke('hub:makerrun-delete', { slug }),
   makerrunOpenAge:       () => ipcRenderer.invoke('hub:makerrun-open-age'),
   makerrunOpenPage:      (slug) => ipcRenderer.invoke('hub:makerrun-open-page', { slug }),

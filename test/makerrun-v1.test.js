@@ -220,3 +220,40 @@ test('a dead link during the forced refresh surfaces as relink', async () => {
   });
   assert.equal(acct.isLinked(dir), false, 'the refused refresh token is cleared');
 });
+
+/* ---- refresh failures that are not a dead link ------------------------------ */
+
+async function refreshWith(answer) {
+  const dir = tmpDir();
+  acct.link(dir, { access: 'OLD', refresh: 'R0', expires: 100 }); // expired: a refresh is needed
+  let err;
+  await withFetch(answer, async () => {
+    err = await V1.withToken(dir, async () => 'never').then(() => null, (e) => e);
+  });
+  return { err, dir };
+}
+
+test('offline during refresh is network, and the link is kept', async () => {
+  const { err, dir } = await refreshWith(async () => { throw new TypeError('fetch failed'); });
+  assert.equal(err.code, 'network');
+  assert.equal(acct.isLinked(dir), true);
+});
+
+test('app-token 429 {error:"rate"} is rate_limited with Retry-After', async () => {
+  const { err, dir } = await refreshWith(async () => ({ status: 429, ok: false, headers: { get: (h) => (h === 'retry-after' ? '45' : null) }, json: async () => ({ error: 'rate' }) }));
+  assert.equal(err.code, 'rate_limited');
+  assert.equal(err.retryAfter, 45);
+  assert.equal(acct.isLinked(dir), true);
+});
+
+test('app-token 5xx is unavailable, not "reconnect"', async () => {
+  const { err, dir } = await refreshWith(async () => ({ status: 502, ok: false, headers: { get: () => null }, json: async () => ({ error: 'server' }) }));
+  assert.equal(err.code, 'unavailable');
+  assert.equal(acct.isLinked(dir), true);
+});
+
+test('only a real 401 from app-token is relink', async () => {
+  const { err, dir } = await refreshWith(async () => ({ status: 401, ok: false, headers: { get: () => null }, json: async () => ({ error: 'invalid' }) }));
+  assert.equal(err.code, 'relink');
+  assert.equal(acct.isLinked(dir), false);
+});

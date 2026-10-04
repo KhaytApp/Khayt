@@ -83,7 +83,8 @@
       '</div>';
     document.body.appendChild(root);
     body = root.querySelector('.mr-body');
-    root.addEventListener('click', function (e) { if (e.target === root) close(); });
+    // Same rule as ✕ and Escape: never abandon a publish half-way by a stray click on the backdrop.
+    root.addEventListener('click', function (e) { if (e.target === root && !(pub && pub.running)) close(); });
     root.querySelector('.mr-close').addEventListener('click', close);
     document.addEventListener('keydown', function (e) {
       if (!isOpen()) return;
@@ -211,7 +212,16 @@
 
   /* ---- BROWSE ---------------------------------------------------------- */
 
+  /** A publish in progress owns the modal: reopening shows it rather than starting anything new. */
+  function showRunning() {
+    mode = 'publish';
+    show(tx('mr.publish_title'));
+    paintDrawer();
+    renderPublish();
+  }
+
   function open() {
+    if (pub && pub.running) { showRunning(); return; }
     mode = 'browse';
     pub = null;
     show(tx('mr.browse_title'));
@@ -487,12 +497,17 @@
    * listing's status (and the way to finish or remove a half-made one) if it has one.
    */
   function publish(recId) {
+    // One publish at a time. A second one for the same record would create a second listing that
+    // nothing tracks; for another record it would orphan the first run's state.
+    if (pub && pub.running) { showRunning(); return; }
     var rec = recById(recId);
     if (!rec) return;
     mode = 'publish';
     detail = null;
     var tm = T();
-    var mrLic = tm ? tm.toMakerRunLicence(rec.licence) : null;
+    // A design downloaded FROM MakerRun carries somebody else's licence; carrying it into a listing
+    // would make that choice for the user. Left blank on purpose, beside the "downloaded" warning.
+    var mrLic = (tm && !rec.makerrun) ? tm.toMakerRunLicence(rec.licence) : null;
     pub = {
       recId: rec.id,
       form: {
@@ -505,7 +520,7 @@
         includePic: false,
         printClaim: false,
       },
-      licenceUnmapped: !!rec.licence && !mrLic,
+      licenceUnmapped: !rec.makerrun && !!rec.licence && !mrLic,
       errors: {},
       stage: rec.makerrunListing ? 'status' : 'form', // form | confirm | running | status
       steps: null,
@@ -540,6 +555,7 @@
     if (pub.stage === 'status') { renderListing(rec); return; }
     if (pub.stage === 'confirm') { renderConfirm(rec); return; }
     if (pub.stage === 'running') { renderSteps(rec); return; }
+    if (pub.stage === 'recreate') { renderRecreate(); return; }
     renderForm(rec);
   }
 
@@ -633,7 +649,7 @@
     if (!pub.running) {
       if (pub.error) {
         tail = errorHtml(pub.error, 'publish') + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">' +
-          (L.slug ? btn(tx('mr.finish_upload'), 'resume', { kind: 'primary' }) + btn(tx('mr.delete_half'), 'delete', { kind: 'danger' })
+          (L.slug ? btn(tx('mr.finish_upload'), 'resume', { kind: 'primary' }) + skipPicBtn(L) + btn(tx('mr.delete_half'), 'delete', { kind: 'danger' })
                   : btn(tx('mr.retry'), 'go', { kind: 'primary' }) + btn(tx('mr.back'), 'edit')) + '</div>';
       } else {
         tail = listingSummary(L) + '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">' + btn(tx('mr.check_status'), 'status') + btn(tx('mr.open_page'), 'page-own') + btn(tx('mr.done'), 'close', { kind: 'primary' }) + '</div>';
@@ -642,6 +658,33 @@
     body.innerHTML = '<div role="status" aria-live="polite" style="max-width:600px;">' +
       '<h3 style="margin:0 0 10px;font-size:16px;">' + esc(tx('mr.publishing', { title: rec.name || '' })) + '</h3>' + list + '</div>' + tail +
       (pub.note ? '<div class="mr-note" style="font-size:13px;margin-top:10px;">' + pub.note + '</div>' : '');
+  }
+
+  /** Only the picture is left: the listing is usable without it, so it can be finished without one. */
+  function skipPicBtn(L) { return L && L.step === 'file' && L.wantPic ? btn(tx('mr.skip_picture'), 'skip-pic') : ''; }
+
+  function skipPicture() {
+    var rec = pub && recById(pub.recId);
+    if (!rec || !rec.makerrunListing || pub.running) return;
+    rec.makerrunListing.step = 'done';
+    rec.makerrunListing.wantPic = false;
+    rec.updatedAt = Date.now();
+    save();
+    repaintLibrary();
+    pub.error = null;
+    pub.stage = 'status';
+    pub.note = '<span style="color:' + MUTED + ';">' + esc(tx('mr.no_picture')) + '</span>';
+    renderPublish();
+  }
+
+  function renderRecreate() {
+    body.innerHTML =
+      '<div role="alertdialog" aria-labelledby="mrRecHead" aria-describedby="mrRecBody" style="max-width:600px;">' +
+        '<h3 id="mrRecHead" style="margin:0 0 8px;font-size:16px;">' + esc(tx('mr.recreate_title')) + '</h3>' +
+        '<p id="mrRecBody" style="margin:0 0 14px;font-size:14px;line-height:1.5;">' + esc(tx('mr.recreate_body')) + '</p>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + btn(tx('mr.recreate_go'), 'recreate', { kind: 'primary' }) + btn(tx('mr.back'), 'edit') + '</div>' +
+      '</div>';
+    focusFirst('.mr-btn[data-mr="edit"]');
   }
 
   function statusLabel(s) {
@@ -677,7 +720,7 @@
         (pub.error ? errorHtml(pub.error, 'publish') : '') +
         '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">' +
           btn(tx('mr.check_status'), 'status') +
-          (incomplete ? btn(tx('mr.finish_upload'), 'resume', { kind: 'primary' }) + btn(tx('mr.delete_half'), 'delete', { kind: 'danger' }) : '') +
+          (incomplete ? btn(tx('mr.finish_upload'), 'resume', { kind: 'primary' }) + skipPicBtn(L) + btn(tx('mr.delete_half'), 'delete', { kind: 'danger' }) : '') +
           btn(tx('mr.open_page'), 'page-own') +
           btn(tx('mr.close'), 'close') +
         '</div>' +
@@ -691,48 +734,78 @@
    * the app closing — leaves a record that knows exactly what exists on MakerRun.
    */
   async function runSteps() {
-    var rec = recById(pub.recId);
-    if (!rec || pub.running) return;
-    var f = pub.form;
+    // This run's OWN state. `pub` is module-level and can be replaced while a request is in flight;
+    // everything below reads and writes P, and paints only while P is still the one on screen.
+    var P = pub;
+    if (!P || P.running) return;
+    var rec = recById(P.recId);
+    if (!rec) return;
+    var f = P.form;
     var L = rec.makerrunListing || null;
     var wantPic = !!f.includePic || !!(L && L.wantPic);
-    pub.steps = [{ id: 'create', state: 'pending' }, { id: 'file', state: 'pending' }].concat(wantPic ? [{ id: 'images', state: 'pending' }] : []);
+    P.steps = [{ id: 'create', state: 'pending' }, { id: 'file', state: 'pending' }].concat(wantPic ? [{ id: 'images', state: 'pending' }] : []);
     var at = !L ? 0 : L.step === 'created' ? 1 : L.step === 'file' ? 2 : 3;
-    for (var i = 0; i < at && i < pub.steps.length; i++) pub.steps[i].state = 'done';
-    pub.stage = 'running';
-    pub.running = true;
-    pub.error = null;
-    pub.note = '';
-    renderSteps(rec);
+    for (var i = 0; i < at && i < P.steps.length; i++) P.steps[i].state = 'done';
+    P.stage = 'running';
+    P.running = true;
+    P.error = null;
+    P.note = '';
+    var paint = function () { if (pub === P) renderSteps(rec); };
+    paint();
 
-    var step = function (id, state) { pub.steps.forEach(function (s) { if (s.id === id) s.state = state; }); renderSteps(rec); };
+    var step = function (id, state) { P.steps.forEach(function (s) { if (s.id === id) s.state = state; }); paint(); };
     var fail = function (id, r) {
-      step(id, 'failed');
-      pub.running = false;
-      pub.error = r || {};
+      P.steps.forEach(function (s) { if (s.id === id) s.state = 'failed'; });
+      P.running = false;
+      P.error = r || {};
+      if (id === 'create') {
+        // The answer was lost, not refused: the listing may exist. The next try looks before it creates.
+        if (r && (r.code === 'timeout' || r.code === 'network')) P.createUncertain = true;
+        P.recreateConfirmed = false;
+      }
       if (id === 'create' && r && r.code === 'invalid' && Array.isArray(r.details) && r.details.length) {
         // Field errors belong on the form, next to the fields — not in a step list.
-        pub.errors = {};
-        r.details.forEach(function (d) { if (d && d.field) pub.errors[d.field === 'license' ? 'license' : d.field] = d.message; });
-        pub.stage = 'form';
-        renderPublish();
+        P.errors = {};
+        r.details.forEach(function (d) { if (d && d.field) P.errors[d.field] = d.message; });
+        P.stage = 'form';
+        if (pub === P) renderPublish();
         return;
       }
-      renderSteps(rec);
+      paint();
     };
+    var adopt = function (slug, status) {
+      L = rec.makerrunListing = { slug: slug, status: status || 'pending', step: 'created', publishedAt: Date.now(), verification: null, wantPic: wantPic, kind: f.printClaim ? 'print' : 'gallery', usePhoto: hasPhoto(rec) };
+      P.createUncertain = false;
+      P.recreateConfirmed = false;
+      rec.updatedAt = Date.now();
+      save();
+      step('create', 'done');
+    };
+    var title = String(f.title).trim();
 
     try {
+      if (!L && P.createUncertain && !P.recreateConfirmed) {
+        step('create', 'running');
+        var fr = await api.makerrunFindRecent(title);
+        if (!fr || !fr.ok) { fail('create', fr); return; }
+        if (fr.found && fr.slug) adopt(fr.slug, fr.status);
+        else {
+          // Nothing matching on the account. Creating again is probably right — but it is the user's call.
+          P.steps.forEach(function (s) { if (s.id === 'create') s.state = 'pending'; });
+          P.running = false;
+          P.stage = 'recreate';
+          if (pub === P) renderPublish();
+          return;
+        }
+      }
       if (!L) {
         step('create', 'running');
         var c = await api.makerrunPublishCreate({
-          title: String(f.title).trim(), description: String(f.description || '').trim(),
+          title: title, description: String(f.description || '').trim(),
           category: f.category, material: f.material || null, license: f.license, nsfw: !!f.nsfw,
         });
         if (!c || !c.ok) { fail('create', c); return; }
-        L = rec.makerrunListing = { slug: c.slug, status: c.status || 'pending', step: 'created', publishedAt: Date.now(), verification: null, wantPic: wantPic, kind: f.printClaim ? 'print' : 'gallery', usePhoto: hasPhoto(rec) };
-        rec.updatedAt = Date.now();
-        save();
-        step('create', 'done');
+        adopt(c.slug, c.status);
       }
       if (L.step === 'created') {
         step('file', 'running');
@@ -754,20 +827,20 @@
           else payload.useThumb = true;
           var im = await api.makerrunPublishImages(payload);
           if (!im || !im.ok) { fail('images', im); return; }
-          if (im.failures && im.failures.length) pub.note = esc(tx('mr.image_failures', { reasons: im.failures.join(' ') }));
+          if (im.failures && im.failures.length) P.note = esc(tx('mr.image_failures', { reasons: im.failures.join(' ') }));
           step('images', 'done');
         }
         L.step = 'done';
         rec.updatedAt = Date.now();
         save();
       }
-      pub.running = false;
-      renderSteps(rec);
+      P.running = false;
+      paint();
       repaintLibrary();
     } catch (e) {
-      pub.running = false;
-      pub.error = { error: String(e && e.message || e) };
-      renderSteps(rec);
+      P.running = false;
+      P.error = { error: String(e && e.message || e) };
+      paint();
     }
   }
 
@@ -779,7 +852,11 @@
     var r;
     try { r = await api.makerrunStatus(rec.makerrunListing.slug); } catch (e) { r = { ok: false, error: String(e && e.message || e) }; }
     if (!r || !r.ok) { pub.note = ''; pub.error = r || {}; }
-    else if (!r.found) { pub.error = null; pub.note = esc(tx('mr.status_gone')); }
+    else if (!r.found) {
+      pub.error = null;
+      // Not seen is only "gone" when every listing was read.
+      pub.note = esc(r.complete === false ? tx('mr.status_not_in_recent', { n: String(r.searched || 0) }) : tx('mr.status_gone'));
+    }
     else {
       pub.error = null;
       rec.makerrunListing.status = r.status;
@@ -880,6 +957,8 @@
         pub.error = null; pub.stage = 'confirm'; renderPublish(); break;
       case 'edit': if (pub) { pub.stage = 'form'; renderPublish(); } break;
       case 'go': runSteps(); break;
+      case 'recreate': if (pub) { pub.recreateConfirmed = true; runSteps(); } break;
+      case 'skip-pic': skipPicture(); break;
       case 'resume': runSteps(); break;
       case 'status': checkStatus(); break;
       case 'page-own': { var r = pub && recById(pub.recId); if (r && r.makerrunListing) api.makerrunOpenPage(r.makerrunListing.slug); break; }

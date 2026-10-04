@@ -5433,17 +5433,10 @@ if (isBedReady) {
   const { BASE: MAKERRUN_BASE } = require('./lib/makerrun');
   const mrUser = () => app.getPath('userData');
 
-  /** A file inside one record's vault folder, or null. Never a path the renderer chose. */
-  const mrVaultFile = (vaultId, filename) => {
-    if (!vaultId || typeof filename !== 'string' || !filename) return null;
-    const dir = printLibItemDir(vaultId);
-    const name = path.basename(filename);
-    if (!name || name === '.' || name === '..') return null;
-    const full = path.join(dir, name);
-    const rel = path.relative(dir, full);
-    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return null;
-    return full;
-  };
+  /** A plain file inside one record's vault folder ({full, size}), or null. Symlinks are refused and
+   *  containment is checked on real paths — see mrPublish.resolveVaultFile. */
+  const mrVaultFile = (vaultId, filename) =>
+    (vaultId ? mrPublish.resolveVaultFile(printLibItemDir(vaultId), filename) : null);
 
   ipcMain.handle('hub:makerrun-browse', async (_e, opts = {}) => {
     try { return { ok: true, ...(await mrCatalog.listDesigns(opts || {})) }; }
@@ -5481,14 +5474,13 @@ if (isBedReady) {
 
   ipcMain.handle('hub:makerrun-publish-file', async (_e, { slug, vaultId, filename } = {}) => {
     try {
-      const full = mrVaultFile(vaultId, filename);
-      if (!full || !fs.existsSync(full)) return { ok: false, error: 'That print file is missing from the library folder.', code: 'missing' };
-      const st = fs.statSync(full);
-      if (!st.isFile()) return { ok: false, error: 'That print file is missing from the library folder.', code: 'missing' };
+      const vf = mrVaultFile(vaultId, filename);
+      if (!vf) return { ok: false, error: 'That print file is missing from the library folder.', code: 'missing' };
+      const full = vf.full;
       // Size and extension BEFORE reading: a 2 GB file is refused without being loaded into memory.
-      const issue = mrPublish.checkModel(path.basename(full), st.size);
+      const issue = mrPublish.checkModel(path.basename(full), vf.size);
       if (issue) return MRV1.toIpcError(MRV1.codedError('invalid', issue.message, { details: [issue] }));
-      const bytes = await fs.promises.readFile(full);
+      const bytes = await mrPublish.readVaultFile(full, mrPublish.MAX_MODEL_BYTES);
       return { ok: true, ...(await MRV1.withToken(mrUser(), (token) =>
         mrPublish.uploadModel(token, slug, { filename: path.basename(full), bytes }))) };
     } catch (e) { return MRV1.toIpcError(e); }
@@ -5506,8 +5498,8 @@ if (isBedReady) {
         buf = Buffer.from(m[2], 'base64');
       } else if (useThumb) {
         for (const name of ['thumb.jpg', 'thumb.png', 'thumb.webp']) {
-          const full = mrVaultFile(vaultId, name);
-          if (full && fs.existsSync(full)) { buf = await fs.promises.readFile(full); break; }
+          const vf = mrVaultFile(vaultId, name);
+          if (vf) { buf = await mrPublish.readVaultFile(vf.full, 64 * 1024 * 1024); break; }
         }
       }
       if (!buf || !buf.length) return { ok: false, error: 'This print file has no picture to upload.', code: 'missing' };
@@ -5531,6 +5523,16 @@ if (isBedReady) {
   ipcMain.handle('hub:makerrun-status', async (_e, { slug } = {}) => {
     try { return { ok: true, ...(await MRV1.withToken(mrUser(), (token) => mrPublish.getStatus(token, slug))) }; }
     catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  // After a create whose answer was lost (timeout / dropped connection): did MakerRun create it anyway?
+  // Looks for the user's own pending listing with this title from the last 15 minutes.
+  ipcMain.handle('hub:makerrun-find-recent', async (_e, { title } = {}) => {
+    try {
+      const since = Date.now() - 15 * 60 * 1000;
+      const hit = await MRV1.withToken(mrUser(), (token) => mrPublish.findRecentListing(token, title, since));
+      return { ok: true, found: !!hit, ...(hit || {}) };
+    } catch (e) { return MRV1.toIpcError(e); }
   });
 
   // Only reachable from an explicit "Delete half-created listing" button behind a confirm dialog.

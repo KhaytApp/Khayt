@@ -22,7 +22,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     anything becomes public, shows each step, and then the result of MakerRun's
     profile check and "Pending review" — MakerRun reviews every new listing.
     **Check status** asks MakerRun on demand; if a step fails you can finish the
-    upload or delete the half-created listing. Maintenance, rate limits,
+    upload, skip the picture, or delete the half-created listing, and a create
+    whose answer was lost is looked up before anything is created twice. Maintenance, rate limits,
     two-factor sign-in and 18+ confirmation each say what to do next.
   - A `.stp` file downloaded from MakerRun is now saved as `.step`; it used to
     get a `.3mf` name.

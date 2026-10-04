@@ -329,3 +329,150 @@ test('publish while signed out asks to connect first', async () => {
   click(doc, '.mr-btn[data-mr="connect"]');
   assert.equal(calls.signin, 1);
 });
+
+/* ---- review fixes ------------------------------------------------------------ */
+
+/** Fill the form and get to the confirm screen. */
+async function toConfirm(window, doc, { pic = false } = {}) {
+  const set = (sel, v) => { const el = $(doc, sel); el.value = v; el.dispatchEvent(new window.Event('change', { bubbles: true })); };
+  set('#mrCatIn', 'tools');
+  if (!$(doc, '#mrLicIn').value) set('#mrLicIn', 'CC-BY-4.0');
+  if (pic) {
+    const p = $(doc, 'input[data-field="includePic"]');
+    p.checked = true;
+    p.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await tick(window);
+  }
+  click(doc, '.mr-btn[data-mr="review"]');
+  await tick(window);
+}
+
+test('while a publish runs: the backdrop does not close it, and publish()/open() show it instead of starting another', async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const rec = REC();
+  const { window, doc, calls } = await boot({
+    printFiles: [rec, Object.assign(REC(), { id: 'PF-2', name: 'Other' })],
+    api: { makerrunPublishCreate: async (input) => { calls.create.push(input); await gate; return { ok: true, slug: 'my-part-z9y8x7', status: 'pending' }; } },
+  });
+  window.BedReadyMakerRun.publish('PF-1');
+  await tick(window);
+  await toConfirm(window, doc);
+  click(doc, '.mr-btn[data-mr="go"]');
+  await tick(window);
+  assert.equal(calls.create.length, 1);
+
+  doc.querySelector('.mr-overlay').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  assert.notEqual(doc.querySelector('.mr-overlay').style.display, 'none', 'a backdrop click mid-publish is ignored');
+
+  window.BedReadyMakerRun.publish('PF-1');
+  window.BedReadyMakerRun.publish('PF-2');
+  window.BedReadyMakerRun.open();
+  await tick(window);
+  assert.match(text(doc), /Publishing “My part”/, 'the running publish stays on screen');
+  assert.equal(doc.querySelectorAll('.mr-card').length, 0);
+
+  release();
+  await tick(window, 20);
+  assert.equal(calls.create.length, 1, 'never a second create');
+  assert.equal(rec.makerrunListing.step, 'done');
+});
+
+test('a create whose answer was lost looks for the listing before creating again — and adopts it', async () => {
+  const rec = REC();
+  rec.licence = 'cc-by';
+  let found = { ok: true, found: true, slug: 'my-part-found1', status: 'pending' };
+  const finds = [];
+  const { window, doc, calls } = await boot({
+    printFiles: [rec],
+    api: {
+      makerrunPublishCreate: async (input) => { calls.create.push(input); return { ok: false, code: 'timeout', error: 'slow' }; },
+      makerrunFindRecent: async (title) => { finds.push(title); return found; },
+    },
+  });
+  window.BedReadyMakerRun.publish('PF-1');
+  await tick(window);
+  await toConfirm(window, doc);
+  click(doc, '.mr-btn[data-mr="go"]');
+  await tick(window, 12);
+  assert.equal(calls.create.length, 1);
+  assert.match(text(doc), /Could not reach MakerRun|took too long|Something went wrong|slow/);
+
+  click(doc, '.mr-btn[data-mr="go"]'); // Try again
+  await tick(window, 20);
+  assert.deepEqual(finds, ['My part']);
+  assert.equal(calls.create.length, 1, 'adopted, not re-created');
+  assert.equal(rec.makerrunListing.slug, 'my-part-found1');
+  assert.deepEqual(plain(calls.file), [{ slug: 'my-part-found1', vaultId: 'PF-1', filename: 'my-part.3mf' }]);
+});
+
+test('…and when nothing is found, re-creating needs the user to say so', async () => {
+  const rec = REC();
+  rec.licence = 'cc-by';
+  let createAnswer = { ok: false, code: 'network', error: 'offline' };
+  const { window, doc, calls } = await boot({
+    printFiles: [rec],
+    api: {
+      makerrunPublishCreate: async (input) => { calls.create.push(input); return createAnswer; },
+      makerrunFindRecent: async () => ({ ok: true, found: false }),
+    },
+  });
+  window.BedReadyMakerRun.publish('PF-1');
+  await tick(window);
+  await toConfirm(window, doc);
+  click(doc, '.mr-btn[data-mr="go"]');
+  await tick(window, 12);
+  click(doc, '.mr-btn[data-mr="go"]');
+  await tick(window, 12);
+  assert.equal(calls.create.length, 1);
+  assert.match(text(doc), /Did MakerRun create the listing\?/);
+  createAnswer = { ok: true, slug: 'my-part-z9y8x7', status: 'pending' };
+  click(doc, '.mr-btn[data-mr="recreate"]');
+  await tick(window, 20);
+  assert.equal(calls.create.length, 2);
+  assert.equal(rec.makerrunListing.step, 'done');
+});
+
+test('a failed picture can be skipped: the listing is finished without it', async () => {
+  const rec = REC();
+  rec.licence = 'cc-by';
+  const { window, doc, calls } = await boot({
+    printFiles: [rec],
+    api: { makerrunPublishImages: async (o) => { calls.images.push(o); return { ok: false, code: 'invalid', error: 'x', details: [{ field: 'images', message: 'photo.jpg: too big' }] }; } },
+  });
+  window.BedReadyMakerRun.publish('PF-1');
+  await tick(window);
+  await toConfirm(window, doc, { pic: true });
+  click(doc, '.mr-btn[data-mr="go"]');
+  await tick(window, 20);
+  assert.equal(rec.makerrunListing.step, 'file');
+  click(doc, '.mr-btn[data-mr="skip-pic"]');
+  await tick(window, 8);
+  assert.equal(rec.makerrunListing.step, 'done');
+  assert.equal(calls.images.length, 1, 'skipping does not retry the picture');
+  assert.doesNotMatch(text(doc), /only partly uploaded/);
+});
+
+test('a design downloaded from MakerRun is never published under its licence by default', async () => {
+  const rec = REC();
+  rec.licence = 'cc-by';
+  rec.makerrun = { slug: 'orig-a1b2c3', license: 'CC-BY-4.0', creator: 'Ada' };
+  const { window, doc } = await boot({ printFiles: [rec] });
+  window.BedReadyMakerRun.publish('PF-1');
+  await tick(window);
+  assert.equal($(doc, '#mrLicIn').value, '');
+  assert.match(text(doc), /downloaded from MakerRun \(original by Ada\)/);
+  assert.doesNotMatch(text(doc), /is not one MakerRun offers/);
+});
+
+test('status not found in a partial read says so, rather than "gone"', async () => {
+  const rec = REC();
+  rec.makerrunListing = { slug: 'old-a1b2c3', status: 'published', step: 'done' };
+  const { window, doc } = await boot({ printFiles: [rec], api: { makerrunStatus: async () => ({ ok: true, found: false, complete: false, searched: 2000 }) } });
+  window.BedReadyMakerRun.publish('PF-1');
+  await tick(window);
+  click(doc, '.mr-btn[data-mr="status"]');
+  await tick(window);
+  assert.match(text(doc), /Not found among your 2000 most recent MakerRun listings/);
+  assert.doesNotMatch(text(doc), /no longer on your MakerRun account/);
+});

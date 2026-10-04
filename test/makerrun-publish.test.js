@@ -156,13 +156,100 @@ test('uploadImages: every image refused (422, no envelope) is invalid with the r
 
 /* ---- status / delete ----------------------------------------------------------- */
 
+const mine = (n, from = 0, over = {}) => Array.from({ length: n }, (_, i) => Object.assign({ slug: 'd-' + (from + i) + '-a1b2c3', title: 'D' + (from + i), status: 'published', createdAt: '2026-01-01T00:00:00Z' }, over));
+
 test('getStatus finds the listing among the user\'s own, and says so when it is gone', async () => {
-  let url;
-  await withFetch(async (u) => { url = u; return res(200, { user: { id: 'u', displayName: 'T', trusted: false }, designs: [{ slug: 'desk-hook-a1b2c3', title: 'Desk hook', status: 'pending', verification: { badge: false, fileChecked: true } }] }); }, async () => {
-    assert.deepEqual(await P.getStatus('T', 'desk-hook-a1b2c3', { baseUrl: BASE }), { found: true, status: 'pending', verification: { badge: false, fileChecked: true } });
-    assert.deepEqual(await P.getStatus('T', 'other-a1b2c3', { baseUrl: BASE }), { found: false, status: null, verification: null });
+  const urls = [];
+  await withFetch(async (u) => { urls.push(u); return res(200, { user: { id: 'u', displayName: 'T', trusted: false }, designs: [{ slug: 'desk-hook-a1b2c3', title: 'Desk hook', status: 'pending', verification: { badge: false, fileChecked: true } }] }); }, async () => {
+    assert.deepEqual(await P.getStatus('T', 'desk-hook-a1b2c3', { baseUrl: BASE }), { found: true, status: 'pending', verification: { badge: false, fileChecked: true }, complete: true });
+    const gone = await P.getStatus('T', 'other-a1b2c3', { baseUrl: BASE });
+    assert.equal(gone.found, false);
+    assert.equal(gone.complete, true, 'a short page means every listing was read');
   });
-  assert.equal(url, BASE + '/api/v1/me?limit=100');
+  assert.equal(urls[0], BASE + '/api/v1/me?limit=100');
+});
+
+test('getStatus pages through /me with offset until a short page', async () => {
+  const urls = [];
+  await withFetch(async (u) => {
+    urls.push(u);
+    const off = Number(new URL(u).searchParams.get('offset') || 0);
+    return res(200, { user: { id: 'u' }, designs: off === 0 ? mine(100) : mine(30, 100) });
+  }, async () => {
+    const r = await P.getStatus('T', 'd-120-a1b2c3', { baseUrl: BASE });
+    assert.equal(r.found, true);
+  });
+  assert.deepEqual(urls, [BASE + '/api/v1/me?limit=100', BASE + '/api/v1/me?limit=100&offset=100']);
+});
+
+test('getStatus that runs out of pages says "not in the latest N", not "gone"', async () => {
+  await withFetch(async (u) => {
+    const off = Number(new URL(u).searchParams.get('offset') || 0);
+    return res(200, { user: { id: 'u' }, designs: mine(100, off) });
+  }, async () => {
+    const r = await P.getStatus('T', 'old-a1b2c3', { baseUrl: BASE }, { maxPages: 2 });
+    assert.equal(r.found, false);
+    assert.equal(r.complete, false);
+    assert.equal(r.searched, 200);
+  });
+});
+
+test('findRecentListing adopts only a pending listing with the same title from the window', async () => {
+  const now = Date.parse('2026-10-04T12:00:00Z');
+  const since = now - 15 * 60 * 1000;
+  const designs = [
+    { slug: 'desk-hook-new111', title: 'Desk hook', status: 'published', createdAt: '2026-10-04T11:59:00Z' },
+    { slug: 'other-222222', title: 'Other', status: 'pending', createdAt: '2026-10-04T11:58:00Z' },
+    { slug: 'desk-hook-abc333', title: 'Desk hook', status: 'pending', createdAt: '2026-10-04T11:55:00Z' },
+    { slug: 'desk-hook-old444', title: 'Desk hook', status: 'pending', createdAt: '2026-10-04T10:00:00Z' },
+  ];
+  let calls = 0;
+  await withFetch(async () => { calls++; return res(200, { user: { id: 'u' }, designs }); }, async () => {
+    assert.deepEqual(await P.findRecentListing('T', ' Desk hook ', since, { baseUrl: BASE }), { slug: 'desk-hook-abc333', status: 'pending', createdAt: '2026-10-04T11:55:00Z' });
+    assert.equal(await P.findRecentListing('T', 'Lamp', since, { baseUrl: BASE }), null);
+    assert.equal(await P.findRecentListing('T', 'Desk hook', now, { baseUrl: BASE }), null, 'too old');
+  });
+  assert.equal(calls, 3, 'one page each — new listings sort first');
+});
+
+test('uploadTimeoutFor grows with size and is capped at 30 minutes', () => {
+  const V1 = require('../lib/makerrun-v1');
+  assert.equal(V1.uploadTimeoutFor(0), 120000);
+  assert.equal(V1.uploadTimeoutFor(100 * 1024 * 1024), 120000 + 400000, '100 MB at 256 KiB/s');
+  assert.equal(V1.uploadTimeoutFor(10 * 1024 * 1024 * 1024), 30 * 60 * 1000);
+});
+
+test('uploadModel and uploadImages pass a size-scaled timeout to the transport', async () => {
+  const V1 = require('../lib/makerrun-v1');
+  const real = V1.request;
+  const seen = [];
+  V1.request = async (method, p, opts) => { seen.push(opts.timeoutMs); return p.endsWith('/files') ? { verification: {}, status: 'pending' } : { images: [], failures: [] }; };
+  try {
+    await P.uploadModel('T', 'desk-hook-a1b2c3', { filename: 'a.3mf', bytes: Buffer.alloc(50 * 1024 * 1024) });
+    await P.uploadImages('T', 'desk-hook-a1b2c3', [img(1, 'image/png', Buffer.alloc(2 * 1024 * 1024))], {});
+  } finally { V1.request = real; }
+  assert.deepEqual(seen, [V1.uploadTimeoutFor(50 * 1024 * 1024), V1.uploadTimeoutFor(2 * 1024 * 1024)]);
+});
+
+test('resolveVaultFile: plain files only, never a symlink, never outside the folder', async () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'mr-vault-'));
+  const dir = path.join(base, 'PF-1');
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, 'part.3mf'), 'model');
+  fs.writeFileSync(path.join(base, 'secret.txt'), 'nope');
+  fs.symlinkSync(path.join(base, 'secret.txt'), path.join(dir, 'link.3mf'));
+  fs.symlinkSync(path.join(dir, 'part.3mf'), path.join(dir, 'inner.3mf'));
+  fs.mkdirSync(path.join(dir, 'sub.3mf'));
+  assert.deepEqual(P.resolveVaultFile(dir, 'part.3mf'), { full: path.join(dir, 'part.3mf'), size: 5 });
+  for (const bad of ['link.3mf', 'inner.3mf', 'sub.3mf', '../secret.txt', 'x/part.3mf', 'missing.3mf', '..', '', null]) {
+    assert.equal(P.resolveVaultFile(dir, bad), null, String(bad));
+  }
+  assert.equal((await P.readVaultFile(path.join(dir, 'part.3mf'))).toString(), 'model');
+  // A symlink swapped in after resolving is still refused at open time.
+  await assert.rejects(() => P.readVaultFile(path.join(dir, 'link.3mf')));
 });
 
 test('getMe refuses an unrecognised body', async () => {
