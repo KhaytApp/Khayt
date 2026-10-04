@@ -894,6 +894,7 @@
   "calc.quote.cart": "Parts in this project",
   "calc.quote.empty": "No parts in the cart yet. The live preview below reflects the current form.",
   "calc.pending_included": "Includes the part in the form",
+  "calc.components_included": "Includes components {amount}",
   "plib.plate": "Plate {n}",
   "plib.plates_n": "{n} plates",
   "calc.plate_whole": "Whole project ({n} plates)",

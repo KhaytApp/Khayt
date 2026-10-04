@@ -894,6 +894,7 @@
   "calc.quote.cart": "Teile in diesem Projekt",
   "calc.quote.empty": "Noch keine Teile im Warenkorb. Die Live-Vorschau unten zeigt das aktuelle Formular.",
   "calc.pending_included": "Inklusive des Teils im Formular",
+  "calc.components_included": "Inklusive Komponenten {amount}",
   "plib.plate": "Platte {n}",
   "plib.plates_n": "{n} Platten",
   "calc.plate_whole": "Ganzes Projekt ({n} Platten)",

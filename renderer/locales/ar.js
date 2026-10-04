@@ -1017,6 +1017,7 @@
   "calc.quote.cart": "الأجزاء في هذا المشروع",
   "calc.quote.empty": "لا توجد أجزاء في السلة بعد. المعاينة أدناه تعكس النموذج الحالي.",
   "calc.pending_included": "يشمل القطعة الموجودة في النموذج",
+  "calc.components_included": "يشمل المكونات {amount}",
   "plib.plate": "اللوح {n}",
   "plib.plates_n": "{n} ألواح",
   "calc.plate_whole": "المشروع كاملًا ({n} ألواح)",

@@ -895,6 +895,7 @@
   "calc.quote.cart": "Peças deste projeto",
   "calc.quote.empty": "Nenhuma peça no carrinho ainda. A prévia ao vivo abaixo reflete o formulário atual.",
   "calc.pending_included": "Inclui a peça do formulário",
+  "calc.components_included": "Inclui componentes {amount}",
   "plib.plate": "Placa {n}",
   "plib.plates_n": "{n} placas",
   "calc.plate_whole": "Projeto inteiro ({n} placas)",

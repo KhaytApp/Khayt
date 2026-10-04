@@ -894,6 +894,7 @@
   "calc.quote.cart": "Pièces dans ce projet",
   "calc.quote.empty": "Aucune pièce dans le panier. L'aperçu en direct ci-dessous reflète le formulaire actuel.",
   "calc.pending_included": "Inclut la pièce du formulaire",
+  "calc.components_included": "Inclut les composants {amount}",
   "plib.plate": "Plateau {n}",
   "plib.plates_n": "{n} plateaux",
   "calc.plate_whole": "Projet entier ({n} plateaux)",

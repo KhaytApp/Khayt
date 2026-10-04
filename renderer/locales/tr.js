@@ -894,6 +894,7 @@
   "calc.quote.cart": "Bu projedeki parçalar",
   "calc.quote.empty": "Sepette henüz parça yok. Aşağıdaki canlı önizleme mevcut formu yansıtır.",
   "calc.pending_included": "Formdaki parça dahil",
+  "calc.components_included": "Bileşenler dahil {amount}",
   "plib.plate": "Tabla {n}",
   "plib.plates_n": "{n} tabla",
   "calc.plate_whole": "Tüm proje ({n} tabla)",

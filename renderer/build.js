@@ -524,6 +524,24 @@ function updateGrandTotal() {
     totalBase = liveBase * qty;
     totalCost = totalBase;
   }
+  // A product's non-printed components (magnets, hardware), priced at cost
+  // plus margin as the saved job prices them (lib/order-new.js, #1745). The
+  // cart left them out, so a job from such a product showed X here and was
+  // saved at X + components marked up. Same rule the Mac's job sheet uses.
+  let componentsBase = 0;
+  if (Array.isArray(currentComponents) && currentComponents.length && typeof KhaytOrderNew !== 'undefined') {
+    try {
+      componentsBase = +KhaytOrderNew.componentsCost(currentComponents, currentAssemblyQty,
+        (typeof consumables !== 'undefined' && Array.isArray(consumables)) ? consumables : undefined) || 0;
+    } catch (e) { componentsBase = 0; }
+    totalBase += componentsBase;
+    totalCost += componentsBase;
+  }
+  const compLine = $('#calcComponentsLine');
+  if (compLine) {
+    compLine.style.display = componentsBase > 0 ? 'inline' : 'none';
+    if (componentsBase > 0) compLine.textContent = t('calc.components_included', { amount: fmtMoney(componentsBase) }) || `Includes components ${fmtMoney(componentsBase)}`;
+  }
   // The last word on the total: round it to a step, or type it. Same words and
   // steps as a product's price; see lib/pricing.js.
   const roundStep = biz ? Math.max(0, num($('#priceRoundStep')?.value, 0)) : 0;
