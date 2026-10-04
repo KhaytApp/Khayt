@@ -31,6 +31,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     Orca no longer resets them to stock. Mixed areas also get extra support
     clearance, and their purge goes to the wipe tower instead of into the
     model and supports.
+  - Converting for a printer with a different nozzle size also adjusts line
+    widths and layer heights to suit it. A 0.6 mm file converted for a 0.4 mm
+    printer used to ask for 0.63 mm lines. Settings taken from your installed
+    slicer's own preset are left as they are.
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the
     notice is rebuilt from the kept copies each time the book opens, and its

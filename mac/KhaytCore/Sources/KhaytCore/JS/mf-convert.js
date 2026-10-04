@@ -1546,6 +1546,82 @@
     if (machine.printer_model) obj.printer_model = machine.printer_model;
     if (procName) { obj.print_settings_id = procName; if (report) report.processPreset = procName; }
     if (report) { report.fieldsChanged.push('printer_gcode', 'process_settings'); report.u1Native = true; }
+    return true;
+  }
+
+  // ── NOZZLE REFIT ─────────────────────────────────────────────────────────────────────────────
+  // A retarget writes the target's nozzle_diameter, but line widths and layer heights are process
+  // settings and arrive from the source untouched. So a 0.6-nozzle file converted for a 0.4 printer
+  // claimed a 0.4 nozzle while asking for 0.63 mm extrusions — silently. Ported from bedready.io's
+  // applyNozzleFit (src/lib/convert.ts): scale the nozzle-dependent values by target/source, and
+  // hold layer height inside 20–80% of the new nozzle (the band its reference profile declares).
+  // A matched nozzle changes nothing, a percentage is already nozzle-relative and is left alone,
+  // and 0 (Prusa's "auto") stays auto. Not applied when the installed slicer's own process preset
+  // was overlaid — that preset is already for the target nozzle.
+  const NOZZLE_FIT_KEYS = ['line_width', 'initial_layer_line_width', 'inner_wall_line_width', 'outer_wall_line_width',
+    'internal_solid_infill_line_width', 'sparse_infill_line_width', 'support_line_width',
+    'top_surface_line_width', 'layer_height', 'initial_layer_print_height'];
+  const NOZZLE_FIT_KEYS_PRUSA = ['extrusion_width', 'first_layer_extrusion_width', 'perimeter_extrusion_width',
+    'external_perimeter_extrusion_width', 'infill_extrusion_width', 'solid_infill_extrusion_width',
+    'top_infill_extrusion_width', 'support_material_extrusion_width', 'layer_height', 'first_layer_height'];
+  // The per-extruder machine limits move with the nozzle by the same ratio, keeping the source's
+  // own proportion (bedready reads them off its reference profile; this has none to read).
+  const NOZZLE_LIMIT_KEYS = ['max_layer_height', 'min_layer_height'];
+  const LAYER_KEYS = new Set(['layer_height', 'initial_layer_print_height', 'first_layer_height']);
+  const LAYER_MIN_RATIO = 0.2, LAYER_MAX_RATIO = 0.8;
+
+  /** The first nozzle a config declares — a list per extruder, uniform in practice — or NaN. */
+  function nozzleNumber(v) {
+    return parseFloat(String(Array.isArray(v) ? v[0] : v).split(/[,;]/)[0]);
+  }
+
+  /**
+   * One refitted value, or null for "leave it". `s` is the value as written; the result keeps
+   * the string-or-number form it came in.
+   */
+  function refitValue(key, s, from, to) {
+    if (s == null || Array.isArray(s)) return null;
+    const str = String(s);
+    if (str.includes('%')) return null;
+    const n = parseFloat(str);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    let next = Math.round(n * (to / from) * 100) / 100;
+    if (LAYER_KEYS.has(key)) next = Math.min(+(to * LAYER_MAX_RATIO).toFixed(2), Math.max(+(to * LAYER_MIN_RATIO).toFixed(2), next));
+    return next === n ? null : next;
+  }
+
+  /** Refit a Bambu/Orca JSON config in place from nozzle `from` to `to`. */
+  function applyNozzleFit(obj, from, to, report) {
+    if (!(from > 0) || !(to > 0) || Math.abs(from - to) < 0.001) return;
+    const note = (k, a, b) => { if (report) { (report.nozzleFit = report.nozzleFit || []).push({ key: k, from: String(a), to: String(b) }); report.fieldsChanged.push(k); } };
+    for (const k of NOZZLE_FIT_KEYS) {
+      const next = refitValue(k, obj[k], from, to);
+      if (next == null) continue;
+      note(k, obj[k], next);
+      obj[k] = typeof obj[k] === 'string' ? String(next) : next;
+    }
+    for (const k of NOZZLE_LIMIT_KEYS) {
+      if (!(k in obj)) continue;
+      const fit = (v) => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? (typeof v === 'string' ? String(Math.round(n * (to / from) * 100) / 100) : Math.round(n * (to / from) * 100) / 100) : v; };
+      const before = JSON.stringify(obj[k]);
+      obj[k] = Array.isArray(obj[k]) ? obj[k].map(fit) : fit(obj[k]);
+      if (before !== JSON.stringify(obj[k])) note(k, before, JSON.stringify(obj[k]));
+    }
+  }
+
+  /** The same refit on a PrusaSlicer config's text, keeping each line's prefix. */
+  function applyNozzleFitIni(text, from, to, report) {
+    if (!(from > 0) || !(to > 0) || Math.abs(from - to) < 0.001) return text;
+    for (const k of NOZZLE_FIT_KEYS_PRUSA) {
+      const r = iniSet(text, k, (old) => {
+        const next = refitValue(k, old, from, to);
+        if (next == null) return old;
+        if (report) { (report.nozzleFit = report.nozzleFit || []).push({ key: k, from: old, to: String(next) }); report.fieldsChanged.push(k); }
+        return String(next);
+      });
+      text = r.text;
+    }
+    return text;
   }
 
   /** Rewrite known Bambu→Orca-incompatible enum values in a project_settings.config object in place. */
@@ -1714,6 +1790,8 @@
           const text = m.data.toString('utf8');
           const obj = tryJson(text);
           if (obj) {
+            // The source's own nozzle, read before the re-profile below overwrites it.
+            const srcNozzle = nozzleNumber(obj.nozzle_diameter);
             // Re-profile fields (same-family only).
             if (reprofile) {
               if (target.printerModel) { obj.printer_model = target.printerModel; report.fieldsChanged.push('printer_model'); }
@@ -1736,7 +1814,10 @@
             }
             // Overlay the real machine + process settings (from the installed slicer) so the printer
             // G-code and print settings are native — runs before Full Spectrum so mix keys win.
-            if (/project_settings\.config$/i.test(m.name) && target.flavour === 'orca') applyOrcaNative(obj, opts, target, report);
+            const native = /project_settings\.config$/i.test(m.name) && target.flavour === 'orca' && applyOrcaNative(obj, opts, target, report);
+            // Widths and layer heights follow a changed nozzle — unless the installed slicer's
+            // process preset was just overlaid, which is already the target nozzle's own.
+            if (reprofile && !native && target.nozzle && /project_settings\.config$/i.test(m.name)) applyNozzleFit(obj, srcNozzle, Number(target.nozzle), report);
             // Band-swap / Full Spectrum own the colour mapping (only meaningful on project_settings, which
             // holds the filament palette + mixed-filament keys); otherwise apply the plain colour→slot remap.
             if (bandPlan && /project_settings\.config$/i.test(m.name)) {
@@ -1790,7 +1871,11 @@
             // One value PER EXTRUDER, as many as the line already had: PrusaSlicer counts a
             // project's extruders from this list, so writing a single `0.4` over an MMU's
             // `0.4,0.4,0.4,0.4,0.4` would quietly turn a five-colour project into one.
-            if (target.nozzle) set('nozzle_diameter', (old) => (old ? old.split(',').map(() => target.nozzle).join(',') : String(target.nozzle)), 'nozzle_diameter');
+            if (target.nozzle) {
+              const srcNozzle = nozzleNumber(iniValue(text, 'nozzle_diameter'));
+              set('nozzle_diameter', (old) => (old ? old.split(',').map(() => target.nozzle).join(',') : String(target.nozzle)), 'nozzle_diameter');
+              text = applyNozzleFitIni(text, srcNozzle, Number(target.nozzle), report);
+            }
             if (target.bed) {
               const { x, y, z } = target.bed;
               set('bed_shape', `0x0,${x}x0,${x}x${y},0x${y}`, 'bed_shape');
