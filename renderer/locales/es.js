@@ -893,6 +893,7 @@
   "calc.quote.title": "4. Carrito y cotización",
   "calc.quote.cart": "Piezas en este proyecto",
   "calc.quote.empty": "Aún no hay piezas en el carrito. La vista previa en vivo refleja el formulario actual.",
+  "calc.pending_included": "Incluye la pieza del formulario",
   "calc.quote.live": "Valor actual de la pieza",
   "calc.quote.add_part": "+ Agregar pieza al carrito",
   "calc.cart.edit": "Editar esta pieza",

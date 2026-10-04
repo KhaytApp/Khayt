@@ -70,6 +70,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   number of assemblies), a typed price still wins, and the components' cost
   is saved on the job as `componentsCost`. On the Mac, the New Job sheet's
   total includes them too.
+- **The calculator's project total follows what you are changing.** With a
+  part already added, changing labour, print time or filament only moved the
+  small part price, and editing a part made it vanish from the total until
+  you pressed Update. The total now includes the part in the form, with a
+  note saying so. Creating the job, saving a quote or saving a template
+  also keeps that part. A part you were editing used to be left out of the
+  job. Reported by a tester.
 
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the

@@ -893,6 +893,7 @@
   "calc.quote.title": "4. Constituer le panier et le devis",
   "calc.quote.cart": "Pièces dans ce projet",
   "calc.quote.empty": "Aucune pièce dans le panier. L'aperçu en direct ci-dessous reflète le formulaire actuel.",
+  "calc.pending_included": "Inclut la pièce du formulaire",
   "calc.quote.live": "Valeur de pièce en direct",
   "calc.quote.add_part": "+ Ajouter une pièce au panier",
   "calc.cart.edit": "Modifier cette pièce",

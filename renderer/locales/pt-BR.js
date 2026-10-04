@@ -894,6 +894,7 @@
   "calc.quote.title": "4. Montar carrinho e orçar",
   "calc.quote.cart": "Peças deste projeto",
   "calc.quote.empty": "Nenhuma peça no carrinho ainda. A prévia ao vivo abaixo reflete o formulário atual.",
+  "calc.pending_included": "Inclui a peça do formulário",
   "calc.quote.live": "Valor da peça ao vivo",
   "calc.quote.add_part": "+ Adicionar peça ao carrinho",
   "calc.cart.edit": "Editar esta peça",

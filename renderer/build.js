@@ -444,10 +444,24 @@ function updateGrandTotal() {
   let totalBase = 0;
   let totalCost = 0;
   let agreedAmount = 0;
+  // The part in the form counts too, live. The total used to be the cart's
+  // saved costs alone, so with anything in the cart, changing labour, time or
+  // filament moved only the small part price, and a part being edited (taken
+  // out of the cart by editPart) vanished from the total until Update. A
+  // tester read that as "the total never changes".
+  let pendingBase = 0;
   if (currentBuild.length > 0) {
     totalCost = currentBuild.reduce((s, p) => s + (+p.baseCost || 0), 0);
     totalBase = currentBuild.reduce((s, p) => s + (isAgreed(p) ? 0 : (+p.baseCost || 0)), 0);
     agreedAmount = currentBuild.reduce((s, p) => s + (isAgreed(p) ? +p.agreedPrice * Math.max(1, +p.qty || 1) : 0), 0);
+    if (formHasPendingPart()) {
+      // As addPart would store it: a price tier is held as its pre-margin cost.
+      pendingBase = activeTier
+        ? (margin > 0 ? activeTier.pricePerUnit * qty / (1 + margin / 100) : activeTier.pricePerUnit * qty)
+        : liveBase * qty;
+      totalCost += pendingBase;
+      totalBase += pendingBase;
+    }
   } else {
     totalBase = liveBase * qty;
     totalCost = totalBase;
@@ -500,6 +514,8 @@ function updateGrandTotal() {
       if (span && resolved[i]) span.textContent = fmtMoney(resolved[i].amount);
     });
   }
+  const pendingNote = $('#calcPendingNote');
+  if (pendingNote) pendingNote.style.display = pendingBase > 0 ? 'inline' : 'none';
   const finalEl = $('#finalPrice');
   if (finalEl) {
     if (!finalEl.getAttribute('aria-live')) finalEl.setAttribute('aria-live', 'polite');
@@ -657,6 +673,15 @@ function snapshotPartFromForm() {
     priceTiers:  currentPriceTiers.filter(ti => ti.minQty > 0 && ti.pricePerUnit > 0).map(ti => ({ ...ti })),
     spoolId:     $('#spoolIdPicker')?.value || null,
   };
+}
+
+/**
+ * Is there a part in the form that is not in the cart? A weight or a time typed
+ * (addPart clears both), so true for a new part being filled in AND for a part
+ * being edited, which editPart takes OUT of the cart while it is in the form.
+ */
+function formHasPendingPart() {
+  return clampPositive($('#printWeight')?.value) > 0 || clampPositive($('#printTime')?.value) > 0;
 }
 
 function addPart() {
@@ -1306,6 +1331,8 @@ async function loadQuoteTemplate() {
 }
 
 function saveQuoteTemplate() {
+  // The part in the form is part of what the shop sees totalled; keep it.
+  if (formHasPendingPart()) addPart();
   if (currentBuild.length === 0) { toast(t('calc.tpl.empty'), 'error'); return; }
   openFormModal({
     title:     t('calc.tpl.save_title'),
@@ -1619,6 +1646,7 @@ function updateResinFieldsVisibility() {
   }
 
   const api = {
+    formHasPendingPart,
     shopRateDefaults,
     seedCalcElecRate,
     saveBuildDraft,

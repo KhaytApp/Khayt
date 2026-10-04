@@ -893,6 +893,7 @@
   "calc.quote.title": "4. Build Cart & Quote",
   "calc.quote.cart": "Parts in this project",
   "calc.quote.empty": "No parts in the cart yet. The live preview below reflects the current form.",
+  "calc.pending_included": "Includes the part in the form",
   "calc.quote.live": "Live part value",
   "calc.quote.add_part": "+ Add part to cart",
   "calc.cart.edit": "Edit this part",

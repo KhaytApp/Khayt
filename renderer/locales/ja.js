@@ -893,6 +893,7 @@
   "calc.quote.title": "4. カート・見積",
   "calc.quote.cart": "このプロジェクトのパーツ",
   "calc.quote.empty": "カートにパーツがありません。下のライブプレビューは現在のフォームを反映しています。",
+  "calc.pending_included": "フォームの部品を含みます",
   "calc.quote.live": "ライブパーツ価格",
   "calc.quote.add_part": "+ パーツをカートに追加",
   "calc.cart.edit": "このパーツを編集",
