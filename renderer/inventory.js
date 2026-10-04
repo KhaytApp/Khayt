@@ -23,11 +23,27 @@ let poSearchTerm = '';
 let poStatusFilter = '';
 let poDisplayLimit = 50;        // pagination: rows shown in PO table
 let _lastPoFilterHash = '';     // detects filter changes to reset PO page
-// Filament manufacturer catalog (loaded from filaments-db.json)
+// Filament manufacturer catalogue: assets/filament-catalog.json (~2,100
+// filaments, 16,000+ colours, from the Open Filament Database, SpoolmanDB and
+// Bambu Lab's own list), read through lib/filament-catalog.js as the Mac does.
+// It replaces the hand-made renderer/filaments-db.json, whose Bambu matte list
+// was invented. `filamentsDB` keeps the old one-row-per-colour shape
+// ({brand, line, type, color, hex}) so the label-scan matching below is
+// unchanged; each row also carries its catalogue filament and colour.
 let filamentsDB = [];
+let filamentCatalog = null;
 if (typeof fetch === 'function' && typeof document !== 'undefined') {
-  fetch('./filaments-db.json').then(r => r.json()).then(data => { filamentsDB = data; }).catch(e => {
-    console.warn('filaments-db.json not loaded:', e);
+  fetch('../assets/filament-catalog.json').then(r => r.json()).then(cat => {
+    const FC = globalThis.KhaytFilamentCatalog;
+    if (!FC || !cat || !Array.isArray(cat.filaments)) throw new Error('catalogue unreadable');
+    filamentCatalog = cat;
+    const rows = [];
+    for (const f of cat.filaments) {
+      for (const c of FC.coloursOf(f)) rows.push({ brand: f.b, line: f.n, type: f.m, color: c.name, hex: c.hex, _f: f, _c: c });
+    }
+    filamentsDB = rows;
+  }).catch(e => {
+    console.warn('filament catalogue not loaded:', e);
     filamentsDB = null;
     const catalogEl = document.getElementById('filamentCatalog') || document.getElementById('filamentDbSection');
     if (catalogEl) catalogEl.innerHTML = `<p style="color:var(--text-muted);padding:12px;font-size:13px;">${_iIcoL('alert', '⚠', 12)}${escapeHtml(t('inv.catalog_unavailable') || 'Filament catalog unavailable')}</p>`;
@@ -272,8 +288,8 @@ function openFilamentCatalog() {
   if (filamentsDB === null) { toast(t('inv.catalog_unavailable') || 'Filament catalog unavailable', 'error'); return; }
   if (!filamentsDB || !filamentsDB.length) { toast(t('inv.catalog_loading') || 'Catalog not ready yet', 'error'); return; }
 
-  const brands = [...new Set(filamentsDB.map(f => f.brand))].sort();
-  const types  = [...new Set(filamentsDB.map(f => f.type))].sort();
+  const brands = [...new Set(filamentsDB.map(f => f.brand).filter(Boolean))].sort();
+  const types  = [...new Set(filamentsDB.map(f => f.type).filter(Boolean))].sort();
 
   const bodyHtml = `
     <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center;">
@@ -302,15 +318,22 @@ function openFilamentCatalog() {
         const brand = document.getElementById('catBrand').value;
         const tp    = document.getElementById('catType').value;
 
-        const filtered = filamentsDB.filter(f => {
-          if (brand && f.brand !== brand) return false;
-          if (tp    && f.type  !== tp)    return false;
-          if (q) {
-            const hay = `${f.brand} ${f.line} ${f.type} ${f.color}`.toLowerCase();
-            if (!hay.includes(q)) return false;
+        // Typed words go through the catalogue's own ranked search (every word
+        // must match; brand and name beat material); the menus then narrow it.
+        const FC = globalThis.KhaytFilamentCatalog;
+        let pool = filamentsDB;
+        if (q && FC && filamentCatalog) {
+          const hits = FC.search(filamentCatalog, q, { limit: 400 });
+          pool = [];
+          for (const h of hits) {
+            const cols = (h.colours && h.colours.length) ? h.colours : FC.coloursOf(h.filament);
+            for (const c of cols) pool.push({ brand: h.filament.b, line: h.filament.n, type: h.filament.m, color: c.name, hex: c.hex, _f: h.filament, _c: c });
           }
-          return true;
-        });
+        }
+        const all = pool.filter(f => (!brand || f.brand === brand) && (!tp || f.type === tp));
+        // 16,000 colours is too many cards to draw at once; say how to narrow.
+        const CAP = 240;
+        const filtered = all.slice(0, CAP);
 
         const grid = document.getElementById('catGrid');
         if (!filtered.length) {
@@ -318,6 +341,9 @@ function openFilamentCatalog() {
           return;
         }
 
+        const more = all.length > CAP
+          ? `<div style="grid-column:1/-1; text-align:center; padding:8px; color:var(--text-muted); font-size:12px;">${escapeHtml(t('inv.catalog_more', { n: String(all.length - CAP) }) || `${all.length - CAP} more — type a brand or colour to narrow`)}</div>`
+          : '';
         grid.innerHTML = filtered.map((f, i) => `
           <button type="button" class="fil-card" data-idx="${i}" aria-label="${escapeHtml(`${f.brand} ${f.line} ${f.color} ${f.type}`)}">
             <div class="fil-card-swatch" style="background:${safeCssColor(f.hex)};"></div>
@@ -327,13 +353,20 @@ function openFilamentCatalog() {
               <span class="fil-card-line">${escapeHtml(f.line)}</span>
               <span class="fil-card-type">${escapeHtml(f.type)}</span>
             </div>
-          </button>`).join('');
+          </button>`).join('') + more;
 
         grid.querySelectorAll('.fil-card').forEach(card => {
           const f = filtered[+card.dataset.idx];
           card.addEventListener('click', () => {
             $('#invMaterial').value = `${f.brand} ${f.line} – ${f.color}`;
             setInvColor(f.hex);
+            // What the catalogue knows about the spool, into fields still empty:
+            // the full-spool weight and diameter. Never the shop's own figures.
+            const FC = globalThis.KhaytFilamentCatalog;
+            const sp = (FC && f._f) ? FC.toSpool(f._f, f._c) : {};
+            const fillIfEmpty = (sel, v) => { const el = $(sel); if (el && v != null && (el.value === '' || el.value == null)) el.value = v; };
+            fillIfEmpty('#invWeight', sp.weight);
+            fillIfEmpty('#invDiameter', sp.diameter);
             $('#modalMount').innerHTML = '';
             toast(t('inv.catalog_picked') || `${f.color} selected`, 'success', 1800);
           });

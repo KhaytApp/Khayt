@@ -16,7 +16,7 @@ struct StockShareOnMacTests {
         // Through the shared dashboard rule, which applies `stockShare` itself
         // (`KhaytKpiRows.orderCost`), handed the inventory.
         #expect(engine.contains("globalThis.KhaytKpiRows.orderCost(o,")
-                && engine.contains("{ settings: ARG2, inventory: ARG6 || [], clients: ARG1 }"))
+                && engine.contains("{ settings: ARG2, inventory: ARG6 || [], clients: ARG1, consumables: ARG7 || [] }"))
         #expect(engine.contains("wasteLog: ARG7, inventory: ARG8"))
     }
 

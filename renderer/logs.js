@@ -6,6 +6,16 @@
 // not overstated. Kept in the order's own currency to stay consistent with the
 // parts cost (baseCost). VAT is extracted with the same rate/(100+rate) formula
 // used in invoicing/expenses/analytics.
+/**
+ * What a job cost, for its margin: its parts plus the components frozen on it
+ * (`componentsCost`, written by lib/order-new.js since #1745), as the Mac's
+ * ledger counts it. Not the P&L's cost of goods, which leaves components out
+ * because buying them is already booked as an expense.
+ */
+function jobCostForMargin(o) {
+  return ((o && o.parts) || []).reduce((s, p) => s + (+p.baseCost || 0), 0) + (+(o && o.componentsCost) || 0);
+}
+
 function orderNetRevenue(o) {
   // Credit notes (refunds) reduce the sale before shipping and VAT come out,
   // otherwise a refunded order still shows its full original margin.
@@ -48,8 +58,8 @@ function getFilteredLogs() {
     if (logSortCol === 'material') return dir * (a.material || '').localeCompare(b.material || '');
     if (logSortCol === 'status')   return dir * (a.status || '').localeCompare(b.status || '');
     if (logSortCol === 'margin') {
-      const costA = (a.parts || []).reduce((s, p) => s + (+p.baseCost || 0), 0);
-      const costB = (b.parts || []).reduce((s, p) => s + (+p.baseCost || 0), 0);
+      const costA = jobCostForMargin(a);
+      const costB = jobCostForMargin(b);
       const revA = orderNetRevenue(a);
       const revB = orderNetRevenue(b);
       const mA = costA > 0 && revA > 0 ? (revA - costA) / revA : -Infinity;
@@ -220,7 +230,7 @@ function renderLogs() {
       ? `<span class="split-badge" title="${escapeHtml(t('kit.badge_title') || 'Part of a kit')}">🧩 ${escapeHtml(kitOf ? kitOf.name : (t('kit.orphaned') || 'kit deleted'))}</span>`
       : '';
     // Profit margin estimation
-    const partsCost = (log.parts || []).reduce((s, p) => s + (+p.baseCost || 0), 0);
+    const partsCost = jobCostForMargin(log);
     const netRevenue = orderNetRevenue(log);
     const hasMarginData = partsCost > 0 && netRevenue > 0;
     const marginPct = hasMarginData ? ((netRevenue - partsCost) / netRevenue * 100) : null;

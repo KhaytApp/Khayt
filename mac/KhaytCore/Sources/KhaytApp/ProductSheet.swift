@@ -192,7 +192,7 @@ struct ProductSheet: View {
             // every figure in it. See `Money.fieldValue`.
             row.grams = Money.fieldValue(Shop.plainNumber(o["printWeight"]))
             row.hours = Money.fieldValue(Shop.plainNumber(o["printTime"]))
-            row.qty = Int(Shop.plainNumber(o["qty"]) ?? 1)
+            row.qty = max(1, min(9999, Int(saturating: Shop.plainNumber(o["qty"]) ?? 1)))
             row.printFileId = Shop.plainString(o["printFileId"])
             for key in rateKeys {
                 if let value = Shop.plainNumber(o[key]) { row.rates[key] = Money.fieldValue(value) }

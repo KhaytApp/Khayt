@@ -27,6 +27,69 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     two-factor sign-in and 18+ confirmation each say what to do next.
   - A `.stp` file downloaded from MakerRun is now saved as `.step`; it used to
     get a `.3mf` name.
+- **A job's margin counts its components.** The margin shown on each job in
+  Orders, sorting by margin, and the calculator's AI price suggestion left
+  out a product's components, so a job with magnets or hardware looked more
+  profitable than it was. They now include them, as the Mac app does. Your
+  P&L is unchanged: buying components is already counted as an expense.
+
+- **A quote from a product with components shows its full price.** Taking a
+  job from a catalogue product that has components (magnets, hardware), the
+  calculator's total left them out, while the job was saved with them. A
+  product that showed 144.49 was saved at 153.49. The total now includes the
+  components, marked up like the rest, and says how much they add.
+- **alpha.59 review fixes (Mac + shared lib).**
+  - Security: a 3MF with a crafted plate index (1e20, "inf", "nan") no longer
+    crashes the Mac every time the model is viewed — the index is checked and
+    the bad plate skipped, and the shared reader replaces it with a small
+    number. Reading plates is linear: 350 KB of unclosed `<plate ` took 4.9 s
+    and now takes milliseconds; at most 256 plates and 64 filaments a plate
+    are read. Slicer grams, metres and times are held to sane finite ranges,
+    plate names are decoded and cut to 80 characters, and a consumable
+    quantity is held to 0–9,999 (an `inf` used to make the book unwritable on
+    the Mac). Embedded G-codes are read by their first 32 KB and last 64 KB.
+    The filament catalogue's SpoolmanDB and Bambu sources are fetched at
+    pinned commits, with each download's SHA-256 recorded in the file and a
+    size cap on every response.
+  - Money: a product's components count in a job's own margin (the ledger,
+    the margin advice, and profit per product and per hour). They are not
+    added to the P&L's cost of goods: consumable purchases are booked as
+    expenses. A shelf cost of 0 is free; a deleted consumable is priced at the
+    cost written on the line, for components and part consumables alike, and
+    the Mac's dashboard prices part consumables from the shelf as the desktop
+    does. Reorder suggestions count part consumables only for jobs that drew
+    them.
+  - A 3MF re-read for plate details no longer bumps every model's revision,
+    so it cannot win a sync over an edit made on another machine. A 3MF with
+    several embedded G-codes and no slice_info is their sum on the Mac too,
+    and a multi-plate project keeps its filament cost when every plate states
+    one.
+  - (Mac) Calculator: removing a colour or filling from a model no longer
+    crashes; the first box says "Colour 1" with its swatch and the total once
+    there are two colours, and adding a colour splits the weight already typed
+    rather than charging it twice; grams read as grams. A job from a product
+    shows its Components line, and changing the number of assemblies re-prices
+    it. The library's As sliced list says "Filament 2 · PLA", Arabic counts
+    plates properly (لوحان), and Consumables per print shows each line's cost.
+    The filament catalogue button is always there, says what to type, lists up
+    to 30 results grouped by brand with colour swatches, and no longer repeats
+    a brand in a name.
+
+- **Quote a multicolour print and its magnets in the calculator.** Add a line
+  for each extra filament or colour, with its own spool and grams, and a
+  purge figure shared across the colours by weight. Each colour is charged
+  at its own spool's price, and finishing the job takes each colour off its
+  own spool. Add consumables (magnets, inserts, screws) per printed piece;
+  they are priced, and taken off the shelf when the job is finished. A print
+  file can carry its own "Consumables per print", which come with it into the
+  calculator and into products made from it. Reported by a tester.
+- **Browse catalog has about 2,100 filaments and 16,000 colours.** The
+  desktop's filament catalogue was a short hand-made list, and its Bambu
+  matte colours were made up. It now uses the same catalogue as the Mac app,
+  built from the Open Filament Database, SpoolmanDB and Bambu Lab's own
+  colours. Typing several words narrows to the filament you mean, for
+  example "bambu pla matte".
+
 - **(Mac) Calculator: several filaments, purge and consumables.**
   - Add filament / colour puts a second, third… spool on one print, each with
     its own grams and its own spool's price. A purge / waste figure (flush and
@@ -51,6 +114,36 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   `calculator-cost` (shelf price, else the written `unitCost`), drawn and
   returned by `order-deduction`, and counted by `consumable-reorder`. Parts
   without it are unchanged.
+- **The filament catalogue lists more brands and colours, and Bambu Lab's own
+  names and colours win.** It had 1,945 filaments and 14,500 colours. It now has
+  2,110 filaments and 16,477 colours from 172 brands.
+  - The Open Filament Database (MIT) is now merged with SpoolmanDB (MIT) and with
+    Bambu Lab's own colour list. Only the facts are taken from Bambu's list: the
+    product line, the colour name and the hex. New are R3D, Siraya Tech, more
+    eSUN, Polymaker (Panchroma, PolyFlex, Fiberon), Creality Hyper RFID, Inland,
+    extrudr and 3DXTech lines, and 129 more Bambu Lab colours (286 → 415). Bambu
+    PLA Matte keeps its 25 official colours.
+  - Each product appears once and each colour once. A row records which source
+    it came from. The sources and their licences are listed in
+    THIRD-PARTY-NOTICES.md and inside the file itself.
+  - Search: words that only a colour name matched must match the same colour.
+    "bambu pla matte black" no longer lands on PLA Lite because it sells
+    "Matte Beige" and "Black".
+  - (Mac) The spool sheet no longer reads the catalogue file on every
+    keystroke. It reads it once per engine.
+- **Bambu PLA Matte colours are Bambu's own.** The colour list had twelve
+  made-up matte names ("Matte White", "Matte Mint"), filed Charcoal, Scarlet
+  Red and Lemon Yellow under PLA Basic, listed a matte "Dark Gray" that does
+  not exist, and gave Basic Pink the colour of Matte Sakura Pink. It now has
+  Bambu's 25 PLA Matte colours with their real names and colours. Reported by
+  a tester.
+- **A 3MF with several plates shows every plate.** Print Files shows how many
+  plates a project has and each plate's time and filament, and the
+  calculator lets you quote the whole project or a single plate. Projects
+  you imported before now get their full totals, read again once in the
+  background. They used to show the first plate's figures. Reported by a
+  tester.
+
 - **A multi-plate 3MF counts every plate, and Bambu PLA Matte colours are
   right.** Reported by a tester.
   - A Bambu Studio or Orca file sliced as several plates was read as plate 1
@@ -75,6 +168,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   number of assemblies), a typed price still wins, and the components' cost
   is saved on the job as `componentsCost`. On the Mac, the New Job sheet's
   total includes them too.
+- **The calculator's project total follows what you are changing.** With a
+  part already added, changing labour, print time or filament only moved the
+  small part price, and editing a part made it vanish from the total until
+  you pressed Update. The total now includes the part in the form, with a
+  note saying so. Creating the job, saving a quote or saving a template
+  also keeps that part. A part you were editing used to be left out of the
+  job. Reported by a tester.
 
 - **(Mac) Fixes from the alpha.58 UI review.**
   - What sync took from the book stays on screen until you deal with it: the

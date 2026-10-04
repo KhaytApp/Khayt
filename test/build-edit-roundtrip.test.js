@@ -25,7 +25,7 @@ const between = (startMarker, endMarker) => {
 const DERIVED = new Set(['material', 'baseCost']);
 
 test('every field the cart stores is restored when the line is edited', () => {
-  const stored = [...between('function snapshotPartFromForm', '\n}')
+  const stored = [...between('function snapshotPartFromFormRaw', '\n}')
     .matchAll(/^\s{4}(\w+):/gm)].map((m) => m[1]);
   assert.ok(stored.length > 20, `expected the full part shape, got ${stored.length}`);
 

@@ -18,10 +18,12 @@ extension StoreWriter {
 
     /// Read-modify-write the whole store, atomically, while we own it.
     static func update(_ build: StoreReader.Build,
+                       recordingDeletes: Bool = true,
                        mutate: (inout [String: JSONValue]) throws -> Void) throws {
         try update(storeURL: build.storeURL,
                    owns: { StoreLock.weOwnIt(build) },
                    whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
+                   recordingDeletes: recordingDeletes,
                    mutate: mutate)
     }
 

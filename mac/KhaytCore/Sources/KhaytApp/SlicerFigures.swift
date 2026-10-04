@@ -25,10 +25,27 @@ enum SlicerFigures {
         return await read(url, engine: engine, wantGcode: true)
     }
 
+    /// The most embedded G-codes read from one 3MF — one per plate, and no
+    /// slicer writes hundreds. Past this a file is not a print project.
+    static let maxGcodes = 256
+
+    /// Where the reading happens: dispatch's threads, not the cooperative
+    /// pool. Unzipping and streaming a G-code BLOCKS, and blocking inside
+    /// `Task.detached` occupies one of the pool's few threads — on a
+    /// three-core runner three of these froze every `await` in the process
+    /// (see the swift-pool-starvation note on `OffPool` in the tests).
+    private static let queue = DispatchQueue(label: "khayt.slicer-figures", qos: .utility)
+
+    private static func offPool<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { done in
+            queue.async { done.resume(returning: work()) }
+        }
+    }
+
     private static func read(_ url: URL, engine: KhaytEngine, wantGcode: Bool) async -> [String: JSONValue]? {
         let ext = url.pathExtension.lowercased()
-        let bits: (configs: [String: String], gcode: String?)? = await Task.detached {
-            if ext == "gcode" || ext == "gco" { return ([:], ends(of: url)) }
+        let bits: (configs: [String: String], gcodes: [String])? = await offPool {
+            if ext == "gcode" || ext == "gco" { return ([:], ends(of: url).map { [$0] } ?? []) }
             guard ext == "3mf", let entries = try? Zip.entries(of: url) else { return nil }
             var configs: [String: String] = [:]
             for e in entries where e.name.lowercased().hasPrefix("metadata/")
@@ -37,13 +54,20 @@ enum SlicerFigures {
                     configs[e.name] = String(decoding: d, as: UTF8.self)
                 }
             }
-            // A 3MF that carries its sliced G-code: its summary, head and tail —
-            // read only when the configs cannot answer (see below), because
-            // streaming a whole embedded G-code for a figure `slice_info`
-            // already holds cost every launch of a big library dearly.
-            var gcode: String?
-            if !configs.isEmpty, !wantGcode { return (configs, nil) }
-            if let g = entries.first(where: { $0.name.lowercased().hasSuffix(".gcode") }) {
+            // A 3MF that carries its sliced G-code: each one's summary, head
+            // and tail — read only when the configs cannot answer (see below),
+            // because streaming a whole embedded G-code for a figure
+            // `slice_info` already holds cost every launch of a big library
+            // dearly.
+            //
+            // EVERY embedded G-code, not the first. "Export all sliced plates"
+            // writes one per plate, and with no slice_info to list them the
+            // project is their sum — what `lib/model-intake.js` answers for
+            // the same file. Each is still only its two windows.
+            if !configs.isEmpty, !wantGcode { return (configs, []) }
+            var gcodes: [String] = []
+            for g in entries where g.name.lowercased().hasSuffix(".gcode") {
+                if gcodes.count >= maxGcodes { break }
                 var first = Data(), last = Data()
                 try? Zip.stream(g, in: url) { chunk in
                     if first.count < head { first.append(contentsOf: chunk.prefix(head - first.count)) }
@@ -51,12 +75,13 @@ enum SlicerFigures {
                     if last.count > tail * 2 { last = last.suffix(tail) }
                     return true
                 }
-                gcode = String(decoding: first, as: UTF8.self) + "\n" + String(decoding: last.suffix(tail), as: UTF8.self)
+                gcodes.append(String(decoding: first, as: UTF8.self) + "\n"
+                              + String(decoding: last.suffix(tail), as: UTF8.self))
             }
-            return (configs, gcode)
-        }.value
+            return (configs, gcodes)
+        }
         guard let bits else { return nil }
-        return try? await engine.slicerFigures(configs: bits.configs, gcodeText: bits.gcode)
+        return try? await engine.slicerFigures(configs: bits.configs, gcodeTexts: bits.gcodes)
     }
 
     /// The first and last kilobytes of a G-code file, as text.

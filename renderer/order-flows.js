@@ -102,7 +102,10 @@ function NewOrderRules() {
 }
 
 function logPrint(asQuote = false) {
-  if (currentBuild.length === 0) {
+  // A part still in the form is in the total the shop is looking at, so it
+  // goes in the job too. Only an EMPTY cart used to take it, and a part being
+  // edited (taken out of the cart while it is in the form) was dropped.
+  if (currentBuild.length === 0 || formHasPendingPart()) {
     const before = currentBuild.length;
     addPart();
     if (currentBuild.length === before) return;

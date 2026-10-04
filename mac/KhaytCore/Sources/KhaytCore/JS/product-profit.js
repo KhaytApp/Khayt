@@ -94,8 +94,16 @@ function productProfit(input, deps) {
     const row = byProduct.get(key);
     row.jobs += 1;
     row.revenue += num(revenueOf(order));
+    // The job's own components (a box, magnets) are part of what THAT job
+    // cost: `order-new` prices them into the job at cost plus margin and
+    // freezes their cost as `componentsCost`. Left out, every product sold
+    // with components read its margin high by exactly their cost. This is a
+    // per-job profit table, not the P&L — see `kpi-rows.orderCost` for why
+    // the dashboard's cost of goods does not add them.
     row.cost += (Array.isArray(order.parts) ? order.parts : [])
-      .reduce((s, p) => s + num(partCostOf(p)), 0) + num(linked.get(String(order.id || '')));
+      .reduce((s, p) => s + num(partCostOf(p)), 0)
+      + Math.max(0, num(order.componentsCost))
+      + num(linked.get(String(order.id || '')));
     row.hours += num(hoursOf(order));
   }
 

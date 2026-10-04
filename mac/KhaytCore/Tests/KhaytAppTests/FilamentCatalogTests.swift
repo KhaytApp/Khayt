@@ -7,7 +7,7 @@ import KhaytCore
 ///
 /// The matching is `lib/filament-catalog.js` and `test/filament-catalog.test.js`
 /// pins it. These are about the CROSSING, and about one thing that only exists
-/// on this side: the catalogue is a 0.78 MB resource loaded out of the app
+/// on this side: the catalogue is a 0.9 MB resource loaded out of the app
 /// bundle, and a bundle that does not carry it fails here rather than returning
 /// an empty list that looks like "no such filament".
 @MainActor
@@ -91,6 +91,19 @@ struct FilamentCatalogTests {
         for key in ["cost", "openedAt", "driedAt", "storage", "id"] {
             #expect(fields[key] == nil, Comment(rawValue: "\(key) was invented"))
         }
+    }
+
+    @Test("every source the catalogue merges reaches the engine")
+    func mergedSources() async throws {
+        // R3D is only in SpoolmanDB and Bambu's PLA Matte is corrected from
+        // Bambu's own list: a hit for each proves the merged file is the one in
+        // the bundle, not the OFD-only snapshot it replaced.
+        let engine = try await Self.engine()
+        let r3d = try await engine.filamentSearch("r3d petg", limit: 3)
+        #expect(r3d.first?.brand == "R3D")
+        let matte = try #require(try await engine.filamentSearch("bambu pla matte", limit: 1).first)
+        #expect(matte.colours.contains { $0.name == "Nardo Gray" })
+        #expect(matte.colours.count == 25)
     }
 
     @Test("a filament nobody has is an empty answer, not a throw")

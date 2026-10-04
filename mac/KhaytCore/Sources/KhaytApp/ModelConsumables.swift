@@ -41,9 +41,13 @@ extension Shop {
     static func consumableUses(_ value: JSONValue?) -> [ConsumableUse] {
         guard case .array(let rows)? = value else { return [] }
         return rows.compactMap { row in
+            // `plainNumber` reads "inf" and "1e400" as numbers; a quantity
+            // that is not a finite count is not a line, and one past the
+            // stepper's 9,999 is held there — written back as `inf` it would
+            // make JSONEncoder refuse the whole book.
             guard case .object(let o) = row, let id = plainString(o["consumableId"]), !id.isEmpty,
-                  let qty = plainNumber(o["qty"]), qty > 0 else { return nil }
-            return ConsumableUse(consumableId: id, qty: qty)
+                  let qty = plainNumber(o["qty"]), qty.isFinite, qty > 0 else { return nil }
+            return ConsumableUse(consumableId: id, qty: min(9999, qty))
         }
     }
 
@@ -119,6 +123,13 @@ struct ModelConsumablesSection: View {
                             Text("× " + Words.plain(.number(use.qty))).monospacedDigit()
                         }
                         .fixedSize()
+                        // What this line adds to each print, at the shelf's
+                        // cost — the figure the calculator and the product
+                        // will charge, so it can be checked here.
+                        if let item = shop.consumables.first(where: { $0.id == use.consumableId }) {
+                            Text(Money.short(Self.lineCost(item.cost, qty: use.qty), shop.currency))
+                                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        }
                         Button(role: .destructive) { write(uses.filter { $0.id != use.id }) } label: {
                             Image(systemName: "minus.circle")
                         }
@@ -128,7 +139,10 @@ struct ModelConsumablesSection: View {
                     }
                 }
                 if shop.consumables.isEmpty {
-                    Text(shop.words.callIt("mac.calc_no_consumables"))
+                    // Its own sentence: the calculator's says the items can be
+                    // "priced into a print here", which on a model's page is
+                    // not what here is for.
+                    Text(shop.words.callIt("mac.model_consumables_empty_shelf"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
@@ -148,6 +162,12 @@ struct ModelConsumablesSection: View {
                 }
             }
         }
+    }
+
+    static func lineCost(_ cost: Double?, qty: Double) -> Double {
+        let c = cost ?? 0
+        guard c.isFinite, qty.isFinite else { return 0 }
+        return max(0, c) * min(9999, max(0, qty))
     }
 
     private func write(_ uses: [Shop.ConsumableUse]) {

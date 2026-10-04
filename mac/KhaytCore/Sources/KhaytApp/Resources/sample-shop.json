@@ -3564,30 +3564,117 @@
     "kind": "model"
    },
    "parsed": {
-    "printTimeMins": null,
-    "filamentGrams": null,
-    "filamentType": null,
-    "slicer": null
+    "printTimeMins": 318,
+    "filamentGrams": 154,
+    "filamentType": "PLA",
+    "slicer": "Bambu/Orca",
+    "source": "slicer",
+    "platesRead": 2,
+    "plates": [
+     {
+      "index": 1,
+      "name": "Body",
+      "printTimeMins": 205,
+      "filamentGrams": 112,
+      "filamentType": "PLA",
+      "filaments": [
+       {
+        "id": "1",
+        "type": "PLA",
+        "color": "#0F5257",
+        "grams": 70,
+        "meters": 23.47
+       },
+       {
+        "id": "2",
+        "type": "PLA",
+        "color": "#7FB2AD",
+        "grams": 30,
+        "meters": 10.06
+       },
+       {
+        "id": "3",
+        "type": "PLA",
+        "color": "#E8D8B0",
+        "grams": 12,
+        "meters": 4.02
+       }
+      ]
+     },
+     {
+      "index": 2,
+      "name": "Cap",
+      "printTimeMins": 113,
+      "filamentGrams": 42,
+      "filamentType": "PLA",
+      "filaments": [
+       {
+        "id": "1",
+        "type": "PLA",
+        "color": "#0F5257",
+        "grams": 18,
+        "meters": 6.04
+       },
+       {
+        "id": "4",
+        "type": "PLA",
+        "color": "#D4AF37",
+        "grams": 24,
+        "meters": 8.05
+       }
+      ]
+     }
+    ],
+    "filaments": [
+     {
+      "id": "1",
+      "type": "PLA",
+      "color": "#0F5257",
+      "grams": 88,
+      "meters": 29.51
+     },
+     {
+      "id": "2",
+      "type": "PLA",
+      "color": "#7FB2AD",
+      "grams": 30,
+      "meters": 10.06
+     },
+     {
+      "id": "3",
+      "type": "PLA",
+      "color": "#E8D8B0",
+      "grams": 12,
+      "meters": 4.02
+     },
+     {
+      "id": "4",
+      "type": "PLA",
+      "color": "#D4AF37",
+      "grams": 24,
+      "meters": 8.05
+     }
+    ]
    },
    "colors": [
     {
      "hex": "#0F5257",
-     "grams": null,
+     "grams": 88,
      "label": "Filament 1"
     },
     {
      "hex": "#7FB2AD",
-     "grams": null,
+     "grams": 30,
      "label": "Filament 2"
     },
     {
      "hex": "#E8D8B0",
-     "grams": null,
+     "grams": 12,
      "label": "Filament 3"
     },
     {
      "hex": "#D4AF37",
-     "grams": null,
+     "grams": 24,
      "label": "Filament 4"
     }
    ],
