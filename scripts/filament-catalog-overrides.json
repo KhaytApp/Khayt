@@ -1,0 +1,43 @@
+{
+  "about": "Corrections applied on top of the Open Filament Database snapshot by scripts/fetch-filament-catalog.py (finish()). Each entry names one filament and the manufacturer's own colour list for it. A colour is matched by name or by an 'aka' (case-insensitive) and takes the manufacturer's name and hex; a listed colour upstream does not carry is added; upstream colours not listed are kept. A name listed here is removed from the filaments in 'notIn' (same brand), which is where a misfiled colour turns up. Codes are the manufacturer's colour codes, kept for whoever re-verifies this, not shipped. When upstream agrees with an entry it becomes a no-op; delete it then.",
+  "filaments": [
+    {
+      "brand": "Bambu Lab",
+      "filament": "PLA Matte",
+      "notIn": ["PLA Basic"],
+      "sources": [
+        "https://github.com/bambulab/BambuStudio/blob/master/resources/profiles/BBL/filament/filaments_color_codes.json (fila_type \"PLA Matte\", fila_id GFA01; commit 804d93bb, 2026-09-22)",
+        "https://us.store.bambulab.com/products/pla-matte (25 colours, same names and codes)"
+      ],
+      "verifiedAt": "2026-10-04",
+      "colours": [
+        { "name": "Apple Green",     "hex": "#C2E189", "code": "11502" },
+        { "name": "Ash Gray",        "hex": "#9B9EA0", "code": "11102" },
+        { "name": "Bone White",      "hex": "#CBC6B8", "code": "11103" },
+        { "name": "Caramel",         "hex": "#AE835B", "code": "11803" },
+        { "name": "Charcoal",        "hex": "#000000", "code": "11101" },
+        { "name": "Dark Blue",       "hex": "#042F56", "code": "11602" },
+        { "name": "Dark Brown",      "hex": "#7D6556", "code": "11801" },
+        { "name": "Dark Chocolate",  "hex": "#4D3324", "code": "11802" },
+        { "name": "Dark Green",      "hex": "#68724D", "code": "11501" },
+        { "name": "Dark Red",        "hex": "#BB3D43", "code": "11202" },
+        { "name": "Desert Tan",      "hex": "#E8DBB7", "code": "11401" },
+        { "name": "Grass Green",     "hex": "#61C680", "code": "11500" },
+        { "name": "Ice Blue",        "hex": "#A3D8E1", "code": "11601" },
+        { "name": "Ivory White",     "hex": "#FFFFFF", "code": "11100" },
+        { "name": "Latte Brown",     "hex": "#D3B7A7", "code": "11800" },
+        { "name": "Lemon Yellow",    "hex": "#F7D959", "code": "11400" },
+        { "name": "Lilac Purple",    "hex": "#AE96D4", "code": "11700" },
+        { "name": "Mandarin Orange", "hex": "#F99963", "code": "11300" },
+        { "name": "Marine Blue",     "hex": "#0078BF", "code": "11600" },
+        { "name": "Nardo Gray",      "hex": "#757575", "code": "11104", "aka": ["Nardo Grey"] },
+        { "name": "Plum",            "hex": "#950051", "code": "11204" },
+        { "name": "Sakura Pink",     "hex": "#E8AFCF", "code": "11201" },
+        { "name": "Scarlet Red",     "hex": "#DE4343", "code": "11200" },
+        { "name": "Sky Blue",        "hex": "#56B7E6", "code": "11603" },
+        { "name": "Terracotta",      "hex": "#B15533", "code": "11203" }
+      ],
+      "added": { "weights": [1000], "diameter": 1.75 }
+    }
+  ]
+}

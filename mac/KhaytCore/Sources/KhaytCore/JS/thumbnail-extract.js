@@ -87,7 +87,13 @@ function colorsFromConfigs(configs) {
     const h = normHex(hex);
     if (!h) return;
     if (seen.has(h)) {
-      if (grams != null) { const e = colors.find((c) => c.hex === h); if (e && e.grams == null) e.grams = grams; }
+      // ADDED, not first-wins. A multi-plate slice_info lists the same spool
+      // once per plate, and keeping the first plate's grams showed a two-plate
+      // project as using one plate's worth of each colour (tester, Oct 2026).
+      if (grams != null) {
+        const e = colors.find((c) => c.hex === h);
+        if (e) e.grams = e.grams == null ? grams : Math.round((e.grams + grams) * 100) / 100;
+      }
       return;
     }
     seen.add(h);

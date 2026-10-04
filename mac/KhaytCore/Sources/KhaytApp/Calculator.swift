@@ -205,6 +205,9 @@ struct Calculator: View {
                             .fixedSize()
                             Spacer(minLength: 0)
                         }
+                        // Weight and time from a library model — the whole
+                        // project, or one plate of it. See CalculatorFromModel.
+                        CalculatorFromModel(shop: shop, grams: $grams, hours: $hours)
                         LayerRule()
                         HStack(spacing: 10) {
                             // The spool decides the material cost per gram, and

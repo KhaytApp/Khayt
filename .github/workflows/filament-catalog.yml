@@ -62,7 +62,7 @@ jobs:
 
       - name: Run the suites that read it
         run: |
-          node --test test/filament-catalog.test.js
+          node --test test/filament-catalog.test.js test/filament-catalog-data.test.js
           node --test test/mac-core-is-not-a-fork.test.js
 
       - name: What changed
