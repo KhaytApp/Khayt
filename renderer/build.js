@@ -376,9 +376,14 @@ async function aiSuggestPrice() {
 
   // Current job cost + specs (mirrors updateGrandTotal).
   const qty = Math.max(1, Math.round(num($('#partQty').value, 1)));
-  const cost = currentBuild.length
+  // Plus the product's components, which the saved job prices (as updateGrandTotal).
+  let compCost = 0;
+  if (Array.isArray(currentComponents) && currentComponents.length && typeof KhaytOrderNew !== 'undefined') {
+    try { compCost = +KhaytOrderNew.componentsCost(currentComponents, currentAssemblyQty, (typeof consumables !== 'undefined' ? consumables : undefined)) || 0; } catch (e) { compCost = 0; }
+  }
+  const cost = (currentBuild.length
     ? currentBuild.reduce((s, p) => s + (+p.baseCost || 0), 0)
-    : calculateLivePartCost() * qty;
+    : calculateLivePartCost() * qty) + compCost;
   const grams = currentBuild.length
     ? currentBuild.reduce((s, p) => s + ((+p.printWeight || 0) + (+p.supportWeight || 0)) * (+p.qty || 1), 0)
     : ((clampPositive($('#printWeight').value) + num($('#supportWeight')?.value, 0)) * qty);
