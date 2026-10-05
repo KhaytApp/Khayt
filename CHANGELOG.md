@@ -12,17 +12,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   which version last opened the book, and a different one saves
   `pre-update-v<new>-from-v<old>-….json` first (never rotated away; skipped
   when the in-app updater already made one).
+
 - **A print-file preview that did not come back with a restore is made again.**
   Previews live beside the model files now, so a backup restored on another
   computer, or after a wipe, brought back cards with a blank picture. Where the
   model file is present the preview is rebuilt from it; where it is not, the
   card says why instead of showing a blank.
+
 - **Straight-line depreciation no longer multiplies wear in a quiet month.**
   It spreads a month's charge over the hours printed, so a printer used twice
   in ninety days put over a hundred an hour of "wear" into the calculator.
   Measured hours now count as at least ten a month; a figure typed in the
   machine's settings is used as given. Bed Ready's hint for the setting talks
   about the calculator, not quotes and P&L.
+
 - **(Bed Ready) Six business modules it never runs are no longer loaded**:
   ZATCA QR, recurring orders, top lists, KPI rows, expense book and the
   low-stock order alert.
@@ -33,19 +36,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   3 kg roll read three times dear and a 250 g sample a quarter of its real cost,
   with no field anywhere to correct it. The spool editor now has **Size when
   new**; blank leaves it as it was. Khayt and Bed Ready both.
+
 - **(Bed Ready) Print-file cards hold their own buttons again.** The action row
   does not wrap, and Bed Ready's narrower content area left every card at 231px,
   so the More actions button hung off the card's edge. Cards are now at least
   260px wide, which fits the row; Khayt at its usual window size is unchanged.
+
 - **(Bed Ready) Update and safety messages say Bed Ready.** The new
   explanations for a failed update check ("…Khayt will try again later"), the
   full-wipe dialogs, the newer-data-file refusal and the printer-history error
   named Khayt in Bed Ready.
-- **A job's margin counts its components.** The margin shown on each job in
-  Orders, sorting by margin, and the calculator's AI price suggestion left
-  out a product's components, so a job with magnets or hardware looked more
-  profitable than it was. They now include them, as the Mac app does. Your
-  P&L is unchanged: buying components is already counted as an expense.
 
 - **A part's magnets and inserts are no longer counted twice in the P&L.** A
   part's own consumables are priced into its material cost, and that material
