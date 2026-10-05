@@ -76,7 +76,48 @@
     if (!p || !P || !P.configFamily) return true;
     if (P.configFamily(p.flavour) === 'generic') return true; // Generic normalize is always valid
     if (!sourceFlavour || sourceFlavour === 'generic') return true;
+    if (isPrusaProject(sourceFlavour, p)) return true; // Bambu/Orca → a real PrusaSlicer project
     return P.configFamily(p.flavour) === P.configFamily(sourceFlavour);
+  }
+  // ── BAMBU/ORCA → PRUSASLICER PROJECT ──────────────────────────────────────────────────────
+  // A Bambu/Orca file aimed at a Prusa whose exact PrusaSlicer preset is known becomes a PrusaSlicer
+  // project (lib/prusa-project.js, ported from bedready.io) instead of a Generic 3MF. Mirrors
+  // `applies` in lib/prusa-project.js; `p` is a profile or a target id.
+  function isPrusaProject(sourceFlavour, p) {
+    const P = profiles();
+    const prof = typeof p === 'string' ? getProfileById(p) : p;
+    return !!(prof && P && P.configFamily && P.configFamily(sourceFlavour) === 'bbl'
+      && P.configFamily(prof.flavour) === 'prusa' && prof.printerSettingsId && prof.bed && prof.bed.x);
+  }
+  // What the project will hold, from the main process's plan (hub:prusa-plan): the tools to load,
+  // where each source colour prints (a tool or a ColorMix blend), and the warnings — or why not.
+  function prusaPlanHtml(plan) {
+    if (!plan) return `<div class="conv-fs-loading">${escapeHtml(t('conv.prusa_planning') || 'Working out the tools…')}</div>`;
+    if (!plan.ok) {
+      return `<p class="conv-note" role="alert">${_emoI('alert', '⚠', 12)}${escapeHtml((t('conv.prusa_cannot') || 'This file can’t become a PrusaSlicer project for {t}:').replace('{t}', plan.targetName || ''))} ${escapeHtml(plan.error || '')}</p>`;
+    }
+    const toolName = (k) => (t('conv.tool') || 'Tool') + ' ' + k;
+    const tools = plan.colours.map((hex, i) => {
+      const used = plan.toolsUsed.includes(i + 1);
+      return `<div class="conv-fs-head">${swatch(hex, 18)}<span>${escapeHtml(toolName(i + 1))} · ${used ? escapeHtml(`${hex} ${plan.types[i] || ''}`) : escapeHtml(t('conv.prusa_unused') || 'not used')}</span></div>`;
+    }).join('');
+    const blendText = (b) => b.components.map((c) => `${Math.round(c.ratio * 100)}% ${swatch(plan.colours[c.tool - 1], 12)} ${escapeHtml(toolName(c.tool))}`).join(' + ');
+    const rows = (plan.srcColours || []).map((hex, i) => {
+      const to = plan.map[i];
+      const dest = to < plan.tools
+        ? `${swatch(plan.colours[to], 14)} ${escapeHtml(toolName(to + 1))}`
+        : `${escapeHtml(t('conv.prusa_blend') || 'ColorMix blend')} ${swatch(plan.blends[to - plan.tools].hex, 14)}: ${blendText(plan.blends[to - plan.tools])}`;
+      return `<div class="conv-fs-mix">${swatch(hex, 16)} → ${dest}</div>`;
+    }).join('');
+    const mixed = plan.blends.length
+      ? `<div class="conv-fs-mix">${escapeHtml((t('conv.prusa_blends_n') || 'Colours mixed from the loaded tools: {n}').replace('{n}', plan.map.filter((m) => m >= plan.tools).length))}</div>` : '';
+    const warns = (plan.warnings || []).map((w) => `<div class="conv-fs-mix">${_emoI('alert', '⚠', 12)}${escapeHtml(w)}</div>`).join('');
+    return `<div class="conv-fs-plan">
+        <div class="conv-fs-sub">${escapeHtml(t('conv.prusa_tools') || 'Load these on the tools:')}</div>
+        <div class="conv-fs-heads">${tools}</div>
+        <div class="conv-fs-sub">${escapeHtml(t('conv.prusa_colours') || 'Where each colour prints:')}</div>
+        <div class="conv-fs-mixes">${rows}${mixed}${warns}</div>
+      </div>`;
   }
   // A printer from a *different* slicer ecosystem than the source. We still let you pick it,
   // but the output is written as a clean Generic 3MF (geometry + colours kept, vendor config
@@ -315,7 +356,9 @@
       row(t('conv.chg_nozzle') || 'Nozzle', m.nozzle ? m.nozzle + ' mm' : null, target.nozzle ? target.nozzle + ' mm' : null),
       row(t('conv.chg_colours') || 'Colours', used ? String(used) : null, (t('conv.chg_slots') || '{n} slots').replace('{n}', target.maxColors || '—'), colBadge),
     ].join('');
-    return `<div class="conv-changes"><div class="conv-changes-h">${escapeHtml(t('conv.changes') || 'What changes')}</div>${rows}</div>`;
+    const prusaNote = isPrusaProject(a.flavour, target)
+      ? `<p class="conv-note">${escapeHtml((t('conv.prusa_note') || 'Saved as a PrusaSlicer project for {t}: every colour goes to the tool shown below, and PrusaSlicer fills in the {t} profile. Open it with File → Open, as a project — imported as geometry, the tool colours are dropped.').replace(/\{t\}/g, target.name || ''))}</p>` : '';
+    return `<div class="conv-changes"><div class="conv-changes-h">${escapeHtml(t('conv.changes') || 'What changes')}</div>${rows}${prusaNote}</div>`;
   }
 
   // Under a mounted 3D preview: a plate picker (multi-plate files) and a live colour strip
@@ -431,13 +474,129 @@
     });
   }
 
+  /* ---------------- One plate of a multi-plate project (lib/plates.js) ----------------
+   * A Bambu/Orca project with several plates gets a picker: each plate's thumbnail, name,
+   * object count and colours, with "Convert this plate" (split it out, then run this same
+   * converter on the split file) and "Save this plate as a 3MF". The whole-file conversion
+   * below it is unchanged. Splitting happens in the main process; this only asks.
+   */
+  function platesOf(src) {
+    const h = hub();
+    if (!h || !h.mfPlates || src.fromPlate) return Promise.resolve(null);
+    return h.mfPlates(src.path)
+      .then((r) => (r && r.ok && Array.isArray(r.plates) && r.plates.length > 1 ? r.plates : null))
+      .catch(() => null);
+  }
+
+  function plateLabel(p) {
+    const n = tf('conv.plate_n', 'Plate {n}').replace('{n}', p.index);
+    return p.name ? `${n} · ${p.name}` : n;
+  }
+
+  function platePickerHtml(plates) {
+    const cards = plates.map((p) => {
+      const thumb = p.thumbnail && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(p.thumbnail)
+        ? `<img class="conv-pp-thumb" alt="" src="${p.thumbnail}">`
+        : `<div class="conv-pp-thumb conv-pp-nothumb">${_emoI('cube', '📦', 22)}</div>`;
+      const cols = (p.colors || []).map((c) => swatch(c, 12)).join('');
+      const approx = p.colorsApprox && cols
+        ? `<span class="conv-pp-approx" title="${escapeHtml(tf('conv.plate_colours_approx', 'Read from object settings — painted colours may be missing.'))}">≈</span>` : '';
+      const why = p.problem
+        ? `<div class="conv-pp-why">${escapeHtml(p.problem.code === 'shared-object'
+          ? tf('conv.plate_shared', 'This plate shares an object with another plate, so it can’t be split out on its own.')
+          : tf('conv.plate_cannot', 'This plate can’t be split out on its own.'))}</div>` : '';
+      const dis = p.splittable ? '' : ' disabled';
+      return `<div class="conv-pp-card" data-plate="${p.index}">
+        ${thumb}
+        <div class="conv-pp-body">
+          <div class="conv-pp-name">${escapeHtml(plateLabel(p))}</div>
+          <div class="conv-pp-meta">${escapeHtml(tf('conv.plate_objects', 'Objects: {n}').replace('{n}', p.objectCount))}<span class="conv-pp-cols">${cols}${approx}</span></div>
+          ${why}
+          <div class="conv-pp-act">
+            <button type="button" class="btn small" data-pp="convert" data-plate="${p.index}"${dis}>${escapeHtml(tf('conv.plate_convert', 'Convert this plate'))}</button>
+            <button type="button" class="btn small ghost" data-pp="save" data-plate="${p.index}"${dis}>${escapeHtml(tf('conv.plate_save', 'Save this plate as a 3MF'))}</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="conv-pp">
+      <div class="conv-pp-head">${escapeHtml(tf('conv.plates_title', '{n} plates — convert or save one on its own').replace('{n}', plates.length))}</div>
+      <p class="conv-pp-hint">${escapeHtml(tf('conv.plates_hint', 'Each plate becomes a 3MF of its own, with just its objects and the project’s colours.'))}</p>
+      <div class="conv-pp-grid">${cards}</div>
+    </div>`;
+  }
+
+  /** Wire a rendered picker. `leave()` closes whatever modal it sits in before the next one opens. */
+  function wirePlatePicker(root, src, plates, leave) {
+    if (!root) return;
+    const reset = () => root.querySelectorAll('[data-pp]').forEach((b) => {
+      const q = plates.find((x) => x.index === parseInt(b.dataset.plate, 10));
+      b.disabled = !(q && q.splittable);
+    });
+    const fail = (r) => {
+      toast(r && r.code === 'shared-object'
+        ? tf('conv.plate_shared', 'This plate shares an object with another plate, so it can’t be split out on its own.')
+        : tf('conv.plate_cannot', 'This plate can’t be split out on its own.'), 'error', 5600);
+      if (r && r.error) try { console.warn('[converter] plate split refused:', r.code, r.error); } catch (_) {}
+    };
+    root.querySelectorAll('[data-pp]').forEach((btn) => btn.addEventListener('click', async () => {
+      const index = parseInt(btn.dataset.plate, 10);
+      if (!plates.some((x) => x.index === index)) return;
+      const h = hub();
+      root.querySelectorAll('[data-pp]').forEach((b) => { b.disabled = true; });
+      toast(tf('conv.plate_extracting', 'Splitting out plate {n}…').replace('{n}', index), 'info', 1600);
+      try {
+        if (btn.dataset.pp === 'save') {
+          const r = await h.mfPlateSave(src.path, index);
+          if (r && r.ok) toast(tf('conv.plate_saved', 'Plate {n} saved as its own 3MF.').replace('{n}', index), 'success', 3200);
+          else if (!(r && r.canceled)) fail(r);
+        } else {
+          const r = await h.mfPlateExtract(src.path, index);
+          if (r && r.ok) {
+            if (typeof leave === 'function') leave();
+            openConverter({ path: r.path, name: r.name, recordId: src.recordId, fromPlate: index });
+            return;
+          }
+          fail(r);
+        }
+      } catch (e) { toast(String((e && e.message) || e), 'error'); }
+      reset();
+    }));
+  }
+
+  /** The file could not be analysed whole, but it has plates: offer those on their own. */
+  function openPlatePicker(src, plates, note) {
+    openFormModal({
+      title: `${_titleIco}${tf('conv.plate_pick_title', 'Pick a plate')}`,
+      bodyHtml: `<div class="conv-src"><div class="conv-src-name">${_emoI('cube', '📦')}${escapeHtml(src.name || 'model.3mf')}</div>${note ? `<div class="conv-pp-note">${escapeHtml(note)}</div>` : ''}</div>${platePickerHtml(plates)}`,
+      noSave: true,
+      onMount(modal) {
+        const leave = () => { const c = modal.querySelector('[data-act="cancel"]'); if (c) c.click(); };
+        wirePlatePicker(modal, src, plates, leave);
+      },
+    });
+  }
+
+  /** A refusal from the engine, in the maker's language where we have it. */
+  function convertErrorText(r) {
+    if (r && r.code === 'too_large') return tf('conv.plate_too_large', 'This file is too large to convert in one piece. If it has several plates, pick one in the plate list to convert or save it on its own.');
+    return (r && r.error) || (t('conv.failed') || 'Conversion failed.');
+  }
+  /* ---------------- end one plate ---------------- */
+
   async function openConverter(src) {
     const h = hub();
     if (!h || !h.mfAnalyze) { toast(t('conv.desktop_only') || 'The converter is available in the desktop app.', 'error'); return; }
     toast(t('conv.analyzing') || 'Analyzing 3MF…', 'info', 1400);
+    const platesP = platesOf(src);
     let a;
     try { a = await h.mfAnalyze(src.path); } catch (e) { toast(String((e && e.message) || e), 'error'); return; }
-    if (!a || !a.ok) { toast((a && a.error) || (t('conv.analyze_failed') || 'Could not read that 3MF.'), 'error'); return; }
+    if (!a || !a.ok) {
+      const plates = await platesP;
+      if (plates) { openPlatePicker(src, plates, (a && a.error) || ''); return; }
+      toast((a && a.error) || (t('conv.analyze_failed') || 'Could not read that 3MF.'), 'error');
+      return;
+    }
 
     const P = profiles();
     const filaments = a.filaments || [];
@@ -452,6 +611,7 @@
     const canPreview = typeof mountMeshViewer === 'function' && !!h.convertMesh;
     const body = `
       ${metaCardHtml(src, a)}
+      <div id="convPlatesWrap"></div>
       ${canPreview ? `
       <div id="convPreview" class="conv-preview">
         <canvas id="convPreviewCanvas" width="300" height="300" class="conv-preview-canvas" aria-label="3D preview"></canvas>
@@ -468,6 +628,7 @@
       <div id="convChanges">${changesHtml(a, targetId)}</div>
       <div id="convBandWrap"></div>
       <div id="convFsWrap"></div>
+      <div id="convPrusaWrap"></div>
       <div id="convFilamentWrap"></div>
       <div id="convRemapWrap">${remapTableHtml(filaments, currentMax(targetId))}</div>
       <div class="conv-dest">
@@ -481,6 +642,13 @@
       bodyHtml: body,
       saveLabel: t('conv.convert') || 'Convert & save…',
       onMount(modal) {
+        // Multi-plate project: the plate picker sits above the whole-file options.
+        platesP.then((plates) => {
+          const box = plates && modal.isConnected ? modal.querySelector('#convPlatesWrap') : null;
+          if (!box) return;
+          box.innerHTML = platePickerHtml(plates);
+          wirePlatePicker(box, src, plates, () => { const c = modal.querySelector('[data-act="cancel"]'); if (c) c.click(); });
+        });
         const sel = modal.querySelector('#convTarget');
         const wrap = modal.querySelector('#convRemapWrap');
         const chg = modal.querySelector('#convChanges');
@@ -658,6 +826,50 @@
         // Expose current band-swap state to onSave.
         modal._bandState = () => ({ enabled: bandEnabled, plan: bandData });
 
+        // Bambu/Orca → PrusaSlicer project: the plan the convert will run, re-asked whenever the target,
+        // the slot map or ColorMix changes. With more colours than tools the colours are merged (and,
+        // on a ColorMix printer, optionally blended), so the manual slot table steps aside.
+        const prusaWrap = modal.querySelector('#convPrusaWrap');
+        let prusaMix = false, prusaPlanData = null, prusaSeq = 0;
+        const prusaMerges = () => { const p = getProfileById(targetId); return !!p && filaments.length > (p.maxColors || 1); };
+        async function loadPrusaPlan() {
+          const seq = ++prusaSeq;
+          prusaPlanData = null;
+          paintPrusa();
+          let slotMap = null;
+          if (!prusaMerges()) {
+            slotMap = Array.from(modal.querySelectorAll('.conv-slot')).map((s) => parseInt(s.value, 10) || 0);
+            if (slotMap.every((v, i) => v === i)) slotMap = null;
+          }
+          // SPOOL MATCH: an active match is what the convert will send, so the preview asks with it.
+          const spool = typeof modal._spoolState === 'function' ? modal._spoolState() : { active: false };
+          const spoolReq = spool.active && spool.request ? spool.request : null;
+          let r = null;
+          try {
+            r = await hub().prusaPlan({ path: src.path, targetId, targetProfile: isCustomId(targetId) ? getProfileById(targetId) : null,
+              slotMap: spoolReq ? spoolReq.slotMap : slotMap, colorMix: prusaMix,
+              spoolMerge: spoolReq ? spoolReq.spoolMerge : null, slotSpools: spoolReq ? spoolReq.slotSpools : null, spoolStrict: !!spoolReq });
+          } catch (e) { r = { available: true, ok: false, error: String((e && e.message) || e) }; }
+          if (seq !== prusaSeq) return; // a newer target / map won
+          prusaPlanData = r && r.available ? r : null;
+          paintPrusa();
+        }
+        function paintPrusa() {
+          if (!prusaWrap) return;
+          const p = getProfileById(targetId);
+          if (!isPrusaProject(a.flavour, targetId) || !hub().prusaPlan) { prusaWrap.innerHTML = ''; prusaMix = false; return; }
+          const offerMix = !!(p && p.prusaColorMix) && prusaMerges();
+          if (!offerMix) prusaMix = false;
+          const mix = offerMix
+            ? `<label class="conv-fs-toggle"><input type="checkbox" id="convPrusaMix"${prusaMix ? ' checked' : ''}> <span>${escapeHtml(t('conv.prusa_colormix') || 'Mix colours no tool holds (ColorMix)')}<br><small class="muted">${escapeHtml(t('conv.prusa_colormix_hint') || 'A colour with no close tool prints as a blend of two or three loaded tools, alternated layer by layer, in PrusaSlicer’s own FullSpectrum format. More tool changes.')}</small></span></label>` : '';
+          prusaWrap.innerHTML = mix + prusaPlanHtml(prusaPlanData);
+          const cb = prusaWrap.querySelector('#convPrusaMix');
+          if (cb) cb.onchange = () => { prusaMix = cb.checked; loadPrusaPlan(); };
+          if (wrap) wrap.style.display = prusaMerges() ? 'none' : '';
+        }
+        if (wrap) wrap.addEventListener('change', (e) => { if (e.target && e.target.classList && e.target.classList.contains('conv-slot') && isPrusaProject(a.flavour, targetId)) loadPrusaPlan(); });
+        modal._prusaState = () => ({ on: isPrusaProject(a.flavour, targetId), colorMix: prusaMix, merges: prusaMerges() });
+
         // 3D preview of the source model — "know what you're converting". Best-effort:
         // if the mesh can't be read, quietly drop the panel rather than block the convert.
         const pvCanvas = modal.querySelector('#convPreviewCanvas');
@@ -703,6 +915,8 @@
           paintFs();
           paintBand();
           paintFilaments();
+          prusaMix = false;
+          if (isPrusaProject(a.flavour, targetId)) loadPrusaPlan(); else paintPrusa();
           applyBed();
           return asGeneric;
         };
@@ -746,6 +960,15 @@
         paintFs();
         paintFilaments();
         loadBandPlan();
+        // ── SPOOL MATCH (renderer/converter-spools.js): "Match to loaded spools" ──
+        if (typeof KhaytConvSpools !== 'undefined') {
+          KhaytConvSpools.mount(modal, {
+            filaments, flavour: a.flavour, targetId: () => targetId, profile: getProfileById,
+            skip: () => (P && targetId === P.GENERIC.id) || isCrossEcosystem(a.flavour, targetId),
+            onChange: () => { if (isPrusaProject(a.flavour, targetId)) loadPrusaPlan(); },
+          });
+        }
+        if (isPrusaProject(a.flavour, targetId)) loadPrusaPlan();
 
         // Apply a saved preset: set the target and, when the slot map fits this file's colours, the mapping.
         const applySel = modal.querySelector('#convPresetApply');
@@ -785,15 +1008,25 @@
         const fsState = (typeof modal._fsState === 'function') ? modal._fsState() : { enabled: false };
         // Band-swap and Full Spectrum are mutually exclusive; band-swap wins if somehow both are set.
         const fsOn = !isGeneric && !bandOn && fsState.enabled && !!fsState.plan;
+        // ── SPOOL MATCH: a match the maker asked for replaces the slot table, or stops here ──
+        const spool = (!isGeneric && !fsOn && !bandOn && typeof modal._spoolState === 'function') ? modal._spoolState() : { active: false };
+        if (spool.active && spool.refusal) { toast(spool.refusal, 'error', 6400); return false; }
+        const spoolOpts = spool.active ? (spool.request || { slotMap: null }) : null;
+        // ── end SPOOL MATCH ──
         let slotMap = null;
         // Band-swap / Full Spectrum handle all colours themselves — the manual slot map doesn't apply.
-        if (!isGeneric && !fsOn && !bandOn && filaments.length) {
+        if (!spoolOpts && !isGeneric && !fsOn && !bandOn && filaments.length) {
           slotMap = Array.from(modal.querySelectorAll('.conv-slot')).map((s) => parseInt(s.value, 10) || 0);
           if (slotMap.every((v, i) => v === i)) slotMap = null; // identity → no remap
-          if (slotMap && new Set(slotMap).size !== slotMap.length) {
+          // A Prusa project may put two colours on one tool on purpose (its plan says so); elsewhere one is dropped.
+          const prusaOn = typeof modal._prusaState === 'function' && modal._prusaState().on;
+          if (slotMap && !prusaOn && new Set(slotMap).size !== slotMap.length) {
             toast(t('conv.dup_slots') || 'Two colours are mapped to the same slot — one will be dropped. Give each colour its own slot.', 'warning', 5600);
           }
         }
+        // A Prusa project with more colours than tools merges them itself; the slot table is hidden.
+        const prusaState = (typeof modal._prusaState === 'function') ? modal._prusaState() : { on: false };
+        if (prusaState.on && prusaState.merges) slotMap = null;
         const dest = (modal.querySelector('input[name="convDest"]:checked') || {}).value || 'library';
         const mode = isGeneric ? 'normalize' : 'retarget';
         // Custom printers AND installed-slicer catalogue printers convert via an explicit targetProfile.
@@ -814,10 +1047,11 @@
             ? Array.from({ length: Math.max(...Object.keys(picksMap).map((k) => +k + 1)) }, (_, i) => picksMap[i] || null)
             : null;
           const process = (typeof modal._procPick === 'function') ? modal._procPick() : null;
-          r = await hub().mfConvert({ path: src.path, targetId, mode, slotMap, intoVaultId, targetProfile, fullSpectrum: fsOn, bandSwap: bandOn, filaments, process });
+          r = await hub().mfConvert({ path: src.path, targetId, mode, slotMap, intoVaultId, targetProfile, fullSpectrum: fsOn, bandSwap: bandOn, filaments, process, colorMix: !!(prusaState.on && prusaState.colorMix), ...(spoolOpts || {}) });
         } catch (e) { toast(String((e && e.message) || e), 'error'); if (btn) { btn.disabled = false; } return false; }
+        if (r && r.refused === 'spool-match' && typeof modal._spoolRefused === 'function') modal._spoolRefused(r.error); // SPOOL MATCH
         if (r && r.canceled) { if (btn) { btn.disabled = false; btn.textContent = t('conv.convert') || 'Convert & save…'; } return false; }
-        if (!r || !r.ok) { toast((r && r.error) || (t('conv.failed') || 'Conversion failed.'), 'error'); if (btn) { btn.disabled = false; } return false; }
+        if (!r || !r.ok) { toast(convertErrorText(r), 'error', r && r.code === 'too_large' ? 7000 : undefined); if (btn) { btn.disabled = false; } return false; }
         const rep = r.report || {};
         for (const w of (rep.warnings || [])) toast((_bdr ? '' : '⚠ ') + w, 'warning', 5200);
 

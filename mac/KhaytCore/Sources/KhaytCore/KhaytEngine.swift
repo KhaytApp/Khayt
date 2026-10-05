@@ -144,6 +144,10 @@ public actor KhaytEngine {
         "filament-mixer",
         "mf-mesh",
         "full-spectrum",
+        // Bambu/Orca → a PrusaSlicer project, with ColorMix blends on the
+        // INDX. `mf-convert` reads it off the global, so it comes first; it
+        // asks for `color-mix` only when it plans, which is loaded below.
+        "prusa-project",
         "mf-convert",
         "kpi-rows",
         // What needs a shop's attention, and the figures on the dashboard.

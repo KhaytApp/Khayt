@@ -4,6 +4,52 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Converter: convert or save one plate of a multi-plate project.** Opening a
+  Bambu Studio or Orca project with several plates now shows a plate list —
+  each plate's picture, name, object count and colours — with "Convert this
+  plate" and "Save this plate as a 3MF". The plate becomes a 3MF of its own
+  with only its objects, its settings and its thumbnails, moved onto the bed
+  exactly where it sat on its plate; the filament list is unchanged, so painted
+  colours stay right. Converting the whole file works as before. A file too
+  large to convert in one piece now points to the plate list instead of telling
+  you to convert one plate at a time with no way to do it. A plate that shares
+  an object with another plate is refused rather than split wrongly. Also
+  available from a print file's Convert action in the library.
+
+- **Converter: match a file's colours to the spools you have loaded.** When
+  the printer is already set up, "Match to loaded spools" sends every colour
+  in the file to the loaded spool that looks most like it (ported from
+  bedready.io), using what one of your machines reports or what you entered
+  for it, or spools you pick from your filament inventory per slot. Several
+  colours may share a spool; empty slots are never used. A table shows each
+  colour, the spool it goes to and how close the match is, warns when a
+  colour has no close spool or its material differs from the spool's (PETG
+  onto PLA), and lets you change any row. A file with more colours than the
+  printer has slots is merged onto the loaded spools; a file with fewer
+  colours whose spools sit in higher slots (a two-colour file on slots 3 and 4
+  of an AMS) gains those slots, each a copy of one of its filaments in the
+  loaded spool's colour. If the converter cannot apply the match whole (a
+  model it could not read, settings it cannot reorder), it stops and says why
+  instead of saving a file in which nothing moved. The match also decides the
+  tools of a PrusaSlicer project, whose tools then carry the loaded spools'
+  colours.
+
+- **Bambu and Orca files convert to a real PrusaSlicer project for the Prusa
+  MK4 / MK4S + MMU3 and the CORE One INDX 8T / 4T.** Before, picking one of
+  these printers saved a Generic 3MF and told you to set the printer up in
+  PrusaSlicer yourself. Now the file opens in PrusaSlicer as a project for
+  that printer, with every colour on the tool the converter shows, including
+  parts that were coloured by object rather than painted. A file with more
+  colours than the printer has tools merges the least-used ones into the
+  closest tool. On the INDX you can tick ColorMix to print those colours as
+  a blend of two or three loaded tools instead. The converter shows which
+  colour goes on which tool, and any blends, before you save. A file it
+  cannot convert cleanly (for example, colours and materials that don't
+  match up, or modifier, negative or support-blocker parts that PrusaSlicer
+  would print as solid) is refused with the reason instead of being saved
+  half-right. In the Mac app, a model too large to hand to the converter
+  keeps the previous Generic-style result.
+
 - **Converter fixes from bedready.io.**
   - PrusaSlicer files are read and rewritten for real. PrusaSlicer writes its
     settings as `; key = value`, and the converter only understood the bare
@@ -4655,6 +4701,59 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [bedready-v1.3.0] - 2026-10-05
+
+### Before you update
+
+- **Bed Ready 1.3.0 needs macOS 13 (Ventura) or later.** The app is built on a
+  newer engine that no longer runs on macOS 12. If your Mac is on macOS 12,
+  stay on 1.2.0 until you can update macOS — 1.3.0 would install and then not
+  open.
+- **A copy of your data is saved before anything changes.** The first time
+  1.3.0 opens your library it keeps the 1.2.0 copy in your backups folder
+  (`pre-update-v1.3.0-…`), however you installed it.
+
+### Added
+
+- **Browse, download and publish on MakerRun.** Search the public MakerRun
+  catalogue from Bed Ready, read a design's licence and files, and download it
+  straight into your print-file library with its source and creator recorded.
+  Publish one of your own prints from its card: you confirm first, it goes to
+  MakerRun's review, and a failed step can be finished, skipped or deleted.
+- **PrusaSlicer projects from Bambu and Orca files.** Converting for an MK4/MK4S
+  with MMU3 or a CORE One INDX now writes a real PrusaSlicer project — paint,
+  one colour and material per tool, centred on the bed. On the INDX, colours no
+  tool holds can print as ColorMix blends.
+- **Convert or save one plate.** A multi-plate project shows its plates;
+  convert one on its own, or save it as its own 3MF.
+- **Match to loaded spools.** Send each colour in a file to the spool that is
+  actually loaded on your printer (or one you pick from your shelf), with how
+  close each match is, a warning when the material differs, and no empty slot
+  ever chosen.
+- **A spool's size when new** can be set on spools added before it was
+  recorded, so their material cost is right.
+- **New printers:** Prusa MK4S + MMU3, CORE One INDX 8T and INDX 4T.
+
+### Fixed
+
+- **Converting a PrusaSlicer file now changes it.** Prusa's settings were being
+  read and written wrong, so a Prusa-to-Prusa conversion changed nothing while
+  saying it had.
+- **Painted colours stay on the right filament** when colours are moved to
+  other slots, and every filament's temperature and type move with its colour.
+  "Merge to the nearest slots" now actually merges.
+- **Colour bands are worked out per plate**, so a pause is never planned at
+  another plate's height.
+- **Full Spectrum settings stay put** when Orca opens the file; changing nozzle
+  size adjusts line widths and layer heights; files from other slicers open
+  fully in Snapmaker Orca.
+- **A preview lost after restoring a backup is made again** from the model file.
+- **The wear rate of a quiet printer** is no longer inflated in the calculator.
+- **Print-file cards hold their own buttons**, and update and safety messages
+  say Bed Ready.
+- **Tougher against broken or hostile 3MF files**, which can no longer hang the
+  converter.
 
 ## [3.11.5] - 2026-10-04
 
