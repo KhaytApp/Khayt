@@ -15,6 +15,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   you to convert one plate at a time with no way to do it. A plate that shares
   an object with another plate is refused rather than split wrongly. Also
   available from a print file's Convert action in the library.
+
 - **Converter: match a file's colours to the spools you have loaded.** When
   the printer is already set up, "Match to loaded spools" sends every colour
   in the file to the loaded spool that looks most like it (ported from
@@ -32,6 +33,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   instead of saving a file in which nothing moved. The match also decides the
   tools of a PrusaSlicer project, whose tools then carry the loaded spools'
   colours.
+
 - **Bambu and Orca files convert to a real PrusaSlicer project for the Prusa
   MK4 / MK4S + MMU3 and the CORE One INDX 8T / 4T.** Before, picking one of
   these printers saved a Generic 3MF and told you to set the printer up in
@@ -47,6 +49,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   would print as solid) is refused with the reason instead of being saved
   half-right. In the Mac app, a model too large to hand to the converter
   keeps the previous Generic-style result.
+
 - **Converter fixes from bedready.io.**
   - PrusaSlicer files are read and rewritten for real. PrusaSlicer writes its
     settings as `; key = value`, and the converter only understood the bare
