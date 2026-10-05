@@ -376,7 +376,7 @@ ipcMain.handle('hub:request-full-wipe', async (event) => {
     cancelId: 0,
     noLink: true,
     title: 'Full wipe',
-    message: 'Delete ALL Khayt data on this computer?',
+    message: `Delete ALL ${FLAVOR_NAME} data on this computer?`,
     detail: 'Store, photos, invoices, backups, and keys will be removed, and the app will restart empty. '
       + 'One safety copy of your book is saved first, in the backups folder, so a wipe made by mistake can be restored from Settings → Backups.',
   });
@@ -390,7 +390,7 @@ ipcMain.handle('hub:request-full-wipe', async (event) => {
     await dialog.showMessageBox(win || undefined, {
       type: 'error', buttons: ['OK'], title: 'Full wipe',
       message: 'Nothing was deleted.',
-      detail: `Khayt could not save a safety copy of your book first, so it stopped before deleting anything.\n\n${why}`,
+      detail: `${FLAVOR_NAME} could not save a safety copy of your book first, so it stopped before deleting anything.\n\n${why}`,
     });
     return { ok: false, error: 'safety-backup-failed', detail: why };
   }
@@ -861,6 +861,33 @@ function writePreUpgradeBackup(raw, diskVersion) {
   const fullPath = path.join(dir, name);
   fs.writeFileSync(fullPath, JSON.stringify(encryptForDisk(raw)), 'utf8');
   console.warn(`store upgrade v${from} → v${STORE_VERSION}: kept a pre-upgrade backup at ${fullPath}`);
+  return fullPath;
+}
+
+/**
+ * Copy the book aside the first time a different APP version opens it — see
+ * lib/upgrade-backup.js needsAppVersionBackup. Same contract as the schema
+ * backup above: verbatim raw bytes, before anything in this build touches them,
+ * and best-effort (the caller logs a failure; a shop must still open its app).
+ * The marker is written only after the copy is safely on disk, so a failed copy
+ * is tried again next launch rather than forgotten.
+ */
+const LAST_APP_VERSION_FILE = 'last-app-version';
+function writeAppVersionBackup(raw) {
+  const userData = app.getPath('userData');
+  const markerPath = path.join(userData, LAST_APP_VERSION_FILE);
+  const current = app.getVersion();
+  let last = null;
+  try { last = fs.readFileSync(markerPath, 'utf8').trim() || null; } catch (_) { /* never recorded */ }
+  if (!upgradeBackup.needsAppVersionBackup(last, current, !!raw)) return null;
+  const dir = backupsDir();
+  let fullPath = null;
+  if (!upgradeBackup.hasBackupForVersion(fs.readdirSync(dir), current)) {
+    fullPath = path.join(dir, upgradeBackup.appVersionBackupName(last, current, new Date().toISOString()));
+    fs.writeFileSync(fullPath, JSON.stringify(encryptForDisk(raw)), 'utf8');
+    console.warn(`app ${last || 'unknown'} → ${current}: kept a backup at ${fullPath}`);
+  }
+  fs.writeFileSync(markerPath, current + '\n', 'utf8');
   return fullPath;
 }
 
@@ -1449,7 +1476,12 @@ ipcMain.handle('hub:load-store', async (event) => {
     // on empty state and then overwrite the good file on the next save.
     const rec = recoverStoreRaw(MAX_STORE_BYTES);
     if (!rec.data) {
-      if (!rec.existed) return null; // genuinely a fresh install
+      if (!rec.existed) {
+        // Genuinely a fresh install. Record the version now, or the second
+        // launch would read "never recorded" as an upgrade and copy a new book.
+        try { fs.writeFileSync(path.join(app.getPath('userData'), LAST_APP_VERSION_FILE), app.getVersion() + '\n', 'utf8'); } catch (_) { /* best-effort */ }
+        return null;
+      }
       console.error('hub:load-store: store unreadable; quarantined to', rec.quarantined);
       return { __corrupt: true, error: 'Store unreadable', quarantined: rec.quarantined };
     }
@@ -1463,6 +1495,8 @@ ipcMain.handle('hub:load-store', async (event) => {
     // the backups directory is unwritable, so a failure here is logged, not fatal.
     try { writePreUpgradeBackup(rec.data, _diskStoreVersion); }
     catch (e) { console.error('hub:load-store: pre-upgrade backup failed:', e && e.message || e); }
+    try { writeAppVersionBackup(rec.data); }
+    catch (e) { console.error('hub:load-store: app-version backup failed:', e && e.message || e); }
     syncLanServerStoreFromDisk();
     const { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
     if (!normalized) {
@@ -1820,7 +1854,7 @@ let _diskStoreVersion = null;
 ipcMain.handle('hub:save-store', async (event, data) => {
   try {
     if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
-      const msg = `This data file was written by a newer version of Khayt (v${_diskStoreVersion}); this build supports v${STORE_VERSION}. Not saving, so nothing is lost — please update Khayt.`;
+      const msg = `This data file was written by a newer version of ${FLAVOR_NAME} (v${_diskStoreVersion}); this build supports v${STORE_VERSION}. Not saving, so nothing is lost — please update ${FLAVOR_NAME}.`;
       console.error('hub:save-store:', msg);
       return { ok: false, error: msg };
     }
@@ -4447,7 +4481,7 @@ ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
 async function fetchPrinterHistory(machine, limit) {
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
-    return { ok: false, error: 'Only Klipper/Moonraker printers keep a job history Khayt can read' };
+    return { ok: false, error: `Only Klipper/Moonraker printers keep a job history ${FLAVOR_NAME} can read` };
   }
   const printerHost = sanitizePrinterHost(host);
   if (!isAllowedPrinterHost(printerHost)) return { ok: false, error: 'Invalid printer host' };

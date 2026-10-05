@@ -314,3 +314,15 @@ test('periodCharges perHour with no purchase date stops at the machine\'s life',
   assert.equal(out.Q2.total, 400);
   assert.equal(out.Q1.total + out.Q2.total, 1000);
 });
+
+test('a quiet stretch does not multiply straight-line wear', () => {
+  // 2 h printed in 90 days is ~0.67 h a month: 122.5 an hour of "wear" before
+  // the floor. Measured hours count as at least ten a month.
+  const quiet = ratesFor({ machine: straight({ monthlyHours: null }), recentMonthlyHours: 0.67 }).wearRate;
+  const floor = ratesFor({ machine: straight({ monthlyHours: null }), recentMonthlyHours: 10 }).wearRate;
+  assert.equal(quiet, floor);
+  // A figure the shop typed is its own business, however small.
+  assert.equal(ratesFor({ machine: straight({ monthlyHours: 2 }) }).wearRate,
+    ratesFor({ machine: straight({ monthlyHours: 2 }), recentMonthlyHours: 500 }).wearRate);
+  assert.ok(ratesFor({ machine: straight({ monthlyHours: 2 }) }).wearRate > floor);
+});

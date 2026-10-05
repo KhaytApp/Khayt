@@ -132,3 +132,29 @@ test('dailies and snapshots rotate in their own pools, and nothing protected or 
   // Sixty snapshots in one day no longer touch the dailies at all.
   assert.ok(days.slice(-30).every((d) => !doomed.includes(d)));
 });
+
+test('a different app version takes a copy; the same one does not', () => {
+  const U = require('../lib/upgrade-backup');
+  // 1.2.0 -> 1.3.0 kept STORE_VERSION at 10, so the schema rule never fired.
+  assert.equal(U.needsAppVersionBackup('1.2.0', '1.3.0'), true);
+  // Nothing recorded = a build older than this rule opened it last.
+  assert.equal(U.needsAppVersionBackup(null, '1.3.0'), true);
+  assert.equal(U.needsAppVersionBackup('1.3.0', '1.3.0'), false);
+  assert.equal(U.needsAppVersionBackup('1.2.0', '1.3.0', false), false, 'no book, nothing to copy');
+  assert.equal(U.needsAppVersionBackup('1.2.0', ''), false);
+});
+
+test('the app-version copy is protected and recognised as this version\'s', () => {
+  const U = require('../lib/upgrade-backup');
+  const name = U.appVersionBackupName('1.2.0', '1.3.0', '2026-10-04T08:15:30.123Z');
+  assert.equal(name, 'pre-update-v1.3.0-from-v1.2.0-2026-10-04T08-15-30-123Z.json');
+  assert.equal(U.isProtectedBackup(name), true, 'rotation must never delete it');
+  assert.ok(!U.backupsToDelete([name, ...Array.from({ length: 40 }, (_, i) => `2026-01-${String(i + 1).padStart(2, '0')}.json`)]).includes(name));
+  assert.match(U.appVersionBackupName(null, '1.3.0', 'x'), /from-vunknown-/);
+  // The updater's own pre-install copy counts, so a launch after an in-app update takes no second one.
+  assert.equal(U.hasBackupForVersion(['pre-update-v1.3.0-2026-10-04.json'], '1.3.0'), true);
+  assert.equal(U.hasBackupForVersion([name], '1.3.0'), true);
+  assert.equal(U.hasBackupForVersion(['pre-update-v1.3.0-beta.1-2026-10-01.json'], '1.3.0'), false,
+    'a beta of the same line is a different version');
+  assert.equal(U.hasBackupForVersion(['2026-10-04.json'], '1.3.0'), false);
+});

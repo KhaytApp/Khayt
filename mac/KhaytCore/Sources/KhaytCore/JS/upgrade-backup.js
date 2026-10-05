@@ -172,7 +172,59 @@
     return oldest(days, daily).concat(oldest(snaps, snapshots)).filter((f) => !except.has(f));
   }
 
+  /**
+   * Should this launch copy the book aside because the APP changed?
+   *
+   * The schema check above fires only when STORE_VERSION moves, and it did not
+   * move between Bed Ready 1.2.0 and 1.3.0 — yet a thousand commits of
+   * migrations ran on the first launch. An in-app update is covered (the
+   * updater writes `pre-update-…` before it installs); a shop that downloads
+   * the installer and runs it by hand got nothing. So the app remembers the
+   * version that last opened the book, and a different one takes a copy first.
+   *
+   * @param {string|null|undefined} lastVersion  what last opened this book, or
+   *   nothing if no build has recorded it yet — which is itself an upgrade from
+   *   a build older than this rule, the case most worth insuring
+   * @param {string} currentVersion  app.getVersion()
+   * @param {boolean} existed  whether there was a book to copy
+   */
+  function needsAppVersionBackup(lastVersion, currentVersion, existed = true) {
+    if (!existed) return false;
+    const cur = String(currentVersion || '').trim();
+    if (!cur) return false;
+    return String(lastVersion || '').trim() !== cur;
+  }
+
+  /**
+   * Named like the updater's own backup — `pre-update-v<new>-…` — so rotation
+   * already protects it, Settings › Backups already lists it beside the
+   * in-app kind, and a launch after an in-app update sees the updater's copy
+   * and does not take a second one.
+   */
+  function appVersionBackupName(lastVersion, currentVersion, isoTimestamp) {
+    const clean = (v) => String(v || '').replace(/[^a-zA-Z0-9._-]/g, '');
+    const from = clean(lastVersion) || 'unknown';
+    const stamp = String(isoTimestamp || '').replace(/[:.]/g, '-');
+    return `${UPDATE_PREFIX}v${clean(currentVersion)}-from-v${from}-${stamp}.json`;
+  }
+
+  /** Any existing copy taken for this version, by the updater or by a launch. */
+  function hasBackupForVersion(filenames, currentVersion) {
+    const v = String(currentVersion || '').replace(/[^a-zA-Z0-9._-]/g, '');
+    if (!v) return false;
+    // The version must END where the name says it does: the updater writes
+    // `pre-update-v<ver>-<YYYY-MM-DD>.json` and a launch writes
+    // `pre-update-v<ver>-from-v…`, so `v1.3.0-` alone would also match
+    // `v1.3.0-beta.1-…` and skip the copy a stable release needed.
+    const esc = v.replace(/[.]/g, '\\.');
+    const own = new RegExp(`^${UPDATE_PREFIX}v${esc}-(\\d{4}-|from-v)`);
+    return (Array.isArray(filenames) ? filenames : []).some((f) => own.test(String(f)));
+  }
+
   const api = {
+    needsAppVersionBackup,
+    appVersionBackupName,
+    hasBackupForVersion,
     backupsToDelete,
     PROTECTED_PREFIX,
     UPDATE_PREFIX,
