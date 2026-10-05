@@ -4,6 +4,49 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A new version takes a copy of the book before it touches it — however it
+  was installed.** The schema backup fires only when the store format changes,
+  and between Bed Ready 1.2.0 and 1.3.0 it did not, while a thousand commits of
+  migrations ran on first launch. An in-app update already copied the book
+  first; running a downloaded installer by hand did not. The app now remembers
+  which version last opened the book, and a different one saves
+  `pre-update-v<new>-from-v<old>-….json` first (never rotated away; skipped
+  when the in-app updater already made one).
+
+- **A print-file preview that did not come back with a restore is made again.**
+  Previews live beside the model files now, so a backup restored on another
+  computer, or after a wipe, brought back cards with a blank picture. Where the
+  model file is present the preview is rebuilt from it; where it is not, the
+  card says why instead of showing a blank.
+
+- **Straight-line depreciation no longer multiplies wear in a quiet month.**
+  It spreads a month's charge over the hours printed, so a printer used twice
+  in ninety days put over a hundred an hour of "wear" into the calculator.
+  Measured hours now count as at least ten a month; a figure typed in the
+  machine's settings is used as given. Bed Ready's hint for the setting talks
+  about the calculator, not quotes and P&L.
+
+- **(Bed Ready) Six business modules it never runs are no longer loaded**:
+  ZATCA QR, recurring orders, top lists, KPI rows, expense book and the
+  low-stock order alert.
+
+- **Spools added before this release can be given their size.** Material cost
+  is the spool's price divided by what it held when bought, and a spool from an
+  earlier release has no record of that, so every one was costed as a kilo — a
+  3 kg roll read three times dear and a 250 g sample a quarter of its real cost,
+  with no field anywhere to correct it. The spool editor now has **Size when
+  new**; blank leaves it as it was. Khayt and Bed Ready both.
+
+- **(Bed Ready) Print-file cards hold their own buttons again.** The action row
+  does not wrap, and Bed Ready's narrower content area left every card at 231px,
+  so the More actions button hung off the card's edge. Cards are now at least
+  260px wide, which fits the row; Khayt at its usual window size is unchanged.
+
+- **(Bed Ready) Update and safety messages say Bed Ready.** The new
+  explanations for a failed update check ("…Khayt will try again later"), the
+  full-wipe dialogs, the newer-data-file refusal and the printer-history error
+  named Khayt in Bed Ready.
+
 - **A part's magnets and inserts are no longer counted twice in the P&L.** A
   part's own consumables are priced into its material cost, and that material
   is what the P&L counts as cost of goods — but buying consumables is already

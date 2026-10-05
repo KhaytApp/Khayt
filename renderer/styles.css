@@ -3403,7 +3403,12 @@ body.mode-enthusiast .biz-only { display: none !important; }
 .pf-sub { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); max-width: 52ch; }
 .pf-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pf-search { padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elev); color: var(--text); min-width: 180px; }
-.pf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+/* 260px is the narrowest card that holds the action row (.act below): the
+   primary label, two icon buttons, the overflow, their gaps and the row's own
+   padding. At 230px the row cannot shrink (it does not wrap, on purpose) and
+   the overflow button hung off the card's edge — Bed Ready's narrower content
+   area put every card at 231px. min() keeps one column usable in a tiny window. */
+.pf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 16px; }
 
 /* Library / Gallery view toggle */
 .pf-view-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
