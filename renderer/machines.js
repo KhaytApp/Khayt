@@ -351,7 +351,7 @@ function openMachineEditor(machineId = null) {
         const sel = (a, b) => (a === b ? ' selected' : '');
         return `<div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border-soft);">
         <label style="margin-top:0; font-weight:600;">${escapeHtml(t('mach.dep_title'))}</label>
-        <div style="font-size:11.5px; color:var(--text-muted); margin:2px 0 8px;">${escapeHtml(t('mach.dep_hint'))}</div>
+        <div style="font-size:11.5px; color:var(--text-muted); margin:2px 0 8px;">${escapeHtml(t(document.documentElement.dataset.app === 'bedready' ? 'mach.dep_hint_maker' : 'mach.dep_hint'))}</div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 12px;">
           <div><label style="margin-top:0;">${escapeHtml(t('mach.dep_price'))}</label>
             <input type="number" id="machDepPrice" min="0" step="0.01" value="${v(dep.price)}"></div>

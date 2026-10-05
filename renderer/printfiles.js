@@ -327,6 +327,49 @@
       const img = document.querySelector(`.pf-card[data-id="${CSS.escape(id)}"] .pf-thumb`);
       if (img && img.tagName === 'IMG') img.src = safeImageSrc(src);
     }
+    /* A preview the record names and the disk does not have. Previews live
+     * beside the model now, not in the book, so a backup restored onto another
+     * computer — or after a wipe — brings back records whose pictures stayed
+     * behind, and each card sat on an empty <img> forever. The picture was only
+     * ever made FROM the model file, so where the model is here it is made
+     * again; where it is not, the card says so instead of showing a blank. */
+    for (const w of wanted) {
+      if (got && Object.prototype.hasOwnProperty.call(got, w.id)) continue;
+      const rec = (printFiles || []).find((r) => r && r.id === w.id);
+      if (rec && rec.thumbFile === w.file) rebuildThumb(rec);
+    }
+  }
+
+  const _thumbRebuilding = new Set();
+  async function rebuildThumb(rec) {
+    if (!rec || _thumbRebuilding.has(rec.id)) return;
+    _thumbRebuilding.add(rec.id);
+    try {
+      const hub = api(); if (!hub) return;
+      delete rec.thumbFile;
+      const ext = String((rec.sourceFile && rec.sourceFile.ext) || '').toLowerCase();
+      const full = rec.sourceFile ? await resolveModelPath(rec) : null;
+      if (full) {
+        if ((ext === 'gcode' || ext === 'gco' || ext === '3mf') && hub.extractThumbnail) {
+          const th = await hub.extractThumbnail(full);
+          if (th && th.pngBase64) await setThumb(rec, await resizeDataUrl('data:image/png;base64,' + th.pngBase64, 280, 0.82), 'embedded');
+        } else if (ext === 'stl' && hub.printLibReadBytes && typeof KhaytStl !== 'undefined' && typeof KhaytStlThumb !== 'undefined') {
+          const rb = await hub.printLibReadBytes(full);
+          if (rb && rb.ok && rb.b64) {
+            const g = KhaytStl.parseStl(base64ToArrayBuffer(rb.b64), { keepTriangles: true });
+            if (g.triangles && g.triangles.length) {
+              const r = KhaytStlThumb.renderStlThumbnail(g.triangles, { size: 300 });
+              if (r.ok && r.dataUrl) await setThumb(rec, r.dataUrl, 'render');
+            }
+          }
+        }
+      }
+      // Where the picture lives is this computer's business, not an edit to the
+      // print, so updatedAt is left alone and nothing re-syncs over it.
+      saveAll();
+      renderPrintFiles();
+    } catch (_) { /* a card with the icon is fine; a thrown handler is not */ }
+    finally { _thumbRebuilding.delete(rec.id); }
   }
 
   function thumbHtml(rec) {
@@ -711,6 +754,14 @@
     });
   }
 
+  /* Bed Ready's MakerRun panel (renderer/bedready-makerrun.js), through an
+   * accessor: Khayt does not load it, so the menu item simply is not drawn
+   * there, and nothing here reads the global bare. */
+  function _MR() {
+    const m = (typeof window !== 'undefined' && window.BedReadyMakerRun) || null;
+    return m && typeof m.publish === 'function' ? m : null;
+  }
+
   function cardHtml(rec) {
     const prof = rec.slicerProfileId && (slicerProfiles || []).find((s) => s.id === rec.slicerProfileId);
     return `
@@ -791,6 +842,7 @@
               ${rec.sourceFile?.ext === '3mf' ? `<button data-act="pf-convert" data-id="${escapeHtml(rec.id)}">${_bi('convert', '🔄')}${escapeHtml(t('conv.convert_short') || 'Convert')}</button>` : ''}
               <button data-act="pf-add-parts" data-id="${escapeHtml(rec.id)}" title="${escapeHtml(t('plib.add_parts_hint') || 'A print can be several files — a head, two arms, a torso')}">${_bi('plus', '＋')}${escapeHtml(t('plib.add_parts') || 'Add files to this print')}</button>
               <button data-act="pf-edit" data-id="${escapeHtml(rec.id)}">${_bi('pencil', '✏')}${escapeHtml(t('common.edit') || 'Edit')}</button>
+              ${_MR() && rec.sourceFile ? `<button data-act="pf-mr-publish" data-id="${escapeHtml(rec.id)}">${_bi('cloud', '☁')}${escapeHtml(t('mr.publish_menu'))}</button>` : ''}
               <!-- Under a rule and last: delete used to sit one button along
                    from "Open in slicer". -->
               <div class="ovf-sep"></div>
@@ -1068,6 +1120,7 @@
       case 'pf-slice': openInSlicer(id); break;
       case 'pf-view3d': view3d(id); break;
       case 'pf-edit':  editPrintFile(id); break;
+      case 'pf-mr-publish': { const mr = _MR(); if (mr) mr.publish(id); break; }
       case 'pf-del':   deletePrintFile(id); break;
       case 'pf-fav':   toggleFav(id); break;
       case 'pf-version': {
@@ -1887,6 +1940,21 @@
       thumb: null, thumbSource: null, userPhoto: null,
       slicerProfileId: null, testedNotes: '', tags: [], folder: '', material: '', favorite: false, converted: [],
     };
+    /* WHERE IT CAME FROM, recorded at the moment it is known. A design pulled
+     * from MakerRun arrives with its page, its licence and its creator; asking
+     * the shop to type those in later is asking for a blank. Each is taken only
+     * in the shape the edit modal itself would write: a short string for the
+     * source, a licence id the menu offers, and a small plain object. */
+    if (typeof meta.source === 'string' && meta.source.trim()) rec.source = meta.source.trim().slice(0, 300);
+    const _ML = (typeof window !== 'undefined' && window.KhaytModelLicence) || null;
+    if (typeof meta.licence === 'string' && _ML && _ML.list().some((l) => l.id === meta.licence)) rec.licence = meta.licence;
+    if (meta.makerrun && typeof meta.makerrun === 'object' && typeof meta.makerrun.slug === 'string') {
+      rec.makerrun = {
+        slug: meta.makerrun.slug.slice(0, 200),
+        license: typeof meta.makerrun.license === 'string' ? meta.makerrun.license.slice(0, 120) : null,
+        creator: typeof meta.makerrun.creator === 'string' ? meta.makerrun.creator.slice(0, 120) : null,
+      };
+    }
     if (!Array.isArray(printFiles)) printFiles = [];
     printFiles.unshift(rec);
     saveAll();

@@ -376,7 +376,7 @@ ipcMain.handle('hub:request-full-wipe', async (event) => {
     cancelId: 0,
     noLink: true,
     title: 'Full wipe',
-    message: 'Delete ALL Khayt data on this computer?',
+    message: `Delete ALL ${FLAVOR_NAME} data on this computer?`,
     detail: 'Store, photos, invoices, backups, and keys will be removed, and the app will restart empty. '
       + 'One safety copy of your book is saved first, in the backups folder, so a wipe made by mistake can be restored from Settings → Backups.',
   });
@@ -390,7 +390,7 @@ ipcMain.handle('hub:request-full-wipe', async (event) => {
     await dialog.showMessageBox(win || undefined, {
       type: 'error', buttons: ['OK'], title: 'Full wipe',
       message: 'Nothing was deleted.',
-      detail: `Khayt could not save a safety copy of your book first, so it stopped before deleting anything.\n\n${why}`,
+      detail: `${FLAVOR_NAME} could not save a safety copy of your book first, so it stopped before deleting anything.\n\n${why}`,
     });
     return { ok: false, error: 'safety-backup-failed', detail: why };
   }
@@ -861,6 +861,33 @@ function writePreUpgradeBackup(raw, diskVersion) {
   const fullPath = path.join(dir, name);
   fs.writeFileSync(fullPath, JSON.stringify(encryptForDisk(raw)), 'utf8');
   console.warn(`store upgrade v${from} → v${STORE_VERSION}: kept a pre-upgrade backup at ${fullPath}`);
+  return fullPath;
+}
+
+/**
+ * Copy the book aside the first time a different APP version opens it — see
+ * lib/upgrade-backup.js needsAppVersionBackup. Same contract as the schema
+ * backup above: verbatim raw bytes, before anything in this build touches them,
+ * and best-effort (the caller logs a failure; a shop must still open its app).
+ * The marker is written only after the copy is safely on disk, so a failed copy
+ * is tried again next launch rather than forgotten.
+ */
+const LAST_APP_VERSION_FILE = 'last-app-version';
+function writeAppVersionBackup(raw) {
+  const userData = app.getPath('userData');
+  const markerPath = path.join(userData, LAST_APP_VERSION_FILE);
+  const current = app.getVersion();
+  let last = null;
+  try { last = fs.readFileSync(markerPath, 'utf8').trim() || null; } catch (_) { /* never recorded */ }
+  if (!upgradeBackup.needsAppVersionBackup(last, current, !!raw)) return null;
+  const dir = backupsDir();
+  let fullPath = null;
+  if (!upgradeBackup.hasBackupForVersion(fs.readdirSync(dir), current)) {
+    fullPath = path.join(dir, upgradeBackup.appVersionBackupName(last, current, new Date().toISOString()));
+    fs.writeFileSync(fullPath, JSON.stringify(encryptForDisk(raw)), 'utf8');
+    console.warn(`app ${last || 'unknown'} → ${current}: kept a backup at ${fullPath}`);
+  }
+  fs.writeFileSync(markerPath, current + '\n', 'utf8');
   return fullPath;
 }
 
@@ -1449,7 +1476,12 @@ ipcMain.handle('hub:load-store', async (event) => {
     // on empty state and then overwrite the good file on the next save.
     const rec = recoverStoreRaw(MAX_STORE_BYTES);
     if (!rec.data) {
-      if (!rec.existed) return null; // genuinely a fresh install
+      if (!rec.existed) {
+        // Genuinely a fresh install. Record the version now, or the second
+        // launch would read "never recorded" as an upgrade and copy a new book.
+        try { fs.writeFileSync(path.join(app.getPath('userData'), LAST_APP_VERSION_FILE), app.getVersion() + '\n', 'utf8'); } catch (_) { /* best-effort */ }
+        return null;
+      }
       console.error('hub:load-store: store unreadable; quarantined to', rec.quarantined);
       return { __corrupt: true, error: 'Store unreadable', quarantined: rec.quarantined };
     }
@@ -1463,6 +1495,8 @@ ipcMain.handle('hub:load-store', async (event) => {
     // the backups directory is unwritable, so a failure here is logged, not fatal.
     try { writePreUpgradeBackup(rec.data, _diskStoreVersion); }
     catch (e) { console.error('hub:load-store: pre-upgrade backup failed:', e && e.message || e); }
+    try { writeAppVersionBackup(rec.data); }
+    catch (e) { console.error('hub:load-store: app-version backup failed:', e && e.message || e); }
     syncLanServerStoreFromDisk();
     const { normalized, warnings, errors } = normalizeStoreSnapshot(rec.data);
     if (!normalized) {
@@ -1820,7 +1854,7 @@ let _diskStoreVersion = null;
 ipcMain.handle('hub:save-store', async (event, data) => {
   try {
     if (typeof _diskStoreVersion === 'number' && _diskStoreVersion > STORE_VERSION) {
-      const msg = `This data file was written by a newer version of Khayt (v${_diskStoreVersion}); this build supports v${STORE_VERSION}. Not saving, so nothing is lost — please update Khayt.`;
+      const msg = `This data file was written by a newer version of ${FLAVOR_NAME} (v${_diskStoreVersion}); this build supports v${STORE_VERSION}. Not saving, so nothing is lost — please update ${FLAVOR_NAME}.`;
       console.error('hub:save-store:', msg);
       return { ok: false, error: msg };
     }
@@ -4509,7 +4543,7 @@ ipcMain.handle('hub:get-printer-status', () => printerStatusCache);
 async function fetchPrinterHistory(machine, limit) {
   const { type, host, port, apiKey } = (machine && machine.printerApi) || {};
   if (type !== 'moonraker') {
-    return { ok: false, error: 'Only Klipper/Moonraker printers keep a job history Khayt can read' };
+    return { ok: false, error: `Only Klipper/Moonraker printers keep a job history ${FLAVOR_NAME} can read` };
   }
   const printerHost = sanitizePrinterHost(host);
   if (!isAllowedPrinterHost(printerHost)) return { ok: false, error: 'Invalid printer host' };
@@ -5486,6 +5520,146 @@ ipcMain.handle('hub:bedready-open-signin', () => {
     return { ok: true };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
+
+// ── MakerRun catalogue (Bed Ready only) — browse the public makerrun.com catalogue, download a design
+// into the print-file library, and publish a library file as a new MakerRun listing. Browsing needs no
+// account; download and publish run under the linked MakerRun account (lib/makerrun-v1 withToken).
+//
+// THE RENDERER NEVER NAMES A PATH. It names a print-file record (vaultId) and a filename; main resolves
+// the file inside that record's own vault folder, by basename, and refuses anything that resolves
+// outside it. Errors come back as {ok:false, error, code, retryAfter?, details?} — the code is what the
+// panel branches on (mfa_required, age_required, relink, maintenance, invalid, rate_limited, …).
+if (isBedReady) {
+  const MRV1 = require('./lib/makerrun-v1');
+  const mrCatalog = require('./lib/makerrun-catalog');
+  const mrPublish = require('./lib/makerrun-publish');
+  const { BASE: MAKERRUN_BASE } = require('./lib/makerrun');
+  const mrUser = () => app.getPath('userData');
+
+  /** A plain file inside one record's vault folder ({full, size}), or null. Symlinks are refused and
+   *  containment is checked on real paths — see mrPublish.resolveVaultFile. */
+  const mrVaultFile = (vaultId, filename) =>
+    (vaultId ? mrPublish.resolveVaultFile(printLibItemDir(vaultId), filename) : null);
+
+  ipcMain.handle('hub:makerrun-browse', async (_e, opts = {}) => {
+    try { return { ok: true, ...(await mrCatalog.listDesigns(opts || {})) }; }
+    catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  ipcMain.handle('hub:makerrun-design', async (_e, { slug } = {}) => {
+    try { return { ok: true, ...(await mrCatalog.getDesign(slug)) }; }
+    catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  // Same shape back as hub:bedready-download-into-vault, so the renderer creates the record the same
+  // way (importConvertedAsNew) whichever door the design came through.
+  ipcMain.handle('hub:makerrun-download-into-vault', async (_e, { slug, filename, vaultId, title } = {}) => {
+    try {
+      if (!vaultId) return { ok: false, error: 'Missing library id.' };
+      requirePrintLib();
+      const dir = printLibItemDir(vaultId);
+      fs.mkdirSync(dir, { recursive: true });
+      const out = await MRV1.withToken(mrUser(), (token) =>
+        mrCatalog.downloadDesignFile(token, { slug, filename, title: typeof title === 'string' ? title : '' }, dir));
+      const stat = fs.statSync(out);
+      return { ok: true, filename: path.basename(out), ext: path.extname(out).slice(1).toLowerCase() || '3mf', size: stat.size };
+    } catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  ipcMain.handle('hub:makerrun-publish-create', async (_e, input = {}) => {
+    try {
+      // Refuse locally before touching the account, so a form error never costs a token refresh.
+      const { errors } = mrPublish.validateCreateInput(input);
+      if (errors.length) return MRV1.toIpcError(MRV1.codedError('invalid', 'Some fields need attention.', { details: errors }));
+      return { ok: true, ...(await MRV1.withToken(mrUser(), (token) => mrPublish.createDesign(token, input))) };
+    } catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  ipcMain.handle('hub:makerrun-publish-file', async (_e, { slug, vaultId, filename } = {}) => {
+    try {
+      const vf = mrVaultFile(vaultId, filename);
+      if (!vf) return { ok: false, error: 'That print file is missing from the library folder.', code: 'missing' };
+      const full = vf.full;
+      // Size and extension BEFORE reading: a 2 GB file is refused without being loaded into memory.
+      const issue = mrPublish.checkModel(path.basename(full), vf.size);
+      if (issue) return MRV1.toIpcError(MRV1.codedError('invalid', issue.message, { details: [issue] }));
+      const bytes = await mrPublish.readVaultFile(full, mrPublish.MAX_MODEL_BYTES);
+      return { ok: true, ...(await MRV1.withToken(mrUser(), (token) =>
+        mrPublish.uploadModel(token, slug, { filename: path.basename(full), bytes }))) };
+    } catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  // One picture: the record's photo (sent as a data: URL — it lives in the store, not on disk) or its
+  // thumbnail from the vault folder. Fitted to MakerRun's 2048px longest edge here, because MakerRun
+  // refuses rather than resamples, and it promises to keep exactly what it is sent.
+  ipcMain.handle('hub:makerrun-publish-images', async (_e, { slug, vaultId, dataUrl, useThumb, kind } = {}) => {
+    try {
+      let buf = null;
+      if (typeof dataUrl === 'string' && dataUrl) {
+        const m = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl);
+        if (!m) return { ok: false, error: 'That photo is not a JPEG, PNG or WebP image.', code: 'invalid' };
+        buf = Buffer.from(m[2], 'base64');
+      } else if (useThumb) {
+        for (const name of ['thumb.jpg', 'thumb.png', 'thumb.webp']) {
+          const vf = mrVaultFile(vaultId, name);
+          if (vf) { buf = await mrPublish.readVaultFile(vf.full, 64 * 1024 * 1024); break; }
+        }
+      }
+      if (!buf || !buf.length) return { ok: false, error: 'This print file has no picture to upload.', code: 'missing' };
+      if (buf.length > 64 * 1024 * 1024) return { ok: false, error: 'That image is too large to process.', code: 'invalid' };
+      let out = buf;
+      const fit = fitImageBuffer(buf, { maxEdge: 2048, budgetBytes: 14 * 1024 * 1024 });
+      if (fit && fit.ok) out = fit.buffer;
+      else if (!(fit && fit.reason === 'unreadable' && mrPublish.sniffImageType(buf) === 'image/webp')) {
+        // nativeImage cannot always decode WebP; such a file goes as-is and MakerRun measures it.
+        return { ok: false, error: 'That image could not be prepared for upload.', code: 'invalid' };
+      }
+      const type = mrPublish.sniffImageType(out);
+      if (!type) return { ok: false, error: 'That photo is not a JPEG, PNG or WebP image.', code: 'invalid' };
+      const ext = type === 'image/png' ? '.png' : type === 'image/webp' ? '.webp' : '.jpg';
+      return { ok: true, ...(await MRV1.withToken(mrUser(), (token) =>
+        mrPublish.uploadImages(token, slug, [{ filename: 'photo' + ext, bytes: out, type }], { kind: kind === 'print' ? 'print' : 'gallery' }))) };
+    } catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  // No timer: status is checked when the user asks, which keeps a closed panel from spending requests.
+  ipcMain.handle('hub:makerrun-status', async (_e, { slug } = {}) => {
+    try { return { ok: true, ...(await MRV1.withToken(mrUser(), (token) => mrPublish.getStatus(token, slug))) }; }
+    catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  // After a create whose answer was lost (timeout / dropped connection): did MakerRun create it anyway?
+  // Looks for the user's own pending listing with this title from the last 15 minutes.
+  ipcMain.handle('hub:makerrun-find-recent', async (_e, { title } = {}) => {
+    try {
+      const since = Date.now() - 15 * 60 * 1000;
+      const hit = await MRV1.withToken(mrUser(), (token) => mrPublish.findRecentListing(token, title, since));
+      return { ok: true, found: !!hit, ...(hit || {}) };
+    } catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  // Only reachable from an explicit "Delete half-created listing" button behind a confirm dialog.
+  ipcMain.handle('hub:makerrun-delete', async (_e, { slug } = {}) => {
+    try { return { ok: true, ...(await MRV1.withToken(mrUser(), (token) => mrPublish.deleteDesign(token, slug))) }; }
+    catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  // age_required: the website's /age page is the only place an account can confirm its age.
+  ipcMain.handle('hub:makerrun-open-age', async () => {
+    try { await shell.openExternal(MAKERRUN_BASE + '/age'); return { ok: true }; }
+    catch (e) { return MRV1.toIpcError(e); }
+  });
+
+  // A design's own page on makerrun.com — where its Buy button lives. Built from a validated slug, so
+  // the renderer can only ever open a makerrun.com address through this.
+  ipcMain.handle('hub:makerrun-open-page', async (_e, { slug } = {}) => {
+    try {
+      if (!mrCatalog.validSlug(slug)) return { ok: false, error: 'That is not a MakerRun design id.', code: 'bad_request' };
+      await shell.openExternal(MAKERRUN_BASE + '/designs/' + encodeURIComponent(slug));
+      return { ok: true };
+    } catch (e) { return MRV1.toIpcError(e); }
+  });
+}
 
 // ── Orca filament installer (Bed Ready) — install OrcaSlicer profiles into any Orca-family slicer ──
 ipcMain.handle('hub:orca-fila-slicers', () => {
