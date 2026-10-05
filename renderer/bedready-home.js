@@ -177,6 +177,17 @@
     ].join('');
   }
 
+  // The public MakerRun catalogue (bedready-makerrun.js). Translated, unlike its
+  // older neighbours, and drawn only when that panel loaded.
+  function mrCardHtml() {
+    if (!(window.BedReadyMakerRun && typeof window.BedReadyMakerRun.open === 'function')) return '';
+    var esc = (typeof escapeHtml === 'function') ? escapeHtml
+      : function (v) { return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var tx = function (k) { try { return (typeof t === 'function') ? t(k) : k; } catch (_) { return k; } };
+    return '<button type="button" class="br-action" data-makerrun="1"><span class="ico" aria-hidden="true">' + ico('search', '🔎') + '</span>'
+      + '<span class="t"><b>' + esc(tx('mr.home_title')) + '</b><span>' + esc(tx('mr.home_sub')) + '</span></span></button>';
+  }
+
   function homeHtml() {
     return [
       '<div class="br-home">',
@@ -204,6 +215,7 @@
           '<button type="button" class="br-action" data-go="printfiles-tab"><span class="ico" aria-hidden="true">' + ico('cube', '🧊') + '</span><span class="t"><b>Print files</b><span>your model library</span></span></button>',
           '<button type="button" class="br-action" data-go="calculator-tab"><span class="ico" aria-hidden="true">' + ico('calc', '◎') + '</span><span class="t"><b>Calculator</b><span>cost per print</span></span></button>',
           '<button type="button" class="br-action" data-library="1"><span class="ico" aria-hidden="true">' + ico('cloud', '☁️') + '</span><span class="t"><b>My BedReady library</b><span>sync your saved designs</span></span></button>',
+          mrCardHtml(),
           '<button type="button" class="br-action" data-filaments="1"><span class="ico" aria-hidden="true">' + ico('nozzle', '🧵') + '</span><span class="t"><b>Filament profiles</b><span>add to your slicer</span></span></button>',
           '<button type="button" class="br-action" data-drylog="1"><span class="ico" aria-hidden="true">' + ico('droplet', '💧') + '</span><span class="t"><b>Filament care</b><span>drying &amp; storage log</span></span></button>',
         '</div>',
@@ -426,6 +438,10 @@
         // MakerRun library card opens the sync modal; the rest switch tabs.
         if (b.getAttribute('data-library') && window.BedReadyLibrary && typeof window.BedReadyLibrary.open === 'function') {
           window.BedReadyLibrary.open();
+          return;
+        }
+        if (b.getAttribute('data-makerrun') && window.BedReadyMakerRun && typeof window.BedReadyMakerRun.open === 'function') {
+          window.BedReadyMakerRun.open();
           return;
         }
         if (b.getAttribute('data-filaments') && window.BedReadyFilaments && typeof window.BedReadyFilaments.open === 'function') {

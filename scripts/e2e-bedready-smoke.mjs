@@ -429,6 +429,52 @@ async function main() {
   assert('window.BedReadyFilaments.open exposed', orcaFila.api === 'function');
   assert('hubAPI.orcaFilaManifest bridge exposed', orcaFila.bridge === 'function');
 
+  // MakerRun catalogue: bridges exist, the home card opens the panel, and the browse modal renders
+  // a result. The browse handler is REPLACED in the main process with a fixture, so this never touches
+  // the network and needs no test seam in the app itself.
+  console.log('\n[MakerRun catalogue]');
+  const mr = await window.evaluate(() => {
+    const names = ['makerrunBrowse', 'makerrunDesign', 'makerrunDownloadToLib', 'makerrunPublishCreate',
+      'makerrunPublishFile', 'makerrunPublishImages', 'makerrunStatus', 'makerrunDelete',
+      'makerrunOpenAge', 'makerrunOpenPage'];
+    return {
+      missing: names.filter((n) => typeof window.hubAPI?.[n] !== 'function'),
+      open: typeof window.BedReadyMakerRun?.open,
+      publish: typeof window.BedReadyMakerRun?.publish,
+      card: !!document.querySelector('#dashboardContent [data-makerrun]'),
+      terms: Array.isArray(window.BedReadyMakerRunTerms?.CATEGORIES) ? window.BedReadyMakerRunTerms.CATEGORIES.length : 0,
+    };
+  });
+  assert(`all MakerRun catalogue bridges exposed (${mr.missing.join(', ') || 'none missing'})`, mr.missing.length === 0);
+  assert('window.BedReadyMakerRun.open / .publish exposed', mr.open === 'function' && mr.publish === 'function');
+  assert('MakerRun catalogue card present on home', mr.card === true);
+  assert(`MakerRun vocabularies loaded (${mr.terms} categories)`, mr.terms === 14);
+
+  const MR_FIXTURE = {
+    ok: true,
+    designs: [{
+      slug: 'e2e-desk-hook-a1b2c3', title: 'E2E desk hook', description: 'fixture', creator: null,
+      license: 'CC-BY-4.0', commercialUse: true, category: 'household', material: 'rigid', nsfw: false,
+      url: 'https://makerrun.com/designs/e2e-desk-hook-a1b2c3', cover: null, sale: null,
+      verification: { badge: true, fileChecked: true, printPhotoConfirmed: false, printer: null },
+    }],
+    page: { limit: 24, offset: 0, total: 1, returned: 1 },
+  };
+  await electronApp.evaluate(({ ipcMain }, fixture) => {
+    ipcMain.removeHandler('hub:makerrun-browse');
+    ipcMain.handle('hub:makerrun-browse', () => fixture);
+  }, MR_FIXTURE);
+  await window.evaluate(() => document.querySelector('#dashboardContent [data-makerrun]').click());
+  await window.waitForSelector('.mr-overlay .mr-card', { timeout: 15_000 });
+  const mrModal = await window.evaluate(() => ({
+    cards: document.querySelectorAll('.mr-overlay .mr-card').length,
+    title: document.querySelector('.mr-overlay .mr-card')?.textContent || '',
+    dialog: !!document.querySelector('.mr-overlay [role="dialog"][aria-modal="true"]'),
+  }));
+  assert(`browse modal renders the stubbed result (${mrModal.cards} card)`, mrModal.cards === 1 && /E2E desk hook/.test(mrModal.title));
+  assert('browse modal is an aria-modal dialog', mrModal.dialog === true);
+  await window.evaluate(() => document.querySelector('.mr-overlay .mr-close').click());
+
   // ── Branding guard: the standalone product must never surface "Khayt" ──────────────────────────────
   // Bed Ready shares Khayt's locale files + shared core, so leaks recur as features land. Assert the
   // three surfaces that have leaked before: localized strings, generated files, and the native menu.

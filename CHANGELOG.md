@@ -59,11 +59,73 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     or 4 toolheads. Converting for a Prusa MMU3 or INDX printer now also
     writes the exact PrusaSlicer printer preset name and nozzle variant, so
     PrusaSlicer matches the project to the right installed printer.
-- **A job's margin counts its components.** The margin shown on each job in
-  Orders, sorting by margin, and the calculator's AI price suggestion left
-  out a product's components, so a job with magnets or hardware looked more
-  profitable than it was. They now include them, as the Mac app does. Your
-  P&L is unchanged: buying components is already counted as an expense.
+
+- **(Bed Ready) Browse, download from and publish to the MakerRun catalogue.**
+  - **Browse MakerRun** (a new home card, and a button in the MakerRun library
+    panel) searches the public makerrun.com catalogue without signing in:
+    filter by category, material, verified profiles and free or for sale, and
+    open a design to see its licence and whether prints may be sold, how it was
+    verified, its files with sizes and its print profiles. A design that is for
+    sale links to its page on makerrun.com, where the designer takes payment.
+  - **Download** names the licence on the button you press, needs your MakerRun
+    account, and adds the file to Print files as a new record that keeps the
+    design's page, its licence and its creator. Designs synced from your saved
+    library now keep the same details.
+  - **Publish to MakerRun** in a print file's ⋯ menu creates a free listing
+    under your MakerRun account: title, description, category, material,
+    licence (taken from the file when MakerRun offers it, otherwise you choose),
+    18+ flag and, if you opt in, the file's photo or preview. It asks before
+    anything becomes public, shows each step, and then the result of MakerRun's
+    profile check and "Pending review" — MakerRun reviews every new listing.
+    **Check status** asks MakerRun on demand; if a step fails you can finish the
+    upload, skip the picture, or delete the half-created listing, and a create
+    whose answer was lost is looked up before anything is created twice. Maintenance, rate limits,
+    two-factor sign-in and 18+ confirmation each say what to do next.
+  - A `.stp` file downloaded from MakerRun is now saved as `.step`; it used to
+    get a `.3mf` name.
+
+- **A new version takes a copy of the book before it touches it — however it
+  was installed.** The schema backup fires only when the store format changes,
+  and between Bed Ready 1.2.0 and 1.3.0 it did not, while a thousand commits of
+  migrations ran on first launch. An in-app update already copied the book
+  first; running a downloaded installer by hand did not. The app now remembers
+  which version last opened the book, and a different one saves
+  `pre-update-v<new>-from-v<old>-….json` first (never rotated away; skipped
+  when the in-app updater already made one).
+
+- **A print-file preview that did not come back with a restore is made again.**
+  Previews live beside the model files now, so a backup restored on another
+  computer, or after a wipe, brought back cards with a blank picture. Where the
+  model file is present the preview is rebuilt from it; where it is not, the
+  card says why instead of showing a blank.
+
+- **Straight-line depreciation no longer multiplies wear in a quiet month.**
+  It spreads a month's charge over the hours printed, so a printer used twice
+  in ninety days put over a hundred an hour of "wear" into the calculator.
+  Measured hours now count as at least ten a month; a figure typed in the
+  machine's settings is used as given. Bed Ready's hint for the setting talks
+  about the calculator, not quotes and P&L.
+
+- **(Bed Ready) Six business modules it never runs are no longer loaded**:
+  ZATCA QR, recurring orders, top lists, KPI rows, expense book and the
+  low-stock order alert.
+
+- **Spools added before this release can be given their size.** Material cost
+  is the spool's price divided by what it held when bought, and a spool from an
+  earlier release has no record of that, so every one was costed as a kilo — a
+  3 kg roll read three times dear and a 250 g sample a quarter of its real cost,
+  with no field anywhere to correct it. The spool editor now has **Size when
+  new**; blank leaves it as it was. Khayt and Bed Ready both.
+
+- **(Bed Ready) Print-file cards hold their own buttons again.** The action row
+  does not wrap, and Bed Ready's narrower content area left every card at 231px,
+  so the More actions button hung off the card's edge. Cards are now at least
+  260px wide, which fits the row; Khayt at its usual window size is unchanged.
+
+- **(Bed Ready) Update and safety messages say Bed Ready.** The new
+  explanations for a failed update check ("…Khayt will try again later"), the
+  full-wipe dialogs, the newer-data-file refusal and the printer-history error
+  named Khayt in Bed Ready.
 
 - **A part's magnets and inserts are no longer counted twice in the P&L.** A
   part's own consumables are priced into its material cost, and that material
@@ -5659,6 +5721,126 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-alpha.59] - 2026-10-05
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+From a Reddit tester report: a calculator for multicolour prints with consumables, every
+plate of a 3MF counted, a far bigger filament catalogue, and review fixes.
+
+### Changed and fixed
+
+- **A part's magnets and inserts are no longer counted twice in the P&L.** A
+  part's own consumables are priced into its material cost, and that material
+  is what the P&L counts as cost of goods — but buying consumables is already
+  booked as an expense. So each magnet was paid for twice. Cost of goods now
+  leaves a part's consumables out (the P&L, the dashboard's cost and margin,
+  and the machine P&L), as it already did for a product's components. They
+  still count in each job's own cost: the job margin, profit per product and
+  per hour, and the quote. A job with no consumables is unchanged.
+
+- **alpha.59 review fixes (Mac + shared lib).**
+  - Security: a 3MF with a crafted plate index (1e20, "inf", "nan") no longer
+    crashes the Mac every time the model is viewed — the index is checked and
+    the bad plate skipped, and the shared reader replaces it with a small
+    number. Reading plates is linear: 350 KB of unclosed `<plate ` took 4.9 s
+    and now takes milliseconds; at most 256 plates and 64 filaments a plate
+    are read. Slicer grams, metres and times are held to sane finite ranges,
+    plate names are decoded and cut to 80 characters, and a consumable
+    quantity is held to 0–9,999 (an `inf` used to make the book unwritable on
+    the Mac). Embedded G-codes are read by their first 32 KB and last 64 KB.
+    The filament catalogue's SpoolmanDB and Bambu sources are fetched at
+    pinned commits, with each download's SHA-256 recorded in the file and a
+    size cap on every response.
+  - Money: a product's components count in a job's own margin (the ledger,
+    the margin advice, and profit per product and per hour). They are not
+    added to the P&L's cost of goods: consumable purchases are booked as
+    expenses. A shelf cost of 0 is free; a deleted consumable is priced at the
+    cost written on the line, for components and part consumables alike, and
+    the Mac's dashboard prices part consumables from the shelf as the desktop
+    does. Reorder suggestions count part consumables only for jobs that drew
+    them.
+  - A 3MF re-read for plate details no longer bumps every model's revision,
+    so it cannot win a sync over an edit made on another machine. A 3MF with
+    several embedded G-codes and no slice_info is their sum on the Mac too,
+    and a multi-plate project keeps its filament cost when every plate states
+    one.
+  - (Mac) Calculator: removing a colour or filling from a model no longer
+    crashes; the first box says "Colour 1" with its swatch and the total once
+    there are two colours, and adding a colour splits the weight already typed
+    rather than charging it twice; grams read as grams. A job from a product
+    shows its Components line, and changing the number of assemblies re-prices
+    it. The library's As sliced list says "Filament 2 · PLA", Arabic counts
+    plates properly (لوحان), and Consumables per print shows each line's cost.
+    The filament catalogue button is always there, says what to type, lists up
+    to 30 results grouped by brand with colour swatches, and no longer repeats
+    a brand in a name.
+
+- **(Mac) Calculator: several filaments, purge and consumables.**
+  - Add filament / colour puts a second, third… spool on one print, each with
+    its own grams and its own spool's price. A purge / waste figure (flush and
+    prime tower) is charged too, shared across the colours by weight, and a
+    job carrying it draws each colour's share off its own spool.
+  - From a model fills the calculator from a library model: one line per
+    colour the slicer weighed, the print time, and the model's consumables.
+    The spool for each colour is the one the colour planner chose, else the
+    closest colour on the shelf.
+  - Consumables (magnets, inserts, screws) can be added to the calculator
+    from the Consumables shelf, per printed piece, and to a library model as
+    Consumables per print. A product made from the model carries them, a job
+    taken from that product is costed with them, and completing the job takes
+    them off the shelf (and putting the job back returns them).
+  - The calculator's figures now live in one model with a test that moves
+    labour, print time, grams, spool and margin and checks the total moves
+    each time. The spool menus name the colour as well as the material.
+  - The sample book's consumables carry their cost under the field Khayt
+    reads (`cost`), so they were priced at nothing before.
+
+- **The filament catalogue lists more brands and colours, and Bambu Lab's own
+  names and colours win.** It had 1,945 filaments and 14,500 colours. It now has
+  2,110 filaments and 16,477 colours from 172 brands.
+  - The Open Filament Database (MIT) is now merged with SpoolmanDB (MIT) and with
+    Bambu Lab's own colour list. Only the facts are taken from Bambu's list: the
+    product line, the colour name and the hex. New are R3D, Siraya Tech, more
+    eSUN, Polymaker (Panchroma, PolyFlex, Fiberon), Creality Hyper RFID, Inland,
+    extrudr and 3DXTech lines, and 129 more Bambu Lab colours (286 → 415). Bambu
+    PLA Matte keeps its 25 official colours.
+  - Each product appears once and each colour once. A row records which source
+    it came from. The sources and their licences are listed in
+    THIRD-PARTY-NOTICES.md and inside the file itself.
+  - Search: words that only a colour name matched must match the same colour.
+    "bambu pla matte black" no longer lands on PLA Lite because it sells
+    "Matte Beige" and "Black".
+  - (Mac) The spool sheet no longer reads the catalogue file on every
+    keystroke. It reads it once per engine.
+
+- **A multi-plate 3MF counts every plate, and Bambu PLA Matte colours are
+  right.** Reported by a tester.
+  - A Bambu Studio or Orca file sliced as several plates was read as plate 1
+    only. The weight and time came from the first plate's G-code, and each
+    colour kept plate 1's grams. Both now cover the whole project, and each
+    plate's name, time and grams per spool are kept (shared reader, so the
+    desktop app's import and calculator get the same totals).
+  - (Mac) A model's page shows what the slicer said: the project's time and
+    weight, then each plate with its spools. Models already in the library
+    are read again once, and their colour grams are corrected.
+  - (Mac) The calculator can fill weight and time from a library model. A
+    multi-plate model starts on the whole project; you can pick one plate.
+  - The filament catalogue's Bambu PLA Matte line now uses Bambu's official
+    names and colours (Nardo Gray, Lilac Purple, Dark Chocolate, Plum,
+    Terracotta), and a bad empty-spool weight on Grass Green is removed. The
+    fixes sit in an overrides file that the monthly catalogue refresh applies.
+
+- **A job taken from a product now sells at the catalogue price when the
+  product has components.** The catalogue counts a product's bought-in
+  components (magnets, screws, a box) in its cost before the margin; a job
+  made from that product left them out and was under-priced by their cost
+  plus margin. The job's price now includes them the same way (times the
+  number of assemblies), a typed price still wins, and the components' cost
+  is saved on the job as `componentsCost`. On the Mac, the New Job sheet's
+  total includes them too.
 
 ## [4.0.0-alpha.58] - 2026-10-03
 
