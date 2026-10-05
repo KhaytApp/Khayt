@@ -43,6 +43,12 @@
           // goes with it: this panel is Bed Ready-only, and t() strips decorative leading emoji
           // in that flavor precisely because they read as off-identity there.
           '<b style="font-size:16px;">' + esc(t('brl.title')) + '</b>' +
+          // The public catalogue lives in its own panel (bedready-makerrun.js); this is the door to it
+          // from the user's own saved designs. Drawn only when that panel loaded.
+          '<span style="flex:1;"></span>' +
+          ((window.BedReadyMakerRun && typeof window.BedReadyMakerRun.open === 'function')
+            ? '<button type="button" class="brl-browse" style="cursor:pointer;border:1px solid var(--border,rgba(17,40,37,0.16));background:transparent;color:inherit;border-radius:10px;padding:6px 12px;font-size:13px;">' + esc(t('mr.browse_button')) + '</button>'
+            : '') +
           '<button type="button" class="brl-close" aria-label="Close" style="border:0;background:transparent;color:inherit;font-size:20px;cursor:pointer;line-height:1;" title="Close">✕</button>' +
         '</div>' +
         '<div class="brl-body" style="padding:20px;"></div>' +
@@ -51,6 +57,11 @@
     body = root.querySelector('.brl-body');
     root.addEventListener('click', function (e) { if (e.target === root) close(); });
     root.querySelector('.brl-close').addEventListener('click', close);
+    var browseBtn = root.querySelector('.brl-browse');
+    if (browseBtn) browseBtn.addEventListener('click', function () {
+      close();
+      if (window.BedReadyMakerRun && typeof window.BedReadyMakerRun.open === 'function') window.BedReadyMakerRun.open();
+    });
     document.addEventListener('keydown', function (e) {
       if (!isOpen()) return;
       if (e.key === 'Escape') { close(); return; }
@@ -255,6 +266,22 @@
       (name ? ' title="' + esc(name) + '"' : '') + '>' + esc(label) + '</div>';
   }
 
+  /**
+   * Where a saved design came from, for the print-file record: its page, its
+   * licence as the record's own licence id when that can be read with
+   * certainty (lib/makerrun-terms.js), and the raw MakerRun facts beside it.
+   * The same three fields the catalogue browser (bedready-makerrun.js) passes,
+   * so a design reads the same whichever door it came through.
+   */
+  function provenance(it) {
+    var T = (typeof globalThis !== 'undefined' && globalThis.BedReadyMakerRunTerms) || null;
+    var out = {};
+    if (it && typeof it.url === 'string' && /^https:\/\//.test(it.url)) out.source = it.url;
+    if (it && it.license && T) { var lic = T.toRecordLicence(it.license); if (lic) out.licence = lic; }
+    if (it && it.slug) out.makerrun = { slug: String(it.slug), license: it.license || null, creator: it.creator || null };
+    return out;
+  }
+
   function canImport() {
     return typeof api.bedreadyImportToLib === 'function' && typeof window.importConvertedAsNew === 'function';
   }
@@ -418,10 +445,10 @@
         var vaultId = (typeof uid === 'function') ? uid('PF') : ('PF' + Date.now().toString(36));
         var d = await api.bedreadyImportToLib(it, vaultId);
         if (!d || !d.ok) { result(esc((d && d.error) || t('brl.add_one_failed')), 'var(--danger,#e0492f)'); return; }
-        await window.importConvertedAsNew({
+        await window.importConvertedAsNew(Object.assign({
           vaultId: vaultId, filename: d.filename, ext: d.ext, size: d.size,
           displayName: name, sourceName: d.filename, noSwitch: true,
-        });
+        }, provenance(it)));
         result(esc(t('brl.added_one', { name: name })), 'var(--ok,#159d68)');
       } catch (e) { result(esc(e && e.message ? e.message : t('brl.add_one_failed')), 'var(--danger,#e0492f)'); }
     }
@@ -460,10 +487,10 @@
         var vaultId = (typeof uid === 'function') ? uid('PF') : ('PF' + Date.now().toString(36) + i);
         var r = await api.bedreadyImportToLib(it, vaultId);
         if (!r || !r.ok) { failed++; continue; }
-        await window.importConvertedAsNew({
+        await window.importConvertedAsNew(Object.assign({
           vaultId: vaultId, filename: r.filename, ext: r.ext, size: r.size,
           displayName: it.title || it.slug, sourceName: r.filename, noSwitch: true,
-        });
+        }, provenance(it)));
         added++;
       } catch (e) { failed++; }
     }

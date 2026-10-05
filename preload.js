@@ -26,6 +26,20 @@ contextBridge.exposeInMainWorld('hubAPI', {
   bedreadyOpenSignIn:   () => ipcRenderer.invoke('hub:bedready-open-signin'),
   bedreadyUnlink:       () => ipcRenderer.invoke('hub:bedready-unlink'),
   onBedreadyLinked:     (cb) => { ipcRenderer.on('bedready-linked', () => { try { cb(); } catch { /* noop */ } }); },
+  // MakerRun catalogue (Bed Ready only; main registers these only in that flavor). Browse the public
+  // catalogue, download a design into a print-file record, publish a record as a new listing. The
+  // renderer names records and filenames, never paths — main resolves them inside the vault.
+  makerrunBrowse:        (opts) => ipcRenderer.invoke('hub:makerrun-browse', opts || {}),
+  makerrunDesign:        (slug) => ipcRenderer.invoke('hub:makerrun-design', { slug }),
+  makerrunDownloadToLib: (slug, filename, vaultId, title) => ipcRenderer.invoke('hub:makerrun-download-into-vault', { slug, filename, vaultId, title }),
+  makerrunPublishCreate: (input) => ipcRenderer.invoke('hub:makerrun-publish-create', input || {}),
+  makerrunPublishFile:   (slug, vaultId, filename) => ipcRenderer.invoke('hub:makerrun-publish-file', { slug, vaultId, filename }),
+  makerrunPublishImages: (opts) => ipcRenderer.invoke('hub:makerrun-publish-images', opts || {}),
+  makerrunStatus:        (slug) => ipcRenderer.invoke('hub:makerrun-status', { slug }),
+  makerrunFindRecent:    (title) => ipcRenderer.invoke('hub:makerrun-find-recent', { title }),
+  makerrunDelete:        (slug) => ipcRenderer.invoke('hub:makerrun-delete', { slug }),
+  makerrunOpenAge:       () => ipcRenderer.invoke('hub:makerrun-open-age'),
+  makerrunOpenPage:      (slug) => ipcRenderer.invoke('hub:makerrun-open-page', { slug }),
 
   // Orca filament installer (Bed Ready): install OrcaSlicer profiles into any Orca-family slicer.
   orcaFilaSlicers:      () => ipcRenderer.invoke('hub:orca-fila-slicers'),

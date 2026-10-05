@@ -754,6 +754,14 @@
     });
   }
 
+  /* Bed Ready's MakerRun panel (renderer/bedready-makerrun.js), through an
+   * accessor: Khayt does not load it, so the menu item simply is not drawn
+   * there, and nothing here reads the global bare. */
+  function _MR() {
+    const m = (typeof window !== 'undefined' && window.BedReadyMakerRun) || null;
+    return m && typeof m.publish === 'function' ? m : null;
+  }
+
   function cardHtml(rec) {
     const prof = rec.slicerProfileId && (slicerProfiles || []).find((s) => s.id === rec.slicerProfileId);
     return `
@@ -834,6 +842,7 @@
               ${rec.sourceFile?.ext === '3mf' ? `<button data-act="pf-convert" data-id="${escapeHtml(rec.id)}">${_bi('convert', '🔄')}${escapeHtml(t('conv.convert_short') || 'Convert')}</button>` : ''}
               <button data-act="pf-add-parts" data-id="${escapeHtml(rec.id)}" title="${escapeHtml(t('plib.add_parts_hint') || 'A print can be several files — a head, two arms, a torso')}">${_bi('plus', '＋')}${escapeHtml(t('plib.add_parts') || 'Add files to this print')}</button>
               <button data-act="pf-edit" data-id="${escapeHtml(rec.id)}">${_bi('pencil', '✏')}${escapeHtml(t('common.edit') || 'Edit')}</button>
+              ${_MR() && rec.sourceFile ? `<button data-act="pf-mr-publish" data-id="${escapeHtml(rec.id)}">${_bi('cloud', '☁')}${escapeHtml(t('mr.publish_menu'))}</button>` : ''}
               <!-- Under a rule and last: delete used to sit one button along
                    from "Open in slicer". -->
               <div class="ovf-sep"></div>
@@ -1111,6 +1120,7 @@
       case 'pf-slice': openInSlicer(id); break;
       case 'pf-view3d': view3d(id); break;
       case 'pf-edit':  editPrintFile(id); break;
+      case 'pf-mr-publish': { const mr = _MR(); if (mr) mr.publish(id); break; }
       case 'pf-del':   deletePrintFile(id); break;
       case 'pf-fav':   toggleFav(id); break;
       case 'pf-version': {
@@ -1930,6 +1940,21 @@
       thumb: null, thumbSource: null, userPhoto: null,
       slicerProfileId: null, testedNotes: '', tags: [], folder: '', material: '', favorite: false, converted: [],
     };
+    /* WHERE IT CAME FROM, recorded at the moment it is known. A design pulled
+     * from MakerRun arrives with its page, its licence and its creator; asking
+     * the shop to type those in later is asking for a blank. Each is taken only
+     * in the shape the edit modal itself would write: a short string for the
+     * source, a licence id the menu offers, and a small plain object. */
+    if (typeof meta.source === 'string' && meta.source.trim()) rec.source = meta.source.trim().slice(0, 300);
+    const _ML = (typeof window !== 'undefined' && window.KhaytModelLicence) || null;
+    if (typeof meta.licence === 'string' && _ML && _ML.list().some((l) => l.id === meta.licence)) rec.licence = meta.licence;
+    if (meta.makerrun && typeof meta.makerrun === 'object' && typeof meta.makerrun.slug === 'string') {
+      rec.makerrun = {
+        slug: meta.makerrun.slug.slice(0, 200),
+        license: typeof meta.makerrun.license === 'string' ? meta.makerrun.license.slice(0, 120) : null,
+        creator: typeof meta.makerrun.creator === 'string' ? meta.makerrun.creator.slice(0, 120) : null,
+      };
+    }
     if (!Array.isArray(printFiles)) printFiles = [];
     printFiles.unshift(rec);
     saveAll();
