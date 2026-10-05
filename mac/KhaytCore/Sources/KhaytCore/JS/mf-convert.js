@@ -57,6 +57,13 @@
 
   const MESH_MEMBER = /\.model$/i;
 
+  // Component-graph nodes one mesh walk may visit — the same ceiling lib/mf-mesh.js puts on the
+  // preview's walk, and for the same hostile file. Read from there so the two cannot drift.
+  const MAX_WALK_VISITS = (mfMesh && mfMesh.MAX_WALK_VISITS) || 4000000;
+  // Triangles one extraction may BUILD after component instancing — mf-mesh's HARD_CAP, the
+  // count past which it will not even decode a model. See the count in _extractCore.
+  const MAX_BUILT_TRIANGLES = (mfMesh && mfMesh.HARD_CAP) || 30000000;
+
   /**
    * Read every member of a 3MF into { name, data:Buffer }. Returns [] on a bad file.
    *
@@ -111,6 +118,33 @@
         if (total + declared > MEMBERS_TOTAL_BUDGET) { dropped++; droppedBytes += declared; continue; }
 
         const src = zip.rawOf(e);
+        // ── A MEMBER THAT DECLARES NOTHING ──────────────────────────────────
+        // The declared size is only a fair charge when zip-read holds the inflate to it.
+        // It does for a member that declares a size (size + 1 KB), but one declaring
+        // `size: 0` may inflate to zip-read's full per-member ceiling (MAX_INFLATED, 400
+        // MB) while being charged its compressed size here — a kilobyte. A few hundred
+        // such members in a small archive were "within budget" and could inflate to
+        // terabytes the moment anything read their lazy `data`. So a deflated member
+        // that declares nothing is read now, like a config, its inflate held to what is
+        // left of the budget, and charged what it really inflated to — or, when it would
+        // not fit, the whole allowance it was given, so a run of them cannot each cost
+        // the full ceiling in work while costing the budget nothing.
+        const undeclared = e.size === 0 && e.method === 8;
+        if (undeclared) {
+          const allowance = Math.min(zipRead.MAX_INFLATED || MEMBERS_TOTAL_BUDGET, MEMBERS_TOTAL_BUDGET - total);
+          // readEntry caps an inflate at `size + 1 KB`; this asks it for the allowance.
+          const data = allowance > 1024 ? zipRead.readEntry(buf, Object.assign({}, e, { size: allowance - 1024 })) : null;
+          if (!data) {
+            total += Math.max(0, allowance);
+            // Past the budget it is a part left out, and the convert must say so. A member
+            // that fails within zip-read's own ceiling is corrupt, and is skipped as before.
+            if (allowance < (zipRead.MAX_INFLATED || 0)) { dropped++; droppedBytes += Math.max(0, allowance); }
+            continue;
+          }
+          total += data.length;
+          out.push({ name: e.name, size: data.length, data, src });
+          continue;
+        }
         if (wantMesh) {
           const member = { name: e.name, size: e.size, src };
           let cached;
@@ -127,6 +161,9 @@
         } else {
           const data = zip.entryData(e);
           if (!data) continue;
+          // Charged on what it REALLY inflated to, and checked again: the check above
+          // used the declared size, which for an undeclared member is not a bound.
+          if (total + data.length > MEMBERS_TOTAL_BUDGET) { dropped++; droppedBytes += data.length; continue; }
           total += data.length;
           out.push({ name: e.name, size: data.length, data, src });
         }
@@ -269,6 +306,49 @@
     try { return JSON.parse(text); } catch (_) { return null; }
   }
 
+  /**
+   * One `key = value` out of a PrusaSlicer config, or null.
+   *
+   * ── THE `; ` IN FRONT OF EVERY LINE ──────────────────────────────────────
+   *
+   * PrusaSlicer writes `Metadata/Slic3r_PE.config` with its whole settings block
+   * commented out — every line is `; printer_model = MK4S`, not
+   * `printer_model = MK4S`. The readers and writers here were anchored at the
+   * line start on the bare key, so on a real Prusa file they matched nothing at
+   * all: the source printer, nozzle and bed came back empty, and a Prusa→Prusa
+   * retarget rewrote nothing while still listing `printer_model` and `bed_shape`
+   * under "fields changed". Found by bedready.io (src/lib/convert.ts iniValue),
+   * which this is ported from.
+   *
+   * The rest of the pattern is that file's too, for the reasons it gives: `[ \t]`
+   * rather than `\s` so nothing can cross a line break (an EMPTY value then
+   * captured the next line), `(\S.*)` so an empty value is no match, and only a
+   * `;` and spaces allowed before the key, so `physical_printer_settings_id` is
+   * never read as `printer_settings_id`. The uncommented form still reads — a
+   * hand-written or older config has no `;`.
+   */
+  function iniValue(ini, key) {
+    const m = new RegExp('^[ \\t]*;?[ \\t]*' + key + '[ \\t]*=[ \\t]*(\\S[^\\r\\n]*)$', 'im').exec(String(ini || ''));
+    return m ? m[1].trim() : null;
+  }
+
+  /**
+   * Rewrite one key in a PrusaSlicer config, KEEPING whatever prefix the line had —
+   * `; ` on a real file, nothing on a bare one — so the rewritten file is the same
+   * dialect it came in as. `value` may be a function of the old value. Returns
+   * `{ text, hit }`; `hit` is false when the key is not there, so a caller reports a
+   * field as changed only when it was.
+   */
+  function iniSet(text, key, value) {
+    let hit = false;
+    const re = new RegExp('^([ \\t]*;?[ \\t]*' + key + '[ \\t]*=)[ \\t]*([^\\r\\n]*)$', 'im');
+    const out = text.replace(re, (_all, pre, old) => {
+      hit = true;
+      return pre + ' ' + (typeof value === 'function' ? value(old.trim()) : value);
+    });
+    return { text: out, hit };
+  }
+
   /** Ordered filament colours from whatever config the file carries. */
   function extractFilaments(members) {
     let list = [];
@@ -303,9 +383,9 @@
       // PrusaSlicer: filament_colour = #a;#b;#c
       const prusa = memberText(members, CFG_PRUSA);
       if (prusa) {
-        const line = /filament_colou?r\s*=\s*([#0-9a-fA-F;,\s]+)/i.exec(prusa);
+        const line = iniValue(prusa, 'filament_colou?r');
         if (line) {
-          list = line[1].split(/[;,]/).map((s) => normHex(s)).filter(Boolean)
+          list = line.split(/[;,]/).map((s) => normHex(s)).filter(Boolean)
             .map((color, i) => ({ index: i, color }));
         }
       }
@@ -451,10 +531,12 @@
     }
     const prusa = memberText(members, CFG_PRUSA);
     if (prusa) {
-      if (!meta.printerModel) { const p = /^printer_model\s*=\s*(.+)$/im.exec(prusa); if (p) meta.printerModel = p[1].trim(); }
-      if (!meta.nozzle) { const nz = /^nozzle_diameter\s*=\s*([\d.]+)/im.exec(prusa); if (nz) meta.nozzle = +nz[1]; }
-      if (!meta.layerHeight) { const lh = /^layer_height\s*=\s*([\d.]+)/im.exec(prusa); if (lh) meta.layerHeight = +lh[1]; }
-      if (!meta.bed) { const bs = /^bed_shape\s*=\s*(.+)$/im.exec(prusa); if (bs) { const pts = bs[1].split(',').map((s) => s.split('x').map(Number)); const xs = pts.map((p) => p[0]).filter(Number.isFinite), ys = pts.map((p) => p[1]).filter(Number.isFinite); if (xs.length && ys.length) meta.bed = { x: Math.round(Math.max(...xs)), y: Math.round(Math.max(...ys)) }; } }
+      // iniValue, not a bare `^key =`: a real PrusaSlicer file comments every line out
+      // (`; printer_model = MK4S`), and the bare form found nothing in one.
+      if (!meta.printerModel) { const p = iniValue(prusa, 'printer_model'); if (p) meta.printerModel = p; }
+      if (!meta.nozzle) { const nz = /^[\d.]+/.exec(iniValue(prusa, 'nozzle_diameter') || ''); if (nz) meta.nozzle = +nz[0]; }
+      if (!meta.layerHeight) { const lh = /^[\d.]+/.exec(iniValue(prusa, 'layer_height') || ''); if (lh) meta.layerHeight = +lh[0]; }
+      if (!meta.bed) { const bs = iniValue(prusa, 'bed_shape'); if (bs) { const pts = bs.split(',').map((s) => s.split('x').map(Number)); const xs = pts.map((p) => p[0]).filter(Number.isFinite), ys = pts.map((p) => p[1]).filter(Number.isFinite); if (xs.length && ys.length) meta.bed = { x: Math.round(Math.max(...xs)), y: Math.round(Math.max(...ys)) }; } }
     }
     meta.totalGrams = Math.round((plateGrams != null && plateGrams > 0 ? plateGrams : meta.grams.reduce((a, b) => a + b, 0)) * 10) / 10;
     return meta;
@@ -670,6 +752,34 @@
     const buildBlock = (/<build\b[^>]*>([\s\S]*?)<\/build>/i.exec(rootText || '') || [])[1];
     const items = [];
     if (buildBlock) { const itRe = /<item\b([^>]*?)\/?>/g; let im; while ((im = itRe.exec(buildBlock))) items.push(im[1]); }
+    // COUNT BEFORE BUILDING. resolve() memoises each object, but its OUTPUT still multiplies:
+    // an object referencing the next one twice, thirty levels deep over one triangle, is 2^30
+    // triangles of nested arrays, and the process dies of memory long before it finishes. The
+    // same count, memoised as numbers, costs one pass over the objects — so a model that would
+    // come out past the ceiling mf-mesh already treats as impractical to even decode is refused
+    // here, before anything is built. Below the ceiling nothing changes.
+    const tally = {};
+    const countOf = (key, depth) => {
+      if (tally[key] != null) return tally[key];
+      const o = objs[key];
+      if (!o || depth > 64) return 0;
+      tally[key] = 0; // a cycle counts as nothing, as resolve() drops it
+      let n = o.tris.length;
+      for (const cp of o.comps) n += countOf(cp.path + '#' + cp.ref, depth + 1);
+      return (tally[key] = n);
+    };
+    let produced = 0;
+    if (items.length) {
+      for (const it of items) {
+        const oid = (/\bobjectid="([^"]+)"/i.exec(it) || [])[1];
+        const pp = (/\b(?:p:)?path="([^"]+)"/i.exec(it) || [])[1];
+        if (oid) produced += countOf((pp ? norm(pp) : rootKey) + '#' + oid, 0);
+      }
+    } else {
+      for (const k in objs) produced += countOf(k, 0);
+    }
+    if (produced > MAX_BUILT_TRIANGLES) return null;
+
     const soup = [], paintOut = [], objOut = [];
     // `oid` — the top-level (build-item) object id each facet belongs to, so the preview can
     // group triangles into build plates. Only tracked when wantPaint (the rich-preview path).
@@ -1047,7 +1157,14 @@
       P[slot] = x * scale; P[slot + 1] = y * scale; P[slot + 2] = z * scale;
     };
 
+    // A total visit budget, for the reason lib/mf-mesh.js `walk` gives: `seen` stops a cycle
+    // but not fan-out, and a component graph that doubles per level is 2^depth visits in a few
+    // hundred bytes (24 levels took over five seconds here). Past the budget the measurement is
+    // abandoned — null, "could not measure", the same answer as a model with no geometry.
+    let visits = 0, overBudget = false;
     const walk = (key, chain, seen) => {
+      if (overBudget) return false;
+      if (++visits > MAX_WALK_VISITS) { overBudget = true; return false; }
       const o = objs[key];
       if (!o || (seen && seen.has(key))) return false;
       for (let i = 0; i < o.nt; i++) {
@@ -1100,7 +1217,7 @@
         }
       }
     }
-    if (!count) return null;
+    if (overBudget || !count) return null;
     const b = largestPlate(plateBoxes);
     return {
       triangleCount: count,
@@ -1194,15 +1311,235 @@
     return out;
   }
 
-  // Reorder every filament_* array of length === n inside a parsed settings object.
-  function remapJsonSettings(obj, map, n) {
+  // ── MOVING A FILAMENT MEANS MOVING EVERYTHING THAT BELONGS TO IT ─────────────────────────────
+  //
+  // A slot map, a merge, Full Spectrum and band-swap all move filaments between positions. Each
+  // position's colour, material, temperatures and fan settings belong together — and so do the
+  // settings that NAME a filament by its number (support_filament = 2) and the purge matrix
+  // indexed by filament pairs. Reindexing only `^filament_` keys left nozzle_temperature, the
+  // plate temperatures and the fans in source order (after a 6→4 merge nozzle_temperature still
+  // had six entries), so a slot printed one filament's colour at another's temperature.
+  //
+  // Which arrays are per-filament is decided by NAME, never by length alone: printable_area has
+  // four corners and a four-filament file has four filaments, and a length test once turned the
+  // bed into a bow-tie. On a toolchanger the per-EXTRUDER arrays (nozzle_diameter, retraction,
+  // z-hop, extruder_offset) have the same length again; those stay with the physical head and
+  // are deliberately absent here. Names from Orca / Bambu Studio's filament option set, as they
+  // appear in a real U1 export (bedready.io's u1-profile.json).
+  const PER_FILAMENT_JSON = new Set([
+    'activate_air_filtration', 'activate_chamber_temp_control', 'adaptive_pressure_advance',
+    'adaptive_pressure_advance_bridges', 'adaptive_pressure_advance_model', 'adaptive_pressure_advance_overhangs',
+    'additional_cooling_fan_speed', 'chamber_temperature', 'chamber_temperatures', 'close_fan_the_first_x_layers',
+    'complete_print_exhaust_fan_speed', 'cool_plate_temp', 'cool_plate_temp_initial_layer', 'default_filament_colour',
+    'dont_slow_down_outer_wall', 'during_print_exhaust_fan_speed', 'enable_overhang_bridge_fan', 'enable_pressure_advance',
+    'eng_plate_temp', 'eng_plate_temp_initial_layer', 'fan_cooling_layer_time', 'fan_max_speed', 'fan_min_speed',
+    'full_fan_speed_layer', 'graphic_effect_plate_temp', 'graphic_effect_plate_temp_initial_layer', 'hot_plate_temp',
+    'hot_plate_temp_initial_layer', 'idle_temperature', 'internal_bridge_fan_speed', 'ironing_fan_speed',
+    'nozzle_temperature', 'nozzle_temperature_initial_layer', 'nozzle_temperature_range_high', 'nozzle_temperature_range_low',
+    'overhang_fan_speed', 'overhang_fan_threshold', 'pellet_flow_coefficient', 'pressure_advance',
+    'reduce_fan_stop_start_freq', 'required_nozzle_HRC', 'slow_down_for_layer_cooling', 'slow_down_layer_time',
+    'slow_down_min_speed', 'supertack_plate_temp', 'supertack_plate_temp_initial_layer',
+    'support_material_interface_fan_speed', 'temperature_vitrification', 'textured_cool_plate_temp',
+    'textured_cool_plate_temp_initial_layer', 'textured_plate_temp', 'textured_plate_temp_initial_layer',
+  ]);
+  const isPerFilamentJson = (k) => /^filament_/i.test(k) || PER_FILAMENT_JSON.has(k);
+  // Settings whose VALUE is a 1-based filament number; 0 means "the default" and stays 0.
+  const FILAMENT_INDEX_JSON = ['support_filament', 'support_interface_filament', 'wipe_tower_filament',
+    'wall_filament', 'sparse_infill_filament', 'solid_infill_filament'];
+  const FILAMENT_INDEX_PRUSA = ['perimeter_extruder', 'infill_extruder', 'solid_infill_extruder',
+    'support_material_extruder', 'support_material_interface_extruder', 'wipe_tower_extruder'];
+  // The same, as per-object / per-part metadata in model_settings.config and Slic3r_PE_model.config.
+  const FILAMENT_INDEX_META = new Set(['extruder'].concat(FILAMENT_INDEX_JSON, FILAMENT_INDEX_PRUSA));
+
+  /**
+   * Output position → source position for a slot map, with permute()'s semantics exactly: slot
+   * map[i] takes source i, and a slot nobody maps to keeps its own. Everything that reindexes
+   * under a slot map goes through this, so the colour and its settings cannot part company.
+   */
+  function srcOfSlotMap(map, n) {
+    const src = [];
+    for (let j = 0; j < n; j++) src.push(j);
+    map.forEach((t, i) => { if (Number.isInteger(t) && t >= 0 && t < n) src[t] = i; });
+    return src;
+  }
+
+  /** A 1-based filament number through a 0-based source→slot map. 0 and unknowns stay. */
+  function remapIndexValue(v, map) {
+    const k = parseInt(v, 10);
+    if (!(k >= 1 && k <= map.length) || !Number.isInteger(map[k - 1])) return v;
+    const nv = map[k - 1] + 1;
+    return typeof v === 'number' ? nv : String(nv);
+  }
+
+  /** An n×n matrix (or e stacked ones), flattened, reindexed on both axes. Null if not that shape. */
+  function reshapeSquare(arr, srcOf, n) {
+    const blk = n * n;
+    if (!arr.length || arr.length % blk) return null;
+    const out = [];
+    for (let b = 0; b < arr.length / blk; b++) {
+      for (const i of srcOf) for (const j of srcOf) out.push(arr[b * blk + i * n + j]);
+    }
+    return out;
+  }
+
+  /** A per-filament list of PAIRS (Bambu's flush_volumes_vector: unload, load per filament). */
+  function reshapePairs(arr, srcOf, n) {
+    if (arr.length !== 2 * n) return null;
+    const out = [];
+    for (const i of srcOf) out.push(arr[2 * i], arr[2 * i + 1]);
+    return out;
+  }
+
+  /**
+   * Reindex a Bambu/Orca JSON config from `n` source filaments to `srcOf.length` output ones:
+   * every named per-filament array of length n, the flush matrix and vector, the per-filament
+   * entries of different_settings_to_system / inherits_group ([print, f1..fn, printer]), and —
+   * when `idxMap` is given — every setting whose value is a filament number. Returns how many
+   * keys moved.
+   */
+  function reindexFilamentJson(obj, srcOf, n, idxMap) {
     let changed = 0;
     for (const k of Object.keys(obj)) {
-      if (!/^filament_/i.test(k)) continue;
       const v = obj[k];
-      if (Array.isArray(v) && v.length === n) { obj[k] = permute(v, map); changed++; }
+      if (!Array.isArray(v)) continue;
+      let next = null;
+      if (isPerFilamentJson(k) && v.length === n) next = srcOf.map((i) => (v[i] != null ? v[i] : v[0]));
+      else if (k === 'flush_volumes_matrix') next = reshapeSquare(v, srcOf, n);
+      else if (k === 'flush_volumes_vector') next = reshapePairs(v, srcOf, n);
+      else if ((k === 'different_settings_to_system' || k === 'inherits_group') && v.length === n + 2) {
+        next = [v[0]].concat(srcOf.map((i) => v[i + 1]), [v[n + 1]]);
+      }
+      if (next) { obj[k] = next; changed++; }
+    }
+    if (idxMap) {
+      for (const k of FILAMENT_INDEX_JSON) {
+        if (!(k in obj)) continue;
+        const before = JSON.stringify(obj[k]);
+        obj[k] = Array.isArray(obj[k]) ? obj[k].map((x) => remapIndexValue(x, idxMap)) : remapIndexValue(obj[k], idxMap);
+        if (before !== JSON.stringify(obj[k])) changed++;
+      }
     }
     return changed;
+  }
+
+  /**
+   * A paint plan's source → slot map restricted to PHYSICAL filaments: Full Spectrum maps the
+   * colours it mixes to virtual slots past the heads, which an object may print in but a
+   * support or wall filament setting may not. Those go to the head with the largest share of
+   * the mix; `clamped` lists the source indices that were moved that way. A band-swap plan is
+   * all heads already, so it comes back unchanged.
+   */
+  function physicalIndexMap(plan) {
+    const heads = plan.physical ? plan.physical.length : Infinity;
+    const clamped = new Set();
+    const map = plan.map.map((t, i) => {
+      if (t < heads) return t;
+      clamped.add(i);
+      const e = (plan.extras || []).find((x) => x.src === i);
+      if (!e || !e.recipe || !e.recipe.ids || !e.recipe.ids.length) return 0;
+      let best = 0;
+      e.recipe.weights.forEach((w, k) => { if (w > e.recipe.weights[best]) best = k; });
+      return Math.min(heads - 1, Math.max(0, e.recipe.ids[best] - 1));
+    });
+    return { map, clamped };
+  }
+
+  /**
+   * True when a per-filament setting holds k>1 values per filament — Bambu's H2D writes some
+   * per nozzle variant, n × variants long. Their layout is not verified against a real project,
+   * so rather than reindex filament_colour and leave those behind, a slot map or merge refuses.
+   */
+  function hasVariantArrays(obj, n) {
+    if (!(n >= 2)) return false;
+    return Object.keys(obj).some((k) => isPerFilamentJson(k) && Array.isArray(obj[k]) && obj[k].length > n && obj[k].length % n === 0);
+  }
+
+  /**
+   * Remap every filament-number metadata (`extruder`, `support_filament`, Prusa's
+   * `perimeter_extruder`…) in model_settings.config / Slic3r_PE_model.config XML, and the
+   * `extruder` of colour changes and layer ranges, through a 0-based source→slot map.
+   */
+  function remapIndexText(text, map, extruderMap) {
+    // `extruderMap`, when given, is for the objects' own `extruder` alone — under Full Spectrum
+    // an object may print in a mixed (virtual) filament, while a support filament may not.
+    return text
+      .replace(/(key="([A-Za-z_]+)"\s+value=")(\d+)(")/g, (all, pre, key, num, post) =>
+        (FILAMENT_INDEX_META.has(key) ? pre + remapIndexValue(num, key === 'extruder' && extruderMap ? extruderMap : map) + post : all))
+      .replace(/(<(?:code|layer)\b[^>]*\bextruder=")(\d+)(")/g, (_a, pre, num, post) => pre + remapIndexValue(num, map) + post)
+      .replace(/(opt_key="extruder"\s*>)(\d+)(<)/g, (_a, pre, num, post) => pre + remapIndexValue(num, map) + post);
+  }
+
+  // PrusaSlicer's per-filament options (its "filament" option set; one value per extruder in a
+  // project) plus extruder_colour, which is what PrusaSlicer shows a painted region in. The
+  // physical extruder's own options — nozzle_diameter, retract_*, extruder_offset, wipe — stay.
+  const PER_FILAMENT_PRUSA = new Set([
+    'temperature', 'first_layer_temperature', 'bed_temperature', 'first_layer_bed_temperature', 'idle_temperature',
+    'chamber_temperature', 'chamber_minimal_temperature', 'fan_always_on', 'cooling', 'min_fan_speed', 'max_fan_speed',
+    'bridge_fan_speed', 'disable_fan_first_layers', 'full_fan_speed_layer', 'fan_below_layer_time',
+    'slowdown_below_layer_time', 'min_print_speed', 'start_filament_gcode', 'end_filament_gcode', 'extrusion_multiplier',
+    'enable_dynamic_fan_speeds', 'overhang_fan_speed_0', 'overhang_fan_speed_1', 'overhang_fan_speed_2',
+    'overhang_fan_speed_3', 'compatible_printers_condition_cummulative', 'compatible_prints_condition_cummulative',
+    'inherits_cummulative', 'extruder_colour',
+  ]);
+  const isPerFilamentPrusa = (k) => /^filament_/i.test(k) || PER_FILAMENT_PRUSA.has(k);
+
+  /**
+   * Split a PrusaSlicer vector value into its raw tokens, or null when it cannot be done safely.
+   *
+   * A string vector is `;`-separated and PrusaSlicer quotes an entry only when it has to: an
+   * empty entry is written bare, so `"Prusament PETG";;;;` is five entries and `"A";` is two.
+   * Each entry is either a quoted string (backslash escapes, `;` allowed inside — G-code) or
+   * bare text up to the next `;`; empty entries count, trailing ones included. Without quotes
+   * or `;` it is a numeric/bool vector, `,`-separated. Tokens keep their exact text so a rejoin
+   * changes nothing but the order.
+   */
+  function splitIniVector(raw) {
+    const v = raw.trim();
+    if (v.indexOf('"') < 0 && v.indexOf(';') < 0) return { parts: v.split(','), sep: ',' };
+    const parts = [];
+    let i = 0;
+    for (;;) {
+      let j = i;
+      if (v[i] === '"') {
+        j = i + 1;
+        while (j < v.length && v[j] !== '"') j += v[j] === '\\' ? 2 : 1;
+        if (j >= v.length) return null; // an unterminated quote
+        j++;
+        if (j < v.length && v[j] !== ';') return null; // text after a closing quote
+      } else {
+        while (j < v.length && v[j] !== ';') { if (v[j] === '"') return null; j++; }
+      }
+      parts.push(v.slice(i, j));
+      if (j >= v.length) break;
+      i = j + 1; // past the ';' — and an entry follows it, even an empty last one
+    }
+    return { parts, sep: ';' };
+  }
+
+  /**
+   * Reindex a PrusaSlicer config the same way. `ok` is false — and the text must then be left
+   * alone — when a per-filament value holds a number of entries other than 1 (one value for all)
+   * or n, because then there is no way to move it with its colour. Wiping volumes are reshaped
+   * like Bambu's flush matrix, and the *_extruder settings follow `idxMap`.
+   */
+  function reindexPrusaConfig(text, srcOf, n, idxMap) {
+    let bad = null;
+    const out = text.replace(/^([ \t]*;?[ \t]*)([A-Za-z0-9_]+)([ \t]*=[ \t]*)([^\r\n]*)$/gm, (all, pre, key, eq, val) => {
+      if (bad) return all;
+      if (key === 'wiping_volumes_matrix' || key === 'wiping_volumes_extruders') {
+        const a = val.trim().split(',');
+        const r = key === 'wiping_volumes_matrix' ? reshapeSquare(a, srcOf, n) : reshapePairs(a, srcOf, n);
+        return r ? pre + key + eq + r.join(',') : all;
+      }
+      if (idxMap && FILAMENT_INDEX_PRUSA.includes(key)) return pre + key + eq + remapIndexValue(val.trim(), idxMap);
+      if (!isPerFilamentPrusa(key) || !val.trim()) return all;
+      const sp = splitIniVector(val);
+      if (!sp) { bad = key; return all; }
+      if (sp.parts.length === 1) return all; // one value applies to every filament — nothing to move
+      if (sp.parts.length !== n) { bad = key; return all; }
+      return pre + key + eq + srcOf.map((i) => sp.parts[i]).join(sp.sep);
+    });
+    return bad ? { ok: false, bad, text } : { ok: true, text: out };
   }
 
   /** Parse the max X/Y of a printable_area polygon (["0x0","256x0",…]) → { x, y } bed size, or null. */
@@ -1390,7 +1727,10 @@
     try { mesh = mfMesh.extractMeshFromMembers(members); } catch (_) { return null; }
     if (!mesh || !mesh.faceState || !mesh.faceState.length) return null;
     const baseState = mesh.baseState >= 1 ? mesh.baseState : 1;
-    const bp = colorBands.detectColorBands(mesh.positions, mesh.faceState, baseState);
+    // Per plate, not per file: plates all stand at z=0, and slicing them together either hides a
+    // real banding or — worse — returns one plate's swap heights for all of them, which this then
+    // writes into the output as pauses. See lib/color-bands.js detectColorBandsForMesh.
+    const bp = colorBands.detectColorBandsForMesh(mesh, baseState);
     if (!bp.banded || bp.bands.length <= 1) return null;
     const meta = extractMeta(members);
     const layerHeight = meta && meta.layerHeight ? meta.layerHeight : undefined;
@@ -1414,16 +1754,10 @@
    * keys (that's Full Spectrum) — the M600 custom_gcode member carries the swaps instead.
    */
   function applyBandSwapConfig(obj, plan, srcCount, report) {
-    for (const k of Object.keys(obj)) {
-      // ONLY per-filament arrays. Reindexing every array whose length happens to equal the
-      // filament count corrupted unrelated config: a 4-filament model matches the FOUR
-      // CORNERS of printable_area, turning the bed rectangle into a self-intersecting
-      // bow-tie. remapJsonSettings (:474) already filters on ^filament_; this loop and
-      // applyFullSpectrumConfig did not.
-      if (!/^filament_/i.test(k)) continue;
-      const v = obj[k];
-      if (Array.isArray(v) && v.length === srcCount) obj[k] = plan.headSrcIdx.map((oldI) => (v[oldI] != null ? v[oldI] : v[0]));
-    }
+    // Per-filament settings by NAME (see reindexFilamentJson): a length test alone once matched
+    // printable_area's four corners on a four-filament model and turned the bed into a bow-tie.
+    // Filament numbers (support_filament…) follow each colour to its head, like the paint.
+    reindexFilamentJson(obj, plan.headSrcIdx, srcCount, plan.map);
     obj.filament_colour = plan.headColors.slice();
     if (report) {
       report.bandSwap = true;
@@ -1433,23 +1767,113 @@
   }
 
   /**
+   * The merge plan for "Merge to the nearest {n} slots", or null when it does not apply: not
+   * asked for, another colour plan or a manual slot map already owns the colours, the file fits,
+   * a colour is unknown, or the file is not the Bambu/Orca JSON dialect this can reindex.
+   * Usage comes from the same mesh tally Full Spectrum uses, so the most-painted colours keep
+   * their own slot; with no usage at all it falls back to merging the nearest pair.
+   */
+  function planMerge(members, filaments, target, opts, otherPlan, flavour) {
+    if (!opts || !opts.mergeToSlots || otherPlan) return null;
+    if (!fullSpectrum || !fullSpectrum.reduceColors) return null;
+    if (profiles.configFamily(flavour) !== 'bbl' || profiles.configFamily(target.flavour) !== 'bbl') return null;
+    const slots = target.maxColors;
+    if (!(slots >= 1) || filaments.length <= slots) return null;
+    const colors = filaments.map((f) => f.color);
+    if (colors.some((c) => !c)) return null;
+    // The palette must be the config's own: a palette read from slice_info or a full-spectrum
+    // JSON is a different length from the arrays this would reindex, and merging it would leave
+    // the config's colours, temperatures and paint describing different filaments.
+    const proj = tryJson(memberText(members, /project_settings\.config$/i));
+    if (!proj || !Array.isArray(proj.filament_colour) || proj.filament_colour.length !== colors.length) return null;
+    const usage = tallyPaintUsage(members, colors.length);
+    const r = fullSpectrum.reduceColors(colors, usage.some((u) => u > 0) ? usage : undefined, undefined, slots);
+    // One group per slot; the clamp is belt and braces, as in the reference.
+    const map = r.map.map((g) => Math.min(g, slots - 1));
+    // Each slot keeps the colour of the source that survived into it — and so its temperatures,
+    // fans and material too. (It used to take the lowest-numbered member's settings, which is not
+    // the colour it kept whenever a higher-numbered colour survived.)
+    const slotSrc = r.reps.slice();
+    return { map, colors: slotSrc.map((i) => normHex(colors[i])), slotSrc };
+  }
+
+  /**
+   * Apply a merge plan to project_settings.config: every per-filament array goes from the source
+   * count to the slot count (each slot taking its first member's value), and the merged colours
+   * are stamped. Per-filament arrays only, for the reason applyBandSwapConfig gives.
+   */
+  function applyMergeConfig(obj, plan, srcCount, report) {
+    reindexFilamentJson(obj, plan.slotSrc, srcCount, plan.map);
+    obj.filament_colour = plan.colors.slice();
+    if (report) {
+      report.colorsMerged = { from: srcCount, to: plan.colors.length };
+      report.fieldsChanged.push('filament_colour');
+    }
+  }
+
+  /**
    * Turn a source Bambu/Orca project_settings.config into a Full Spectrum U1 config: keep only the 4
    * physical filaments (reindex every per-filament array to them), stamp the loaded head colours, and
    * add the mixed_filament_definitions + dithering keys that realise the extra colours as mixes.
    */
-  function applyFullSpectrumConfig(obj, plan, srcCount, report) {
+  function applyFullSpectrumConfig(obj, plan, srcCount, report, opts) {
+    opts = opts || {};
     const keep = plan.physical; // 0-based source indices, length = slots
-    for (const k of Object.keys(obj)) {
-      // Per-filament arrays only — same reason as applyBandSwapConfig above: an unrelated
-      // array that happens to be srcCount long (printable_area's four corners) would be
-      // permuted into nonsense.
-      if (!/^filament_/i.test(k)) continue;
-      const v = obj[k];
-      if (Array.isArray(v) && v.length === srcCount) obj[k] = keep.map((oldI) => (v[oldI] != null ? v[oldI] : v[0]));
+    // Per-filament settings by name, as above, and filament numbers through the physical map:
+    // a support or wall filament that Full Spectrum turned into a mix has no filament of its
+    // own any more, so it goes to the head that carries most of that mix — and the maker is told.
+    const phys = physicalIndexMap(plan);
+    const mixedRefs = FILAMENT_INDEX_JSON.filter((k) => [].concat(obj[k]).some((v) => phys.clamped.has(parseInt(v, 10) - 1)));
+    reindexFilamentJson(obj, keep, srcCount, phys.map);
+    if (mixedRefs.length && report) {
+      report.warnings.push(`Full Spectrum mixes a colour that ${mixedRefs.join(', ')} used, so ${mixedRefs.length === 1 ? 'it now uses' : 'they now use'} the head that carries most of that mix. Check those settings in your slicer.`);
     }
     obj.filament_colour = plan.physicalHex.slice();
     obj.mixed_filament_definitions = fullSpectrum.serializeMixedDefs(plan.mixDefs);
     for (const [k, val] of Object.entries(fullSpectrum.MIXED_DITHERING_DEFAULTS)) obj[k] = val;
+
+    // The rest is bedready.io's withMixes (src/lib/convert.ts), learned from real mixed prints.
+    //
+    // "Subdivide Mix Layer" (dithering_local_z_mode): on by default — the U1 splits each layer
+    // into thinner sub-layers inside mixed areas for smoother blends — and off on request, for
+    // fewer tool changes and less purge.
+    if (opts.fsSubdivide === false) { obj.dithering_local_z_mode = '0'; obj.dithering_local_z_infill = '0'; }
+    // A fixed mixed-colour layer height re-slices the painted mixed zones at that height. It is
+    // the fixed-step pipeline, which excludes the adaptive one, so Subdivide goes off with it.
+    const mlh = Number(opts.fsMixedLayerHeight);
+    if (mlh > 0) {
+      obj.dithering_z_step_size = String(mlh);
+      obj.dithering_step_painted_zones_only = '1';
+      obj.dithering_local_z_mode = '0';
+      obj.dithering_local_z_infill = '0';
+    }
+    // Mixed zones lay two filaments down in alternating thin layers, run hotter and fuse supports
+    // more readily, so support interfaces get extra clearance. A floor only — a creator's larger
+    // gap is kept. (0.35 because a real print still fused at 0.3.)
+    if (!(parseFloat(obj.support_top_z_distance) >= 0.35)) obj.support_top_z_distance = '0.35';
+    if (!(parseFloat(obj.support_bottom_z_distance) >= 0.25)) obj.support_bottom_z_distance = '0.25';
+    // A mix swaps filament every dither step, which is a lot of purge. flush_into_* on dumped it
+    // into the model and the supports right beside the painted features — the ooze seen on real
+    // mixed prints. Off, the purge goes to the tower.
+    obj.flush_into_objects = '0';
+    obj.flush_into_infill = '0';
+    obj.flush_into_support = '0';
+    // ── AND MAKE ORCA KEEP ALL OF IT ──────────────────────────────────────────────────────
+    // When print_settings_id names a system preset, Orca rebuilds that preset on import and
+    // re-applies ONLY the keys listed in different_settings_to_system — everything else here,
+    // the mix definitions included, silently reverted to stock. lib/hueforge-3mf.js already pins
+    // its own keys for exactly this reason; this did not. Index 0 is the print-preset list (all of
+    // these are print-scoped), the array is filament count + 2 long, and whatever the source had
+    // declared there is kept. The per-filament entries are cleared, not carried: the filaments
+    // were just reindexed to the physical heads, so the source's positions no longer line up.
+    const pins = ['mixed_filament_definitions'].concat(Object.keys(fullSpectrum.MIXED_DITHERING_DEFAULTS),
+      ['support_top_z_distance', 'support_bottom_z_distance', 'flush_into_objects', 'flush_into_infill', 'flush_into_support']);
+    if (mlh > 0) pins.push('dithering_z_step_size');
+    const prev = Array.isArray(obj.different_settings_to_system) ? obj.different_settings_to_system : [];
+    const printDiffs = [...new Set(String(prev[0] || '').split(';').filter(Boolean).concat(pins))].sort();
+    const dss = new Array(obj.filament_colour.length + 2).fill('');
+    dss[0] = printDiffs.join(';');
+    obj.different_settings_to_system = dss;
     if (report) {
       report.fullSpectrum = true;
       report.fullSpectrumMixes = plan.mixDefs.length;
@@ -1525,6 +1949,170 @@
     if (machine.printer_model) obj.printer_model = machine.printer_model;
     if (procName) { obj.print_settings_id = procName; if (report) report.processPreset = procName; }
     if (report) { report.fieldsChanged.push('printer_gcode', 'process_settings'); report.u1Native = true; }
+    // What was overlaid, for the nozzle refit: a resolved PROCESS preset brings widths and layer
+    // heights already made for the target nozzle; the machine alone brings only its limits. It
+    // used to answer "yes" either way, so a machine without a process preset skipped the refit
+    // and kept the source nozzle's widths.
+    return proc && Object.keys(proc).length ? 'process' : 'machine';
+  }
+
+  // ── WHO WROTE THE FILE ───────────────────────────────────────────────────────────────────────
+  // Snapmaker Orca, like mainline OrcaSlicer and Bambu Studio, imports a 3MF as a full project —
+  // colours, painting, plates, object assignments — only when the root model's
+  // <metadata name="Application"> starts with a producer it trusts. Anything else ("Creality_Print
+  // V6…", Cura, …) loads as "geometry data only", every colour dropped, even when the configs this
+  // converter just wrote are perfect. Rewriting the producer to an OrcaSlicer- string makes Orca
+  // trust the project. Ported from bedready.io (forceOrcaGenerator, verified there against
+  // OrcaSlicer/CrealityPrint Format/bbs_3mf.cpp).
+  const ORCA_GENERATOR = 'OrcaSlicer-2.1.1';
+  const TRUSTED_GENERATORS = /^(BambuStudio-|OrcaSlicer-|SnapmakerOrca-)/;
+  const APPLICATION_RE = /(<metadata\s+name="Application"[^>]*>)([^<]*)(<\/metadata>)/;
+
+  /**
+   * The root model with an Orca-trusted producer, as `{ text, from }`, or null when it already
+   * has one, has none, or never crossed into this process (a host passing the mesh by name). Only
+   * the head of the file is searched — the producer sits in the opening metadata — so a large
+   * mesh is not turned into one enormous string just to be told it is fine.
+   */
+  function forceOrcaGenerator(member) {
+    if (!member || member.data == null) return null;
+    const head = typeof member.data === 'string' ? member.data.slice(0, 65536)
+      : member.data.subarray(0, 65536).toString('utf8');
+    const m = APPLICATION_RE.exec(head);
+    if (!m || TRUSTED_GENERATORS.test(m[2].trim())) return null;
+    let text;
+    try { text = member.data.toString('utf8'); } catch (_) { return null; } // past V8's string limit: leave it
+    return { text: text.replace(APPLICATION_RE, (_a, open, _old, close) => open + ORCA_GENERATOR + close), from: m[2].trim() };
+  }
+
+  // ── VARIABLE LAYER HEIGHT ON THE U1 ─────────────────────────────────────────────────────────
+  /** A Snapmaker-Orca target: the built-in U1, or a profile resolved from its machine catalogue. */
+  function isSnapmakerOrca(target) {
+    return target.flavour === 'orca' && (!!target.supportsMixedFilament || /snapmaker/i.test(String(target.orcaMachine || target.printerModel || '')));
+  }
+
+  /**
+   * Pin print-preset keys in different_settings_to_system[0] so Orca KEEPS these overrides on
+   * import instead of rebuilding the named system preset and reverting them, merged with whatever
+   * the file already declared. Format: a (filament count + 2) array, index 0 the print-preset list.
+   * Ported from bedready.io pinProcessKeys.
+   */
+  function pinProcessKeys(obj, keys) {
+    if (!keys.length) return;
+    const filCount = Array.isArray(obj.filament_colour) ? obj.filament_colour.length : 4;
+    const prev = Array.isArray(obj.different_settings_to_system) ? obj.different_settings_to_system : [];
+    const merged = [...new Set(String(prev[0] || '').split(';').filter(Boolean).concat(keys))].sort();
+    const dss = new Array(Math.max(filCount + 2, prev.length)).fill('');
+    for (let i = 1; i < prev.length; i++) dss[i] = prev[i] || '';
+    dss[0] = merged.join(';');
+    obj.different_settings_to_system = dss;
+  }
+
+  /**
+   * Snapmaker Orca refuses to slice variable layer height with a prime tower or tree supports, so a
+   * VLH file converted for it came out unsliceable. Tower off, tree → normal (keeping the
+   * (auto)/(manual) suffix), both pinned or Orca puts the tower straight back on import. The VLH
+   * profile itself is kept. `keepPrimeTowerVlh` skips this. Ported from bedready.io applyVlhGuard.
+   */
+  function applyVlhGuard(obj, report) {
+    const pins = [];
+    if (String(obj.enable_prime_tower) !== '0') { obj.enable_prime_tower = '0'; pins.push('enable_prime_tower'); }
+    if (typeof obj.support_type === 'string' && obj.support_type.startsWith('tree')) {
+      obj.support_type = obj.support_type.replace(/^tree/, 'normal');
+      pins.push('support_type');
+    }
+    if (!pins.length) return;
+    pinProcessKeys(obj, pins);
+    if (report) {
+      report.vlhGuard = true;
+      report.fieldsChanged.push(...pins);
+      report.warnings.push('This model uses variable layer height, which Snapmaker Orca cannot slice with a prime tower or tree supports — the prime tower was turned off and tree supports switched to normal.');
+    }
+  }
+
+  // ── NOZZLE REFIT ─────────────────────────────────────────────────────────────────────────────
+  // A retarget writes the target's nozzle_diameter, but line widths and layer heights are process
+  // settings and arrive from the source untouched. So a 0.6-nozzle file converted for a 0.4 printer
+  // claimed a 0.4 nozzle while asking for 0.63 mm extrusions — silently. Ported from bedready.io's
+  // applyNozzleFit (src/lib/convert.ts): scale the nozzle-dependent values by target/source, and
+  // hold layer height inside 20–80% of the new nozzle (the band its reference profile declares).
+  // A matched nozzle changes nothing, a percentage is already nozzle-relative and is left alone,
+  // and 0 (Prusa's "auto") stays auto. Not applied when the installed slicer's own process preset
+  // was overlaid — that preset is already for the target nozzle.
+  const NOZZLE_FIT_KEYS = ['line_width', 'initial_layer_line_width', 'inner_wall_line_width', 'outer_wall_line_width',
+    'internal_solid_infill_line_width', 'sparse_infill_line_width', 'support_line_width',
+    'top_surface_line_width', 'layer_height', 'initial_layer_print_height'];
+  const NOZZLE_FIT_KEYS_PRUSA = ['extrusion_width', 'first_layer_extrusion_width', 'perimeter_extrusion_width',
+    'external_perimeter_extrusion_width', 'infill_extrusion_width', 'solid_infill_extrusion_width',
+    'top_infill_extrusion_width', 'support_material_extrusion_width', 'layer_height', 'first_layer_height'];
+  // The per-extruder machine limits move with the nozzle by the same ratio, keeping the source's
+  // own proportion (bedready reads them off its reference profile; this has none to read).
+  const NOZZLE_LIMIT_KEYS = ['max_layer_height', 'min_layer_height'];
+  const LAYER_KEYS = new Set(['layer_height', 'initial_layer_print_height', 'first_layer_height']);
+  const LAYER_MIN_RATIO = 0.2, LAYER_MAX_RATIO = 0.8;
+
+  /** The first nozzle a config declares — a list per extruder, uniform in practice — or NaN. */
+  function nozzleNumber(v) {
+    return parseFloat(String(Array.isArray(v) ? v[0] : v).split(/[,;]/)[0]);
+  }
+
+  /**
+   * One refitted value, or null for "leave it". `s` is the value as written; the result keeps
+   * the string-or-number form it came in.
+   */
+  function refitValue(key, s, from, to) {
+    if (s == null || Array.isArray(s)) return null;
+    const str = String(s);
+    if (str.includes('%')) return null;
+    const n = parseFloat(str);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    let next = Math.round(n * (to / from) * 100) / 100;
+    if (LAYER_KEYS.has(key)) next = Math.min(+(to * LAYER_MAX_RATIO).toFixed(2), Math.max(+(to * LAYER_MIN_RATIO).toFixed(2), next));
+    return next === n ? null : next;
+  }
+
+  /** Refit a Bambu/Orca JSON config in place from nozzle `from` to `to`. */
+  function applyNozzleFit(obj, from, to, report, fitOpts) {
+    if (!(from > 0) || !(to > 0) || Math.abs(from - to) < 0.001) return;
+    const limits = !fitOpts || fitOpts.limits !== false;
+    const note = (k, a, b) => { if (report) { (report.nozzleFit = report.nozzleFit || []).push({ key: k, from: String(a), to: String(b) }); report.fieldsChanged.push(k); } };
+    for (const k of NOZZLE_FIT_KEYS) {
+      const next = refitValue(k, obj[k], from, to);
+      if (next == null) continue;
+      note(k, obj[k], next);
+      obj[k] = typeof obj[k] === 'string' ? String(next) : next;
+    }
+    for (const k of limits ? NOZZLE_LIMIT_KEYS : []) {
+      if (!(k in obj)) continue;
+      const fit = (v) => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? (typeof v === 'string' ? String(Math.round(n * (to / from) * 100) / 100) : Math.round(n * (to / from) * 100) / 100) : v; };
+      const before = JSON.stringify(obj[k]);
+      obj[k] = Array.isArray(obj[k]) ? obj[k].map(fit) : fit(obj[k]);
+      if (before !== JSON.stringify(obj[k])) note(k, before, JSON.stringify(obj[k]));
+    }
+  }
+
+  /** The same refit on a PrusaSlicer config's text, keeping each line's prefix. */
+  function applyNozzleFitIni(text, from, to, report) {
+    if (!(from > 0) || !(to > 0) || Math.abs(from - to) < 0.001) return text;
+    for (const k of NOZZLE_FIT_KEYS_PRUSA) {
+      const r = iniSet(text, k, (old) => {
+        const next = refitValue(k, old, from, to);
+        if (next == null) return old;
+        if (report) { (report.nozzleFit = report.nozzleFit || []).push({ key: k, from: old, to: String(next) }); report.fieldsChanged.push(k); }
+        return String(next);
+      });
+      text = r.text;
+    }
+    // The per-extruder limits too, entry by entry and by the same ratio — a 0.6 profile's 0.45 mm
+    // ceiling is not a 0.4 nozzle's. `0` (no limit) stays.
+    for (const k of NOZZLE_LIMIT_KEYS) {
+      text = iniSet(text, k, (old) => {
+        const next = old.split(',').map((v) => { const x = parseFloat(v); return Number.isFinite(x) && x > 0 ? String(Math.round(x * (to / from) * 100) / 100) : v.trim(); }).join(',');
+        if (next !== old && report) { (report.nozzleFit = report.nozzleFit || []).push({ key: k, from: old, to: next }); report.fieldsChanged.push(k); }
+        return next;
+      }).text;
+    }
+    return text;
   }
 
   /** Rewrite known Bambu→Orca-incompatible enum values in a project_settings.config object in place. */
@@ -1614,7 +2202,29 @@
     } else {
       // Retarget: rewrite the JSON/text settings for the target printer + optional remap.
       const n = filaments.length;
-      const slotMap = Array.isArray(opts.slotMap) && opts.slotMap.length === n ? opts.slotMap : null;
+      let slotMap = Array.isArray(opts.slotMap) && opts.slotMap.length === n ? opts.slotMap : null;
+      // A slot past the file's own filaments has no colour, material or temperature to give it —
+      // the picker offers the printer's slots, which can outnumber the file's colours. Moving paint
+      // there wrote states and extruders past the end of filament_colour; growing every
+      // per-filament array to fit would mean inventing a filament. Nothing is moved instead, and
+      // the maker is told to place it in the slicer.
+      if (slotMap && slotMap.some((t) => !Number.isInteger(t) || t < 0 || t >= n)) {
+        const far = Math.max(...slotMap.filter(Number.isInteger)) + 1;
+        report.warnings.push(`The colour assignment uses slot ${far}, but this file has only ${n} filament${n === 1 ? '' : 's'}, so colours were left in their original slots. Reassign them in your slicer.`);
+        slotMap = null;
+      }
+      // PrusaSlicer's config can only move as a whole: every per-filament value has to split into
+      // exactly one entry per filament. Worked out before anything is rewritten, so a config that
+      // cannot move leaves the paint where it is too.
+      let prusaReindexed = null;
+      if (slotMap && flavour === 'prusa') {
+        const r = reindexPrusaConfig(memberText(members, CFG_PRUSA) || '', srcOfSlotMap(slotMap, n), n, slotMap);
+        if (r.ok) prusaReindexed = r.text;
+        else {
+          report.warnings.push(`Colours were left in their original slots: this PrusaSlicer project's "${r.bad}" setting could not be matched to its ${n} filaments. Reassign the colours in PrusaSlicer.`);
+          slotMap = null;
+        }
+      }
 
       // Band-swap: a cleanly vertically-banded painted model keeps ALL colours exactly by mapping each to a
       // physical head + M600 pauses (opt-in, U1 only). When active it supersedes Full Spectrum — the two are
@@ -1626,6 +2236,65 @@
       const fsPlan = bandPlan ? null : planFS(members, filaments, target, opts);
       // The active paint plan (band-swap or Full Spectrum) — both expose stateMap + map with the same shape.
       const paintPlan = bandPlan || fsPlan;
+
+      // "Merge to the nearest {n} slots" (opts.mergeToSlots): more colours than the target has
+      // slots, and no mixing or swapping asked for. Folds the least-used colours into their
+      // nearest-looking neighbour until they fit (fullSpectrum.reduceColors, ported from
+      // bedready.io). Only for a same-family Bambu/Orca file — the JSON config is the one this
+      // can reindex — and never under a manual slot map, which is the maker's own decision.
+      let mergePlan = planMerge(members, filaments, target, opts, paintPlan || slotMap, flavour);
+
+      // ── THE PLAIN COLOUR → SLOT MAP REACHES THE PAINT TOO ─────────────────────────────
+      // A slot map used to reorder the filament_* arrays and nothing else. On a PAINTED model
+      // the colours live in the mesh — each triangle's paint code names a filament by number —
+      // and on an object-coloured one in each object's `extruder`. Neither was touched, so the
+      // palette moved and the paint still pointed at the old numbers: every colour landed on
+      // somebody else's slot. bedready.io's retargetThreeMF remaps all three with one map
+      // (remapPaintCode / remapExtruders / stateMap, its #39); so does this now. 0 is "the
+      // object's own filament" and stays 0 — the object's extruder is remapped instead.
+      let plainMap = paintPlan ? null : (mergePlan ? mergePlan.map : slotMap);
+      // Variable layer height travels as one of these two members; see applyVlhGuard.
+      const hasVLH = members.some((mm) => /(^|\/)(layer_config_ranges\.xml|layer_heights_profile\.txt)$/i.test(mm.name));
+
+      // ── ALL OF THE PAINT MOVES, OR NONE OF IT ─────────────────────────────────────────
+      // The mesh's paint, each object's extruder and the colour changes are rewritten together
+      // or not at all, and decided BEFORE anything is written: a file whose model_settings moved
+      // while its mesh could not (a host passing the mesh by name, a paint code that would not
+      // re-encode, a palette that is not the config's) says two different things about the same
+      // object.
+      //
+      // And when they cannot move, NOTHING moves — the config included. Reindexing the palette
+      // and its temperatures while an object stays on extruder 1 prints that object in another
+      // filament's colour at another filament's temperature (red PLA at 220 became green PETG at
+      // 250), which is worse than not reassigning at all. The one safe exception is a file shown
+      // to have no paint: then the config and the objects' extruders move together. A mesh that
+      // never crossed into this process cannot be shown to have none, so that is refused too.
+      let paintRewrites = null, paintBlocked = null;
+      if (plainMap && plainMap.some((t, i) => t !== i)) {
+        const proj = tryJson(memberText(members, /project_settings\.config$/i));
+        const projCount = proj && Array.isArray(proj.filament_colour) ? proj.filament_colour.length : null;
+        if (flavour !== 'prusa' && projCount !== n) paintBlocked = 'palette';
+        else if (proj && hasVariantArrays(proj, n)) paintBlocked = 'variants';
+        else if (members.some((mm) => /\.model$/i.test(mm.name) && mm.data == null)) paintBlocked = 'mesh';
+        else {
+          const stateMap = (st) => (st >= 1 && st <= n ? plainMap[st - 1] + 1 : st);
+          paintRewrites = new Map();
+          try {
+            for (const mm of members) {
+              if (!/\.model$/i.test(mm.name)) continue;
+              const text = mm.data.toString('utf8');
+              // Unpainted geometry is left as it was, still compressed — byte-identical.
+              if (/(paint_color|mmu_segmentation)="/.test(text)) paintRewrites.set(mm.name, remapModelPaint(text, { stateMap }));
+            }
+          } catch (_) { paintBlocked = 'encode'; paintRewrites = null; } // a slot past the paint encoding, or text past V8's limit
+        }
+      }
+      // A merge cannot leave the paint behind: states past the new slot count would point at
+      // nothing. So a merge whose paint cannot move does not happen at all.
+      let mergeDropped = false, slotMapDropped = false;
+      if (paintBlocked && mergePlan) { mergePlan = null; plainMap = null; mergeDropped = true; }
+      if (paintBlocked && slotMap) { slotMap = null; prusaReindexed = null; plainMap = null; slotMapDropped = true; }
+      const plainMoves = !!paintRewrites;
 
       // Re-profiling only makes sense within one config family (Bambu/Orca share a JSON
       // dialect; Prusa is separate). Across families we can't produce a coherent file by
@@ -1648,15 +2317,26 @@
         }
         if (paintPlan && /model_settings\.config$/i.test(m.name) && !tryJson(m.data.toString('utf8'))) {
           // Bambu model_settings.config is XML: <metadata key="extruder" value="N"/> (1-based).
-          const text = m.data.toString('utf8').replace(
-            /(key="extruder"\s+value=")(\d+)(")/g,
-            (_a, pre, num, post) => { const old = parseInt(num, 10); const ni = old >= 1 && old <= paintPlan.map.length ? paintPlan.map[old - 1] + 1 : old; return `${pre}${ni}${post}`; });
+          // Each object's extruder through the plan (a mixed filament is a valid object colour);
+          // its support / wall filament numbers through the plan's PHYSICAL map.
+          const text = remapIndexText(m.data.toString('utf8'), physicalIndexMap(paintPlan).map, paintPlan.map);
           return { name: m.name, data: text };
+        }
+        if (plainMoves && paintRewrites.has(m.name)) return { name: m.name, data: paintRewrites.get(m.name) };
+        if (plainMoves && m.data != null && (/custom_gcode_per_(layer|print_z)\.xml$/i.test(m.name) || /layer_config_ranges\.xml$/i.test(m.name)
+          || (/(model_settings|Slic3r_PE_model)\.config$/i.test(m.name) && !tryJson(m.data.toString('utf8'))))) {
+          // Bambu model_settings.config / Prusa Slic3r_PE_model.config are XML: each object's and
+          // part's extruder and filament settings (1-based) follow the same map, and so do the
+          // colour changes and layer ranges that name an extruder.
+          const before = m.data.toString('utf8'), after = remapIndexText(before, plainMap);
+          return after === before ? m : { name: m.name, data: after };
         }
         if (/project_settings\.config$/i.test(m.name) || /model_settings\.config$/i.test(m.name)) {
           const text = m.data.toString('utf8');
           const obj = tryJson(text);
           if (obj) {
+            // The source's own nozzle, read before the re-profile below overwrites it.
+            const srcNozzle = nozzleNumber(obj.nozzle_diameter);
             // Re-profile fields (same-family only).
             if (reprofile) {
               if (target.printerModel) { obj.printer_model = target.printerModel; report.fieldsChanged.push('printer_model'); }
@@ -1679,20 +2359,30 @@
             }
             // Overlay the real machine + process settings (from the installed slicer) so the printer
             // G-code and print settings are native — runs before Full Spectrum so mix keys win.
-            if (/project_settings\.config$/i.test(m.name) && target.flavour === 'orca') applyOrcaNative(obj, opts, target, report);
+            const native = /project_settings\.config$/i.test(m.name) && target.flavour === 'orca' && applyOrcaNative(obj, opts, target, report);
+            // Widths and layer heights follow a changed nozzle — unless the installed slicer's
+            // process preset was just overlaid, which is already the target nozzle's own.
+            if (reprofile && native !== 'process' && target.nozzle && /project_settings\.config$/i.test(m.name)) {
+              // With the machine overlaid, max/min_layer_height are already the target machine's own.
+              applyNozzleFit(obj, srcNozzle, Number(target.nozzle), report, { limits: native !== 'machine' });
+            }
             // Band-swap / Full Spectrum own the colour mapping (only meaningful on project_settings, which
             // holds the filament palette + mixed-filament keys); otherwise apply the plain colour→slot remap.
             if (bandPlan && /project_settings\.config$/i.test(m.name)) {
               applyBandSwapConfig(obj, bandPlan, n, report);
             } else if (fsPlan && /project_settings\.config$/i.test(m.name)) {
-              applyFullSpectrumConfig(obj, fsPlan, n, report);
+              applyFullSpectrumConfig(obj, fsPlan, n, report, opts);
+            } else if (mergePlan && /project_settings\.config$/i.test(m.name)) {
+              applyMergeConfig(obj, mergePlan, n, report);
             } else if (slotMap && !paintPlan) {
-              report.colorsRemapped += remapJsonSettings(obj, slotMap, n);
+              // Every per-filament setting and every filament number moves with its colour.
+              report.colorsRemapped += reindexFilamentJson(obj, srcOfSlotMap(slotMap, n), n, slotMap);
             }
             // Snapmaker Orca rejects a few Bambu enum spellings — normalise them so it opens clean.
             if (/project_settings\.config$/i.test(m.name) && target.flavour === 'orca') {
               applyOrcaValueSafety(obj, report);
               applyOrcaFilaments(obj, opts, report); // real Orca filament presets (+ per-slot picks)
+              if (hasVLH && isSnapmakerOrca(target) && !opts.keepPrimeTowerVlh) applyVlhGuard(obj, report);
             }
             return { name: m.name, data: JSON.stringify(obj, null, 4) };
           }
@@ -1716,27 +2406,59 @@
         }
         if (CFG_PRUSA.test(m.name)) {
           let text = m.data.toString('utf8');
+          // iniSet keeps each line's own prefix: PrusaSlicer writes `; key = value`, and a
+          // writer anchored on the bare key changed nothing in a real file while every one
+          // of these fields was still reported as rewritten. A field is reported only when
+          // the line was really there to rewrite.
+          const set = (key, value, field) => {
+            const r = iniSet(text, key, value);
+            text = r.text;
+            if (r.hit && field) report.fieldsChanged.push(field);
+            return r.hit;
+          };
           if (reprofile) {
-            if (target.printerModel) { text = text.replace(/^printer_model\s*=.*$/im, `printer_model = ${target.printerModel}`); report.fieldsChanged.push('printer_model'); }
-            if (target.nozzle) text = text.replace(/^nozzle_diameter\s*=.*$/im, `nozzle_diameter = ${target.nozzle}`);
+            if (target.printerModel) set('printer_model', target.printerModel, 'printer_model');
+            // The exact preset name and its variant, when the profile carries them — for the
+            // reason the Bambu branch writes printer_settings_id: PrusaSlicer matches a project to
+            // an installed printer by name, and a stale "Original Prusa MK3S" keeps the old one.
+            if (target.printerSettingsId) set('printer_settings_id', target.printerSettingsId, 'printer_settings_id');
+            if (target.printerVariant) set('printer_variant', target.printerVariant, 'printer_variant');
+            // One value PER EXTRUDER, as many as the line already had: PrusaSlicer counts a
+            // project's extruders from this list, so writing a single `0.4` over an MMU's
+            // `0.4,0.4,0.4,0.4,0.4` would quietly turn a five-colour project into one.
+            if (target.nozzle) {
+              const srcNozzle = nozzleNumber(iniValue(text, 'nozzle_diameter'));
+              set('nozzle_diameter', (old) => (old ? old.split(',').map(() => target.nozzle).join(',') : String(target.nozzle)), 'nozzle_diameter');
+              text = applyNozzleFitIni(text, srcNozzle, Number(target.nozzle), report);
+            }
             if (target.bed) {
               const { x, y, z } = target.bed;
-              text = text.replace(/^bed_shape\s*=.*$/im, `bed_shape = 0x0,${x}x0,${x}x${y},0x${y}`);
-              report.fieldsChanged.push('bed_shape');
-              if (z) { text = text.replace(/^max_print_height\s*=.*$/im, `max_print_height = ${z}`); report.fieldsChanged.push('max_print_height'); }
+              set('bed_shape', `0x0,${x}x0,${x}x${y},0x${y}`, 'bed_shape');
+              if (z) set('max_print_height', String(z), 'max_print_height');
             }
           }
-          if (slotMap) {
-            text = text.replace(/^(filament_colou?r\s*=\s*)([#0-9a-fA-F;,\s]+)$/im, (_all, pre, val) => {
-              const cols = val.split(/;/).map((s) => s.trim()).filter(Boolean);
-              return cols.length === n ? pre + permute(cols, slotMap).join(';') : _all;
-            });
-            report.colorsRemapped += 1;
+          if (slotMap && prusaReindexed != null) {
+            // Every per-filament option, extruder_colour, the wiping volumes and the *_extruder
+            // settings, together (reindexPrusaConfig). Checked on the source up front; the
+            // re-profile above touched only printer and process keys, so it still holds here.
+            const r = reindexPrusaConfig(text, srcOfSlotMap(slotMap, n), n, slotMap);
+            if (r.ok && r.text !== text) { text = r.text; report.colorsRemapped += 1; }
           }
           return { name: m.name, data: text };
         }
         return m;
       });
+
+      // A foreign producer string makes Orca load geometry only — see forceOrcaGenerator.
+      if (reprofile && target.flavour === 'orca') {
+        const ri = out.findIndex((mm) => /(^|\/)3D\/3dmodel\.model$/i.test(mm.name));
+        const fixed = ri >= 0 ? forceOrcaGenerator(out[ri]) : null;
+        if (fixed) {
+          out[ri] = { name: out[ri].name, data: fixed.text };
+          report.producerRewritten = fixed.from;
+          report.fieldsChanged.push('Application');
+        }
+      }
 
       // Re-tile the multi-plate object layout when the target bed size differs from the source's, so
       // plates stay centred instead of drifting to the edge. Operates on the already-rewritten output.
@@ -1771,8 +2493,21 @@
           (sw ? ` with ${sw} manual filament swap(s) — M600 pauses were added at the swap heights. Load the head colours shown and swap the spool when ${target.name} pauses.` : ' — no manual swaps needed (fits the heads).'));
       } else if (fsPlan) {
         report.warnings.push(`Full Spectrum: kept ${target.maxColors} filaments physical and reproduced ${n - target.maxColors} extra colour(s) as ${fsPlan.mixDefs.length} dithered mix(es). Load the ${target.maxColors} head colours shown; ${target.name} prints the rest by mixing.`);
+      } else if (mergePlan) {
+        report.warnings.push(`Merged ${n} colours into the nearest ${mergePlan.colors.length} for ${target.name}: the least-used colours now print in the closest-looking slot. Check the colours in your slicer before printing.`);
       } else if (target.maxColors && n > target.maxColors) {
         report.warnings.push(`Source uses ${n} colours but ${target.name} supports ${target.maxColors}. Extra colours will need manual mapping in your slicer.`);
+      }
+      if (paintBlocked) {
+        // Why, in words that fit a file whether it is painted or coloured per object.
+        const why = {
+          mesh: 'this app could not read the model to move its colours with them',
+          palette: 'the file\'s colour list does not match its filament settings',
+          variants: 'this file keeps several values per filament (one per nozzle type), which this converter does not reorder yet',
+          encode: 'the model\'s colour data could not be rewritten for the new slots',
+        }[paintBlocked];
+        if (mergeDropped) report.warnings.push(`Colours were not merged: ${why}. ${target.name} supports ${target.maxColors} colours — map the extra ones in your slicer.`);
+        if (slotMapDropped) report.warnings.push(`Colours were left in their original slots: ${why}. Reassign them in your slicer${paintBlocked === 'mesh' ? ', or convert the file in Khayt' : ''}.`);
       }
       const bounds = computeBounds(members);
       if (bounds) { report.bounds = bounds; for (const w of fitWarnings(bounds, target)) report.warnings.push(w); }
@@ -1809,7 +2544,8 @@
       const back = analyze(zipped);
       // Full Spectrum / band-swap reduce the palette to the physical heads (FS mixes are virtual; band-swap
       // folds colours onto heads), so the round-trip colour count is the target's slot count, not the source's.
-      const expectColours = (report.fullSpectrum || report.bandSwap) ? (target.maxColors || filaments.length) : filaments.length;
+      const expectColours = (report.fullSpectrum || report.bandSwap) ? (target.maxColors || filaments.length)
+        : report.colorsMerged ? report.colorsMerged.to : filaments.length;
       const coloursOk = mode === 'normalize' ? true : back.colorCount === expectColours;
       report.verified = !!(back && back.ok && back.hasGeometry && coloursOk);
     } catch (_) { report.verified = false; }
@@ -1863,7 +2599,7 @@
     try { mesh = mfMesh.extractMeshFromMembers(members); } catch (_) { return { available: false }; }
     if (!mesh || !mesh.faceState || !mesh.faceState.length) return { available: false };
     const baseState = mesh.baseState >= 1 ? mesh.baseState : 1;
-    const plan = colorBands.detectColorBands(mesh.positions, mesh.faceState, baseState);
+    const plan = colorBands.detectColorBandsForMesh(mesh, baseState); // per plate — see planBandSwap
     const palette = Array.isArray(mesh.palette) ? mesh.palette.slice() : [];
     const base = {
       available: true,

@@ -156,3 +156,10 @@ test('bad input returns null, never throws', () => {
     ['parts with no geometry', { parts: [{ head: 0, triangles: [] }] }],
   ]) assert.equal(M3.buildFlatU1_3mf(arg), null, why + ' should return null');
 });
+
+test('the parts file carries the <build/> the 3MF core spec requires', () => {
+  // Same omission as the relief's object part, same fix (bedready.io, validated with lib3mf).
+  const parts = open(build()).text('3D/Objects/object_1.model');
+  assert.match(parts, /<\/resources><build\/><\/model>$/);
+  assert.doesNotMatch(parts, /<item\b/);
+});

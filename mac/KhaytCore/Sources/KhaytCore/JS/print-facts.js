@@ -130,9 +130,18 @@ function effective(objects, key, projectValue) {
   return { value: seen[0], varies: seen.length > 1 };
 }
 
-/** `key = value` out of a PrusaSlicer config, or null. */
+/**
+ * `key = value` out of a PrusaSlicer config, or null.
+ *
+ * The optional `;` is the whole point: PrusaSlicer writes the settings block of
+ * a 3MF's `Slic3r_PE.config` commented out, `; layer_height = 0.2`, so a reader
+ * anchored on the bare key read nothing from a real file. Only a `;` and spaces
+ * may sit before the key, which keeps `physical_printer_settings_id` from
+ * answering for `printer_settings_id`. Same rule as `iniValue` in
+ * lib/mf-convert.js (ported from bedready.io).
+ */
 function ini(text, key) {
-  const re = new RegExp('^[ \\t]*' + key + '[ \\t]*=[ \\t]*(.*)$', 'm');
+  const re = new RegExp('^[ \\t]*;?[ \\t]*' + key + '[ \\t]*=[ \\t]*(.*)$', 'm');
   const m = re.exec(String(text || ''));
   return m ? m[1].trim() : null;
 }

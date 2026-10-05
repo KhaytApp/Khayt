@@ -26,6 +26,8 @@
  *   bed          build volume {x,y,z} mm
  *   nozzle       default nozzle diameter mm
  *   printerModel vendor printer_model identifier written into project settings
+ *   printerSettingsId  exact slicer preset name (printer_settings_id), when known
+ *   printerVariant     PrusaSlicer printer_variant — the nozzle variant the preset name carries
  *   gcodeFlavour target g-code flavour hint
  *   system       name of the multicolour system (for UI copy)
  */
@@ -59,10 +61,37 @@ const PROFILES = [
     maxColors: 4, bed: { x: 256, y: 256, z: 256 }, nozzle: 0.4,
     printerModel: 'Bambu Lab A1', gcodeFlavour: 'marlin', system: 'AMS lite',
   },
+  // The MMU3 machines and the CORE One INDX: identity from Prusa's own PrusaResearch 2.5.10 profile
+  // bundle ([printer_model:MK4ISMMU3|MK4SMMU3|COREONE_INDX8T|COREONE_INDX4T] and the matching
+  // [printer:…] presets), copied exactly from bedready.io's src/lib/targets.ts, which read them
+  // there. printerSettingsId is the preset name PrusaSlicer matches a project to an installed
+  // printer by; printerVariant is the nozzle variant that name carries.
   {
     id: 'prusa-mk4-mmu3', name: 'Prusa MK4 + MMU3', vendor: 'Prusa Research', flavour: 'prusa',
     maxColors: 5, bed: { x: 250, y: 210, z: 220 }, nozzle: 0.4,
-    printerModel: 'MK4ISMMU3', gcodeFlavour: 'marlin', system: 'MMU3 5-colour',
+    printerModel: 'MK4ISMMU3', printerSettingsId: 'Original Prusa MK4 MMU3 0.4 nozzle', printerVariant: '0.4',
+    gcodeFlavour: 'marlin', system: 'MMU3 5-colour',
+  },
+  {
+    id: 'prusa-mk4s-mmu3', name: 'Prusa MK4S + MMU3', vendor: 'Prusa Research', flavour: 'prusa',
+    maxColors: 5, bed: { x: 250, y: 210, z: 220 }, nozzle: 0.4,
+    printerModel: 'MK4SMMU3', printerSettingsId: 'Original Prusa MK4S MMU3 0.4 nozzle', printerVariant: '0.4',
+    gcodeFlavour: 'marlin', system: 'MMU3 5-colour',
+  },
+  // The CORE One INDX toolchanger in both configurations. `prusaColorMix` is carried as bedready.io
+  // has it (PrusaSlicer FullSpectrum virtual extruders on a toolchanger); nothing in this engine
+  // reads it yet — a Bambu/Orca → PrusaSlicer project is not something this converter writes.
+  {
+    id: 'prusa-core-one-indx-8t', name: 'Prusa CORE One INDX 8T', vendor: 'Prusa Research', flavour: 'prusa',
+    maxColors: 8, bed: { x: 248, y: 205, z: 270 }, nozzle: 0.4,
+    printerModel: 'COREONE_INDX8T', printerSettingsId: 'Prusa CORE One INDX 8T HF0.4 nozzle', printerVariant: 'HF0.4',
+    prusaColorMix: true, gcodeFlavour: 'marlin', system: 'INDX 8 toolheads',
+  },
+  {
+    id: 'prusa-core-one-indx-4t', name: 'Prusa CORE One INDX 4T', vendor: 'Prusa Research', flavour: 'prusa',
+    maxColors: 4, bed: { x: 248, y: 205, z: 270 }, nozzle: 0.4,
+    printerModel: 'COREONE_INDX4T', printerSettingsId: 'Prusa CORE One INDX 4T HF0.4 nozzle', printerVariant: 'HF0.4',
+    prusaColorMix: true, gcodeFlavour: 'marlin', system: 'INDX 4 toolheads',
   },
   {
     id: 'prusa-xl-5t', name: 'Prusa XL (5 toolheads)', vendor: 'Prusa Research', flavour: 'prusa',

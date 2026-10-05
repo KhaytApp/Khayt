@@ -24,19 +24,36 @@ const bodyOf = (fnName) => {
   return src.slice(i, src.indexOf('\n  }', i));
 };
 
-for (const fn of ['applyBandSwapConfig', 'applyFullSpectrumConfig']) {
-  test(`${fn} only reindexes per-filament arrays`, () => {
-    const body = bodyOf(fn);
-    assert.ok(/\^filament_/i.test(body),
-      `${fn} reindexes any array of the right length — printable_area's 4 corners get permuted ` +
-      `into a self-intersecting bed outline on any 4-filament model`);
-    // The guard must come BEFORE the length-matched assignment.
-    const guardAt = body.search(/\^filament_/i);
-    const assignAt = body.search(/v\.length === srcCount/);
-    assert.ok(guardAt !== -1 && assignAt !== -1 && guardAt < assignAt,
-      `${fn}: the ^filament_ guard must precede the reindex`);
+// Both now delegate to reindexFilamentJson, which picks per-filament arrays by NAME (an
+// explicit set plus ^filament_) — so the guard is checked there, and each caller must use it
+// rather than a loop of its own.
+for (const fn of ['applyBandSwapConfig', 'applyFullSpectrumConfig', 'applyMergeConfig']) {
+  test(`${fn} reindexes through the per-filament name filter`, () => {
+    assert.match(bodyOf(fn), /reindexFilamentJson\(/, `${fn} reindexes with a loop of its own`);
   });
 }
+
+test('reindexFilamentJson filters by name before it looks at length', () => {
+  const body = bodyOf('reindexFilamentJson');
+  const guardAt = body.search(/isPerFilamentJson\(k\) && v\.length === n/);
+  assert.ok(guardAt !== -1, 'the per-filament name test must gate the length-matched reindex');
+});
+
+test('a four-filament Full Spectrum conversion leaves printable_area alone', () => {
+  const { writeZip } = require('../lib/zip-write');
+  const { openZip } = require('../lib/zip-read');
+  const { convert } = require('../lib/mf-convert');
+  const area = ['0x0', '256x0', '256x256', '0x256'];
+  const r = convert(writeZip([
+    { name: '3D/3dmodel.model', data: '<?xml version="1.0"?><model unit="millimeter"><resources><object id="1"/></resources></model>' },
+    { name: 'Metadata/project_settings.config', data: JSON.stringify({
+      printer_model: 'X1C', printable_area: area, nozzle_diameter: ['0.4'],
+      filament_colour: ['#FF0000', '#00AA00', '#0000FF', '#FFFF00', '#FF00FF'], filament_type: ['PLA', 'PLA', 'PLA', 'PLA', 'PLA'],
+    }) },
+  ]), { targetId: 'ignored', targetProfile: { id: 'c-mix', name: 'Mix', flavour: 'bambu', maxColors: 4, supportsMixedFilament: true, printerModel: 'Mix' }, fullSpectrum: true });
+  assert.equal(r.report.fullSpectrum, true);
+  assert.deepEqual(JSON.parse(openZip(r.buffer).file('Metadata/project_settings.config').toString()).printable_area, area);
+});
 
 test('the per-filament filter keeps the reindex working', () => {
   // Behavioural check on the same logic, so the guard cannot be "fixed" by disabling it.

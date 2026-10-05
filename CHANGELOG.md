@@ -4,6 +4,62 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Converter fixes from bedready.io.**
+  - PrusaSlicer files are read and rewritten for real. PrusaSlicer writes its
+    settings as `; key = value`, and the converter only understood the bare
+    form, so a Prusa→Prusa conversion changed nothing while listing the
+    printer, nozzle and bed as changed, and the source printer showed blank.
+    An MMU project keeps one nozzle per extruder.
+  - Small hostile 3MFs can no longer freeze or exhaust the app: a triangle
+    tag that never closes is read in linear time, a component graph that
+    doubles per level stops at a fixed budget in the preview, measuring and
+    STL export, and a mesh whose zip header claims a size of zero is charged
+    what it really inflates to.
+  - Reassigning colours to slots now moves a painted model's paint and each
+    object's colour with them. Before, only the palette moved, so every
+    painted area printed in another slot's colour. Each filament's material,
+    temperatures, fan settings and purge volumes move with its colour, and
+    settings such as the support filament follow it. A slot beyond the
+    file's own colours is not applied; you are told to place it in your
+    slicer. When the colours cannot be moved together with the model (for
+    example a large model in the Mac app), nothing is reassigned and the
+    report says why. Full Spectrum and band-swap also move the support and
+    wall filament settings to the right head.
+  - "Merge to the nearest {n} slots" in batch conversion now merges. A file
+    with more colours than the printer has slots used to convert with a
+    warning and nothing merged. The least-used colours now go to the
+    closest-looking slot, paint included.
+  - Band-swap checks each plate on its own. A multi-plate file whose plates
+    change colour at different heights used to get one plate's pause heights
+    written into the file for all of them; it is now left without pauses and
+    the reason names the plates. So is a file whose plates change colour at
+    the same heights but in different colours. Plates that agree on both
+    keep their plan.
+  - Full Spectrum files keep their mixes when opened in Snapmaker Orca. The
+    mix settings are now marked as changed from the printer's preset, so
+    Orca no longer resets them to stock. Mixed areas also get extra support
+    clearance, and their purge goes to the wipe tower instead of into the
+    model and supports.
+  - Converting for a printer with a different nozzle size also adjusts line
+    widths and layer heights to suit it. A 0.6 mm file converted for a 0.4 mm
+    printer used to ask for 0.63 mm lines. Settings taken from your installed
+    slicer's own process preset are left as they are; when only its printer
+    profile is found, line widths are still adjusted. PrusaSlicer files also
+    get their minimum and maximum layer heights adjusted.
+  - Files made in Creality Print and other slicers now open in Snapmaker Orca
+    as full projects with their colours and plates. Before, Orca loaded only
+    the shape.
+  - Variable layer height files converted for the Snapmaker U1 now slice:
+    the prime tower is turned off and tree supports become normal supports,
+    which Snapmaker Orca requires, and the change is listed in the report.
+  - HueForge 3MFs for the Snapmaker U1 follow the 3MF standard: each model
+    part now has the build element the standard requires, so strict readers
+    no longer refuse the file with "Build item not found".
+  - New converter targets: Prusa MK4S + MMU3, and Prusa CORE One INDX with 8
+    or 4 toolheads. Converting for a Prusa MMU3 or INDX printer now also
+    writes the exact PrusaSlicer printer preset name and nozzle variant, so
+    PrusaSlicer matches the project to the right installed printer.
+
 - **(Bed Ready) Browse, download from and publish to the MakerRun catalogue.**
   - **Browse MakerRun** (a new home card, and a button in the MakerRun library
     panel) searches the public makerrun.com catalogue without signing in:

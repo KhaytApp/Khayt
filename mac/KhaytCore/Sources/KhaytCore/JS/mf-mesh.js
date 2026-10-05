@@ -96,7 +96,12 @@
         if (!info || !info.vols.length) return block;
         const extOf = (t) => { for (const v of info.vols) if (t >= v.first && t <= v.last) return v.extruder; return info.objExtruder; };
         let t = -1;
-        return block.replace(/<triangle\b([^>]*?)\s*\/>/g, (tri, attrs) => {
+        // Linear on purpose: `([^>]*?)\s*\/>` let both halves match whitespace, so a run of
+        // spaces with no "/>" backtracked quadratically — bedready.io measured a 903-byte file
+        // holding the thread for 15 s (its #38, 2026-10-02 security review). One greedy group
+        // that cannot overlap anything after it, and the trailing spaces trimmed afterwards.
+        return block.replace(/<triangle\b([^>]*)\/>/g, (tri, rawAttrs) => {
+          const attrs = rawAttrs.trimEnd();
           t++;
           if (/paint_color=|mmu_segmentation=/.test(attrs)) return tri;
           changed = true;
@@ -156,6 +161,10 @@
   // only genuinely enormous meshes get sampled, and only the truly impractical are skipped.
   const PREVIEW_BUDGET = 4_000_000;
   const HARD_CAP = 30_000_000;
+  // Component-graph nodes one extraction may visit, across every root and instance. See `walk`.
+  // Real projects visit thousands; the emit pass legitimately visits every leaf instance, which
+  // is itself capped at two million below, so this sits above that with room for the assemblies.
+  const MAX_WALK_VISITS = 4_000_000;
   const TRI_RE = /<triangle[ />]/g;
   const IDENTITY4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
   function transform12to16(t) {
@@ -290,8 +299,17 @@
     // more faces than the typed arrays were sized for (silently discarded) and advertising
     // `parts` ranges many times larger than the buffers, which any consumer slicing by
     // part.start/end would read past.
+    //
+    // A TOTAL visit budget as well as the depth cap. The depth cap stops cycles but not fan-out:
+    // objects that each reference the next one twice double the work per level, and subtree()'s
+    // instance cap only counts LEAVES — so a branch that doubles for thirty levels and ends in
+    // nothing, beside one real mesh, passed every check and walked 2^30 empty nodes (24 levels
+    // took six seconds here; bedready.io's #38 has 22 levels in 513 bytes at 41 s). Over the
+    // budget, the walk stops and the extraction reports `skipped`, like any other too-large model.
+    let visits = 0, overBudget = false;
     const walk = (path, oid, M, depth, onLeaf, seen) => {
-      if (depth > 64) return;
+      if (depth > 64 || overBudget) return;
+      if (++visits > MAX_WALK_VISITS) { overBudget = true; return; }
       const key = path + '\u0000' + oid;
       if (seen && seen.has(key)) return;                 // cycle — stop this branch
       const node = (files.get(path) || new Map()).get(oid);
@@ -403,6 +421,7 @@
       partRanges.push({ name: rootName[ri], objectId: r.objectid, start: fc });
       walk(r.path, r.objectid, r.transform, 0, (node, M, leafOid) => emit(node.mesh, M, idToExtr.get(leafOid) != null ? idToExtr.get(leafOid) : rootBase[ri]));
     });
+    if (overBudget) return emptyMesh(true);
     const parts = partRanges.map((pr, i) => {
       const end = i + 1 < partRanges.length ? partRanges[i + 1].start : fc;
       return { name: pr.name, objectId: pr.objectId, start: pr.start, end, triangleCount: end - pr.start };
@@ -438,7 +457,7 @@
     return extractMeshFromMembers(members, maxFaces, hardCap);
   }
 
-  const api = { extractMeshFromMembers, extractMeshFromBuffer, dominantState, hexToBits, bitsToHex, encodeSolidPaint, normalizeHex, paletteFromFullSpectrum, recipesFromFullSpectrum, fullSpectrumFromMembers, unitScale, PREVIEW_BUDGET, HARD_CAP };
+  const api = { extractMeshFromMembers, extractMeshFromBuffer, dominantState, hexToBits, bitsToHex, encodeSolidPaint, normalizeHex, paletteFromFullSpectrum, recipesFromFullSpectrum, fullSpectrumFromMembers, unitScale, PREVIEW_BUDGET, HARD_CAP, MAX_WALK_VISITS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') global.KhaytMfMesh = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
