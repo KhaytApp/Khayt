@@ -75,7 +75,7 @@ struct ClientsView: View {
                     .font(.khayt(15, .semibold, relativeTo: .headline))
                     .foregroundStyle(KhaytDesign.ink)
                 Text(errorMessage ?? (searchText.isEmpty ? L10n.tr("clients.none.sub")
-                                      : String(format: L10n.tr("clients.no_match.sub"), searchText)))
+                                      : L10n.format("clients.no_match.sub", searchText)))
                     .font(.khayt(13, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.note)
             }
@@ -100,7 +100,7 @@ struct ClientsView: View {
     /// the whole order history did too.
     private var windowLine: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(String(format: L10n.tr("clients.window.count"), clients.count.formatted()))
+            Text(L10n.format("clients.window.count", clients.count.formatted()))
                 .font(.khayt(12.5, .semibold, relativeTo: .footnote).monospacedDigit())
                 .foregroundStyle(KhaytDesign.ink)
             if totalsByName == nil {
@@ -171,7 +171,7 @@ private struct ClientRow: View {
                     .font(.khayt(15, .medium, relativeTo: .body))
                     .foregroundStyle(KhaytDesign.ink)
                     .lineLimit(1)
-                Text(String(format: L10n.tr("clients.open"), open.formatted()))
+                Text(L10n.format("clients.open", open.formatted()))
                     .font(.khayt(12.5, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.note)
             }

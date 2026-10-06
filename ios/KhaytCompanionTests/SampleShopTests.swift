@@ -37,7 +37,23 @@ final class SampleShopTests: XCTestCase {
         let pulse = try await BookReader(book: book).pulse()
         XCTAssertGreaterThan(pulse.owed, 0)
         XCTAssertNotNil(pulse.thisMonth, "a whole book answers the month")
+        // Four finished, paid jobs inside the last six weeks: a reviewer's
+        // first screen must not say the shop earned nothing this year.
+        XCTAssertGreaterThan(pulse.thisYear ?? 0, 0, "year=\(String(describing: pulse.thisYear)) month=\(String(describing: pulse.thisMonth))")
         XCTAssertEqual(pulse.currency, "USD")
+    }
+
+    /// A phone set to Saudi Arabia runs Umm al-Qura. Home keyed this month as
+    /// "1448-04" against the P&L's "2026-10" rows and showed 0 and 0.
+    func testASaudiPhonesCalendarStillCountsTheShopsMoney() async throws {
+        var hijri = Calendar(identifier: .islamicUmmAlQura)
+        hijri.timeZone = TimeZone(identifier: "Asia/Riyadh")!
+        let reader = BookReader(book: book)
+        let saudi = try await reader.pulse(calendar: hijri)
+        let plain = try await reader.pulse(calendar: Calendar(identifier: .gregorian))
+        XCTAssertGreaterThan(saudi.thisYear ?? 0, 0)
+        XCTAssertEqual(saudi.thisYear, plain.thisYear)
+        XCTAssertEqual(saudi.thisMonth, plain.thisMonth)
     }
 
     func testTheSamplePrintersMoveWithTheClock() {
@@ -47,5 +63,31 @@ final class SampleShopTests: XCTestCase {
         XCTAssertEqual(printing.count, 2)
         for r in printing { XCTAssertTrue((1...100).contains(r.progress ?? -1)) }
         XCTAssertNotEqual(a.first?.progress, b.first?.progress, "ten minutes later it has moved")
+    }
+
+    /// The sample shop has no address and no sign-in, by design. The gate in
+    /// front of the tabs once asked for one of the two, so the button wrote
+    /// the book and the phone stayed on the pairing screen.
+    @MainActor
+    func testOpeningTheSampleShopGetsPastPairing() {
+        let defaults = UserDefaults.standard
+        let keys = ["khayt.host", "khayt.paired", "khayt.sampleShop"]
+        let saved = keys.map { defaults.object(forKey: $0) }
+        defer {
+            for (key, value) in zip(keys, saved) {
+                if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+            }
+        }
+        let settings = ConnectionSettings()
+        settings.host = ""
+        settings.isPaired = true
+        settings.isSampleShop = false
+        XCTAssertFalse(ContentView.hasAShop(settings: settings, signedInToCloud: false),
+                       "paired to nothing is not a shop")
+        settings.isSampleShop = true
+        XCTAssertTrue(ContentView.hasAShop(settings: settings, signedInToCloud: false))
+        settings.unpair()
+        XCTAssertFalse(ContentView.hasAShop(settings: settings, signedInToCloud: false),
+                       "leaving the sample shop goes back to pairing")
     }
 }

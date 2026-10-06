@@ -4,6 +4,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: a UI pass in English, Arabic and dark mode.** Four things a shop
+  would have seen:
+  - **"Explore with a sample shop" opened nothing.** It wrote the sample book
+    and left the phone on the pairing screen, because the gate in front of the
+    tabs wanted a Mac address or a cloud sign-in. Beta review is sent in this
+    way.
+  - **Every Saudi phone read "This month 0 / This year 0" on Home.** A phone set
+    to Saudi Arabia runs the Umm al-Qura calendar, so the month was keyed
+    "1448-04" against the P&L's "2026-10" rows. Home now counts in Gregorian,
+    as the Mac does.
+  - **Arabic screens mixed Western and Arabic-Indic digits** ("5 غير مدفوع"
+    under "٥١٥", "١٢٠ g" beside "180 غ"), and due dates showed as "2026-10-07".
+    Numbers, the gram unit and due dates ("٧ أكتوبر", "7 Oct") now follow the
+    app's language. A test fails on a new bare `String(format:)` or a literal
+    " g".
+  - **A black spool vanished on the dark theme;** the swatch's ring is now
+    visible on both.
+
 - **iOS: delete a spool, log waste and file an expense with the Mac switched
   off — and with the Mac app at all.** The native Mac serves none of
   `DELETE /api/inventory`, `POST /api/waste` or `POST /api/expense`, so on a

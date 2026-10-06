@@ -17,9 +17,7 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            // Paired with a Mac, or set up from Khayt Cloud alone — either is a
-            // way home, and a phone with one of them has a shop to show.
-            if settings.isPaired && (settings.isConfigured || api.cloud != nil) {
+            if Self.hasAShop(settings: settings, signedInToCloud: api.cloud != nil) {
                 MainTabView(selectedTab: $selectedTab, tabs: tabs)
             } else {
                 PairingView()
@@ -29,6 +27,15 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { applyPendingTab() }
         }
+    }
+
+    /// Paired with a Mac, set up from Khayt Cloud alone, or opened on the
+    /// sample shop — each is a shop to show. The sample shop has neither an
+    /// address nor a sign-in by design, and before it was named here the
+    /// "Explore with a sample shop" button wrote its book and then left the
+    /// phone on the pairing screen, which is where beta review is sent in.
+    static func hasAShop(settings: ConnectionSettings, signedInToCloud: Bool) -> Bool {
+        settings.isPaired && (settings.isConfigured || signedInToCloud || settings.isSampleShop)
     }
 
     private func applyPendingTab() {

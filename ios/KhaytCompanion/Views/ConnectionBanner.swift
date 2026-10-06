@@ -71,11 +71,11 @@ struct ConnectionBanner: View {
         }
     }
 
-    private var pending: String { String(format: L10n.tr("sync.pending"), api.pendingCount) }
+    private var pending: String { L10n.format("sync.pending", api.pendingCount) }
 
     private var asOf: String {
         let when = api.bookAsOf.map { $0.formatted(date: .omitted, time: .shortened) } ?? "—"
-        return String(format: L10n.tr("connection.as_of"), when)
+        return L10n.format("connection.as_of", when)
     }
 
     private func strip(tint: Color, loud: Bool, title: String, line: String?, action: Bool) -> some View {

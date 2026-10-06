@@ -33,7 +33,7 @@ struct WriteNFCTagSheet: View {
                     VStack(spacing: 0) {
                         previewRow(L10n.tr("nfc.write.material"), draft.material.isEmpty ? "—" : draft.material)
                         if !draft.brand.isEmpty { previewRow(L10n.tr("nfc.write.brand"), draft.brand) }
-                        previewRow(L10n.tr("nfc.write.weight"), "\(draft.weightGrams) g")
+                        previewRow(L10n.tr("nfc.write.weight"), L10n.grams(draft.weightGrams))
                         if !draft.printTemp.isEmpty { previewRow(L10n.tr("nfc.write.print_temp"), "\(draft.printTemp) °C") }
                         if !draft.bedTemp.isEmpty { previewRow(L10n.tr("nfc.write.bed_temp"), "\(draft.bedTemp) °C") }
                     }

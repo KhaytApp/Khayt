@@ -42,7 +42,7 @@ struct JobCard: View {
         var parts = [order.displayClient]
         if let facts {
             if let m = facts.material { parts.append(m) }
-            if let q = facts.quantity { parts.append("×\(q)") }
+            if let q = facts.quantity { parts.append("×" + q.formatted(.number.locale(L10n.locale))) }
         } else if let machine = order.machine, !machine.isEmpty {
             parts.append(machine)
         }
@@ -83,7 +83,7 @@ struct JobCard: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityAction(named: next.map { String(format: L10n.tr("order.detail.move_to"), $0.localizedLabel) } ?? "") {
+        .accessibilityAction(named: next.map { L10n.format("order.detail.move_to", $0.localizedLabel) } ?? "") {
             if next != nil { onAdvance() }
         }
     }

@@ -62,7 +62,7 @@ struct SettingsView: View {
         if health.macInReach {
             headline = L10n.tr("settings.mac_in_reach")
         } else if let asOf = api.bookAsOf {
-            headline = String(format: L10n.tr("settings.mac_away_since"), asOf.formatted(date: .omitted, time: .shortened))
+            headline = L10n.format("settings.mac_away_since", asOf.formatted(date: .omitted, time: .shortened))
         } else {
             headline = L10n.tr("settings.mac_away")
         }
@@ -132,7 +132,7 @@ struct SettingsView: View {
             if t != k { return t }
             return key.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression).lowercased()
         }
-        return String(format: L10n.tr("settings.not_sent"), ListFormatter.localizedString(byJoining: names))
+        return L10n.format("settings.not_sent", ListFormatter.localizedString(byJoining: names))
     }
 
     private var languagePicker: some View {
@@ -208,7 +208,8 @@ struct SettingsView: View {
                     if let err = settings.hostValidationError {
                         Text(err).font(.khayt(12, relativeTo: .caption)).foregroundStyle(KhaytDesign.late)
                     }
-                    Stepper(String(format: L10n.tr("settings.port"), settings.port), value: $settings.port, in: 1024...65535)
+                    // A port is part of an address, written as the IP beside it is: Western digits.
+                    Stepper(String(format: L10n.tr("settings.port"), locale: Locale(identifier: "en_US_POSIX"), settings.port), value: $settings.port, in: 1024...65535)
                     SecureField(L10n.tr("settings.pin"), text: $settings.pin)
                     Button {
                         Task { await testConnection() }
@@ -298,8 +299,7 @@ struct SettingsView: View {
                 settingRow(L10n.tr("cloud.role")) { value(session.role) }
                 if let mark = api.lastSync {
                     settingRow(L10n.tr("cloud.last_sync")) {
-                        value(String(format: L10n.tr(mark.route == .cloud ? "cloud.via_cloud" : "cloud.via_mac"),
-                                     mark.at.formatted(date: .omitted, time: .shortened)))
+                        value(L10n.format(mark.route == .cloud ? "cloud.via_cloud" : "cloud.via_mac", mark.at.formatted(date: .omitted, time: .shortened)))
                     }
                 }
                 if let problem = api.cloudProblem {
@@ -363,7 +363,7 @@ struct SettingsView: View {
         do {
             let status = try await api.validatePairing()
             testOK = true
-            testResult = String(format: L10n.tr("pair.verify.ok"), status.queued)
+            testResult = L10n.format("pair.verify.ok", status.queued)
             await health.refresh()
         } catch {
             testOK = false

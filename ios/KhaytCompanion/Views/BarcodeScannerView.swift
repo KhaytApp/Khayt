@@ -157,7 +157,7 @@ struct BarcodeScannerView: View {
             Button {
                 finishCapture()
             } label: {
-                Label(String(format: L10n.tr("scan.use_text"), capturedLines.count), systemImage: "checkmark.circle.fill")
+                Label(L10n.format("scan.use_text", capturedLines.count), systemImage: "checkmark.circle.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)

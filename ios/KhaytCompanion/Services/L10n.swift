@@ -77,8 +77,24 @@ enum L10n {
     /// set to Arabic otherwise gets English's two forms — "إضافة 2 بكرة"
     /// where Arabic says "إضافة بكرتين".
     static func count(_ key: String, _ n: Int) -> String {
-        let locale = currentLanguage.locale ?? Locale.current
-        return String(format: tr(key), locale: locale, n)
+        String(format: tr(key), locale: locale, n)
+    }
+
+    /// The app's language as a locale — what every number and date is written in.
+    static var locale: Locale { currentLanguage.locale ?? Locale.current }
+
+    /// `String(format:)` in the app's language. A bare `String(format: tr(k), n)`
+    /// writes `n` in Western digits whatever the language, beside SwiftUI
+    /// `Text` interpolation that writes Arabic-Indic — so one Arabic screen
+    /// read "5 غير مدفوع" over "٥١٥". The desktop writes Arabic-Indic
+    /// throughout, and so does this.
+    static func format(_ key: String, _ args: CVarArg...) -> String {
+        String(format: tr(key), locale: locale, arguments: args)
+    }
+
+    /// "640 g" / "٦٤٠ غ" — the number and the unit both in the app's language.
+    static func grams(_ n: Int) -> String {
+        "\(n.formatted(.number.locale(locale).grouping(.never))) \(tr("unit.g"))"
     }
 }
 

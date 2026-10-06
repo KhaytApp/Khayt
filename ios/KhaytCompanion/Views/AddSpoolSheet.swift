@@ -507,7 +507,7 @@ struct TagPreviewCard: View {
                 }
             }
             HStack(spacing: 12) {
-                if let w = tag.weight { meta(L10n.tr("spool.tag.weight"), "\(w) g") }
+                if let w = tag.weight { meta(L10n.tr("spool.tag.weight"), L10n.grams(w)) }
                 if let p = tag.printTemp { meta(L10n.tr("spool.tag.print"), "\(p)°C") }
                 if let b = tag.bedTemp { meta(L10n.tr("spool.tag.bed"), "\(b)°C") }
             }

@@ -42,7 +42,7 @@ struct QuoteSheet: View {
                     eyebrow(L10n.tr("quote.part"))
                     V2FieldCard {
                         HStack(spacing: 0) {
-                            numberField(L10n.tr("quote.weight"), $printWeight, unit: "g")
+                            numberField(L10n.tr("quote.weight"), $printWeight, unit: L10n.tr("unit.g"))
                             divider
                             numberField(L10n.tr("quote.time"), $printTime, unit: "h")
                             divider
