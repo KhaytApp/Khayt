@@ -361,6 +361,8 @@
 "error.record_not_added" = "That record could not be added to the book.";
 "error.empty_book" = "The Mac sent an empty book. Nothing was changed on this phone.";
 "error.project_required" = "Project name is required.";
+"error.no_such_spool" = "That spool is no longer on this phone's shelf.";
+"error.amount_required" = "Amount is required.";
 "error.partial_add" = "Added %1$d of %2$d spools, then: %3$@";
 "error.unexpected_spool" = "Unexpected response adding spool";
 "error.invalid_order_id" = "Invalid order ID.";

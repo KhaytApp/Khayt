@@ -299,4 +299,124 @@ final class OfflineWriteTests: XCTestCase {
         XCTAssertEqual(try record("printLog", "O-1")["status"], .string("completed"),
                        "the higher revision wins, as it does everywhere else")
     }
+
+    // MARK: - Deleting, waste and expenses
+
+    /// The native Mac serves no `DELETE /api/inventory`, so this is the only way
+    /// a spool deleted on the phone is deleted at all for a shop on it.
+    func testDeletingASpoolLeavesATombstoneAndTheMacTakesItOff() async throws {
+        let macCopy = try book.read()
+        try writer.deleteSpool(id: "S-1")
+
+        guard case .array(let shelf)? = try book.read()["inventory"] else { return XCTFail() }
+        XCTAssertTrue(shelf.isEmpty)
+        guard case .array(let tombs)? = try book.read()["tombstones"], case .object(let t)? = tombs.first else {
+            return XCTFail("no tombstone: the removal would never reach the Mac")
+        }
+        XCTAssertEqual(t["collection"], .string("inventory"))
+        XCTAssertEqual(t["rev"], .number(1), "the rev the phone saw, which the conflict check measures")
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        XCTAssertEqual(outbox.tombstones.count, 1)
+        let engine = try await reader.sharedEngine()
+        let folded = try await engine.foldDeltas(base: macCopy, deltas: [outbox.wire]).store
+        guard case .array(let macShelf)? = folded["inventory"] else { return XCTFail() }
+        XCTAssertTrue(macShelf.isEmpty, "the Mac's copy lost the spool too")
+    }
+
+    func testDeletingASpoolThisPhoneDoesNotHoldWritesNothing() throws {
+        XCTAssertThrowsError(try writer.deleteSpool(id: "S-gone")) {
+            XCTAssertEqual($0 as? BookWriter.Refusal, .noSuchSpool)
+        }
+        XCTAssertNil(try book.read()["tombstones"], "no tombstone for a record never seen")
+    }
+
+    private func waste(grams: Double, deduct: Bool, material: String = "PLA") -> WasteEntry {
+        WasteEntry(material: material, failureType: "spaghetti", weight: grams, cost: 4.5,
+                   reason: "  lifted off the bed ", notes: "", machineId: "M-1", deduct: deduct)
+    }
+
+    func testLoggingWasteFilesItUnderTheShopsDayAndItReachesTheMac() async throws {
+        let macCopy = try book.read()
+        let made = try writer.logWaste(waste(grams: 40, deduct: false))
+
+        XCTAssertEqual(made.entry["date"], .string(BookWriter.localDay(Date())))
+        XCTAssertEqual(made.entry["reason"], .string("lifted off the bed"), "trimmed, as the endpoint trims")
+        XCTAssertNil(made.deducted)
+        XCTAssertEqual(try record("inventory", "S-1")["weight"], .number(640), "not asked to deduct")
+        guard case .string(let id)? = made.entry["id"] else { return XCTFail() }
+        XCTAssertTrue(id.hasPrefix("w-"), "the endpoint's own id shape")
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        let engine = try await reader.sharedEngine()
+        let folded = try await engine.foldDeltas(base: macCopy, deltas: [outbox.wire]).store
+        guard case .array(let log)? = folded["wasteLog"] else {
+            return XCTFail("the Mac never got the waste: \(folded.keys)")
+        }
+        XCTAssertEqual(log.count, 1)
+    }
+
+    /// The endpoint deducts from `weight`; the phone reads `remaining` first,
+    /// so all three names move or the shelf shows the old figure.
+    func testDeductingWasteMovesAllThreeNamesForWhatIsLeft() throws {
+        let made = try writer.logWaste(waste(grams: 40, deduct: true))
+        XCTAssertEqual(made.deducted, "S-1")
+        let spool = try record("inventory", "S-1")
+        XCTAssertEqual(spool["weight"], .number(600))
+        XCTAssertEqual(spool["remaining"], .number(600))
+        XCTAssertEqual(spool["weightRemaining"], .number(600))
+        XCTAssertEqual(spool["rev"], .number(2), "stamped, so the deduction travels too")
+    }
+
+    func testWasteNeverTakesASpoolBelowZero() throws {
+        try writer.logWaste(waste(grams: 5_000, deduct: true))
+        XCTAssertEqual(try record("inventory", "S-1")["weight"], .number(0))
+    }
+
+    func testWasteOfAMaterialNotOnTheShelfDeductsNothing() throws {
+        let made = try writer.logWaste(waste(grams: 40, deduct: true, material: "PETG"))
+        XCTAssertNil(made.deducted)
+        XCTAssertEqual(try record("inventory", "S-1")["weight"], .number(640))
+    }
+
+    func testWasteWithNoMaterialIsRefused() {
+        XCTAssertThrowsError(try writer.logWaste(waste(grams: 40, deduct: false, material: "  "))) {
+            XCTAssertEqual($0 as? BookWriter.Refusal, .noMaterial)
+        }
+    }
+
+    func testAnExpenseWithoutAReceiptIsARecordThatReachesTheMac() async throws {
+        let macCopy = try book.read()
+        let made = try writer.addExpense(ExpenseDraft(amount: 120, category: "", note: "nozzles",
+                                                      receiptBase64: nil))
+        XCTAssertEqual(made["category"], .string("other"), "the endpoint's default")
+        XCTAssertEqual(made["receiptPath"], .null)
+        XCTAssertEqual(made["date"], .string(BookWriter.localDay(Date())))
+
+        let produced = try await reader.pendingChanges()
+        let outbox = try XCTUnwrap(produced)
+        let engine = try await reader.sharedEngine()
+        let folded = try await engine.foldDeltas(base: macCopy, deltas: [outbox.wire]).store
+        guard case .array(let expenses)? = folded["expenses"] else { return XCTFail("\(folded.keys)") }
+        XCTAssertEqual(expenses.count, 1)
+    }
+
+    func testAnExpenseOfNothingIsRefused() {
+        XCTAssertThrowsError(try writer.addExpense(ExpenseDraft(amount: 0, category: "x", note: "",
+                                                                receiptBase64: nil))) {
+            XCTAssertEqual($0 as? BookWriter.Refusal, .noAmount)
+        }
+    }
+
+    /// Sent, then pulled: the Mac's working set carries no `wasteLog`, and that
+    /// must not read as the phone deleting the entry.
+    func testAPullAfterSendingWasteDoesNotDeleteIt() async throws {
+        try writer.logWaste(waste(grams: 40, deduct: false))
+        try book.markSynced()
+        try await reader.adopt(shop(), scope: nil)
+        let outbox = try await reader.pendingChanges()
+        XCTAssertEqual(outbox?.tombstones.count ?? 0, 0, "absence after a pull is not a deletion")
+    }
 }

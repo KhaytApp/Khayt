@@ -79,6 +79,10 @@ struct BookWriter {
         case noProject
         case recordHasNoId
         case idTaken
+        /// A spool this book does not hold — gone already, or never sent.
+        case noSuchSpool
+        /// An expense of nothing, which the endpoint answers 400.
+        case noAmount
 
         var errorDescription: String? {
             switch self {
@@ -90,6 +94,10 @@ struct BookWriter {
                 return L10n.tr("error.project_required")
             case .recordHasNoId, .idTaken:
                 return L10n.tr("error.record_not_added")
+            case .noSuchSpool:
+                return L10n.tr("error.no_such_spool")
+            case .noAmount:
+                return L10n.tr("error.amount_required")
             }
         }
     }
@@ -181,6 +189,145 @@ struct BookWriter {
                                   "rev": .number(rev), "deletedAt": .string(when)]))
             root["tombstones"] = .array(tombs)
         }
+    }
+
+    // MARK: - Taking a roll off the shelf
+
+    /// Delete a spool, as `DELETE /api/inventory/:id` does.
+    ///
+    /// ── THE TOMBSTONE IS WRITTEN FOR US, AND THAT IS THE POINT ───────────
+    ///
+    /// `StoreWriter.update` records a tombstone for every record a write
+    /// removes (#1609), carrying the rev the phone last saw. So removing the
+    /// row is the whole of it: `changesToSend` sends the tombstone, and the
+    /// Mac's `applyDeltas` takes the spool off — or, if someone edited it
+    /// there since, keeps the edit and reports the conflict.
+    ///
+    /// This used to be a network call only, and the native Mac serves no
+    /// `DELETE /api/inventory` at all — so for a shop on the Mac app the
+    /// button answered 404 every time.
+    ///
+    /// A spool that is not in the book is not "deleted": nothing is written,
+    /// and the caller is told, rather than a tombstone being minted for a
+    /// record this phone has never seen.
+    func deleteSpool(id: String) throws {
+        var found = false
+        try book.update { root in
+            guard case .array(var rows)? = root["inventory"],
+                  let at = rows.firstIndex(where: {
+                      if case .object(let o) = $0, o["id"] == .string(id) { return true }
+                      return false
+                  }) else { return }
+            rows.remove(at: at)
+            root["inventory"] = .array(rows)
+            found = true
+        }
+        if !found { throw Refusal.noSuchSpool }
+    }
+
+    // MARK: - Waste and expenses
+
+    /// Log a failed print, as `POST /api/waste` does — the record, the shop's
+    /// calendar day, and the optional deduction, in ONE write.
+    ///
+    /// ── THE DEDUCTION IS THE ENDPOINT'S, PLUS THE OTHER TWO NAMES ────────
+    ///
+    /// The endpoint takes the grams off the FIRST spool of that material, from
+    /// `weight`, floored at zero. Same here, inside the same write as the
+    /// entry, so the two cannot land apart. What it does not do is write
+    /// `remaining` and `weightRemaining` — and on this phone `InventorySpool`
+    /// reads those first, so a deduction written to `weight` alone would show
+    /// the old figure on the shelf. All three are set, as
+    /// `setSpoolRemaining` sets them.
+    ///
+    /// `wasteLog` is not part of the phone's working set. That does not matter
+    /// for sending — `changesToSend` sends any record the baseline has never
+    /// seen, and the Mac's fold accepts a collection by name — and once the
+    /// Mac has it, the next pull simply does not bring it back.
+    @discardableResult
+    func logWaste(_ entry: WasteEntry, now: Date = Date()) throws -> (entry: [String: JSONValue], deducted: String?) {
+        let material = String(entry.material.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
+        guard !material.isEmpty else { throw Refusal.noMaterial }
+        func text(_ s: String, _ max: Int = 500) -> String {
+            String(s.trimmingCharacters(in: .whitespacesAndNewlines).prefix(max))
+        }
+        func pos(_ v: Double) -> Double { v.isFinite ? max(0, v) : 0 }
+        let failure = text(entry.failureType, 60)
+        let machine = text(entry.machineId ?? "", 128)
+        let record: [String: JSONValue] = [
+            "id": .string(Self.lanId("w", now: now)),
+            "date": .string(Self.localDay(now)),
+            "material": .string(material),
+            "failureType": .string(failure.isEmpty ? "other" : failure),
+            "weight": .number(pos(entry.weight)),
+            "cost": .number(pos(entry.cost)),
+            "reason": .string(text(entry.reason)),
+            "notes": .string(text(entry.notes)),
+            "orderId": .null,
+            "machineId": machine.isEmpty ? .null : .string(machine),
+        ]
+        let grams = pos(entry.weight)
+        var deducted: String?
+        try book.update { root in
+            var log: [JSONValue] = []
+            if case .array(let had)? = root["wasteLog"] { log = had }
+            var stamped = record
+            StoreWriter.stamp(&stamped)
+            log.insert(.object(stamped), at: 0)
+            root["wasteLog"] = .array(log)
+
+            guard entry.deduct, grams > 0, case .array(var shelf)? = root["inventory"],
+                  let at = shelf.firstIndex(where: {
+                      if case .object(let o) = $0, o["material"] == .string(material) { return true }
+                      return false
+                  }),
+                  case .object(var spool) = shelf[at] else { return }
+            var had = 0.0
+            if case .number(let w)? = spool["weight"] { had = w }
+            let left = JSONValue.number(max(0, had - grams))
+            spool["weight"] = left
+            spool["remaining"] = left
+            spool["weightRemaining"] = left
+            shelf[at] = .object(spool)
+            root["inventory"] = .array(shelf)
+            if case .string(let sid)? = spool["id"] { deducted = sid }
+        }
+        return (record, deducted)
+    }
+
+    /// File an expense, as `POST /api/expense` does — WITHOUT a receipt.
+    ///
+    /// A receipt is a file on the desk's disk, named by the desk, and the
+    /// record points at it by path. Nothing the phone could write would be a
+    /// path that exists there, so an expense with a photo still goes over the
+    /// wire (and needs a desktop that serves `/api/expense`). One without is
+    /// just a record, and is written here like any other.
+    @discardableResult
+    func addExpense(_ draft: ExpenseDraft, now: Date = Date()) throws -> [String: JSONValue] {
+        let amount = draft.amount.isFinite ? max(0, draft.amount) : 0
+        guard amount > 0 else { throw Refusal.noAmount }
+        let category = String(draft.category.trimmingCharacters(in: .whitespacesAndNewlines).prefix(60))
+        let record: [String: JSONValue] = [
+            "id": .string(Self.lanId("EXP", now: now)),
+            "date": .string(Self.localDay(now)),
+            "category": .string(category.isEmpty ? "other" : category),
+            "amount": .number(amount),
+            "note": .string(String(draft.note.trimmingCharacters(in: .whitespacesAndNewlines).prefix(500))),
+            "orderId": .null,
+            "receiptPath": .null,
+            "recurring": .null,
+            "nextDue": .null,
+            "locationId": .string(""),
+        ]
+        try book.insertRecord(collection: "expenses", atFront: true) { _ in record }
+        return record
+    }
+
+    /// `uniqueLanId(prefix)` in `lib/lan-server.js`: prefix, milliseconds, four
+    /// random hex digits — so a record reads the same wherever it was made.
+    static func lanId(_ prefix: String, now: Date = Date()) -> String {
+        let ms = Int(now.timeIntervalSince1970 * 1000)
+        return "\(prefix)-\(ms)-\(String(format: "%04x", UInt16.random(in: .min ... .max)))"
     }
 
     // MARK: - Booking a roll in
