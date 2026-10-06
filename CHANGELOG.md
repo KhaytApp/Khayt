@@ -4,33 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Pre-release fixes to the converter, the library and Backups.**
-  - With Snapmaker Orca installed, converting for the U1 no longer resets which
-    filament prints supports, support interfaces and walls. The installed
-    process preset's default was replacing the file's own choice, so a
-    dedicated support material went back to the model colour.
-  - With "Match to loaded spools", colours that share one spool now print with
-    the settings of the colour closest to that spool. Before, the slot took
-    whichever colour was listed last, so red PLA could print with a dark-red
-    PETG's temperatures.
-  - Band-swap on a file with several plates now puts its M600 pauses on every
-    plate. Before, only plate 1 had them, and the other plates printed their
-    upper bands in the wrong colour.
-  - Listing the plates of a sliced project no longer unpacks its G-code and
-    pictures. A small model sliced into large plate files could use gigabytes
-    of memory just to show the plate list.
-  - The plate list, and the "fits" and "over" badges, are translated again.
-    They were showing in English in every language.
-  - A run of broken `<triangle` tags is read in linear time. A 1.4 KB file had
-    held the converter for 12 seconds.
-  - A print file's preview is no longer forgotten when the library folder or
-    NAS is offline. The card shows its icon until the folder is back, and the
-    picture is not lost.
-  - Settings › Backups lists backups newest first by date and always shows the
-    daily ones. Copies kept at each app update used to fill the list.
-  - Publishing to MakerRun brings a model back from cold storage first, rather
-    than calling it missing.
-
 - **iOS: delete a spool, log waste and file an expense with the Mac switched
   off — and with the Mac app at all.** The native Mac serves none of
   `DELETE /api/inventory`, `POST /api/waste` or `POST /api/expense`, so on a
@@ -40,105 +13,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   what is left, so the shelf shows it), the expense as a record. An expense with
   a receipt photo still goes over the wire, because the receipt is a file on the
   desk's disk.
-
-- **LAN printer webhook: a job a printer starts now has a start time.** When a
-  printer told Khayt a print had started or finished, the job moved column but
-  its start was saved under a name nothing reads, so it showed no elapsed time,
-  no ETA and no running timer. The move now goes through the same rule as
-  dragging the card, which also records it in the job's history. And a status
-  you set on the desktop while the printer's message was arriving is no longer
-  overwritten by it.
-
-- **Converter: convert or save one plate of a multi-plate project.** Opening a
-  Bambu Studio or Orca project with several plates now shows a plate list —
-  each plate's picture, name, object count and colours — with "Convert this
-  plate" and "Save this plate as a 3MF". The plate becomes a 3MF of its own
-  with only its objects, its settings and its thumbnails, moved onto the bed
-  exactly where it sat on its plate; the filament list is unchanged, so painted
-  colours stay right. Converting the whole file works as before. A file too
-  large to convert in one piece now points to the plate list instead of telling
-  you to convert one plate at a time with no way to do it. A plate that shares
-  an object with another plate is refused rather than split wrongly. Also
-  available from a print file's Convert action in the library.
-
-- **Converter: match a file's colours to the spools you have loaded.** When
-  the printer is already set up, "Match to loaded spools" sends every colour
-  in the file to the loaded spool that looks most like it (ported from
-  bedready.io), using what one of your machines reports or what you entered
-  for it, or spools you pick from your filament inventory per slot. Several
-  colours may share a spool; empty slots are never used. A table shows each
-  colour, the spool it goes to and how close the match is, warns when a
-  colour has no close spool or its material differs from the spool's (PETG
-  onto PLA), and lets you change any row. A file with more colours than the
-  printer has slots is merged onto the loaded spools; a file with fewer
-  colours whose spools sit in higher slots (a two-colour file on slots 3 and 4
-  of an AMS) gains those slots, each a copy of one of its filaments in the
-  loaded spool's colour. If the converter cannot apply the match whole (a
-  model it could not read, settings it cannot reorder), it stops and says why
-  instead of saving a file in which nothing moved.
-
-- **Bambu and Orca files for a Prusa MMU3 or CORE One INDX still save as a
-  Generic 3MF.** Converting them into a full PrusaSlicer project is built
-  but switched off in this release: the project would likely open in
-  PrusaSlicer 2.9 with that program's default printer G-code instead of the
-  printer's own. It stays off until a converted file has been checked in
-  PrusaSlicer.
-
-- **Converter fixes from bedready.io.**
-  - PrusaSlicer files are read and rewritten for real. PrusaSlicer writes its
-    settings as `; key = value`, and the converter only understood the bare
-    form, so a Prusa→Prusa conversion changed nothing while listing the
-    printer, nozzle and bed as changed, and the source printer showed blank.
-    An MMU project keeps one nozzle per extruder.
-  - Small hostile 3MFs can no longer freeze or exhaust the app: a triangle
-    tag that never closes is read in linear time, a component graph that
-    doubles per level stops at a fixed budget in the preview, measuring and
-    STL export, and a mesh whose zip header claims a size of zero is charged
-    what it really inflates to.
-  - Reassigning colours to slots now moves a painted model's paint and each
-    object's colour with them. Before, only the palette moved, so every
-    painted area printed in another slot's colour. Each filament's material,
-    temperatures, fan settings and purge volumes move with its colour, and
-    settings such as the support filament follow it. A slot beyond the
-    file's own colours is not applied; you are told to place it in your
-    slicer. When the colours cannot be moved together with the model (for
-    example a large model in the Mac app), nothing is reassigned and the
-    report says why. Full Spectrum and band-swap also move the support and
-    wall filament settings to the right head.
-  - "Merge to the nearest {n} slots" in batch conversion now merges. A file
-    with more colours than the printer has slots used to convert with a
-    warning and nothing merged. The least-used colours now go to the
-    closest-looking slot, paint included.
-  - Band-swap checks each plate on its own. A multi-plate file whose plates
-    change colour at different heights used to get one plate's pause heights
-    written into the file for all of them; it is now left without pauses and
-    the reason names the plates. So is a file whose plates change colour at
-    the same heights but in different colours. Plates that agree on both
-    keep their plan.
-  - Full Spectrum files keep their mixes when opened in Snapmaker Orca. The
-    mix settings are now marked as changed from the printer's preset, so
-    Orca no longer resets them to stock. Mixed areas also get extra support
-    clearance, and their purge goes to the wipe tower instead of into the
-    model and supports.
-  - Converting for a printer with a different nozzle size also adjusts line
-    widths and layer heights to suit it. A 0.6 mm file converted for a 0.4 mm
-    printer used to ask for 0.63 mm lines. Settings taken from your installed
-    slicer's own process preset are left as they are; when only its printer
-    profile is found, line widths are still adjusted. PrusaSlicer files also
-    get their minimum and maximum layer heights adjusted.
-  - Files made in Creality Print and other slicers now open in Snapmaker Orca
-    as full projects with their colours and plates. Before, Orca loaded only
-    the shape.
-  - Variable layer height files converted for the Snapmaker U1 now slice:
-    the prime tower is turned off and tree supports become normal supports,
-    which Snapmaker Orca requires, and the change is listed in the report.
-  - HueForge 3MFs for the Snapmaker U1 follow the 3MF standard: each model
-    part now has the build element the standard requires, so strict readers
-    no longer refuse the file with "Build item not found".
-  - New converter targets: Prusa MK4S + MMU3, and Prusa CORE One INDX with 8
-    or 4 toolheads. Converting for a Prusa MMU3 or INDX printer now also
-    writes the exact PrusaSlicer printer preset name and nozzle variant, so
-    PrusaSlicer matches the project to the right installed printer.
 
 - **(Bed Ready) Browse, download from and publish to the MakerRun catalogue.**
   - **Browse MakerRun** (a new home card, and a button in the MakerRun library
@@ -164,38 +38,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - A `.stp` file downloaded from MakerRun is now saved as `.step`; it used to
     get a `.3mf` name.
 
-- **A new version takes a copy of the book before it touches it — however it
-  was installed.** The schema backup fires only when the store format changes,
-  and between Bed Ready 1.2.0 and 1.3.0 it did not, while a thousand commits of
-  migrations ran on first launch. An in-app update already copied the book
-  first; running a downloaded installer by hand did not. The app now remembers
-  which version last opened the book, and a different one saves
-  `pre-update-v<new>-from-v<old>-….json` first (never rotated away; skipped
-  when the in-app updater already made one).
-
-- **A print-file preview that did not come back with a restore is made again.**
-  Previews live beside the model files now, so a backup restored on another
-  computer, or after a wipe, brought back cards with a blank picture. Where the
-  model file is present the preview is rebuilt from it; where it is not, the
-  card says why instead of showing a blank.
-
-- **Straight-line depreciation no longer multiplies wear in a quiet month.**
-  It spreads a month's charge over the hours printed, so a printer used twice
-  in ninety days put over a hundred an hour of "wear" into the calculator.
-  Measured hours now count as at least ten a month; a figure typed in the
-  machine's settings is used as given. Bed Ready's hint for the setting talks
-  about the calculator, not quotes and P&L.
-
 - **(Bed Ready) Six business modules it never runs are no longer loaded**:
   ZATCA QR, recurring orders, top lists, KPI rows, expense book and the
   low-stock order alert.
-
-- **Spools added before this release can be given their size.** Material cost
-  is the spool's price divided by what it held when bought, and a spool from an
-  earlier release has no record of that, so every one was costed as a kilo — a
-  3 kg roll read three times dear and a 250 g sample a quarter of its real cost,
-  with no field anywhere to correct it. The spool editor now has **Size when
-  new**; blank leaves it as it was. Khayt and Bed Ready both.
 
 - **(Bed Ready) Print-file cards hold their own buttons again.** The action row
   does not wrap, and Bed Ready's narrower content area left every card at 231px,
@@ -207,19 +52,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   full-wipe dialogs, the newer-data-file refusal and the printer-history error
   named Khayt in Bed Ready.
 
-- **A part's magnets and inserts are no longer counted twice in the P&L.** A
-  part's own consumables are priced into its material cost, and that material
-  is what the P&L counts as cost of goods — but buying consumables is already
-  booked as an expense. So each magnet was paid for twice. Cost of goods now
-  leaves a part's consumables out (the P&L, the dashboard's cost and margin,
-  and the machine P&L), as it already did for a product's components. They
-  still count in each job's own cost: the job margin, profit per product and
-  per hour, and the quote. A job with no consumables is unchanged.
-- **A quote from a product with components shows its full price.** Taking a
-  job from a catalogue product that has components (magnets, hardware), the
-  calculator's total left them out, while the job was saved with them. A
-  product that showed 144.49 was saved at 153.49. The total now includes the
-  components, marked up like the rest, and says how much they add.
 - **alpha.59 review fixes (Mac + shared lib).**
   - Security: a 3MF with a crafted plate index (1e20, "inf", "nan") no longer
     crashes the Mac every time the model is viewed — the index is checked and
@@ -4735,6 +4567,185 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.6] - 2026-10-06
+
+The converter, a safer upgrade and a review's fixes, since 3.11.5.
+Individual entries are kept below; this is what changed for you.
+
+**Convert or save one plate, and match colours to the spools you have
+loaded.** A multi-plate Bambu Studio or Orca project shows its plates, and
+one can be converted or saved as its own 3MF. "Match to loaded spools"
+sends each colour in a file to the loaded spool closest to it. The Prusa
+MK4S + MMU3 and CORE One INDX are new converter targets; a Bambu or Orca
+file for them still saves as a Generic 3MF.
+
+**A copy of the book before a new version touches it**, and Settings ›
+Backups that always lists the daily backups.
+
+- **Pre-release fixes to the converter, the library and Backups.**
+  - With Snapmaker Orca installed, converting for the U1 no longer resets which
+    filament prints supports, support interfaces and walls. The installed
+    process preset's default was replacing the file's own choice, so a
+    dedicated support material went back to the model colour.
+  - With "Match to loaded spools", colours that share one spool now print with
+    the settings of the colour closest to that spool. Before, the slot took
+    whichever colour was listed last, so red PLA could print with a dark-red
+    PETG's temperatures.
+  - Band-swap on a file with several plates now puts its M600 pauses on every
+    plate. Before, only plate 1 had them, and the other plates printed their
+    upper bands in the wrong colour.
+  - Listing the plates of a sliced project no longer unpacks its G-code and
+    pictures. A small model sliced into large plate files could use gigabytes
+    of memory just to show the plate list.
+  - The plate list, and the "fits" and "over" badges, are translated again.
+    They were showing in English in every language.
+  - A run of broken `<triangle` tags is read in linear time. A 1.4 KB file had
+    held the converter for 12 seconds.
+  - A print file's preview is no longer forgotten when the library folder or
+    NAS is offline. The card shows its icon until the folder is back, and the
+    picture is not lost.
+  - Settings › Backups lists backups newest first by date and always shows the
+    daily ones. Copies kept at each app update used to fill the list.
+  - Publishing to MakerRun brings a model back from cold storage first, rather
+    than calling it missing.
+
+- **LAN printer webhook: a job a printer starts now has a start time.** When a
+  printer told Khayt a print had started or finished, the job moved column but
+  its start was saved under a name nothing reads, so it showed no elapsed time,
+  no ETA and no running timer. The move now goes through the same rule as
+  dragging the card, which also records it in the job's history. And a status
+  you set on the desktop while the printer's message was arriving is no longer
+  overwritten by it.
+
+- **Converter: convert or save one plate of a multi-plate project.** Opening a
+  Bambu Studio or Orca project with several plates now shows a plate list —
+  each plate's picture, name, object count and colours — with "Convert this
+  plate" and "Save this plate as a 3MF". The plate becomes a 3MF of its own
+  with only its objects, its settings and its thumbnails, moved onto the bed
+  exactly where it sat on its plate; the filament list is unchanged, so painted
+  colours stay right. Converting the whole file works as before. A file too
+  large to convert in one piece now points to the plate list instead of telling
+  you to convert one plate at a time with no way to do it. A plate that shares
+  an object with another plate is refused rather than split wrongly. Also
+  available from a print file's Convert action in the library.
+
+- **Converter: match a file's colours to the spools you have loaded.** When
+  the printer is already set up, "Match to loaded spools" sends every colour
+  in the file to the loaded spool that looks most like it (ported from
+  bedready.io), using what one of your machines reports or what you entered
+  for it, or spools you pick from your filament inventory per slot. Several
+  colours may share a spool; empty slots are never used. A table shows each
+  colour, the spool it goes to and how close the match is, warns when a
+  colour has no close spool or its material differs from the spool's (PETG
+  onto PLA), and lets you change any row. A file with more colours than the
+  printer has slots is merged onto the loaded spools; a file with fewer
+  colours whose spools sit in higher slots (a two-colour file on slots 3 and 4
+  of an AMS) gains those slots, each a copy of one of its filaments in the
+  loaded spool's colour. If the converter cannot apply the match whole (a
+  model it could not read, settings it cannot reorder), it stops and says why
+  instead of saving a file in which nothing moved.
+
+- **Bambu and Orca files for a Prusa MMU3 or CORE One INDX still save as a
+  Generic 3MF.** Converting them into a full PrusaSlicer project is built
+  but switched off in this release: the project would likely open in
+  PrusaSlicer 2.9 with that program's default printer G-code instead of the
+  printer's own. It stays off until a converted file has been checked in
+  PrusaSlicer.
+
+- **Converter fixes from bedready.io.**
+  - PrusaSlicer files are read and rewritten for real. PrusaSlicer writes its
+    settings as `; key = value`, and the converter only understood the bare
+    form, so a Prusa→Prusa conversion changed nothing while listing the
+    printer, nozzle and bed as changed, and the source printer showed blank.
+    An MMU project keeps one nozzle per extruder.
+  - Small hostile 3MFs can no longer freeze or exhaust the app: a triangle
+    tag that never closes is read in linear time, a component graph that
+    doubles per level stops at a fixed budget in the preview, measuring and
+    STL export, and a mesh whose zip header claims a size of zero is charged
+    what it really inflates to.
+  - Reassigning colours to slots now moves a painted model's paint and each
+    object's colour with them. Before, only the palette moved, so every
+    painted area printed in another slot's colour. Each filament's material,
+    temperatures, fan settings and purge volumes move with its colour, and
+    settings such as the support filament follow it. A slot beyond the
+    file's own colours is not applied; you are told to place it in your
+    slicer. When the colours cannot be moved together with the model (for
+    example a large model in the Mac app), nothing is reassigned and the
+    report says why. Full Spectrum and band-swap also move the support and
+    wall filament settings to the right head.
+  - "Merge to the nearest {n} slots" in batch conversion now merges. A file
+    with more colours than the printer has slots used to convert with a
+    warning and nothing merged. The least-used colours now go to the
+    closest-looking slot, paint included.
+  - Band-swap checks each plate on its own. A multi-plate file whose plates
+    change colour at different heights used to get one plate's pause heights
+    written into the file for all of them; it is now left without pauses and
+    the reason names the plates. So is a file whose plates change colour at
+    the same heights but in different colours. Plates that agree on both
+    keep their plan.
+  - Full Spectrum files keep their mixes when opened in Snapmaker Orca. The
+    mix settings are now marked as changed from the printer's preset, so
+    Orca no longer resets them to stock. Mixed areas also get extra support
+    clearance, and their purge goes to the wipe tower instead of into the
+    model and supports.
+  - Converting for a printer with a different nozzle size also adjusts line
+    widths and layer heights to suit it. A 0.6 mm file converted for a 0.4 mm
+    printer used to ask for 0.63 mm lines. Settings taken from your installed
+    slicer's own process preset are left as they are; when only its printer
+    profile is found, line widths are still adjusted. PrusaSlicer files also
+    get their minimum and maximum layer heights adjusted.
+  - Files made in Creality Print and other slicers now open in Snapmaker Orca
+    as full projects with their colours and plates. Before, Orca loaded only
+    the shape.
+  - Variable layer height files converted for the Snapmaker U1 now slice:
+    the prime tower is turned off and tree supports become normal supports,
+    which Snapmaker Orca requires, and the change is listed in the report.
+  - HueForge 3MFs for the Snapmaker U1 follow the 3MF standard: each model
+    part now has the build element the standard requires, so strict readers
+    no longer refuse the file with "Build item not found".
+  - New converter targets: Prusa MK4S + MMU3, and Prusa CORE One INDX with 8
+    or 4 toolheads. Converting for a Prusa MMU3 or INDX printer now also
+    writes the exact PrusaSlicer printer preset name and nozzle variant, so
+    PrusaSlicer matches the project to the right installed printer.
+
+- **A new version takes a copy of the book before it touches it — however it
+  was installed.** The schema backup fires only when the store format changes,
+  and between Bed Ready 1.2.0 and 1.3.0 it did not, while a thousand commits of
+  migrations ran on first launch. An in-app update already copied the book
+  first; running a downloaded installer by hand did not. The app now remembers
+  which version last opened the book, and a different one saves
+  `pre-update-v<new>-from-v<old>-….json` first (never rotated away; skipped
+  when the in-app updater already made one).
+
+- **A print-file preview that did not come back with a restore is made again.**
+  Previews live beside the model files now, so a backup restored on another
+  computer, or after a wipe, brought back cards with a blank picture. Where the
+  model file is present the preview is rebuilt from it; where it is not, the
+  card says why instead of showing a blank.
+
+- **Straight-line depreciation no longer multiplies wear in a quiet month.**
+  It spreads a month's charge over the hours printed, so a printer used twice
+  in ninety days put over a hundred an hour of "wear" into the calculator.
+  Measured hours now count as at least ten a month; a figure typed in the
+  machine's settings is used as given. Bed Ready's hint for the setting talks
+  about the calculator, not quotes and P&L.
+
+- **Spools added before this release can be given their size.** Material cost
+  is the spool's price divided by what it held when bought, and a spool from an
+  earlier release has no record of that, so every one was costed as a kilo — a
+  3 kg roll read three times dear and a 250 g sample a quarter of its real cost,
+  with no field anywhere to correct it. The spool editor now has **Size when
+  new**; blank leaves it as it was. Khayt and Bed Ready both.
+
+- **A part's magnets and inserts are no longer counted twice in the P&L.** A
+  part's own consumables are priced into its material cost, and that material
+  is what the P&L counts as cost of goods — but buying consumables is already
+  booked as an expense. So each magnet was paid for twice. Cost of goods now
+  leaves a part's consumables out (the P&L, the dashboard's cost and margin,
+  and the machine P&L), as it already did for a product's components. They
+  still count in each job's own cost: the job margin, profit per product and
+  per hour, and the quote. A job with no consumables is unchanged.
 
 ## [bedready-v1.3.0] - 2026-10-05
 
