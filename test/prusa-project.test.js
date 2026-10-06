@@ -7,6 +7,9 @@
  * the base with the part's own filament). The rest are Khayt's: the refusals, the per-extruder
  * consistency and an end-to-end run of bedready.io's own sample.3mf.
  */
+// The PrusaSlicer project is held in the app for v3.11.6 (see lib/printer-profiles.js); its own
+// tests keep it covered until it ships.
+require('../lib/printer-profiles').prusaProjectReady = true;
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

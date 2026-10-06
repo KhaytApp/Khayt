@@ -158,3 +158,18 @@ test('the app-version copy is protected and recognised as this version\'s', () =
     'a beta of the same line is a different version');
   assert.equal(U.hasBackupForVersion(['2026-10-04.json'], '1.3.0'), false);
 });
+
+test('Settings › Backups lists dailies even after many app versions left their copy', () => {
+  const { backupsToList } = require('../lib/upgrade-backup');
+  const day = 86400000;
+  const entries = [];
+  for (let i = 0; i < 30; i++) entries.push({ filename: `2026-09-${String(i + 1).padStart(2, '0')}.json`, mtime: i * day });
+  // Eleven versions, the newest the most recent file on disk; v1.10.0 must not sort below v1.9.0.
+  for (let i = 0; i < 11; i++) entries.push({ filename: `pre-update-v1.${i}.0-from-v1.${i - 1}.0-x.json`, mtime: 30 * day + i });
+  const list = backupsToList(entries);
+  assert.equal(list.length, 10);
+  assert.deepEqual(list.slice(0, 3).map((e) => e.filename), [
+    'pre-update-v1.10.0-from-v1.9.0-x.json', 'pre-update-v1.9.0-from-v1.8.0-x.json', 'pre-update-v1.8.0-from-v1.7.0-x.json']);
+  assert.equal(list[3].filename, '2026-09-30.json', 'the newest daily is offered');
+  assert.equal(list.filter((e) => /^\d{4}-/.test(e.filename)).length, 7);
+});
