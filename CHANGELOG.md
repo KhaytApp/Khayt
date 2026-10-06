@@ -4,6 +4,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Client retention, on the Mac and corrected on the desktop.** Reports →
+  Best now has the client retention card: how many customers came back within
+  30, 60 and 90 days of their first order, how long the ones who returned took,
+  and the customers who come back most. Both apps now work it out the same
+  way, and it was wrong in several ways:
+  - A customer who placed two orders on their first day counted as having
+    come back "in 0 days" — the best possible figure, from someone who never
+    returned. A return is now an order on a later day.
+  - Every customer counted in every window, so someone who first ordered last
+    week counted as "did not return within 90 days". A growing shop read as one
+    losing its customers. Each rate now counts only customers whose first order
+    is old enough, says how many that is ("2 of 6"), and says "too soon to
+    tell" instead of 0% when none are.
+  - Voided orders, archived orders and prints marked "not business" made a
+    customer look like a regular.
+  - "×orders" was English in every language, and the Arabic window labels read
+    just "30 days".
+
 - **(Mac) Kiosk: times say their units.** "About 18:04 to print" read as six
   in the evening on a screen across the room, under the kiosk's own clock. The
   kiosk now writes "About 18h 4m to print", "5h 40m left".

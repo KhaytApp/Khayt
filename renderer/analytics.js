@@ -2368,65 +2368,45 @@ function renderRevenueChart() {
 function renderClientRetention() {
   const el = $('#clientRetentionSection');
   if (!el) return;
-  const completed = printLog.filter(o => KhaytOrderStatus.isFinished(o) && o.clientId && o.date);
-  // Group by client, sorted by date
-  const clientOrders = {};
-  for (const o of completed) {
-    if (!clientOrders[o.clientId]) clientOrders[o.clientId] = [];
-    clientOrders[o.clientId].push(o.date);
-  }
-  // Only clients with at least one order
-  const allClients = Object.entries(clientOrders).map(([id, dates]) => {
-    const sorted = [...dates].sort();
-    return { id, firstDate: sorted[0], secondDate: sorted[1] || null, total: sorted.length };
-  });
-  const withAtLeastOne = allClients.length;
-  if (withAtLeastOne < 2) {
+  // `lib/client-retention.js`, not the arithmetic that used to be here. It
+  // counted voided and not-business orders, read two orders on a customer's
+  // first day as a return "in 0 days", and put every customer in every
+  // window's denominator — so a customer who first ordered last week counted
+  // as lost at 90 days, and a growing shop read as one losing its customers.
+  // Whole book, not the period: whether people come back is a fact about them.
+  const r = KhaytClientRetention.retention(
+    { orders: printLog || [], today: localDateStr() },
+    { isFinished: KhaytOrderStatus.isFinished, countsForBusiness: _countsForBusiness });
+  if (!r.enough) {
     el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.retention_no_data'))}</p>`;
     return;
   }
-  const withTwo = allClients.filter(c => c.secondDate !== null);
-  const daysBetween = (a, b) => Math.round(Math.abs(new Date(b) - new Date(a)) / 86400000);
-  const ret30 = withTwo.filter(c => daysBetween(c.firstDate, c.secondDate) <= 30).length;
-  const ret60 = withTwo.filter(c => daysBetween(c.firstDate, c.secondDate) <= 60).length;
-  const ret90 = withTwo.filter(c => daysBetween(c.firstDate, c.secondDate) <= 90).length;
-  const pct = (n) => withAtLeastOne > 0 ? (n / withAtLeastOne * 100).toFixed(1) : '0.0';
-  const avgDays = withTwo.length > 0
-    ? (withTwo.reduce((s, c) => s + daysBetween(c.firstDate, c.secondDate), 0) / withTwo.length).toFixed(1)
-    : '—';
-
-  // Top returning clients
-  const topReturning = [...allClients]
-    .filter(c => c.total >= 2)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
+  const label = { 30: 'an.retention_30', 60: 'an.retention_60', 90: 'an.retention_90' };
+  const stat = (w) => `
+      <div class="retention-stat accuracy-stat">
+        <div class="v" style="color:var(--primary);">${w.rate == null ? '—' : (w.rate * 100).toFixed(1) + '%'}</div>
+        <div class="l">${escapeHtml(t(label[w.days]))}</div>
+        <div class="l" style="font-size:11px;">${escapeHtml(w.rate == null
+          ? t('an.retention_too_soon')
+          : t('an.retention_of_n', { returned: w.returned, eligible: w.eligible }))}</div>
+      </div>`;
+  const avgDays = r.avgDaysToReturn == null ? '—' : r.avgDaysToReturn.toFixed(1);
 
   el.innerHTML = `
     <div class="accuracy-stats" style="margin-bottom:16px;">
-      <div class="retention-stat accuracy-stat">
-        <div class="v" style="color:var(--primary);">${pct(ret30)}%</div>
-        <div class="l">${escapeHtml(t('an.retention_30'))}</div>
-      </div>
-      <div class="retention-stat accuracy-stat">
-        <div class="v" style="color:var(--primary);">${pct(ret60)}%</div>
-        <div class="l">${escapeHtml(t('an.retention_60'))}</div>
-      </div>
-      <div class="retention-stat accuracy-stat">
-        <div class="v" style="color:var(--primary);">${pct(ret90)}%</div>
-        <div class="l">${escapeHtml(t('an.retention_90'))}</div>
-      </div>
+      ${r.windows.map(stat).join('')}
       <div class="retention-stat accuracy-stat">
         <div class="v">${escapeHtml(String(avgDays))}</div>
         <div class="l">${escapeHtml(t('an.retention_avg_days'))}</div>
       </div>
     </div>
-    ${topReturning.length > 0 ? `
+    ${r.top.length > 0 ? `
     <div style="font-size:12px;font-weight:600;color:var(--text-dim);margin-bottom:8px;">${escapeHtml(t('an.top_returning'))}</div>
     <ul class="leaderboard">
-      ${topReturning.map((c, i) => {
-        const cl = clients.find(x => x.id === c.id);
-        const name = cl ? localName(cl) : c.id;
-        return `<li><span class="rank">${i+1}.</span><span class="name">${escapeHtml(name)}</span><span class="value">${c.total}× orders</span></li>`;
+      ${r.top.map((c, i) => {
+        const cl = clients.find(x => x.id === c.clientId);
+        const name = cl ? localName(cl) : c.clientId;
+        return `<li><span class="rank">${i+1}.</span><span class="name">${escapeHtml(name)}</span><span class="value">${escapeHtml(t('an.retention_orders_n', { n: c.orders }))}</span></li>`;
       }).join('')}
     </ul>` : ''}`;
 }
