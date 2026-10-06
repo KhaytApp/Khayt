@@ -355,6 +355,10 @@ public actor KhaytEngine {
         //   that has ever opened this app.
         //
         "client-sources",
+        // Whether customers come back, and how soon. Beside where they came
+        // from: one says how a shop finds people, this says whether it keeps
+        // them.
+        "client-retention",
         // What a finished job takes off the shelf: the grams, the hourly
         // consumables, the bought-in components, the packaging. Lifted out of
         // renderer/inventory.js because the move being shared is not enough —
@@ -9805,6 +9809,63 @@ public actor KhaytEngine {
             });
         })()
         """#, [.array(clients), .array(orders), .object(settings)], as: ClientSources.self)
+    }
+
+    /// Whether customers come back — `lib/client-retention.js`.
+    ///
+    /// The rates count only customers whose first order is old enough to have
+    /// had the window, so a shop full of new customers does not read as one
+    /// losing them. `today` is the shop's local day; the rule has no clock.
+    public struct ClientRetention: Decodable, Sendable {
+        public struct Window: Decodable, Sendable, Hashable {
+            public let days: Int
+            public let eligible: Int
+            public let returned: Int
+            /// Nil when no customer is old enough — not 0%.
+            public let rate: Double?
+        }
+        public struct Regular: Decodable, Sendable, Hashable, Identifiable {
+            public var id: String { clientId }
+            public let clientId: String
+            public let name: String
+            public let orders: Int
+            public let visits: Int
+            public let firstDay: String
+        }
+        public let clients: Int
+        public let returned: Int
+        public let enough: Bool
+        public let windows: [Window]
+        public let avgDaysToReturn: Double?
+        public let top: [Regular]
+    }
+
+    public func clientRetention(clients: [JSONValue], orders: [JSONValue], today: String,
+                                settings: [String: JSONValue], language: String)
+        throws -> ClientRetention {
+        try runtime.call2(#"""
+        (function () {
+          var r = globalThis.KhaytClientRetention.retention(
+            { orders: ARG1, today: ARG2 },
+            {
+              isFinished: function (o) { return globalThis.KhaytOrderStatus.isFinished(o); },
+              countsForBusiness: function (o) {
+                return globalThis.KhaytBusinessScope
+                  ? globalThis.KhaytBusinessScope.countsForBusiness(o) : true;
+              },
+            });
+          var byId = {};
+          (ARG0 || []).forEach(function (c) { if (c && c.id != null) byId[String(c.id)] = c; });
+          r.top = r.top.map(function (t) {
+            var c = byId[t.clientId];
+            var name = c ? String(globalThis.KhaytContentLanguages.read(c, 'name', ARG4, ARG3)
+              || c.name || c.company || '') : '';
+            return Object.assign({}, t, { name: name || t.clientId });
+          });
+          return r;
+        })()
+        """#, [.array(clients), .array(orders), .string(today), .object(settings), .string(language)],
+            as: ClientRetention.self)
     }
 
     /// What the shop spent, by category.

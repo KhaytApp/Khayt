@@ -55,6 +55,8 @@ struct Reports: View {
     /// Where the shop's customers came from. Beside the customer mix, which
     /// says whether it is finding new ones at all.
     @State private var sources: KhaytEngine.ClientSources?
+    /// Whether customers come back, and how soon. See `ClientRetentionCard`.
+    @State private var retention: KhaytEngine.ClientRetention?
     /// The P&L's expense figure, broken up. NOT the Expenses screen's panel —
     /// `ExpenseCategoriesCard` has the argument for why they differ.
     @State private var spending: KhaytEngine.Spending?
@@ -95,7 +97,8 @@ struct Reports: View {
             } else if shop.reportPage == .best {
                 Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix,
                      when: when, quality: quality, cycle: cycle, lead: lead,
-                     promises: promises, ratings: ratings, sources: sources)
+                     promises: promises, ratings: ratings, sources: sources,
+                     retention: retention)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
             } else if shop.reportPage == .machines {
@@ -448,6 +451,7 @@ struct Reports: View {
         await recomputeQuality()
         await recomputeRatings()
         await recomputeSources()
+        await recomputeRetention()
         await recomputeSpending()
         await recomputeMaintenance()
         await recomputeDowntime()
@@ -609,6 +613,17 @@ struct Reports: View {
         ratings = try? await engine.ratingTrend(orders: shop.orderRows, months: months)
     }
 
+    private func recomputeRetention() async {
+        guard let engine = shop.engine else { retention = nil; return }
+        // The whole book, NOT the chosen period, for the reason
+        // `recomputeCustomerMix` gives: whether a customer came back is
+        // decided by their whole history, and a quarter would cut a first
+        // order off from the return that answers it.
+        retention = try? await engine.clientRetention(
+            clients: shop.clientRows, orders: shop.orderRows, today: Shop.today(),
+            settings: shop.settingsDict, language: shop.words.language)
+    }
+
     private func recomputeSources() async {
         guard let engine = shop.engine else { sources = nil; return }
         // NOT filtered to the chosen period, for the reason `recomputeClientValue`
@@ -758,6 +773,7 @@ struct Reports: View {
         let promises: KhaytEngine.OnTime?
         let ratings: KhaytEngine.RatingTrend?
         let sources: KhaytEngine.ClientSources?
+        let retention: KhaytEngine.ClientRetention?
 
         var body: some View {
             // Two cards rather than two halves of one pane divided by a rule.
@@ -791,6 +807,11 @@ struct Reports: View {
                     // arriving, this one says where from. A shop deciding
                     // where to spend needs both, and neither alone.
                     ClientSourcesCard(shop: shop, report: sources)
+                        .card(rail: Khayt.brand, padding: 14)
+                    // And whether the people found that way stay. Above the
+                    // lifetime table, which ranks them by what they spent;
+                    // this says how many come back at all.
+                    ClientRetentionCard(shop: shop, report: retention)
                         .card(rail: Khayt.brand, padding: 14)
                     ClientValueTable(shop: shop, report: worth)
                         .card(rail: Khayt.brand, padding: 14)
