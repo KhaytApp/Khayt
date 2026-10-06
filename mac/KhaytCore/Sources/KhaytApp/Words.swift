@@ -3362,6 +3362,20 @@ final class Words {
         "mac.kiosk_due":     ["en": "Due {date}", "ar": "التسليم {date}"],
         "mac.kiosk_from_printer": ["en": "from the printer", "ar": "من الطابعة"],
         "mac.kiosk_estimated": ["en": "estimated", "ar": "تقديري"],
+        // The shop's sites. The other app's delete confirmation says "this
+        // cannot be undone", which is not true here (⌘Z puts it back), so the
+        // Mac says what a delete actually does.
+        "mac.locations_hint": ["en": "Branches or rooms your machines stand in. Jobs belong to their machine's location, and Reports splits profit by location.",
+                               "ar": "الفروع أو الغرف التي توجد فيها أجهزتك. ينتمي كل طلب إلى موقع جهازه، وتقسّم التقارير الربح حسب الموقع."],
+        "mac.no_locations": ["en": "No locations yet. A shop with one site does not need any.",
+                             "ar": "لا توجد مواقع بعد. المتجر ذو الموقع الواحد لا يحتاج إليها."],
+        "mac.location_delete_confirm": ["en": "Delete “{name}”?", "ar": "حذف «{name}»؟"],
+        "mac.location_delete_hint": ["en": "Machines, spools, expenses and jobs at it become unassigned. You can undo this.",
+                                     "ar": "تصبح الأجهزة والبكرات والمصروفات والطلبات التابعة له بلا موقع. يمكنك التراجع عن ذلك."],
+        "mac.location_none": ["en": "None", "ar": "بدون"],
+        "mac.location_gone": ["en": "A deleted location", "ar": "موقع محذوف"],
+        "mac.location_pl_hint": ["en": "The shop's P&L for this period, split by where the work was done. Fixed overhead belongs to the whole shop and is not split.",
+                                 "ar": "أرباح وخسائر المتجر لهذه الفترة مقسّمة حسب مكان العمل. التكاليف الثابتة للمتجر كله ولا تُقسَّم."],
         "mac.kiosk_unbooked": ["en": "Printing something not in the book",
                                "ar": "تطبع شيئاً غير مسجّل في الدفتر"],
         // Help ▸ Send Feedback… — see `Feedback`.

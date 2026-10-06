@@ -165,7 +165,7 @@ struct EveryBarGrowsTests {
             "ClientSources.swift": 1, "ClientValue.swift": 1, "CloudLibrarySettings.swift": 1, "Craft.swift": 3,
             "CustomerMix.swift": 1, "CycleTime.swift": 1, "Downtime.swift": 1,
             "Drawings.swift": 3, "ExpenseCategories.swift": 1, "Kiosk.swift": 1,
-            "MachineReliability.swift": 1, "MaintenanceCost.swift": 1,
+            "LocationPl.swift": 1, "MachineReliability.swift": 1, "MaintenanceCost.swift": 1,
             "OrdersTable.swift": 1, "ProductProfit.swift": 1, "ProfitPerHour.swift": 1,
             "QuoteFunnel.swift": 1, "RatingTrend.swift": 1, "ShopFloor.swift": 7,
             "Trends.swift": 1, "WasteTrend.swift": 1,

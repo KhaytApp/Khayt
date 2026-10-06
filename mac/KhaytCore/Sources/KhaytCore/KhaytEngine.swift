@@ -529,6 +529,10 @@ public actor KhaytEngine {
         // it does not raise — it reports every order at its gross price and no
         // tax collected at all.
         "pnl-report",
+        // The same P&L, once per site. PNL-REPORT AND ORDER-DEDUCTION ARE
+        // ALREADY ABOVE and must be: it runs the one and reads which site a
+        // job belongs to from the other.
+        "location-pl",
         // Who owes the shop money and how long they have owed it. ORDER-MONEY
         // AND ORDER-PAYMENT ARE ALREADY ABOVE and must be: it reaches both
         // through globals, and without them every order reads as unpaid at its
@@ -7139,6 +7143,50 @@ public actor KhaytEngine {
              .array(wasteLog), .array(inventory), .array(machines),
              .object(recentMonthlyHours.mapValues { .number($0) })],
             as: [PnlPeriod].self)
+    }
+
+    /// The shop's P&L split by site: `lib/location-pl.js`, which sorts the book
+    /// into one pile per location and runs `pnlByPeriod` on each, so the sites
+    /// add up to the shop. Handed rows already narrowed to the chosen period —
+    /// the module takes a range only as a callback, which cannot cross from
+    /// here. Fixed overhead is the shop's and is in no row.
+    public func locationPl(orders: [JSONValue], expenses: [JSONValue], wasteLog: [JSONValue],
+                           machines: [JSONValue], locations: [JSONValue],
+                           settings: [String: JSONValue], clients: [JSONValue],
+                           currencies: [String: JSONValue], inventory: [JSONValue],
+                           now: Date, recentMonthlyHours: [String: Double] = [:]) throws -> LocationPl {
+        try runtime.call2(
+            "KhaytLocationPl.locationPl({orders: ARG0, expenses: ARG1, wasteLog: ARG2, machines: ARG3, locations: ARG4, settings: ARG5, clients: ARG6, currencies: ARG7, inventory: ARG8, now: new Date(ARG9), recentMonthlyHours: ARG10})",
+            [.array(orders), .array(expenses), .array(wasteLog), .array(machines), .array(locations),
+             .object(settings), .array(clients), .object(currencies), .array(inventory),
+             .number(now.timeIntervalSince1970 * 1000),
+             .object(recentMonthlyHours.mapValues { .number($0) })],
+            as: LocationPl.self)
+    }
+
+    public struct LocationPl: Decodable, Sendable, Hashable {
+        /// One row per location in the book, then the unassigned row when
+        /// anything is unassigned. A site that sold nothing is a row of zeros.
+        public let rows: [Row]
+        /// False when the book has no locations, and there is nothing to draw.
+        public let located: Bool
+
+        public struct Row: Decodable, Sendable, Hashable, Identifiable {
+            /// Empty for the unassigned row.
+            public let locationId: String
+            public let orders: Int
+            public let revenue: Double
+            public let cogs: Double
+            public let expenses: Double
+            public let waste: Double
+            public let depreciation: Double
+            /// cogs + expenses + waste + depreciation.
+            public let costs: Double
+            public let net: Double
+            /// Nil where nothing was billed — not a 0% that reads as "broke even".
+            public let marginPct: Double?
+            public var id: String { locationId }
+        }
     }
 
     // MARK: - The shelf

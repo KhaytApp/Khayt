@@ -42,6 +42,9 @@ struct MachineProfitPage: View {
     /// second is usually the larger number.
     var downtime: [KhaytEngine.DowntimeRow] = []
     var downtimeMonths: [String] = []
+    /// The shop's P&L by site, when it has sites. Under the machines, because
+    /// a site is where machines stand.
+    var sites: KhaytEngine.LocationPl?
 
     var body: some View {
         let words = shop.words
@@ -49,6 +52,11 @@ struct MachineProfitPage: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     rows(report)
+                    if let sites {
+                        LocationPlCard(shop: shop, report: sites)
+                            .card(rail: Khayt.brand, padding: 14)
+                            .padding(Metric.screen)
+                    }
                     Accuracy(shop: shop, rows: accuracy, all: shopAccuracy)
                     PowerActuals(shop: shop, rows: power)
                     // Under the money and the calibration, because it is the

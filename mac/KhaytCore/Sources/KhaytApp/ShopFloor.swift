@@ -326,6 +326,13 @@ private struct Card: View {
                     if !machine.model.isEmpty, !machine.model.caseInsensitiveEquals(machine.name) {
                         Text(machine.model).font(.caption).foregroundStyle(.secondary)
                     }
+                    // Which site it stands in, for a shop with more than one.
+                    // Nothing for a machine with none: most shops have one site.
+                    if let site = shop.locationName(machine.locationId) {
+                        Label(site, systemImage: "mappin.and.ellipse")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .labelStyle(.titleAndIcon).lineLimit(1)
+                    }
                 }
             }
 

@@ -2050,43 +2050,29 @@ function renderLocationPL() {
     return;
   }
 
-  // Map machineId → locationId and machineName → locationId
-  const machLocById  = {};
-  const machLocByName = {};
-  machines.forEach(m => {
-    if (m.locationId) { machLocById[m.id] = m.locationId; machLocByName[m.name] = m.locationId; }
+  // The money is lib/location-pl.js's: the shop's own P&L (lib/pnl-report.js)
+  // run once per location, so the branches add up to the shop. This did its
+  // own sums — pricing cost re-priced at today's spool prices, expenses with
+  // their reclaimable VAT, the job's own location ignored — and disagreed
+  // with the P&L about the same jobs. Fixed overhead stays with the shop.
+  if (typeof KhaytLocationPl === 'undefined') { container.innerHTML = ''; return; }
+  const report = KhaytLocationPl.locationPl({
+    orders: printLog, expenses, wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
+    machines, locations, settings, clients,
+    currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
+    inventory: (typeof inventory !== 'undefined' ? inventory : []),
+    now: new Date(),
+    recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
+    inRange: (d) => inRange(d, analyticsRange, 'analytics'),
   });
 
-  const locTotals = {}; // locationId | '__none__' → { revenue, matCost, expenses, waste, orders }
-  const getD = id => { if (!locTotals[id]) locTotals[id] = { revenue: 0, matCost: 0, expenses: 0, waste: 0, orders: 0 }; return locTotals[id]; };
-
-  // Orders
-  printLog.filter(o => KhaytOrderStatus.isFinished(o) && !o.voidedAt && _countsForBusiness(o) && inRange(o.date || (o.timestamp || '').slice(0,10), analyticsRange, 'analytics')).forEach(o => {
-    const lid = (o.machineId && machLocById[o.machineId]) || (o.machine && machLocByName[o.machine]) || '__none__';
-    const d = getD(lid);
-    d.revenue += orderNetRevenueBase(o);
-    d.orders++;
-    (o.parts || []).forEach(p => { d.matCost += (typeof partTotalCost === 'function' ? (partTotalCost(p) || 0) : 0); });
-  });
-
-  // Expenses
-  // Filament bought is stock: it reaches a location's figures as its jobs'
-  // material cost (matCost above), not again as an expense (lib/pnl-report.js).
-  expenses.filter(e => inRange(e.date, analyticsRange, 'analytics') && !KhaytPnl.isInventoryPurchase(e)).forEach(e => {
-    getD(e.locationId || '__none__').expenses += +e.amount || 0;
-  });
-  // Filament lost to failed prints, at the location of the machine it failed on.
-  (typeof wasteLog !== 'undefined' ? wasteLog : []).filter(w => w && inRange(w.date, analyticsRange, 'analytics')).forEach(w => {
-    getD((w.machineId && machLocById[w.machineId]) || '__none__').waste += Math.max(0, +w.cost || 0);
-  });
-
-  // Build rows
-  const nameMap = { '__none__': t('an.unassigned_location') };
+  const nameMap = {};
   locations.forEach(l => { nameMap[l.id] = l.name; });
-
-  const rows = Object.entries(locTotals)
-    .map(([lid, d]) => ({ lid, name: nameMap[lid] || lid, ...d, net: d.revenue - d.matCost - d.expenses - d.waste }))
-    .sort((a, b) => b.revenue - a.revenue);
+  const rows = report.rows.map(r => ({
+    lid: r.locationId,
+    name: r.locationId ? (nameMap[r.locationId] || r.locationId) : t('an.unassigned_location'),
+    orders: r.orders, revenue: r.revenue, costs: r.costs, net: r.net, marginPct: r.marginPct,
+  }));
 
   if (!rows.length) {
     container.innerHTML = `<p style="color:var(--text-muted);font-size:13px;padding:12px 0;">${t('an.no_data')}</p>`;
@@ -2125,13 +2111,13 @@ function renderLocationPL() {
 
   // Summary table
   const tableRows = rows.map(r => {
-    const margin = r.revenue > 0 ? (r.net / r.revenue * 100).toFixed(1) + '%' : '—';
+    const margin = r.marginPct != null ? r.marginPct.toFixed(1) + '%' : '—';
     const netCol = r.net >= 0 ? `<span style="color:var(--success)">${cur}${fmtMoney(r.net)}</span>` : `<span style="color:var(--danger)">${cur}${fmtMoney(r.net)}</span>`;
     return `<tr>
       <td><strong>${escapeHtml(r.name)}</strong></td>
       <td style="text-align:right;">${r.orders}</td>
       <td style="text-align:right;">${cur}${fmtMoney(r.revenue)}</td>
-      <td style="text-align:right;">${cur}${fmtMoney(r.matCost + r.expenses + r.waste)}</td>
+      <td style="text-align:right;">${cur}${fmtMoney(r.costs)}</td>
       <td style="text-align:right;">${netCol}</td>
       <td style="text-align:right;">${margin}</td>
     </tr>`;

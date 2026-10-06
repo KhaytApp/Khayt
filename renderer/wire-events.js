@@ -1704,6 +1704,13 @@ function wireEvents() {
         { danger: true, okText: t('common.delete') },
       ).then((ok) => {
         if (!ok) return;
+        // Clear what pointed at it, as the Mac's delete does. This used to drop
+        // the location alone, so its machines, spools, expenses and jobs kept an
+        // id naming nothing — and the location P&L drew it as a branch called
+        // `LOC-…`.
+        if (typeof KhaytLocationPl !== 'undefined') {
+          KhaytLocationPl.unpoint({ machines, inventory, expenses, printLog }, btn.dataset.id);
+        }
         locations = locations.filter(l => l.id !== btn.dataset.id);
         saveAll();
         renderLocationsSettings();

@@ -48,6 +48,8 @@ struct MachineSheet: View {
     // app's own, so a printer added and left alone still looks like it belongs
     // to Khayt rather than to whatever SwiftUI's `.blue` happens to be.
     @State private var swatch = Khayt.brand
+    /// Which of the shop's sites it stands in; empty for none.
+    @State private var locationId = ""
     @State private var model = ""
     @State private var search = ""
     @State private var nozzleDiameter: Double = 0.4
@@ -302,6 +304,26 @@ struct MachineSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mach.color")).foregroundStyle(.secondary)
                     ColorPicker("", selection: $swatch, supportsOpacity: false).labelsHidden()
+                }
+                // Only for a shop that has sites — or a machine still naming
+                // one, so the sheet can say so and offer None.
+                if !shop.locations.isEmpty || !locationId.isEmpty {
+                    GridRow {
+                        Text(shop.words.callIt("mach.location")).foregroundStyle(.secondary)
+                        Picker("", selection: $locationId) {
+                            Text(shop.words.callIt("mac.location_none")).tag("")
+                            ForEach(shop.locations) { loc in Text(loc.name).tag(loc.id) }
+                            // An id the book no longer has (a location deleted
+                            // by an older build) is a real value of the field,
+                            // and a Picker with no tag for its selection draws
+                            // blank. Shown, so None is a choice and not a guess.
+                            if !locationId.isEmpty && shop.locationName(locationId) == nil {
+                                Text(shop.words.callIt("mac.location_gone")).tag(locationId)
+                            }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
                 }
                 // WHAT IS LOADED, for a printer that cannot say. The library's
                 // "Ready on" chip reads it; a printer that reports its spools
@@ -751,6 +773,7 @@ struct MachineSheet: View {
         var depResidual: Double = 0
         var depMethod = "perHour"
         var depMonthly: Double = 0
+        var locationId = ""
 
         /// A machine as the sheet opens it. `kind` is the module's answer —
         /// for every machine recorded before Khayt could ask, a filament
@@ -785,6 +808,7 @@ struct MachineSheet: View {
             f.apiSerial = machine.printerApi?.serial ?? ""
             f.apiSlug = machine.printerApi?.printerSlug ?? ""
             f.targetHours = machine.targetHoursPerDay ?? 0
+            f.locationId = machine.locationId ?? ""
             if let d = machine.depreciation {
                 f.depPrice = d.price ?? 0
                 f.depBought = Order.day(d.purchaseDate)
@@ -834,6 +858,10 @@ struct MachineSheet: View {
                 // Through the shared rule, which drops the whole block when there
                 // is no price — so clearing the price is how a shop takes it off.
                 "depreciation": depreciation,
+                // `lib/machine-edit.js` writes '' for none, as the other app's
+                // sheet does. A machine that never had one opens as '' and
+                // saves as '', so `keepUntouched` leaves it absent.
+                "locationId": .string(locationId),
             ]
             let serial = apiSerial.trimmingCharacters(in: .whitespaces)
             let slug = apiSlug.trimmingCharacters(in: .whitespaces)
@@ -898,7 +926,7 @@ struct MachineSheet: View {
              plugUser: plugUser, plugAutoOff: plugAutoOff, plugDelay: plugDelay,
              loadedRows: loadedRows, depPrice: depPrice, depBought: depBought,
              depLife: depLife, depUnit: depUnit, depResidual: depResidual,
-             depMethod: depMethod, depMonthly: depMonthly)
+             depMethod: depMethod, depMonthly: depMonthly, locationId: locationId)
     }
 
     private func fill() {
@@ -944,6 +972,7 @@ struct MachineSheet: View {
         depResidual = f.depResidual
         depMethod = f.depMethod
         depMonthly = f.depMonthly
+        locationId = f.locationId
         loadedRows = f.loadedRows
         opened = f
         focused = true

@@ -52,5 +52,6 @@ test('the desktop applies the same share to the headline and the CSV', () => {
   assert.equal((src.match(/\* KhaytPnl\.stockShare\(o, \{ inventory, settings \}\)/g) || []).length, 1,
     'the P&L headline');
   assert.match(src, /cost: KhaytKpiRows\.orderCost\(o, \{/, 'the dashboard KPI margin, by the shared rule');
-  assert.equal((src.match(/inventory: \(typeof inventory !== 'undefined' \? inventory : \[\]\)/g) || []).length, 3);
+  assert.equal((src.match(/inventory: \(typeof inventory !== 'undefined' \? inventory : \[\]\)/g) || []).length, 4,
+    'three P&L tables and the per-location view (lib/location-pl.js runs the same rule)');
 });

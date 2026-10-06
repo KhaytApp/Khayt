@@ -61,6 +61,8 @@ test('the CSV says what was bought, outside the arithmetic', () => {
 
 test('the per-location view and the P&L table use the same rule', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'analytics.js'), 'utf8');
-  assert.match(src, /!KhaytPnl\.isInventoryPurchase\(e\)/, 'the location breakdown still counts filament twice');
+  // The location breakdown IS the P&L rule now, run once per site
+  // (lib/location-pl.js), so it leaves filament out where the table does.
+  assert.match(src, /KhaytLocationPl\.locationPl\(/, 'the location breakdown has its own sums again');
   assert.match(src, /t\('pnl\.inventory_note', \{ amount: fmtMoney\(bought\) \}\)/, 'the table does not say where the filament went');
 });

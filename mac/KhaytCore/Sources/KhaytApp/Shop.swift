@@ -663,6 +663,7 @@ final class Shop {
             } else {
                 supplierRows = []
             }
+            locationRows = Self.rows(root, "locations")
             // What has been ordered and not yet arrived. Read raw for the same
             // reason the consumables are: the rule reads fields this app has no
             // model for, and deciding which of them matter belongs in the rule.
@@ -5916,6 +5917,12 @@ final class Shop {
     /// The shop's suppliers, with whatever they quote.
     private(set) var supplierRows: [JSONValue] = []
 
+    /// The shop's sites (`store.locations`), as the book holds them. Read raw:
+    /// the location P&L hands them to `lib/location-pl.js`, and every field a
+    /// record carries — `rev`, `updatedAt`, an address — has to survive an
+    /// edit made here.
+    private(set) var locationRows: [JSONValue] = []
+
     /// What is low and has not already been ordered.
     private(set) var needsOrdering: [KhaytEngine.ToOrder] = []
 
@@ -6671,6 +6678,171 @@ final class Shop {
                         if touched { root[collection] = .array(records) }
                     }
                 }
+            } catch {
+                shop.moveProblem = String(describing: error)
+            }
+        }
+    }
+
+    // MARK: - The shop's sites
+
+    /// The shop's locations, in the book's order — the order the other app
+    /// lists them in, and the order a shop added them in.
+    var locations: [ShopLocation] { locationRows.compactMap(ShopLocation.init(row:)) }
+
+    /// A location's name, or nil for an id that names none (empty, or one
+    /// deleted before deletes cleared what pointed at it).
+    func locationName(_ id: String?) -> String? {
+        guard let id, !id.isEmpty else { return nil }
+        return locations.first { $0.id == id }?.name
+    }
+
+    /// Add a location, or rename one / change its address.
+    ///
+    /// Through the write chain like every other record, stamped so the other
+    /// app's merge sees the change. An edit writes the two fields the sheet
+    /// shows and nothing else, so whatever else a record carries survives.
+    /// The id is `LOC-…` from the same `uid` the other app uses.
+    func saveLocation(id: String?, name: String, address: String) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let address = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { moveProblem = words.callIt("mach.need_name"); return }
+        var undo: [ChangedRecord] = []
+        do {
+            try StoreWriter.update(build) { root in
+                Self.writeLocation(into: &root, id: id, name: name, address: address,
+                                   newId: Self.uid("LOC"), undo: &undo)
+                Self.sealUndo(&undo, in: root)
+            }
+            if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("set.locations")) }
+            await load(source)
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    /// The write itself, static and taking `root` so a test can drive it
+    /// against a plain book.
+    static func writeLocation(into root: inout [String: JSONValue], id: String?, name: String,
+                              address: String, newId: String, undo: inout [ChangedRecord]) {
+        var rows = Self.rows(root, "locations")
+        if let id, let at = rows.firstIndex(where: { Self.recordId($0) == id }),
+           case .object(var record) = rows[at] {
+            undo.append(ChangedRecord(collection: "locations", id: id, was: record))
+            record["name"] = .string(name)
+            record["address"] = .string(address)
+            StoreWriter.stamp(&record)
+            rows[at] = .object(record)
+        } else {
+            var record: [String: JSONValue] = [
+                "id": .string(newId), "name": .string(name), "address": .string(address),
+            ]
+            StoreWriter.stamp(&record)
+            rows.append(.object(record))
+        }
+        root["locations"] = .array(rows)
+    }
+
+    /// Take a location off the list, and unpoint everything that named it.
+    ///
+    /// The other app's delete dropped the row alone, so its machines, spools,
+    /// expenses and jobs kept an id naming nothing — and the location P&L drew
+    /// that id as a branch called `LOC-…`. Both apps now clear them, to the
+    /// empty string `lib/machine-edit.js` and `lib/expense-book.js` write for
+    /// "none", and an undo puts the row back and points them at it again.
+    func deleteLocation(_ id: String) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        var removed: [String: JSONValue]?
+        var unlinked: [ChangedRecord] = []
+        do {
+            try StoreWriter.update(build) { root in
+                var rows = Self.rows(root, "locations")
+                guard let at = rows.firstIndex(where: { Self.recordId($0) == id }),
+                      case .object(let was) = rows[at] else { return }
+                removed = was
+                rows.remove(at: at)
+                root["locations"] = .array(rows)
+                unlinked = Self.unpointingLocation(&root, from: id)
+            }
+            if let removed { registerLocationUndo(removed, relinking: unlinked) }
+            await load(source)
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    /// Which collections carry a `locationId`. `lib/location-pl.js` POINTERS
+    /// is the same list, and `LocationsTests` holds the two together — a third
+    /// collection growing the field on one side is how a delete quietly starts
+    /// leaving ids behind again.
+    static let pointAtLocations = ["machines", "inventory", "expenses", "printLog"]
+
+    /// Clear every `locationId` that names this location; say what changed.
+    static func unpointingLocation(_ root: inout [String: JSONValue],
+                                   from id: String) -> [ChangedRecord] {
+        var changed: [ChangedRecord] = []
+        for collection in pointAtLocations {
+            var records = rows(root, collection)
+            var touched = false
+            for i in records.indices {
+                guard case .object(var record) = records[i],
+                      plainString(record["locationId"]) == id else { continue }
+                changed.append(ChangedRecord(collection: collection,
+                                             id: recordId(records[i]) ?? "", was: record))
+                record["locationId"] = .string("")
+                StoreWriter.stamp(&record)
+                records[i] = .object(record)
+                touched = true
+            }
+            if touched { root[collection] = .array(records) }
+        }
+        return changed
+    }
+
+    /// Put a deleted location back, and point back at it what pointed at it.
+    /// Only a record still unassigned is relinked: one moved to another site
+    /// since is the shop's newer word.
+    static func relinkingLocation(_ root: inout [String: JSONValue], record: [String: JSONValue],
+                                  id: String, unlinked: [ChangedRecord]) {
+        var rows = Self.rows(root, "locations")
+        guard !rows.contains(where: { Self.recordId($0) == id }) else { return }
+        rows.append(.object(record))
+        root["locations"] = .array(rows)
+        for (collection, wanted) in Dictionary(grouping: unlinked, by: { $0.collection }) {
+            var records = Self.rows(root, collection)
+            let ids = Set(wanted.map { $0.id })
+            var touched = false
+            for i in records.indices {
+                guard case .object(var r) = records[i],
+                      let rid = Self.recordId(records[i]), ids.contains(rid),
+                      (Self.plainString(r["locationId"]) ?? "").isEmpty else { continue }
+                r["locationId"] = .string(id)
+                StoreWriter.stamp(&r)
+                records[i] = .object(r)
+                touched = true
+            }
+            if touched { root[collection] = .array(records) }
+        }
+    }
+
+    private func registerLocationUndo(_ record: [String: JSONValue],
+                                      relinking unlinked: [ChangedRecord]) {
+        guard let undoManager, let build = source.build,
+              case .string(let id)? = record["id"] else { return }
+        undoManager.setActionName(words.callIt("set.locations"))
+        undoManager.registerUndo(withTarget: self) { shop in
+            do {
+                try StoreWriter.update(build) { root in
+                    Self.relinkingLocation(&root, record: record, id: id, unlinked: unlinked)
+                }
+                Task { await shop.load(shop.source) }
             } catch {
                 shop.moveProblem = String(describing: error)
             }
