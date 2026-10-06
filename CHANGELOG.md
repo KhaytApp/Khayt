@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: delete a spool, log waste and file an expense with the Mac switched
+  off — and with the Mac app at all.** The native Mac serves none of
+  `DELETE /api/inventory`, `POST /api/waste` or `POST /api/expense`, so on a
+  shop running it those three buttons answered 404. They now write into the
+  phone's book and travel like every other edit: the deleted spool as a
+  tombstone, the waste entry with its optional deduction (all three names for
+  what is left, so the shelf shows it), the expense as a record. An expense with
+  a receipt photo still goes over the wire, because the receipt is a file on the
+  desk's disk.
+
 - **LAN printer webhook: a job a printer starts now has a start time.** When a
   printer told Khayt a print had started or finished, the job moved column but
   its start was saved under a name nothing reads, so it showed no elapsed time,

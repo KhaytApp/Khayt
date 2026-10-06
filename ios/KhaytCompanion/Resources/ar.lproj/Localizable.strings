@@ -361,6 +361,8 @@
 "error.record_not_added" = "تعذّرت إضافة هذا السجل إلى الدفتر.";
 "error.empty_book" = "أرسل جهاز Mac دفتراً فارغاً. لم يتغير شيء على هذا الهاتف.";
 "error.project_required" = "اسم المشروع مطلوب.";
+"error.no_such_spool" = "هذه البكرة لم تعد على رف هذا الهاتف.";
+"error.amount_required" = "المبلغ مطلوب.";
 "error.partial_add" = "أُضيفت %1$d من %2$d بكرات، ثم: %3$@";
 "error.unexpected_spool" = "رد غير متوقع عند إضافة البكرة";
 "error.invalid_order_id" = "رقم الطلب غير صالح.";

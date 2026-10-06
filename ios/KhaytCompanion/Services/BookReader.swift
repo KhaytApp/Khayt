@@ -334,9 +334,10 @@ actor BookReader {
     /// `tombstones` collection. Absence says nothing. Verified against the rule
     /// directly, not assumed.
     ///
-    /// The consequence is that a deletion made on the phone is not expressible
-    /// yet — nothing here writes a tombstone — so deleting stays a desktop
-    /// action. That is a limit, stated, rather than a silent half-behaviour.
+    /// The consequence is that a deletion made on the phone has to be SAID:
+    /// removing a row is not enough on its own. `StoreWriter.update` says it,
+    /// recording a tombstone for every record a write removes — which is how
+    /// a spool deleted or a request declined here reaches the Mac.
     ///
     /// Returns nil when there is no baseline: a phone that has never been given
     /// the book has not changed anything, and has nothing to say.

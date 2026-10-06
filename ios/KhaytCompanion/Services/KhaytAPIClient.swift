@@ -613,9 +613,14 @@ final class KhaytAPIClient: ObservableObject {
         try ensureOK(data, response)
     }
 
-    /// File an expense, with an optional photographed receipt. A write, so it
-    /// needs a live connection — refused rather than queued, like every other.
+    /// File an expense, with an optional photographed receipt.
+    ///
+    /// Into the book when there is no receipt — see `BookWriter.addExpense`.
+    /// A receipt is a file the desk stores and points at, so one with a photo
+    /// still needs a desktop that serves `/api/expense`.
     func addExpense(_ draft: ExpenseDraft) async throws {
+        if draft.receiptBase64 == nil,
+           try await writeLocally({ try $0.addExpense(draft) }) { return }
         let body = try JSONEncoder().encode(draft)
         let (data, response) = try await request(
             path: "/api/expense", method: "POST", body: body, requiresPin: true
@@ -626,15 +631,12 @@ final class KhaytAPIClient: ObservableObject {
     /**
      * Record a failed print where it happened.
      *
-     * A write, so it needs a live connection — refused rather than queued, for
-     * the same reason every other write is: a queued write is a promise about
-     * ordering the phone cannot keep, and the desktop owns the data.
-     *
-     * The desktop stamps the date with the SHOP'S calendar day, so the phone
-     * deliberately sends none. A phone travelling through a timezone would
-     * otherwise file a failure under the wrong day's waste.
+     * Into the book when this phone keeps one, deduction and all, and sent on
+     * like any edit — see `BookWriter.logWaste`. Over the wire otherwise, where
+     * the desktop stamps the SHOP'S calendar day, so the phone sends none.
      */
     func logWaste(_ entry: WasteEntry) async throws {
+        if try await writeLocally({ try $0.logWaste(entry) }) { return }
         let body = try JSONEncoder().encode(entry)
         let (data, response) = try await request(
             path: "/api/waste", method: "POST", body: body, requiresPin: true
@@ -642,7 +644,12 @@ final class KhaytAPIClient: ObservableObject {
         try ensureOK(data, response)
     }
 
+    /// Into the book when this phone keeps one: the removal leaves a tombstone
+    /// that carries it home — see `BookWriter.deleteSpool`. The native Mac
+    /// serves no `DELETE /api/inventory`, so for a shop on it this is the only
+    /// way a spool deleted here is deleted at all.
     func deleteSpool(id: String) async throws {
+        if try await writeLocally({ try $0.deleteSpool(id: id) }) { return }
         let encodedId = try encodeOrderIdForPath(id)
         let (data, response) = try await request(
             path: "/api/inventory/\(encodedId)", method: "DELETE", body: nil, requiresPin: true

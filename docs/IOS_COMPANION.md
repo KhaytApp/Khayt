@@ -119,10 +119,15 @@ holds one — see "How it actually works now" above. Anything in this repo that
 still describes the companion as having no local store, or as a live view of the
 desktop, predates that and is wrong.
 
-**Still true:** the phone cannot delete records, and does not write offline. A
-deletion needs a tombstone and nothing on the phone writes one, so deleting stays
-a desktop action. Offline writes are a protocol question rather than a missing
-button — see `BookReader.pendingChanges` and `POST /api/store/deltas`.
+**Writes land on the phone first.** Advancing or assigning a job, raising an
+order, booking in or correcting a spool, deleting a spool, triaging a walk-in,
+marking a job shipped, logging waste and filing an expense without a receipt are
+all written into the phone's book (`BookWriter`) and sent on — to the Mac with
+`POST /api/store/deltas`, or through Khayt Cloud when the Mac is out of reach.
+A deletion travels as a tombstone, which `StoreWriter.update` records for every
+record a write removes. Still online-only: a quote (a live question about
+today's prices) and an expense with a receipt photo (the receipt is a file on
+the desk's disk).
 
 ## UI redesign
 
