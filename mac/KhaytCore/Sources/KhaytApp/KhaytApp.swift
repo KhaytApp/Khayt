@@ -41,6 +41,14 @@ struct KhaytApp: App {
         }
         .defaultSize(width: 940, height: 640)
         .keyboardShortcut("?", modifiers: .command)
+
+        // View ▸ Kiosk — every machine at once, for a screen across the shop.
+        // A window of its own so it can be put on a second display and left
+        // full screen while this one is used. See `KioskWindow`.
+        Window(Text(Words.upfront("mac.kiosk_title")), id: KioskWindow.id) {
+            KioskWindow(shop: shop)
+        }
+        .defaultSize(width: 1280, height: 760)
     }
 
     /// The shop's window, with no title bar of its own.

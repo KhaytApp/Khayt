@@ -8,6 +8,7 @@ import KhaytCore
 /// colours — does not line up into columns worth scanning.
 struct Machines: View {
     let shop: Shop
+    @Environment(\.openWindow) private var openWindow
 
     // `alignment: .top` AND `fills: true` on the card, and they are two halves
     // of one thing. A `GridItem` with no alignment centres its cell in the row,
@@ -79,6 +80,14 @@ struct Machines: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
+                    // The same machines, drawn for a screen across the room.
+                    if !shop.machines.isEmpty {
+                        Button {
+                            openWindow(id: KioskWindow.id)
+                        } label: {
+                            Label(shop.words.callIt("mac.kiosk_open"), systemImage: "rectangle.grid.2x2")
+                        }
+                    }
                 }
                 // ── AND WHETHER THERE IS ROOM FOR ANOTHER ─────────────────
                 //

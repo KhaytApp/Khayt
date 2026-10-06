@@ -51,6 +51,8 @@ struct KhaytCommands: Commands {
             DetailsCommand()
             Divider()
             SortMenu().environment(shop)
+            Divider()
+            KioskCommand()
         }
 
         // Find, where every Mac app keeps it. `.searchable` puts the field in
@@ -95,6 +97,16 @@ private struct DetailsCommand: View {
         }
         .keyboardShortcut("i", modifiers: [.option, .command])
         .disabled(showing == nil)
+    }
+}
+
+/// ⌃⌘K opens the kiosk — see `KioskWindow`.
+private struct KioskCommand: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button(Words.upfront("mac.kiosk_open")) { openWindow(id: KioskWindow.id) }
+            .keyboardShortcut("k", modifiers: [.control, .command])
     }
 }
 

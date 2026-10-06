@@ -14,6 +14,25 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   a receipt photo still goes over the wire, because the receipt is a file on the
   desk's disk.
 
+- **(Mac) Kiosk: every machine at once, for a screen across the shop.**
+  View ▸ Open Kiosk (⌃⌘K), or the button on the Machines screen, opens a
+  window with one large card per machine: the job on it, the customer, a
+  progress bar, time left and the due date. It is meant to go full screen on a
+  TV or a second display. Progress comes from the printer itself when the
+  printer reports it, and from the job's estimate otherwise; the card says
+  which. A printer running something with no job in the book shows as
+  printing, not idle, and a printer that is not answering says so.
+
+- **Kiosk view fixes (desktop).** The board's Kiosk view now shares its rules
+  with the Mac's kiosk (`lib/kiosk.js`), which fixed six things: a cancelled,
+  split, voided or archived job no longer shows as the machine's current job;
+  a job on hold or in post-processing no longer shows a bar that keeps moving
+  with the clock; time left can no longer read "1h 60m"; a print running past
+  its estimate shows how far over it is instead of "Done"; a printing job with
+  an estimate but no start time shows "~Nh total", which was worked out but
+  never displayed; and a machine with a model but no name no longer shows its
+  model twice.
+
 - **(Bed Ready) Browse, download from and publish to the MakerRun catalogue.**
   - **Browse MakerRun** (a new home card, and a button in the MakerRun library
     panel) searches the public makerrun.com catalogue without signing in:
