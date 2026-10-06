@@ -10,6 +10,9 @@
  *   4. Modifier / negative / support-blocker parts would load in PrusaSlicer as solid geometry.
  *   5. A mesh passed by name (the Mac app) to a Prusa target keeps the old cross-family path.
  */
+// The PrusaSlicer project is held in the app for v3.11.6 (see lib/printer-profiles.js); its own
+// tests keep it covered until it ships.
+require('../lib/printer-profiles').prusaProjectReady = true;
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { writeZip } = require('../lib/zip-write');

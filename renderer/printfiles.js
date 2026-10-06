@@ -317,7 +317,7 @@
      * cache entries on the way out. */
     if (_view === 'gallery') return;
     const wanted = (rows || [])
-      .filter((r) => r && r.thumbFile && !r.thumb && !_thumbCache.has(r.id))
+      .filter((r) => r && r.thumbFile && !r.thumb && !_thumbCache.has(r.id) && !_thumbUnavailable.has(r.id))
       .map((r) => ({ id: r.id, file: r.thumbFile }));
     if (!wanted.length) return;
     let got = null;
@@ -341,32 +341,39 @@
   }
 
   const _thumbRebuilding = new Set();
+  /* Previews that could neither be read nor made again THIS session. The card
+   * shows its icon, but the record keeps its thumbFile: a library folder or NAS
+   * that is offline for a moment reads exactly like a lost preview, and
+   * forgetting the name for good would orphan a thumb.jpg that comes back with
+   * the share. Only a preview actually made again replaces it in the book. */
+  const _thumbUnavailable = new Set();
   async function rebuildThumb(rec) {
     if (!rec || _thumbRebuilding.has(rec.id)) return;
     _thumbRebuilding.add(rec.id);
     try {
       const hub = api(); if (!hub) return;
-      delete rec.thumbFile;
+      let made = false;
       const ext = String((rec.sourceFile && rec.sourceFile.ext) || '').toLowerCase();
       const full = rec.sourceFile ? await resolveModelPath(rec) : null;
       if (full) {
         if ((ext === 'gcode' || ext === 'gco' || ext === '3mf') && hub.extractThumbnail) {
           const th = await hub.extractThumbnail(full);
-          if (th && th.pngBase64) await setThumb(rec, await resizeDataUrl('data:image/png;base64,' + th.pngBase64, 280, 0.82), 'embedded');
+          if (th && th.pngBase64) made = await setThumb(rec, await resizeDataUrl('data:image/png;base64,' + th.pngBase64, 280, 0.82), 'embedded');
         } else if (ext === 'stl' && hub.printLibReadBytes && typeof KhaytStl !== 'undefined' && typeof KhaytStlThumb !== 'undefined') {
           const rb = await hub.printLibReadBytes(full);
           if (rb && rb.ok && rb.b64) {
             const g = KhaytStl.parseStl(base64ToArrayBuffer(rb.b64), { keepTriangles: true });
             if (g.triangles && g.triangles.length) {
               const r = KhaytStlThumb.renderStlThumbnail(g.triangles, { size: 300 });
-              if (r.ok && r.dataUrl) await setThumb(rec, r.dataUrl, 'render');
+              if (r.ok && r.dataUrl) made = await setThumb(rec, r.dataUrl, 'render');
             }
           }
         }
       }
       // Where the picture lives is this computer's business, not an edit to the
       // print, so updatedAt is left alone and nothing re-syncs over it.
-      saveAll();
+      if (made) { _thumbUnavailable.delete(rec.id); saveAll(); }
+      else _thumbUnavailable.add(rec.id);
       renderPrintFiles();
     } catch (_) { /* a card with the icon is fine; a thrown handler is not */ }
     finally { _thumbRebuilding.delete(rec.id); }
@@ -378,7 +385,7 @@
     /* Known to have a picture, just not fetched yet. An empty <img> holds the
      * card's shape so the grid does not jump when it arrives — a reflow of a
      * thousand cards is the thing this change is trying not to do. */
-    if (rec.thumbFile) return `<img class="pf-thumb" src="" alt="" loading="lazy">`;
+    if (rec.thumbFile && !_thumbUnavailable.has(rec.id)) return `<img class="pf-thumb" src="" alt="" loading="lazy">`;
     const ext = rec.sourceFile?.ext;
     const ico = (_BDR && window.BedReadyIcons)
       ? window.BedReadyIcons.get(EXT_ICON_NAME[ext] || 'cube', 44)
@@ -1999,8 +2006,9 @@
    * verified — a picture in the store is a picture, and losing it to be tidy
    * would be a bad trade.
    */
+  /** True when the record now carries the picture (on disk, or inline). */
   async function setThumb(rec, dataUrl, source) {
-    if (!rec || !dataUrl) return;
+    if (!rec || !dataUrl) return false;
     rec.thumbSource = source;
     const hub = api();
     if (hub && hub.printLibSaveThumb) {
@@ -2010,10 +2018,11 @@
         rec.thumbFile = res.filename;
         delete rec.thumb;
         cacheThumb(rec.id, dataUrl);
-        return;
+        return true;
       }
     }
     rec.thumb = dataUrl;      // unverified, so it stays where it is known to be
+    return true;
   }
 
   async function enrichPrintFile(rec, fullPath) {

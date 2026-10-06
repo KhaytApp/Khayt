@@ -4,6 +4,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Pre-release fixes to the converter, the library and Backups.**
+  - With Snapmaker Orca installed, converting for the U1 no longer resets which
+    filament prints supports, support interfaces and walls. The installed
+    process preset's default was replacing the file's own choice, so a
+    dedicated support material went back to the model colour.
+  - With "Match to loaded spools", colours that share one spool now print with
+    the settings of the colour closest to that spool. Before, the slot took
+    whichever colour was listed last, so red PLA could print with a dark-red
+    PETG's temperatures.
+  - Band-swap on a file with several plates now puts its M600 pauses on every
+    plate. Before, only plate 1 had them, and the other plates printed their
+    upper bands in the wrong colour.
+  - Listing the plates of a sliced project no longer unpacks its G-code and
+    pictures. A small model sliced into large plate files could use gigabytes
+    of memory just to show the plate list.
+  - The plate list, and the "fits" and "over" badges, are translated again.
+    They were showing in English in every language.
+  - A run of broken `<triangle` tags is read in linear time. A 1.4 KB file had
+    held the converter for 12 seconds.
+  - A print file's preview is no longer forgotten when the library folder or
+    NAS is offline. The card shows its icon until the folder is back, and the
+    picture is not lost.
+  - Settings › Backups lists backups newest first by date and always shows the
+    daily ones. Copies kept at each app update used to fill the list.
+  - Publishing to MakerRun brings a model back from cold storage first, rather
+    than calling it missing.
+
 - **iOS: delete a spool, log waste and file an expense with the Mac switched
   off — and with the Mac app at all.** The native Mac serves none of
   `DELETE /api/inventory`, `POST /api/waste` or `POST /api/expense`, so on a
@@ -48,25 +75,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   of an AMS) gains those slots, each a copy of one of its filaments in the
   loaded spool's colour. If the converter cannot apply the match whole (a
   model it could not read, settings it cannot reorder), it stops and says why
-  instead of saving a file in which nothing moved. The match also decides the
-  tools of a PrusaSlicer project, whose tools then carry the loaded spools'
-  colours.
+  instead of saving a file in which nothing moved.
 
-- **Bambu and Orca files convert to a real PrusaSlicer project for the Prusa
-  MK4 / MK4S + MMU3 and the CORE One INDX 8T / 4T.** Before, picking one of
-  these printers saved a Generic 3MF and told you to set the printer up in
-  PrusaSlicer yourself. Now the file opens in PrusaSlicer as a project for
-  that printer, with every colour on the tool the converter shows, including
-  parts that were coloured by object rather than painted. A file with more
-  colours than the printer has tools merges the least-used ones into the
-  closest tool. On the INDX you can tick ColorMix to print those colours as
-  a blend of two or three loaded tools instead. The converter shows which
-  colour goes on which tool, and any blends, before you save. A file it
-  cannot convert cleanly (for example, colours and materials that don't
-  match up, or modifier, negative or support-blocker parts that PrusaSlicer
-  would print as solid) is refused with the reason instead of being saved
-  half-right. In the Mac app, a model too large to hand to the converter
-  keeps the previous Generic-style result.
+- **Bambu and Orca files for a Prusa MMU3 or CORE One INDX still save as a
+  Generic 3MF.** Converting them into a full PrusaSlicer project is built
+  but switched off in this release: the project would likely open in
+  PrusaSlicer 2.9 with that program's default printer G-code instead of the
+  printer's own. It stays off until a converted file has been checked in
+  PrusaSlicer.
 
 - **Converter fixes from bedready.io.**
   - PrusaSlicer files are read and rewritten for real. PrusaSlicer writes its

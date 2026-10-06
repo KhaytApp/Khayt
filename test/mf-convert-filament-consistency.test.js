@@ -16,6 +16,7 @@
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+require('./helpers/no-installed-slicer'); // the converter's own rules, not the installed preset's
 const { writeZip } = require('../lib/zip-write');
 const { openZip } = require('../lib/zip-read');
 const { convert, convertMembers } = require('../lib/mf-convert');

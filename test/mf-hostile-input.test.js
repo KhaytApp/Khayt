@@ -75,13 +75,13 @@ function doubling(levels, leaf) {
 test('preview: a component graph that doubles per level stops on the visit budget', () => {
   const { r, ms } = timed(() => mesh.extractMeshFromMembers(members(doubling(40, false))));
   assert.equal(r.skipped, true, 'a graph past the visit budget is reported as too large');
-  assert.ok(ms < 10000, `took ${ms} ms`);
+  assert.ok(ms < 30000, `took ${ms} ms`); // ~1 s alone; the unguarded walk is 2^40 visits, not 30 s
 });
 
 test('measureMesh: the same graph is abandoned, not walked', () => {
   const { r, ms } = timed(() => conv.measureMesh(members(doubling(40, false))));
   assert.equal(r, null);
-  assert.ok(ms < 10000, `took ${ms} ms`);
+  assert.ok(ms < 30000, `took ${ms} ms`); // ~1 s alone; the unguarded walk is 2^40 visits, not 30 s
 });
 
 test('extractTriangles: a graph that would build 2^39 triangles is refused before building', () => {

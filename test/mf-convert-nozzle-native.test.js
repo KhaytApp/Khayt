@@ -49,3 +49,21 @@ test('a resolved process preset is the target nozzle\'s own and is not refitted'
   assert.equal(c.line_width, '0.45');
   assert.equal(c.layer_height, '0.24');
 });
+
+test('the process preset does not reset which filament prints supports and walls', () => {
+  // A preset's support_filament is its default (0, "the object's own"); the file's 2 names its
+  // second filament, the support material. Overlaying it would print supports in the model colour.
+  processPreset = { support_filament: '0', support_interface_filament: '0', wall_filament: '0', layer_height: '0.2' };
+  const two = writeZip([
+    { name: '3D/3dmodel.model', data: '<?xml version="1.0"?><model unit="millimeter"><resources><object id="1"/></resources></model>' },
+    { name: 'Metadata/project_settings.config', data: JSON.stringify({
+      printer_model: 'Creality K2 Plus', nozzle_diameter: ['0.4'], filament_colour: ['#FF0000', '#FFFFFF'], filament_type: ['PLA', 'PVA'],
+      support_filament: '2', support_interface_filament: '2', wall_filament: '1',
+    }) },
+  ]);
+  const c = cfgOf(convert(two, { targetId: 'ignored', targetProfile: TARGET }));
+  assert.equal(c.support_filament, '2');
+  assert.equal(c.support_interface_filament, '2');
+  assert.equal(c.wall_filament, '1');
+  assert.equal(c.layer_height, '0.2', 'the rest of the preset still applies');
+});

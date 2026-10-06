@@ -960,12 +960,12 @@ ipcMain.handle('hub:last-backup-date', async () => {
 // List recent backups (Feature 6)
 ipcMain.handle('hub:list-backups', async () => {
   const dir = backupsDir();
-  const files = (await fs.promises.readdir(dir)).filter(f => f.endsWith('.json')).sort().reverse().slice(0, 10);
-  return Promise.all(files.map(async (f) => {
-    const fullPath = path.join(dir, f);
-    const stat = await fs.promises.stat(fullPath);
-    return { name: f.replace('.json', ''), filename: path.basename(fullPath), mtime: stat.mtimeMs };
+  const files = (await fs.promises.readdir(dir)).filter(f => f.endsWith('.json'));
+  const entries = await Promise.all(files.map(async (f) => {
+    const stat = await fs.promises.stat(path.join(dir, f));
+    return { name: f.replace('.json', ''), filename: f, mtime: stat.mtimeMs };
   }));
+  return upgradeBackup.backupsToList(entries);
 });
 
 // Read a backup file by path (Feature 6)
@@ -5577,6 +5577,12 @@ if (isBedReady) {
 
   ipcMain.handle('hub:makerrun-publish-file', async (_e, { slug, vaultId, filename } = {}) => {
     try {
+      // A model moved to cold storage leaves only its sidecar; bring it back first, as every other
+      // read of a library file does. A bare name only — resolveVaultFile below re-checks it.
+      if (vaultId && typeof filename === 'string' && filename && path.basename(filename) === filename) {
+        const back = await printLibRehydrate(path.join(printLibItemDir(vaultId), filename));
+        if (!back.ok) return { ok: false, error: back.error, code: 'missing' };
+      }
       const vf = mrVaultFile(vaultId, filename);
       if (!vf) return { ok: false, error: 'That print file is missing from the library folder.', code: 'missing' };
       const full = vf.full;

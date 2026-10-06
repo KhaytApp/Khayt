@@ -86,7 +86,7 @@
   function isPrusaProject(sourceFlavour, p) {
     const P = profiles();
     const prof = typeof p === 'string' ? getProfileById(p) : p;
-    return !!(prof && P && P.configFamily && P.configFamily(sourceFlavour) === 'bbl'
+    return !!(prof && P && P.prusaProjectReady === true && P.configFamily && P.configFamily(sourceFlavour) === 'bbl'
       && P.configFamily(prof.flavour) === 'prusa' && prof.printerSettingsId && prof.bed && prof.bed.x);
   }
   // What the project will hold, from the main process's plan (hub:prusa-plan): the tools to load,
@@ -307,7 +307,7 @@
           'Read from a thinned mesh — a colour covering very few faces may be missed.'))}</div>`
       : '';
     return `<details class="conv-plates"><summary>${escapeHtml(
-      tf('conv.plate_colours', '{n} plates, each using its own colours').replace('{n}', pp.length))}</summary>${rows}${sampled}</details>`;
+      tf('conv.plate_colours', '{n} plates, each using its own colours'.replace('{n}', pp.length), { n: pp.length }))}</summary>${rows}${sampled}</details>`;
   }
 
   function changesHtml(a, targetId) {
@@ -340,14 +340,14 @@
       const pp = Array.isArray(a.platePalettes) ? a.platePalettes.filter((p) => p.colors.length) : [];
       const overPlates = pp.filter((p) => p.colors.length > target.maxColors);
       if (pp.length > 1 && !overPlates.length) {
-        colBadge = `<span class="conv-fit ok">✓ ${escapeHtml(tf('conv.per_plate_fits', 'every plate fits {n}').replace('{n}', target.maxColors))}</span>`;
+        colBadge = `<span class="conv-fit ok">✓ ${escapeHtml(tf('conv.per_plate_fits', 'every plate fits {n}'.replace('{n}', target.maxColors), { n: target.maxColors }))}</span>`;
       } else if (pp.length > 1) {
         // Some fit, some do not. "2 over" is true of the FILE and unhelpful when 17 of 18
         // plates print as they are — it is the plate count that tells the maker what to do.
         colBadge = `<span class="conv-fit no">${_emoI('alert', '⚠', 12)}${escapeHtml(
-          tf('conv.plates_over', '{k} of {n} plates over').replace('{k}', overPlates.length).replace('{n}', pp.length))}</span>`;
+          tf('conv.plates_over', '{k} of {n} plates over'.replace('{k}', overPlates.length).replace('{n}', pp.length), { k: overPlates.length, n: pp.length }))}</span>`;
       } else {
-        colBadge = `<span class="conv-fit no">${_emoI('alert', '⚠', 12)}${escapeHtml(tf('conv.over_slots', '{n} over').replace('{n}', used - target.maxColors))}</span>`;
+        colBadge = `<span class="conv-fit no">${_emoI('alert', '⚠', 12)}${escapeHtml(tf('conv.over_slots', '{n} over'.replace('{n}', used - target.maxColors), { n: used - target.maxColors }))}</span>`;
       }
     }
     const rows = [
@@ -489,7 +489,7 @@
   }
 
   function plateLabel(p) {
-    const n = tf('conv.plate_n', 'Plate {n}').replace('{n}', p.index);
+    const n = tf('conv.plate_n', 'Plate {n}'.replace('{n}', p.index), { n: p.index });
     return p.name ? `${n} · ${p.name}` : n;
   }
 
@@ -510,7 +510,7 @@
         ${thumb}
         <div class="conv-pp-body">
           <div class="conv-pp-name">${escapeHtml(plateLabel(p))}</div>
-          <div class="conv-pp-meta">${escapeHtml(tf('conv.plate_objects', 'Objects: {n}').replace('{n}', p.objectCount))}<span class="conv-pp-cols">${cols}${approx}</span></div>
+          <div class="conv-pp-meta">${escapeHtml(tf('conv.plate_objects', 'Objects: {n}'.replace('{n}', p.objectCount), { n: p.objectCount }))}<span class="conv-pp-cols">${cols}${approx}</span></div>
           ${why}
           <div class="conv-pp-act">
             <button type="button" class="btn small" data-pp="convert" data-plate="${p.index}"${dis}>${escapeHtml(tf('conv.plate_convert', 'Convert this plate'))}</button>
@@ -520,7 +520,7 @@
       </div>`;
     }).join('');
     return `<div class="conv-pp">
-      <div class="conv-pp-head">${escapeHtml(tf('conv.plates_title', '{n} plates — convert or save one on its own').replace('{n}', plates.length))}</div>
+      <div class="conv-pp-head">${escapeHtml(tf('conv.plates_title', '{n} plates — convert or save one on its own'.replace('{n}', plates.length), { n: plates.length }))}</div>
       <p class="conv-pp-hint">${escapeHtml(tf('conv.plates_hint', 'Each plate becomes a 3MF of its own, with just its objects and the project’s colours.'))}</p>
       <div class="conv-pp-grid">${cards}</div>
     </div>`;
@@ -544,11 +544,11 @@
       if (!plates.some((x) => x.index === index)) return;
       const h = hub();
       root.querySelectorAll('[data-pp]').forEach((b) => { b.disabled = true; });
-      toast(tf('conv.plate_extracting', 'Splitting out plate {n}…').replace('{n}', index), 'info', 1600);
+      toast(tf('conv.plate_extracting', 'Splitting out plate {n}…'.replace('{n}', index), { n: index }), 'info', 1600);
       try {
         if (btn.dataset.pp === 'save') {
           const r = await h.mfPlateSave(src.path, index);
-          if (r && r.ok) toast(tf('conv.plate_saved', 'Plate {n} saved as its own 3MF.').replace('{n}', index), 'success', 3200);
+          if (r && r.ok) toast(tf('conv.plate_saved', 'Plate {n} saved as its own 3MF.'.replace('{n}', index), { n: index }), 'success', 3200);
           else if (!(r && r.canceled)) fail(r);
         } else {
           const r = await h.mfPlateExtract(src.path, index);
