@@ -377,6 +377,10 @@ public actor KhaytEngine {
         // with the shelf about whether it can. Loaded AFTER both, because it
         // reaches for them through the global.
         "machine-band",
+        // What each machine is doing, for a screen across the shop: one card
+        // each, the job on it and how far along. The kiosk window draws it;
+        // the desktop's board draws the same cards.
+        "kiosk",
         // What a shop has been paid, and what that makes an order. One answer
         // to "is this paid" instead of the three that had drifted apart — the
         // smallest of which was the one that WROTE the field the others read.
@@ -8977,6 +8981,56 @@ public actor KhaytEngine {
         /// Whether a spec row is worth showing for this kind. A laser has no
         /// extruder, and Khayt used to tell it its nozzle was 0.4 mm.
         public func shows(_ field: String) -> Bool { specs.contains(field) }
+    }
+
+    // MARK: - The kiosk
+
+    /// One card per machine for a screen across the shop: `lib/kiosk.js`.
+    ///
+    /// `live` is the band's shape — `{ progress, timeRemaining }` for a printer
+    /// that is printing, `{ error }` for one that is not answering — so the
+    /// card reads the printer's own progress where there is one and the clock
+    /// against the estimate where there is not.
+    public func kiosk(machines: [JSONValue], orders: [JSONValue],
+                      live: [String: JSONValue], mode: String,
+                      now: Date) throws -> [KioskCard] {
+        try runtime.call2("""
+            (function (a) { return KhaytKiosk.cards(a); })(ARG0)
+            """,
+            [.object([
+                "machines": .array(machines), "orders": .array(orders),
+                "live": .object(live), "mode": .string(mode),
+                "now": .number(now.timeIntervalSince1970 * 1000),
+            ])],
+            as: [KioskCard].self)
+    }
+
+    public struct KioskCard: Decodable, Sendable, Hashable, Identifiable {
+        public var id: String { machineId }
+        public let machineId: String
+        public let name: String
+        /// Empty when it would only repeat the name.
+        public let model: String
+        /// The job's status, `idle`, or `busy` — printing something the book
+        /// has no job for.
+        public let state: String
+        /// The printer did not answer its last polls.
+        public let offline: Bool
+        public let orderId: String
+        public let project: String
+        /// Empty in a mode with no customers.
+        public let clientId: String
+        public let clientLabel: String
+        public let dueDate: String
+        /// `printer`, `estimate` or `none` — where `pct` came from.
+        public let source: String
+        /// 0–100, for the bar. Nil when nothing is known.
+        public let pct: Double?
+        public let remainingMinutes: Double?
+        /// How far past its estimate a print still running is. The bar stops at
+        /// 100; this does not.
+        public let overrunMinutes: Double
+        public let totalHours: Double?
     }
 
     // MARK: - The next 48 hours on the machines

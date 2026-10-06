@@ -226,71 +226,55 @@ function renderCalendarView() {
 }
 
 /* ── Kiosk view ─────────────────────────────────────────── */
+// What each machine is doing is lib/kiosk.js, shared with the Mac; this draws it.
 function renderKioskView() {
   const el = $('#kioskView');
   if (!el) return;
 
-  // Build a map: machineId → current active order
-  const activeMachines = machines.filter(m => !m.deleted);
-  const activeOrders = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
+  const statusColors = {
+    printing: '#22c55e',
+    busy:     '#22c55e',
+    post:     '#f59e0b',
+    qc:       '#3b82f6',
+    pending:  '#6b7280',
+    on_hold:  '#ef4444',
+  };
+  const idleColor = '#374151';
 
-  const cards = activeMachines.map(m => {
-    const job = activeOrders.filter(o => o.machineId === m.id)
-      .sort((a, b) => {
-        const rankOf = s => ({ printing: 0, post: 1, qc: 2, pending: 3, on_hold: 4 })[s] ?? 5;
-        return rankOf(a.status) - rankOf(b.status);
-      })[0] || null;
-
-    const statusColors = {
-      printing: '#22c55e',
-      post:     '#f59e0b',
-      qc:       '#3b82f6',
-      pending:  '#6b7280',
-      on_hold:  '#ef4444',
-    };
-    const idleColor = '#374151';
-
-    const borderColor = job ? (statusColors[job.status] || '#6b7280') : idleColor;
+  const cards = KhaytKiosk.cards({
+    machines, orders: printLog, mode: settings.mode, now: Date.now(),
+  }).map(card => {
+    const borderColor = card.state === 'idle' ? idleColor : (statusColors[card.state] || '#6b7280');
 
     let progressHtml = '';
-    if (job) {
-      const printHrs = +job.printTime || 0;
-      const startedAt = job.printingStartedAt ? new Date(job.printingStartedAt).getTime() : null;
-      let pct = 0;
+    if (card.orderId) {
+      const client = card.clientId ? clients.find(c => c.id === card.clientId) : null;
+      const clientName = client ? localName(client) : card.clientLabel;
       let etaStr = '';
-      if (printHrs > 0 && startedAt) {
-        const elapsed = (Date.now() - startedAt) / 3600000;
-        pct = Math.min(100, Math.round((elapsed / printHrs) * 100));
-        const remaining = Math.max(0, printHrs - elapsed);
-        if (remaining > 0) {
-          const h = Math.floor(remaining);
-          const min = Math.round((remaining - h) * 60);
-          etaStr = h > 0 ? `${h}h ${min}m` : `${min}m`;
-        } else {
-          etaStr = t('kiosk.done') || 'Done';
-        }
-      } else if (printHrs > 0) {
-        etaStr = `~${printHrs}h total`;
+      if (card.overrunMinutes > 0) {
+        // Past its estimate and still printing: say by how much, not "Done".
+        etaStr = `+${KhaytKiosk.duration(card.overrunMinutes)}`;
+      } else if (card.remainingMinutes > 0) {
+        etaStr = KhaytKiosk.duration(card.remainingMinutes);
+      } else if (card.remainingMinutes === 0) {
+        etaStr = t('kiosk.done') || 'Done';
       }
-
-      // Enthusiast (hobbyist) mode has no clients — don't show a client name on kiosk cards.
-      const kioskBiz = (typeof KhaytTiers !== 'undefined') ? KhaytTiers.showsBusiness(settings.mode) : settings.mode !== 'enthusiast';
-      const client = (kioskBiz && job.clientId) ? clients.find(c => c.id === job.clientId) : null;
-      const clientName = kioskBiz ? (client ? localName(client) : (job.client || '')) : '';
+      const pct = card.pct || 0;
 
       progressHtml = `
         <div class="kiosk-job">
-          <div class="kiosk-job-name">${escapeHtml(job.project || t('inv.walk_in'))}</div>
+          <div class="kiosk-job-name">${escapeHtml(card.project || t('inv.walk_in'))}</div>
           ${clientName ? `<div class="kiosk-job-client">👤 ${escapeHtml(clientName)}</div>` : ''}
           <div class="kiosk-job-status">
-            <span class="badge ${escapeHtml(job.status)}" style="font-size:13px;padding:3px 10px;">${escapeHtml(t('queue.' + job.status))}</span>
+            <span class="badge ${escapeHtml(card.state)}" style="font-size:13px;padding:3px 10px;">${escapeHtml(t('queue.' + card.state))}</span>
           </div>
           ${pct > 0 ? `
           <div class="kiosk-progress-wrap">
             <div class="kiosk-progress-bar" style="width:${pct}%;background:${borderColor};"></div>
           </div>
-          <div class="kiosk-eta">${pct}% ${etaStr ? `· ETA ${escapeHtml(etaStr)}` : ''}</div>` : ''}
-          ${job.dueDate ? `<div class="kiosk-due">📅 ${escapeHtml(job.dueDate)}</div>` : ''}
+          <div class="kiosk-eta">${pct}% ${etaStr ? `· ${card.overrunMinutes > 0 ? '' : 'ETA '}${escapeHtml(etaStr)}` : ''}</div>` : (card.totalHours ? `
+          <div class="kiosk-eta">~${card.totalHours}h total</div>` : '')}
+          ${card.dueDate ? `<div class="kiosk-due">📅 ${escapeHtml(card.dueDate)}</div>` : ''}
         </div>`;
     } else {
       progressHtml = `<div class="kiosk-idle">${escapeHtml(t('kiosk.idle') || 'Idle')}</div>`;
@@ -298,8 +282,8 @@ function renderKioskView() {
 
     return `
       <div class="kiosk-card" style="border-color:${borderColor};">
-        <div class="kiosk-machine-name">${escapeHtml(m.name || m.model || m.id)}</div>
-        ${m.model && m.name !== m.model ? `<div class="kiosk-machine-model">${escapeHtml(m.model)}</div>` : ''}
+        <div class="kiosk-machine-name">${escapeHtml(card.name)}</div>
+        ${card.model ? `<div class="kiosk-machine-model">${escapeHtml(card.model)}</div>` : ''}
         ${progressHtml}
       </div>`;
   });

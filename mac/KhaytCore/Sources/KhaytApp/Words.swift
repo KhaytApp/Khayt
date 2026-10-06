@@ -3353,6 +3353,17 @@ final class Words {
         "ad.held":            ["en": "Held back",    "ar": "موقوفة"],
         "mac.bed_cleared":    ["en": "Bed is clear", "ar": "الطاولة فارغة"],
         "mac.help_title":    ["en": "Khayt Help",   "ar": "مساعدة خيط"],
+        // View ▸ Kiosk — see `KioskWindow`.
+        "mac.kiosk_title":   ["en": "Kiosk", "ar": "شاشة الورشة"],
+        "mac.kiosk_open":    ["en": "Open Kiosk", "ar": "فتح شاشة الورشة"],
+        "mac.kiosk_left":    ["en": "{time} left", "ar": "متبقٍ {time}"],
+        "mac.kiosk_over":    ["en": "{time} over its estimate", "ar": "تجاوزت تقديرها بـ {time}"],
+        "mac.kiosk_total":   ["en": "About {time} to print", "ar": "نحو {time} للطباعة"],
+        "mac.kiosk_due":     ["en": "Due {date}", "ar": "التسليم {date}"],
+        "mac.kiosk_from_printer": ["en": "from the printer", "ar": "من الطابعة"],
+        "mac.kiosk_estimated": ["en": "estimated", "ar": "تقديري"],
+        "mac.kiosk_unbooked": ["en": "Printing something not in the book",
+                               "ar": "تطبع شيئاً غير مسجّل في الدفتر"],
         // Help ▸ Send Feedback… — see `Feedback`.
         "mac.feedback_menu":  ["en": "Send Feedback\u{2026}", "ar": "إرسال ملاحظات\u{2026}"],
         "mac.feedback_title": ["en": "Send Feedback", "ar": "إرسال ملاحظات"],

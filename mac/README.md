@@ -1098,9 +1098,7 @@ failed.
 
 ## Not yet built
 
-The rest of analytics, the cloud portal, the board's kiosk display (the
-other app's big-screen card per machine, for a monitor on the shop wall), and
-the LAN server's printer webhook — every other LAN route a phone or a customer
+The rest of analytics, the cloud portal, and the LAN server's printer webhook — every other LAN route a phone or a customer
 uses is here, including `/status/<id>` and the storefront and carrier webhooks;
 the printer webhook matters least, because this app polls its printers
 itself. `KhaytCore` came first

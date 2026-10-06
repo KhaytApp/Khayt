@@ -15882,6 +15882,16 @@ final class Shop {
         // that had never answered at all. `heard` decides the grace now, for
         // all three. A machine Khayt has no protocol for, or one not set up,
         // is still counted as free: the shop plans those by hand.
+        return try? await engine.machineBand(machines: machineRows, orders: orderRows,
+                                             inventory: inventoryRows, live: liveReadings(),
+                                             now: Date(), hours: hours)
+    }
+
+    /// What the printers said, in the shape `lib/machine-band.js` and
+    /// `lib/kiosk.js` both read: a reading only for a machine that is
+    /// PRINTING (see `machineBand` for why an idle answer is left out), an
+    /// `error` for one that is not answering.
+    private func liveReadings() -> [String: JSONValue] {
         var live: [String: JSONValue] = [:]
         for machine in machines {
             if let status = printers.heard(machine.id) {
@@ -15894,9 +15904,16 @@ final class Shop {
                 live[machine.id] = .object(["error": .string(why)])
             }
         }
-        return try? await engine.machineBand(machines: machineRows, orders: orderRows,
-                                             inventory: inventoryRows, live: live,
-                                             now: Date(), hours: hours)
+        return live
+    }
+
+    /// The kiosk's cards: one per machine, from the same readings as the band,
+    /// so the screen across the room cannot disagree with the Machines screen
+    /// about which printer is printing.
+    func kiosk() async -> [KhaytEngine.KioskCard]? {
+        guard let engine else { return nil }
+        return try? await engine.kiosk(machines: machineRows, orders: orderRows,
+                                       live: liveReadings(), mode: mode, now: Date())
     }
 
     /// What one machine is due for.
