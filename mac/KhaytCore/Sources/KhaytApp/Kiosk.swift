@@ -155,6 +155,21 @@ enum KioskGrid {
 }
 
 /// One machine.
+/// A length of time as the kiosk spells it: "5h 40m", "5س 40د".
+///
+/// Not `Hours.spell`'s "5:40". That reads fine on the machine band, up close
+/// and under a ruler of clock times; on a screen across the shop, under the
+/// header's clock, "about 18:04 to print" reads as six in the evening. The
+/// units say which it is. Latin digits, as everywhere else in the app.
+enum KioskTime {
+    static func spell(_ minutes: Double, _ language: String) -> String {
+        let whole = max(0, Int(saturating: minutes.rounded()))
+        return Duration.seconds(whole * 60).formatted(
+            .units(allowed: [.hours, .minutes], width: .narrow, zeroValueUnits: .hide)
+                .locale(Locale(identifier: language + "@numbers=latn")))
+    }
+}
+
 struct KioskCardView: View {
     let card: KhaytEngine.KioskCard
     let shop: Shop
@@ -245,7 +260,7 @@ struct KioskCardView: View {
             if let pct = card.pct {
                 progress(pct)
             } else if let total = card.totalHours, total > 0 {
-                Text(words.callIt("mac.kiosk_total", ["time": .string(Hours.spell(total * 60))]))
+                Text(words.callIt("mac.kiosk_total", ["time": .string(KioskTime.spell(total * 60, words.language))]))
                     .font(.system(size: 16 * scale).monospacedDigit())
                     .foregroundStyle(Role.text2)
             }
@@ -303,11 +318,11 @@ struct KioskCardView: View {
                 Text("\(Int(pct.rounded()))%")
                     .font(.system(size: 22 * scale, weight: .bold).monospacedDigit())
                 if card.overrunMinutes > 0 {
-                    Text(words.callIt("mac.kiosk_over", ["time": .string(Hours.spell(card.overrunMinutes))]))
+                    Text(words.callIt("mac.kiosk_over", ["time": .string(KioskTime.spell(card.overrunMinutes, words.language))]))
                         .foregroundStyle(Khayt.late)
                 } else if let left = card.remainingMinutes {
                     Text(left > 0
-                         ? words.callIt("mac.kiosk_left", ["time": .string(Hours.spell(left))])
+                         ? words.callIt("mac.kiosk_left", ["time": .string(KioskTime.spell(left, words.language))])
                          : words.callIt("kiosk.done"))
                         .foregroundStyle(Role.text2)
                 }

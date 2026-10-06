@@ -4,6 +4,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Kiosk: times say their units.** "About 18:04 to print" read as six
+  in the evening on a screen across the room, under the kiosk's own clock. The
+  kiosk now writes "About 18h 4m to print", "5h 40m left".
+
 - **iOS: a UI pass in English, Arabic and dark mode.** Four things a shop
   would have seen:
   - **"Explore with a sample shop" opened nothing.** It wrote the sample book
