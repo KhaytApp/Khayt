@@ -206,7 +206,7 @@ struct OrderDetailContent: View {
             LevelBar(fraction: Double(min(100, max(0, progress))) / 100, color: KhaytDesign.hot, height: 7)
                 .animation(.easeOut(duration: 0.45), value: progress)
             if let eta = live.etaLocalized, let done = live.finishesAt() {
-                Text(String(format: L10n.tr("machines.left_until"), eta,
+                Text(L10n.format("machines.left_until", eta,
                             done.formatted(date: .omitted, time: .shortened)))
                     .font(.khayt(12.5, relativeTo: .footnote).monospacedDigit())
                     .foregroundStyle(KhaytDesign.note)
@@ -314,7 +314,7 @@ struct OrderDetailContent: View {
                         ProgressView().tint(KhaytDesign.onBrand)
                     } else {
                         Text(next == .completed ? L10n.tr("order.detail.mark_done")
-                                                : String(format: L10n.tr("order.detail.move_to"), next.localizedLabel))
+                                                : L10n.format("order.detail.move_to", next.localizedLabel))
                         Image(systemName: "arrow.forward")
                             .flipsForRightToLeftLayoutDirection(true)
                     }

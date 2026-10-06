@@ -51,7 +51,7 @@ struct NewOrderSheet: View {
                             TextField("", text: $draft.material, prompt: prompt("PLA · Ink"))
                         }
                         // The shop's own currency when the book says it.
-                        field(currency.map { String(format: L10n.tr("order.new.price_in"), Money.mark($0)) }
+                        field(currency.map { L10n.format("order.new.price_in", Money.mark($0)) }
                               ?? L10n.tr("order.new.price")) {
                             TextField("", text: $draft.price, prompt: prompt("0"))
                                 .keyboardType(.decimalPad)

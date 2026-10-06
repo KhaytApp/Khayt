@@ -16,6 +16,10 @@ final class CompanionNotifications: ObservableObject {
     func requestAuthorizationIfNeeded() async {
         // Skip the system permission prompt during automated screenshot runs.
         if ProcessInfo.processInfo.environment["KHAYT_SCREENSHOT"] != nil { return }
+        #if DEBUG
+        // The sample-shop launch line (see `KhaytCompanionApp`) is a screenshot run too.
+        if UserDefaults.standard.bool(forKey: "KhaytSampleShop") { return }
+        #endif
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
         if settings.authorizationStatus == .notDetermined {
@@ -57,7 +61,7 @@ final class CompanionNotifications: ObservableObject {
                 post(
                     id: "khayt.queue",
                     title: L10n.tr("notify.queue.title"),
-                    body: String(format: L10n.tr("notify.queue.body"), q, p)
+                    body: L10n.format("notify.queue.body", q, p)
                 )
             }
             lastQueued = q
@@ -70,7 +74,7 @@ final class CompanionNotifications: ObservableObject {
                 post(
                     id: "khayt.overdue",
                     title: L10n.tr("notify.overdue.title"),
-                    body: String(format: L10n.tr("notify.overdue.body"), overdue)
+                    body: L10n.format("notify.overdue.body", overdue)
                 )
             }
             lastOverdueCount = overdue
@@ -81,7 +85,7 @@ final class CompanionNotifications: ObservableObject {
                 post(
                     id: "khayt.lowstock",
                     title: L10n.tr("notify.low_stock.title"),
-                    body: String(format: L10n.tr("notify.low_stock.body"), lowStockCount)
+                    body: L10n.format("notify.low_stock.body", lowStockCount)
                 )
             }
             lastLowStock = lowStockCount

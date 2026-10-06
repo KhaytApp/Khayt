@@ -55,7 +55,23 @@ struct KhaytCompanionApp: App {
         }
         PushTokenDelegate.api = apiClient
         KhaytType.applyNavigationBarAppearance()
+        #if DEBUG
+        Self.openForScreenshots(apiClient)
+        #endif
     }
+
+    #if DEBUG
+    /// `-KhaytSampleShop YES -KhaytTab orders` on the launch line: the sample
+    /// shop, opened on that tab, so every screen can be photographed from the
+    /// command line (`simctl launch`) without a tap. Debug builds only.
+    private static func openForScreenshots(_ api: KhaytAPIClient) {
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: "KhaytSampleShop") { try? api.openSampleShop() }
+        if let tab = defaults.string(forKey: "KhaytTab") {
+            defaults.set(tab, forKey: "khayt.pending.tab")
+        }
+    }
+    #endif
 
     var body: some Scene {
         WindowGroup {

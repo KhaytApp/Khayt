@@ -86,7 +86,7 @@ struct SpoolDetailPage: View {
             Button(L10n.tr("common.remove"), role: .destructive) { Task { await removeSpool() } }
             Button(L10n.tr("common.cancel"), role: .cancel) {}
         } message: {
-            Text(String(format: L10n.tr("inventory.remove.body"), spool.displayLabel))
+            Text(L10n.format("inventory.remove.body", spool.displayLabel))
         }
         .onDisappear { writeTask?.cancel(); flushIfPending() }
     }
@@ -152,7 +152,7 @@ struct SpoolDetailPage: View {
 
     private func nudge(_ grams: Int) -> some View {
         Button { set(remaining + grams) } label: {
-            Text(grams < 0 ? "−\(-grams) g" : "+\(grams) g")
+            Text((grams < 0 ? "−" : "+") + L10n.grams(abs(grams)))
                 .font(.khayt(15, .semibold, relativeTo: .body))
                 .foregroundStyle(KhaytDesign.ink)
                 .frame(maxWidth: .infinity, minHeight: 46)
@@ -276,7 +276,10 @@ struct SpoolSwatch: View {
         Circle()
             .fill(hex.flatMap { Color(hex: $0) } ?? KhaytDesign.sunk)
             .frame(width: size, height: size)
-            .overlay(Circle().strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+            // Ink, not the hairline: a black spool on the dark surface had
+            // only #3a342c around it and vanished; a white one did the same
+            // in light. A faint ring of the text colour shows both.
+            .overlay(Circle().strokeBorder(KhaytDesign.ink.opacity(0.22), lineWidth: 1))
             .accessibilityHidden(true)
     }
 }

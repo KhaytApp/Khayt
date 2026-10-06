@@ -156,7 +156,7 @@ struct InventoryView: View {
 
     private var wholeLine: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(String(format: L10n.tr("inventory.whole.count"), spools.count.formatted()))
+            Text(L10n.format("inventory.whole.count", spools.count.formatted()))
                 .font(.khayt(12.5, .semibold, relativeTo: .footnote).monospacedDigit())
                 .foregroundStyle(KhaytDesign.ink)
             Text(L10n.tr("inventory.whole.body"))
@@ -220,10 +220,11 @@ private struct SpoolRow: View {
                         Spacer(minLength: 0)
                     }
                     if let left = spool.remainingGrams {
-                        Text("\(Int(left.rounded())) g")
+                        // Not forced left-to-right: in Arabic the unit is
+                        // a word, "١٢٠ غ", and reads in the line's own direction.
+                        Text(L10n.grams(Int(left.rounded())))
                             .font(.khayt(12.5, .medium, relativeTo: .caption).monospacedDigit())
                             .foregroundStyle(tone)
-                            .environment(\.layoutDirection, .leftToRight)
                     }
                 }
             }

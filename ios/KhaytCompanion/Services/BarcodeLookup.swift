@@ -59,7 +59,7 @@ struct BarcodeLookup {
             if let product = try await productDatabase(code) {
                 var draft = Self.draft(fromTitle: product.title, brand: product.brand)
                 draft.barcode = code
-                draft.sourceNote = String(format: L10n.tr("barcode.source.database"), product.title)
+                draft.sourceNote = L10n.format("barcode.source.database", product.title)
                 return .inDatabase(draft, title: product.title)
             }
             return Self.notFound(code, L10n.tr("barcode.not_found"))
@@ -98,7 +98,7 @@ struct BarcodeLookup {
     private static func notFound(_ code: String, _ reason: String) -> Found {
         var draft = SpoolDraft()
         draft.barcode = code
-        draft.sourceNote = String(format: L10n.tr("barcode.source.code"), code, reason)
+        draft.sourceNote = L10n.format("barcode.source.code", code, reason)
         return .notFound(draft, reason: reason)
     }
 

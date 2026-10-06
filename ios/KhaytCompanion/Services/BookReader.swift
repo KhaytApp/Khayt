@@ -133,7 +133,17 @@ actor BookReader {
     /// The money is the shop's own rules: `owedByOrder` (credit notes, gift
     /// cards and foreign currency taken into account) and `pnlByPeriod`, the
     /// P&L's month rows — not arithmetic done here.
-    func pulse(now: Date = Date(), calendar: Calendar = .current) async throws -> ShopPulse {
+    ///
+    /// ── THE BOOK'S CALENDAR IS GREGORIAN, WHATEVER THE PHONE'S IS ───────
+    ///
+    /// `pnlByPeriod` keys its rows "2026-09". A phone set to Saudi Arabia runs
+    /// Umm al-Qura, so `Calendar.current` made this month "1448-04" and this
+    /// year "1448-", matched no row, and every Saudi shop read 0 and 0. Only
+    /// the caller's time zone is taken; the calendar is always Gregorian —
+    /// the Mac's `Calendar.book` rule (#1568).
+    func pulse(now: Date = Date(), calendar callers: Calendar = .current) async throws -> ShopPulse {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = callers.timeZone
         let store = try book.read()
         let status = try await status(today: Self.today())
         let orders: [JSONValue] = { if case .array(let r)? = store["printLog"] { return r }; return [] }()

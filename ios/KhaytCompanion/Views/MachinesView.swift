@@ -25,8 +25,7 @@ struct MachinesView: View {
     /// off" are different things to a shop deciding whether to drive in.
     private var staleNote: String {
         if let reported = printers.reportedAt {
-            return String(format: L10n.tr("machines.reported"),
-                          reported.formatted(.relative(presentation: .named)))
+            return L10n.format("machines.reported", reported.formatted(.relative(presentation: .named)))
         }
         return L10n.tr("machines.stale")
     }
@@ -113,8 +112,7 @@ struct LiveStamp: View {
                         .font(.khayt(11, .bold, relativeTo: .caption2))
                         .tracking(0.9)
                         .foregroundStyle(KhaytDesign.done)
-                    Text(String(format: L10n.tr("machines.live.ago"),
-                                max(0, Int(context.date.timeIntervalSince(printers.reportedAt ?? at)))))
+                    Text(L10n.format("machines.live.ago", max(0, Int(context.date.timeIntervalSince(printers.reportedAt ?? at)))))
                         .font(.khayt(11.5, relativeTo: .caption2).monospacedDigit())
                         .foregroundStyle(KhaytDesign.note)
                     if printers.source == .cloud {
@@ -204,7 +202,7 @@ private struct MachineCard: View {
                 .padding(.top, 11)
                 // What a shop plans by: how long, and what time on the clock.
                 if let eta = live.etaLocalized, let done = live.finishesAt() {
-                    Text(String(format: L10n.tr("machines.left_until"), eta,
+                    Text(L10n.format("machines.left_until", eta,
                                 done.formatted(date: .omitted, time: .shortened)))
                         .font(.khayt(12.5, relativeTo: .caption).monospacedDigit())
                         .foregroundStyle(KhaytDesign.note)

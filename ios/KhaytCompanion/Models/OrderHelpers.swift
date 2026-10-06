@@ -7,7 +7,15 @@ extension QueueOrder {
 
     var formattedDueDate: String? {
         guard let dueDate, !dueDate.isEmpty else { return nil }
-        return dueDate
+        // "8 Oct" / "٨ أكتوبر" in the app's language, the year only when it is
+        // not this one — rather than the book's "2026-10-08", which read as a
+        // stray Western number on an Arabic screen. Unparseable: as written.
+        guard let date = DueDateParser.parse(dueDate) else { return dueDate }
+        let gregorian = Calendar(identifier: .gregorian)   // the book's calendar, as `pulse` says why
+        let thisYear = gregorian.isDate(date, equalTo: Date(), toGranularity: .year)
+        let style = Date.FormatStyle(date: .omitted, time: .omitted, locale: L10n.locale, calendar: gregorian)
+            .day().month(.abbreviated)
+        return thisYear ? date.formatted(style) : date.formatted(style.year())
     }
 }
 

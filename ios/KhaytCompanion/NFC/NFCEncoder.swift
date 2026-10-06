@@ -41,7 +41,7 @@ enum NFCEncodeError: Error, LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .missingMaterial: return L10n.tr("nfc.error.missing_material")
-        case .payloadTooLarge(let n): return String(format: L10n.tr("nfc.error.payload_large"), n)
+        case .payloadTooLarge(let n): return L10n.format("nfc.error.payload_large", n)
         case .invalidColor: return L10n.tr("nfc.error.invalid_color")
         }
     }

@@ -833,7 +833,7 @@ final class KhaytAPIClient: ObservableObject {
             do {
                 added.append(try await postSpool(draft: draft, material: material))
             } catch where !added.isEmpty {
-                throw KhaytAPIError.server(String(format: L10n.tr("error.partial_add"), added.count, count, error.localizedDescription))
+                throw KhaytAPIError.server(L10n.format("error.partial_add", added.count, count, error.localizedDescription))
             }
         }
         return added
@@ -893,14 +893,14 @@ final class KhaytAPIClient: ObservableObject {
             switch err {
             case .transport, .notConfigured, .invalidURL:
                 throw KhaytAPIError.server(
-                    String(format: L10n.tr("connection.error.reach_status"), settings.displayURL)
+                    L10n.format("connection.error.reach_status", settings.displayURL)
                 )
             default:
                 throw err
             }
         } catch {
             throw KhaytAPIError.server(
-                String(format: L10n.tr("connection.error.reach_status"), settings.displayURL)
+                L10n.format("connection.error.reach_status", settings.displayURL)
             )
         }
         do {

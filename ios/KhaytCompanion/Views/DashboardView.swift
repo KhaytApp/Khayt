@@ -48,7 +48,7 @@ struct DashboardView: View {
                     section(L10n.tr("home.pipeline"), trailing: L10n.tr("pulse.tap_to_filter"))
                     lanes
                     alerts.padding(.top, 16)
-                    section(laneTitle, trailing: String(format: L10n.tr("pulse.jobs"), laneJobs.count))
+                    section(laneTitle, trailing: L10n.format("pulse.jobs", laneJobs.count))
                     jobs
                     Text(L10n.tr("pulse.swipe_hint"))
                         .font(.khayt(11.5, relativeTo: .caption2))
@@ -121,7 +121,7 @@ struct DashboardView: View {
                 }
             }
             .accessibilityLabel(L10n.tr("feed.title"))
-            .accessibilityValue(feed.unreadCount > 0 ? String(format: L10n.tr("feed.unread_count"), feed.unreadCount) : "")
+            .accessibilityValue(feed.unreadCount > 0 ? L10n.format("feed.unread_count", feed.unreadCount) : "")
             Menu {
                 Button { showQuote = true } label: { Label(L10n.tr("home.action.quote"), systemImage: "tag") }
                 Button { showWaste = true } label: { Label(L10n.tr("home.action.waste"), systemImage: "trash") }
@@ -156,7 +156,7 @@ struct DashboardView: View {
 
     private func countTile(_ value: Int?, _ label: String, tint: Color, label labelTint: Color, rail: Color?) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(value.map(String.init) ?? "—")
+            Text(value.map { $0.formatted(.number.locale(L10n.locale)) } ?? "—")
                 .font(.khayt(34, .semibold, relativeTo: .largeTitle).monospacedDigit())
                 .foregroundStyle(value == nil ? KhaytDesign.note : tint)
                 .environment(\.layoutDirection, .leftToRight)
@@ -180,7 +180,7 @@ struct DashboardView: View {
     private var money: some View {
         HStack(spacing: 0) {
             moneyFigure(pulse.map { $0.owed }, L10n.tr("pulse.owed"),
-                        note: pulse.map { String(format: L10n.tr("pulse.unpaid"), $0.unpaid) } ?? "",
+                        note: pulse.map { L10n.format("pulse.unpaid", $0.unpaid) } ?? "",
                         tint: KhaytDesign.attention)
             Rectangle().fill(KhaytDesign.hairline).frame(width: 1)
             moneyFigure(pulse?.thisMonth, L10n.tr("pulse.this_month"), note: currencyNote, tint: KhaytDesign.done)
@@ -283,7 +283,7 @@ struct DashboardView: View {
                               title: L10n.count("pulse.low_stock", lowSpools.count),
                               sub: lowSpools.map { spool in
                                   let grams = Int((spool.remainingGrams ?? 0).rounded())
-                                  return "\(spool.displayLabel) · \(grams) \(L10n.tr("unit.g"))"
+                                  return "\(spool.displayLabel) · \(L10n.grams(grams))"
                               }.joined(separator: " · ")) {
                         ordersNav.openLowStock()
                     }
