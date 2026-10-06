@@ -164,15 +164,17 @@ struct KioskCardView: View {
 
     /// The palette's own sentences, as the board uses them: printing is "hot",
     /// held wants a person, and the ordinary course of a job is ordinary text.
-    private var tint: Color {
-        if card.offline { return Khayt.late }
+    private var stateTint: Color {
         switch card.state {
-        case "printing", "busy": return Khayt.hot
-        case "on_hold": return Khayt.attention
-        case "idle": return Role.text3
-        default: return Role.text2
+        case "printing", "busy": Khayt.hot
+        case "on_hold": Khayt.attention
+        case "idle": Role.text3
+        default: Role.text2
         }
     }
+
+    /// The border: the state, unless the printer has stopped answering.
+    private var tint: Color { card.offline ? Khayt.late : stateTint }
 
     private var stateWord: String {
         switch card.state {
@@ -215,7 +217,10 @@ struct KioskCardView: View {
                     }
                 }
                 Spacer(minLength: 8)
-                chip(stateWord, tint)
+                // The state's own colour: a machine that is idle AND not
+                // answering is not an idle machine in red; the chip below says
+                // the second thing.
+                chip(stateWord, stateTint)
             }
             if card.offline {
                 chip(words.callIt("ad.no_reading"), Khayt.late)
@@ -249,7 +254,8 @@ struct KioskCardView: View {
                                    ["date": .string(words.say(due, .dateTime.day().month(.abbreviated)))]),
                       systemImage: "calendar")
                     .font(.system(size: 15 * scale))
-                    .foregroundStyle(Role.text2)
+                    // Past it, in the palette's word for late.
+                    .foregroundStyle(due < Calendar.book.startOfDay(for: Date()) ? Khayt.late : Role.text2)
             }
         }
         .padding(18 * scale)
@@ -275,10 +281,19 @@ struct KioskCardView: View {
 
     private func progress(_ pct: Double) -> some View {
         VStack(alignment: .leading, spacing: 4 * scale) {
-            ProgressView(value: min(100, max(0, pct)), total: 100)
-                .progressViewStyle(.linear)
-                .tint(tint)
-                .scaleEffect(x: 1, y: max(1, 2 * scale), anchor: .center)
+            // Drawn rather than a `ProgressView`: the control's height cannot be
+            // set, and stretching it with `scaleEffect` does not move the
+            // layout, so a bar tall enough to read across a room overlapped the
+            // line under it. The fill scales from the LEADING edge, which
+            // follows the writing direction — an Arabic bar fills from the right.
+            Capsule()
+                .fill(Role.line2)
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(tint)
+                        .scaleEffect(x: min(1, max(0, pct / 100)), y: 1, anchor: .leading)
+                }
+                .frame(height: 10 * scale)
                 .padding(.vertical, 4 * scale)
             HStack(spacing: 6 * scale) {
                 Text("\(Int(pct.rounded()))%")
