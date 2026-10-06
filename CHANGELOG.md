@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **LAN printer webhook: a job a printer starts now has a start time.** When a
+  printer told Khayt a print had started or finished, the job moved column but
+  its start was saved under a name nothing reads, so it showed no elapsed time,
+  no ETA and no running timer. The move now goes through the same rule as
+  dragging the card, which also records it in the job's history. And a status
+  you set on the desktop while the printer's message was arriving is no longer
+  overwritten by it.
+
 - **Converter: convert or save one plate of a multi-plate project.** Opening a
   Bambu Studio or Orca project with several plates now shows a plate list —
   each plate's picture, name, object count and colours — with "Convert this
