@@ -286,12 +286,16 @@ struct KioskCardView: View {
             // layout, so a bar tall enough to read across a room overlapped the
             // line under it. The fill scales from the LEADING edge, which
             // follows the writing direction — an Arabic bar fills from the right.
+            // And it is a gauge (`growsToItsReading`): it travels to a new
+            // reading rather than jumping, which on a screen nobody touches is
+            // the only sign the printer said something.
             Capsule()
                 .fill(Role.line2)
                 .overlay(alignment: .leading) {
                     Capsule()
                         .fill(tint)
                         .scaleEffect(x: min(1, max(0, pct / 100)), y: 1, anchor: .leading)
+                        .growsToItsReading(pct, from: .leading)
                 }
                 .frame(height: 10 * scale)
                 .padding(.vertical, 4 * scale)
