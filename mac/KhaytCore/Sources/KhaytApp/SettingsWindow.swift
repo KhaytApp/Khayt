@@ -999,6 +999,9 @@ struct OperationsPane: View {
                     Toggle(shop.words.callIt("set.qc_require_photo"), isOn: $draft.qcRequirePhotoOnFail).disabled(!draft.qcEnabled)
                     numberRow("set.qc_warranty_days", $draft.qcWarrantyDays).disabled(!draft.qcEnabled)
                 }
+                // Records, written when saved — not part of the draft above.
+                // The other app keeps them on its Operations page too.
+                Section { LocationsSection(shop: shop) }
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,

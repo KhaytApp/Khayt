@@ -72,6 +72,9 @@ struct Reports: View {
     /// property of this quarter, and the measured-only filter already thins the
     /// readings enough without also throwing away last month's.
     @State private var accuracy: [KhaytEngine.MachineAccuracy] = []
+    /// The P&L by site, over the chosen period. Nil for a book with no
+    /// locations, and then nothing is drawn.
+    @State private var sites: KhaytEngine.LocationPl?
     @State private var shopAccuracy: KhaytEngine.MachineAccuracy?
     @State private var power: [KhaytEngine.MachinePower] = []
     @State private var variance: [KhaytEngine.ModelVariance] = []
@@ -106,7 +109,8 @@ struct Reports: View {
                                   accuracy: accuracy, shopAccuracy: shopAccuracy,
                                   power: power,
                                   maintenance: maintenance,
-                                  downtime: downtime, downtimeMonths: downtimeMonths)
+                                  downtime: downtime, downtimeMonths: downtimeMonths,
+                                  sites: sites)
             } else if shop.reportPage == .custom {
                 CustomReportPage(shop: shop)
             } else if rows.isEmpty {
@@ -229,6 +233,12 @@ struct Reports: View {
         // question about a stretch of time, and the same machine can be the
         // best one quarter and the worst the next. That is the point of asking.
         .task(id: shop.period) { await recomputeMachinePL() }
+        // And when a site is added, renamed or deleted, or a machine moved to
+        // another — none of which changes the period or the counts above.
+        .task(id: SitesKey(locations: shop.locationRows, placed: shop.machines.map { $0.locationId ?? "" },
+                           books: shop.orderRows.count + shop.expenseRows.count + shop.wasteRows.count)) {
+            if let engine = shop.engine { await recomputeSites(engine) }
+        }
         // And NOT with the period, beside it on the same screen. "Which machine
         // earned" is a question about a stretch of time; "is this machine
         // slower than its slicer thinks" is a question about the machine, and
@@ -525,6 +535,28 @@ struct Reports: View {
             now: Date(), months: 12)
     }
 
+    /// The shop's P&L split by site, for the same period as the machine P&L
+    /// beside it. Narrowed HERE — the module takes a range only as a callback
+    /// — with the same `inPeriod` every other figure on the page is narrowed
+    /// by; the P&L rule inside it decides which jobs are finished and count.
+    private func recomputeSites(_ engine: KhaytEngine) async {
+        guard !shop.locationRows.isEmpty else { sites = nil; return }
+        func dated(_ rows: [JSONValue]) -> [JSONValue] {
+            rows.filter { row in
+                guard case .object(let r) = row, case .string(let d)? = r["date"] else { return false }
+                return shop.inPeriod(d)
+            }
+        }
+        let report = try? await engine.locationPl(
+            orders: dated(shop.orderRows), expenses: dated(shop.expenseRows),
+            wasteLog: dated(shop.wasteRows), machines: shop.machineRows,
+            locations: shop.locationRows, settings: shop.settingsDict,
+            clients: shop.clientRows, currencies: Invoice.currencyTable(shop),
+            inventory: shop.inventoryRows, now: Date(),
+            recentMonthlyHours: shop.recentMonthlyHours)
+        sites = (report?.located ?? false) ? report : nil
+    }
+
     private func recomputeClientValue() async {
         guard let engine = shop.engine else { return }
         // NOT filtered to the chosen period. Lifetime value is a lifetime — a
@@ -679,6 +711,7 @@ struct Reports: View {
 
     private func recomputeMachinePL() async {
         guard let engine = shop.engine else { return }
+        await recomputeSites(engine)
         // ── ALL FOUR FILTERED THE SAME WAY ────────────────────────────────
         //
         // The module does not know what a range is, and the bug this code

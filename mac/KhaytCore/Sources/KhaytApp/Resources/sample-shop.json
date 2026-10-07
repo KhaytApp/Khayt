@@ -1,4 +1,16 @@
 {
+ "locations": [
+  {
+   "id": "LOC-sample-ryd",
+   "name": "Riyadh workshop",
+   "address": "Al Olaya, Riyadh"
+  },
+  {
+   "id": "LOC-sample-jed",
+   "name": "Jeddah studio",
+   "address": "Al Rawdah, Jeddah"
+  }
+ ],
  "printLog": [
   {
    "id": "ORD-01000",
@@ -2430,6 +2442,7 @@
  "machines": [
   {
    "id": "MACH-u1",
+   "locationId": "LOC-sample-ryd",
    "name": "Snapmaker U1",
    "smartPlug": { "type": "shelly-rpc", "host": "192.168.1.40", "autoOff": true, "delayMin": 10 },
    "loaded": [
@@ -2480,6 +2493,7 @@
   },
   {
    "id": "MACH-core-one",
+   "locationId": "LOC-sample-jed",
    "name": "Prusa CORE One",
    "loaded": [
     { "slot": 0, "hex": "#1E1E1E", "material": "PETG" }
@@ -2512,6 +2526,7 @@
   },
   {
    "id": "MACH-x1c",
+   "locationId": "LOC-sample-ryd",
    "name": "Bambu X1C",
    "vendor": "Bambu Lab",
    "printerModelName": "Bambu Lab X1 Carbon",
@@ -2554,6 +2569,7 @@
   },
   {
    "id": "MACH-UVFLAT",
+   "locationId": "LOC-sample-jed",
    "name": "Roland VersaUV",
    "kind": "uv",
    "color": "#3E5A70",
@@ -4227,6 +4243,7 @@
   },
   {
    "id": "EXP-0008",
+   "locationId": "LOC-sample-ryd",
    "date": "2026-09-01",
    "category": "electricity",
    "amount": 610,
@@ -4239,6 +4256,7 @@
   },
   {
    "id": "EXP-0007",
+   "locationId": "LOC-sample-jed",
    "date": "2026-08-27",
    "category": "maintenance",
    "amount": 180,

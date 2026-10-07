@@ -93,6 +93,7 @@ function loadAnalyticsStack() {
   // were missing here until a test seeded one.
   require('../lib/expense-categories.js'); // globalThis.KhaytExpenseCategories
   require('../lib/pnl-report.js'); // globalThis.KhaytPnl
+  require('../lib/location-pl.js'); // globalThis.KhaytLocationPl
   // The category chart labels its slices with the expenses screen's helper,
   // which is a plain global in the app.
   require('../renderer/expenses.js'); // expCatLabel

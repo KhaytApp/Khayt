@@ -47,6 +47,12 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     /// one is quoted at its flat wear rate, as every machine always was.
     let depreciation: Depreciation?
 
+    /// Which of the shop's sites this machine stands in (`store.locations`).
+    /// Empty, absent or naming a location since deleted all mean "none" —
+    /// `lib/location-pl.js` reads them the same way. A job on this machine
+    /// belongs to this site unless the job names one of its own.
+    let locationId: String?
+
     struct Depreciation: Decodable, Hashable, Sendable {
         let price: Double?
         let purchaseDate: String?

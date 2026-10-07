@@ -681,6 +681,7 @@ struct RoundTripTests {
         "editFiles": "a library edit hands one closure per field the shop changed; it never re-encodes a record",
         "saveSeen": "the LAN server's replay list, a file of its own; not a record in the book",
         "saveInstead": "Send Feedback's fallback: writes a zip to Downloads; reads the book, never writes it",
+        "saveLocation": "sets name and address on the stored record in place (Shop.writeLocation) and never re-encodes it; LocationsTests.editKeepsFields proves every other field survives",
     ]
 
     @Test("every save path is round-trip tested or says why it need not be")

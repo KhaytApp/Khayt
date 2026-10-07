@@ -91,8 +91,8 @@ test('a straight-line machine is costed on the hours it has actually printed lat
 test('the calculator, both P&Ls and the headline all carry recent hours', () => {
   const buildSrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'build.js'), 'utf8');
   assert.match(buildSrc, /machineWearRate\(m\)/, 'applyMachineToCalculator');
-  assert.equal((analyticsSrc.match(/recentMonthlyHours: \(typeof machineRecentHours === 'function' \? machineRecentHours\(\) : \{\}\)/g) || []).length, 7,
-    'three pnlByPeriod, three machineProfit, one periodCharges');
+  assert.equal((analyticsSrc.match(/recentMonthlyHours: \(typeof machineRecentHours === 'function' \? machineRecentHours\(\) : \{\}\)/g) || []).length, 8,
+    'three pnlByPeriod, three machineProfit, one periodCharges, and the per-location P&L that runs pnlByPeriod per site');
 });
 
 test('every machine P&L gets the whole book, so earlier hours count against its life', () => {

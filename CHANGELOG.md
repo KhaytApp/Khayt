@@ -4,6 +4,30 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Locations.** Settings → Operations now lists the shop's sites: add
+  one, rename it, change its address, or delete it. A machine's sheet has a
+  Location picker, its card on the Machines screen shows where it stands, and
+  Reports → Machines shows the P&L for each site over the chosen period.
+  Deleting a location marks its machines, spools, expenses and jobs as
+  unassigned, and ⌘Z restores the location and those links.
+
+- **Per-location P&L agrees with the P&L (both apps).** The desktop's location
+  breakdown did its own sums, and they disagreed with the P&L for the same
+  jobs:
+  - It priced each job at today's spool prices, with the quoting estimates for
+    power, wear and labour folded in, while also subtracting the real
+    electricity and maintenance bills. Those costs were counted twice, so a
+    site's profit read lower than the shop's.
+  - It counted the VAT a registered shop reclaims as a cost.
+  - It ignored a job's own location.
+
+  Each site's figures now come from the P&L itself, run once per site, so the
+  sites add up to the shop. Machine depreciation is charged to the site the
+  machine is at. Fixed overhead stays shop-wide and is not split. A site that
+  sold nothing shows a row of zeros instead of disappearing. A deleted
+  location no longer appears as a site named `LOC-…`, and deleting a location
+  on the desktop now clears what pointed at it, as the Mac does.
+
 - **Client retention, on the Mac and corrected on the desktop.** Reports →
   Best now has the client retention card: how many customers came back within
   30, 60 and 90 days of their first order, how long the ones who returned took,
