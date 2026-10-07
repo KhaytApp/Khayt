@@ -130,6 +130,10 @@ import KhaytCore
         let riyadh = try #require(report.rows.first { $0.locationId == "LOC-sample-ryd" })
         #expect(riyadh.revenue > 0 && riyadh.orders > 0)
         #expect(riyadh.expenses > 0, "an expense booked to the site")
+        // Both sites have sales: a second site with nothing but costs is the one
+        // row of this table a shop with two real branches never sees.
+        let jeddah = try #require(report.rows.first { $0.locationId == "LOC-sample-jed" })
+        #expect(jeddah.revenue > 0 && jeddah.orders > 0)
 
         let shopWide = try await engine.pnlByPeriod(
             orders: shop.orderRows, expenses: shop.expenseRows, settings: shop.settingsDict,

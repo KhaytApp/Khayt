@@ -2493,7 +2493,7 @@
   },
   {
    "id": "MACH-core-one",
-   "locationId": "LOC-sample-ryd",
+   "locationId": "LOC-sample-jed",
    "name": "Prusa CORE One",
    "loaded": [
     { "slot": 0, "hex": "#1E1E1E", "material": "PETG" }
