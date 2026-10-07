@@ -7171,17 +7171,23 @@ public actor KhaytEngine {
                            settings: [String: JSONValue], clients: [JSONValue],
                            currencies: [String: JSONValue], inventory: [JSONValue],
                            now: Date, recentMonthlyHours: [String: Double] = [:],
-                           timeEntries: [JSONValue] = [], jobs: [JSONValue] = []) throws -> LocationPl {
+                           timeEntries: [JSONValue] = [], jobs: [JSONValue] = [],
+                           range: (from: String, to: String)? = nil) throws -> LocationPl {
         // `timeEntries` already narrowed to the period, like the rest; `jobs`
         // is the WHOLE book, because labour is dated by when it was worked and
         // its job can sit outside the period the orders were narrowed to.
-        try runtime.call2(
-            "KhaytLocationPl.locationPl({orders: ARG0, expenses: ARG1, wasteLog: ARG2, machines: ARG3, locations: ARG4, settings: ARG5, clients: ARG6, currencies: ARG7, inventory: ARG8, now: new Date(ARG9), recentMonthlyHours: ARG10, timeEntries: ARG11, jobs: ARG12})",
+        // `range` is what each machine's depreciation is charged over — the
+        // machine P&L's, so the two cards agree; none is everything to date.
+        let span: JSONValue = range.map {
+            .object(["from": .string($0.from), "to": .string($0.to)])
+        } ?? .null
+        return try runtime.call2(
+            "KhaytLocationPl.locationPl({orders: ARG0, expenses: ARG1, wasteLog: ARG2, machines: ARG3, locations: ARG4, settings: ARG5, clients: ARG6, currencies: ARG7, inventory: ARG8, now: new Date(ARG9), recentMonthlyHours: ARG10, timeEntries: ARG11, jobs: ARG12, range: ARG13})",
             [.array(orders), .array(expenses), .array(wasteLog), .array(machines), .array(locations),
              .object(settings), .array(clients), .object(currencies), .array(inventory),
              .number(now.timeIntervalSince1970 * 1000),
              .object(recentMonthlyHours.mapValues { .number($0) }),
-             .array(timeEntries), .array(jobs)],
+             .array(timeEntries), .array(jobs), span],
             as: LocationPl.self)
     }
 

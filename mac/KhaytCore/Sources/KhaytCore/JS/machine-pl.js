@@ -62,11 +62,16 @@ function hoursOf(order) {
  *   machines   [{ id, name, color }]
  *   completed  finished orders ALREADY filtered to the range
  *   expenses   expenses already filtered to the range; linked by `orderId`
- *   timeEntries the time log already filtered to the range; a job's logged
- *              labour is charged to the machine it ran on, as its linked
- *              expenses are (lib/pnl-report.js LABOUR has the rule). Hours
- *              logged against no job are the shop's, not a machine's, and are
- *              not here. Omit it and every figure is as before.
+ *   timeEntries the time log filtered to the range BY THE DAY THE HOURS WERE
+ *              WORKED, as the P&L dates them (lib/pnl-report.js LABOUR). Each
+ *              stretch is charged to the machine its job ran on — the job
+ *              found in `orders`, the whole book, because it may have been
+ *              filed in another period than the hours (it was dropped from
+ *              every range but All time when it was looked up in `completed`).
+ *              Hours on a voided or not-business job are skipped as the P&L
+ *              skips them; hours logged against no job are the shop's, not a
+ *              machine's, and are not here. Omit it and every figure is as
+ *              before.
  *   maintenance machine maintenance entries already filtered, `{ machineId, cost }`
  *   unassigned what to call work that names no machine
  *   days       how long the range is, for utilisation; omit and it is null
@@ -136,12 +141,8 @@ function machineProfit(input, deps) {
     || (typeof require === 'function'
       ? (() => { try { return require('./pnl-report.js'); } catch (e) { return null; } })()
       : null);
-  const labourBy = new Map();
-  for (const e of Array.isArray(i.timeEntries) ? i.timeEntries : []) {
-    const id = String((e && e.orderId) || '');
-    if (!id || !Pnl || typeof Pnl.labourCostOf !== 'function') continue;
-    labourBy.set(id, (labourBy.get(id) || 0) + Pnl.labourCostOf(e));
-  }
+  const jobList = Array.isArray(i.orders) ? i.orders : (Array.isArray(i.completed) ? i.completed : []);
+  const jobById = new Map(jobList.filter((o) => o && o.id).map((o) => [String(o.id), o]));
 
   for (const o of Array.isArray(i.completed) ? i.completed : []) {
     if (!o) continue;
@@ -160,7 +161,18 @@ function machineProfit(input, deps) {
     row.revenue += num(revenueOf(o));
     for (const p of Array.isArray(o.parts) ? o.parts : []) row.materialCost += num(partCostOf(p));
     row.linkedExpenses += linked.get(String(o.id)) || 0;
-    row.labour += labourBy.get(String(o.id)) || 0;
+  }
+
+  // Labour by the day it was worked, on its job's machine, scoped as the P&L
+  // scopes it — so the machines and the shop's own labour line agree for any
+  // range: Σ machines (with the unassigned row) + hours on no job = the P&L's.
+  for (const e of Array.isArray(i.timeEntries) ? i.timeEntries : []) {
+    const id = String((e && e.orderId) || '');
+    if (!id || !Pnl || typeof Pnl.labourCostOf !== 'function') continue;
+    if (typeof Pnl.labourCounts === 'function' && !Pnl.labourCounts(e, jobById)) continue;
+    const job = jobById.get(id);
+    const key = job && job.machineId && byId.has(String(job.machineId)) ? String(job.machineId) : NONE;
+    byId.get(key).labour += Pnl.labourCostOf(e);
   }
 
   /* ── WHAT THE MACHINE LOST IN VALUE OVER THE RANGE ──────────────────────
@@ -231,7 +243,9 @@ function machineProfit(input, deps) {
   for (const row of byId.values()) {
     // A machine that finished nothing in this range has no P&L. A row of
     // zeroes reads as a machine that lost nothing, which is a different claim.
-    if (row.jobs === 0) continue;
+    // Unless people worked on its jobs in the range: that was paid for, and a
+    // row dropped for it would leave the hours on no machine at all.
+    if (row.jobs === 0 && !(row.labour > 0)) continue;
     const net = row.revenue - row.materialCost - row.linkedExpenses - row.labour - row.maintenance - row.depreciation;
     rows.push({
       ...row,

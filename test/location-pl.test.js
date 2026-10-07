@@ -224,12 +224,14 @@ test('a site that earned nothing is a row of zeros, not missing', () => {
   assert.ok(!row(r, LP.UNASSIGNED), 'and an empty unassigned row is not drawn');
 });
 
-test('a machine’s depreciation is charged to its site', () => {
+test('a machine’s depreciation is charged to its site, over the range — the machine P&L’s charge', () => {
   const dep = { ...machines[1], depreciation: { price: 3600, life: 10, lifeUnit: 'years', purchaseDate: '2025-01-01' } };
-  const r = run({ machines: [machines[0], dep], orders: [job('b', 'm2', 400)] });
-  const [shop] = pnlByPeriod([job('b', 'm2', 400)], [], { settings: SAR, now: NOW, machines: [dep], granularity: 'month' });
-  assert.ok(shop.depreciation > 0, 'the fixture depreciates');
-  assert.equal(row(r, 'LOC-two').depreciation, shop.depreciation);
+  const range = { from: '2026-09-01', to: '2026-09-30' };
+  const r = run({ machines: [machines[0], dep], orders: [job('b', 'm2', 400)], range });
+  const D = require('../lib/depreciation.js');
+  const expected = D.periodCharge(dep, range, {});
+  assert.ok(expected > 0, 'the fixture depreciates');
+  assert.equal(row(r, 'LOC-two').depreciation, expected);
   assert.equal(row(r, 'LOC-main').depreciation, 0, 'and not at the other site');
 });
 

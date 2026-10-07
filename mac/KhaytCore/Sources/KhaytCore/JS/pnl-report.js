@@ -156,6 +156,12 @@
    * without a word — so it errs wide. */
   const PAYROLL_WORDS = /salar|wage|payroll|staff|labou?r|employee|\bpay\b|راتب|رواتب|أجور|اجور|موظف|عمالة|lohn|gehalt|personal|salaire|personnel|sueldo|n[oó]mina|maa[sş]|[uü]cret|給|工资|薪/i;
   const looksLikePayroll = (text) => PAYROLL_WORDS.test(String(text || ''));
+  /* What an expense says about itself. Both apps write the free text to
+   * `note` (lib/expense-book.js); `description` is kept for records written
+   * before that. Reading only `description` missed "Staff wages September"
+   * typed into either app's form, so labour and the same pay booked as an
+   * expense went unflagged. */
+  const expenseText = (e) => `${e.category || ''} ${e.note || ''} ${e.description || ''}`;
   /** The fixed costs that read as pay — which a period with labour may be counting twice. */
   const payrollFixedCosts = (settings) => (((settings || {}).fixedCosts) || [])
     .filter((fc) => fc && (+fc.amount || 0) > 0 && looksLikePayroll(fc.name || fc.label));
@@ -198,8 +204,10 @@
     let labour = 0;
     for (const e of (Array.isArray(input.labour) ? input.labour : [])) labour += labourCostOf(e);
     const labourOverlap = labour > 0 && (
-      expenses.some((e) => e && !isInventoryPurchase(e) && looksLikePayroll(`${e.category || ''} ${e.description || ''}`))
-      || (Array.isArray(input.fixedCosts) && input.fixedCosts.some((fc) => fc && looksLikePayroll(fc.name || fc.label))));
+      expenses.some((e) => e && !isInventoryPurchase(e) && looksLikePayroll(expenseText(e)))
+      // The same test `pnlByPeriod` uses: a payroll-named cost of nothing is
+      // not pay, and the CSV warned where the screen did not.
+      || payrollFixedCosts({ fixedCosts: input.fixedCosts }).length > 0);
     const grossProfit = revenue - cogs;
     const netProfit = grossProfit - expensesTotal - waste - depreciation - labour;
     return {
@@ -430,7 +438,7 @@
       if (isInventoryPurchase(e)) at(key).inventory += paid - claimable;
       else {
         at(key).expenses += paid - claimable;
-        if (looksLikePayroll(`${e.category || ''} ${e.description || ''}`)) at(key).payrollExpense = true;
+        if (looksLikePayroll(expenseText(e))) at(key).payrollExpense = true;
       }
       at(key).vatReclaimable += claimable;
     }
