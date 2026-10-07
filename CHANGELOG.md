@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Reports: the quarter's waterfall reads the right way in Arabic, and
+  says what its last cost is.** In Arabic the chart ran left to right, so it
+  opened on the side an Arabic reader finishes on; it now starts with revenue
+  on the right. Its step for the monthly costs was labelled "incl. overhead",
+  which says those costs are part of the expenses bar beside it. They are
+  taken off after it, as the net is, so the step is now called "Monthly
+  costs", the name they have in Settings.
+
 - **(Mac) A phone is never handed a PIN hash.** The book a paired phone pulls
   over the shop network carried the hash of the PIN-reset code on every pull,
   and with the full book every staff member's PIN hash. A four-digit PIN behind

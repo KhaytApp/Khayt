@@ -183,6 +183,11 @@ struct Waterfall: View {
     let steps: [WaterfallStep]
     let currency: String
     var height: CGFloat = 260
+    /// Read, not left to SwiftUI: a `Canvas` draws at the points it is given
+    /// and never mirrors them, so in Arabic the quarter ran left to right —
+    /// revenue on the far side of where an Arabic reader starts, and the net
+    /// where they begin. The slots are mirrored by hand below.
+    @Environment(\.layoutDirection) private var direction
 
     /// The light step of the brand ramp — validated against this app's surface
     /// as an ordinal ramp, and legal at 3.36:1 partly because every bar carries
@@ -254,6 +259,12 @@ struct Waterfall: View {
             let plot = size.height - 34            // room for the names
             let step = size.width / CGFloat(max(spans.count, 1))
             let barW = min(46, step * 0.58)
+            // The centre of bar `i`'s slot, from the side a reader starts on.
+            let count = spans.count
+            func centreOf(_ i: Int) -> CGFloat {
+                let slot = direction == .rightToLeft ? count - 1 - i : i
+                return step * CGFloat(slot) + step / 2
+            }
             func y(_ v: Double) -> CGFloat { CGFloat((hi - v) / span) * plot }
 
             // The zero line — the only rule on the chart that means anything,
@@ -267,11 +278,13 @@ struct Waterfall: View {
                 // running total rather than as a bar chart of unrelated
                 // figures. Dashed and faint: it is a guide, not a value.
                 if index > 0, !bar.step.anchored {
-                    let previous = step * CGFloat(index - 1) + step / 2 + barW / 2
+                    // From the edge of the bar before to the edge of this one,
+                    // whichever way the row runs.
+                    let a = centreOf(index - 1), b = centreOf(index)
+                    let way: CGFloat = b > a ? 1 : -1
                     var line = Path()
-                    line.move(to: CGPoint(x: previous + 1, y: y(bar.from)))
-                    line.addLine(to: CGPoint(x: step * CGFloat(index) + step / 2 - barW / 2 - 1,
-                                             y: y(bar.from)))
+                    line.move(to: CGPoint(x: a + way * (barW / 2 + 1), y: y(bar.from)))
+                    line.addLine(to: CGPoint(x: b - way * (barW / 2 + 1), y: y(bar.from)))
                     context.stroke(line, with: .color(Khayt.hairline),
                                    style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
                 }
@@ -280,7 +293,7 @@ struct Waterfall: View {
                 let tint: Color = closing
                     ? (bar.step.amount < 0 ? Khayt.late : Khayt.done)
                     : (bar.step.amount >= 0 ? Self.inward : Self.out)
-                let centre = step * CGFloat(index) + step / 2
+                let centre = centreOf(index)
 
                 context.fill(
                     Path(roundedRect: CGRect(x: centre - barW / 2, y: top, width: barW, height: tall),

@@ -1207,7 +1207,7 @@ struct Reports: View {
             // Only when there is any. A bar of zero height under a label is a
             // row of the table that wandered onto the chart.
             if row.fixed != 0 {
-                out.append(WaterfallStep(label: shop.words.callIt("mac.of_which_fixed"),
+                out.append(WaterfallStep(label: shop.words.callIt("mac.waterfall_fixed"),
                                          amount: -row.fixed))
             }
             out.append(WaterfallStep(label: shop.words.callIt("an.pnl_net"),
