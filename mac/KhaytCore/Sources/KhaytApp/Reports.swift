@@ -1245,6 +1245,21 @@ struct Reports: View {
             ScrollView { statement }
         }
 
+        /// "revenue − cogs − waste − depreciation − labour − expenses": the
+        /// net's own arithmetic, each cost only where there is any. Built term
+        /// by term — as one `+` chain inside the view it outran the type
+        /// checker on CI once the labour term joined it.
+        static func arithmetic(_ rows: [PnlPeriod]) -> String {
+            func sum(_ value: (PnlPeriod) -> Double) -> Double { rows.reduce(0) { $0 + value($1) } }
+            var terms: [String] = [Money.figure(sum { $0.revenue }), Money.figure(sum { $0.cogsValue })]
+            let optional: [(PnlPeriod) -> Double] = [{ $0.wasteValue }, { $0.depreciationValue }, { $0.labourValue }]
+            for value in optional where rows.contains(where: { value($0) > 0 }) {
+                terms.append(Money.figure(sum(value)))
+            }
+            terms.append(Money.figure(sum { $0.expenses + $0.fixed }))
+            return terms.joined(separator: " − ")
+        }
+
         /// The panel without its scroll view — what a photograph can see
         /// (`ImageRenderer` draws nothing inside a `ScrollView`).
         @ViewBuilder var statement: some View {
@@ -1284,15 +1299,7 @@ struct Reports: View {
                         // does not come from is a figure that looks wrong.
                         HStack(spacing: 5) {
                             Rectangle().fill(Khayt.hairline).frame(width: 1, height: 9)
-                            Text("\(Money.figure(rows.reduce(0) { $0 + $1.revenue })) − "
-                                 + "\(Money.figure(rows.reduce(0) { $0 + $1.cogsValue })) − "
-                                 + (rows.contains { $0.wasteValue > 0 }
-                                    ? "\(Money.figure(rows.reduce(0) { $0 + $1.wasteValue })) − " : "")
-                                 + (rows.contains { $0.depreciationValue > 0 }
-                                    ? "\(Money.figure(rows.reduce(0) { $0 + $1.depreciationValue })) − " : "")
-                                 + (rows.contains { $0.labourValue > 0 }
-                                    ? "\(Money.figure(rows.reduce(0) { $0 + $1.labourValue })) − " : "")
-                                 + "\(Money.figure(rows.reduce(0) { $0 + $1.expenses + $1.fixed }))")
+                            Text(Self.arithmetic(rows))
                                 .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
                         }
                         Text(shop.words.callIt("mac.pnl_title"))
