@@ -39,6 +39,22 @@ import KhaytCore
 
     // ── THE RECORD ──────────────────────────────────────────────────────
 
+    @Test("saving someone deleted elsewhere while the sheet was open does not re-create them")
+    func editOfDeletedIsRefused() throws {
+        var root = Self.book()
+        let op = try #require(ShopOperator(row: Shop.rows(root, "operators")[0]))
+        root["operators"] = .array([Shop.rows(root, "operators")[1]])   // OP-a deleted meanwhile
+        let before = root
+        var undo: [Shop.ChangedRecord] = []
+        var changed = op.fields
+        changed.name = "Ali Al-Hassan"
+        let saved = Shop.writeOperator(into: &root, id: "OP-a", changed, opened: op.fields,
+                                       newId: "OP-new", undo: &undo)
+        #expect(!saved)
+        #expect(root == before, "a deleted operator came back under a new id")
+        #expect(undo.isEmpty)
+    }
+
     @Test("an edit writes only what changed; pinHash and every other field survive")
     func editKeepsFields() throws {
         var root = Self.book()

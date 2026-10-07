@@ -3301,6 +3301,7 @@
   "op.switch": "Bediener wechseln",
   "op.enter_pin": "PIN eingeben",
   "op.wrong_pin": "Falsche PIN",
+  "op.pin_elsewhere": "Die PIN dieser Person wurde auf einem anderen Computer festgelegt und ist hier nicht angekommen. Lege sie unter Einstellungen → Bediener neu fest.",
   "op.role_admin": "Administrator",
   "op.lock_enabled": "Sperre aktiviert",
   "op.pin_set": "PIN aktualisiert",

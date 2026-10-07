@@ -1549,19 +1549,43 @@ final class LanServer {
         // `tombstones` as arrays; handing it an object or a string is a way to
         // find out what a JavaScript runtime does with the unexpected, which is
         // not a question a shop's book should be the subject of.
-        guard case .array(let deltas)? = payload["deltas"],
-              case .array(let tombstones)? = payload["tombstones"] else {
+        guard case .array(let sentDeltas)? = payload["deltas"],
+              case .array(let sentTombstones)? = payload["tombstones"] else {
             return .json(400, #"{"error":"Expected {deltas, tombstones, cursor}"}"#)
         }
+        // ── ONLY WHAT A PHONE WRITES ────────────────────────────────────────
+        //
+        // `applyDeltas` takes a record for any collection by name, and so did
+        // this route — so anyone holding the owner PIN could create an
+        // operator with no PIN and the `owner` role, promote one, strip a PIN
+        // by sending the record without it, or tombstone a staff member: on a
+        // desktop with the operator lock on, owner rights from a phone. The
+        // companion writes these five and nothing else (BookWriter.swift), so
+        // anything else is dropped and counted as skipped. Dropped, not
+        // refused: a 4xx keeps a phone resending the same batch for ever, and
+        // its real edits would be stuck behind the one it can never deliver.
+        let named: (JSONValue) -> String? = {
+            if case .object(let o) = $0, case .string(let c)? = o["collection"] { return c }
+            return nil
+        }
+        let deltas = sentDeltas.filter { named($0).map(Self.phoneWritable.contains) ?? false }
+        let tombstones = sentTombstones.filter { named($0).map(Self.phoneWritable.contains) ?? false }
+        let dropped = (sentDeltas.count - deltas.count) + (sentTombstones.count - tombstones.count)
+        var allowed: [String: JSONValue] = payload
+        allowed["deltas"] = JSONValue.array(deltas)
+        allowed["tombstones"] = JSONValue.array(tombstones)
         guard !deltas.isEmpty || !tombstones.isEmpty else {
+            if dropped > 0 {
+                return .json(200, #"{"applied":0,"skipped":\#(dropped),"removed":0}"#)
+            }
             // Nothing to do, and worth answering rather than writing the book
             // to say so: a write with no change still rewrites the file and
             // still rolls `.prev`.
             return .json(200, #"{"applied":0,"skipped":0,"removed":0}"#)
         }
         do {
-            let folded = try await fold(payload)
-            return .json(200, #"{"applied":\#(folded.applied),"skipped":\#(folded.skipped),"removed":\#(folded.removed)}"#)
+            let folded = try await fold(allowed)
+            return .json(200, #"{"applied":\#(folded.applied),"skipped":\#(folded.skipped + dropped),"removed":\#(folded.removed)}"#)
         } catch {
             // The book was not written. The phone keeps its changes and tries
             // again — which is why it must not read this as "delivered".
@@ -1570,6 +1594,12 @@ final class LanServer {
     }
 
     // MARK: - Storefront order webhooks
+
+    /// The collections a phone may change: what the companion writes
+    /// (`ios/KhaytCompanion/Services/BookWriter.swift`). See `foldFromPhone`.
+    nonisolated static let phoneWritable: Set<String> = [
+        "printLog", "inventory", "waitingList", "expenses", "wasteLog",
+    ]
 
     nonisolated static let storefrontHookPath = "/api/webhook/"
     /// Where each platform's secret is kept under `settings.lanApi`.

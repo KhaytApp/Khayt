@@ -71,6 +71,18 @@ import KhaytCore
                 "a move made since the delete is the shop's newer word")
     }
 
+    @Test("saving a location deleted elsewhere while the sheet was open does not bring it back")
+    func editOfDeletedIsRefused() {
+        var root = Self.book()
+        let before = root
+        var undo: [Shop.ChangedRecord] = []
+        let saved = Shop.writeLocation(into: &root, id: "LOC-gone", name: "Riyadh", address: "",
+                                       newId: "LOC-new", undo: &undo)
+        #expect(!saved)
+        #expect(root == before, "the book was written for a location that is not in it")
+        #expect(undo.isEmpty)
+    }
+
     @Test("an edit changes the name and address and keeps everything else")
     func editKeepsFields() {
         var root = Self.book()

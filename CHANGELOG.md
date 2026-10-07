@@ -4,6 +4,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **alpha.60 review fixes (Mac + desktop).**
+  - Security: a phone on the shop network can change only what the iPhone
+    app writes (jobs, spools, the waiting list, expenses, waste). With the
+    owner PIN it could create, promote, strip the PIN of, or delete a staff
+    member. The Mac's feedback email no longer attaches PIN hashes. On the
+    desktop, a staff PIN that reached the computer only as the sync mask is
+    refused instead of being cleared.
+  - Desktop: a job a printer starts keeps its start time. The window used to
+    write its older copy of the job over the one the printer's message saved.
+  - Mac: saving a location or a staff member that another device deleted
+    while you were editing it no longer brings it back under a new id.
+  - Mac Reports: the Expenses column no longer cuts off its figures, the cost
+    lines of the statement are readable, and monthly costs have one name
+    everywhere. The By machine caption no longer says labour is not there.
+  - Mac kiosk: a machine that is off and has no job says only "Not
+    answering"; the job sits under the machine's name; time left reads right
+    in Arabic.
+  - Mac staff: a deleted operator is named as the time log recorded them, hours
+    have one decimal everywhere, sheets have real titles, and Locations and
+    Operators are at the top of Settings → Operations.
+
 - **(Mac) Reports: the quarter's waterfall reads the right way in Arabic, and
   says what its last cost is.** In Arabic the chart ran left to right, so it
   opened on the side an Arabic reader finishes on; it now starts with revenue

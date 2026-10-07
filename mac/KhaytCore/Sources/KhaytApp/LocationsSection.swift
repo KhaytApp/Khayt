@@ -77,8 +77,11 @@ struct LocationsSection: View {
                 }
             }
 
-            Button(words.callIt("set.location_add")) {
+            // An icon, not the catalogue's "+ " prefix — see the operators'.
+            Button {
                 editing = ShopLocation(id: "", name: "", address: "")
+            } label: {
+                Label(words.callIt("mac.location_add"), systemImage: "plus")
             }
             .disabled(!shop.canWrite)
             .help(shop.canWrite ? words.callIt("mac.locations_hint") : words.callIt("mac.move_sample"))
@@ -112,7 +115,7 @@ struct LocationEditor: View {
     var body: some View {
         let words = shop.words
         VStack(alignment: .leading, spacing: 14) {
-            Text(words.callIt(location.id.isEmpty ? "set.location_add" : "set.locations"))
+            Text(words.callIt(location.id.isEmpty ? "mac.location_new" : "mac.location_edit"))
                 .font(.headline)
             Form {
                 TextField(words.callIt("set.location_name"), text: $name)

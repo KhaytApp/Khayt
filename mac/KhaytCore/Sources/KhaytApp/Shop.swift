@@ -6723,12 +6723,14 @@ final class Shop {
         let address = address.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { moveProblem = words.callIt("mach.need_name"); return }
         var undo: [ChangedRecord] = []
+        var there = true
         do {
             try StoreWriter.update(build) { root in
-                Self.writeLocation(into: &root, id: id, name: name, address: address,
-                                   newId: Self.uid("LOC"), undo: &undo)
+                there = Self.writeLocation(into: &root, id: id, name: name, address: address,
+                                           newId: Self.uid("LOC"), undo: &undo)
                 Self.sealUndo(&undo, in: root)
             }
+            if !there { moveProblem = words.callIt("mac.record_gone") }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("set.locations")) }
             await load(source)
         } catch {
@@ -6738,9 +6740,16 @@ final class Shop {
 
     /// The write itself, static and taking `root` so a test can drive it
     /// against a plain book.
+    ///
+    /// Returns false, and writes nothing, when `id` names a location that is
+    /// no longer in the book — deleted by the other app or a sync while the
+    /// sheet was open. Saving it as new would bring it back under another id,
+    /// with none of what pointed at it.
+    @discardableResult
     static func writeLocation(into root: inout [String: JSONValue], id: String?, name: String,
-                              address: String, newId: String, undo: inout [ChangedRecord]) {
+                              address: String, newId: String, undo: inout [ChangedRecord]) -> Bool {
         var rows = Self.rows(root, "locations")
+        if let id, !rows.contains(where: { Self.recordId($0) == id }) { return false }
         if let id, let at = rows.firstIndex(where: { Self.recordId($0) == id }),
            case .object(var record) = rows[at] {
             undo.append(ChangedRecord(collection: "locations", id: id, was: record))
@@ -6756,6 +6765,7 @@ final class Shop {
             rows.append(.object(record))
         }
         root["locations"] = .array(rows)
+        return true
     }
 
     /// Take a location off the list, and unpoint everything that named it.
@@ -6879,7 +6889,18 @@ final class Shop {
     /// Nil for a job nobody was put on.
     func operatorLabel(_ id: String?) -> String? {
         guard let id, !id.isEmpty else { return nil }
-        guard let op = shopOperator(id) else { return words.callIt("an.op_removed") }
+        guard let op = shopOperator(id) else {
+            // Gone from the list — but a time entry froze their name when the
+            // hours were logged, so say who it was. "An operator no longer on
+            // the list" in the picker beside an entry that names them read as
+            // two different answers about one job.
+            let named = timeEntryRows.lazy.compactMap(Self.asObject)
+                .first { Self.plainString($0["operatorId"]) == id }
+                .flatMap { Self.plainString($0["operatorName"]) }
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+            return named.isEmpty ? words.callIt("an.op_removed")
+                                 : named + " · " + words.callIt("mac.op_gone")
+        }
         return op.active ? op.name : op.name + " · " + words.callIt("op.inactive")
     }
 
@@ -6907,12 +6928,14 @@ final class Shop {
             moveProblem = words.callIt("mach.need_name"); return
         }
         var undo: [ChangedRecord] = []
+        var there = true
         do {
             try StoreWriter.update(build) { root in
-                Self.writeOperator(into: &root, id: id, fields, opened: opened,
-                                   newId: Self.uid("OP"), undo: &undo)
+                there = Self.writeOperator(into: &root, id: id, fields, opened: opened,
+                                           newId: Self.uid("OP"), undo: &undo)
                 Self.sealUndo(&undo, in: root)
             }
+            if !there { moveProblem = words.callIt("mac.record_gone") }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("op.title")) }
             await load(source)
         } catch {
@@ -6922,10 +6945,16 @@ final class Shop {
 
     /// The write itself, static and taking `root` so a test can drive it
     /// against a plain book.
+    ///
+    /// Returns false, and writes nothing, when `id` names someone no longer
+    /// in the book; see `writeLocation`. Re-created under a new id, their jobs
+    /// and logged time would point at the old one.
+    @discardableResult
     static func writeOperator(into root: inout [String: JSONValue], id: String?,
                               _ fields: ShopOperator.Fields, opened: ShopOperator.Fields?,
-                              newId: String, undo: inout [ChangedRecord]) {
+                              newId: String, undo: inout [ChangedRecord]) -> Bool {
         var rows = Self.rows(root, "operators")
+        if let id, !rows.contains(where: { Self.recordId($0) == id }) { return false }
         func cleaned(_ f: ShopOperator.Fields) -> [String: JSONValue] {
             [
                 "name": .string(f.name.trimmingCharacters(in: .whitespacesAndNewlines)),
@@ -6941,7 +6970,7 @@ final class Shop {
             let was = record
             let before = opened.map(cleaned)
             for (key, value) in shown where before?[key] != value { record[key] = value }
-            guard record != was else { return }
+            guard record != was else { return true }
             StoreWriter.stamp(&record)
             undo.append(ChangedRecord(collection: "operators", id: id, was: was))
             rows[at] = .object(record)
@@ -6953,6 +6982,7 @@ final class Shop {
             undo.append(ChangedRecord(collection: "operators", id: newId, was: [:], kind: .created))
         }
         root["operators"] = .array(rows)
+        return true
     }
 
     /// Delete an operator — or, when their name is on work, make them

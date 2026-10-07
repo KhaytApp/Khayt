@@ -426,7 +426,7 @@ struct LanServerTests {
 
         // The shop's book as this Mac holds it. C-1 was edited at the desk after
         // the phone last pulled, so it stands at rev 5.
-        bench.book.value["clients"] = .array([
+        bench.book.value["printLog"] = .array([
             .object(["id": .string("C-1"), "name": .string("Edited at the desk"), "rev": .number(5)]),
             .object(["id": .string("C-2"), "name": .string("Nora"), "rev": .number(1)]),
         ])
@@ -435,8 +435,8 @@ struct LanServerTests {
         // the shape a phone has when it was pulled before the desk touched it.
         let outbox = #"""
         {"deltas":[
-          {"collection":"clients","record":{"id":"C-2","name":"Nora Al-Harbi","rev":2}},
-          {"collection":"clients","record":{"id":"C-1","name":"Stale from the phone","rev":2}}],
+          {"collection":"printLog","record":{"id":"C-2","name":"Nora Al-Harbi","rev":2}},
+          {"collection":"printLog","record":{"id":"C-1","name":"Stale from the phone","rev":2}}],
          "tombstones":[],"cursor":null}
         """#
 
@@ -449,8 +449,8 @@ struct LanServerTests {
         #expect(reply.text.contains("\"applied\":1"), Comment(rawValue: reply.text))
         #expect(reply.text.contains("\"skipped\":1"), Comment(rawValue: reply.text))
 
-        guard case .array(let clients)? = bench.book.value["clients"] else {
-            Issue.record("the clients collection went missing"); return
+        guard case .array(let clients)? = bench.book.value["printLog"] else {
+            Issue.record("the printLog collection went missing"); return
         }
         var byId: [String: [String: JSONValue]] = [:]
         for row in clients {
@@ -464,6 +464,58 @@ struct LanServerTests {
         #expect(byId["C-1"]?["name"] == .string("Edited at the desk"),
                 "a stale phone overwrote work done at the desk")
         #expect(byId["C-1"]?["rev"] == .number(5))
+    }
+
+    @Test("a phone changes only what the companion writes: never a staff member")
+    func foldOnlyPhoneCollections() async throws {
+        let bench = try await Bench(foldsDeltas: true)
+        defer { bench.stop() }
+        let hash = "p2$210000$00112233445566778899aabbccddeeff$" + String(repeating: "ab", count: 32)
+        bench.book.value["operators"] = .array([.object([
+            "id": .string("OP-1"), "name": .string("Noura"), "roleKey": .string("operator"),
+            "pinHash": .string(hash), "rev": .number(1),
+        ])])
+        bench.book.value["printLog"] = .array([
+            .object(["id": .string("J-1"), "project": .string("Bracket"), "rev": .number(1)]),
+        ])
+        // With the owner PIN, the shapes that took owner rights on a desktop
+        // with the operator lock on: a promotion that also drops the PIN, a new
+        // owner with no PIN, a staff member deleted, labour invented — beside
+        // one real edit to a job, which must still land.
+        let outbox = #"""
+        {"deltas":[
+          {"collection":"operators","record":{"id":"OP-1","name":"Noura","roleKey":"owner","rev":4}},
+          {"collection":"operators","record":{"id":"OP-X","name":"Me","roleKey":"owner","rev":1}},
+          {"collection":"timeEntries","record":{"id":"TE-X","hours":900,"cost":99999,"rev":1}},
+          {"collection":"printLog","record":{"id":"J-1","project":"Bracket v2","rev":2}}],
+         "tombstones":[{"collection":"operators","id":"OP-1","rev":9}],"cursor":null}
+        """#
+        let reply = try await bench.post("/api/store/deltas", json: outbox,
+                                         headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"applied\":1"), Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"skipped\":4"), Comment(rawValue: reply.text))
+
+        guard case .array(let ops)? = bench.book.value["operators"], ops.count == 1,
+              case .object(let op) = ops[0] else {
+            Issue.record("a phone added or removed a staff member"); return
+        }
+        #expect(op["roleKey"] == .string("operator"), "a phone promoted a staff member")
+        #expect(op["pinHash"] == .string(hash), "a phone stripped a staff member's PIN")
+        #expect(bench.book.value["timeEntries"] == nil, "a phone invented labour")
+        guard case .array(let jobs)? = bench.book.value["printLog"], case .object(let job) = jobs[0] else {
+            Issue.record("the job went missing"); return
+        }
+        #expect(job["project"] == .string("Bracket v2"), "the phone's real edit did not land")
+
+        // Nothing it may write: answered, not written.
+        let calls = bench.foldCalls.n
+        let only = try await bench.post("/api/store/deltas",
+            json: #"{"deltas":[{"collection":"operators","record":{"id":"OP-Y","rev":1}}],"tombstones":[],"cursor":null}"#,
+            headers: ["x-khayt-pin": "24682468"])
+        #expect(only.status == 200)
+        #expect(only.text.contains("\"skipped\":1"))
+        #expect(bench.foldCalls.n == calls, "the book was rewritten for a batch with nothing to write")
     }
 
     @Test("a Mac that has not switched the capability on says so, rather than failing")

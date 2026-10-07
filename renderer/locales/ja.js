@@ -3301,6 +3301,7 @@
   "op.switch": "オペレーターを切り替え",
   "op.enter_pin": "PINを入力",
   "op.wrong_pin": "PINが正しくありません",
+  "op.pin_elsewhere": "この担当者のPINは別のコンピューターで設定され、このコンピューターには届いていません。設定 → オペレーターで再設定してください。",
   "op.role_admin": "管理者",
   "op.lock_enabled": "ロックを有効にしました",
   "op.pin_set": "PINを更新しました",

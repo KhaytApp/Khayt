@@ -191,8 +191,12 @@ struct OperatorsSection: View {
                 }
             }
 
-            Button(words.callIt("op.add")) {
+            // An icon, not the catalogue's "+ " prefix: a literal plus is a
+            // character, and in Arabic it sat on the far side of the words.
+            Button {
                 editing = EditingOperator(id: "new", original: nil)
+            } label: {
+                Label(words.callIt("mac.operator_add"), systemImage: "plus")
             }
             .disabled(!shop.canWrite)
             .help(shop.canWrite ? words.callIt("mac.operators_hint") : words.callIt("mac.move_sample"))
@@ -226,7 +230,7 @@ struct OperatorsSection: View {
         guard let op = deleting else { return "" }
         let words = shop.words
         guard keepsWork(op) else {
-            return words.callIt("mac.location_delete_confirm", ["name": .string(op.name)])
+            return words.callIt("mac.operator_delete_confirm", ["name": .string(op.name)])
         }
         let jobs = shop.orders.filter { $0.operatorId == op.id }.count
         let entries = shop.timeEntryRows.filter {
@@ -250,7 +254,7 @@ struct OperatorEditor: View {
     var body: some View {
         let words = shop.words
         VStack(alignment: .leading, spacing: 14) {
-            Text(words.callIt(original == nil ? "op.add" : "op.title"))
+            Text(words.callIt(original == nil ? "mac.operator_new" : "mac.operator_edit"))
                 .font(.headline)
             Form {
                 TextField(words.callIt("op.name"), text: $fields.name)
@@ -260,6 +264,12 @@ struct OperatorEditor: View {
                         Text(words.callIt("role." + key)).tag(key)
                     }
                 }
+                // Said, because nothing on this Mac changes with it: the level
+                // is what the other app's operator lock lets a person do.
+                .help(words.callIt("mac.operator_access_hint"))
+                Text(words.callIt("mac.operator_access_hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 TextField(words.callIt("op.hourly_rate") + " (" + shop.currency + ")",
                           value: $fields.hourlyRate, format: .number)
                     .help(words.callIt("mac.operator_rate_hint"))
@@ -338,7 +348,7 @@ struct JobStaffSection: View {
                 ForEach(entries) { entry in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(StaffLine.join([Money.quantity(entry.hours, decimals: 2) + " "
+                            Text(StaffLine.join([Money.quantity(entry.hours, decimals: 1) + " "
                                                  + words.callIt("unit.h"), name(entry)],
                                                 language: words.language))
                                 .font(.callout)
@@ -364,7 +374,7 @@ struct JobStaffSection: View {
                 }
                 let hours = entries.reduce(0) { $0 + $1.hours }
                 let cost = entries.reduce(0) { $0 + $1.cost }
-                Text(words.callIt("time.total_hours") + ": " + Money.quantity(hours, decimals: 2) + " "
+                Text(words.callIt("time.total_hours") + ": " + Money.quantity(hours, decimals: 1) + " "
                      + words.callIt("unit.h") + " · " + Money.text(cost, shop.currency))
                     .font(.caption.weight(.semibold))
             }
@@ -381,7 +391,7 @@ struct JobStaffSection: View {
         // book, and a trash button beside it is one stray click away.
         .askFirst($deletingEntry,
                   title: { shop.words.callIt("mac.delete_product_q",
-                                             ["name": .string(Money.quantity($0.hours, decimals: 2) + " "
+                                             ["name": .string(Money.quantity($0.hours, decimals: 1) + " "
                                                               + shop.words.callIt("unit.h") + " · " + name($0))]) },
                   message: { _ in shop.words.callIt("mac.operator_delete_hint") },
                   confirm: shop.words.callIt("common.delete"),

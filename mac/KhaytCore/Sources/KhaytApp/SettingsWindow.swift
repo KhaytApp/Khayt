@@ -879,6 +879,13 @@ struct OperationsPane: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
+                // FIRST: who works here and where. Records, saved as they are
+                // made — not part of the draft the bar below saves. At the foot
+                // of the pane they sat about 5,500 points down, under the QC
+                // switches, where a shop setting up its sites would not find
+                // them. The other app keeps them on its Operations page too.
+                Section { LocationsSection(shop: shop) }
+                Section { OperatorsSection(shop: shop) }
                 Section(shop.words.callIt("set.ops_section")) {
                     numberRow("set.min_margin", $draft.minMarginPct)
                     numberRow("set.quote_validity", $draft.quoteValidityDays)
@@ -999,10 +1006,6 @@ struct OperationsPane: View {
                     Toggle(shop.words.callIt("set.qc_require_photo"), isOn: $draft.qcRequirePhotoOnFail).disabled(!draft.qcEnabled)
                     numberRow("set.qc_warranty_days", $draft.qcWarrantyDays).disabled(!draft.qcEnabled)
                 }
-                // Records, written when saved — not part of the draft above.
-                // The other app keeps them on its Operations page too.
-                Section { LocationsSection(shop: shop) }
-                Section { OperatorsSection(shop: shop) }
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,
