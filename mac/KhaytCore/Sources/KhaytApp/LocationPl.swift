@@ -93,9 +93,25 @@ struct LocationPlCard: View {
 }
 
 /// What the location P&L is recomputed on, beside the period: the sites, which
-/// machine stands where, and how much book there is.
+/// machine stands where, how much book there is, and the time log — logged
+/// labour is a line of every site's P&L.
 struct SitesKey: Equatable {
     let locations: [JSONValue]
     let placed: [String]
     let books: Int
+    let entries: [JSONValue]
+}
+
+/// What the quarters are recomputed on: how much book there is, and the time
+/// log, whose rows change without a count changing (an edit, an undo).
+struct LedgerKey: Equatable {
+    let books: Int
+    let entries: [JSONValue]
+}
+
+/// What the machine P&L is recomputed on: the period, and the time log — a
+/// job's logged labour is charged to its machine.
+struct MachinesKey: Equatable {
+    let period: Period
+    let entries: [JSONValue]
 }

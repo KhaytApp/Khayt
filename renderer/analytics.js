@@ -2090,6 +2090,9 @@ function renderLocationPL() {
     now: new Date(),
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
     inRange: (d) => inRange(d, analyticsRange, 'analytics'),
+    // What each machine's depreciation is charged over: the machine P&L's
+    // range, so the two cards agree about one printer.
+    range: analyticsRangeSpan(printLog.map(o => o.date)),
   });
 
   const nameMap = {};

@@ -51,7 +51,9 @@ test('the machine sheet sets depreciation through the shared rule', () => {
 
 test('wear is counted once on the desktop: stocked cost, and depreciation', () => {
   assert.equal((analyticsSrc.match(/partCostOf: stockedPartCost,/g) || []).length, 3, 'every machine P&L view');
-  assert.equal((analyticsSrc.match(/range: analyticsRangeSpan\(/g) || []).length, 3);
+  // Three machine P&L views, and the location P&L, which charges each
+  // machine's depreciation over the same range (alpha.60 review).
+  assert.equal((analyticsSrc.match(/range: analyticsRangeSpan\(/g) || []).length, 4);
   assert.equal((analyticsSrc.match(/machines: \(typeof machines !== 'undefined' \? machines : \[\]\),/g) || []).length, 3, 'every pnlByPeriod view');
   assert.match(analyticsSrc, /return \{ orders, expenses: expenseRows, waste: wasteRows, depreciation[,\s]/, 'the headline and the CSV');
 });

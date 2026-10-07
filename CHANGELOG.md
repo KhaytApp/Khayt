@@ -25,6 +25,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     have one decimal everywhere, sheets have real titles, and Locations and
     Operators are at the top of Settings → Operations.
 
+- **Reports: the per-location and per-machine figures add up again (alpha.60
+  review, both apps).**
+  - A machine with no site lost its depreciation from every site's row; it is
+    now on the unassigned row.
+  - Each machine's depreciation on the location card is charged over the
+    chosen period, exactly as the machine card beside it charges it: a
+    straight-line machine is no longer charged only in months its site had
+    work, and a week is charged a week rather than the whole month.
+  - Hours logged on a job filed in another month were on no machine for any
+    period but "All time"; they are on the job's machine in the period they
+    were worked. Hours on a voided job are no longer charged to a machine.
+  - A job still naming a deleted site counts at its machine's site, and the
+    scrap from a job moved to another site goes with the job.
+  - The warning that pay may be counted twice saw only an expense's old
+    `description` field; both apps write the text to `note`, so "Staff wages"
+    typed into an expense now raises it. A payroll-named monthly cost of zero
+    no longer raises it in the exported summary.
+  - On the Mac, logging, editing or undoing time refreshes the P&L, the
+    location card and the machine card at once.
+
+  None of this changes a figure in a book with no locations, no depreciation
+  and no logged hours.
+
 - **(Mac) Reports: the quarter's waterfall reads the right way in Arabic, and
   says what its last cost is.** In Arabic the chart ran left to right, so it
   opened on the side an Arabic reader finishes on; it now starts with revenue

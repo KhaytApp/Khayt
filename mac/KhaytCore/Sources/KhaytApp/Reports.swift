@@ -232,7 +232,11 @@ struct Reports: View {
                 }
             }
         }
-        .task(id: shop.orderRows.count + shop.expenseRows.count) { await recompute() }
+        // The time log too, and the rows rather than a count: logged labour is
+        // a line of the P&L, and logging an hour, changing one or ⌘Z on one
+        // moves no count above — the net stayed stale until the page reopened.
+        .task(id: LedgerKey(books: shop.orderRows.count + shop.expenseRows.count,
+                            entries: shop.timeEntryRows)) { await recompute() }
         // The P&L's grain is a view preference; only the rows it draws move.
         .task(id: shop.pnlByMonth) { await recompute() }
         // The period is the Best page's alone — the P&L reports every quarter
@@ -246,11 +250,14 @@ struct Reports: View {
         // With the PERIOD, unlike the variance: "which machine earned" is a
         // question about a stretch of time, and the same machine can be the
         // best one quarter and the worst the next. That is the point of asking.
-        .task(id: shop.period) { await recomputeMachinePL() }
+        .task(id: MachinesKey(period: shop.period, entries: shop.timeEntryRows)) {
+            await recomputeMachinePL()
+        }
         // And when a site is added, renamed or deleted, or a machine moved to
         // another — none of which changes the period or the counts above.
         .task(id: SitesKey(locations: shop.locationRows, placed: shop.machines.map { $0.locationId ?? "" },
-                           books: shop.orderRows.count + shop.expenseRows.count + shop.wasteRows.count)) {
+                           books: shop.orderRows.count + shop.expenseRows.count + shop.wasteRows.count,
+                           entries: shop.timeEntryRows)) {
             if let engine = shop.engine { await recomputeSites(engine) }
         }
         // And when an operator is added or changed, a job is put on somebody,
@@ -603,7 +610,13 @@ struct Reports: View {
             recentMonthlyHours: shop.recentMonthlyHours,
             // Labour by the day it was worked, and the whole book to find
             // each stretch's job in — the job may sit outside the period.
-            timeEntries: dated(shop.timeEntryRows), jobs: shop.orderRows)
+            timeEntries: dated(shop.timeEntryRows), jobs: shop.orderRows,
+            // Depreciation over the same span the machine P&L beside this
+            // charges it over, so one printer reads the same on both cards.
+            range: Shop.periodSpan(shop.period, dates: shop.orderRows.compactMap { row in
+                if case .object(let o) = row, case .string(let d)? = o["date"] { return d }
+                return nil
+            }))
         sites = (report?.located ?? false) ? report : nil
     }
 
