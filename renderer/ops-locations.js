@@ -253,7 +253,7 @@ function openTimeEntryModal(orderId) {
   }
 
   const opOpts = activeOps.map(op =>
-    `<option value="${op.id}" data-rate="${+op.hourlyRate || 0}">${escapeHtml(op.name)}${op.role ? ' (' + escapeHtml(op.role) + ')' : ''}</option>`
+    `<option value="${escapeHtml(op.id)}" data-rate="${+op.hourlyRate || 0}">${escapeHtml(op.name)}${op.role ? ' (' + escapeHtml(op.role) + ')' : ''}</option>`
   ).join('');
 
   openFormModal({
@@ -403,7 +403,7 @@ function openPinPadModal(afterUnlock) {
           <div style="margin-bottom:12px;">
             <label style="font-size:12.5px;">${escapeHtml(t('op.enter_pin') || 'Select operator')}</label>
             <select id="pinOpSelect" style="margin-top:4px;">
-              ${opList.map(op => `<option value="${op.id}"${op.id === selectedOpId ? ' selected' : ''}>${escapeHtml(op.name)}${op.role ? ' · ' + escapeHtml(op.role) : ''}</option>`).join('')}
+              ${opList.map(op => `<option value="${escapeHtml(op.id)}"${op.id === selectedOpId ? ' selected' : ''}>${escapeHtml(op.name)}${op.role ? ' · ' + escapeHtml(op.role) : ''}</option>`).join('')}
             </select>
           </div>
           <div id="pinDisplay" style="font-size:24px;letter-spacing:10px;text-align:center;margin:10px 0;min-height:36px;color:var(--primary);">${'●'.repeat(enteredPin.length)}</div>
@@ -456,6 +456,16 @@ function openPinPadModal(afterUnlock) {
         return;
       }
       const errEl = overlay.querySelector('#pinError');
+      // A PIN that reached this computer only as the sync mask. It IS set —
+      // on another computer — so it is not a free switch, and it is not a
+      // legacy PIN either: the branch below clears what it cannot read, and
+      // clearing this would turn "set elsewhere" into "no PIN" for anyone at
+      // the pad. Refused until it is set again here.
+      if (op.pinHash === '__KHAYT_MASKED__') {
+        if (errEl) errEl.textContent = t('op.pin_elsewhere');
+        enteredPin = '';
+        return;
+      }
       // Support legacy btoa PINs (migration: clear them and prompt re-set)
       if (isLegacyPin(op.pinHash)) {
         op.pinHash = '';

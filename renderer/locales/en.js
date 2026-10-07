@@ -3302,6 +3302,7 @@
   "op.switch": "Switch operator",
   "op.enter_pin": "Enter PIN",
   "op.wrong_pin": "Incorrect PIN",
+  "op.pin_elsewhere": "This person's PIN was set on another computer and has not reached this one. Set it again in Settings → Operators.",
   "op.role_admin": "Admin",
   "op.lock_enabled": "Lock enabled",
   "op.pin_set": "PIN updated",

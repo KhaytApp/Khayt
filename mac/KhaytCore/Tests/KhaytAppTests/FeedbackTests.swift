@@ -171,6 +171,13 @@ import KhaytCore
                    value: .object(["wrapped": .string("planted-keyset-wrapped-3d"), "salt": .string("planted-keyset-salt-3d")]))
         planted += ["planted-api-hash-5b1e", "planted-hook-path-7c",
                     "planted-keyset-wrapped-3d", "planted-keyset-salt-3d"]
+        // The staff PIN and the recovery code, hashed: a four-digit PIN behind
+        // a hash is a lookup for whoever holds the file (PHONE_PRIVATE).
+        root["operators"] = .array([.object([
+            "id": .string("OP-1"), "name": .string("Noura"), "pinHash": .string("planted-pin-hash-8e"),
+        ])])
+        Self.plant(&root, path: "settings.recoveryCodeHash", value: .string("planted-recovery-hash-8e"))
+        planted += ["planted-pin-hash-8e", "planted-recovery-hash-8e"]
 
         let data = try #require(await Feedback.maskedBook(root, engine: engine))
         let bytes = try #require(String(data: data, encoding: .utf8))

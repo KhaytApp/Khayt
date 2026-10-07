@@ -3301,6 +3301,7 @@
   "op.switch": "Operatör değiştir",
   "op.enter_pin": "PIN girin",
   "op.wrong_pin": "Yanlış PIN",
+  "op.pin_elsewhere": "Bu kişinin PIN'i başka bir bilgisayarda ayarlandı ve buraya ulaşmadı. Ayarlar → Operatörler'den yeniden ayarlayın.",
   "op.role_admin": "Yönetici",
   "op.lock_enabled": "Kilit etkinleştirildi",
   "op.pin_set": "PIN güncellendi",

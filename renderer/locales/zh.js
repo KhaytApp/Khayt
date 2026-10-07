@@ -3301,6 +3301,7 @@
   "op.switch": "切换操作员",
   "op.enter_pin": "输入 PIN",
   "op.wrong_pin": "PIN 错误",
+  "op.pin_elsewhere": "此人的 PIN 是在另一台电脑上设置的，尚未同步到这台电脑。请在“设置 → 操作员”中重新设置。",
   "op.role_admin": "管理员",
   "op.lock_enabled": "已启用锁定",
   "op.pin_set": "PIN 已更新",

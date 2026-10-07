@@ -456,6 +456,8 @@ final class Words {
                                   "ar": "أُعيد {weight} غ إلى المخزون — لم يعد العمل منتهيًا، فخيوطه لم تُستهلك بعد."],
         "mac.undo_partial":  ["en": "Some of this changed since — not undone: {fields}",
                               "ar": "تغيّر بعض هذا منذ ذلك الحين — لم يُتراجع عنه: {fields}"],
+        "mac.record_gone":   ["en": "Not saved: this was deleted on another device while you were editing it.",
+                              "ar": "لم يُحفظ: حُذف هذا من جهاز آخر أثناء تعديلك له."],
         "mac.move_sample":   ["en": "The sample shop cannot be changed.",
                               "ar": "لا يمكن تغيير المحل التجريبي."],
         "mac.remeasured":    ["en": "{n} models were measured again — their sizes were wrong.",

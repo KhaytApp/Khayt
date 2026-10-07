@@ -3301,6 +3301,7 @@
   "op.switch": "Cambiar operador",
   "op.enter_pin": "Ingresar PIN",
   "op.wrong_pin": "PIN incorrecto",
+  "op.pin_elsewhere": "El PIN de esta persona se configuró en otro ordenador y no ha llegado a este. Vuelve a configurarlo en Ajustes → Operadores.",
   "op.role_admin": "Administrador",
   "op.lock_enabled": "Bloqueo activado",
   "op.pin_set": "PIN actualizado",

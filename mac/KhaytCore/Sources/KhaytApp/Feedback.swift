@@ -217,10 +217,13 @@ enum Feedback {
     /// copy needs them, it is the shop's own — and the export redaction
     /// (`lib/store.js buildExportPayload`) knows nothing of device-private
     /// values or of anything sealed but unlisted. A feedback report is a file
-    /// emailed to a stranger, so it gets the union.
+    /// emailed to a stranger, so it gets the union — and the PHONE's mask,
+    /// not the cloud's: that one also hides the staff PIN hashes and the
+    /// recovery hash, which the cloud keeps for the shop's other computers and
+    /// a stranger has even less claim to than a phone.
     static func maskedBook(_ root: [String: JSONValue], engine: KhaytEngine?) async -> Data? {
         guard let engine,
-              let masked = try? await engine.storeForCloud(root),
+              let masked = try? await engine.storeForPhone(root),
               let exported = try? await engine.redactedExport(masked) else { return nil }
         return try? JSONEncoder().encode(exported)
     }

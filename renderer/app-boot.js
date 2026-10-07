@@ -598,17 +598,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       toast(t('lan.start_failed') || 'LAN server failed to start — port may be in use', 'warning', 6000);
     });
   }
-  window.hubAPI?.onLanKanbanAdvanced?.(({ id, from, to, project }) => {
-    const idx = printLog.findIndex(o => o.id === id);
-    if (idx !== -1) {
-      const order = printLog[idx];
-      printLog[idx] = { ...order, status: to };
-      if (!printLog[idx].statusHistory) printLog[idx].statusHistory = [];
-      printLog[idx].statusHistory.push({ status: to, at: new Date().toISOString() });
-      saveAll();
-      renderKanban();
-      renderLogs();
+  // The main process has ALREADY written the move, through the status rule:
+  // the start time, the timer, the history entry. So read the book back, as the
+  // survey handler above does. This used to set the status on the window's own
+  // copy — which had none of those — push a second history entry, and save,
+  // which wrote the stale copy over the main process's write: a job a printer
+  // started lost its start time again the moment the window heard about it.
+  window.hubAPI?.onLanKanbanAdvanced?.(async ({ id, from, to, project }) => {
+    try {
+      const store = await window.hubAPI.loadStore();
+      if (store && !store.__corrupt) applyStoreFromSnapshot(store);
+    } catch (e) {
+      console.error('reload store after printer move:', e);
     }
+    renderKanban();
+    renderLogs();
     toast(`🖨️ ${project || id}: ${from} → ${to}`, 'success');
   });
   window.hubAPI?.onTunnelStatusChanged?.(({ active, url, error }) => {
