@@ -173,10 +173,12 @@ still in the shop.
 `curl`. The companion never asks for it.
 
 **Secrets are masked** either way. The store passes through
-`KhaytCloudOutbox.forCloud(store)` — the same rule the cloud push uses — so every
-path named in `lib/store-secret-paths.js` (printer access codes, API keys, bot
-tokens, refresh tokens) arrives as `"__KHAYT_MASKED__"`. A device on the LAN is
-trusted with exactly what the cloud is trusted with, and no more.
+`KhaytCloudOutbox.forPhone(store)` — the cloud push's `forCloud`, plus one list
+more — so every path named in `lib/store-secret-paths.js` (printer access codes,
+API keys, bot tokens, refresh tokens) arrives as `"__KHAYT_MASKED__"`. The list
+more is PHONE_PRIVATE: an operator's `pinHash` and `settings.recoveryCodeHash`,
+which the shop's other computers need through the cloud and a phone never does.
+A device on the LAN is trusted with less than the cloud, never more.
 
 **Customer data is NOT masked**, because it is not a secret — it is the book. The
 response carries the shop's clients, orders and prices, which is why the owner PIN
