@@ -2227,6 +2227,11 @@ final class Words {
         "mac.search_products": ["en": "Product, material or group", "ar": "منتج أو خامة أو مجموعة"],
         "mac.search_waste":  ["en": "Material, reason or failure", "ar": "خامة أو سبب أو نوع العطل"],
         "mac.of_which_fixed": ["en": "incl. overhead", "ar": "منها التكاليف الثابتة"],
+        // The waterfall's own step. NOT "of which": there the monthly costs
+        // come off AFTER the expenses, as the rule's net takes them, so a label
+        // saying they are part of the bar beside them reads as counted twice.
+        // Named as Settings names them, where the shop typed them in.
+        "mac.waterfall_fixed": ["en": "Monthly costs", "ar": "التكاليف الشهرية"],
         "mac.pnl_unpriced": ["en": "{n} finished jobs were charged nothing. What they cost to make is in the margin and the net income. For a test, a gift or something for the shop itself, right-click the job and choose Not business to leave it out.", "ar": "{n} من الأعمال المنجزة لم يُحتسب عليها شيء، وتكلفتها داخلة في الهامش وصافي الدخل. إن كانت تجربة أو هدية أو شيئًا للمحل نفسه، انقر على العمل بالزر الأيمن واختر «ليس عملًا تجاريًا» لاستبعاده."],
         "mac.not_business": ["en": "Not business", "ar": "ليس عملًا تجاريًا"],
         "mac.quarter_in_progress": ["en": "This quarter is still running, so its overhead is charged for the days elapsed.",
