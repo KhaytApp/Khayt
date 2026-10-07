@@ -59,6 +59,10 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     let priorityLevel: String?
     let notes: String
     let machineId: String?
+    /// Who did the work: an `OP-…` in `store.operators`, or nobody. Lenient: a
+    /// field this app never wrote until operators came to it must not be able
+    /// to make a job unreadable.
+    let operatorId: String?
     /// This piece came off the shelf. It was printed in a batch weeks ago and
     /// is being SOLD now, not made now — so its price, its cost and its print
     /// hours all land on the sale, which is the only combination that leaves
@@ -107,7 +111,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
-        case machineId, clientId, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
+        case machineId, operatorId, clientId, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
         case carrier, trackingNumber, shippingService, shippingStatus
         case fromStock
         case nonBusiness
@@ -212,6 +216,8 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         priorityLevel = try c.decodeIfPresent(String.self, forKey: .priorityLevel)
         notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         machineId = try c.decodeIfPresent(String.self, forKey: .machineId)
+        operatorId = (try? c.decodeIfPresent(String.self, forKey: .operatorId)).flatMap { $0 }
+            .flatMap { $0.isEmpty ? nil : $0 }
         // Absent means made to order, which is every order written before
         // the shelf existed and most of them since.
         fromStock = (try? c.decodeIfPresent(Bool.self, forKey: .fromStock)) as? Bool ?? false

@@ -319,7 +319,7 @@ function renderOperatorsList() {
       <span class="machine-name">${escapeHtml(op.name)}</span>
       ${op.role ? `<span style="font-size:11.5px;color:var(--text-muted);margin-inline-start:8px;">${escapeHtml(op.role)}</span>` : ''}
       ${op.hourlyRate ? `<span style="font-size:11px;color:var(--primary);margin-inline-start:8px;">${fmtPrice(+op.hourlyRate)}/hr</span>` : ''}
-      ${op.active === false ? `<span class="machine-jobs-badge" style="background:var(--danger);color:#fff;">Inactive</span>` : ''}
+      ${op.active === false ? `<span class="machine-jobs-badge" style="background:var(--danger);color:#fff;">${escapeHtml(t('op.inactive'))}</span>` : ''}
       <button class="btn small" data-act="edit-operator" data-id="${op.id}">${escapeHtml(t('common.edit'))}</button>
       <button class="btn danger small" data-act="del-operator" data-id="${op.id}">${escapeHtml(t('common.delete'))}</button>
     </div>`).join('');

@@ -57,6 +57,10 @@ struct Reports: View {
     @State private var sources: KhaytEngine.ClientSources?
     /// Whether customers come back, and how soon. See `ClientRetentionCard`.
     @State private var retention: KhaytEngine.ClientRetention?
+    /// Who did the work, and the hours they logged. Nil for a book with no
+    /// operators / no time logged, and then nothing is drawn.
+    @State private var staff: KhaytEngine.OperatorPerformance?
+    @State private var labour: KhaytEngine.OperatorTime?
     /// The P&L's expense figure, broken up. NOT the Expenses screen's panel —
     /// `ExpenseCategoriesCard` has the argument for why they differ.
     @State private var spending: KhaytEngine.Spending?
@@ -101,7 +105,7 @@ struct Reports: View {
                 Best(shop: shop, best: best, worth: worth, earns: earns, mix: mix,
                      when: when, quality: quality, cycle: cycle, lead: lead,
                      promises: promises, ratings: ratings, sources: sources,
-                     retention: retention)
+                     retention: retention, staff: staff, labour: labour)
             } else if shop.reportPage == .quoting {
                 Quoting(shop: shop, rows: variance, said: advice, funnel: funnel)
             } else if shop.reportPage == .machines {
@@ -238,6 +242,13 @@ struct Reports: View {
         .task(id: SitesKey(locations: shop.locationRows, placed: shop.machines.map { $0.locationId ?? "" },
                            books: shop.orderRows.count + shop.expenseRows.count + shop.wasteRows.count)) {
             if let engine = shop.engine { await recomputeSites(engine) }
+        }
+        // And when an operator is added or changed, a job is put on somebody,
+        // or time is logged — none of which moves a count above.
+        .task(id: StaffKey(operators: shop.operatorRows, entries: shop.timeEntryRows,
+                           assigned: shop.orders.map { $0.operatorId ?? "" },
+                           books: shop.orderRows.count + shop.wasteRows.count)) {
+            await recomputeStaff()
         }
         // And NOT with the period, beside it on the same screen. "Which machine
         // earned" is a question about a stretch of time; "is this machine
@@ -645,6 +656,24 @@ struct Reports: View {
         ratings = try? await engine.ratingTrend(orders: shop.orderRows, months: months)
     }
 
+    /// The two staff cards. The whole book, NOT the chosen period: an
+    /// operator's record is a record, and over a quarter a small shop's
+    /// figures for one person are three jobs — which reads as a verdict and is
+    /// not one. The other app draws both over the whole book too.
+    private func recomputeStaff() async {
+        guard let engine = shop.engine, !shop.operatorRows.isEmpty || !shop.timeEntryRows.isEmpty else {
+            staff = nil; labour = nil; return
+        }
+        let perf = try? await engine.operatorPerformance(
+            operators: shop.operatorRows, orders: shop.orderRows, wasteLog: shop.wasteRows,
+            settings: shop.settingsDict, clients: shop.clientRows)
+        staff = (perf?.hasOperators ?? false) && !(perf?.rows.isEmpty ?? true) ? perf : nil
+        let time = try? await engine.operatorTime(
+            timeEntries: shop.timeEntryRows, orders: shop.orderRows, operators: shop.operatorRows,
+            settings: shop.settingsDict, clients: shop.clientRows)
+        labour = (time?.entries ?? 0) > 0 ? time : nil
+    }
+
     private func recomputeRetention() async {
         guard let engine = shop.engine else { retention = nil; return }
         // The whole book, NOT the chosen period, for the reason
@@ -807,6 +836,8 @@ struct Reports: View {
         let ratings: KhaytEngine.RatingTrend?
         let sources: KhaytEngine.ClientSources?
         let retention: KhaytEngine.ClientRetention?
+        let staff: KhaytEngine.OperatorPerformance?
+        let labour: KhaytEngine.OperatorTime?
 
         var body: some View {
             // Two cards rather than two halves of one pane divided by a rule.
@@ -875,6 +906,18 @@ struct Reports: View {
                         .card(rail: (quality?.firstPassYield ?? 1) < 0.75
                                     ? Khayt.attention : Khayt.brand,
                               padding: 14)
+                    // Who did that work, under how well it was done: the
+                    // jobs, the waste and the estimates are the same three
+                    // questions asked of each person. Only for a shop with
+                    // staff on the book.
+                    if let staff {
+                        OperatorPerformanceCard(shop: shop, report: staff)
+                            .card(rail: Khayt.brand, padding: 14)
+                    }
+                    if let labour {
+                        OperatorTimeCard(shop: shop, report: labour)
+                            .card(rail: Khayt.brand, padding: 14)
+                    }
                     // Under quality, and last, because it is the only figure on
                     // this screen the shop did not work out for itself: whether
                     // the work passed inspection is the shop's own opinion of

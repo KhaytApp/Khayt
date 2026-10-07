@@ -417,6 +417,12 @@ private struct JobCard: View {
                     if !job.client.isEmpty {
                         Text(job.client).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
+                    // Who it is on, as the other app's card says it — the
+                    // question a shop with staff asks of every card.
+                    if let who = shop.operatorLabel(job.operatorId) {
+                        Label(who, systemImage: "person.badge.clock")
+                            .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
                     // What it is being printed in, in the shop's own words.
                     let colours = shop.partColours(of: job)
                     if !colours.isEmpty {

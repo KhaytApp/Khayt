@@ -77,6 +77,12 @@ private struct Detail: View {
                     Divider()
                     parts
                 }
+                // Who did it and the hours on it — for a shop with staff, or a
+                // job that already names somebody.
+                if JobStaffSection.shows(shop, job) {
+                    Divider()
+                    JobStaffSection(shop: shop, job: job)
+                }
                 // What the whole object came to, for a shop looking at one
                 // leg of it. Only where there is a kit to show or a book that
                 // has kits in it — a picker offering to file a job into

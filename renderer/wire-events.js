@@ -1766,12 +1766,21 @@ function wireEvents() {
     if (btn.dataset.act === 'edit-operator') openOperatorEditor(btn.dataset.id);
     if (btn.dataset.act === 'del-operator') {
       const op = operators.find(o => o.id === btn.dataset.id);
+      // Who did a job is history, not a setting: an operator with work on
+      // record is made inactive rather than deleted, so their name stays on
+      // it (`lib/operators.js`, the rule the Mac uses). This dropped the row
+      // alone and left every job and time entry naming nobody.
+      const book = { operators, printLog, timeEntries };
+      const refs = KhaytOperators.references(book, btn.dataset.id);
+      const keeps = refs.jobs + refs.timeEntries > 0;
       confirmModal(
-        t('op.delete_confirm', { name: op?.name || '' }) || `Delete operator "${op?.name || ''}"?`,
-        { danger: true, okText: t('common.delete') },
+        keeps
+          ? t('op.deactivate_confirm', { name: op?.name || '', jobs: refs.jobs, entries: refs.timeEntries })
+          : t('op.delete_confirm', { name: op?.name || '' }),
+        { danger: true, okText: keeps ? t('op.deactivate') : t('common.delete') },
       ).then((ok) => {
         if (!ok) return;
-        operators = operators.filter(o => o.id !== btn.dataset.id);
+        operators = KhaytOperators.remove({ operators, printLog, timeEntries }, btn.dataset.id).operators;
         saveAll();
         renderOperatorsList();
       });

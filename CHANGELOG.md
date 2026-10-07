@@ -4,6 +4,40 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Operators.** Settings → Operations now lists the shop's staff: add
+  someone, change their name, job title, access level, hourly rate, or mark
+  them inactive. A job's inspector has an operator picker and a time log —
+  "Log work time…" records the hours, the day and a note, at the person's
+  rate on that day, and an entry can be deleted (⌘Z puts it back). Board
+  cards show who a job is on. Reports → Best shows each operator's finished
+  jobs, the waste on their jobs and how close their printer-measured prints
+  came to the estimate, and the hours logged, what they cost and what the
+  work earned per hour. The operator lock (a PIN to switch people) stays in
+  the desktop app; an operator's PIN is never touched by the Mac.
+
+- **Deleting an operator who has work on record now makes them inactive
+  instead (both apps).** Who did a job is history: the desktop's delete used
+  to drop the person and leave their jobs and time entries pointing at
+  nobody. Somebody with no work is still removed.
+
+- **Operator reports corrected (both apps).** Per-operator accuracy went
+  negative when a print ran more than twice its estimate (one such job
+  cancelled out two perfect ones) and counted times somebody typed in as
+  perfectly accurate; waste was a count of entries, and only on jobs that
+  finished — a failed, cancelled job's waste was nobody's; voided and
+  not-business jobs counted; and a deleted operator's work vanished. In time
+  tracking, every operator on a job was credited with ALL of its revenue, so
+  the rows added up to more than the shop took; revenue was the typed price
+  of any order, including quotes and open and voided jobs; revenue per hour
+  divided by hours that had not earned yet; time logged against no job
+  inflated hours per job; a renamed operator kept their old name; and the
+  card was in English in every language.
+
+- **Desktop: a job's operator no longer disappears when they are made
+  inactive.** The job editor offered active operators only, so a job on
+  somebody inactive opened as Unassigned and saving it for any reason
+  cleared who did it.
+
 - **(Mac) Locations.** Settings → Operations now lists the shop's sites: add
   one, rename it, change its address, or delete it. A machine's sheet has a
   Location picker, its card on the Machines screen shows where it stands, and

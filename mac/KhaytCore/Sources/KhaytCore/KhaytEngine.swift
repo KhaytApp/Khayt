@@ -533,6 +533,11 @@ public actor KhaytEngine {
         // ALREADY ABOVE and must be: it runs the one and reads which site a
         // job belongs to from the other.
         "location-pl",
+        // The staff: who did the work, the hours they logged, what it earned.
+        // Takes every rule it needs as a callback, so it reads no global —
+        // but the callbacks the engine hands it reach ORDER-MONEY,
+        // ORDER-STATUS, BUSINESS-SCOPE and MACHINE-ACCURACY, all above.
+        "operators",
         // Who owes the shop money and how long they have owed it. ORDER-MONEY
         // AND ORDER-PAYMENT ARE ALREADY ABOVE and must be: it reaches both
         // through globals, and without them every order reads as unpaid at its
@@ -7187,6 +7192,136 @@ public actor KhaytEngine {
             public let marginPct: Double?
             public var id: String { locationId }
         }
+    }
+
+    // MARK: - The staff
+
+    /// The rules `lib/operators.js` takes as callbacks, the ones the desktop
+    /// hands it: what finished, what is the shop's trade, which actual a
+    /// printer measured, and what an order earned (`order-money`).
+    private static let operatorDeps = """
+        {
+          isFinished: function (o) { return globalThis.KhaytOrderStatus.isFinished(o); },
+          countsForBusiness: function (o) {
+            return globalThis.KhaytBusinessScope
+              ? globalThis.KhaytBusinessScope.countsForBusiness(o) : (o && o.nonBusiness !== true);
+          },
+          timeWasMeasured: function (o) { return globalThis.KhaytMachineAccuracy.timeWasMeasured(o); },
+          revenueOf: function (o) {
+            var n = Number(globalThis.KhaytOrderMoney.orderEarnedBase(o, ctx));
+            return isFinite(n) ? n : 0;
+          }
+        }
+        """
+
+    /// Per operator: jobs finished, waste on their jobs, and how close their
+    /// measured prints came to the estimate. `lib/operators.js` `performance`.
+    /// The whole book: an operator's record is a record.
+    public func operatorPerformance(operators: [JSONValue], orders: [JSONValue],
+                                    wasteLog: [JSONValue], settings: [String: JSONValue],
+                                    clients: [JSONValue]) throws -> OperatorPerformance {
+        try runtime.call2("""
+            (function () {
+              var ctx = { settings: ARG3, clients: ARG4 };
+              return globalThis.KhaytOperators.performance(
+                { operators: ARG0, orders: ARG1, wasteLog: ARG2 }, \(Self.operatorDeps));
+            })()
+            """,
+            [.array(operators), .array(orders), .array(wasteLog), .object(settings), .array(clients)],
+            as: OperatorPerformance.self)
+    }
+
+    public struct OperatorPerformance: Decodable, Sendable, Hashable {
+        /// False when the book has no operators, and there is nothing to draw.
+        public let hasOperators: Bool
+        public let rows: [Row]
+
+        public struct Row: Decodable, Sendable, Hashable, Identifiable {
+            public let operatorId: String
+            /// Empty for an operator no longer on the list (`known` false).
+            public let name: String
+            public let role: String
+            public let active: Bool
+            public let known: Bool
+            public let jobs: Int
+            public let wasteEntries: Int
+            public let wasteGrams: Double
+            public let wasteCost: Double
+            /// Nil when no job of theirs had a printer-measured time.
+            public let accuracyPct: Double?
+            /// How many jobs the accuracy is over.
+            public let scored: Int
+            public var id: String { operatorId }
+        }
+    }
+
+    /// The hours the staff logged, what they cost, and what the work they were
+    /// on earned. `lib/operators.js` `timeTracking`.
+    public func operatorTime(timeEntries: [JSONValue], orders: [JSONValue], operators: [JSONValue],
+                             settings: [String: JSONValue], clients: [JSONValue]) throws -> OperatorTime {
+        try runtime.call2("""
+            (function () {
+              var ctx = { settings: ARG3, clients: ARG4 };
+              return globalThis.KhaytOperators.timeTracking(
+                { timeEntries: ARG0, orders: ARG1, operators: ARG2 }, \(Self.operatorDeps));
+            })()
+            """,
+            [.array(timeEntries), .array(orders), .array(operators), .object(settings), .array(clients)],
+            as: OperatorTime.self)
+    }
+
+    public struct OperatorTime: Decodable, Sendable, Hashable {
+        public let entries: Int
+        public let totals: Totals
+        public let operators: [Row]
+        public let topOrders: [TopOrder]
+
+        public struct Totals: Decodable, Sendable, Hashable {
+            public let hours: Double
+            public let cost: Double
+            public let orders: Int
+            public let avgHoursPerOrder: Double?
+        }
+
+        public struct Row: Decodable, Sendable, Hashable, Identifiable {
+            public let operatorId: String
+            /// The current name; the name frozen on the entries for somebody no
+            /// longer on the list.
+            public let name: String
+            public let known: Bool
+            public let active: Bool
+            public let hours: Double
+            public let cost: Double
+            public let orders: Int
+            public let avgHoursPerOrder: Double?
+            /// This person's share, by hours, of what the finished jobs they
+            /// worked on earned.
+            public let revenue: Double
+            public let earningHours: Double
+            public let revenuePerHour: Double?
+            public var id: String { operatorId }
+        }
+
+        public struct TopOrder: Decodable, Sendable, Hashable, Identifiable {
+            public let orderId: String
+            public let project: String
+            public let hours: Double
+            public let operators: [String]
+            public var id: String { orderId }
+        }
+    }
+
+    /// `lib/operators.js` `remove` — removed, or made inactive when their name
+    /// is on work. The Mac's own write mirrors it; `OperatorsTests` holds the
+    /// two together.
+    public func removeOperator(book: [String: JSONValue], id: String) throws -> OperatorRemoval {
+        try runtime.call2("globalThis.KhaytOperators.remove(ARG0, ARG1)",
+                          [.object(book), .string(id)], as: OperatorRemoval.self)
+    }
+
+    public struct OperatorRemoval: Decodable, Sendable {
+        public let operators: [JSONValue]
+        public let outcome: String
     }
 
     // MARK: - The shelf

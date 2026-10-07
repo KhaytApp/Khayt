@@ -2468,31 +2468,24 @@ function renderCostTrends() {
 function renderOperatorAnalytics() {
   const el = $('#operatorAnalyticsSection');
   if (!el) return;
-  if (operators.length === 0) { el.innerHTML = ''; return; }
-
-  const completed = printLog.filter(o => KhaytOrderStatus.isFinished(o) && o.operatorId);
-  if (completed.length === 0) {
+  // `lib/operators.js`, not the arithmetic that used to be here. Its accuracy
+  // went negative past a 2× overrun (one bad job cancelled two perfect ones),
+  // it scored times somebody typed, it counted waste as entries and only on
+  // jobs that finished, it counted voided and not-business jobs, and a deleted
+  // operator's work vanished from the table.
+  const perf = KhaytOperators.performance({ operators, orders: printLog, wasteLog }, {
+    isFinished: (o) => KhaytOrderStatus.isFinished(o),
+    countsForBusiness: _countsForBusiness,
+    timeWasMeasured: (o) => (typeof KhaytMachineAccuracy !== 'undefined'
+      ? KhaytMachineAccuracy.timeWasMeasured(o)
+      : !!(o && o.actualsSource && o.actualsSource.time && o.actualsSource.time !== 'manual')),
+  });
+  if (!perf.hasOperators) { el.innerHTML = ''; return; }
+  const rows = perf.rows;
+  if (rows.length === 0) {
     el.innerHTML = `<h3 class="card-head"><span class="swatch"></span><span>${escapeHtml(t('an.operator_title'))}</span></h3><p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('an.accuracy_none'))}</p>`;
     return;
   }
-
-  const rows = operators.map(op => {
-    const jobs = completed.filter(o => o.operatorId === op.id);
-    const wasteEntries = wasteLog.filter(w => {
-      // Match waste entries to orders assigned to this operator
-      return jobs.some(j => j.id === w.orderId);
-    });
-    // Avg print time accuracy: (estimated - actual) / estimated
-    const accuracyScores = jobs
-      .filter(o => o.actualPrintTime != null && o.printTime > 0)
-      .map(o => (1 - Math.abs(+o.actualPrintTime - +o.printTime) / +o.printTime) * 100);
-    const avgAccuracy = accuracyScores.length > 0
-      ? (accuracyScores.reduce((s, v) => s + v, 0) / accuracyScores.length).toFixed(1) + '%'
-      : '—';
-    return { op, jobs: jobs.length, wasteEntries: wasteEntries.length, avgAccuracy };
-  }).filter(r => r.jobs > 0);
-
-  if (rows.length === 0) { el.innerHTML = ''; return; }
 
   el.innerHTML = `
     <h3 class="card-head"><span class="swatch"></span><span>${escapeHtml(t('an.operator_title'))}</span></h3>
@@ -2501,15 +2494,15 @@ function renderOperatorAnalytics() {
         <thead><tr style="border-bottom:1px solid var(--border-soft);color:var(--text-muted);">
           <th style="padding:6px 8px;text-align:start;">${escapeHtml(t('op.name'))}</th>
           <th style="padding:6px 8px;text-align:end;">${escapeHtml(t('an.op_jobs'))}</th>
-          <th style="padding:6px 8px;text-align:end;">${escapeHtml(t('an.op_waste'))}</th>
+          <th style="padding:6px 8px;text-align:end;">${escapeHtml(t('an.op_waste_amount'))}</th>
           <th style="padding:6px 8px;text-align:end;">${escapeHtml(t('an.op_accuracy'))}</th>
         </tr></thead>
         <tbody>
           ${rows.map(r => `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-            <td style="padding:7px 8px;font-weight:500;">${escapeHtml(r.op.name)}${r.op.role ? `<span style="font-size:11px;color:var(--text-muted);margin-inline-start:5px;">${escapeHtml(r.op.role)}</span>` : ''}</td>
+            <td style="padding:7px 8px;font-weight:500;">${escapeHtml(r.known ? r.name : t('an.op_removed'))}${r.role ? `<span style="font-size:11px;color:var(--text-muted);margin-inline-start:5px;">${escapeHtml(r.role)}</span>` : ''}</td>
             <td style="padding:7px 8px;text-align:end;">${r.jobs}</td>
-            <td style="padding:7px 8px;text-align:end;color:${r.wasteEntries > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${r.wasteEntries}</td>
-            <td style="padding:7px 8px;text-align:end;color:var(--primary);">${escapeHtml(String(r.avgAccuracy))}</td>
+            <td style="padding:7px 8px;text-align:end;color:${r.wasteEntries > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${r.wasteEntries > 0 ? `${Math.round(r.wasteGrams)} g · ${fmtPrice(r.wasteCost)}` : '0'}</td>
+            <td style="padding:7px 8px;text-align:end;color:var(--primary);">${r.accuracyPct == null ? '—' : `${r.accuracyPct.toFixed(1)}% <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('an.op_scored', { n: r.scored }))}</span>`}</td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -2519,106 +2512,79 @@ function renderOperatorAnalytics() {
 function renderTimeAnalytics() {
   const el = $('#timeAnalyticsSection');
   if (!el) return;
-  if (timeEntries.length === 0) {
-    el.innerHTML = `<h3 class="card-head"><span class="swatch"></span><span>${escapeHtml(t('time.analytics_title') || 'Time Tracking')}</span></h3><p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('time.no_entries') || 'No time entries yet — log time using ⏱ on orders.')}</p>`;
+  // `lib/operators.js`. The inline version credited every operator on a job
+  // with ALL of its revenue (so the rows added up to more than the shop
+  // took), read revenue as the typed price from any order — quotes, open and
+  // voided ones too — divided revenue by hours that had earned nothing yet,
+  // put time logged against no job into hours per job, labelled a renamed
+  // operator by their old name, and was English on every screen.
+  const tt = KhaytOperators.timeTracking({ timeEntries, orders: printLog, operators }, {
+    revenueOf: orderEarnedBase,
+    isFinished: (o) => KhaytOrderStatus.isFinished(o),
+    countsForBusiness: _countsForBusiness,
+  });
+  if (tt.entries === 0) {
+    el.innerHTML = `<h3 class="card-head"><span class="swatch"></span><span>${escapeHtml(t('time.analytics_title'))}</span></h3><p style="color:var(--text-muted);font-size:13px;">${escapeHtml(t('time.no_entries'))}</p>`;
     return;
   }
-
-  const totalHours = timeEntries.reduce((s, e) => s + (+e.hours || 0), 0);
-  const totalCost  = timeEntries.reduce((s, e) => s + (+e.cost  || 0), 0);
-  const orderIds   = [...new Set(timeEntries.map(e => e.orderId).filter(Boolean))];
-  const avgHrsPerOrder = orderIds.length > 0 ? (totalHours / orderIds.length) : 0;
-
-  // Per-operator stats
-  const opStats = {};
-  for (const entry of timeEntries) {
-    const oid = entry.operatorId;
-    if (!opStats[oid]) opStats[oid] = { name: entry.operatorName, hours: 0, cost: 0, orderIds: new Set() };
-    opStats[oid].hours += +entry.hours || 0;
-    opStats[oid].cost  += +entry.cost  || 0;
-    if (entry.orderId) opStats[oid].orderIds.add(entry.orderId);
-  }
-  const opRows = Object.entries(opStats).map(([, s]) => {
-    const ordersWorked = [...s.orderIds];
-    const revenue = ordersWorked.reduce((sum, oid) => {
-      const o = printLog.find(x => x.id === oid);
-      return sum + (+o?.price || 0);
-    }, 0);
-    const avgRevPerHr = s.hours > 0 ? revenue / s.hours : 0;
-    const avgHrs      = s.orderIds.size > 0 ? s.hours / s.orderIds.size : 0;
-    return { ...s, orders: s.orderIds.size, avgHrs: avgHrs.toFixed(2), avgRevPerHr: avgRevPerHr.toFixed(2) };
-  });
-
-  // Top 3 orders by hours
-  const orderHours = {};
-  for (const e of timeEntries) {
-    if (!e.orderId) continue;
-    if (!orderHours[e.orderId]) orderHours[e.orderId] = { hours: 0, ops: new Set() };
-    orderHours[e.orderId].hours += +e.hours || 0;
-    orderHours[e.orderId].ops.add(e.operatorName);
-  }
-  const top3 = Object.entries(orderHours)
-    .sort((a, b) => b[1].hours - a[1].hours)
-    .slice(0, 3)
-    .map(([oid, v]) => {
-      const o = printLog.find(x => x.id === oid);
-      return { name: o?.project || oid, hours: v.hours.toFixed(2), ops: [...v.ops].join(', ') };
-    });
+  const hrs = (h) => `${(+h).toFixed(2)}h`;
+  const opRows = tt.operators;
+  const top3 = tt.topOrders;
 
   el.innerHTML = `
-    <h3 class="card-head"><span class="swatch"></span><span>${escapeHtml(t('time.analytics_title') || 'Time Tracking Analytics')}</span></h3>
+    <h3 class="card-head"><span class="swatch"></span><span>${escapeHtml(t('time.analytics_title'))}</span></h3>
     <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;">
       <div style="flex:1;min-width:100px;text-align:center;">
-        <div style="font-size:20px;font-weight:700;">${totalHours.toFixed(2)}h</div>
-        <div style="font-size:11px;color:var(--text-muted);">Total hours</div>
+        <div style="font-size:20px;font-weight:700;">${hrs(tt.totals.hours)}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('time.total_hours'))}</div>
       </div>
       <div style="flex:1;min-width:100px;text-align:center;">
-        <div style="font-size:20px;font-weight:700;color:#22c55e;">${fmtPrice(totalCost)}</div>
-        <div style="font-size:11px;color:var(--text-muted);">Total labor cost</div>
+        <div style="font-size:20px;font-weight:700;color:#22c55e;">${fmtPrice(tt.totals.cost)}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('time.total_cost'))}</div>
       </div>
       <div style="flex:1;min-width:100px;text-align:center;">
-        <div style="font-size:20px;font-weight:700;">${avgHrsPerOrder.toFixed(2)}h</div>
-        <div style="font-size:11px;color:var(--text-muted);">Avg hrs/order</div>
+        <div style="font-size:20px;font-weight:700;">${tt.totals.avgHoursPerOrder == null ? '—' : hrs(tt.totals.avgHoursPerOrder)}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('time.avg_per_order'))}</div>
       </div>
     </div>
     ${opRows.length > 0 ? `
-    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">Per-Operator Breakdown</div>
+    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">${escapeHtml(t('time.by_operator'))}</div>
     <div class="table-wrap">
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
         <thead><tr style="border-bottom:1px solid var(--border-soft);color:var(--text-muted);">
-          <th style="padding:6px 8px;text-align:start;">Operator</th>
-          <th style="padding:6px 8px;text-align:end;">Hours</th>
-          <th style="padding:6px 8px;text-align:end;">Cost</th>
-          <th style="padding:6px 8px;text-align:end;">Orders</th>
-          <th style="padding:6px 8px;text-align:end;">Avg h/order</th>
-          <th style="padding:6px 8px;text-align:end;">Revenue/hr</th>
+          <th style="padding:6px 8px;text-align:start;">${escapeHtml(t('time.operator'))}</th>
+          <th style="padding:6px 8px;text-align:end;">${escapeHtml(t('time.hours'))}</th>
+          <th style="padding:6px 8px;text-align:end;">${escapeHtml(t('time.cost'))}</th>
+          <th style="padding:6px 8px;text-align:end;">${escapeHtml(t('time.orders'))}</th>
+          <th style="padding:6px 8px;text-align:end;">${escapeHtml(t('time.avg_per_order'))}</th>
+          <th style="padding:6px 8px;text-align:end;">${escapeHtml(t('time.rev_per_hour'))}</th>
         </tr></thead>
         <tbody>
           ${opRows.map(r => `<tr style="border-bottom:1px solid rgba(255,255,255,.05);">
-            <td style="padding:7px 8px;font-weight:500;">${escapeHtml(r.name)}</td>
-            <td style="padding:7px 8px;text-align:end;">${r.hours.toFixed(2)}h</td>
+            <td style="padding:7px 8px;font-weight:500;">${escapeHtml(r.name || t('an.op_removed'))}</td>
+            <td style="padding:7px 8px;text-align:end;">${hrs(r.hours)}</td>
             <td style="padding:7px 8px;text-align:end;">${fmtPrice(r.cost)}</td>
             <td style="padding:7px 8px;text-align:end;">${r.orders}</td>
-            <td style="padding:7px 8px;text-align:end;">${r.avgHrs}h</td>
-            <td style="padding:7px 8px;text-align:end;color:var(--primary);">${fmtPrice(+r.avgRevPerHr)}</td>
+            <td style="padding:7px 8px;text-align:end;">${r.avgHoursPerOrder == null ? '—' : hrs(r.avgHoursPerOrder)}</td>
+            <td style="padding:7px 8px;text-align:end;color:var(--primary);">${r.revenuePerHour == null ? '—' : fmtPrice(r.revenuePerHour)}</td>
           </tr>`).join('')}
         </tbody>
       </table>
     </div>` : ''}
     ${top3.length > 0 ? `
-    <div style="font-weight:600;font-size:13px;margin-top:16px;margin-bottom:8px;">Top Orders by Hours</div>
+    <div style="font-weight:600;font-size:13px;margin-top:16px;margin-bottom:8px;">${escapeHtml(t('time.top_orders'))}</div>
     <div class="table-wrap">
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
         <thead><tr style="border-bottom:1px solid var(--border-soft);color:var(--text-muted);">
-          <th style="padding:6px 8px;text-align:start;">Project</th>
-          <th style="padding:6px 8px;text-align:end;">Total Hours</th>
-          <th style="padding:6px 8px;text-align:start;">Operators</th>
+          <th style="padding:6px 8px;text-align:start;">${escapeHtml(t('time.project'))}</th>
+          <th style="padding:6px 8px;text-align:end;">${escapeHtml(t('time.hours'))}</th>
+          <th style="padding:6px 8px;text-align:start;">${escapeHtml(t('time.operators'))}</th>
         </tr></thead>
         <tbody>
           ${top3.map(r => `<tr style="border-bottom:1px solid rgba(255,255,255,.05);">
-            <td style="padding:7px 8px;">${escapeHtml(r.name)}</td>
-            <td style="padding:7px 8px;text-align:end;font-weight:600;">${r.hours}h</td>
-            <td style="padding:7px 8px;font-size:11.5px;color:var(--text-muted);">${escapeHtml(r.ops)}</td>
+            <td style="padding:7px 8px;">${escapeHtml(r.project || r.orderId)}</td>
+            <td style="padding:7px 8px;text-align:end;font-weight:600;">${hrs(r.hours)}</td>
+            <td style="padding:7px 8px;font-size:11.5px;color:var(--text-muted);">${escapeHtml(r.operators.join(', '))}</td>
           </tr>`).join('')}
         </tbody>
       </table>
