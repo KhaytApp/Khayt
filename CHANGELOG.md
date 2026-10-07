@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) A phone is never handed a PIN hash.** The book a paired phone pulls
+  over the shop network carried the hash of the PIN-reset code on every pull,
+  and with the full book every staff member's PIN hash. A four-digit PIN behind
+  a hash can be guessed offline in seconds. Both now arrive masked. The shop's
+  computers still share them through cloud sync, so a staff PIN set on one
+  computer keeps working on the others.
+
 - **(Mac) Operators.** Settings → Operations now lists the shop's staff: add
   someone, change their name, job title, access level, hourly rate, or mark
   them inactive. A job's inspector has an operator picker and a time log —

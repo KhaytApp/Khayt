@@ -790,14 +790,16 @@ final class LanServer {
         // has always pushed masks. `forCloud` is the rule that draws that line
         // and it is `lib/cloud-outbox.js`'s, not a second one written here for
         // the phone: a device on the LAN is exactly as entitled to a shop's
-        // secrets as the cloud is, which is to say not at all.
+        // secrets as the cloud is, which is to say not at all. And to one thing
+        // less: `forPhone` also masks the staff PIN hashes, which the shop's
+        // other computers need through the cloud and a phone never does.
         //
         // Behind the same PIN as the queue. Anyone who can read this can read
         // the shop's client list, so it is the owner PIN that gates it, and
         // `pinGate` does the constant-time compare and the lockout.
         case ("/api/store", true):
             if let refused = await pinGate(request) { return refused }
-            guard let masked = try? await engine.storeForCloud(host.store()) else {
+            guard let masked = try? await engine.storeForPhone(host.store()) else {
                 // Deliberately not an empty book. A phone that took `{}` for an
                 // answer would replace a shop it already had with nothing.
                 return .json(500, #"{"error":"The book could not be prepared to send"}"#)

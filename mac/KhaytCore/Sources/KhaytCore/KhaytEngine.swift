@@ -9480,6 +9480,13 @@ public actor KhaytEngine {
                           as: [String: JSONValue].self)
     }
 
+    /// What a phone on the LAN is handed: `storeForCloud`, and the PIN
+    /// hashes masked too (`KhaytCloudOutbox.forPhone`).
+    public func storeForPhone(_ store: [String: JSONValue]) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytCloudOutbox.forPhone(ARG0)", [.object(store)],
+                          as: [String: JSONValue].self)
+    }
+
     public func changesToSend(local: [String: JSONValue],
                               server: [String: JSONValue]) throws -> Outbox {
         try runtime.call2("KhaytCloudOutbox.changesToSend(ARG0, ARG1)",

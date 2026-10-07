@@ -181,10 +181,43 @@
     'settings.slicersAutoDetected',
   ]);
 
-  /** Visit every non-empty string at a DEVICE_PRIVATE path, with a setter. */
-  function forEachDevicePrivate(data, visit) {
+  /* ── PHONE-PRIVATE: kept between computers, never handed to a phone ─────
+   *
+   *   operators[].pinHash        a staff member's PIN, hashed
+   *   settings.recoveryCodeHash  the code that resets a forgotten PIN, hashed
+   *
+   * A four-to-eight digit PIN is ten thousand to a hundred million guesses,
+   * and with the hash in hand every guess is offline, unthrottled and silent —
+   * salting slows each one, it does not change how few there are. The phone has
+   * no use for either: the PIN lock is the desktop's, and nothing on the phone
+   * checks a PIN against these.
+   *
+   * NOT device-private. An operator's PIN set on one computer must still work
+   * on the shop's other computers, so the cloud push keeps it (it is inside
+   * the blob only the shop's passphrase opens), and so does a cloud restore —
+   * masking the recovery hash there would leave a restored shop with a
+   * recovery code that can never match. Only the Mac's /api/store applies
+   * this list (cloud-outbox `forPhone`). Decided by the maintainer 2026-10-07.
+   *
+   * MASKED, not deleted, on the way out: a phone that sends an operator back
+   * sends the mask, and lib/sync.js never lets a mask overwrite a real value.
+   * A deleted field would come back as absent, and a whole-record merge would
+   * take the absence.
+   *
+   * Through the cloud the phone still receives the shop's blob with these in
+   * it, because the phone holds the passphrase that opens it. Keeping them
+   * from a device that can read the blob needs a key that device does not
+   * hold; that is not this list.
+   */
+  const PHONE_PRIVATE_PATHS = Object.freeze([
+    'operators[].pinHash',
+    'settings.recoveryCodeHash',
+  ]);
+
+  /** Visit every non-empty string at a path in `paths`, with a setter. */
+  function forEachAt(paths, data, visit) {
     if (!data || typeof data !== 'object' || typeof visit !== 'function') return;
-    for (const p of DEVICE_PRIVATE_PATHS) {
+    for (const p of paths) {
       const leafStrings = (parent, key) => {
         const v = parent[key];
         if (typeof v === 'string' && v) visit(v, (next) => { parent[key] = next; });
@@ -208,6 +241,12 @@
       }
     }
   }
+
+  /** Visit every non-empty string at a DEVICE_PRIVATE path, with a setter. */
+  function forEachDevicePrivate(data, visit) { forEachAt(DEVICE_PRIVATE_PATHS, data, visit); }
+
+  /** Visit every non-empty string at a PHONE_PRIVATE path, with a setter. */
+  function forEachPhonePrivate(data, visit) { forEachAt(PHONE_PRIVATE_PATHS, data, visit); }
 
   const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
@@ -275,6 +314,7 @@
   const api = {
     SECRET_PATHS, forEachSecret,
     DEVICE_PRIVATE_PATHS, forEachDevicePrivate,
+    PHONE_PRIVATE_PATHS, forEachPhonePrivate,
     MACHINE_LOCAL_PATHS, keepMachineLocal,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

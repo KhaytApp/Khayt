@@ -279,6 +279,30 @@ struct LanServerTests {
         #expect(wrong.headers["x-content-type-options"] == "nosniff")
     }
 
+    @Test("a phone is never handed a PIN hash, in the working set or the whole book")
+    func noPinHashes() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        // Hashes the desktop's operator lock checks PINs against. Settings go
+        // out on every pull, so the recovery hash used to; operators go out
+        // only with `?scope=whole`, so a staff PIN did there.
+        let hash = "p2$210000$00112233445566778899aabbccddeeff$" + String(repeating: "ab", count: 32)
+        bench.book.value["settings"] = .object([
+            "shopName": .string("Ward"), "recoveryCodeHash": .string(hash),
+        ])
+        bench.book.value["operators"] = .array([.object([
+            "id": .string("OP-1"), "name": .string("Noura"), "pinHash": .string(hash),
+        ])])
+        for path in ["/api/store", "/api/store?scope=whole"] {
+            let reply = try await bench.get(path, headers: ["x-khayt-pin": "24682468"])
+            #expect(reply.status == 200, Comment(rawValue: reply.text))
+            #expect(!reply.text.contains(hash), "\(path) sent a PIN hash to a phone")
+            #expect(reply.text.contains("Ward"), "\(path) did not send the book at all")
+        }
+        let whole = try await bench.get("/api/store?scope=whole", headers: ["x-khayt-pin": "24682468"])
+        #expect(whole.text.contains("Noura"), "the operator itself still goes, masked")
+    }
+
     @Test("a phone is sent a working set, not the whole book, with the shop's secrets masked")
     func workingSetBehindPin() async throws {
         let bench = try await Bench()
