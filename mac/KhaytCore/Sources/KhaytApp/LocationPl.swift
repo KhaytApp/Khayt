@@ -85,6 +85,9 @@ struct LocationPlCard: View {
         if row.depreciation > 0 {
             parts.append(words.callIt("mac.pnl_depreciation") + " " + Money.text(row.depreciation, shop.currency))
         }
+        if let labour = row.labour, labour > 0 {
+            parts.append(words.callIt("pnl.labour") + " " + Money.text(labour, shop.currency))
+        }
         return parts.joined(separator: "\n")
     }
 }

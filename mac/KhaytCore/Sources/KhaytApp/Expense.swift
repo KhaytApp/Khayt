@@ -154,4 +154,7 @@ extension PnlPeriod {
     /// What the machines lost in value, zero for a bundle older than the field
     /// or a book whose machines carry no depreciation.
     var depreciationValue: Double { depreciation ?? 0 }
+    /// The hours the shop's people logged, at their rate — zero for a bundle
+    /// older than the field or a book with no time log.
+    var labourValue: Double { labour ?? 0 }
 }

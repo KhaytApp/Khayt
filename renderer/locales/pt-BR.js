@@ -2047,6 +2047,8 @@
   "pnl.inventory_note": "Filamento comprado no período: {amount}. É estoque e entra no custo das vendas quando um pedido o usa, por isso não aparece nas despesas acima.",
   "pnl.waste": "Filamento desperdiçado (impressões com falha)",
   "pnl.depreciation": "Depreciação das máquinas",
+  "pnl.labour": "Mão de obra (horas registradas)",
+  "pnl.labour_overlap": "Parte desta mão de obra pode estar também como salário nas suas despesas ou custos fixos. Horas registradas e um salário pelo mesmo trabalho contam duas vezes; mantenha um.",
   "pnl.gross": "Lucro bruto",
   "pnl.gross_margin": "Margem bruta %",
   "pnl.opex": "Despesas operacionais",

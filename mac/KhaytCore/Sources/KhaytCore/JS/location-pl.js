@@ -71,13 +71,15 @@
 
   /**
    * @param {object} input
-   *   orders, expenses, wasteLog, machines, locations — the book
+   *   orders, expenses, wasteLog, machines, locations, timeEntries — the book
+   *   jobs     optional, the WHOLE book when `orders` was narrowed to a
+   *     period: where a stretch of logged labour finds its job
    *   settings, clients, currencies, inventory, now, recentMonthlyHours — what
    *     `pnlByPeriod` is handed by the shop's own P&L, passed through unchanged
    *   inRange  optional `(isoDate) => boolean`. Absent, the whole book. A host
    *     that has already filtered its rows to a period passes none.
    * @returns {{ rows: Array<{locationId, orders, revenue, cogs, expenses,
-   *   waste, depreciation, costs, net, marginPct}>, located: boolean }}
+   *   waste, depreciation, labour, costs, net, marginPct}>, located: boolean }}
    *   One row per location in the book, in the book's order of revenue, then
    *   the unassigned row — present only when something is unassigned.
    */
@@ -95,7 +97,7 @@
 
     const piles = new Map();
     const pile = (key) => {
-      if (!piles.has(key)) piles.set(key, { orders: [], expenses: [], waste: [], machines: [] });
+      if (!piles.has(key)) piles.set(key, { orders: [], expenses: [], waste: [], machines: [], labour: [] });
       return piles.get(key);
     };
     for (const l of locations) pile(str(l.id));
@@ -121,6 +123,18 @@
     for (const m of machines) {
       if (m && m.locationId && known.has(str(m.locationId))) pile(str(m.locationId)).machines.push(m);
     }
+    // LABOUR goes where its job was done; hours logged against no job — a
+    // shift, cleaning, setup — belong to the shop, like its overhead, and are
+    // shown as unassigned rather than guessed onto a branch.
+    // Labour is dated by when it was WORKED, so its job may be outside the
+    // range the host narrowed `orders` to: `jobs`, the whole book, finds it.
+    const book = arr(c.jobs).length ? arr(c.jobs) : orders;
+    const jobById = new Map(book.filter((o) => o && o.id).map((o) => [o.id, o]));
+    for (const e of arr(c.timeEntries)) {
+      if (!e || !inRange(str(e.date))) continue;
+      const job = e.orderId ? jobById.get(e.orderId) : null;
+      pile(site(job ? orderLocationId(job, machines) : null)).labour.push(e);
+    }
 
     // Overhead stays with the shop — see the header.
     const settings = Object.assign({}, c.settings || {}, { fixedCosts: [] });
@@ -132,11 +146,14 @@
         now: c.now instanceof Date ? c.now : (c.now != null ? new Date(c.now) : new Date()),
         granularity: 'month', wasteLog: p.waste, machines: p.machines,
         recentMonthlyHours: c.recentMonthlyHours,
+        // The pile's hours, with the WHOLE book to judge their jobs by: an
+        // hour on a voided job is out wherever the job was filed.
+        timeEntries: p.labour, jobs: book,
       });
       const sum = (k) => periods.reduce((s, r) => s + (+r[k] || 0), 0);
       const revenue = sum('revenue'), cogs = sum('cogs'), expenses = sum('expenses');
-      const waste = sum('waste'), depreciation = sum('depreciation');
-      const costs = cogs + expenses + waste + depreciation;
+      const waste = sum('waste'), depreciation = sum('depreciation'), labour = sum('labour');
+      const costs = cogs + expenses + waste + depreciation + labour;
       const row = {
         locationId,
         orders: sum('orders'),
@@ -145,6 +162,7 @@
         expenses: round2(expenses),
         waste: round2(waste),
         depreciation: round2(depreciation),
+        labour: round2(labour),
         costs: round2(costs),
         net: round2(revenue - costs),
         // On what was kept, like the P&L's — and none where nothing was billed,

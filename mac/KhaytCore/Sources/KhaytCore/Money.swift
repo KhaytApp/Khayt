@@ -611,6 +611,15 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// has it taken off. Optional because an older bundle has no such field;
     /// zero for a book whose machines carry no depreciation.
     public let depreciation: Double?
+    /// What the shop's people cost for the hours they logged in the period
+    /// (`store.timeEntries`, at the rate frozen when the hours were logged) —
+    /// a line of its own, and `net` already has it taken off. Optional because
+    /// an older bundle has no such field; zero for a book with no time log.
+    public let labour: Double?
+    /// Labour was logged in a period that ALSO books pay as an expense or a
+    /// fixed cost — possibly the same money twice. The rule cannot know, so it
+    /// says so and the screen passes it on; nothing is subtracted.
+    public let labourOverlap: Bool?
     public var id: String { period }
 }
 

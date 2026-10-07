@@ -1533,6 +1533,7 @@ final class Words {
         // `an.pnl_vat`); a column header is a label, not the line's name.
         "mac.pnl_col_cogs": ["en": "Cost of goods", "ar": "تكلفة البضاعة"],
         "mac.pnl_col_waste": ["en": "Waste", "ar": "الهدر"],
+        "mac.pnl_col_labour": ["en": "Labour", "ar": "العمالة"],
         "mac.pnl_col_vat": ["en": "VAT", "ar": "الضريبة"],
         "mac.pnl_col_margin": ["en": "Margin", "ar": "الهامش"],
         // A failure allowance learned from the shop's own history —

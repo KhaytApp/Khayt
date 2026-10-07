@@ -1056,7 +1056,8 @@ final class Shop {
             engine: engine, orders: orders, expenses: expenses,
             settings: settings, clients: clients, currencies: Invoice.currencyTable(self),
             wasteLog: Self.rows(root, "wasteLog"), inventory: Self.rows(root, "inventory"),
-            machines: machines, recentMonthlyHours: recentMonthlyHours, now: now)
+            machines: machines, recentMonthlyHours: recentMonthlyHours,
+            timeEntries: Self.rows(root, "timeEntries"), now: now)
         monthNetRevenue = month?.revenue
         // The masthead's NET is the P&L's net income for the month — revenue
         // less cost of goods, expenses and overhead, filament bought counted
@@ -15458,16 +15459,18 @@ final class Shop {
                               inventory: [JSONValue] = [],
                               machines: [JSONValue] = [],
                               recentMonthlyHours: [String: Double] = [:],
+                              timeEntries: [JSONValue] = [],
                               now: Date = Date()) async -> PnlPeriod? {
         guard let engine else { return nil }
         // The waste log goes in, as it does for Reports: failed prints are a
         // cost line of the P&L, and a masthead net without them would be the
-        // Reports net plus the month's waste.
+        // Reports net plus the month's waste. The time log likewise — logged
+        // labour is a line of the P&L too.
         let periods = (try? await engine.pnlByPeriod(
             orders: orders, expenses: expenses, settings: settings, clients: clients,
             currencies: currencies, now: now, granularity: "month",
             wasteLog: wasteLog, inventory: inventory, machines: machines,
-            recentMonthlyHours: recentMonthlyHours)) ?? []
+            recentMonthlyHours: recentMonthlyHours, timeEntries: timeEntries)) ?? []
         return periods.first { $0.period == DateRange.localMonth(now) }
     }
 

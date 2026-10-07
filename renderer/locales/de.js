@@ -2046,6 +2046,8 @@
   "pnl.inventory_note": "In diesem Zeitraum gekauftes Filament: {amount}. Es ist Lagerbestand und wird als Wareneinsatz verbucht, wenn ein Auftrag es verbraucht – deshalb steht es nicht bei den Ausgaben oben.",
   "pnl.waste": "Verschwendetes Filament (Fehldrucke)",
   "pnl.depreciation": "Maschinenabschreibung",
+  "pnl.labour": "Arbeit (erfasste Stunden)",
+  "pnl.labour_overlap": "Ein Teil dieser Arbeit steht möglicherweise auch als Lohn in Ihren Ausgaben oder Fixkosten. Erfasste Stunden und ein Gehalt für dieselbe Arbeit zählen sie doppelt; behalten Sie eines.",
   "pnl.gross": "Bruttogewinn",
   "pnl.gross_margin": "Bruttomarge %",
   "pnl.opex": "Betriebskosten",

@@ -4177,6 +4177,9 @@ public actor KhaytEngine {
         public let materialCost: Double
         /// Expenses filed against one of this machine's orders.
         public let linkedExpenses: Double
+        /// Labour logged against this machine's orders, at the rate frozen
+        /// when it was logged. Optional: an older bundle has no such field.
+        public let labour: Double?
         public let maintenance: Double
         /// What the machine lost in value over the range — the one place its
         /// wear is counted (lib/depreciation.js). Optional: an older bundle
@@ -4209,6 +4212,7 @@ public actor KhaytEngine {
         public let revenue: Double
         public let materialCost: Double
         public let linkedExpenses: Double
+        public let labour: Double?
         public let maintenance: Double
         public let depreciation: Double?
         public let net: Double
@@ -4241,7 +4245,10 @@ public actor KhaytEngine {
                               recentMonthlyHours: [String: Double] = [:],
                               days: Int = 0,
                               inventory: [JSONValue] = [],
-                              orders: [JSONValue]? = nil) throws -> MachineProfitReport {
+                              orders: [JSONValue]? = nil,
+                              timeEntries: [JSONValue] = []) throws -> MachineProfitReport {
+        // `timeEntries` is the time log filtered to the range like the four
+        // above: a job's logged labour is charged to its machine.
         // `range` is the period the four were filtered to, as book days — what
         // a straight-line machine's depreciation is pro-rated over.
         //
@@ -4259,7 +4266,7 @@ public actor KhaytEngine {
           var input = {
             machines: ARG0, completed: ARG1, expenses: ARG2,
             maintenance: ARG3, unassigned: ARG6, days: ARG7,
-            range: ARG8, recentMonthlyHours: ARG9,
+            range: ARG8, recentMonthlyHours: ARG9, timeEntries: ARG12,
           };
           if (Array.isArray(ARG11)) input.orders = ARG11;
           return globalThis.KhaytMachinePL.machineProfit(input, {
@@ -4278,7 +4285,8 @@ public actor KhaytEngine {
                            .array(maintenance), .object(settings), .array(clients),
                            .string(unassigned), .number(Double(days)), span,
                            .object(recentMonthlyHours.mapValues { .number($0) }),
-                           .array(inventory), orders.map { .array($0) } ?? .null],
+                           .array(inventory), orders.map { .array($0) } ?? .null,
+                           .array(timeEntries)],
                           as: MachineProfitReport.self)
     }
 
@@ -7135,18 +7143,21 @@ public actor KhaytEngine {
                             wasteLog: [JSONValue] = [],
                             inventory: [JSONValue] = [],
                             machines: [JSONValue] = [],
-                            recentMonthlyHours: [String: Double] = [:]) throws -> [PnlPeriod] {
+                            recentMonthlyHours: [String: Double] = [:],
+                            timeEntries: [JSONValue] = []) throws -> [PnlPeriod] {
         // `wasteLog` is the book's failed-print log: the rule charges each
         // entry's `cost` to its period as a WASTE line, and net takes it off.
         // `machines` is what the DEPRECIATION line is worked out from — the
         // one place a machine's wear enters the P&L (lib/depreciation.js). A
-        // machine with no depreciation set adds nothing.
+        // machine with no depreciation set adds nothing. `timeEntries` is the
+        // LABOUR line — the hours the shop's people logged, at their rate, in
+        // the period they were worked (lib/pnl-report.js LABOUR).
         try runtime.call2(
-            "KhaytPnl.pnlByPeriod(ARG0, ARG1, {settings: ARG2, clients: ARG3, currencies: ARG4, now: new Date(ARG5), granularity: ARG6, wasteLog: ARG7, inventory: ARG8, machines: ARG9, recentMonthlyHours: ARG10})",
+            "KhaytPnl.pnlByPeriod(ARG0, ARG1, {settings: ARG2, clients: ARG3, currencies: ARG4, now: new Date(ARG5), granularity: ARG6, wasteLog: ARG7, inventory: ARG8, machines: ARG9, recentMonthlyHours: ARG10, timeEntries: ARG11})",
             [.array(orders), .array(expenses), .object(settings), .array(clients),
              .object(currencies), .number(now.timeIntervalSince1970 * 1000), .string(granularity),
              .array(wasteLog), .array(inventory), .array(machines),
-             .object(recentMonthlyHours.mapValues { .number($0) })],
+             .object(recentMonthlyHours.mapValues { .number($0) }), .array(timeEntries)],
             as: [PnlPeriod].self)
     }
 
@@ -7159,13 +7170,18 @@ public actor KhaytEngine {
                            machines: [JSONValue], locations: [JSONValue],
                            settings: [String: JSONValue], clients: [JSONValue],
                            currencies: [String: JSONValue], inventory: [JSONValue],
-                           now: Date, recentMonthlyHours: [String: Double] = [:]) throws -> LocationPl {
+                           now: Date, recentMonthlyHours: [String: Double] = [:],
+                           timeEntries: [JSONValue] = [], jobs: [JSONValue] = []) throws -> LocationPl {
+        // `timeEntries` already narrowed to the period, like the rest; `jobs`
+        // is the WHOLE book, because labour is dated by when it was worked and
+        // its job can sit outside the period the orders were narrowed to.
         try runtime.call2(
-            "KhaytLocationPl.locationPl({orders: ARG0, expenses: ARG1, wasteLog: ARG2, machines: ARG3, locations: ARG4, settings: ARG5, clients: ARG6, currencies: ARG7, inventory: ARG8, now: new Date(ARG9), recentMonthlyHours: ARG10})",
+            "KhaytLocationPl.locationPl({orders: ARG0, expenses: ARG1, wasteLog: ARG2, machines: ARG3, locations: ARG4, settings: ARG5, clients: ARG6, currencies: ARG7, inventory: ARG8, now: new Date(ARG9), recentMonthlyHours: ARG10, timeEntries: ARG11, jobs: ARG12})",
             [.array(orders), .array(expenses), .array(wasteLog), .array(machines), .array(locations),
              .object(settings), .array(clients), .object(currencies), .array(inventory),
              .number(now.timeIntervalSince1970 * 1000),
-             .object(recentMonthlyHours.mapValues { .number($0) })],
+             .object(recentMonthlyHours.mapValues { .number($0) }),
+             .array(timeEntries), .array(jobs)],
             as: LocationPl.self)
     }
 
@@ -7185,7 +7201,11 @@ public actor KhaytEngine {
             public let expenses: Double
             public let waste: Double
             public let depreciation: Double
-            /// cogs + expenses + waste + depreciation.
+            /// Logged labour on the site's jobs. Hours logged against no job
+            /// are the shop's and land on the unassigned row. Optional: an
+            /// older bundle has no such field.
+            public let labour: Double?
+            /// cogs + expenses + waste + depreciation + labour.
             public let costs: Double
             public let net: Double
             /// Nil where nothing was billed — not a 0% that reads as "broke even".

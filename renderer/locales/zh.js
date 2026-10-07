@@ -2046,6 +2046,8 @@
   "pnl.inventory_note": "本期购入的耗材：{amount}。它属于库存，在订单使用时计入销售成本，因此不在上方的支出中。",
   "pnl.waste": "浪费的耗材（打印失败）",
   "pnl.depreciation": "设备折旧",
+  "pnl.labour": "人工（已记录工时）",
+  "pnl.labour_overlap": "部分人工可能也作为工资记入了您的支出或固定成本。同一工作的记录工时和工资会被计算两次；请保留其一。",
   "pnl.gross": "毛利",
   "pnl.gross_margin": "毛利率%",
   "pnl.opex": "运营费用",
