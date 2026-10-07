@@ -1808,8 +1808,8 @@ final class Words {
         // What each machine earned, and what it cost to keep earning it.
         "mac.mpl_title":        ["en": "By machine",   "ar": "حسب الآلة"],
         "mac.mpl_all_machines": ["en": "All machines", "ar": "كل الآلات"],
-        "mac.mpl_not_net":      ["en": "What each job consumed — its filament, expenses filed against it, and the machine's servicing. Your labour, power and rent are in the Profit & Loss, not here.",
-                                 "ar": "ما استهلكه كل عمل — خيطه، والمصروفات المسجّلة عليه، وصيانة الآلة. أما العمالة والكهرباء والإيجار فهي في الأرباح والخسائر، لا هنا."],
+        "mac.mpl_not_net":      ["en": "What each job consumed — its filament, expenses filed against it, and the machine's servicing. Power and rent are in the Profit & Loss, not here.",
+                                 "ar": "ما استهلكه كل عمل — خيطه، والمصروفات المسجّلة عليه، وصيانة الآلة. أما الكهرباء والإيجار فهي في الأرباح والخسائر، لا هنا."],
         "mac.check_updates": ["en": "Check for Updates…", "ar": "التحقق من التحديثات…"],
         "mac.updates_always_ask": ["en": "Khayt looks for a new version when it opens and asks before installing it — never on its own.", "ar": "يبحث خيط عن إصدار جديد عند فتحه ويستأذنك قبل تثبيته — لا يثبّت شيئًا من تلقاء نفسه."],
         "mac.updates_auto_check": ["en": "Check for updates when Khayt opens, and every hour",
@@ -2228,12 +2228,15 @@ final class Words {
         "mac.search_filament": ["en": "Material or colour", "ar": "خامة أو لون"],
         "mac.search_products": ["en": "Product, material or group", "ar": "منتج أو خامة أو مجموعة"],
         "mac.search_waste":  ["en": "Material, reason or failure", "ar": "خامة أو سبب أو نوع العطل"],
-        "mac.of_which_fixed": ["en": "incl. overhead", "ar": "منها التكاليف الثابتة"],
         // The waterfall's own step. NOT "of which": there the monthly costs
         // come off AFTER the expenses, as the rule's net takes them, so a label
         // saying they are part of the bar beside them reads as counted twice.
         // Named as Settings names them, where the shop typed them in.
         "mac.waterfall_fixed": ["en": "Monthly costs", "ar": "التكاليف الشهرية"],
+        // Captions under a quarter's Expenses figure, naming its parts. Short,
+        // because three of them share one column.
+        "mac.pnl_cap_monthly": ["en": "Monthly costs", "ar": "التكاليف الشهرية"],
+        "mac.pnl_cap_depreciation": ["en": "Depreciation", "ar": "الإهلاك"],
         "mac.pnl_unpriced": ["en": "{n} finished jobs were charged nothing. What they cost to make is in the margin and the net income. For a test, a gift or something for the shop itself, right-click the job and choose Not business to leave it out.", "ar": "{n} من الأعمال المنجزة لم يُحتسب عليها شيء، وتكلفتها داخلة في الهامش وصافي الدخل. إن كانت تجربة أو هدية أو شيئًا للمحل نفسه، انقر على العمل بالزر الأيمن واختر «ليس عملًا تجاريًا» لاستبعاده."],
         "mac.not_business": ["en": "Not business", "ar": "ليس عملًا تجاريًا"],
         "mac.quarter_in_progress": ["en": "This quarter is still running, so its overhead is charged for the days elapsed.",
@@ -3378,12 +3381,24 @@ final class Words {
         "mac.no_locations": ["en": "No locations yet. A shop with one site does not need any.",
                              "ar": "لا توجد مواقع بعد. المتجر ذو الموقع الواحد لا يحتاج إليها."],
         "mac.location_delete_confirm": ["en": "Delete “{name}”?", "ar": "حذف «{name}»؟"],
+        "mac.location_add": ["en": "Add location", "ar": "إضافة موقع"],
+        "mac.location_new": ["en": "New location", "ar": "موقع جديد"],
+        "mac.location_edit": ["en": "Edit location", "ar": "تعديل الموقع"],
+        // The operators' own: they read the same as the locations' today, and
+        // sharing a key meant rewording one would silently reword the other.
+        "mac.operator_delete_confirm": ["en": "Delete “{name}”?", "ar": "حذف «{name}»؟"],
+        "mac.operator_add": ["en": "Add operator", "ar": "إضافة مشغّل"],
+        "mac.operator_new": ["en": "New operator", "ar": "مشغّل جديد"],
+        "mac.operator_edit": ["en": "Edit operator", "ar": "تعديل المشغّل"],
+        "mac.operator_access_hint": ["en": "Used by the desktop app's operator lock. This Mac does not ask for a PIN.",
+                                     "ar": "يستخدمه قفل المشغّلين في تطبيق سطح المكتب. هذا الماك لا يطلب رمزًا."],
+        "mac.op_gone": ["en": "no longer on the list", "ar": "لم يعد في القائمة"],
         "mac.location_delete_hint": ["en": "Machines, spools, expenses and jobs at it become unassigned. You can undo this.",
                                      "ar": "تصبح الأجهزة والبكرات والمصروفات والطلبات التابعة له بلا موقع. يمكنك التراجع عن ذلك."],
         "mac.location_none": ["en": "None", "ar": "بدون"],
         "mac.location_gone": ["en": "A deleted location", "ar": "موقع محذوف"],
-        "mac.location_pl_hint": ["en": "The shop's P&L for this period, split by where the work was done. Fixed overhead belongs to the whole shop and is not split.",
-                                 "ar": "أرباح وخسائر المتجر لهذه الفترة مقسّمة حسب مكان العمل. التكاليف الثابتة للمتجر كله ولا تُقسَّم."],
+        "mac.location_pl_hint": ["en": "The shop's P&L for this period, split by where the work was done. Monthly costs belong to the whole shop and are not split.",
+                                 "ar": "أرباح وخسائر المتجر لهذه الفترة مقسّمة حسب مكان العمل. التكاليف الشهرية للمتجر كله ولا تُقسَّم."],
         // The staff. A delete of somebody with work on record makes them
         // inactive instead (`lib/operators.js`), and the Mac says so before,
         // not after.

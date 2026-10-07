@@ -321,6 +321,13 @@ struct Reports: View {
     // Arabic the leading one. `CustomersTable` made the same trade. The
     // headers are short labels (`mac.pnl_col_*`); the statement keeps the
     // lines' full names.
+    /// A part of the Expenses figure, under it.
+    private func caption(_ key: String, _ value: Double) -> some View {
+        Text(shop.words.callIt(key) + " " + Figure.isolated(Money.figure(value)))
+            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            .lineLimit(1).minimumScaleFactor(0.85)
+    }
+
     private var table: some View {
         Table(rows.sorted(using: order), sortOrder: $order, columnCustomization: $columns) {
             TableColumn(shop.words.callIt("an.pnl_period"), value: \.period) { r in
@@ -379,22 +386,23 @@ struct Reports: View {
                     Text(spent > 0 ? Money.figure(-spent) : "—")
                         .monospacedDigit()
                         .foregroundStyle(spent > 0 ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.tertiary))
+                    // The parts of the figure above, named short: three captions
+                    // in a column this narrow were cut to "Machine depreci…",
+                    // and in Arabic the cut fell inside the number. Secondary,
+                    // not tertiary — a figure has to be readable.
                     if r.fixed > 0 {
-                        Text(shop.words.callIt("mac.of_which_fixed") + " " + Money.figure(r.fixed))
-                            .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                        caption("mac.pnl_cap_monthly", r.fixed)
                     }
                     if r.depreciationValue > 0 {
-                        Text(shop.words.callIt("mac.pnl_depreciation") + " " + Money.figure(r.depreciationValue))
-                            .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                        caption("mac.pnl_cap_depreciation", r.depreciationValue)
                     }
                     if r.labourValue > 0 {
-                        Text(shop.words.callIt("mac.pnl_col_labour") + " " + Money.figure(r.labourValue))
-                            .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                        caption("mac.pnl_col_labour", r.labourValue)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .width(min: 92, ideal: 92, max: 240)
+            .width(min: 150, ideal: 170, max: 260)
             // The margin on what the shop kept. Blended by the rule, so one
             // small job at a high margin cannot colour a month green.
             TableColumn(shop.words.callIt("mac.pnl_col_margin"), value: \.marginSort) { r in
@@ -1326,21 +1334,21 @@ struct Reports: View {
                             DetailLine(shop.words.callIt("an.revenue"),
                                        Money.text(rows.reduce(0) { $0 + $1.revenue }, shop.currency))
                             DetailLine(shop.words.callIt("pnl.cogs"),
-                                       Money.cost(rows.reduce(0) { $0 + $1.cogsValue }, shop.currency), dim: true)
+                                       Money.cost(rows.reduce(0) { $0 + $1.cogsValue }, shop.currency))
                             if rows.contains(where: { $0.wasteValue > 0 }) {
                                 DetailLine(shop.words.callIt("pnl.waste"),
-                                           Money.cost(rows.reduce(0) { $0 + $1.wasteValue }, shop.currency), dim: true)
+                                           Money.cost(rows.reduce(0) { $0 + $1.wasteValue }, shop.currency))
                             }
                             if rows.contains(where: { $0.depreciationValue > 0 }) {
                                 DetailLine(shop.words.callIt("mac.pnl_depreciation"),
-                                           Money.cost(rows.reduce(0) { $0 + $1.depreciationValue }, shop.currency), dim: true)
+                                           Money.cost(rows.reduce(0) { $0 + $1.depreciationValue }, shop.currency))
                             }
                             if rows.contains(where: { $0.labourValue > 0 }) {
                                 DetailLine(shop.words.callIt("pnl.labour"),
-                                           Money.cost(rows.reduce(0) { $0 + $1.labourValue }, shop.currency), dim: true)
+                                           Money.cost(rows.reduce(0) { $0 + $1.labourValue }, shop.currency))
                             }
                             DetailLine(shop.words.callIt("an.pnl_expenses"),
-                                       Money.cost(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency), dim: true)
+                                       Money.cost(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency))
                             // Ruled off from the two above it, because it is
                             // NOT a third subtraction — it is what the shop
                             // owes ZATCA, and it has already been taken out of

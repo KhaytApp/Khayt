@@ -232,15 +232,22 @@ struct KioskCardView: View {
                     }
                 }
                 Spacer(minLength: 8)
-                // The state's own colour: a machine that is idle AND not
-                // answering is not an idle machine in red; the chip below says
-                // the second thing.
-                chip(stateWord, stateTint)
+                // A machine with nothing booked that does not answer is NOT
+                // ANSWERING, and only that: "Idle" beside it read, across a
+                // room, as two contradicting answers. A machine with a job
+                // keeps its state here and says it is silent below.
+                if card.offline && card.state == "idle" {
+                    chip(words.callIt("ad.no_reading"), Khayt.late)
+                } else {
+                    chip(stateWord, stateTint)
+                }
             }
-            if card.offline {
+            if card.offline && card.state != "idle" {
                 chip(words.callIt("ad.no_reading"), Khayt.late)
             }
-            Spacer(minLength: 0)
+            // No spacer here. One pushed the job to the foot of the card and
+            // left a band of nothing under the machine's name; the job reads
+            // as the machine's own line now, and the spare room is below it.
             if card.state == "busy" {
                 Text(words.callIt("mac.kiosk_unbooked"))
                     .font(.system(size: 18 * scale))
@@ -260,7 +267,7 @@ struct KioskCardView: View {
             if let pct = card.pct {
                 progress(pct)
             } else if let total = card.totalHours, total > 0 {
-                Text(words.callIt("mac.kiosk_total", ["time": .string(KioskTime.spell(total * 60, words.language))]))
+                Text(words.callIt("mac.kiosk_total", ["time": .string(Figure.isolated(KioskTime.spell(total * 60, words.language)))]))
                     .font(.system(size: 16 * scale).monospacedDigit())
                     .foregroundStyle(Role.text2)
             }
@@ -318,11 +325,11 @@ struct KioskCardView: View {
                 Text("\(Int(pct.rounded()))%")
                     .font(.system(size: 22 * scale, weight: .bold).monospacedDigit())
                 if card.overrunMinutes > 0 {
-                    Text(words.callIt("mac.kiosk_over", ["time": .string(KioskTime.spell(card.overrunMinutes, words.language))]))
+                    Text(words.callIt("mac.kiosk_over", ["time": .string(Figure.isolated(KioskTime.spell(card.overrunMinutes, words.language)))]))
                         .foregroundStyle(Khayt.late)
                 } else if let left = card.remainingMinutes {
                     Text(left > 0
-                         ? words.callIt("mac.kiosk_left", ["time": .string(KioskTime.spell(left, words.language))])
+                         ? words.callIt("mac.kiosk_left", ["time": .string(Figure.isolated(KioskTime.spell(left, words.language)))])
                          : words.callIt("kiosk.done"))
                         .foregroundStyle(Role.text2)
                 }

@@ -6889,7 +6889,18 @@ final class Shop {
     /// Nil for a job nobody was put on.
     func operatorLabel(_ id: String?) -> String? {
         guard let id, !id.isEmpty else { return nil }
-        guard let op = shopOperator(id) else { return words.callIt("an.op_removed") }
+        guard let op = shopOperator(id) else {
+            // Gone from the list — but a time entry froze their name when the
+            // hours were logged, so say who it was. "An operator no longer on
+            // the list" in the picker beside an entry that names them read as
+            // two different answers about one job.
+            let named = timeEntryRows.lazy.compactMap(Self.asObject)
+                .first { Self.plainString($0["operatorId"]) == id }
+                .flatMap { Self.plainString($0["operatorName"]) }
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+            return named.isEmpty ? words.callIt("an.op_removed")
+                                 : named + " · " + words.callIt("mac.op_gone")
+        }
         return op.active ? op.name : op.name + " · " + words.callIt("op.inactive")
     }
 
