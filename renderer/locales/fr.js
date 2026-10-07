@@ -2046,6 +2046,8 @@
   "pnl.inventory_note": "Filament acheté sur la période : {amount}. C’est du stock, compté en coût des ventes quand une commande l’utilise ; il n’apparaît donc pas dans les dépenses ci-dessus.",
   "pnl.waste": "Filament perdu (impressions ratées)",
   "pnl.depreciation": "Amortissement des machines",
+  "pnl.labour": "Main-d'œuvre (heures saisies)",
+  "pnl.labour_overlap": "Une partie de cette main-d'œuvre figure peut-être aussi comme salaire dans vos dépenses ou frais fixes. Des heures saisies et un salaire pour le même travail le comptent deux fois ; gardez-en un.",
   "pnl.gross": "Bénéfice brut",
   "pnl.gross_margin": "Marge brute %",
   "pnl.opex": "Charges d'exploitation",

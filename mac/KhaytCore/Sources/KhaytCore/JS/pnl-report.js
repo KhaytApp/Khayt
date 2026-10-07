@@ -95,6 +95,71 @@
   const isInventoryPurchase = (e) =>
     !!e && INVENTORY_CATEGORIES.has(String(e.category || '').trim().toLowerCase());
 
+  /* ── LABOUR IS WHAT THE SHOP PAID ITS PEOPLE FOR THE HOURS THEY LOGGED ────
+   *
+   * The shop's decision (2026-10-07): the time log (`store.timeEntries`, one
+   * row per stretch of work — hours × the operator's hourly rate, FROZEN as
+   * `cost` when the hours were logged, lib/operators.js) is a cost, and it is
+   * a P&L line of its own — "Labour" — not folded into cost of goods or into
+   * expenses, so a shop can see what its people cost beside what its material
+   * did.
+   *
+   * WHEN: in the period the hours were WORKED (the entry's `date`, a local day
+   * like every other date here). That is how this report already treats every
+   * cost that is a payment rather than stock: an expense lands on the day it
+   * was paid, waste on the day the print failed, depreciation over the days
+   * the machine printed. Cost of goods follows the job only because it is
+   * INVENTORY, released when the job ships; an hour of somebody's time is not
+   * on a shelf waiting — it was paid for when it was worked, finished job or
+   * not. It also means time logged against no job (cleaning, setup, a shift)
+   * has a period at all, and it counts: the money was spent.
+   *
+   * WHICH: the hours on a job follow the job's SCOPE — a voided job, or one
+   * the shop marked "not business" (lib/business-scope.js), is out of this
+   * report's revenue and cost of goods, and its labour goes with it, so a
+   * test print stays a test print all the way down. An entry whose job is no
+   * longer in the book, or whose operator was deleted, still counts.
+   *
+   * NOT IN A JOB'S OWN MARGIN. Per-job figures (job margin, product profit,
+   * the quote) read the PRICING cost, which already carries an estimate of
+   * labour (lib/calculator-cost.js); putting logged hours in as well would
+   * charge the job twice. The P&L is where the estimate is not, and the
+   * logged figure is.
+   *
+   * THE ONE THING THIS CANNOT KNOW: whether the same people's pay is ALSO in
+   * the book as an expense or a fixed cost ("Salaries" in the overhead, a
+   * "wages" expense). Neither is deduplicated — guessing which hours a salary
+   * covered would be inventing the shop's payroll — and a period holding both
+   * says so instead (`labourOverlap`), so the shop can take one of them out.
+   * A book with no time entries has a labour line of zero and every other
+   * figure exactly as before. */
+  const labourCostOf = (e) => {
+    if (!e || typeof e !== 'object') return 0;
+    const hours = +e.hours;
+    if (!(hours > 0) || !Number.isFinite(hours)) return 0;
+    const frozen = e.cost != null && Number.isFinite(Number(e.cost)) ? Number(e.cost) : null;
+    const rate = Number.isFinite(+e.hourlyRate) ? +e.hourlyRate : 0;
+    return Math.max(0, frozen != null ? frozen : hours * Math.max(0, rate));
+  };
+  /** Is this stretch of work inside the report: out with its job, when its job is out. */
+  function labourCounts(e, orderById) {
+    if (!e || !e.orderId) return true;
+    const o = orderById && orderById.get(String(e.orderId));
+    if (!o) return true;
+    if (o.voidedAt) return false;
+    const scope = (typeof global !== 'undefined' && global.KhaytBusinessScope) || null;
+    return !(scope && !scope.countsForBusiness(o));
+  }
+  /* Words a shop uses for its payroll, in the languages Khayt speaks. Matched
+   * against an expense's category and description and a fixed cost's name. A
+   * false match costs one line of advice; a missed one, money counted twice
+   * without a word — so it errs wide. */
+  const PAYROLL_WORDS = /salar|wage|payroll|staff|labou?r|employee|\bpay\b|راتب|رواتب|أجور|اجور|موظف|عمالة|lohn|gehalt|personal|salaire|personnel|sueldo|n[oó]mina|maa[sş]|[uü]cret|給|工资|薪/i;
+  const looksLikePayroll = (text) => PAYROLL_WORDS.test(String(text || ''));
+  /** The fixed costs that read as pay — which a period with labour may be counting twice. */
+  const payrollFixedCosts = (settings) => (((settings || {}).fixedCosts) || [])
+    .filter((fc) => fc && (+fc.amount || 0) > 0 && looksLikePayroll(fc.name || fc.label));
+
   /**
    * @param {object} input
    * @param {Array<{revenue:number, cogs:number, vat?:number}>} input.orders base-currency per order
@@ -128,8 +193,15 @@
     // lib/depreciation.js (`periodCharges`). The one place machine wear enters
     // the P&L; absent is none, and nothing about an old book changes.
     const depreciation = Math.max(0, +input.depreciation || 0);
+    // What the shop's people cost for the hours they logged in the period —
+    // see LABOUR above. The caller has already scoped and dated the entries.
+    let labour = 0;
+    for (const e of (Array.isArray(input.labour) ? input.labour : [])) labour += labourCostOf(e);
+    const labourOverlap = labour > 0 && (
+      expenses.some((e) => e && !isInventoryPurchase(e) && looksLikePayroll(`${e.category || ''} ${e.description || ''}`))
+      || (Array.isArray(input.fixedCosts) && input.fixedCosts.some((fc) => fc && looksLikePayroll(fc.name || fc.label))));
     const grossProfit = revenue - cogs;
-    const netProfit = grossProfit - expensesTotal - waste - depreciation;
+    const netProfit = grossProfit - expensesTotal - waste - depreciation - labour;
     return {
       label: input.label || '',
       orderCount: orders.length,
@@ -147,6 +219,9 @@
       waste: round2(waste),
       // Machines losing value as they print — see lib/depreciation.js.
       depreciation: round2(depreciation),
+      // The hours the shop's people logged, at their rate: a line of its own.
+      labour: round2(labour),
+      labourOverlap,
       vatCollected: round2(vatCollected),
       netProfit: round2(netProfit),
     };
@@ -182,6 +257,7 @@
     for (const e of summary.expensesByCategory) rows.push(['  ' + e.category, -e.amount]);
     if (summary.waste) rows.push([lab('waste', 'Filament wasted (failed prints)'), -summary.waste]);
     if (summary.depreciation) rows.push([lab('depreciation', 'Machine depreciation'), -summary.depreciation]);
+    if (summary.labour) rows.push([lab('labour', 'Labour (logged hours)'), -summary.labour]);
     rows.push(['', '']);
     rows.push([lab('vat', 'VAT collected'), summary.vatCollected]);
     rows.push([lab('net', 'Net profit'), summary.netProfit]);
@@ -221,7 +297,10 @@
    *   it is not charged a full quarter's rent on day three.
    *
    * `ctx`: `{ settings, clients, currencies, now, granularity, wasteLog,
-   * machines, recentMonthlyHours }`. `machines` is what the depreciation line
+   * machines, recentMonthlyHours, timeEntries, jobs }`. `timeEntries` is the
+   * labour line (see LABOUR above); `jobs`, the whole book's orders, lets a
+   * caller that passes a SLICE of the book as `orders` still leave out the
+   * labour on a voided job. `machines` is what the depreciation line
    * is worked out from; a caller that passes none, or a book whose machines
    * carry no `depreciation`, gets `depreciation: 0` and the old net. The siblings
    * are consulted through the globals they assign themselves to, present in
@@ -234,8 +313,8 @@
    * Returns rows newest first: `{ period, orders, revenue, shipping, expenses,
    * fixed, vatCollected, vatReclaimable, vatDue, net, cogs, marginPct }`.
    *
-   * `net` = revenue − cogs − expenses − fixed, the same arithmetic as
-   * `computePnl`'s `netProfit`.
+   * `net` = revenue − cogs − expenses − waste − fixed − depreciation −
+   * labour, the same arithmetic as `computePnl`'s `netProfit`.
    *
    * `cogs` is what the finished work cost to make — each job's `costBasis`,
    * which `order-new` freezes from its parts — in the shop's currency, and
@@ -268,7 +347,7 @@
       if (!byQuarter[key]) {
         byQuarter[key] = {
           period: key, orders: 0, revenue: 0, shipping: 0, expenses: 0, inventory: 0, waste: 0,
-          vatCollected: 0, vatReclaimable: 0, cogs: 0, unpriced: 0,
+          vatCollected: 0, vatReclaimable: 0, cogs: 0, unpriced: 0, labour: 0, payrollExpense: false,
         };
       }
       return byQuarter[key];
@@ -349,7 +428,10 @@
       // Filament is stock, counted as cost of goods when used — see
       // INVENTORY_CATEGORIES. Its tax is reclaimable all the same.
       if (isInventoryPurchase(e)) at(key).inventory += paid - claimable;
-      else at(key).expenses += paid - claimable;
+      else {
+        at(key).expenses += paid - claimable;
+        if (looksLikePayroll(`${e.category || ''} ${e.description || ''}`)) at(key).payrollExpense = true;
+      }
       at(key).vatReclaimable += claimable;
     }
     // Filament lost to failed prints, in the period it failed. A caller that
@@ -361,10 +443,29 @@
       const cost = wasteCostOf(w);
       if (cost > 0) at(key).waste += cost;
     }
+    // Labour, in the period it was worked — see LABOUR above. A caller that
+    // passes no time log (`timeEntries`) sees no change. `jobs` is the whole
+    // book's orders when `orders` is a slice of it (a branch's pile), so an
+    // hour on a voided job is still known to be one.
+    const labourEntries = Array.isArray(c.timeEntries) ? c.timeEntries : [];
+    if (labourEntries.length) {
+      const orderById = new Map();
+      for (const o of (Array.isArray(c.jobs) ? c.jobs : []).concat(orders || [])) {
+        if (o && o.id != null && !orderById.has(String(o.id))) orderById.set(String(o.id), o);
+      }
+      for (const e of labourEntries) {
+        if (!e || !labourCounts(e, orderById)) continue;
+        const key = quarterOf(e.date);
+        if (!key) continue;
+        const cost = labourCostOf(e);
+        if (cost > 0) at(key).labour += cost;
+      }
+    }
 
     // The overhead per period: a quarter's worth, or a month's.
     const fixedPerQuarter = ((c.settings || {}).fixedCosts || [])
       .reduce((s, fc) => s + (+((fc && fc.amount)) || 0), 0) * (monthly ? 1 : 3);
+    const payrollOverhead = payrollFixedCosts(c.settings).length > 0;
     const nowQuarter = monthly
       ? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       : `${now.getFullYear()}-Q${Math.ceil((now.getMonth() + 1) / 3)}`;
@@ -422,6 +523,11 @@
         fixed: round2(fixed),
         // Machines losing value, per lib/depreciation.js: in net, below.
         depreciation: round2(depreciation),
+        // The hours the shop's people logged, at their rate — see LABOUR.
+        labour: round2(row.labour),
+        // Labour logged in a period that ALSO books pay as an expense or a
+        // fixed cost: possibly the same money twice. Said, never subtracted.
+        labourOverlap: row.labour > 0 && (row.payrollExpense || (payrollOverhead && fixed > 0)),
         vatCollected: round2(row.vatCollected),
         vatReclaimable: round2(row.vatReclaimable),
         // What the shop actually owes the authority for the quarter: the tax it
@@ -434,7 +540,7 @@
         // both took the cost of goods out — so the shop's real book printed a
         // -495.8% margin beside a 50.00 net income for the same quarter, and
         // the two figures could not both be true.
-        net: round2(row.revenue - row.cogs - row.expenses - row.waste - fixed - depreciation),
+        net: round2(row.revenue - row.cogs - row.expenses - row.waste - fixed - depreciation - row.labour),
         cogs: round2(row.cogs),
         unpriced: row.unpriced,
         marginPct: row.revenue > 0 ? Math.round(((row.revenue - row.cogs) / row.revenue) * 1000) / 10 : null,
@@ -442,7 +548,8 @@
     });
   }
 
-  const api = { computePnl, pnlToCsv, pnlByPeriod, isInventoryPurchase, INVENTORY_CATEGORIES, stockShare };
+  const api = { computePnl, pnlToCsv, pnlByPeriod, isInventoryPurchase, INVENTORY_CATEGORIES, stockShare,
+    labourCostOf, labourCounts, looksLikePayroll, payrollFixedCosts };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') globalThis.KhaytPnl = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

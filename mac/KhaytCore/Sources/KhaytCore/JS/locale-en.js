@@ -2047,6 +2047,8 @@
   "pnl.inventory_note": "Filament bought in this period: {amount}. It is stock, counted as cost of goods when a job uses it, so it is not in the expenses above.",
   "pnl.waste": "Filament wasted (failed prints)",
   "pnl.depreciation": "Machine depreciation",
+  "pnl.labour": "Labour (logged hours)",
+  "pnl.labour_overlap": "Some of this labour may also be in your expenses or fixed costs as pay. Logged hours and a salary for the same work count it twice; keep one.",
   "pnl.gross": "Gross profit",
   "pnl.gross_margin": "Gross margin %",
   "pnl.opex": "Operating expenses",

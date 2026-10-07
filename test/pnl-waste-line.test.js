@@ -54,6 +54,6 @@ test('the desktop passes its waste log to every P&L it draws', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'analytics.js'), 'utf8');
   assert.equal((src.match(/wasteLog: \(typeof wasteLog !== 'undefined' \? wasteLog : \[\]\)/g) || []).length, 4,
     'every pnlByPeriod call site, and the per-location view that runs it per site');
-  assert.match(src, /return \{ orders, expenses: expenseRows, waste: wasteRows(, depreciation)? \};/, 'the headline and the CSV');
+  assert.match(src, /return \{ orders, expenses: expenseRows, waste: wasteRows(, depreciation)?[,\s]/, 'the headline and the CSV');
   assert.match(src, /KhaytLocationPl\.locationPl\(\{[\s\S]{0,120}wasteLog:/, 'the per-location view');
 });

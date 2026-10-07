@@ -162,12 +162,22 @@ struct Reports: View {
                         // Capped so a shop with three years of quarters gets a
                         // table that scrolls rather than a page that does.
                         table
-                            .frame(height: Self.tableHeight(rows.count, lines: rows.contains {
-                                $0.fixed > 0 && $0.depreciationValue > 0 } ? 3 : 2))
+                            .frame(height: Self.tableHeight(rows.count, lines: Self.expenseLines(rows)))
                         // WHY A MARGIN CAN READ −400%. Finished jobs charged
                         // nothing still cost their material, and the margin
                         // counts it. Said, with the way to leave them out,
                         // rather than left as a number that looks like a fault.
+                        // LOGGED LABOUR BESIDE PAY BOOKED AS A COST. The rule
+                        // cannot know whether a salary and the hours are the
+                        // same money, so it says so and subtracts nothing.
+                        if rows.contains(where: { $0.labourOverlap == true }) {
+                            Text(shop.words.callIt("pnl.labour_overlap"))
+                                .font(.callout).foregroundStyle(Khayt.attention)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, Metric.screen)
+                                .padding(.top, 8)
+                        }
                         if let note = unpricedNote {
                             Text(note)
                                 .font(.callout).foregroundStyle(.secondary)
@@ -278,7 +288,17 @@ struct Reports: View {
     /// and at 44 a row cut the depreciation caption in half.
     static func tableHeight(_ count: Int, lines: Int = 2) -> CGFloat {
         let rows = CGFloat(max(1, min(count, 10)))
-        return 46 + rows * (lines > 2 ? 60 : 44)
+        return 46 + rows * (lines > 3 ? 76 : lines > 2 ? 60 : 44)
+    }
+
+    /// How many lines the tallest expenses cell stacks: the figure, and a
+    /// caption each for overhead, depreciation and logged labour. Two is the
+    /// floor the row was always given.
+    static func expenseLines(_ rows: [PnlPeriod]) -> Int {
+        let tallest = rows.map { r in
+            1 + (r.fixed > 0 ? 1 : 0) + (r.depreciationValue > 0 ? 1 : 0) + (r.labourValue > 0 ? 1 : 0)
+        }.max() ?? 1
+        return max(2, tallest)
     }
 
     /// The sentence under the table when some finished work was charged
@@ -347,7 +367,10 @@ struct Reports: View {
                     // Machine depreciation rides here too, as a line of its
                     // own below: a Table holds only so many columns, and it
                     // is an operating cost like the overhead beside it.
-                    let spent = r.expenses + r.fixed + r.depreciationValue
+                    // And logged LABOUR, the same way: the table is at the
+                    // ten columns a `Table` builder takes, and the statement
+                    // beside it names labour as a line of its own.
+                    let spent = r.expenses + r.fixed + r.depreciationValue + r.labourValue
                     // A quarter that spent nothing shows nothing, rather than
                     // "−0.00", which reads as a figure somebody worked out.
                     // Negated rather than prefixed with a minus glyph: the
@@ -362,6 +385,10 @@ struct Reports: View {
                     }
                     if r.depreciationValue > 0 {
                         Text(shop.words.callIt("mac.pnl_depreciation") + " " + Money.figure(r.depreciationValue))
+                            .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                    }
+                    if r.labourValue > 0 {
+                        Text(shop.words.callIt("mac.pnl_col_labour") + " " + Money.figure(r.labourValue))
                             .font(.caption).foregroundStyle(.tertiary).monospacedDigit()
                     }
                 }
@@ -459,7 +486,8 @@ struct Reports: View {
             granularity: shop.pnlByMonth ? "month" : "quarter",
             wasteLog: shop.wasteRows, inventory: shop.inventoryRows,
             machines: shop.machineRows,
-            recentMonthlyHours: shop.recentMonthlyHours)) ?? []
+            recentMonthlyHours: shop.recentMonthlyHours,
+            timeEntries: shop.timeEntryRows)) ?? []
         await recomputeBreakEven()
         await recomputeCashFlow()
         await recomputeTrends()
@@ -564,7 +592,10 @@ struct Reports: View {
             locations: shop.locationRows, settings: shop.settingsDict,
             clients: shop.clientRows, currencies: Invoice.currencyTable(shop),
             inventory: shop.inventoryRows, now: Date(),
-            recentMonthlyHours: shop.recentMonthlyHours)
+            recentMonthlyHours: shop.recentMonthlyHours,
+            // Labour by the day it was worked, and the whole book to find
+            // each stretch's job in — the job may sit outside the period.
+            timeEntries: dated(shop.timeEntryRows), jobs: shop.orderRows)
         sites = (report?.located ?? false) ? report : nil
     }
 
@@ -776,7 +807,13 @@ struct Reports: View {
             inventory: shop.inventoryRows,
             // The whole book, so a perHour machine's depreciation is the shop
             // P&L's: hours before its purchase and past its life are not charged.
-            orders: shop.orderRows)
+            orders: shop.orderRows,
+            // The time log, filtered as the four are: a job's logged labour is
+            // charged to its machine.
+            timeEntries: shop.timeEntryRows.filter { row in
+                guard case .object(let r) = row, case .string(let d)? = r["date"] else { return false }
+                return shop.inPeriod(d)
+            })
     }
 
     private func recomputeAccuracy() async {
@@ -1132,7 +1169,7 @@ struct Reports: View {
     /// Only ONE quarter. A waterfall reads left to right as one running total,
     /// so two quarters side by side on one axis would draw a sum nobody is
     /// asking for — the table below is where quarters are compared.
-    private struct QuarterDrawn: View {
+    struct QuarterDrawn: View {
         let shop: Shop
         let row: PnlPeriod
 
@@ -1160,6 +1197,11 @@ struct Reports: View {
             if row.depreciationValue != 0 {
                 out.append(WaterfallStep(label: shop.words.callIt("mac.pnl_depreciation"),
                                          amount: -row.depreciationValue))
+            }
+            // Logged labour, where there was any — the rule takes it off too.
+            if row.labourValue != 0 {
+                out.append(WaterfallStep(label: shop.words.callIt("mac.pnl_col_labour"),
+                                         amount: -row.labourValue))
             }
             out.append(WaterfallStep(label: shop.words.callIt("an.pnl_expenses"), amount: -row.expenses))
             // Only when there is any. A bar of zero height under a label is a
@@ -1194,14 +1236,19 @@ struct Reports: View {
     }
 
     /// Every quarter added up, and the last one on its own.
-    private struct Totals: View {
+    struct Totals: View {
         let shop: Shop
         let rows: [PnlPeriod]
         let floor: KhaytEngine.BreakEven?
 
         var body: some View {
+            ScrollView { statement }
+        }
+
+        /// The panel without its scroll view — what a photograph can see
+        /// (`ImageRenderer` draws nothing inside a `ScrollView`).
+        @ViewBuilder var statement: some View {
             let net = rows.reduce(0) { $0 + $1.net }
-            ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     // ── THE ANSWER, FIRST AND LARGEST ─────────────────────
                     //
@@ -1243,6 +1290,8 @@ struct Reports: View {
                                     ? "\(Money.figure(rows.reduce(0) { $0 + $1.wasteValue })) − " : "")
                                  + (rows.contains { $0.depreciationValue > 0 }
                                     ? "\(Money.figure(rows.reduce(0) { $0 + $1.depreciationValue })) − " : "")
+                                 + (rows.contains { $0.labourValue > 0 }
+                                    ? "\(Money.figure(rows.reduce(0) { $0 + $1.labourValue })) − " : "")
                                  + "\(Money.figure(rows.reduce(0) { $0 + $1.expenses + $1.fixed }))")
                                 .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
                         }
@@ -1278,6 +1327,10 @@ struct Reports: View {
                             if rows.contains(where: { $0.depreciationValue > 0 }) {
                                 DetailLine(shop.words.callIt("mac.pnl_depreciation"),
                                            Money.cost(rows.reduce(0) { $0 + $1.depreciationValue }, shop.currency), dim: true)
+                            }
+                            if rows.contains(where: { $0.labourValue > 0 }) {
+                                DetailLine(shop.words.callIt("pnl.labour"),
+                                           Money.cost(rows.reduce(0) { $0 + $1.labourValue }, shop.currency), dim: true)
                             }
                             DetailLine(shop.words.callIt("an.pnl_expenses"),
                                        Money.cost(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency), dim: true)
@@ -1328,7 +1381,6 @@ struct Reports: View {
                     }
                 }
                 .padding(Metric.pane)
-            }
         }
     }
 }

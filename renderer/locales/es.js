@@ -2046,6 +2046,8 @@
   "pnl.inventory_note": "Filamento comprado en este periodo: {amount}. Es existencia y se cuenta como coste de ventas cuando un pedido lo usa, por eso no aparece en los gastos de arriba.",
   "pnl.waste": "Filamento desperdiciado (impresiones fallidas)",
   "pnl.depreciation": "Depreciación de máquinas",
+  "pnl.labour": "Mano de obra (horas registradas)",
+  "pnl.labour_overlap": "Parte de esta mano de obra puede figurar también como sueldo en sus gastos o costes fijos. Las horas registradas y un sueldo por el mismo trabajo lo cuentan dos veces; conserve uno.",
   "pnl.gross": "Beneficio bruto",
   "pnl.gross_margin": "Margen bruto %",
   "pnl.opex": "Gastos operativos",

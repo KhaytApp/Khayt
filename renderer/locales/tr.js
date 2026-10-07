@@ -2046,6 +2046,8 @@
   "pnl.inventory_note": "Bu dönemde satın alınan filament: {amount}. Stoktur ve bir sipariş kullandığında satılan malın maliyetine sayılır; bu yüzden yukarıdaki giderlerde yer almaz.",
   "pnl.waste": "Boşa giden filament (başarısız baskılar)",
   "pnl.depreciation": "Makine amortismanı",
+  "pnl.labour": "İşçilik (kaydedilen saatler)",
+  "pnl.labour_overlap": "Bu işçiliğin bir kısmı giderlerinizde veya sabit maliyetlerinizde maaş olarak da yer alıyor olabilir. Aynı iş için kaydedilen saatler ve maaş onu iki kez sayar; birini tutun.",
   "pnl.gross": "Brüt kâr",
   "pnl.gross_margin": "Brüt kâr marjı %",
   "pnl.opex": "İşletme giderleri",

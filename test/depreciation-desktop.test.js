@@ -53,7 +53,7 @@ test('wear is counted once on the desktop: stocked cost, and depreciation', () =
   assert.equal((analyticsSrc.match(/partCostOf: stockedPartCost,/g) || []).length, 3, 'every machine P&L view');
   assert.equal((analyticsSrc.match(/range: analyticsRangeSpan\(/g) || []).length, 3);
   assert.equal((analyticsSrc.match(/machines: \(typeof machines !== 'undefined' \? machines : \[\]\),/g) || []).length, 3, 'every pnlByPeriod view');
-  assert.match(analyticsSrc, /return \{ orders, expenses: expenseRows, waste: wasteRows, depreciation \};/, 'the headline and the CSV');
+  assert.match(analyticsSrc, /return \{ orders, expenses: expenseRows, waste: wasteRows, depreciation[,\s]/, 'the headline and the CSV');
 });
 
 // The desktop's quote rate, run for real: the helpers out of machines.js in a

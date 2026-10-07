@@ -224,6 +224,12 @@ struct MachineProfitPage: View {
                         Figure(label: words.callIt("mac.pnl_depreciation"), amount: lost,
                                shop: shop, negative: true)
                     }
+                    // The hours logged on its jobs, at the operator's rate.
+                    // Only for a machine whose jobs carry any.
+                    if let labour = row.labour, labour > 0 {
+                        Figure(label: words.callIt("mac.pnl_col_labour"), amount: labour,
+                               shop: shop, negative: true)
+                    }
                     Spacer()
                     // ── AND HOW HARD IT WORKED FOR IT ─────────────────────
                     //

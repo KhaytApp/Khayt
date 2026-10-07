@@ -53,7 +53,9 @@ struct MastheadNetTests {
             // As Reports asks it: the machines, so their depreciation is in
             // the net (the sample's laser carries some since the UI review).
             inventory: shop.inventoryRows, machines: shop.machineRows,
-            recentMonthlyHours: shop.recentMonthlyHours)
+            recentMonthlyHours: shop.recentMonthlyHours,
+            // And the time log: logged labour is a line of the P&L.
+            timeEntries: shop.timeEntryRows)
         let key = DateRange.localMonth(shop.now)
         let reports = rows.first { $0.period == key }?.net
         // Hoisted, and stringified with an explicit closure: `String.init` on
@@ -94,11 +96,13 @@ struct MastheadNetTests {
             // As Reports asks it: the machines, so their depreciation is in
             // the net (the sample's laser carries some since the UI review).
             inventory: shop.inventoryRows, machines: shop.machineRows,
-            recentMonthlyHours: shop.recentMonthlyHours)
+            recentMonthlyHours: shop.recentMonthlyHours,
+            // And the time log: logged labour is a line of the P&L.
+            timeEntries: shop.timeEntryRows)
         let row = try #require(rows.first { $0.period == DateRange.localMonth(shop.now) })
         let net = try #require(shop.monthNet)
         let expected = row.revenue - (row.cogs ?? 0) - (row.waste ?? 0) - row.expenses - row.fixed
-            - row.depreciationValue
+            - row.depreciationValue - row.labourValue
         #expect(abs(net - expected) < 0.011,
                 Comment(rawValue: "masthead \(net) vs revenue−cogs−expenses−overhead \(expected)"))
         if (row.cogs ?? 0) > 0 {
@@ -127,7 +131,9 @@ struct MastheadNetTests {
             // As Reports asks it: the machines, so their depreciation is in
             // the net (the sample's laser carries some since the UI review).
             inventory: shop.inventoryRows, machines: shop.machineRows,
-            recentMonthlyHours: shop.recentMonthlyHours)
+            recentMonthlyHours: shop.recentMonthlyHours,
+            // And the time log: logged labour is a line of the P&L.
+            timeEntries: shop.timeEntryRows)
         let row = rows.first { $0.period == DateRange.localMonth(shop.now) }
         let expected = row.map { $0.revenue + $0.vatCollected }
         let said = shop.monthGross.map { "\($0)" } ?? "nil"

@@ -11,6 +11,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   computers still share them through cloud sync, so a staff PIN set on one
   computer keeps working on the others.
 
+- **Logged labour is a line of the P&L (both apps).** The hours your staff log
+  on the time log, at the rate they were logged at, now come off net profit as
+  their own "Labour" line — in the P&L table, the monthly charts, the headline
+  net, the CSV export, the Mac's masthead and statement, the per-location P&L
+  and each machine's P&L. Hours count in the month they were worked, including
+  hours logged against no job; hours on a voided or "not business" job leave
+  with the job. A job's own margin and a quote are unchanged: they already
+  carry an estimate of labour from pricing. If a period also has pay booked as
+  an expense or a fixed cost ("Salaries", "wages", "رواتب"…), the P&L says it
+  may be counting the same money twice — nothing is subtracted for you. A book
+  with no time log shows exactly the figures it showed before.
+
 - **(Mac) Operators.** Settings → Operations now lists the shop's staff: add
   someone, change their name, job title, access level, hourly rate, or mark
   them inactive. A job's inspector has an operator picker and a time log —

@@ -174,6 +174,9 @@ function computeHandoffMachineRows() {
     completed: orders,
     expenses: expenses.filter(e => e.orderId),
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
+    // A job's logged labour, charged to the machine it ran on.
+    timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : [])
+      .filter(e => e && inRange(e.date, analyticsRange, 'analytics')),
     unassigned: t('dash.unassigned'),
     days: analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date)),
     range: analyticsRangeSpan(printLog.map(o => o.date)),
@@ -741,6 +744,7 @@ function renderMonthlyTrendChart() {
   const rows = KhaytPnl.pnlByPeriod(printLog, expenses, {
     settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
     now: today, granularity: 'month', wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
+    timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : []),
     inventory: (typeof inventory !== 'undefined' ? inventory : []),
     machines: (typeof machines !== 'undefined' ? machines : []),
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
@@ -748,7 +752,7 @@ function renderMonthlyTrendChart() {
   const byKey = Object.fromEntries(rows.map((r) => [r.period, r]));
   const revByMonth = {};
   const expByMonth = {};
-  months.forEach(m => { revByMonth[m] = byKey[m] ? byKey[m].revenue : 0; expByMonth[m] = byKey[m] ? byKey[m].expenses + (byKey[m].waste || 0) + (byKey[m].depreciation || 0) : 0; });
+  months.forEach(m => { revByMonth[m] = byKey[m] ? byKey[m].revenue : 0; expByMonth[m] = byKey[m] ? byKey[m].expenses + (byKey[m].waste || 0) + (byKey[m].depreciation || 0) + (byKey[m].labour || 0) : 0; });
 
   const maxVal = Math.max(...months.map(m => Math.max(revByMonth[m], expByMonth[m])), 1);
 
@@ -936,6 +940,7 @@ function renderProfitMarginChart() {
   const rows = KhaytPnl.pnlByPeriod(printLog, expenses, {
     settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
     now: today, granularity: 'month', wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
+    timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : []),
     inventory: (typeof inventory !== 'undefined' ? inventory : []),
     machines: (typeof machines !== 'undefined' ? machines : []),
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
@@ -1589,6 +1594,9 @@ function renderPrinterUtilizationChart() {
     completed: orders,
     expenses: expenses.filter(e => e.orderId),
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
+    // A job's logged labour, charged to the machine it ran on.
+    timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : [])
+      .filter(e => e && inRange(e.date, analyticsRange, 'analytics')),
     unassigned: t('dash.unassigned'),
     days: analyticsRangeDays(analyticsRange, 'analytics', orders.map(o => o.date)),
     range: analyticsRangeSpan(printLog.map(o => o.date)),
@@ -1692,6 +1700,7 @@ function renderPnLSection() {
   const rows = Pnl.pnlByPeriod(printLog, expenses, {
     settings, clients, currencies: CURRENCIES, now: new Date(),
     wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
+    timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : []),
     inventory: (typeof inventory !== 'undefined' ? inventory : []),
     machines: (typeof machines !== 'undefined' ? machines : []),
     recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}),
@@ -1702,6 +1711,8 @@ function renderPnLSection() {
   const hasWaste = rows.some((r) => (r.waste || 0) > 0);
   // Machines losing value (lib/depreciation.js): a column where there is any.
   const hasDep = rows.some((r) => (r.depreciation || 0) > 0);
+  // The hours the shop's people logged, at their rate: a column where there is any.
+  const hasLabour = rows.some((r) => (r.labour || 0) > 0);
 
   const cur = currencySymbol();
   el.innerHTML = `
@@ -1717,6 +1728,7 @@ function renderPnLSection() {
             <th style="padding:4px 8px;">${escapeHtml(t('an.pnl_expenses'))} (${cur})</th>
             ${hasWaste ? `<th style="padding:4px 8px;">${escapeHtml(t('pnl.waste'))} (${cur})</th>` : ''}
             ${hasDep ? `<th style="padding:4px 8px;">${escapeHtml(t('pnl.depreciation'))} (${cur})</th>` : ''}
+            ${hasLabour ? `<th style="padding:4px 8px;">${escapeHtml(t('pnl.labour'))} (${cur})</th>` : ''}
             <th style="padding:4px 8px;">${escapeHtml(t('an.pnl_vat'))} (${cur})</th>
             <th style="padding:4px 8px; font-weight:700;">${escapeHtml(t('an.pnl_net'))} (${cur})</th>
           </tr>
@@ -1732,6 +1744,7 @@ function renderPnLSection() {
               <td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.expenses + r.fixed)}</td>
               ${hasWaste ? `<td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">${r.waste > 0 ? '−' + fmtMoney(r.waste) : '—'}</td>` : ''}
               ${hasDep ? `<td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">${r.depreciation > 0 ? '−' + fmtMoney(r.depreciation) : '—'}</td>` : ''}
+              ${hasLabour ? `<td style="padding:6px 8px; text-align:right; color:var(--danger); font-variant-numeric:tabular-nums;">${r.labour > 0 ? '−' + fmtMoney(r.labour) : '—'}</td>` : ''}
               <td style="padding:6px 8px; text-align:right; color:var(--text-muted); font-variant-numeric:tabular-nums;">${fmtMoney(r.vatCollected)}</td>
               <td style="padding:6px 8px; text-align:right; font-weight:700; color:${netCol}; font-variant-numeric:tabular-nums;">${fmtMoney(r.net)}</td>
             </tr>`;
@@ -1746,6 +1759,11 @@ function renderPnLSection() {
           ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:6px;">${escapeHtml(t('pnl.inventory_note', { amount: fmtMoney(bought) }))}</div>`
           : '';
       })()}
+      ${rows.some((r) => r.labourOverlap)
+        // Logged labour beside pay booked as an expense or a fixed cost: the
+        // rule cannot know whether they are the same money, so it says so.
+        ? `<div style="font-size:11.5px;color:var(--warning, var(--text-muted));margin-top:6px;">${escapeHtml(t('pnl.labour_overlap'))}</div>`
+        : ''}
     </div>`;
 }
 
@@ -1973,6 +1991,9 @@ function renderMachinePL() {
     completed,
     expenses: expenses.filter(e => e.orderId),
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
+    // A job's logged labour, charged to the machine it ran on.
+    timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : [])
+      .filter(e => e && inRange(e.date, analyticsRange, 'analytics')),
     unassigned: t('dash.unassigned'),
     range: analyticsRangeSpan(printLog.map(o => o.date)),
     // The whole book, so hours printed before the range count against a
@@ -1993,6 +2014,8 @@ function renderMachinePL() {
   // A machine with a purchase price set loses value as it prints — the one
   // place its wear is counted. A column only where there is any.
   const hasDep = rows.some((r) => (r.depreciation || 0) > 0);
+  // Logged labour on the machine's jobs — a column only where there is any.
+  const hasLabour = rows.some((r) => (r.labour || 0) > 0);
   el.innerHTML = `
     <div class="table-wrap">
       <table class="machine-pl-table" style="width:100%; border-collapse:collapse; font-size:13px;">
@@ -2005,6 +2028,7 @@ function renderMachinePL() {
             <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.linked_exp_col'))} (${cur})</th>
             <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.maint_cost_col'))} (${cur})</th>
             ${hasDep ? `<th style="text-align:right; padding:6px 8px;">${escapeHtml(t('pnl.depreciation'))} (${cur})</th>` : ''}
+            ${hasLabour ? `<th style="text-align:right; padding:6px 8px;">${escapeHtml(t('pnl.labour'))} (${cur})</th>` : ''}
             <th style="text-align:right; padding:6px 8px; font-weight:700;">${escapeHtml(t('an.net_col'))} (${cur})</th>
             <th style="text-align:right; padding:6px 8px;">${escapeHtml(t('an.margin_col'))}</th>
           </tr>
@@ -2029,6 +2053,7 @@ function renderMachinePL() {
               <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.linkedExpenses)}</td>
               <td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">−${fmtMoney(r.maintenance)}</td>
               ${hasDep ? `<td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">${r.depreciation > 0 ? '−' + fmtMoney(r.depreciation) : '—'}</td>` : ''}
+              ${hasLabour ? `<td style="text-align:right; padding:6px 8px; color:var(--danger); font-variant-numeric:tabular-nums;">${r.labour > 0 ? '−' + fmtMoney(r.labour) : '—'}</td>` : ''}
               <td style="text-align:right; padding:6px 8px; font-weight:700; color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}; font-variant-numeric:tabular-nums;">${fmtMoney(net)}</td>
               <td style="text-align:right; padding:6px 8px; font-weight:600; color:${marginCol};">${margin === null ? '—' : margin.toFixed(1) + '%'}</td>
             </tr>`;
@@ -2058,6 +2083,7 @@ function renderLocationPL() {
   if (typeof KhaytLocationPl === 'undefined') { container.innerHTML = ''; return; }
   const report = KhaytLocationPl.locationPl({
     orders: printLog, expenses, wasteLog: (typeof wasteLog !== 'undefined' ? wasteLog : []),
+    timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : []),
     machines, locations, settings, clients,
     currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
     inventory: (typeof inventory !== 'undefined' ? inventory : []),
@@ -2825,7 +2851,13 @@ function pnlInputsForRange() {
         { recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}) })
     : {};
   const depreciation = (dep.range && dep.range.total) || 0;
-  return { orders, expenses: expenseRows, waste: wasteRows, depreciation };
+  // Logged labour in the range, with its job's scope (lib/pnl-report.js
+  // LABOUR): hours on a voided or not-business job are out, as the job is.
+  const byId = new Map((printLog || []).filter(o => o && o.id).map(o => [String(o.id), o]));
+  const labourRows = (typeof timeEntries !== 'undefined' ? timeEntries : [])
+    .filter(e => e && inRange(e.date, analyticsRange, 'analytics') && KhaytPnl.labourCounts(e, byId));
+  return { orders, expenses: expenseRows, waste: wasteRows, depreciation,
+           labour: labourRows, fixedCosts: (settings && settings.fixedCosts) || [] };
 }
 
 function exportPnlCsv() {
@@ -2835,16 +2867,17 @@ function exportPnlCsv() {
     const f = customRangeFrom.analytics || '', tt = customRangeTo.analytics || '';
     if (f || tt) label = `${f || '…'} → ${tt || '…'}`;
   }
-  const { orders, expenses: exps, waste, depreciation } = pnlInputsForRange();
+  const { orders, expenses: exps, waste, depreciation, labour, fixedCosts } = pnlInputsForRange();
 
   if (!orders.length && !exps.length) { toast(t('an.pnl_empty') || 'No data for this period', 'error'); return; }
 
-  const summary = KhaytPnl.computePnl({ orders, expenses: exps, waste, depreciation, label });
+  const summary = KhaytPnl.computePnl({ orders, expenses: exps, waste, depreciation, labour, fixedCosts, label });
   const labels = {
     title: t('pnl.title'), item: t('pnl.item'), amount: t('pnl.amount'), orders: t('an.pnl_orders'),
     revenue: t('an.revenue'), cogs: t('pnl.cogs'), gross: t('pnl.gross'), gross_margin: t('pnl.gross_margin'),
     opex: t('pnl.opex'), vat: t('an.pnl_vat'), net: t('an.pnl_net'),
     inventory: t('pnl.inventory'), waste: t('pnl.waste'), depreciation: t('pnl.depreciation'),
+    labour: t('pnl.labour'),
   };
   const csv = KhaytPnl.pnlToCsv(summary, { currency: currencySymbol(), labels });
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }),
