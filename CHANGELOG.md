@@ -6054,6 +6054,56 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.60] - 2026-10-07
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The last pieces of the reports the Mac was missing — client retention, locations,
+staff and labour — a kiosk for a screen across the shop, and review fixes.
+
+### New
+
+- **Kiosk** (View ▸ Open Kiosk, ⌃⌘K, or the button on Machines). One large
+  card per machine for a TV on the shop wall: the job on it, a progress bar
+  from the printer's own report when it gives one, time left as "5h 40m",
+  and the due date, red when late. A machine that does not answer says so.
+- **Locations.** Settings → Operations → Locations: add, rename, delete. Pick
+  a machine's site on its sheet; the Machines screen shows it. Reports → By
+  machine has a per-location P&L for the chosen period, and its sites add up
+  to the shop's P&L. Deleting a site clears it from machines, spools, expenses
+  and jobs; ⌘Z puts it back.
+- **Staff.** Settings → Operations → Operators: name, job title, access level,
+  hourly rate. Put a job on somebody in the job panel and log the hours they
+  spend on it; the board card shows who has it. Reports → Best shows each
+  person's jobs, waste and estimate accuracy, and a labour card. Removing
+  someone whose name is on work makes them inactive instead, so their name
+  stays on it.
+- **Labour in the P&L.** Logged hours are their own line in the P&L, the
+  per-location and per-machine P&L and the net income, in the month the hours
+  were worked. If a period also has a cost that looks like pay, a note says
+  the same work may be counted twice. Nothing changes for a shop that logs no
+  hours.
+- **Client retention** on Reports → Best: how many customers came back within
+  30, 60 and 90 days, counting only customers whose first order is old enough
+  to have had the chance, and who comes back most.
+
+### Changed and fixed
+
+- **A phone is never handed a PIN hash,** and it can change only what the
+  iPhone app writes (jobs, spools, the waiting list, expenses, waste) — not
+  staff, not their access level. The feedback email no longer attaches PIN
+  hashes either.
+- **Reports in Arabic:** the quarter's waterfall reads from the right. Its
+  monthly-costs step is called "Monthly costs", which is now their one name
+  across Reports. The Expenses column no longer cuts off its figures, and the
+  statement's cost lines are readable.
+- **Saving a location or staff member another device deleted** while you were
+  editing no longer brings it back under a new id.
+- **Kiosk, staff sheets, Settings:** a machine that is off and has nothing to
+  do says only "Not answering"; sheets have real titles; Locations and
+  Operators are at the top of Settings → Operations.
+
 ## [4.0.0-alpha.59] - 2026-10-05
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
