@@ -1444,6 +1444,16 @@ function openOrderEditor(orderId) {
       <select id="oeOperator" style="flex:1; max-width:220px;">
         <option value="">${escapeHtml(t('op.unassigned'))}</option>
         ${operators.filter(o => o.active !== false).map(o => `<option value="${o.id}"${draft.operatorId === o.id ? ' selected' : ''}>${escapeHtml(o.name)}${o.role ? ' · ' + escapeHtml(o.role) : ''}</option>`).join('')}
+        ${(() => {
+          // The job's own operator, when they are no longer offered. Without
+          // this the select had no option for them, fell back to Unassigned,
+          // and saving the job for any other reason cleared who did it.
+          if (!draft.operatorId) return '';
+          const cur = operators.find(o => o.id === draft.operatorId);
+          if (cur && cur.active !== false) return '';
+          const label = cur ? `${cur.name} · ${t('op.inactive')}` : t('an.op_removed');
+          return `<option value="${escapeHtml(draft.operatorId)}" selected>${escapeHtml(label)}</option>`;
+        })()}
       </select>
     </div>` : ''}
     ${(() => {

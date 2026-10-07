@@ -1,4 +1,152 @@
 {
+ "operators": [
+  {
+   "id": "OP-sample-noura",
+   "name": "Noura Al-Qahtani",
+   "role": "Lead technician",
+   "roleKey": "manager",
+   "hourlyRate": 60,
+   "active": true
+  },
+  {
+   "id": "OP-sample-faisal",
+   "name": "Faisal Al-Harbi",
+   "role": "Technician",
+   "roleKey": "operator",
+   "hourlyRate": 45,
+   "active": true
+  },
+  {
+   "id": "OP-sample-reem",
+   "name": "Reem Al-Dosari",
+   "role": "Finishing",
+   "roleKey": "operator",
+   "hourlyRate": 35,
+   "active": false
+  }
+ ],
+ "timeEntries": [
+  {
+   "id": "TE-sample-01",
+   "orderId": "ORD-01017",
+   "operatorId": "OP-sample-noura",
+   "operatorName": "Noura Al-Qahtani",
+   "hours": 3,
+   "hourlyRate": 55,
+   "cost": 165,
+   "date": "2026-06-03",
+   "notes": "Support removal and sanding",
+   "createdAt": "2026-06-03T15:00:00.000Z"
+  },
+  {
+   "id": "TE-sample-02",
+   "orderId": "ORD-01017",
+   "operatorId": "OP-sample-faisal",
+   "operatorName": "Faisal Al-Harbi",
+   "hours": 1,
+   "hourlyRate": 45,
+   "cost": 45,
+   "date": "2026-06-04",
+   "notes": "Packing",
+   "createdAt": "2026-06-04T15:00:00.000Z"
+  },
+  {
+   "id": "TE-sample-03",
+   "orderId": "ORD-01012",
+   "operatorId": "OP-sample-noura",
+   "operatorName": "Noura Al-Qahtani",
+   "hours": 2.5,
+   "hourlyRate": 60,
+   "cost": 150.0,
+   "date": "2026-08-20",
+   "notes": "Assembly",
+   "createdAt": "2026-08-20T15:00:00.000Z"
+  },
+  {
+   "id": "TE-sample-04",
+   "orderId": "ORD-01011",
+   "operatorId": "OP-sample-noura",
+   "operatorName": "Noura Al-Qahtani",
+   "hours": 4,
+   "hourlyRate": 60,
+   "cost": 240,
+   "date": "2026-09-02",
+   "notes": "Still printing — prep work",
+   "createdAt": "2026-09-02T15:00:00.000Z"
+  },
+  {
+   "id": "TE-sample-05",
+   "orderId": "ORD-01016",
+   "operatorId": "OP-sample-faisal",
+   "operatorName": "Faisal Al-Harbi",
+   "hours": 1.5,
+   "hourlyRate": 45,
+   "cost": 67.5,
+   "date": "2026-08-29",
+   "notes": "",
+   "createdAt": "2026-08-29T15:00:00.000Z"
+  },
+  {
+   "id": "TE-sample-06",
+   "orderId": "ORD-01036",
+   "operatorId": "OP-sample-faisal",
+   "operatorName": "Faisal Al-Harbi",
+   "hours": 2,
+   "hourlyRate": 45,
+   "cost": 90,
+   "date": "2026-05-14",
+   "notes": "Painting",
+   "createdAt": "2026-05-14T15:00:00.000Z"
+  },
+  {
+   "id": "TE-sample-07",
+   "orderId": "ORD-01024",
+   "operatorId": "OP-sample-faisal",
+   "operatorName": "Faisal Al-Harbi",
+   "hours": 3,
+   "hourlyRate": 45,
+   "cost": 135,
+   "date": "2026-09-03",
+   "notes": "",
+   "createdAt": "2026-09-03T15:00:00.000Z"
+  },
+  {
+   "id": "TE-sample-08",
+   "orderId": "ORD-01002",
+   "operatorId": "OP-sample-reem",
+   "operatorName": "Reem Al-Dosari",
+   "hours": 1,
+   "hourlyRate": 35,
+   "cost": 35,
+   "date": "2026-07-10",
+   "notes": "Finishing",
+   "createdAt": "2026-07-10T15:00:00.000Z"
+  },
+  {
+   "id": "TE-sample-09",
+   "orderId": "ORD-01029",
+   "operatorId": "OP-sample-majed",
+   "operatorName": "Majed Al-Otaibi",
+   "hours": 2,
+   "hourlyRate": 40,
+   "cost": 80,
+   "date": "2026-07-21",
+   "notes": "",
+   "createdAt": "2026-07-21T15:00:00.000Z"
+  },
+  {
+   "id": "TE-sample-10",
+   "orderId": null,
+   "operatorId": "OP-sample-noura",
+   "operatorName": "Noura Al-Qahtani",
+   "hours": 1,
+   "hourlyRate": 60,
+   "cost": 60,
+   "date": "2026-09-05",
+   "notes": "Nozzle change, bed levelling",
+   "createdAt": "2026-09-05T15:00:00.000Z"
+  }
+ ],
  "locations": [
   {
    "id": "LOC-sample-ryd",
@@ -14,6 +162,7 @@
  "printLog": [
   {
    "id": "ORD-01000",
+   "operatorId": "OP-sample-noura",
    "trackingToken": "trk-sample01",
    "date": "2026-07-02",
    "status": "delivered",
@@ -138,6 +287,7 @@
   },
   {
    "id": "ORD-01002",
+   "operatorId": "OP-sample-reem",
    "date": "2026-06-15",
    "status": "completed",
    "project": "Kaaba desk piece",
@@ -192,6 +342,7 @@
   },
   {
    "id": "ORD-01003",
+   "operatorId": "OP-sample-faisal",
    "date": "2026-07-06",
    "status": "delivered",
    "project": "Cable chain, 40 links",
@@ -397,6 +548,7 @@
   },
   {
    "id": "ORD-01007",
+   "operatorId": "OP-sample-reem",
    "date": "2026-08-28",
    "status": "completed",
    "project": "Gearbox housing",
@@ -452,6 +604,7 @@
   },
   {
    "id": "ORD-01008",
+   "operatorId": "OP-sample-noura",
    "date": "2026-08-26",
    "status": "delivered",
    "project": "Falcon hood",
@@ -523,6 +676,7 @@
   },
   {
    "id": "ORD-01009",
+   "operatorId": "OP-sample-reem",
    "date": "2026-08-03",
    "status": "completed",
    "project": "Camera rig plate",
@@ -626,6 +780,7 @@
   },
   {
    "id": "ORD-01011",
+   "operatorId": "OP-sample-noura",
    "date": "2026-09-01",
    "status": "printing",
    "project": "Coffee dallah stand",
@@ -701,6 +856,7 @@
   },
   {
    "id": "ORD-01012",
+   "operatorId": "OP-sample-noura",
    "date": "2026-05-16",
    "status": "delivered",
    "project": "Prosthetic socket trial",
@@ -916,6 +1072,7 @@
   },
   {
    "id": "ORD-01016",
+   "operatorId": "OP-sample-faisal",
    "date": "2026-08-29",
    "status": "completed",
    "project": "Ramadan lantern",
@@ -980,6 +1137,7 @@
   },
   {
    "id": "ORD-01017",
+   "operatorId": "OP-sample-noura",
    "date": "2026-06-04",
    "status": "delivered",
    "project": "Robot gripper fingers",
@@ -1209,6 +1367,7 @@
   },
   {
    "id": "ORD-01021",
+   "operatorId": "OP-sample-faisal",
    "date": "2026-07-07",
    "status": "completed",
    "project": "Dental model set",
@@ -1266,6 +1425,7 @@
   },
   {
    "id": "ORD-01022",
+   "operatorId": "OP-sample-reem",
    "date": "2026-08-07",
    "status": "delivered",
    "project": "Kaaba desk piece",
@@ -1382,6 +1542,7 @@
   },
   {
    "id": "ORD-01024",
+   "operatorId": "OP-sample-faisal",
    "date": "2026-08-18",
    "status": "printing",
    "project": "Museum replica — Kings",
@@ -1432,6 +1593,7 @@
   },
   {
    "id": "ORD-01025",
+   "operatorId": "OP-sample-noura",
    "date": "2026-08-17",
    "status": "printing",
    "project": "Drone arm v4",
@@ -1598,6 +1760,7 @@
   },
   {
    "id": "ORD-01028",
+   "operatorId": "OP-sample-faisal",
    "date": "2026-09-01",
    "status": "delivered",
    "project": "Falcon hood",
@@ -1661,6 +1824,7 @@
   },
   {
    "id": "ORD-01029",
+   "operatorId": "OP-sample-majed",
    "date": "2026-06-16",
    "status": "delivered",
    "project": "Camera rig plate",
@@ -2019,6 +2183,7 @@
   },
   {
    "id": "ORD-01036",
+   "operatorId": "OP-sample-faisal",
    "date": "2026-05-14",
    "status": "delivered",
    "project": "Ramadan lantern",

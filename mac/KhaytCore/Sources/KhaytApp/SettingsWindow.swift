@@ -1002,6 +1002,7 @@ struct OperationsPane: View {
                 // Records, written when saved — not part of the draft above.
                 // The other app keeps them on its Operations page too.
                 Section { LocationsSection(shop: shop) }
+                Section { OperatorsSection(shop: shop) }
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original,

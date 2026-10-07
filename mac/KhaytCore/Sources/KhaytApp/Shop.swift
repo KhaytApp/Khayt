@@ -664,6 +664,8 @@ final class Shop {
                 supplierRows = []
             }
             locationRows = Self.rows(root, "locations")
+            operatorRows = Self.rows(root, "operators")
+            timeEntryRows = Self.rows(root, "timeEntries")
             // What has been ordered and not yet arrived. Read raw for the same
             // reason the consumables are: the rule reads fields this app has no
             // model for, and deciding which of them matter belongs in the rule.
@@ -5923,6 +5925,14 @@ final class Shop {
     /// edit made here.
     private(set) var locationRows: [JSONValue] = []
 
+    /// The shop's staff (`store.operators`), raw: a record carries fields this
+    /// app never shows — `pinHash`, `roleKey` set by the other app's lock —
+    /// and every one of them has to survive an edit made here.
+    private(set) var operatorRows: [JSONValue] = []
+
+    /// Hours the staff logged against jobs (`store.timeEntries`), raw.
+    private(set) var timeEntryRows: [JSONValue] = []
+
     /// What is low and has not already been ordered.
     private(set) var needsOrdering: [KhaytEngine.ToOrder] = []
 
@@ -6846,6 +6856,254 @@ final class Shop {
             } catch {
                 shop.moveProblem = String(describing: error)
             }
+        }
+    }
+
+    // MARK: - The staff
+
+    /// The shop's operators, in the book's order — the order the other app
+    /// lists them in.
+    var operators: [ShopOperator] { operatorRows.compactMap(ShopOperator.init(row:)) }
+
+    /// The ones a job or a time entry can be given to now.
+    var activeOperators: [ShopOperator] { operators.filter(\.active) }
+
+    func shopOperator(_ id: String?) -> ShopOperator? {
+        guard let id, !id.isEmpty else { return nil }
+        return operators.first { $0.id == id }
+    }
+
+    /// What a job's operator is called on screen: the name, marked when they
+    /// are inactive, or "no longer on the list" for an id that names nobody.
+    /// Nil for a job nobody was put on.
+    func operatorLabel(_ id: String?) -> String? {
+        guard let id, !id.isEmpty else { return nil }
+        guard let op = shopOperator(id) else { return words.callIt("an.op_removed") }
+        return op.active ? op.name : op.name + " · " + words.callIt("op.inactive")
+    }
+
+    /// The hours logged against one job, newest first.
+    func timeEntries(for jobId: String) -> [TimeEntry] {
+        timeEntryRows.compactMap(TimeEntry.init(row:))
+            .filter { $0.orderId == jobId }
+            .sorted { ($0.date, $0.createdAt) > ($1.date, $1.createdAt) }
+    }
+
+    /// Add an operator, or change one.
+    ///
+    /// The fields the other app's editor writes — name, role, access level,
+    /// hourly rate, active — and of those only the ones the shop CHANGED from
+    /// what the sheet opened with (`opened`): saving an old record untouched
+    /// must not stamp an access level on it that nobody chose. `pinHash` and
+    /// anything this app does not know stay exactly as they were. The id is
+    /// `OP-…` from the same `uid` the other app uses.
+    func saveOperator(id: String?, _ fields: ShopOperator.Fields, opened: ShopOperator.Fields?) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        guard !fields.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            moveProblem = words.callIt("mach.need_name"); return
+        }
+        var undo: [ChangedRecord] = []
+        do {
+            try StoreWriter.update(build) { root in
+                Self.writeOperator(into: &root, id: id, fields, opened: opened,
+                                   newId: Self.uid("OP"), undo: &undo)
+                Self.sealUndo(&undo, in: root)
+            }
+            if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("op.title")) }
+            await load(source)
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    /// The write itself, static and taking `root` so a test can drive it
+    /// against a plain book.
+    static func writeOperator(into root: inout [String: JSONValue], id: String?,
+                              _ fields: ShopOperator.Fields, opened: ShopOperator.Fields?,
+                              newId: String, undo: inout [ChangedRecord]) {
+        var rows = Self.rows(root, "operators")
+        func cleaned(_ f: ShopOperator.Fields) -> [String: JSONValue] {
+            [
+                "name": .string(f.name.trimmingCharacters(in: .whitespacesAndNewlines)),
+                "role": .string(f.role.trimmingCharacters(in: .whitespacesAndNewlines)),
+                "roleKey": .string(ShopOperator.roles.contains(f.roleKey) ? f.roleKey : "operator"),
+                "hourlyRate": .number(f.hourlyRate.isFinite ? max(0, f.hourlyRate) : 0),
+                "active": .bool(f.active),
+            ]
+        }
+        let shown = cleaned(fields)
+        if let id, let at = rows.firstIndex(where: { Self.recordId($0) == id }),
+           case .object(var record) = rows[at] {
+            let was = record
+            let before = opened.map(cleaned)
+            for (key, value) in shown where before?[key] != value { record[key] = value }
+            guard record != was else { return }
+            StoreWriter.stamp(&record)
+            undo.append(ChangedRecord(collection: "operators", id: id, was: was))
+            rows[at] = .object(record)
+        } else {
+            var record = shown
+            record["id"] = .string(newId)
+            StoreWriter.stamp(&record)
+            rows.append(.object(record))
+            undo.append(ChangedRecord(collection: "operators", id: newId, was: [:], kind: .created))
+        }
+        root["operators"] = .array(rows)
+    }
+
+    /// Delete an operator — or, when their name is on work, make them
+    /// inactive. `lib/operators.js` `remove` decides, the rule the other app's
+    /// delete now runs too: who did a job is history, so it is not cleared
+    /// the way a deleted location is. Returns what happened, for the caller
+    /// to say.
+    @discardableResult
+    func deleteOperator(_ id: String) async -> String? {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return nil
+        }
+        guard let engine else {
+            moveProblem = words.callIt("mac.move_no_engine"); return nil
+        }
+        var undo: [ChangedRecord] = []
+        var outcome: String?
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                let before = Self.rows(root, "operators")
+                let book: [String: JSONValue] = [
+                    "operators": .array(before),
+                    "printLog": .array(Self.rows(root, "printLog")),
+                    "timeEntries": .array(Self.rows(root, "timeEntries")),
+                ]
+                let out = try await engine.removeOperator(book: book, id: id)
+                outcome = out.outcome
+                undo = Self.operatorRemoval(&root, before: before, after: out.operators, id: id)
+            }
+            if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("op.title")) }
+            await load(source)
+        } catch {
+            moveProblem = String(describing: error)
+        }
+        return outcome
+    }
+
+    /// Write the rule's answer: the row gone, or the row made inactive and
+    /// stamped. What changed goes on the undo.
+    static func operatorRemoval(_ root: inout [String: JSONValue], before: [JSONValue],
+                                after: [JSONValue], id: String) -> [ChangedRecord] {
+        guard let at = before.firstIndex(where: { recordId($0) == id }),
+              case .object(let was) = before[at] else { return [] }
+        if let kept = after.first(where: { recordId($0) == id }), case .object(var now) = kept {
+            guard now != was else { return [] }
+            StoreWriter.stamp(&now)
+            var rows = before
+            rows[at] = .object(now)
+            root["operators"] = .array(rows)
+            return [ChangedRecord(collection: "operators", id: id, was: was, now: now)]
+        }
+        var rows = before
+        rows.remove(at: at)
+        root["operators"] = .array(rows)
+        return [ChangedRecord(collection: "operators", id: id, was: was, kind: .deleted, at: at)]
+    }
+
+    /// Put a job on an operator, or on nobody.
+    ///
+    /// The other app's editor writes `operatorId` and removes it for nobody;
+    /// so does this.
+    func setJobOperator(_ jobId: Order.ID, _ operatorId: String?) async {
+        await writeToOneOrder(jobId, named: words.callIt("op.assigned")) { order, _, _ in
+            OneOrderEdit(order: Self.withOperator(order, operatorId))
+        }
+    }
+
+    static func withOperator(_ order: JSONValue, _ operatorId: String?) -> JSONValue {
+        guard case .object(var o) = order else { return order }
+        if let operatorId, !operatorId.isEmpty { o["operatorId"] = .string(operatorId) }
+        else { o.removeValue(forKey: "operatorId") }
+        return .object(o)
+    }
+
+    /// Log time an operator spent on a job.
+    ///
+    /// The other app's shape exactly, with the rate and the cost FROZEN at the
+    /// operator's rate today: a raise next year does not reprice this work.
+    func logTime(jobId: String, operatorId: String, hours: Double, day: String, notes: String) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        guard hours.isFinite, hours > 0 else {
+            moveProblem = words.callIt("shift.hours_positive"); return
+        }
+        var undo: [ChangedRecord] = []
+        do {
+            try StoreWriter.update(build) { root in
+                Self.writeTimeEntry(into: &root, id: Self.uid("TE"), jobId: jobId,
+                                    operatorId: operatorId, hours: hours, day: day, notes: notes,
+                                    at: StoreWriter.iso(Date()), undo: &undo)
+                Self.sealUndo(&undo, in: root)
+            }
+            if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("time.log_title")) }
+            await load(source)
+        } catch {
+            moveProblem = String(describing: error)
+        }
+    }
+
+    static func writeTimeEntry(into root: inout [String: JSONValue], id: String, jobId: String,
+                               operatorId: String, hours: Double, day: String, notes: String,
+                               at: String, undo: inout [ChangedRecord]) {
+        let op = rows(root, "operators").first { recordId($0) == operatorId }
+            .flatMap(ShopOperator.init(row:))
+        let rate = op?.hourlyRate ?? 0
+        var record: [String: JSONValue] = [
+            "id": .string(id),
+            "orderId": jobId.isEmpty ? .null : .string(jobId),
+            "operatorId": .string(operatorId),
+            "operatorName": .string(op?.name ?? ""),
+            "hours": .number(hours),
+            "hourlyRate": .number(rate),
+            "cost": .number(hours * rate),
+            "date": .string(day),
+            "notes": .string(notes.trimmingCharacters(in: .whitespacesAndNewlines)),
+            "createdAt": .string(at),
+        ]
+        StoreWriter.stamp(&record)
+        var entries = rows(root, "timeEntries")
+        entries.append(.object(record))
+        root["timeEntries"] = .array(entries)
+        undo.append(ChangedRecord(collection: "timeEntries", id: id, was: [:], kind: .created))
+    }
+
+    /// Take a time entry off. Undo puts it back where it was.
+    func deleteTimeEntry(_ id: String) async {
+        moveProblem = nil
+        guard let build = source.build else {
+            moveProblem = words.callIt("mac.move_sample"); return
+        }
+        var undo: [ChangedRecord] = []
+        do {
+            try StoreWriter.update(build) { root in
+                var entries = Self.rows(root, "timeEntries")
+                guard let at = entries.firstIndex(where: { Self.recordId($0) == id }),
+                      case .object(let was) = entries[at] else { return }
+                entries.remove(at: at)
+                root["timeEntries"] = .array(entries)
+                undo.append(ChangedRecord(collection: "timeEntries", id: id, was: was,
+                                          kind: .deleted, at: at))
+            }
+            if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("time.log_title")) }
+            await load(source)
+        } catch {
+            moveProblem = String(describing: error)
         }
     }
 
