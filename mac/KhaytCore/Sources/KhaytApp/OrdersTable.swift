@@ -43,6 +43,9 @@ struct OrdersTable: View {
         decided = true
         if !shop.anyJobHasAClient { columns[visibility: "client"] = .hidden }
         if !shop.anyJobHasADueDate { columns[visibility: "due"] = .hidden }
+        if !shop.orders.contains(where: { !($0.operatorId ?? "").isEmpty }) {
+            columns[visibility: "operator"] = .hidden
+        }
     }
 
     /// False until the restored column widths have been dropped. The `Table`
@@ -82,7 +85,9 @@ struct OrdersTable: View {
             // Arabic it is on the left. The ideals now sit near the minimums
             // (about 810pt with every column shown) and the table grows them
             // into whatever room the window has.
-            .width(min: 200, ideal: 220)
+            // 200, not 220: seven columns now share the room the ideals have
+            // to fit in (see above, and `ColumnWidthsTests.idealsFit`).
+            .width(min: 200, ideal: 200)
 
             // A COLUMN OF DASHES IS NOT A COLUMN.
             //
@@ -97,8 +102,22 @@ struct OrdersTable: View {
                     .foregroundStyle(job.client.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
                     .lineLimit(1)
             }
-            .width(min: 120, ideal: 130)
+            .width(min: 100, ideal: 110)
             .customizationID("client")
+
+            // WHO HAS IT. The board card says; the table, where a shop lives,
+            // did not. Hidden, like the client column, for a book where no job
+            // has anybody on it. A name that left keeps its label — see
+            // `Shop.operatorLabel`.
+            TableColumn(shop.words.callIt("op.assigned")) { job in
+                if let label = shop.operatorLabel(job.operatorId) {
+                    Text(label).lineLimit(1)
+                } else {
+                    Text("—").foregroundStyle(.tertiary)
+                }
+            }
+            .width(min: 64, ideal: 76)
+            .customizationID("operator")
 
             TableColumn(shop.words.callIt("mac.stage"), value: \.status) { job in
                 StageCell(shop: shop, job: job)
@@ -130,13 +149,13 @@ struct OrdersTable: View {
                     Text("—").foregroundStyle(.quaternary)
                 }
             }
-            .width(min: 80, ideal: 84)
+            .width(min: 80, ideal: 80)
             .alignment(.trailing)
 
             TableColumn(shop.words.callIt("flow.owed"), value: \.owed) { job in
                 Owed(job: job, words: shop.words)
             }
-            .width(min: 96, ideal: 96)
+            .width(min: 92, ideal: 92)
             .alignment(.trailing)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: false))

@@ -29,7 +29,7 @@ struct ColumnWidthsTests {
 
     /// A `Table` never shrinks a column below its IDEAL (measured in the app:
     /// 1,023pt of ideals in an 887pt slot beside the panel, Owed under the
-    /// panel). So the ideals of all six Jobs columns, plus the spacing between
+    /// panel). So the ideals of all seven Jobs columns, plus the spacing between
     /// them, have to fit the narrowest ordinary slot: a 1,320pt window less the
     /// sidebar and the detail panel.
     @Test("the jobs columns' ideal widths fit beside the detail panel")
@@ -37,7 +37,7 @@ struct ColumnWidthsTests {
         let source = try QuoteSheetStatusTests.source("OrdersTable.swift")
         let pattern = /\.width\(min: (\d+), ideal: (\d+)\)/
         let ideals = source.matches(of: pattern).compactMap { Int($0.output.2) }
-        #expect(ideals.count == 6, "expected six Jobs columns, found \(ideals.count)")
+        #expect(ideals.count == 7, "expected seven Jobs columns, found \(ideals.count)")
         let spacing = 17 * ideals.count
         #expect(ideals.reduce(0, +) + spacing <= 860,
                 Comment(rawValue: "ideals \(ideals) come to \(ideals.reduce(0, +) + spacing)pt"))
