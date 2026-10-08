@@ -1085,7 +1085,7 @@ ipcMain.handle('hub:pick-file', async (event, opts = {}) => {
 // all three call sites here kept the denylist, so every one of the binaries
 // above was accepted as a slicer for as long as it existed. Measured, not
 // assumed — the denylist said yes to all ten.
-const { isAllowedSlicerBinary, sliceArgv } = require('./lib/slicers');
+const { isAllowedSlicerBinary, sliceArgv, sliceFailureReason } = require('./lib/slicers');
 
 async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   const { spawn } = require('node:child_process');
@@ -1097,15 +1097,20 @@ async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   const outPath = path.join(outDir, 'out.gcode');
   // Split then fill, in `lib/slicers.js` — the same argv the Mac builds, and
   // the reason substitution never happens before the split.
-  const argv = sliceArgv(args, { model: modelPath, output: outPath, outdir: outDir });
+  // The slicer path picks the default template: an Orca/Bambu fork has no --export-gcode.
+  const argv = sliceArgv(args, { model: modelPath, output: outPath, outdir: outDir, slicer: slicerPath });
   const result = await new Promise((resolve) => {
+    // Both streams: the Orca forks log their real reason ("File Version 2.3.0.4 not
+    // supported…") to STDOUT and leave stderr with a usage dump or nothing.
     let stderr = '';
+    let stdout = '';
     let child;
-    try { child = spawn(slicerPath, argv, { timeout: 180000, windowsHide: true }); }
-    catch (err) { return resolve({ code: -1, stderr: String(err && err.message || err) }); }
-    child.stderr?.on('data', (d) => { stderr = (stderr + d.toString()).slice(-4000); });
-    child.on('error', (err) => resolve({ code: -1, stderr: String(err && err.message || err) }));
-    child.on('close', (code) => resolve({ code, stderr }));
+    try { child = spawn(slicerPath, argv, { cwd: outDir, timeout: 180000, windowsHide: true }); }
+    catch (err) { return resolve({ code: -1, stderr: String(err && err.message || err), stdout }); }
+    child.stderr?.on('data', (d) => { stderr = (stderr + d.toString()).slice(-8000); });
+    child.stdout?.on('data', (d) => { stdout = (stdout + d.toString()).slice(-8000); });
+    child.on('error', (err) => resolve({ code: -1, stderr: String(err && err.message || err), stdout }));
+    child.on('close', (code) => resolve({ code, stderr, stdout }));
   });
   let gpath = fs.existsSync(outPath) ? outPath : null;
   if (!gpath) {
@@ -1114,7 +1119,7 @@ async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   }
   if (!gpath) {
     try { fs.rmSync(outDir, { recursive: true, force: true }); } catch { /* ignore */ }
-    return { ok: false, error: 'No G-code produced. ' + String(result.stderr || `exit ${result.code}`).slice(0, 300) };
+    return { ok: false, error: 'No G-code produced. ' + sliceFailureReason(result) };
   }
   const buf = fs.readFileSync(gpath);
   const head = buf.subarray(0, 65536).toString('utf8');

@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **"Slice for exact quote" works with OrcaSlicer, Bambu Studio and Snapmaker
+  Orca.** A slicer found by "Detect installed slicers" was run with
+  PrusaSlicer's options, which these slicers do not have, so every slice
+  failed with "Invalid option --export-gcode … setup params error". They are
+  now run the way their own command line expects. When a slice still fails,
+  the message gives the slicer's own reason (for example, a file saved by a
+  newer version of the slicer) instead of its list of options.
+
 - **alpha.60 review fixes (Mac + desktop).**
   - Security: a phone on the shop network can change only what the iPhone
     app writes (jobs, spools, the waiting list, expenses, waste). With the

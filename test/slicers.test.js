@@ -197,3 +197,40 @@ test('main.js builds its argv from the shared rule, not its own copy', () => {
   assert.ok(src.includes('sliceArgv(args, {'), 'runSlice no longer asks the shared rule');
   assert.ok(!src.includes('function tokenizeSliceArgs'), 'main.js has its own tokenizer again');
 });
+
+// Reported on 3.11.4 (macOS): "Slice for exact quote" on a .3mf failed with
+// "Invalid option --export-gcode setup params error". Auto-detected slicers are
+// saved with no template, and the fallback was PrusaSlicer's, which no Orca/Bambu
+// fork accepts. Measured on this Mac: Snapmaker Orca prints its usage and
+// "setup params error" for --export-gcode, and slices with --slice 0 --outputdir.
+test('an Orca/Bambu fork with no template slices with --slice 0 into the output folder', () => {
+  const paths = { model: '/m/a b.3mf', output: '/t/out.gcode', outdir: '/t' };
+  for (const slicer of [
+    '/Applications/Snapmaker Orca.app/Contents/MacOS/Snapmaker_Orca',
+    '/Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer',
+    '/Applications/BambuStudio.app/Contents/MacOS/BambuStudio',
+    'C:\\Program Files\\OrcaSlicer\\orca-slicer.exe',
+    '/opt/QIDIStudio/qidi-studio',
+  ]) {
+    assert.deepEqual(S.sliceArgv('', { ...paths, slicer }), ['--slice', '0', '--outputdir', '/t', '/m/a b.3mf'], slicer);
+    // The PrusaSlicer default can only fail on a fork, so it is replaced too.
+    assert.deepEqual(S.sliceArgv(S.DEFAULT_SLICE_ARGS, { ...paths, slicer }), ['--slice', '0', '--outputdir', '/t', '/m/a b.3mf'], slicer);
+  }
+});
+
+test('PrusaSlicer, Cura and an unknown slicer keep the PrusaSlicer default; a typed template is used as typed', () => {
+  const paths = { model: 'm.stl', output: 'o.gcode', outdir: 'd' };
+  for (const slicer of ['/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer', '/Applications/ELEGOO Cura.app/Contents/MacOS/ELEGOO Cura', undefined]) {
+    assert.deepEqual(S.sliceArgv('', { ...paths, slicer }), ['--export-gcode', '-o', 'o.gcode', 'm.stl'], String(slicer));
+  }
+  assert.deepEqual(S.sliceArgv('--slice 1 --outputdir {outdir} {model}', { ...paths, slicer: '/x/OrcaSlicer' }), ['--slice', '1', '--outputdir', 'd', 'm.stl']);
+});
+
+test('a failed slice says the slicer\'s own reason, not its usage text', () => {
+  const usage = 'Usage: orca-slicer [ OPTIONS ] [ file.3mf/file.stl ... ]\n  3) setting values loaded from 3mf(lowest priority)\nsetup params error';
+  const log = '[2026-10-08 07:40:23.033302] [0x00000001fc96bf80] [error]   Version Check: File Version 2.3.0.4 not supported by current cli version 01.10.01.50\nrun found error, exit\n';
+  assert.equal(S.sliceFailureReason({ stderr: '', stdout: log, code: 0 }),
+    'Version Check: File Version 2.3.0.4 not supported by current cli version 01.10.01.50');
+  assert.equal(S.sliceFailureReason({ stderr: usage, stdout: '', code: 1 }), 'setup params error');
+  assert.equal(S.sliceFailureReason({ stderr: '', stdout: '', code: 3 }), 'exit 3');
+});
