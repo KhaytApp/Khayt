@@ -3778,6 +3778,7 @@
   "slicer.no_config": "Définissez d'abord le chemin du trancheur dans Réglages → Trancheur.",
   "slicer.fail": "Échec de la découpe :",
   "slicer.note": "Tranché avec {slicer} : {weight} g · {time} h",
+  "slicer.note_presets": "Réglages du trancheur : {machine} · {process} · {filament}",
   "slicer.note_derived": "{slicer} : {time} h · {weight} g — poids calculé à partir du volume du trancheur et de la densité de votre filament.",
   "slicer.applied": "Estimation appliquée depuis la découpe — vérifiez avant d'enregistrer.",
   "slicer.send_title": "Trancher et imprimer",

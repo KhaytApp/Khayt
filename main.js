@@ -1085,7 +1085,44 @@ ipcMain.handle('hub:pick-file', async (event, opts = {}) => {
 // all three call sites here kept the denylist, so every one of the binaries
 // above was accepted as a slicer for as long as it existed. Measured, not
 // assumed — the denylist said yes to all ten.
-const { isAllowedSlicerBinary, sliceArgv, sliceFailureReason } = require('./lib/slicers');
+const { isAllowedSlicerBinary, sliceArgv, sliceFailureReason, slicerFamily, usesDefaultArgs } = require('./lib/slicers');
+const slicerPresets = require('./lib/slicer-presets');
+
+/**
+ * Presets for a model with no settings of its own, sliced by an Orca/Bambu fork with the
+ * arguments Khayt chose (#1778): the printer the shop last used in that slicer, a process and a
+ * filament it accepts, flattened and written into the slice's own temp folder. Returns
+ * { presets } or { error } — never throws; a slice without presets is still attempted.
+ */
+function bareModelPresets(slicerPath, args, modelPath, outDir) {
+  if (slicerFamily(slicerPath) !== 'orca' || !usesDefaultArgs(args, slicerPath)) return {};
+  let entries = null;
+  if (/\.3mf$/i.test(modelPath)) {
+    try { entries = require('./lib/zip-read').listEntries(fs.readFileSync(modelPath)).map((e) => e.name); }
+    catch (_) { entries = null; }
+  }
+  if (!slicerPresets.needsPresets(modelPath, entries)) return {};
+  const io = {
+    readText: (p) => fs.readFileSync(p, 'utf8'),
+    listDir: (p) => fs.readdirSync(p),
+    isFile: (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } },
+    join: path.join,
+  };
+  const roots = slicerPresets.presetRoots(slicerPath, { platform: process.platform, home: require('os').homedir(), env: process.env })
+    .find((r) => { try { return fs.statSync(r.dir).isDirectory(); } catch (_) { return false; } });
+  if (!roots) return { error: 'Open the slicer once and pick your printer, so Khayt can use its settings.' };
+  let conf = '';
+  try { conf = fs.readFileSync(roots.confFile, 'utf8'); } catch (_) { /* no config yet */ }
+  const r = slicerPresets.choosePresets(io, { conf, user: roots.user, system: roots.system, bundled: roots.bundled });
+  if (!r.ok) return { error: r.error };
+  const file = (kind) => {
+    const f = path.join(outDir, `khayt-${kind}.json`);
+    fs.writeFileSync(f, slicerPresets.presetFileJson(kind, r[kind]), 'utf8');
+    return f;
+  };
+  return { presets: { settings: [file('machine'), file('process')], filaments: [file('filament')] },
+           names: { machine: r.machine.name, process: r.process.name, filament: r.filament.name } };
+}
 
 async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   const { spawn } = require('node:child_process');
@@ -1098,7 +1135,9 @@ async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   // Split then fill, in `lib/slicers.js` — the same argv the Mac builds, and
   // the reason substitution never happens before the split.
   // The slicer path picks the default template: an Orca/Bambu fork has no --export-gcode.
-  const argv = sliceArgv(args, { model: modelPath, output: outPath, outdir: outDir, slicer: slicerPath });
+  // A model with no settings of its own also needs the fork's presets (#1778).
+  const bare = bareModelPresets(slicerPath, args, modelPath, outDir);
+  const argv = sliceArgv(args, { model: modelPath, output: outPath, outdir: outDir, slicer: slicerPath, presets: bare.presets });
   const result = await new Promise((resolve) => {
     // Both streams: the Orca forks log their real reason ("File Version 2.3.0.4 not
     // supported…") to STDOUT and leave stderr with a usage dump or nothing.
@@ -1110,7 +1149,7 @@ async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
     child.stderr?.on('data', (d) => { stderr = (stderr + d.toString()).slice(-8000); });
     child.stdout?.on('data', (d) => { stdout = (stdout + d.toString()).slice(-8000); });
     child.on('error', (err) => resolve({ code: -1, stderr: String(err && err.message || err), stdout }));
-    child.on('close', (code) => resolve({ code, stderr, stdout }));
+    child.on('close', (code, signal) => resolve({ code, signal, stderr, stdout }));
   });
   let gpath = fs.existsSync(outPath) ? outPath : null;
   if (!gpath) {
@@ -1119,7 +1158,9 @@ async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   }
   if (!gpath) {
     try { fs.rmSync(outDir, { recursive: true, force: true }); } catch { /* ignore */ }
-    return { ok: false, error: 'No G-code produced. ' + sliceFailureReason(result) };
+    // Why there were no presets says more than the validation error that follows from it.
+    const why = bare.error ? ` ${bare.error}` : '';
+    return { ok: false, error: 'No G-code produced. ' + sliceFailureReason(result) + why };
   }
   const buf = fs.readFileSync(gpath);
   const head = buf.subarray(0, 65536).toString('utf8');
@@ -1127,7 +1168,7 @@ async function runSlice({ modelPath, slicerPath, args, densityGPerCm3 }) {
   // The shop's density lets a profile-less slice still be weighed: PrusaSlicer
   // reports the volume exactly but writes 0.00 g when no filament profile is
   // loaded, which is most of the time from a bare STL.
-  return { ok: true, gcodePath: gpath, outDir, meta: parseGcodeText(head + '\n' + tail, { densityGPerCm3 }) };
+  return { ok: true, gcodePath: gpath, outDir, presets: bare.names || null, meta: parseGcodeText(head + '\n' + tail, { densityGPerCm3 }) };
 }
 const rmDir = (d) => { try { if (d) fs.rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ } };
 
@@ -1136,7 +1177,7 @@ ipcMain.handle('hub:slice', async (_e, opts = {}) => {
     const r = await runSlice(opts);
     if (!r.ok) return r;
     rmDir(r.outDir);
-    return { ok: true, ...r.meta };
+    return { ok: true, ...r.meta, presets: r.presets };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 

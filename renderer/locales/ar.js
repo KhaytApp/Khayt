@@ -3778,6 +3778,7 @@
   "slicer.no_config": "حدّد مسار المُقطّع في الإعدادات ← المُقطّع أولاً.",
   "slicer.fail": "فشل التقطيع:",
   "slicer.note": "تم التقطيع بواسطة {slicer}: {weight} غ · {time} ساعة",
+  "slicer.note_presets": "إعدادات المقطِّع: {machine} · {process} · {filament}",
   "slicer.note_derived": "{slicer}: {time} ساعة · {weight} غ — حُسب الوزن من حجم الشرائح حسب كثافة خيطك.",
   "slicer.applied": "تم تطبيق التقدير من التقطيع — راجِع قبل الحفظ.",
   "slicer.send_title": "قطّع واطبع",

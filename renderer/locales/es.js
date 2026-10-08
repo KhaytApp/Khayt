@@ -3778,6 +3778,7 @@
   "slicer.no_config": "Configura la ruta del laminador en Ajustes → Laminador primero.",
   "slicer.fail": "Fallo al laminar:",
   "slicer.note": "Laminado con {slicer}: {weight} g · {time} h",
+  "slicer.note_presets": "Ajustes del laminador: {machine} · {process} · {filament}",
   "slicer.note_derived": "{slicer}: {time} h · {weight} g — peso calculado del volumen del laminador con la densidad de tu filamento.",
   "slicer.applied": "Estimación aplicada del laminado — revisa antes de guardar.",
   "slicer.send_title": "Laminar e imprimir",

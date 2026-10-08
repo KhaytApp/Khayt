@@ -3778,6 +3778,7 @@
   "slicer.no_config": "Önce Ayarlar → Dilimleyici'den dilimleyici yolunuzu ayarlayın.",
   "slicer.fail": "Dilimleme başarısız oldu:",
   "slicer.note": "{slicer} ile dilimlendi: {weight} g · {time} sa",
+  "slicer.note_presets": "Dilimleyici ayarları: {machine} · {process} · {filament}",
   "slicer.note_derived": "{slicer}: {time} sa · {weight} g — ağırlık, dilimleyicinin hacminden filament yoğunluğunuzla hesaplandı.",
   "slicer.applied": "Dilimden tahmin uygulandı — kaydetmeden önce gözden geçirin.",
   "slicer.send_title": "Dilimle ve yazdır",

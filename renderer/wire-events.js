@@ -809,7 +809,10 @@ function wireEvents() {
         // different claims; the note says which, rather than letting a derived
         // figure read as the slicer's own.
         note.textContent = t(r.filamentGramsDerived ? 'slicer.note_derived' : 'slicer.note',
-          { slicer: r.slicer || 'slicer', weight: g != null ? g : '?', time: h != null ? h : '?' });
+          { slicer: r.slicer || 'slicer', weight: g != null ? g : '?', time: h != null ? h : '?' })
+          // A bare STL was sliced on the printer the shop last used in that slicer (#1778):
+          // name it, because another printer or profile gives another weight and time.
+          + (r.presets && r.presets.machine ? ' — ' + t('slicer.note_presets', r.presets) : '');
         note.style.display = 'block';
       }
       toast(t('slicer.applied'), 'success');
