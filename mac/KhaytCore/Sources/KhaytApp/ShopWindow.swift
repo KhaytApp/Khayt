@@ -129,16 +129,31 @@ struct ShopWindow: View {
 
     /// Every screen but the Dashboard, shared by both shells.
     @ViewBuilder private var classicScreens: some View {
+            // A NARROWED SCREEN SAYS SO. Each of the five the site filter
+            // narrows carries the banner (SiteFilter.swift); it draws nothing
+            // when no site is chosen.
             if shop.showingDashboard {
-                Dashboard(shop: shop)
+                VStack(spacing: 0) {
+                    SiteScopeBanner(shop: shop, counting: .none)
+                    Dashboard(shop: shop)
+                }
             } else if shop.showingLibrary {
                 LibraryGrid(shop: shop)
             } else if shop.showingBoard {
-                Kanban(shop: shop)
+                VStack(spacing: 0) {
+                    SiteScopeBanner(shop: shop, counting: .jobs)
+                    Kanban(shop: shop)
+                }
             } else if shop.showingMachines {
-                Machines(shop: shop).environment(shop.cameras)
+                VStack(spacing: 0) {
+                    SiteScopeBanner(shop: shop, counting: .machines)
+                    Machines(shop: shop).environment(shop.cameras)
+                }
             } else if shop.showingInventory {
-                Inventory(shop: shop)
+                VStack(spacing: 0) {
+                    SiteScopeBanner(shop: shop, counting: .spools)
+                    Inventory(shop: shop)
+                }
             } else if shop.showingExpenses {
                 Expenses(shop: shop)
             } else if shop.showingWaste {
@@ -162,6 +177,7 @@ struct ShopWindow: View {
                 // the shop has never made one — a band explaining an empty
                 // feature is furniture on the screen people live in.
                 VStack(spacing: 0) {
+                    SiteScopeBanner(shop: shop, counting: .jobs)
                     KitBand(shop: shop)
                     OrdersTable(shop: shop)
                 }

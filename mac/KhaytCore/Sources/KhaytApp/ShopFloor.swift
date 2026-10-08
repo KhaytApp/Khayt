@@ -108,7 +108,7 @@ struct Machines: View {
                               padding: 14)
                 }
                 LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(shop.machines) { machine in
+                    ForEach(shop.siteMachines) { machine in
                         Card(machine: machine, wear: shop.wear[machine.id], shop: shop)
                             .atCardHeight(tallest)
                     }
@@ -697,8 +697,9 @@ struct Inventory: View {
 
     private var shown: [Spool] {
         let term = shop.search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !term.isEmpty else { return shop.spools }
-        return shop.spools.filter {
+        // The site's, when the shop is looking at one (SiteFilter.swift).
+        guard !term.isEmpty else { return shop.siteSpools }
+        return shop.siteSpools.filter {
             $0.material.lowercased().contains(term)
                 || ($0.colourVariant ?? "").lowercased().contains(term)
         }

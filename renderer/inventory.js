@@ -93,16 +93,12 @@ function setInvColor(hex) {
  * - Otherwise         → exact location match.
  */
 function spoolMatchesLocation(item, activeLoc) {
-  if (!activeLoc) return true;
-  if (!item || !item.locationId) return true;
-  return item.locationId === activeLoc;
+  return _siteFilter().spoolMatches(item, activeLoc, _invLocations());
 }
 
 /** Filter a list of stock items to those visible under the active location. */
 function filterInventoryByLocation(items, activeLoc) {
-  if (!Array.isArray(items)) return [];
-  if (!activeLoc) return items.slice();
-  return items.filter((it) => spoolMatchesLocation(it, activeLoc));
+  return _siteFilter().filterInventory(items, activeLoc, _invLocations());
 }
 
 /**
@@ -113,13 +109,17 @@ function filterInventoryByLocation(items, activeLoc) {
  */
 function perLocationLowStockCounts(items, lowFn) {
   const isLow = typeof lowFn === 'function' ? lowFn : isLowStock;
-  const out = {};
-  (Array.isArray(items) ? items : []).forEach((it) => {
-    if (!isLow(it)) return;
-    const key = it && it.locationId ? it.locationId : '_unassigned';
-    out[key] = (out[key] || 0) + 1;
-  });
-  return out;
+  return _siteFilter().perLocationLowStockCounts(items, isLow, _invLocations());
+}
+
+/** The rule is lib/site-filter.js — the Mac narrows its stock by it too. */
+function _siteFilter() {
+  if (typeof globalThis !== 'undefined' && globalThis.KhaytSiteFilter) return globalThis.KhaytSiteFilter;
+  return require('../lib/site-filter.js');
+}
+/** The shop's sites, so a spool naming a deleted one is unassigned, not lost. */
+function _invLocations() {
+  return (typeof locations !== 'undefined' && Array.isArray(locations)) ? locations : undefined;
 }
 
 /**

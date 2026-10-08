@@ -297,9 +297,13 @@ struct ShellSidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             book
+            // Under the book's name: which shop, then which of its sites.
+            SitePicker(shop: shop)
             group("mac.group_shop", [
                 .init(.dashboard, "mac.dashboard"),
-                .init(.jobs(nil), "mac.all_jobs", count: shop.orders.count),
+                // The site's count when narrowed — the picker directly above
+                // says which site, so the number is never a mystery.
+                .init(.jobs(nil), "mac.all_jobs", count: shop.orders.count(where: shop.inSite)),
                 .init(.board, "mac.board"),
                 .init(.library(nil), "mac.all_models", count: shop.files.count),
                 .init(.catalogue, "cat.title", count: shop.catalogueRows.count),
