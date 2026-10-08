@@ -47,7 +47,7 @@ struct Kanban: View {
     /// cancelled — the ones a shop would otherwise think had vanished.
     private var finished: Int {
         shop.matching(shop.orders).filter {
-            guard let stage = Stage.of($0) else { return false }
+            guard shop.inSite($0), let stage = Stage.of($0) else { return false }
             return !Stage.boardColumns.contains(stage)
         }.count
     }

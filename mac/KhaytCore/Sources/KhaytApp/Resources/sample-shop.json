@@ -4179,6 +4179,7 @@
  "inventory": [
   {
    "id": "sp-1",
+   "locationId": "LOC-sample-ryd",
    "usageHistory": [
     {"date": "2026-06-15", "project": "Kaaba desk piece", "orderId": "ORD-01002", "weightUsed": 752.84},
     {"date": "2026-08-29", "project": "Ramadan lantern", "orderId": "ORD-01016", "weightUsed": 232.02}
@@ -4199,6 +4200,7 @@
   },
   {
    "id": "sp-2",
+   "locationId": "LOC-sample-ryd",
    "usageHistory": [
     {"date": "2026-05-16", "project": "Prosthetic socket trial", "orderId": "ORD-01012", "weightUsed": 78.62},
     {"date": "2026-08-03", "project": "Camera rig plate", "orderId": "ORD-01009", "weightUsed": 297.78}
@@ -4219,6 +4221,7 @@
   },
   {
    "id": "sp-3",
+   "locationId": "LOC-sample-ryd",
    "material": "Sunlu TPU",
    "cost": 110,
    "weight": 480,
@@ -4235,6 +4238,7 @@
   },
   {
    "id": "sp-4",
+   "locationId": "LOC-sample-jed",
    "material": "PA-CF",
    "cost": 240,
    "weight": 120,
@@ -4249,6 +4253,7 @@
   },
   {
    "id": "sp-5",
+   "locationId": "LOC-sample-jed",
    "material": "ASA",
    "cost": 95,
    "weight": 640,
@@ -4322,6 +4327,7 @@
   },
   {
    "id": "sp-10",
+   "locationId": "LOC-sample-ryd",
    "material": "PLA+ 2.0",
    "cost": 62,
    "weight": 780,
@@ -4337,6 +4343,7 @@
   },
   {
    "id": "sp-11",
+   "locationId": "LOC-sample-jed",
    "material": "PLA+ 2.0",
    "cost": 69,
    "weight": 610,

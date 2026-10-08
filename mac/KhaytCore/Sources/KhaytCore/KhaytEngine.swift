@@ -533,6 +533,9 @@ public actor KhaytEngine {
         // ALREADY ABOVE and must be: it runs the one and reads which site a
         // job belongs to from the other.
         "location-pl",
+        // Which jobs, machines and spools one site shows. LOCATION-PL is
+        // directly above and must be: it reads where a job is from it.
+        "site-filter",
         // The staff: who did the work, the hours they logged, what it earned.
         // Takes every rule it needs as a callback, so it reads no global —
         // but the callbacks the engine hands it reach ORDER-MONEY,
@@ -7287,6 +7290,35 @@ public actor KhaytEngine {
              .array(wasteLog), .array(inventory), .array(machines),
              .object(recentMonthlyHours.mapValues { .number($0) }), .array(timeEntries)],
             as: [PnlPeriod].self)
+    }
+
+    /// What one site shows: `lib/site-filter.js`, the desktop's board and
+    /// stock filter. Asked once per change of book or filter, as ids, because
+    /// the screens filter synchronously and the rule — which site a job is
+    /// at, what an unplaced job or a deleted site means — is not this file's.
+    public func siteScope(orders: [JSONValue], machines: [JSONValue], inventory: [JSONValue],
+                          locations: [JSONValue], active: String?) throws -> SiteScope {
+        try runtime.call2(
+            "KhaytSiteFilter.scope({orders: ARG0, machines: ARG1, inventory: ARG2, locations: ARG3}, ARG4)",
+            [.array(orders), .array(machines), .array(inventory), .array(locations),
+             active.map(JSONValue.string) ?? .null],
+            as: SiteScope.self)
+    }
+
+    public struct SiteScope: Decodable, Sendable, Equatable {
+        /// The site really filtered to: nil when none is chosen, or the chosen
+        /// one is no longer in the book.
+        public let active: String?
+        public let name: String
+        public let orderIds: [String]
+        public let machineIds: [String]
+        public let spoolIds: [String]
+        public let total: Total
+        public struct Total: Decodable, Sendable, Equatable {
+            public let orders: Int
+            public let machines: Int
+            public let spools: Int
+        }
     }
 
     /// The shop's P&L split by site: `lib/location-pl.js`, which sorts the book

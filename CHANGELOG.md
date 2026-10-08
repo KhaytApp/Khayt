@@ -39,6 +39,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   shows. Hidden for a book where no job has anyone on it, like the client
   column; a person no longer on the staff list keeps their name.
 
+- **(Mac) Look at one site at a time.** A shop with locations has a site picker
+  under its name in the sidebar. Choosing a site narrows the jobs, the board,
+  the machines, the stock, and the dashboard's attention list, live printers,
+  floor strip and will-be-late jobs to that site; anything with no site is
+  shown at every site. Each narrowed screen says so ("Main only — 12 of 42")
+  with a button back to all sites. Money, Reports and the kiosk stay the
+  whole shop's. The choice lasts until the app is closed, as on the desktop.
+- **Desktop: a site that was deleted no longer hides things from every site.**
+  With the site filter on, a job, machine or spool still naming a deleted
+  location matched no site and could only be seen under "All". It now counts
+  as having no site, and is shown everywhere, as the per-location P&L already
+  counted it. The rule is now shared with the Mac (lib/site-filter.js).
+
 - **(Mac) Reports: the quarter's waterfall reads the right way in Arabic, and
   says what its last cost is.** In Arabic the chart ran left to right, so it
   opened on the side an Arabic reader finishes on; it now starts with revenue

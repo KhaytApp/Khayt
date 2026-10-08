@@ -33,11 +33,13 @@ struct Dashboard: View {
         //
         // This is every machine, always, one tile each, and the state is the
         // drawing rather than the caption.
-        if let attention = shop.attention, !attention.items.isEmpty {
+        // The site's rows when narrowed, as the desktop's attention bar is.
+        if let attention = shop.attention,
+           case let items = attention.items.filter(shop.inSite(attention:)), !items.isEmpty {
             // First, and above the figures. A shop that opens this app is
             // asking "is anything wrong" before it asks "how are we doing", and
             // a late job under a revenue tile is a late job nobody sees.
-            NeedsAttention(items: attention.items, shop: shop)
+            NeedsAttention(items: items, shop: shop)
         }
         if let facts = shop.facts {
             // The floor leads when nothing is wrong — which is most mornings.
@@ -159,7 +161,8 @@ private struct FloorStrip: View {
     let shop: Shop
 
     var body: some View {
-        if !shop.machines.isEmpty {
+        // The site's machines when narrowed — every machine, always, at it.
+        if !shop.siteMachines.isEmpty {
             Group {
                 // ── AN HStack, NOT A LazyVGrid ────────────────────────────
                 //
@@ -176,7 +179,7 @@ private struct FloorStrip: View {
                 // handful of machines, not forty, so there is nothing here a
                 // grid was buying.
                 HStack(spacing: 0) {
-                    ForEach(Array(shop.machines.enumerated()), id: \.element.id) { index, machine in
+                    ForEach(Array(shop.siteMachines.enumerated()), id: \.element.id) { index, machine in
                         if index > 0 {
                             Rectangle().fill(Khayt.layerLine)
                                 .frame(width: 1).padding(.vertical, 6)
@@ -378,13 +381,15 @@ struct RunningOut: View {
 
     /// Six, and then a count. The same rule the attention list keeps: a list
     /// that silently stops is a list that misstates how much is wrong.
-    private var shown: [Order] { Array(shop.willBeLate.prefix(6)) }
-    private var hidden: Int { max(0, shop.willBeLate.count - shown.count) }
+    /// The site's, when the shop is looking at one.
+    private var late: [Order] { shop.willBeLate.filter(shop.inSite) }
+    private var shown: [Order] { Array(late.prefix(6)) }
+    private var hidden: Int { max(0, late.count - shown.count) }
 
     var body: some View {
-        if !shop.willBeLate.isEmpty {
+        if !late.isEmpty {
             DetailSection(shop.words.callIt("mac.will_be_late"),
-                          accent: Khayt.attention, count: shop.willBeLate.count) {
+                          accent: Khayt.attention, count: late.count) {
                 VStack(spacing: 0) {
                     ForEach(shown) { job in
                         row(job)
@@ -825,7 +830,7 @@ private struct RunningNow: View {
     let shop: Shop
 
     private var running: [(Machine, KhaytEngine.PrinterStatus)] {
-        shop.machines.compactMap { machine in
+        shop.siteMachines.compactMap { machine in
             // The one predicate, not a fourth spelling of it. This file, the
             // machine card and two properties on `Shop` each had their own,
             // and two of the four forgot to lowercase.

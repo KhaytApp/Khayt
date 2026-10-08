@@ -474,7 +474,8 @@ final class Shop {
         // The search box is one box for the whole window. A board that ignored
         // it left somebody typing a customer's name into a field that visibly
         // did nothing.
-        for order in matching(orders) {
+        // And the site, when the shop is looking at one (SiteFilter.swift).
+        for order in matching(orders) where inSite(order) {
             guard let stage = Stage.of(order) else { continue }
             out[stage, default: []].append(order)
         }
@@ -927,7 +928,11 @@ final class Shop {
             Spotlight.shared.reindex(shop: self)
             // A model chosen in Spotlight before the book was open.
             answerPendingReveal()
+            // What the chosen site shows, worked out again: the book may have
+            // gained a job, moved a machine, or lost the site itself.
+            await refreshSiteScope()
         } catch {
+            siteScope = nil
             orders = []
             files = []
             // A book that would not open must not stay findable.
@@ -14221,7 +14226,7 @@ final class Shop {
     // MARK: - What the table shows
 
     var shown: [Order] {
-        var rows = orders
+        var rows = orders.filter(inSite)
         if let stage { rows = rows.filter { Stage.of($0) == stage } }
         // Narrowed to one kit, when the band above the table has been asked
         // for one. A chip that only states a total is decoration; this is what
@@ -14245,7 +14250,22 @@ final class Shop {
         }
     }
 
-    func count(_ stage: Stage) -> Int { orders.count { Stage.of($0) == stage } }
+    /// The site the shop is looking at, if it has narrowed to one. Not
+    /// persisted, for the reason `kitFilter` is not: a book that opens showing
+    /// one branch's jobs with nothing saying so reads as a shop that lost the
+    /// other branch's. The desktop keeps it for the session too.
+    var siteFilter: String? {
+        didSet {
+            guard siteFilter != oldValue else { return }
+            Task { await refreshSiteScope() }
+        }
+    }
+
+    /// What `siteFilter` shows, as ids — `lib/site-filter.js`'s answer, asked
+    /// whenever the book or the filter changes. Nil when nothing is filtered.
+    var siteScope: KhaytEngine.SiteScope?
+
+    func count(_ stage: Stage) -> Int { orders.count { Stage.of($0) == stage && inSite($0) } }
 
     // MARK: - What the library shows
 

@@ -67,29 +67,32 @@ function openLocationEditor(locId = null) {
 
 const ACTIVE_LOCATION_KEY = 'khayt_active_location';
 
-/** Resolve site/branch for an order via assigned machine (or optional order.locationId). */
+/** The shared rule (lib/site-filter.js), in the browser or under node. */
+function SiteFilter() {
+  if (typeof globalThis !== 'undefined' && globalThis.KhaytSiteFilter) return globalThis.KhaytSiteFilter;
+  return require('../lib/site-filter.js');
+}
+const _siteLocations = () => (typeof locations !== 'undefined' && Array.isArray(locations) ? locations : undefined);
+const _siteMachines = () => (typeof machines !== 'undefined' && Array.isArray(machines) ? machines : []);
+
+/**
+ * Resolve site/branch for an order: its own site, else its machine's — the
+ * one rule, lib/location-pl.js `orderLocationId`. A site the shop no longer
+ * has is no site, as the per-location P&L already counts it.
+ */
 function orderLocationId(order) {
-  if (!order) return null;
-  if (order.locationId) return order.locationId;
-  const mid = order.machineId;
-  const m = mid
-    ? machines.find(x => x.id === mid)
-    : machines.find(x => x.name && order.machine && x.name === order.machine);
-  return m?.locationId || null;
+  const L = (typeof globalThis !== 'undefined' && globalThis.KhaytLocationPl) || require('../lib/location-pl.js');
+  const known = _siteLocations();
+  return L.orderLocationId(order, _siteMachines(), known ? new Set(known.filter(l => l && l.id).map(l => String(l.id))) : null);
 }
 
 /** Top-bar location filter: all sites when unset; unassigned jobs stay visible at every site. */
 function orderMatchesActiveLocation(order) {
-  if (!activeLocation) return true;
-  const loc = orderLocationId(order);
-  if (!loc) return true;
-  return loc === activeLocation;
+  return SiteFilter().orderMatches(order, activeLocation, { machines: _siteMachines(), locations: _siteLocations() });
 }
 
 function machineMatchesActiveLocation(machine) {
-  if (!activeLocation) return true;
-  if (!machine?.locationId) return true;
-  return machine.locationId === activeLocation;
+  return SiteFilter().machineMatches(machine, activeLocation, _siteLocations());
 }
 
 function restoreActiveLocationFromSession() {
