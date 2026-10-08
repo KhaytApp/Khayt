@@ -31,6 +31,9 @@ enum BoundedProcess {
         var timedOut: Bool
         /// The caller's `watch` asked for it to be stopped.
         var stopped: Bool
+        /// The signal that ended it, when one did (`status` is then that
+        /// signal's number, not an exit code) — a crash, or our own stop.
+        var signal: Int32? = nil
     }
 
     /// How long a program gets between SIGTERM and SIGKILL, and how long its
@@ -93,9 +96,11 @@ enum BoundedProcess {
         out.waitForEnd(grace)
         err.waitForEnd(grace)
         out.detach(); err.detach()
+        let signalled = !process.isRunning && process.terminationReason == .uncaughtSignal
         return Outcome(status: process.isRunning ? -1 : process.terminationStatus,
                        stdout: out.data, stderr: err.data,
-                       timedOut: timedOut, stopped: stopped)
+                       timedOut: timedOut, stopped: stopped,
+                       signal: signalled ? process.terminationStatus : nil)
     }
 
     /// One pipe's reader. Appends what arrives, up to `keep`; past that keeps

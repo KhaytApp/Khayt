@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) A customer's bare STL slices with OrcaSlicer or Bambu Studio.** A mesh
+  carries no printer settings, and these slicers' built-in defaults fail their
+  own checks, so no upload could be sliced with them. The Mac now hands the
+  slicer the printer you last used in it, with a print and a filament profile
+  that printer accepts — the same choice the desktop makes (3.11.7). Snapmaker
+  Orca's command line crashes on such a slice (its bug); Khayt says it crashed.
+
 - **"Slice for exact quote" works on a plain STL with OrcaSlicer and Bambu
   Studio.** A model with no print settings of its own, such as an STL or a
   3MF that holds only the shape, could not be sliced by these slicers. Their

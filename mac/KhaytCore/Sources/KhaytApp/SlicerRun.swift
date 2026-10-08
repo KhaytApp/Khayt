@@ -94,6 +94,52 @@ enum SlicerRun {
         try run(slicer.path, argv, timeout: timeout, name: slicer.name)
     }
 
+    /// Presets for a model with no settings of its own, sliced by an Orca or
+    /// Bambu Studio fork with the arguments Khayt chose (#1778): the printer
+    /// the shop last used in that slicer, a print and a filament profile it
+    /// accepts, flattened and written into the slice's own folder.
+    ///
+    /// The desktop's `bareModelPresets` (main.js), step for step, and every
+    /// step is the shared rule's — which family, whether the default arguments
+    /// run, whether the model needs presets, where the slicer keeps them, which
+    /// to take, and the file each becomes. This only sequences them and does
+    /// the file I/O. Returns `.null` presets when none are needed or none can
+    /// be chosen (a slice is still attempted), and the reason in the second.
+    static func bareModelPresets(engine: KhaytEngine, slicer: KhaytEngine.Slicer,
+                                 template: String, model: URL,
+                                 outDir: URL) async -> (presets: JSONValue, problem: String?) {
+        guard (try? await engine.slicerFamily(path: slicer.path)) == "orca",
+              (try? await engine.usesDefaultSliceArgs(template: template, slicer: slicer.path)) == true
+        else { return (.null, nil) }
+        let entries = model.pathExtension.lowercased() == "3mf"
+            ? (try? Zip.entries(of: model))?.map(\.name) : nil
+        guard (try? await engine.needsPresets(model: model.path, entries: entries)) == true else {
+            return (.null, nil)
+        }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        var isDir: ObjCBool = false
+        guard let roots = (try? await engine.presetRoots(slicer: slicer.path, home: home))?
+            .first(where: { FileManager.default.fileExists(atPath: $0.dir, isDirectory: &isDir) && isDir.boolValue })
+        else {
+            return (.null, "Open the slicer once and pick your printer, so Khayt can use its settings.")
+        }
+        let conf = (try? String(contentsOfFile: roots.confFile, encoding: .utf8)) ?? ""
+        guard let choice = try? await engine.choosePresets(conf: conf, user: roots.user,
+                                                            system: roots.system, bundled: roots.bundled)
+        else { return (.null, nil) }
+        guard choice.ok, let machine = choice.machine, let process = choice.process,
+              let filament = choice.filament else { return (.null, choice.error) }
+        func file(_ kind: String, _ preset: JSONValue) async -> String? {
+            guard let text = try? await engine.presetFileJson(kind: kind, preset: preset) else { return nil }
+            let url = outDir.appending(path: "khayt-\(kind).json")
+            return (try? text.write(to: url, atomically: true, encoding: .utf8)) != nil ? url.path : nil
+        }
+        guard let m = await file("machine", machine), let p = await file("process", process),
+              let f = await file("filament", filament) else { return (.null, nil) }
+        return (.object(["settings": .array([.string(m), .string(p)]),
+                         "filaments": .array([.string(f)])]), nil)
+    }
+
     /// A directory of our own to slice into, so nothing lands beside the model.
     static func scratch() throws -> URL {
         let dir = FileManager.default.temporaryDirectory
@@ -160,6 +206,13 @@ enum SlicerRun {
                                              keepOut: 16 << 10, tailOut: true)
         } catch { throw Failure.failed(error.localizedDescription) }
         if outcome.timedOut { throw Failure.tookTooLong(name) }
+        if let sig = outcome.signal {
+            // Killed, not failed: Snapmaker Orca's CLI segfaults on a U1 slice
+            // handed presets, its own bundled ones included (#1778). "exit 11"
+            // reads as Khayt's fault; `sliceFailureReason` words it, given the
+            // signal.
+            throw Failure.producedNothing("signal \(sig)")
+        }
         if outcome.status != 0 {
             let err = String(decoding: outcome.stderr.suffix(400), as: UTF8.self)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
