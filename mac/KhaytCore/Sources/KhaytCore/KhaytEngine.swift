@@ -3389,11 +3389,27 @@ public actor KhaytEngine {
     /// in backups and cloud sync — and how it is split decides what the slicer
     /// is actually run with. A Swift copy of that decision is the divergence
     /// `lib/` exists to prevent.
-    public func sliceArgv(template: String, model: String, output: String, outdir: String) throws -> [String] {
+    ///
+    /// `slicer` is the executable's path. The rule needs it: an Orca or Bambu
+    /// Studio fork has its own command line (`--slice 0 --outputdir …`), and a
+    /// fork found by "Find installed slicers" is saved with no template — which
+    /// fell back to PrusaSlicer's `--export-gcode -o …`, which the forks reject
+    /// with "setup params error" and write nothing (#1737, #1776).
+    public func sliceArgv(template: String, model: String, output: String, outdir: String,
+                          slicer: String = "") throws -> [String] {
         try runtime.call2("""
-            KhaytSlicers.sliceArgv(ARG0, { model: ARG1, output: ARG2, outdir: ARG3 })
+            KhaytSlicers.sliceArgv(ARG0, { model: ARG1, output: ARG2, outdir: ARG3, slicer: ARG4 })
             """,
-            [.string(template), .string(model), .string(output), .string(outdir)], as: [String].self)
+            [.string(template), .string(model), .string(output), .string(outdir), .string(slicer)],
+            as: [String].self)
+    }
+
+    /// Why a slicer that exited with an error did: its own `[error]` line
+    /// (an Orca fork prints it on STDOUT, its stderr holds only a usage
+    /// dump), else the likeliest line, else the exit code.
+    public func sliceFailureReason(stderr: String, stdout: String, code: Int) throws -> String {
+        try runtime.call2("KhaytSlicers.sliceFailureReason({ stderr: ARG0, stdout: ARG1, code: ARG2 })",
+                          [.string(stderr), .string(stdout), .number(Double(code))], as: String.self)
     }
 
     public func slicerDisplayName(path: String) throws -> String {

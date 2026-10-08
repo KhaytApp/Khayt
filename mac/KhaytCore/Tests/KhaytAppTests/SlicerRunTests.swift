@@ -32,6 +32,35 @@ struct SlicerRunTests {
                                                   output: "o.gcode", outdir: "d")
         #expect(fallback == ["--export-gcode", "-o", "o.gcode", "m.stl"])
 
+        // …but an Orca or Bambu Studio fork with no template has its OWN
+        // command line. "Find installed slicers" saves them with none, and the
+        // PrusaSlicer default made every fork refuse ("setup params error")
+        // and write nothing — #1737 on the desktop, #1776 here. They write
+        // plate_N.gcode into the directory, which `gcode(in:)` already finds.
+        for path in ["/Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer",
+                     "/Applications/BambuStudio.app/Contents/MacOS/BambuStudio",
+                     "/Applications/Snapmaker Orca.app/Contents/MacOS/Snapmaker Orca"] {
+            let orca = try await engine.sliceArgv(template: "", model: "m.stl", output: "o.gcode",
+                                                  outdir: "/tmp/d", slicer: path)
+            #expect(orca == ["--slice", "0", "--outputdir", "/tmp/d", "m.stl"], Comment(rawValue: path))
+            // A fork still carrying the old PrusaSlicer default is given its own too.
+            let stale = try await engine.sliceArgv(template: "--export-gcode -o {output} {model}",
+                                                   model: "m.stl", output: "o.gcode",
+                                                   outdir: "/tmp/d", slicer: path)
+            #expect(stale == orca, Comment(rawValue: path))
+        }
+        // PrusaSlicer is unchanged.
+        let prusa = try await engine.sliceArgv(template: "", model: "m.stl", output: "o.gcode", outdir: "d",
+                                               slicer: "/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer")
+        #expect(prusa == ["--export-gcode", "-o", "o.gcode", "m.stl"])
+
+        // And the reason a fork failed is its own `[error]` line, from stdout.
+        let why = try await engine.sliceFailureReason(
+            stderr: "Usage: orca-slicer [ OPTIONS ] [ file.3mf/file.stl ... ]",
+            stdout: "[2026-10-08 10:00:01] [error] File Version 2.3.0.4 not supported by current cli version\nrun found error, exit",
+            code: 1)
+        #expect(why.contains("not supported by current cli version"), Comment(rawValue: why))
+
         // A model path that looks like arguments cannot become any: it is
         // filled into a token that was already final.
         let nasty = try await engine.sliceArgv(template: "{model}",

@@ -148,15 +148,24 @@ enum SlicerRun {
                             timeout: TimeInterval, name: String) throws {
         // Both pipes drained while it runs and the deadline enforced on the
         // slicer itself — see `BoundedProcess` for the hang this used to be.
-        // Nothing reads stdout; it is drained only so a chatty slicer never
-        // stalls on a full pipe.
+        // The TAIL of stdout is kept: an Orca or Bambu Studio fork prints why
+        // it failed there, as an `[error]` line ("File Version 2.3.0.4 not
+        // supported by current cli version"), and its stderr is only a usage
+        // dump. Which line is the reason is `lib/slicers.js`
+        // `sliceFailureReason` (`KhaytEngine.sliceFailureReason`); both tails
+        // travel in the failure so a caller with the engine can ask it.
         let outcome: BoundedProcess.Outcome
-        do { outcome = try BoundedProcess.run(path, arguments, timeout: timeout, keepOut: 0) }
-        catch { throw Failure.failed(error.localizedDescription) }
+        do {
+            outcome = try BoundedProcess.run(path, arguments, timeout: timeout,
+                                             keepOut: 16 << 10, tailOut: true)
+        } catch { throw Failure.failed(error.localizedDescription) }
         if outcome.timedOut { throw Failure.tookTooLong(name) }
         if outcome.status != 0 {
-            let why = String(decoding: outcome.stderr.suffix(400), as: UTF8.self)
+            let err = String(decoding: outcome.stderr.suffix(400), as: UTF8.self)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
+            let out = String(decoding: outcome.stdout.suffix(400), as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let why = [err, out].filter { !$0.isEmpty }.joined(separator: "\n")
             throw Failure.producedNothing(why.isEmpty ? "exit \(outcome.status)" : why)
         }
     }
