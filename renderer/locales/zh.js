@@ -3603,6 +3603,8 @@
   "cloud.deposit_amount": "需收取的定金（可选）",
   "cloud.deposit_payurl": "支付链接（可选）",
   "cloud.deposit_hint": "粘贴任意支付提供商的支付链接。客户在该处付款；“已支付”状态通过您的提供商 webhook 更新。留空则不收取定金。",
+  "cloud.deposit_bad_url": "付款链接必须以 https:// 开头",
+  "cloud.deposit_bad_amount": "定金必须是正数金额",
   "cloud.deposit_publish": "发布链接",
   "cloud.portal_deposit_paid": "定金已支付",
   "ai.assistant_btn": "询问 AI",

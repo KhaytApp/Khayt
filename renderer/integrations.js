@@ -1342,21 +1342,18 @@ function portalTrialNow() {
  * During beta this cannot refuse and cannot start a clock; see lib/portal-trial.js.
  */
 function portalTrialAllows() {
-  const s = portalTrialNow();
-  if (!s) return true;
-  if (!s.available) {
+  // `lib/portal-owner.js trialGate`: whether the trial still allows a publish,
+  // and the timestamp to start its clock with — the write stays here.
+  const gate = (typeof KhaytPortalOwner !== 'undefined')
+    ? KhaytPortalOwner.trialGate(settings.cloud || {}, Date.now())
+    : { allowed: true, startAt: null };
+  if (!gate.allowed) {
     toast((t('trial.portal_over') || 'Your 30-day portal trial has ended — subscribe to keep publishing links'), 'error');
     return false;
   }
-  const startAt = KhaytPortalTrial.trialStartOnPublish({
-    betaFree: (typeof KhaytCloudPlans !== 'undefined') ? KhaytCloudPlans.isBetaFree() : true,
-    subscribed: (settings.cloud || {}).planActive === true,
-    startedAt: (settings.cloud || {}).portalTrialStartedAt || null,
-    now: Date.now(),
-  });
-  if (startAt) {
+  if (gate.startAt) {
     settings.cloud = settings.cloud || {};
-    settings.cloud.portalTrialStartedAt = startAt;
+    settings.cloud.portalTrialStartedAt = gate.startAt;
     saveAll();
   }
   return true;
@@ -1383,11 +1380,20 @@ async function publishOrderToCloudPortal(orderId) {
         <input id="qpPay" type="url" placeholder="https://… your provider's pay link" value="${escapeHtml(order.cloudPayUrl || settings.cloud?.lastPayUrl || '')}">
         <p style="font-size:11.5px;color:var(--text-muted);margin-top:6px;">${escapeHtml(t('cloud.deposit_hint') || 'Paste a payment link from any provider. The customer pays there; "paid" updates via your provider webhook. Leave blank for no deposit.')}</p>`,
       onSave: async (modal) => {
-        const dep = modal.querySelector('#qpDep').value.trim();
-        const payUrl = modal.querySelector('#qpPay').value.trim();
-        order.cloudDeposit = dep ? +dep : null;
-        order.cloudPayUrl = payUrl || null;
-        if (payUrl) { settings.cloud = settings.cloud || {}; settings.cloud.lastPayUrl = payUrl; }
+        // `lib/portal-owner.js depositForm`: a positive amount or none, and an
+        // http(s) pay link or none. "abc" stored NaN and "-50" asked the
+        // customer for a negative deposit; a `javascript:` link went public.
+        const form = KhaytPortalOwner.depositForm(modal.querySelector('#qpDep').value,
+          modal.querySelector('#qpPay').value);
+        if (!form.ok) {
+          toast(form.error === 'pay_url'
+            ? (t('cloud.deposit_bad_url') || 'The payment link must start with https://')
+            : (t('cloud.deposit_bad_amount') || 'The deposit must be a positive amount'), 'error');
+          return false;
+        }
+        order.cloudDeposit = form.cloudDeposit;
+        order.cloudPayUrl = form.cloudPayUrl;
+        if (form.lastPayUrl) { settings.cloud = settings.cloud || {}; settings.cloud.lastPayUrl = form.lastPayUrl; }
         saveAll();
         order._skipDepositPrompt = true;
         await publishOrderToCloudPortal(orderId); // re-enter; now skips the prompt
@@ -1407,7 +1413,7 @@ async function publishOrderToCloudPortal(orderId) {
   if (!r.ok) { toast('✗ ' + (r.error || 'publish failed'), 'error'); return; }
   order.cloudPublished = true; saveAll(); // track so status changes auto-refresh the link
 
-  const portalUrl = String(c.url || '').replace(/\/$/, '') + '/p/' + pubToken;
+  const portalUrl = KhaytPortalOwner.portalUrl(c.url, pubToken);
   let qrHtml = '';
   try {
     const qr = await window.hubAPI.generateQR(portalUrl, { width: 200, dataUrl: true });
@@ -1447,21 +1453,21 @@ async function publishOrderToCloudPortal(orderId) {
         resp.textContent = t('cloud.portal_checking') || 'Checking…'; resp.style.color = 'var(--text-muted)';
         const lst = await window.hubAPI.cloudPublishedList({ url: c.url, shopId: c.shopId, token: c.token });
         if (!lst.ok) { resp.textContent = '✗ ' + (lst.error || 'failed'); resp.style.color = 'var(--danger)'; return; }
-        const item = (lst.items || []).find(x => x.token === pubToken);
-        const act = item && item.action;
-        const paid = item && item.payment && item.payment.status === 'paid';
+        // `lib/portal-owner.js responseFor` reads the customer's answer.
+        const said = KhaytPortalOwner.responseFor(lst.items, pubToken, order);
+        const paid = said.paid;
         const paidNote = paid ? ('  💰 ' + (t('cloud.portal_deposit_paid') || 'deposit paid')) : '';
-        if (!act || !act.type) {
+        if (said.response === 'none') {
           resp.textContent = (paid ? ('✓ ' + (t('cloud.portal_deposit_paid') || 'Deposit paid')) : (t('cloud.portal_no_response') || 'No response yet'));
           resp.style.color = paid ? 'var(--success)' : 'var(--text-muted)';
           return;
         }
-        const approved = act.type === 'approve';
+        const approved = said.response === 'approved';
         resp.textContent = (approved ? '✓ ' : '✗ ') + (approved ? (t('cloud.portal_approved') || 'Customer approved the quote') : (t('cloud.portal_declined') || 'Customer declined the quote')) + paidNote;
         resp.style.color = approved ? 'var(--success)' : 'var(--danger)';
         // Close the loop: an approved quote advances the order to Pending via the
         // normal status-change path (history, webhooks, re-renders all fire).
-        if (approved && order.status === 'quote' && typeof updateStatus === 'function') {
+        if (said.advance && typeof updateStatus === 'function') {
           updateStatus(order.id, 'pending');
           resp.textContent = '✓ ' + (t('cloud.portal_approved_advanced') || 'Customer approved — order moved to Pending') + paidNote;
         }

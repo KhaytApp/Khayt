@@ -3604,6 +3604,8 @@
   "cloud.deposit_amount": "Entrada a solicitar (opcional)",
   "cloud.deposit_payurl": "Link de pagamento (opcional)",
   "cloud.deposit_hint": "Cole um link de pagamento de qualquer provedor. O cliente paga por lá; o status “pago” é atualizado pelo webhook do seu provedor. Deixe em branco para não pedir entrada.",
+  "cloud.deposit_bad_url": "O link de pagamento deve começar com https://",
+  "cloud.deposit_bad_amount": "O sinal deve ser um valor positivo",
   "cloud.deposit_publish": "Publicar link",
   "cloud.portal_deposit_paid": "entrada paga",
   "ai.assistant_btn": "Perguntar à IA",

@@ -46,6 +46,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     regular file is skipped, and choosing presets makes about a tenth of the
     file-system calls it did.
 
+- **(Mac) The customer's cloud link, from the Mac.** With Khayt Cloud connected,
+  a job's panel can publish its customer link (a quote with an optional deposit
+  and your own pay link), copy it, check whether the customer approved or paid
+  — an approved quote moves to Pending — read and answer the customer's
+  messages, and take the link down. Before, the Mac could only refresh a link
+  the desktop app had published. A published page now also updates when a job
+  ships, its tracking changes, or a payment is recorded, on both apps' rule. A
+  view-only cloud member sees the link and the messages but not the buttons that
+  would change them. The portal trial's days left show in Settings →
+  Integrations.
+- **Customer link fixes (both apps).** A deposit that is not a positive number,
+  or a pay link that is not an https address, is refused instead of being put
+  on the customer's page (a typed "abc" asked the customer for "NaN"). The link
+  is built cleanly from a server address typed with a trailing slash.
+
 - **(Mac) A customer's bare STL slices with OrcaSlicer or Bambu Studio.** A mesh
   carries no printer settings, and these slicers' built-in defaults fail their
   own checks, so no upload could be sliced with them. The Mac now hands the

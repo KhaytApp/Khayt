@@ -313,6 +313,9 @@ private struct Detail: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            // The customer's CLOUD link — publish, copy, ask, talk, take down.
+            // Beside the LAN links above, which point at this Mac.
+            CustomerLinkSection(shop: shop, job: job)
             if let due = Order.day(job.dueDate) {
                 DetailLine(shop.words.callIt("doc.due"), shop.words.say(due, Date.FormatStyle(date: .abbreviated, time: .omitted)),
                      warn: job.isOverdue())

@@ -3603,6 +3603,8 @@
   "cloud.deposit_amount": "Acompte à demander (facultatif)",
   "cloud.deposit_payurl": "Lien de paiement (facultatif)",
   "cloud.deposit_hint": "Collez un lien de paiement de n'importe quel prestataire. Le client paie sur ce lien ; le statut « payé » se met à jour via le webhook de votre prestataire. Laissez vide pour ne pas demander d'acompte.",
+  "cloud.deposit_bad_url": "Le lien de paiement doit commencer par https://",
+  "cloud.deposit_bad_amount": "L'acompte doit être un montant positif",
   "cloud.deposit_publish": "Publier le lien",
   "cloud.portal_deposit_paid": "acompte payé",
   "ai.assistant_btn": "Demander à l'IA",

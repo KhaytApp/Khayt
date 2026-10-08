@@ -3603,6 +3603,8 @@
   "cloud.deposit_amount": "Depósito a solicitar (opcional)",
   "cloud.deposit_payurl": "Enlace de pago (opcional)",
   "cloud.deposit_hint": "Pega un enlace de pago de cualquier proveedor. El cliente paga ahí; el estado «pagado» se actualiza mediante el webhook de tu proveedor. Déjalo en blanco para no pedir depósito.",
+  "cloud.deposit_bad_url": "El enlace de pago debe empezar por https://",
+  "cloud.deposit_bad_amount": "El depósito debe ser un importe positivo",
   "cloud.deposit_publish": "Publicar enlace",
   "cloud.portal_deposit_paid": "depósito pagado",
   "ai.assistant_btn": "Preguntar a la AI",

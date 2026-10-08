@@ -3603,6 +3603,8 @@
   "cloud.deposit_amount": "İstenecek kapora (isteğe bağlı)",
   "cloud.deposit_payurl": "Ödeme bağlantısı (isteğe bağlı)",
   "cloud.deposit_hint": "Herhangi bir sağlayıcıdan bir ödeme bağlantısı yapıştırın. Müşteri oradan öder; “ödendi” durumu sağlayıcınızın webhook'u üzerinden güncellenir. Kapora istemiyorsanız boş bırakın.",
+  "cloud.deposit_bad_url": "Ödeme bağlantısı https:// ile başlamalıdır",
+  "cloud.deposit_bad_amount": "Kapora pozitif bir tutar olmalıdır",
   "cloud.deposit_publish": "Bağlantıyı yayınla",
   "cloud.portal_deposit_paid": "kapora ödendi",
   "ai.assistant_btn": "Yapay zekâya sor",

@@ -124,6 +124,9 @@ struct IntegrationsPane: View {
                 // the book is connected.
                 if shop.cloudConnected {
                     ImportKeySection(shop: shop)
+                    // Where the shop stands on the portal trial — only when
+                    // there is one to show (`isTrialVisible`: started, or over).
+                    PortalTrialLine(shop: shop)
                 }
 
                 Section(shop.words.callIt("integ.payments")) {
@@ -300,5 +303,31 @@ private struct StorefrontRow: View {
     private func put(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+/// "N days left in your portal trial", or that it has ended. Nothing during
+/// beta, for a subscriber, or before the first publish starts the clock.
+struct PortalTrialLine: View {
+    let shop: Shop
+    @State private var gate: KhaytEngine.PortalTrialGate?
+
+    var body: some View {
+        Group {
+            if let s = gate?.state, s.state == "active" || s.state == "expired" {
+                Section {
+                    Text(s.state == "expired"
+                         ? shop.words.callIt("trial.portal_over")
+                         : shop.words.callIt("trial.portal_left", ["n": .number(s.daysLeft ?? 0)]))
+                        .foregroundStyle(s.state == "expired" ? Khayt.late : Color.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .task {
+            var cloud: [String: JSONValue] = [:]
+            if case .object(let c)? = shop.settingsDict["cloud"] { cloud = c }
+            gate = try? await shop.engine?.portalTrialGate(cloud: cloud, now: Date())
+        }
     }
 }

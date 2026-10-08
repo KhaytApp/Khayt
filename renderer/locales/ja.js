@@ -3603,6 +3603,8 @@
   "cloud.deposit_amount": "請求する手付金（任意）",
   "cloud.deposit_payurl": "支払いリンク（任意）",
   "cloud.deposit_hint": "任意のプロバイダーの支払いリンクを貼り付けてください。お客様はそこで支払い、「支払い済み」はプロバイダーのwebhook経由で更新されます。手付金が不要な場合は空欄にしてください。",
+  "cloud.deposit_bad_url": "支払いリンクは https:// で始まる必要があります",
+  "cloud.deposit_bad_amount": "前金は正の金額である必要があります",
   "cloud.deposit_publish": "リンクを発行",
   "cloud.portal_deposit_paid": "手付金支払い済み",
   "ai.assistant_btn": "AIに質問",
