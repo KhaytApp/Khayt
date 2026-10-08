@@ -23,36 +23,47 @@ function body(src, marker) {
   throw new Error('unbalanced');
 }
 
-test('a printer move is read back from disk, never written over from a stale copy', () => {
-  const handler = body(read('renderer/app-boot.js'), 'onLanKanbanAdvanced?.(');
-  assert.match(handler, /loadStore\(\)/);
-  assert.doesNotMatch(handler, /saveAll\(/, 'the window wrote its copy over the main process\'s write');
-  assert.doesNotMatch(handler, /statusHistory/, 'a second history entry for one move');
+function mergeHelper() {
+  const src = read('renderer/app-boot.js');
+  const i = src.indexOf('async function mergeOrderFromDisk(');
+  assert.ok(i >= 0, 'mergeOrderFromDisk not found');
+  return 'async function mergeOrderFromDisk(id) ' + body(src.slice(i).replace('async function mergeOrderFromDisk(id) ', 'x = (id) => '), 'x = (id) =>');
+}
+
+test('a printer move or a survey is read back from disk, never written over from a stale copy', () => {
+  const src = read('renderer/app-boot.js');
+  for (const marker of ['onLanKanbanAdvanced?.(', 'onLanSurveySubmitted(']) {
+    const handler = body(src, marker);
+    assert.match(handler, /mergeOrderFromDisk\(/, marker);
+    assert.doesNotMatch(handler, /applyStoreFromSnapshot\(/, `${marker} reloads the whole book`);
+    assert.doesNotMatch(handler, /saveAll\(/, 'the window wrote its copy over the main process\'s write');
+    assert.doesNotMatch(handler, /statusHistory/, 'a second history entry for one move');
+  }
 });
 
 // v3.11.7 review: reloading the WHOLE book (applyStoreFromSnapshot) swapped every
 // record for a new object, so an editor open on another job saved into an orphan —
-// the toast said "Saved" and the edit was gone. Run the real handler.
-test('a printer move updates only its job, in place, so an open editor still saves', async () => {
-  const handler = body(read('renderer/app-boot.js'), 'onLanKanbanAdvanced?.(');
-  assert.doesNotMatch(handler, /applyStoreFromSnapshot\(/);
+// the toast said "Saved" and the edit was gone. v3.11.8 review (Mac lane): a save
+// still in saveAll's debounce must be written BEFORE the read-back. Run the real code.
+test('one job is merged in place, after any pending save is written', async () => {
   const a = { id: 'A', status: 'pending', notes: 'old' };
   const b = { id: 'B', status: 'pending', printingStartedAt: null, stale: 1 };
   const printLog = [a, b];
   const disk = { printLog: [{ id: 'A', status: 'pending', notes: 'old' }, { id: 'B', status: 'printing', printingStartedAt: '2026-10-08T08:00:00Z' }] };
+  const order = [];
   const vm = require('node:vm');
-  const ctx = { printLog, window: { hubAPI: { loadStore: async () => disk } }, console,
-    renderKanban() {}, renderLogs() {}, toast() {}, applyStoreFromSnapshot() { throw new Error('whole-book reload'); } };
+  const ctx = { printLog, console,
+    flushSave: async () => { order.push('flush'); },
+    window: { hubAPI: { loadStore: async () => { order.push('load'); return disk; } } } };
   vm.createContext(ctx);
-  const fn = vm.runInContext(`(async ({ id, from, to, project }) => ${handler})`, ctx);
-  await fn({ id: 'B', from: 'pending', to: 'printing', project: 'B' });
+  vm.runInContext(mergeHelper(), ctx);
+  await ctx.mergeOrderFromDisk('B');
+  assert.deepEqual(order, ['flush', 'load'], 'a pending save is written before the book is read back');
   assert.equal(ctx.printLog[0], a, 'job A is the same object an open editor holds');
   assert.equal(ctx.printLog[1], b, 'job B is updated in place');
   assert.equal(b.status, 'printing');
   assert.equal(b.printingStartedAt, '2026-10-08T08:00:00Z', 'the start time the main process wrote');
   assert.ok(!('stale' in b), 'a field the move removed is removed');
-  a.notes = 'edited in the open editor';
-  assert.equal(ctx.printLog.find((o) => o.id === 'A').notes, 'edited in the open editor');
 });
 
 test('a PIN that arrived only as the sync mask is refused, not cleared as legacy', () => {

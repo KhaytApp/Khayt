@@ -314,6 +314,27 @@ function initWizard() {
    Boot
    ============================================================ */
 if (typeof document !== 'undefined') {
+/**
+ * The main process changed ONE job on disk (a printer's move, a customer's survey): take that
+ * job from the book and copy it into the object the window already holds. A whole-book reload
+ * swapped every record for a new object, so an open editor saved into a copy nothing used.
+ * A save still waiting out saveAll's 300 ms debounce is written FIRST — otherwise the read-back
+ * would replace an edit made a moment ago to that very job.
+ */
+async function mergeOrderFromDisk(id) {
+  if (typeof flushSave === 'function') await flushSave();
+  const store = await window.hubAPI.loadStore();
+  const fresh = store && !store.__corrupt && (store.printLog || []).find((o) => o && o.id === id);
+  if (!fresh) return;
+  const mine = printLog.find((o) => o && o.id === id);
+  if (mine) {
+    for (const k of Object.keys(mine)) if (!(k in fresh)) delete mine[k];
+    Object.assign(mine, fresh);
+  } else {
+    printLog.unshift(fresh);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   await loadAll();
   pruneExpiredNotifs();
@@ -579,11 +600,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   if (window.hubAPI?.onLanSurveySubmitted) {
     window.hubAPI.onLanSurveySubmitted(async ({ orderId, rating }) => {
-      try {
-        const store = await window.hubAPI.loadStore();
-        if (store && !store.__corrupt) applyStoreFromSnapshot(store);
-      } catch (e) {
-        console.error('reload store after survey:', e);
+      // Only the rated job, copied into the object the window holds — as for a printer's
+      // move below: a whole-book reload left any open editor saving into a detached copy.
+      try { await mergeOrderFromDisk(orderId); } catch (e) {
+        console.error('reload job after survey:', e);
       }
       const o = printLog.find(x => x.id === orderId);
       if (o) {
@@ -611,17 +631,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // object nothing pointed at any more — "Saved", and the edit was gone. The
   // printer's move writes this one job and nothing else (lib/lan-server.js).
   window.hubAPI?.onLanKanbanAdvanced?.(async ({ id, from, to, project }) => {
-    try {
-      const store = await window.hubAPI.loadStore();
-      const fresh = store && !store.__corrupt && (store.printLog || []).find((o) => o && o.id === id);
-      const mine = fresh && printLog.find((o) => o && o.id === id);
-      if (mine) {
-        for (const k of Object.keys(mine)) if (!(k in fresh)) delete mine[k];
-        Object.assign(mine, fresh);
-      } else if (fresh) {
-        printLog.unshift(fresh);
-      }
-    } catch (e) {
+    try { await mergeOrderFromDisk(id); } catch (e) {
       console.error('reload job after printer move:', e);
     }
     renderKanban();

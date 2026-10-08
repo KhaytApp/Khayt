@@ -1095,6 +1095,12 @@ const slicerPresets = require('./lib/slicer-presets');
  * { presets } or { error } — never throws; a slice without presets is still attempted.
  */
 function bareModelPresets(slicerPath, args, modelPath, outDir) {
+  // "Never throws" is a promise runSlice relies on: it already made outDir, and a throw
+  // here skipped the cleanup and left the temp folder behind.
+  try { return bareModelPresetsUnsafe(slicerPath, args, modelPath, outDir); }
+  catch (e) { return { error: `Could not read the slicer's settings (${String((e && e.message) || e).slice(0, 120)}).` }; }
+}
+function bareModelPresetsUnsafe(slicerPath, args, modelPath, outDir) {
   if (slicerFamily(slicerPath) !== 'orca' || !usesDefaultArgs(args, slicerPath)) return {};
   let entries = null;
   if (/\.3mf$/i.test(modelPath)) {
