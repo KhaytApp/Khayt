@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A printer starting or finishing a job no longer throws away an edit you
+  are making.** When a printer moved a job on the board, the window reloaded
+  the whole book, so a job you had open in the editor (notes, a discount)
+  was saved into a copy nothing used: it said "Saved" and the change was
+  gone. Only the job the printer moved is updated now.
+
 - **"Slice for exact quote" works with OrcaSlicer, Bambu Studio and Snapmaker
   Orca.** A slicer found by "Detect installed slicers" was run with
   PrusaSlicer's options, which these slicers do not have, so every slice

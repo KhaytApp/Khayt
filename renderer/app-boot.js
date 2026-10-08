@@ -604,12 +604,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   // copy — which had none of those — push a second history entry, and save,
   // which wrote the stale copy over the main process's write: a job a printer
   // started lost its start time again the moment the window heard about it.
+  //
+  // Only THAT job is taken from the book, and it is copied INTO the object the
+  // window already holds. Replacing the whole store swapped every record for a
+  // new object, so an editor open on any job (notes, a discount) saved into an
+  // object nothing pointed at any more — "Saved", and the edit was gone. The
+  // printer's move writes this one job and nothing else (lib/lan-server.js).
   window.hubAPI?.onLanKanbanAdvanced?.(async ({ id, from, to, project }) => {
     try {
       const store = await window.hubAPI.loadStore();
-      if (store && !store.__corrupt) applyStoreFromSnapshot(store);
+      const fresh = store && !store.__corrupt && (store.printLog || []).find((o) => o && o.id === id);
+      const mine = fresh && printLog.find((o) => o && o.id === id);
+      if (mine) {
+        for (const k of Object.keys(mine)) if (!(k in fresh)) delete mine[k];
+        Object.assign(mine, fresh);
+      } else if (fresh) {
+        printLog.unshift(fresh);
+      }
     } catch (e) {
-      console.error('reload store after printer move:', e);
+      console.error('reload job after printer move:', e);
     }
     renderKanban();
     renderLogs();
