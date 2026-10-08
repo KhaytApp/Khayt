@@ -35,6 +35,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   quote could be sliced with them. The Mac now gives them their own, as the
   desktop does since 3.11.7, and keeps the slicer's own reason when it fails.
 
+- **(Mac) Jobs: an "Assigned to" column.** Who has each job, as the board card
+  shows. Hidden for a book where no job has anyone on it, like the client
+  column; a person no longer on the staff list keeps their name.
+
 - **(Mac) Reports: the quarter's waterfall reads the right way in Arabic, and
   says what its last cost is.** In Arabic the chart ran left to right, so it
   opened on the side an Arabic reader finishes on; it now starts with revenue
