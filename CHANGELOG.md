@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A customer's rating is kept, and they are told it was received.** When a
+  customer rated a finished job from its status page, the rating was saved,
+  but the page then said "Could not submit", and Khayt's window was never
+  told. The window's next save could write over the rating. Now the customer
+  sees "Thank you", and the window takes in that one job without disturbing
+  an edit you have open. An edit made a moment before a printer or a survey
+  updates a job is no longer overwritten either.
+
 - **(Mac) A customer's bare STL slices with OrcaSlicer or Bambu Studio.** A mesh
   carries no printer settings, and these slicers' built-in defaults fail their
   own checks, so no upload could be sliced with them. The Mac now hands the
