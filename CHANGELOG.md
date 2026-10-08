@@ -4,64 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **A printer starting or finishing a job no longer throws away an edit you
-  are making.** When a printer moved a job on the board, the window reloaded
-  the whole book, so a job you had open in the editor (notes, a discount)
-  was saved into a copy nothing used: it said "Saved" and the change was
-  gone. Only the job the printer moved is updated now.
-
-- **"Slice for exact quote" works with OrcaSlicer, Bambu Studio and Snapmaker
-  Orca.** A slicer found by "Detect installed slicers" was run with
-  PrusaSlicer's options, which these slicers do not have, so every slice
-  failed with "Invalid option --export-gcode … setup params error". They are
-  now run the way their own command line expects. When a slice still fails,
-  the message gives the slicer's own reason (for example, a file saved by a
-  newer version of the slicer) instead of its list of options.
-
-- **alpha.60 review fixes (Mac + desktop).**
-  - Security: a phone on the shop network can change only what the iPhone
-    app writes (jobs, spools, the waiting list, expenses, waste). With the
-    owner PIN it could create, promote, strip the PIN of, or delete a staff
-    member. The Mac's feedback email no longer attaches PIN hashes. On the
-    desktop, a staff PIN that reached the computer only as the sync mask is
-    refused instead of being cleared.
-  - Desktop: a job a printer starts keeps its start time. The window used to
-    write its older copy of the job over the one the printer's message saved.
-  - Mac: saving a location or a staff member that another device deleted
-    while you were editing it no longer brings it back under a new id.
-  - Mac Reports: the Expenses column no longer cuts off its figures, the cost
-    lines of the statement are readable, and monthly costs have one name
-    everywhere. The By machine caption no longer says labour is not there.
-  - Mac kiosk: a machine that is off and has no job says only "Not
-    answering"; the job sits under the machine's name; time left reads right
-    in Arabic.
-  - Mac staff: a deleted operator is named as the time log recorded them, hours
-    have one decimal everywhere, sheets have real titles, and Locations and
-    Operators are at the top of Settings → Operations.
-
-- **Reports: the per-location and per-machine figures add up again (alpha.60
-  review, both apps).**
-  - A machine with no site lost its depreciation from every site's row; it is
-    now on the unassigned row.
-  - Each machine's depreciation on the location card is charged over the
-    chosen period, exactly as the machine card beside it charges it: a
-    straight-line machine is no longer charged only in months its site had
-    work, and a week is charged a week rather than the whole month.
-  - Hours logged on a job filed in another month were on no machine for any
-    period but "All time"; they are on the job's machine in the period they
-    were worked. Hours on a voided job are no longer charged to a machine.
-  - A job still naming a deleted site counts at its machine's site, and the
-    scrap from a job moved to another site goes with the job.
-  - The warning that pay may be counted twice saw only an expense's old
-    `description` field; both apps write the text to `note`, so "Staff wages"
-    typed into an expense now raises it. A payroll-named monthly cost of zero
-    no longer raises it in the exported summary.
-  - On the Mac, logging, editing or undoing time refreshes the P&L, the
-    location card and the machine card at once.
-
-  None of this changes a figure in a book with no locations, no depreciation
-  and no logged hours.
-
 - **(Mac) Reports: the quarter's waterfall reads the right way in Arabic, and
   says what its last cost is.** In Arabic the chart ran left to right, so it
   opened on the side an Arabic reader finishes on; it now starts with revenue
@@ -77,18 +19,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   computers still share them through cloud sync, so a staff PIN set on one
   computer keeps working on the others.
 
-- **Logged labour is a line of the P&L (both apps).** The hours your staff log
-  on the time log, at the rate they were logged at, now come off net profit as
-  their own "Labour" line — in the P&L table, the monthly charts, the headline
-  net, the CSV export, the Mac's masthead and statement, the per-location P&L
-  and each machine's P&L. Hours count in the month they were worked, including
-  hours logged against no job; hours on a voided or "not business" job leave
-  with the job. A job's own margin and a quote are unchanged: they already
-  carry an estimate of labour from pricing. If a period also has pay booked as
-  an expense or a fixed cost ("Salaries", "wages", "رواتب"…), the P&L says it
-  may be counting the same money twice — nothing is subtracted for you. A book
-  with no time log shows exactly the figures it showed before.
-
 - **(Mac) Operators.** Settings → Operations now lists the shop's staff: add
   someone, change their name, job title, access level, hourly rate, or mark
   them inactive. A job's inspector has an operator picker and a time log —
@@ -100,70 +30,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   work earned per hour. The operator lock (a PIN to switch people) stays in
   the desktop app; an operator's PIN is never touched by the Mac.
 
-- **Deleting an operator who has work on record now makes them inactive
-  instead (both apps).** Who did a job is history: the desktop's delete used
-  to drop the person and leave their jobs and time entries pointing at
-  nobody. Somebody with no work is still removed.
-
-- **Operator reports corrected (both apps).** Per-operator accuracy went
-  negative when a print ran more than twice its estimate (one such job
-  cancelled out two perfect ones) and counted times somebody typed in as
-  perfectly accurate; waste was a count of entries, and only on jobs that
-  finished — a failed, cancelled job's waste was nobody's; voided and
-  not-business jobs counted; and a deleted operator's work vanished. In time
-  tracking, every operator on a job was credited with ALL of its revenue, so
-  the rows added up to more than the shop took; revenue was the typed price
-  of any order, including quotes and open and voided jobs; revenue per hour
-  divided by hours that had not earned yet; time logged against no job
-  inflated hours per job; a renamed operator kept their old name; and the
-  card was in English in every language.
-
-- **Desktop: a job's operator no longer disappears when they are made
-  inactive.** The job editor offered active operators only, so a job on
-  somebody inactive opened as Unassigned and saving it for any reason
-  cleared who did it.
-
 - **(Mac) Locations.** Settings → Operations now lists the shop's sites: add
   one, rename it, change its address, or delete it. A machine's sheet has a
   Location picker, its card on the Machines screen shows where it stands, and
   Reports → Machines shows the P&L for each site over the chosen period.
   Deleting a location marks its machines, spools, expenses and jobs as
   unassigned, and ⌘Z restores the location and those links.
-
-- **Per-location P&L agrees with the P&L (both apps).** The desktop's location
-  breakdown did its own sums, and they disagreed with the P&L for the same
-  jobs:
-  - It priced each job at today's spool prices, with the quoting estimates for
-    power, wear and labour folded in, while also subtracting the real
-    electricity and maintenance bills. Those costs were counted twice, so a
-    site's profit read lower than the shop's.
-  - It counted the VAT a registered shop reclaims as a cost.
-  - It ignored a job's own location.
-
-  Each site's figures now come from the P&L itself, run once per site, so the
-  sites add up to the shop. Machine depreciation is charged to the site the
-  machine is at. Fixed overhead stays shop-wide and is not split. A site that
-  sold nothing shows a row of zeros instead of disappearing. A deleted
-  location no longer appears as a site named `LOC-…`, and deleting a location
-  on the desktop now clears what pointed at it, as the Mac does.
-
-- **Client retention, on the Mac and corrected on the desktop.** Reports →
-  Best now has the client retention card: how many customers came back within
-  30, 60 and 90 days of their first order, how long the ones who returned took,
-  and the customers who come back most. Both apps now work it out the same
-  way, and it was wrong in several ways:
-  - A customer who placed two orders on their first day counted as having
-    come back "in 0 days" — the best possible figure, from someone who never
-    returned. A return is now an order on a later day.
-  - Every customer counted in every window, so someone who first ordered last
-    week counted as "did not return within 90 days". A growing shop read as one
-    losing its customers. Each rate now counts only customers whose first order
-    is old enough, says how many that is ("2 of 6"), and says "too soon to
-    tell" instead of 0% when none are.
-  - Voided orders, archived orders and prints marked "not business" made a
-    customer look like a regular.
-  - "×orders" was English in every language, and the Arabic window labels read
-    just "30 days".
 
 - **(Mac) Kiosk: times say their units.** "About 18:04 to print" read as six
   in the evening on a screen across the room, under the kiosk's own clock. The
@@ -205,16 +77,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   printer reports it, and from the job's estimate otherwise; the card says
   which. A printer running something with no job in the book shows as
   printing, not idle, and a printer that is not answering says so.
-
-- **Kiosk view fixes (desktop).** The board's Kiosk view now shares its rules
-  with the Mac's kiosk (`lib/kiosk.js`), which fixed six things: a cancelled,
-  split, voided or archived job no longer shows as the machine's current job;
-  a job on hold or in post-processing no longer shows a bar that keeps moving
-  with the clock; time left can no longer read "1h 60m"; a print running past
-  its estimate shows how far over it is instead of "Done"; a printing job with
-  an estimate but no start time shows "~Nh total", which was worked out but
-  never displayed; and a machine with a model but no name no longer shows its
-  model twice.
 
 - **(Bed Ready) Browse, download from and publish to the MakerRun catalogue.**
   - **Browse MakerRun** (a new home card, and a button in the MakerRun library
@@ -4769,6 +4631,162 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.7] - 2026-10-08
+
+Slicing for an exact quote, and logged labour in the P&L, since 3.11.6.
+Individual entries are kept below; this is what changed for you.
+
+**"Slice for exact quote" works with OrcaSlicer, Bambu Studio and Snapmaker
+Orca.** A slicer Khayt found for you was run with PrusaSlicer's options, so
+every slice failed with "setup params error". It is now run the way that
+slicer expects, and a slice that still fails says why.
+
+**Hours your staff log come off net profit as their own Labour line.** A
+shop that uses the time log will see net profit go down by those hours at
+their logged rate; a book with no time log shows the same figures as
+before. The per-location and per-machine P&L now add up to the P&L.
+
+**A printer starting or finishing a job no longer throws away an edit you
+are making** in another job.
+
+- **A printer starting or finishing a job no longer throws away an edit you
+  are making.** When a printer moved a job on the board, the window reloaded
+  the whole book, so a job you had open in the editor (notes, a discount)
+  was saved into a copy nothing used: it said "Saved" and the change was
+  gone. Only the job the printer moved is updated now.
+
+- **"Slice for exact quote" works with OrcaSlicer, Bambu Studio and Snapmaker
+  Orca.** A slicer found by "Detect installed slicers" was run with
+  PrusaSlicer's options, which these slicers do not have, so every slice
+  failed with "Invalid option --export-gcode … setup params error". They are
+  now run the way their own command line expects. When a slice still fails,
+  the message gives the slicer's own reason (for example, a file saved by a
+  newer version of the slicer) instead of its list of options.
+
+- **alpha.60 review fixes (Mac + desktop).**
+  - Security: a phone on the shop network can change only what the iPhone
+    app writes (jobs, spools, the waiting list, expenses, waste). With the
+    owner PIN it could create, promote, strip the PIN of, or delete a staff
+    member. The Mac's feedback email no longer attaches PIN hashes. On the
+    desktop, a staff PIN that reached the computer only as the sync mask is
+    refused instead of being cleared.
+  - Desktop: a job a printer starts keeps its start time. The window used to
+    write its older copy of the job over the one the printer's message saved.
+  - Mac: saving a location or a staff member that another device deleted
+    while you were editing it no longer brings it back under a new id.
+  - Mac Reports: the Expenses column no longer cuts off its figures, the cost
+    lines of the statement are readable, and monthly costs have one name
+    everywhere. The By machine caption no longer says labour is not there.
+  - Mac kiosk: a machine that is off and has no job says only "Not
+    answering"; the job sits under the machine's name; time left reads right
+    in Arabic.
+  - Mac staff: a deleted operator is named as the time log recorded them, hours
+    have one decimal everywhere, sheets have real titles, and Locations and
+    Operators are at the top of Settings → Operations.
+
+- **Reports: the per-location and per-machine figures add up again (alpha.60
+  review, both apps).**
+  - A machine with no site lost its depreciation from every site's row; it is
+    now on the unassigned row.
+  - Each machine's depreciation on the location card is charged over the
+    chosen period, exactly as the machine card beside it charges it: a
+    straight-line machine is no longer charged only in months its site had
+    work, and a week is charged a week rather than the whole month.
+  - Hours logged on a job filed in another month were on no machine for any
+    period but "All time"; they are on the job's machine in the period they
+    were worked. Hours on a voided job are no longer charged to a machine.
+  - A job still naming a deleted site counts at its machine's site, and the
+    scrap from a job moved to another site goes with the job.
+  - The warning that pay may be counted twice saw only an expense's old
+    `description` field; both apps write the text to `note`, so "Staff wages"
+    typed into an expense now raises it. A payroll-named monthly cost of zero
+    no longer raises it in the exported summary.
+  - On the Mac, logging, editing or undoing time refreshes the P&L, the
+    location card and the machine card at once.
+
+  None of this changes a figure in a book with no locations, no depreciation
+  and no logged hours.
+
+- **Logged labour is a line of the P&L (both apps).** The hours your staff log
+  on the time log, at the rate they were logged at, now come off net profit as
+  their own "Labour" line — in the P&L table, the monthly charts, the headline
+  net, the CSV export, the Mac's masthead and statement, the per-location P&L
+  and each machine's P&L. Hours count in the month they were worked, including
+  hours logged against no job; hours on a voided or "not business" job leave
+  with the job. A job's own margin and a quote are unchanged: they already
+  carry an estimate of labour from pricing. If a period also has pay booked as
+  an expense or a fixed cost ("Salaries", "wages", "رواتب"…), the P&L says it
+  may be counting the same money twice — nothing is subtracted for you. A book
+  with no time log shows exactly the figures it showed before.
+
+- **Deleting an operator who has work on record now makes them inactive
+  instead (both apps).** Who did a job is history: the desktop's delete used
+  to drop the person and leave their jobs and time entries pointing at
+  nobody. Somebody with no work is still removed.
+
+- **Operator reports corrected (both apps).** Per-operator accuracy went
+  negative when a print ran more than twice its estimate (one such job
+  cancelled out two perfect ones) and counted times somebody typed in as
+  perfectly accurate; waste was a count of entries, and only on jobs that
+  finished — a failed, cancelled job's waste was nobody's; voided and
+  not-business jobs counted; and a deleted operator's work vanished. In time
+  tracking, every operator on a job was credited with ALL of its revenue, so
+  the rows added up to more than the shop took; revenue was the typed price
+  of any order, including quotes and open and voided jobs; revenue per hour
+  divided by hours that had not earned yet; time logged against no job
+  inflated hours per job; a renamed operator kept their old name; and the
+  card was in English in every language.
+
+- **Desktop: a job's operator no longer disappears when they are made
+  inactive.** The job editor offered active operators only, so a job on
+  somebody inactive opened as Unassigned and saving it for any reason
+  cleared who did it.
+
+- **Per-location P&L agrees with the P&L (both apps).** The desktop's location
+  breakdown did its own sums, and they disagreed with the P&L for the same
+  jobs:
+  - It priced each job at today's spool prices, with the quoting estimates for
+    power, wear and labour folded in, while also subtracting the real
+    electricity and maintenance bills. Those costs were counted twice, so a
+    site's profit read lower than the shop's.
+  - It counted the VAT a registered shop reclaims as a cost.
+  - It ignored a job's own location.
+
+  Each site's figures now come from the P&L itself, run once per site, so the
+  sites add up to the shop. Machine depreciation is charged to the site the
+  machine is at. Fixed overhead stays shop-wide and is not split. A site that
+  sold nothing shows a row of zeros instead of disappearing. A deleted
+  location no longer appears as a site named `LOC-…`, and deleting a location
+  on the desktop now clears what pointed at it, as the Mac does.
+
+- **Client retention, on the Mac and corrected on the desktop.** Reports →
+  Best now has the client retention card: how many customers came back within
+  30, 60 and 90 days of their first order, how long the ones who returned took,
+  and the customers who come back most. Both apps now work it out the same
+  way, and it was wrong in several ways:
+  - A customer who placed two orders on their first day counted as having
+    come back "in 0 days" — the best possible figure, from someone who never
+    returned. A return is now an order on a later day.
+  - Every customer counted in every window, so someone who first ordered last
+    week counted as "did not return within 90 days". A growing shop read as one
+    losing its customers. Each rate now counts only customers whose first order
+    is old enough, says how many that is ("2 of 6"), and says "too soon to
+    tell" instead of 0% when none are.
+  - Voided orders, archived orders and prints marked "not business" made a
+    customer look like a regular.
+  - "×orders" was English in every language, and the Arabic window labels read
+    just "30 days".
+
+- **Kiosk view fixes (desktop).** The board's Kiosk view now shares its rules
+  with the Mac's kiosk (`lib/kiosk.js`), which fixed six things: a cancelled,
+  split, voided or archived job no longer shows as the machine's current job;
+  a job on hold or in post-processing no longer shows a bar that keeps moving
+  with the clock; time left can no longer read "1h 60m"; a print running past
+  its estimate shows how far over it is instead of "Done"; a printing job with
+  an estimate but no start time shows "~Nh total", which was worked out but
+  never displayed; and a machine with a model but no name no longer shows its
+  model twice.
 
 ## [3.11.6] - 2026-10-06
 
