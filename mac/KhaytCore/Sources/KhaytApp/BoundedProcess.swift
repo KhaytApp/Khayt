@@ -44,6 +44,7 @@ enum BoundedProcess {
     /// stops it (an archive that has unpacked past its budget).
     static func run(_ path: String, _ arguments: [String], timeout: TimeInterval,
                     keepOut: Int = 4 << 20, keepErr: Int = 64 << 10,
+                    tailOut: Bool = false,
                     every: TimeInterval = 0.25,
                     watch: (@Sendable () -> Bool)? = nil) throws -> Outcome {
         let process = Process()
@@ -54,7 +55,10 @@ enum BoundedProcess {
         process.standardOutput = outPipe
         process.standardError = errPipe
 
-        let out = Sink(keep: keepOut, tail: false)
+        // The head by default (a program's answer is at the top); the TAIL
+        // for a caller reading why it failed — an Orca fork logs its `[error]`
+        // on stdout, last.
+        let out = Sink(keep: keepOut, tail: tailOut)
         let err = Sink(keep: keepErr, tail: true)
         out.attach(outPipe.fileHandleForReading)
         err.attach(errPipe.fileHandleForReading)

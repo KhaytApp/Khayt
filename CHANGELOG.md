@@ -11,6 +11,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   quarter's waterfall now calls its waste step "Failed prints" instead of
   cutting off "Filament wasted (fail…".
 
+- **(Mac) Slicing a customer's upload with OrcaSlicer, Bambu Studio or
+  Snapmaker Orca.** A slicer found by "Find installed slicers" was run with
+  PrusaSlicer's arguments, which these refuse ("setup params error"), so no
+  quote could be sliced with them. The Mac now gives them their own, as the
+  desktop does since 3.11.7, and keeps the slicer's own reason when it fails.
+
 - **(Mac) Reports: the quarter's waterfall reads the right way in Arabic, and
   says what its last cost is.** In Arabic the chart ran left to right, so it
   opened on the side an Arabic reader finishes on; it now starts with revenue
