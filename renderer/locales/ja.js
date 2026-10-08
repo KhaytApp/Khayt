@@ -3778,6 +3778,7 @@
   "slicer.no_config": "先に 設定 → スライサー でスライサーのパスを設定してください。",
   "slicer.fail": "スライスに失敗:",
   "slicer.note": "{slicer} でスライス: {weight} g · {time} h",
+  "slicer.note_presets": "スライサーの設定: {machine} · {process} · {filament}",
   "slicer.note_derived": "{slicer}: {time} 時間 · {weight} g — 重量はスライサーの体積とフィラメント密度から算出。",
   "slicer.applied": "スライスから見積を適用しました — 保存前に確認してください。",
   "slicer.send_title": "スライスして印刷",

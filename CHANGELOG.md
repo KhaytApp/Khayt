@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **"Slice for exact quote" works on a plain STL with OrcaSlicer and Bambu
+  Studio.** A model with no print settings of its own, such as an STL or a
+  3MF that holds only the shape, could not be sliced by these slicers. Their
+  built-in defaults are not a printer, so OrcaSlicer refused it and Bambu
+  Studio weighed it at 0 g. Khayt now slices it on the printer you last used
+  in that slicer, with a print profile and filament that printer accepts, and
+  the calculator's note names them. A project file that carries its own
+  settings is sliced exactly as before. If the slicer itself crashes,
+  Khayt now says so. Snapmaker Orca's command line currently crashes on its
+  U1 presets, so use OrcaSlicer or Bambu Studio for quotes from an STL.
+
 - **(Mac) Reports → Best: top clients count delivered jobs.** A job that had
   reached its customer was left out of the top clients list, so the shop's
   best customers read as "1×", or were missing, beside a retention card that

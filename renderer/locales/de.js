@@ -3778,6 +3778,7 @@
   "slicer.no_config": "Lege zuerst den Slicer-Pfad unter Einstellungen → Slicer fest.",
   "slicer.fail": "Slicen fehlgeschlagen:",
   "slicer.note": "Gesliced mit {slicer}: {weight} g · {time} h",
+  "slicer.note_presets": "Einstellungen aus dem Slicer: {machine} · {process} · {filament}",
   "slicer.note_derived": "{slicer}: {time} h · {weight} g — Gewicht aus dem Volumen des Slicers mit Ihrer Filamentdichte berechnet.",
   "slicer.applied": "Schätzung aus dem Slice übernommen — vor dem Speichern prüfen.",
   "slicer.send_title": "Slicen & drucken",

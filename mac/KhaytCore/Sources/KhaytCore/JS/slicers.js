@@ -163,22 +163,40 @@
     return out;
   }
 
+  /** True when the template that will run is the one Khayt chose, not the shop's own. */
+  function usesDefaultArgs(template, slicerPath) {
+    const t = String(template || '').trim();
+    return !t || (t === DEFAULT_SLICE_ARGS && defaultSliceArgs(slicerPath) !== DEFAULT_SLICE_ARGS);
+  }
+
   /**
    * The finished argv: split first, then fill in. `paths.slicer` (the executable)
    * picks the default template when there is none — see defaultSliceArgs.
+   *
+   * `paths.presets` ({ settings: [machine.json, process.json], filaments: [filament.json] })
+   * is what an Orca fork needs to slice a model that carries no settings of its own
+   * (lib/slicer-presets.js). It is added only to the template Khayt chose: a shop that
+   * wrote its own arguments already says which presets to load.
    */
   function sliceArgv(template, paths) {
     const p = paths || {};
-    const fallback = defaultSliceArgs(p.slicer);
-    const t = String(template || '').trim();
-    const chosen = !t || (t === DEFAULT_SLICE_ARGS && fallback !== DEFAULT_SLICE_ARGS) ? fallback : template;
+    const own = !usesDefaultArgs(template, p.slicer);
+    const chosen = own ? template : defaultSliceArgs(p.slicer);
     const model = p.model == null ? '' : String(p.model);
     const output = p.output == null ? '' : String(p.output);
     const outdir = p.outdir == null ? '' : String(p.outdir);
-    return tokenizeSliceArgs(chosen)
+    const argv = tokenizeSliceArgs(chosen)
       .map((a) => a.replace(/\{model\}/g, model)
                    .replace(/\{output\}/g, output)
                    .replace(/\{outdir\}/g, outdir));
+    const pre = p.presets || {};
+    const files = (x) => (Array.isArray(x) ? x.filter((f) => typeof f === 'string' && f && f.indexOf(';') < 0) : []);
+    const settings = files(pre.settings);
+    const filaments = files(pre.filaments);
+    if (own || slicerFamily(p.slicer) !== 'orca' || !settings.length) return argv;
+    const head = ['--load-settings', settings.join(';')];
+    if (filaments.length) head.push('--load-filaments', filaments.join(';'));
+    return head.concat(argv);
   }
 
   /**
@@ -190,6 +208,12 @@
    */
   function sliceFailureReason(result) {
     const r = result || {};
+    // Killed by a signal (Node reports code null + signal), or 128+n through a wrapper. Seen
+    // for real: Snapmaker Orca's command line segfaults on any U1 slice handed presets, its own
+    // bundled ones included. Say so — "exit 139" reads as Khayt's fault.
+    if (r.signal || r.code === 134 || r.code === 139) {
+      return `The slicer crashed (${r.signal || 'exit ' + r.code}). Try another slicer for quotes, or slice the file in the slicer itself.`;
+    }
     const text = String(r.stderr || '') + '\n' + String(r.stdout || '');
     const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     const clean = (l) => l.replace(/^\[[^\]]*\]\s*(\[[^\]]*\]\s*)*/, '').replace(/^\[error\]\s*/i, '').trim();
@@ -200,7 +224,7 @@
     return String(r.stderr || r.stdout || `exit ${r.code}`).trim().slice(-300) || `exit ${r.code}`;
   }
 
-  const api = { sliceFailureReason, listSlicers, defaultSlicer, getSlicer, slicerDisplayName, isAllowedSlicerBinary,
+  const api = { sliceFailureReason, usesDefaultArgs, listSlicers, defaultSlicer, getSlicer, slicerDisplayName, isAllowedSlicerBinary,
                 tokenizeSliceArgs, sliceArgv, DEFAULT_SLICE_ARGS, ORCA_SLICE_ARGS, slicerFamily, defaultSliceArgs };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytSlicers = api;
