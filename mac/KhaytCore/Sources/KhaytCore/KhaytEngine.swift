@@ -7901,7 +7901,12 @@ public actor KhaytEngine {
         return try runtime.call2(
             "(function (ranged, ctx, period, at, limit) {"
           + "  var completed = ranged.filter(function (o) {"
-          + "    return o.status === 'completed' && !o.voidedAt"
+          // FINISHED, by the rule both apps use — `delivered` is PAST
+          // completed. `=== 'completed'` dropped every job that had reached
+          // its customer, so a shop's best client read as "1×" beside a
+          // retention card counting three of their orders. The desktop has
+          // always filtered with `isFinished`.
+          + "    return KhaytOrderStatus.isFinished(o) && !o.voidedAt"
           + "        && KhaytBusinessScope.countsForBusiness(o);"
           + "  });"
           + "  return { clients: KhaytTopLists.topClients(completed, ctx, { limit: limit }),"

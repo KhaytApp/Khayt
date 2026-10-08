@@ -50,6 +50,22 @@ struct TopListsTests {
             language: "en", period: period, now: now)
     }
 
+    @Test("a delivered job is finished work: it counts, and so does its money")
+    func deliveredCounts() async throws {
+        // `delivered` is past `completed`. The filter here asked for
+        // `completed` only, so a customer whose jobs had reached them read as
+        // "1×" — or not at all — on a screen beside one counting all of them.
+        let out = try await Self.lists([
+            Self.job("O-1", client: "C-1", product: "P-1", price: 100),
+            Self.job("O-2", client: "C-1", product: "P-1", price: 200, status: "delivered"),
+            Self.job("O-3", client: "C-2", product: "P-2", price: 900, status: "delivered"),
+        ])
+        let aisha = try #require(out.clients.first { $0.name == "Aisha" })
+        #expect(aisha.count == 2)
+        #expect(aisha.revenue > 250)
+        #expect(out.clients.first?.name == "Omar", "a customer whose only job was delivered is still a customer")
+    }
+
     @Test("customers are ranked by what they actually paid")
     func clientsByRevenue() async throws {
         let out = try await Self.lists([
