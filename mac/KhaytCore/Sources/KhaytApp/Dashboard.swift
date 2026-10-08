@@ -44,7 +44,7 @@ struct Dashboard: View {
         if let facts = shop.facts {
             // The floor leads when nothing is wrong — which is most mornings.
             Work(facts: facts, shop: shop,
-                 leads: (shop.attention?.items.isEmpty ?? true))
+                 leads: (shop.attention?.items.filter(shop.inSite(attention:)).isEmpty ?? true))
         }
         // What the machines are ACTUALLY doing, under the count of how many the
         // book thinks are busy. The tile above is the book's answer; this is
@@ -469,8 +469,12 @@ struct ToChase: View {
     /// expire and an invoice on a job that was delivered on time are money
     /// questions with nobody late attached, and those are exactly the rows this
     /// section exists for.
+    /// What the attention panel above actually SHOWS — narrowed to the site
+    /// like it. Built from every attention row, a late job at another site
+    /// was hidden there AND left out here, and its overdue invoice showed
+    /// nowhere on the dashboard. Money is the shop's, so it shows here.
     private var alreadyShown: Set<String> {
-        Set((shop.attention?.items ?? []).map(\.id))
+        Set((shop.attention?.items ?? []).filter(shop.inSite(attention:)).map(\.id))
     }
     private var invoices: [Chase] { shop.invoicesToChase.filter { !alreadyShown.contains($0.id) } }
     private var quotes: [Chase] { shop.quotesToChase.filter { !alreadyShown.contains($0.id) } }

@@ -18,6 +18,34 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - The quote sheet's hours unit is "س" in Arabic, and a literal unit in a
     field now fails a test.
 
+
+
+- **A customer's rating is kept, and they are told it was received.** When a
+  customer rated a finished job from its status page, the rating was saved,
+  but the page then said "Could not submit", and Khayt's window was never
+  told. The window's next save could write over the rating. Now the customer
+  sees "Thank you", and the window takes in that one job without disturbing
+  an edit you have open. An edit made a moment before a printer or a survey
+  updates a job is no longer overwritten either.
+
+- **alpha.61 review fixes (Mac + shared).**
+  - Reports: the P&L table's Net Income column is back on screen. alpha.60
+    widened Expenses for its captions and pushed the last column off the
+    edge; the parts of each quarter's expenses are in the figure's tooltip
+    now, and the waterfall above still names each.
+  - Site filter: an overdue invoice for another site no longer vanishes from
+    the Dashboard; the Dashboard says its money is the whole shop's; the
+    sidebar's low-stock badge and running-machine dot follow the chosen site;
+    the classic sidebar has the site picker too; switching sites quickly can
+    no longer leave the wrong one applied; and the filter no longer slows down
+    with the number of jobs.
+  - Jobs: the Assigned to column shows a person's first name, with the full
+    name in its tooltip.
+  - Slicing a customer's upload: the slicer's preset folders are read through
+    symlinks only when the file stays inside them, a file there that is not a
+    regular file is skipped, and choosing presets makes about a tenth of the
+    file-system calls it did.
+
 - **(Mac) A customer's bare STL slices with OrcaSlicer or Bambu Studio.** A mesh
   carries no printer settings, and these slicers' built-in defaults fail their
   own checks, so no upload could be sliced with them. The Mac now hands the

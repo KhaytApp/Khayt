@@ -328,11 +328,15 @@ struct Reports: View {
     // Arabic the leading one. `CustomersTable` made the same trade. The
     // headers are short labels (`mac.pnl_col_*`); the statement keeps the
     // lines' full names.
-    /// A part of the Expenses figure, under it.
-    private func caption(_ key: String, _ value: Double) -> some View {
-        Text(shop.words.callIt(key) + " " + Figure.isolated(Money.figure(value)))
-            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-            .lineLimit(1).minimumScaleFactor(0.85)
+    /// The parts of a quarter's Expenses figure, for its tooltip.
+    private func expenseParts(_ r: PnlPeriod) -> String {
+        var parts: [String] = []
+        if r.fixed > 0 { parts.append(shop.words.callIt("mac.pnl_cap_monthly") + " " + Money.figure(r.fixed)) }
+        if r.depreciationValue > 0 {
+            parts.append(shop.words.callIt("mac.pnl_cap_depreciation") + " " + Money.figure(r.depreciationValue))
+        }
+        if r.labourValue > 0 { parts.append(shop.words.callIt("mac.pnl_col_labour") + " " + Money.figure(r.labourValue)) }
+        return parts.joined(separator: "\n")
     }
 
     private var table: some View {
@@ -378,12 +382,10 @@ struct Reports: View {
                 // is the figure the net is worked out from. Two numbers in one
                 // column, because the shop is owed the one it can check.
                 VStack(alignment: .trailing, spacing: 1) {
-                    // Machine depreciation rides here too, as a line of its
-                    // own below: a Table holds only so many columns, and it
-                    // is an operating cost like the overhead beside it.
-                    // And logged LABOUR, the same way: the table is at the
-                    // ten columns a `Table` builder takes, and the statement
-                    // beside it names labour as a line of its own.
+                    // Machine depreciation and logged LABOUR ride in this
+                    // figure too: the table is at the ten columns a `Table`
+                    // builder takes. Their parts are in the tooltip, and the
+                    // waterfall and the statement name each as its own line.
                     let spent = r.expenses + r.fixed + r.depreciationValue + r.labourValue
                     // A quarter that spent nothing shows nothing, rather than
                     // "−0.00", which reads as a figure somebody worked out.
@@ -393,23 +395,17 @@ struct Reports: View {
                     Text(spent > 0 ? Money.figure(-spent) : "—")
                         .monospacedDigit()
                         .foregroundStyle(spent > 0 ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.tertiary))
-                    // The parts of the figure above, named short: three captions
-                    // in a column this narrow were cut to "Machine depreci…",
-                    // and in Arabic the cut fell inside the number. Secondary,
-                    // not tertiary — a figure has to be readable.
-                    if r.fixed > 0 {
-                        caption("mac.pnl_cap_monthly", r.fixed)
-                    }
-                    if r.depreciationValue > 0 {
-                        caption("mac.pnl_cap_depreciation", r.depreciationValue)
-                    }
-                    if r.labourValue > 0 {
-                        caption("mac.pnl_col_labour", r.labourValue)
-                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
+                // ITS PARTS IN A TOOLTIP, NOT UNDER IT. Three captions here
+                // widened the column to 170 and the table's ideals past the
+                // room beside the totals; a `Table` never shrinks below its
+                // ideals, so Net Income — the column that matters most — went
+                // off the edge (alpha.61 review). The same parts are drawn,
+                // per quarter, in the waterfall right above the table.
+                .help(expenseParts(r))
             }
-            .width(min: 150, ideal: 170, max: 260)
+            .width(min: 92, ideal: 92, max: 260)
             // The margin on what the shop kept. Blended by the rule, so one
             // small job at a high margin cannot colour a month green.
             TableColumn(shop.words.callIt("mac.pnl_col_margin"), value: \.marginSort) { r in

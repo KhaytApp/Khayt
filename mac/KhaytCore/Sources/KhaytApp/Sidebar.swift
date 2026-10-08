@@ -11,6 +11,11 @@ struct Sidebar: View {
     var body: some View {
         List(selection: $shop.shelf) {
             Section {
+                // Which site, first: the classic sidebar had no picker, so a
+                // shop on it could not narrow, and the banners on its screens
+                // only ever offered the way back (alpha.61 review). Untagged,
+                // so it is never a selectable row.
+                SitePicker(shop: shop)
                 // First, and above the pipeline: it is the screen a shop opens
                 // the app to look at.
                 // Nothing at all when nothing needs a person, rather than a
@@ -24,7 +29,8 @@ struct Sidebar: View {
                     selected: shop.shelf == .dashboard,
                     tint: Khayt.attention)
                     .tag(Shop.Shelf.dashboard)
-                Row(title: shop.words.callIt("mac.all_jobs"), mark: .jobs, count: shop.orders.count,
+                Row(title: shop.words.callIt("mac.all_jobs"), mark: .jobs,
+                    count: shop.orders.count(where: shop.inSite),
                     selected: shop.shelf == .jobs(nil))
                     .tag(Shop.Shelf.jobs(nil))
             }

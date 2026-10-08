@@ -310,8 +310,11 @@ struct ShellSidebar: View {
                 .init(.customers, "tab.clients", count: shop.customers.count),
             ])
             group("mac.group_floor", [
-                .init(.machines, "mac.machines", dot: shop.anyMachineRunning ? Role.ok : nil),
-                .init(.inventory, "mac.inventory", alarm: shop.lowSpools.count),
+                // The site's, when one is chosen, as the screens they open are:
+                // a "▼2" for another site's spools above an Inventory showing
+                // none of them read as a fault (alpha.61 review).
+                .init(.machines, "mac.machines", dot: shop.anySiteMachineRunning ? Role.ok : nil),
+                .init(.inventory, "mac.inventory", alarm: shop.lowSpools.filter { shop.inSite(spool: $0) }.count),
                 .init(.expenses, "mac.nav_expenses"),
                 .init(.waste, "mac.nav_waste"),
             ])

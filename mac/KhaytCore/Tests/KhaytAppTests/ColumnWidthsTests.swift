@@ -43,6 +43,24 @@ struct ColumnWidthsTests {
                 Comment(rawValue: "ideals \(ideals) come to \(ideals.reduce(0, +) + spacing)pt"))
     }
 
+    /// The same floor for the P&L's quarters table, which sits beside the
+    /// totals panel. Its Expenses column was widened to 170 for captions in
+    /// alpha.60, and Net Income — the last column, the one that matters most —
+    /// was pushed off the edge (found by the alpha.61 UI review).
+    @Test("the P&L table's ideal widths fit beside the totals")
+    func pnlIdealsFit() throws {
+        let source = try QuoteSheetStatusTests.source("Reports.swift")
+        let start = try #require(source.range(of: "private var table: some View {"))
+        let end = try #require(source.range(of: ".tableStyle", range: start.upperBound..<source.endIndex))
+        let table = source[start.upperBound..<end.lowerBound]
+        let pattern = /\.width\(min: (\d+), ideal: (\d+)/
+        let ideals = table.matches(of: pattern).compactMap { Int($0.output.2) }
+        #expect(ideals.count == 10, "expected ten P&L columns, found \(ideals.count)")
+        let spacing = 17 * ideals.count
+        #expect(ideals.reduce(0, +) + spacing <= 860,
+                Comment(rawValue: "ideals \(ideals) come to \(ideals.reduce(0, +) + spacing)pt"))
+    }
+
     @Test("the jobs table is not built until the widths are gone")
     func tableWaitsForFreshWidths() throws {
         let source = try QuoteSheetStatusTests.source("OrdersTable.swift")

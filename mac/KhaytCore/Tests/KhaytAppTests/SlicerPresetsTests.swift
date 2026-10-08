@@ -103,6 +103,33 @@ struct SlicerPresetsTests {
         }
     }
 
+    @Test("a symlink inside the presets folder cannot reach a file outside it, and a FIFO is not a file")
+    func linksAndFifos() async throws {
+        let t = try Self.tree()
+        defer { try? FileManager.default.removeItem(at: t.root) }
+        let machines = t.bundled.appending(path: "Snapmaker/machine")
+        // A "printer" that is a link to a file outside every root: the text of
+        // its path is inside, the file is not.
+        try FileManager.default.createSymbolicLink(atPath: machines.appending(path: "Linked.json").path,
+                                                   withDestinationPath: t.root.appending(path: "outside.json").path)
+        // A FIFO named like a preset: opening it to read would block for good.
+        #expect(mkfifo(machines.appending(path: "Fifo.json").path, 0o600) == 0)
+        let engine = try KhaytEngine()
+        for name in ["Linked", "Fifo"] {
+            let r = try await engine.choosePresets(conf: Self.conf(machine: name),
+                                                   user: "", system: "", bundled: t.bundled.path)
+            #expect(!r.ok, Comment(rawValue: name))
+            #expect(r.code == "printer-missing", Comment(rawValue: name))
+        }
+        // A link that stays INSIDE the roots is still followed.
+        try FileManager.default.createSymbolicLink(
+            atPath: machines.appending(path: "Alias.json").path,
+            withDestinationPath: machines.appending(path: "Snapmaker U1 (0.4 nozzle).json").path)
+        let alias = try await engine.choosePresets(conf: Self.conf(machine: "Alias"),
+                                                   user: "", system: "", bundled: t.bundled.path)
+        #expect(alias.code != "printer-missing", Comment(rawValue: alias.error ?? ""))
+    }
+
     @Test("the glue hands an Orca fork the presets, and the argv loads them first")
     func glueAndArgv() async throws {
         let t = try Self.tree()
