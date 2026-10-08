@@ -26,9 +26,33 @@ function body(src, marker) {
 test('a printer move is read back from disk, never written over from a stale copy', () => {
   const handler = body(read('renderer/app-boot.js'), 'onLanKanbanAdvanced?.(');
   assert.match(handler, /loadStore\(\)/);
-  assert.match(handler, /applyStoreFromSnapshot\(/);
   assert.doesNotMatch(handler, /saveAll\(/, 'the window wrote its copy over the main process\'s write');
   assert.doesNotMatch(handler, /statusHistory/, 'a second history entry for one move');
+});
+
+// v3.11.7 review: reloading the WHOLE book (applyStoreFromSnapshot) swapped every
+// record for a new object, so an editor open on another job saved into an orphan —
+// the toast said "Saved" and the edit was gone. Run the real handler.
+test('a printer move updates only its job, in place, so an open editor still saves', async () => {
+  const handler = body(read('renderer/app-boot.js'), 'onLanKanbanAdvanced?.(');
+  assert.doesNotMatch(handler, /applyStoreFromSnapshot\(/);
+  const a = { id: 'A', status: 'pending', notes: 'old' };
+  const b = { id: 'B', status: 'pending', printingStartedAt: null, stale: 1 };
+  const printLog = [a, b];
+  const disk = { printLog: [{ id: 'A', status: 'pending', notes: 'old' }, { id: 'B', status: 'printing', printingStartedAt: '2026-10-08T08:00:00Z' }] };
+  const vm = require('node:vm');
+  const ctx = { printLog, window: { hubAPI: { loadStore: async () => disk } }, console,
+    renderKanban() {}, renderLogs() {}, toast() {}, applyStoreFromSnapshot() { throw new Error('whole-book reload'); } };
+  vm.createContext(ctx);
+  const fn = vm.runInContext(`(async ({ id, from, to, project }) => ${handler})`, ctx);
+  await fn({ id: 'B', from: 'pending', to: 'printing', project: 'B' });
+  assert.equal(ctx.printLog[0], a, 'job A is the same object an open editor holds');
+  assert.equal(ctx.printLog[1], b, 'job B is updated in place');
+  assert.equal(b.status, 'printing');
+  assert.equal(b.printingStartedAt, '2026-10-08T08:00:00Z', 'the start time the main process wrote');
+  assert.ok(!('stale' in b), 'a field the move removed is removed');
+  a.notes = 'edited in the open editor';
+  assert.equal(ctx.printLog.find((o) => o.id === 'A').notes, 'edited in the open editor');
 });
 
 test('a PIN that arrived only as the sync mask is refused, not cleared as legacy', () => {
