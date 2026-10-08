@@ -19,18 +19,18 @@ extension Shop {
 
     /// Is this job shown at the chosen site? Always, when none is chosen.
     func inSite(_ order: Order) -> Bool {
-        guard let scope = siteScope, scope.active != nil else { return true }
-        return siteOrderIds.contains(order.id)
+        guard siteScope?.active != nil else { return true }
+        return siteIds.orders.contains(order.id)
     }
 
     func inSite(machine id: String) -> Bool {
-        guard let scope = siteScope, scope.active != nil else { return true }
-        return scope.machineIds.contains(id)
+        guard siteScope?.active != nil else { return true }
+        return siteIds.machines.contains(id)
     }
 
     func inSite(spool id: String) -> Bool {
-        guard let scope = siteScope, scope.active != nil else { return true }
-        return scope.spoolIds.contains(id)
+        guard siteScope?.active != nil else { return true }
+        return siteIds.spools.contains(id)
     }
 
     /// An attention row is about a job, a machine or a spool, by its `kind`
@@ -39,14 +39,19 @@ extension Shop {
     func inSite(attention item: DashboardFacts.Item) -> Bool {
         guard siteScope?.active != nil else { return true }
         switch item.kind {
-        case "order": return siteOrderIds.contains(item.id)
+        case "order": return siteIds.orders.contains(item.id)
         case "machine", "nozzle": return inSite(machine: item.id)
         case "stock": return inSite(spool: item.id)
         default: return true
         }
     }
 
-    private var siteOrderIds: Set<String> { Set(siteScope?.orderIds ?? []) }
+    /// Is a machine the chosen site shows printing? Every machine, unfiltered.
+    var anySiteMachineRunning: Bool {
+        machines.contains {
+            inSite(machine: $0.id) && PrinterWatch.isPrinting(printers.readings[$0.id]?.status?.state ?? "")
+        }
+    }
 
     /// The machines the chosen site shows.
     var siteMachines: [Machine] { machines.filter { inSite(machine: $0.id) } }
@@ -69,9 +74,14 @@ extension Shop {
             return
         }
         guard let engine else { siteScope = nil; return }
-        siteScope = try? await engine.siteScope(orders: orderRows, machines: machineRows,
+        let scope = try? await engine.siteScope(orders: orderRows, machines: machineRows,
                                                 inventory: inventoryRows, locations: locationRows,
                                                 active: id)
+        // The shop may have chosen another site while this was asked: A, then
+        // B, then A again could finish out of order and leave B's jobs under
+        // A's name. The answer is kept only if it is still the question.
+        guard siteFilter == id else { return }
+        siteScope = scope
         // A selected job the site does not show is a row the table cannot
         // draw and an inspector describing something invisible.
         if let selection, let job = orders.first(where: { $0.id == selection }), !inSite(job) {
@@ -172,7 +182,9 @@ struct SiteScopeBanner: View {
         case .spools: (scope.spoolIds.count, scope.total.spools)
         case .none: (0, 0)
         }
-        if counting == .none { return shop.words.callIt("mac.site_only", ["site": .string(site)]) }
+        // The Dashboard's: its jobs, machines and stock narrow, its MONEY does
+        // not — and "Riyadh only" above "Owed 50,422" read as Riyadh's figure.
+        if counting == .none { return shop.words.callIt("mac.site_dashboard", ["site": .string(site)]) }
         return shop.words.callIt("mac.site_banner", ["site": .string(site),
                                                      "shown": .number(Double(shown)),
                                                      "total": .number(Double(total))])

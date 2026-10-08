@@ -18,6 +18,34 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - The quote sheet's hours unit is "س" in Arabic, and a literal unit in a
     field now fails a test.
 
+
+
+- **A customer's rating is kept, and they are told it was received.** When a
+  customer rated a finished job from its status page, the rating was saved,
+  but the page then said "Could not submit", and Khayt's window was never
+  told. The window's next save could write over the rating. Now the customer
+  sees "Thank you", and the window takes in that one job without disturbing
+  an edit you have open. An edit made a moment before a printer or a survey
+  updates a job is no longer overwritten either.
+
+- **alpha.61 review fixes (Mac + shared).**
+  - Reports: the P&L table's Net Income column is back on screen. alpha.60
+    widened Expenses for its captions and pushed the last column off the
+    edge; the parts of each quarter's expenses are in the figure's tooltip
+    now, and the waterfall above still names each.
+  - Site filter: an overdue invoice for another site no longer vanishes from
+    the Dashboard; the Dashboard says its money is the whole shop's; the
+    sidebar's low-stock badge and running-machine dot follow the chosen site;
+    the classic sidebar has the site picker too; switching sites quickly can
+    no longer leave the wrong one applied; and the filter no longer slows down
+    with the number of jobs.
+  - Jobs: the Assigned to column shows a person's first name, with the full
+    name in its tooltip.
+  - Slicing a customer's upload: the slicer's preset folders are read through
+    symlinks only when the file stays inside them, a file there that is not a
+    regular file is skipped, and choosing presets makes about a tenth of the
+    file-system calls it did.
+
 - **(Mac) A customer's bare STL slices with OrcaSlicer or Bambu Studio.** A mesh
   carries no printer settings, and these slicers' built-in defaults fail their
   own checks, so no upload could be sliced with them. The Mac now hands the
@@ -6169,6 +6197,42 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-alpha.61] - 2026-10-09
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Look at one site at a time, slice a customer's upload with OrcaSlicer or Bambu
+Studio, and review fixes — one of them a column alpha.60 pushed off the screen.
+
+### New
+
+- **One site at a time.** A shop with locations picks one under the shop's
+  name in the sidebar, and Jobs, the Board, Machines, Inventory and the
+  Dashboard's jobs, machines and stock narrow to it. Jobs and machines with no
+  site show at every site. Each narrowed screen says so ("Riyadh workshop only —
+  26 of 42") with an All sites button. Money and Reports stay the whole shop's,
+  and the kiosk shows its own floor. The choice is not saved: the app opens on
+  all sites.
+- **Slicing a customer's upload with OrcaSlicer or Bambu Studio.** These
+  slicers were run with PrusaSlicer's arguments, which they refuse, and a plain
+  STL carries no printer settings, which they need. The Mac now gives them their
+  own arguments and the printer you last used in them, with a print and a
+  filament profile it accepts. Snapmaker Orca's command line crashes on such a
+  slice (its bug); the quote falls back to the estimate.
+- **Jobs: an Assigned to column**, with who has each job. Hidden until a job
+  has somebody on it.
+
+### Changed and fixed
+
+- **Reports → Profit & Loss: Net Income is back on screen.** alpha.60 widened
+  the Expenses column for its captions and pushed the last column off the
+  edge. The parts of each quarter's expenses are in the figure's tooltip, and
+  the waterfall above still names each.
+- **Reports → Best: top clients count delivered jobs.** A job that had reached
+  its customer was left out, so the best customers read "1×".
+- **The waterfall's waste step** is called "Failed prints" and no longer cut off.
 
 ## [4.0.0-alpha.60] - 2026-10-07
 

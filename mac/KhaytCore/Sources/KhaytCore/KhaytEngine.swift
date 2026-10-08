@@ -3468,27 +3468,34 @@ public actor KhaytEngine {
     /// nothing; a preset is a few kilobytes.
     public func choosePresets(conf: String, user: String, system: String,
                               bundled: String) throws -> PresetChoice {
+        // Symlinks RESOLVED, on the roots and on every path, before the
+        // inside-the-roots test: a link under user/ naming a file elsewhere
+        // passed a test on the text of the path, and was read. Only regular
+        // files: a FIFO called `x.json` would block this engine for good.
         let roots = [user, system, bundled].filter { !$0.isEmpty }
-            .map { URL(fileURLWithPath: $0).standardizedFileURL.path }
-        let inside: (String) -> String? = { raw in
-            let path = URL(fileURLWithPath: raw).standardizedFileURL.path
-            return roots.contains { path == $0 || path.hasPrefix($0 + "/") } ? path : nil
+            .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().standardizedFileURL.path }
+        let regular: (String) -> String? = { raw in
+            let path = URL(fileURLWithPath: raw).resolvingSymlinksInPath().standardizedFileURL.path
+            guard roots.contains(where: { path == $0 || path.hasPrefix($0 + "/") }),
+                  (try? FileManager.default.attributesOfItem(atPath: path))?[.type] as? FileAttributeType
+                    == .typeRegular else { return nil }
+            return path
         }
         let readText: @convention(block) (String) -> String? = { raw in
-            guard let path = inside(raw),
-                  let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int,
-                  size <= 4 << 20 else { return nil }
-            return try? String(contentsOfFile: path, encoding: .utf8)
+            // Read through a handle, capped: the size in the attributes was
+            // the link's own, not the file's.
+            let cap = 4 << 20
+            guard let path = regular(raw), let handle = FileHandle(forReadingAtPath: path) else { return nil }
+            defer { try? handle.close() }
+            guard let data = try? handle.read(upToCount: cap + 1), data.count <= cap else { return nil }
+            return String(data: data, encoding: .utf8)
         }
         let listDir: @convention(block) (String) -> [String] = { raw in
-            guard let path = inside(raw) else { return [] }
+            let path = URL(fileURLWithPath: raw).resolvingSymlinksInPath().standardizedFileURL.path
+            guard roots.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) else { return [] }
             return (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
         }
-        let isFile: @convention(block) (String) -> Bool = { raw in
-            var dir: ObjCBool = false
-            guard let path = inside(raw) else { return false }
-            return FileManager.default.fileExists(atPath: path, isDirectory: &dir) && !dir.boolValue
-        }
+        let isFile: @convention(block) (String) -> Bool = { raw in regular(raw) != nil }
         return try runtime.withBoundValues([
             "__kioRead": readText, "__kioList": listDir, "__kioIsFile": isFile,
         ]) {

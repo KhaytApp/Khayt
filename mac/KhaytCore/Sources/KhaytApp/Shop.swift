@@ -14263,7 +14263,19 @@ final class Shop {
 
     /// What `siteFilter` shows, as ids — `lib/site-filter.js`'s answer, asked
     /// whenever the book or the filter changes. Nil when nothing is filtered.
-    var siteScope: KhaytEngine.SiteScope?
+    var siteScope: KhaytEngine.SiteScope? {
+        didSet {
+            siteIds = SiteIds(orders: Set(siteScope?.orderIds ?? []),
+                              machines: Set(siteScope?.machineIds ?? []),
+                              spools: Set(siteScope?.spoolIds ?? []))
+        }
+    }
+
+    /// `siteScope`'s ids as sets, built once when the scope changes. Every
+    /// screen asks `inSite` once per row as it draws, and building the set on
+    /// each ask made the board and the sidebar count quadratic in the jobs.
+    struct SiteIds { var orders = Set<String>(), machines = Set<String>(), spools = Set<String>() }
+    var siteIds = SiteIds()
 
     func count(_ stage: Stage) -> Int { orders.count { Stage.of($0) == stage && inSite($0) } }
 

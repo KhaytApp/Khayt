@@ -111,7 +111,17 @@ struct OrdersTable: View {
             // `Shop.operatorLabel`.
             TableColumn(shop.words.callIt("op.assigned")) { job in
                 if let label = shop.operatorLabel(job.operatorId) {
-                    Text(label).lineLimit(1)
+                    // The first name, which is what a shop calls its people:
+                    // the column is narrow, and "Noura Al-Q…" was neither.
+                    // The whole label — and "no longer on the list" — in the
+                    // tooltip.
+                    // Only a current, active person's name is shortened — "An
+                    // operator no longer on the list" is a sentence, and
+                    // "Reem · inactive" has to keep saying so.
+                    let current = shop.shopOperator(job.operatorId ?? "").map(\.active) == true
+                    Text(current ? (label.split(separator: " ").first.map(String.init) ?? label) : label)
+                        .lineLimit(1)
+                        .help(label)
                 } else {
                     Text("—").foregroundStyle(.tertiary)
                 }
