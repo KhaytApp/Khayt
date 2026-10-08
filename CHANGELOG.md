@@ -4,31 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **A customer's rating is kept, and they are told it was received.** When a
-  customer rated a finished job from its status page, the rating was saved,
-  but the page then said "Could not submit", and Khayt's window was never
-  told. The window's next save could write over the rating. Now the customer
-  sees "Thank you", and the window takes in that one job without disturbing
-  an edit you have open. An edit made a moment before a printer or a survey
-  updates a job is no longer overwritten either.
-
 - **(Mac) A customer's bare STL slices with OrcaSlicer or Bambu Studio.** A mesh
   carries no printer settings, and these slicers' built-in defaults fail their
   own checks, so no upload could be sliced with them. The Mac now hands the
   slicer the printer you last used in it, with a print and a filament profile
   that printer accepts — the same choice the desktop makes (3.11.7). Snapmaker
   Orca's command line crashes on such a slice (its bug); Khayt says it crashed.
-
-- **"Slice for exact quote" works on a plain STL with OrcaSlicer and Bambu
-  Studio.** A model with no print settings of its own, such as an STL or a
-  3MF that holds only the shape, could not be sliced by these slicers. Their
-  built-in defaults are not a printer, so OrcaSlicer refused it and Bambu
-  Studio weighed it at 0 g. Khayt now slices it on the printer you last used
-  in that slicer, with a print profile and filament that printer accepts, and
-  the calculator's note names them. A project file that carries its own
-  settings is sliced exactly as before. If the slicer itself crashes,
-  Khayt now says so. Snapmaker Orca's command line currently crashes on its
-  U1 presets, so use OrcaSlicer or Bambu Studio for quotes from an STL.
 
 - **(Mac) Reports → Best: top clients count delivered jobs.** A job that had
   reached its customer was left out of the top clients list, so the shop's
@@ -54,11 +35,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   shown at every site. Each narrowed screen says so ("Main only — 12 of 42")
   with a button back to all sites. Money, Reports and the kiosk stay the
   whole shop's. The choice lasts until the app is closed, as on the desktop.
-- **Desktop: a site that was deleted no longer hides things from every site.**
-  With the site filter on, a job, machine or spool still naming a deleted
-  location matched no site and could only be seen under "All". It now counts
-  as having no site, and is shown everywhere, as the per-location P&L already
-  counted it. The rule is now shared with the Mac (lib/site-filter.js).
 
 - **(Mac) Reports: the quarter's waterfall reads the right way in Arabic, and
   says what its last cost is.** In Arabic the chart ran left to right, so it
@@ -4687,6 +4663,44 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.8] - 2026-10-08
+
+Exact quotes from a plain STL, since 3.11.7.
+Individual entries are kept below; this is what changed for you.
+
+**"Slice for exact quote" works on a plain STL with OrcaSlicer and Bambu
+Studio.** Khayt slices it on the printer you last used in that slicer and
+says which printer, print profile and filament it used. And with the site
+filter on, something still naming a deleted site is no longer hidden.
+
+**A customer's rating from the status page is kept**, and they are told
+it was received.
+
+- **"Slice for exact quote" works on a plain STL with OrcaSlicer and Bambu
+  Studio.** A model with no print settings of its own, such as an STL or a
+  3MF that holds only the shape, could not be sliced by these slicers. Their
+  built-in defaults are not a printer, so OrcaSlicer refused it and Bambu
+  Studio weighed it at 0 g. Khayt now slices it on the printer you last used
+  in that slicer, with a print profile and filament that printer accepts, and
+  the calculator's note names them. A project file that carries its own
+  settings is sliced exactly as before. If the slicer itself crashes,
+  Khayt now says so. Snapmaker Orca's command line currently crashes on its
+  U1 presets, so use OrcaSlicer or Bambu Studio for quotes from an STL.
+
+- **Desktop: a site that was deleted no longer hides things from every site.**
+  With the site filter on, a job, machine or spool still naming a deleted
+  location matched no site and could only be seen under "All". It now counts
+  as having no site, and is shown everywhere, as the per-location P&L already
+  counted it. The rule is now shared with the Mac (lib/site-filter.js).
+
+- **A customer's rating is kept, and they are told it was received.** When a
+  customer rated a finished job from its status page, the rating was saved,
+  but the page then said "Could not submit", and Khayt's window was never
+  told. The window's next save could write over the rating. Now the customer
+  sees "Thank you", and the window takes in that one job without disturbing
+  an edit you have open. An edit made a moment before a printer or a survey
+  updates a job is no longer overwritten either.
 
 ## [3.11.7] - 2026-10-08
 
