@@ -1,0 +1,15 @@
+/* The widget's own words. Every literal Text("…") in KhaytQueueWidget.swift
+   is a key here; an interpolated Int is "%lld", a String "%@". Held to the
+   Arabic table by LocalizationCompletenessTests. */
+"Queue" = "Queue";
+"Print" = "Print";
+"Printing" = "Printing";
+"QC" = "QC";
+"Done" = "Done";
+"Nothing printing right now" = "Nothing printing right now";
+"Offline" = "Offline";
+"LAN connected" = "Connected";
+"%lld queued · %lld printing" = "%lld queued · %lld printing";
+"ETA %@" = "Done in %@";
+"Open app on shop Wi‑Fi" = "Open Khayt on the shop's Wi‑Fi";
+"%lld%%" = "%lld%%";

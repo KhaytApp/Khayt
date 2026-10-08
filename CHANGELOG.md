@@ -4,6 +4,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: first steps for iPhone Duo, and fixes from a pass over every detail
+  screen.**
+  - The tab bar is the system's `TabView` now. On iPhone Duo only system bars
+    move to the side of the outer display and become a sidebar on the inner
+    one. Settings left the bar, which holds five tabs on iPhone: it opens from
+    Home's gear, and is a sidebar tab where there is a sidebar.
+  - The Home Screen widget had no Arabic at all. It now has its own English and
+    Arabic words, kept in step by a test.
+  - The expense sheet's last category chip drew over the "Note" field. The
+    chip layout reported its width as its widest row, the width came back
+    rounded to the pixel grid, and a row measured as fitting wrapped.
+  - The quote sheet's hours unit is "س" in Arabic, and a literal unit in a
+    field now fails a test.
+
 - **(Mac) A customer's bare STL slices with OrcaSlicer or Bambu Studio.** A mesh
   carries no printer settings, and these slicers' built-in defaults fail their
   own checks, so no upload could be sliced with them. The Mac now hands the

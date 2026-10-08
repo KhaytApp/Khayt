@@ -34,6 +34,11 @@ struct DashboardView: View {
     @State private var showWaste = false
     @State private var showExpense = false
     @State private var showIntake = false
+    @State private var showSettings = false
+    /// Settings is a sidebar-only tab (see `MainTabView`). Where there is no
+    /// sidebar — compact width: an iPhone, iPhone Duo's outer display — it
+    /// opens from here.
+    @Environment(\.horizontalSizeClass) private var widthClass
 
     private static let stages = ["pending", "printing", "post", "qc", "completed"]
 
@@ -65,6 +70,7 @@ struct DashboardView: View {
             .refreshable { await load() }
             .task { await load() }
             .watchesPrinters(when: queue.contains { $0.status == "printing" && $0.machineId != nil })
+            .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showAddSpool) { AddSpoolSheet { Task { await load() } } }
             .sheet(isPresented: $showQuote) { QuoteSheet() }
             .sheet(isPresented: $showWaste) { LogWasteSheet() }
@@ -95,9 +101,23 @@ struct DashboardView: View {
                     Text(L10n.tr("pulse.title"))
                         .font(.khayt(27, .semibold, relativeTo: .largeTitle))
                         .foregroundStyle(KhaytDesign.ink)
+                        // One line beside three buttons: it shrinks a little
+                        // before it would wrap under the mark.
+                        .lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
             Spacer(minLength: 8)
+            if widthClass == .compact {
+                Button { showSettings = true } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(KhaytDesign.ink)
+                        .frame(width: 44, height: 44)
+                        .background(KhaytDesign.surface, in: Circle())
+                        .overlay(Circle().strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+                }
+                .accessibilityLabel(L10n.tr("tab.settings"))
+            }
             // The design's bell, with how many are unread.
             NavigationLink {
                 NotificationsView()
@@ -393,6 +413,14 @@ struct DashboardView: View {
         waiting = await waitingTask ?? []
         pulse = await pulseTask
         facts = await factsTask
+        #if DEBUG
+        for (name, show) in [("quote", { showQuote = true }), ("waste", { showWaste = true }),
+                             ("expense", { showExpense = true }), ("addspool", { showAddSpool = true }),
+                             ("intake", { showIntake = true }), ("settings", { showSettings = true })] as [(String, () -> Void)] {
+            if KhaytCompanionApp.ScreenshotOpen.take(name) != nil { show() }
+        }
+        if let id = KhaytCompanionApp.ScreenshotOpen.take("order:") { openOrder = queue.first { $0.id == id } }
+        #endif
     }
 
     private func advance(_ order: QueueOrder) async {

@@ -125,7 +125,12 @@ struct FlowLayout: Layout {
             rowHeight = max(rowHeight, size.height)
             widest = max(widest, x - spacing)
         }
-        return CGSize(width: min(widest, width), height: y + rowHeight)
+        // The whole width offered, not the widest row's. Reported as the
+        // widest row (292.83 pt), the width came back rounded to the pixel
+        // grid (292.67) when the chips were placed — and a row that was
+        // measured as fitting no longer did, wrapped, and drew its last chip
+        // over the field below. Measured on the expense sheet's categories.
+        return CGSize(width: width.isFinite ? width : widest, height: y + rowHeight)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {

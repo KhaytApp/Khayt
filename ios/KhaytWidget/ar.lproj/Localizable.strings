@@ -1,0 +1,13 @@
+/* كلمات الأداة. انظر الجدول الإنجليزي. */
+"Queue" = "الطابور";
+"Print" = "طباعة";
+"Printing" = "قيد الطباعة";
+"QC" = "فحص";
+"Done" = "أُنجز";
+"Nothing printing right now" = "لا شيء قيد الطباعة الآن";
+"Offline" = "غير متصل";
+"LAN connected" = "متصل";
+"%lld queued · %lld printing" = "%lld في الطابور · %lld قيد الطباعة";
+"ETA %@" = "ينتهي بعد %@";
+"Open app on shop Wi‑Fi" = "افتح خيط على شبكة الورشة";
+"%lld%%" = "%lld٪";

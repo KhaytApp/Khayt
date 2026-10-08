@@ -129,6 +129,34 @@ record a write removes. Still online-only: a quote (a live question about
 today's prices) and an expense with a receipt photo (the receipt is a file on
 the desk's disk).
 
+## iPhone Duo
+
+Apple's foldable (on sale 23 Oct 2026): a 5.4" outer display (compact width)
+and a 7.6" inner one (regular width and height). Everything here is from
+developer.apple.com — the preparation guide, the "Prepare your app" and "Design
+for iPhone Duo" tech talks and the iPhone Duo group-lab Q&A on the forums.
+
+**Done (Oct 2026):**
+- **Native `TabView` (`sidebarAdaptable`), not our own bar.** Only system tab
+  bars move to the trailing edge of the outer display and become a sidebar on
+  the inner one; Apple's Q&A says custom bars do not adapt. An iPhone tab bar
+  holds five, so compact width shows Home, Orders, Inventory, Machines and
+  Clients, and Settings opens from Home's gear. In regular width Settings is a
+  sidebar-only tab (`TabLayoutTests`).
+- **No screen or orientation APIs.** Nothing uses `UIScreen.main`,
+  `UIDevice.orientation` or `userInterfaceIdiom`. The inner display ignores
+  `UISupportedInterfaceOrientations`, so layout follows size classes only.
+
+**Waiting on Xcode 27.1** (this Mac has 27.0):
+- Building with the iOS 27.1 SDK. Older SDKs run letterboxed at an iPhone-mini
+  aspect ratio, and 27.0 still leaves some letterboxing.
+- Device Hub's Duo simulator, for checking every pose. Until then the iPad
+  simulator stands in for the inner display: it has the same size classes, but
+  it runs the iPad idiom with a top tab bar, which the Duo does not.
+- `ReservedRegion` for the hinge, and whether `defaultAdaptableTabBarPlacement`
+  opens the sidebar on the inner display. Its published doc says iPadOS only.
+- Duo screenshots, which App Store Connect requires from April 2027.
+
 ## UI redesign
 
 Copy the prompt in [IOS_UI_REDESIGN_PROMPT.md](./IOS_UI_REDESIGN_PROMPT.md) into a design AI.

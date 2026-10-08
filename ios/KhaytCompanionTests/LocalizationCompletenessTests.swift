@@ -42,12 +42,12 @@ final class LocalizationCompletenessTests: XCTestCase {
         for (name, text) in try swiftSources() where name != "L10n.swift" {
             for (i, line) in text.components(separatedBy: "\n").enumerated() {
                 if line.contains("String(format: L10n.tr("), !line.contains("locale:") { bare.append("\(name):\(i + 1)") }
-                if line.range(of: #"\) g"|"g"\)"#, options: .regularExpression) != nil { grams.append("\(name):\(i + 1)") }
+                if line.range(of: #"\) g"|"g"\)|unit: "[a-z%]+""#, options: .regularExpression) != nil { grams.append("\(name):\(i + 1)") }
                 if line.range(of: #"(^|[^A-Za-z])Text\((String\(|.*String\.init)"#, options: .regularExpression) != nil { bare.append("\(name):\(i + 1)") }
             }
         }
         XCTAssertEqual(bare, [], "use L10n.format, which writes the numbers in the app's language")
-        XCTAssertEqual(grams, [], "use L10n.grams — the unit is a word in Arabic")
+        XCTAssertEqual(grams, [], "use L10n.grams / L10n.tr(\"unit.…\") — a unit is a word in Arabic")
     }
 
     func testEnglishAndArabicHoldTheSameKeys() throws {
