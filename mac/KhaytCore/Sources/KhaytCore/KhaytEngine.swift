@@ -958,6 +958,7 @@ public actor KhaytEngine {
         // two apps come to disagree about what they are willing to run. The
         // Electron app spent months not calling it at all.
         "slicers",
+        "slicer-presets",
         // When this shop could have a new order printed, finished and posted —
         // and the snapshot a storefront quotes that from.
         //
@@ -3395,21 +3396,132 @@ public actor KhaytEngine {
     /// fork found by "Find installed slicers" is saved with no template — which
     /// fell back to PrusaSlicer's `--export-gcode -o …`, which the forks reject
     /// with "setup params error" and write nothing (#1737, #1776).
+    ///
+    /// `presets` is `{ settings: [machine, process], filaments: [filament] }`
+    /// (file paths) for a model with no settings of its own; the rule adds
+    /// them only to the arguments Khayt chose for an Orca fork.
     public func sliceArgv(template: String, model: String, output: String, outdir: String,
-                          slicer: String = "") throws -> [String] {
+                          slicer: String = "", presets: JSONValue = .null) throws -> [String] {
         try runtime.call2("""
-            KhaytSlicers.sliceArgv(ARG0, { model: ARG1, output: ARG2, outdir: ARG3, slicer: ARG4 })
+            KhaytSlicers.sliceArgv(ARG0, { model: ARG1, output: ARG2, outdir: ARG3, slicer: ARG4, presets: ARG5 })
             """,
-            [.string(template), .string(model), .string(output), .string(outdir), .string(slicer)],
+            [.string(template), .string(model), .string(output), .string(outdir), .string(slicer), presets],
             as: [String].self)
+    }
+
+    // MARK: - Presets for a model with no settings of its own (#1778)
+
+    /// Where a slicer keeps its presets: `lib/slicer-presets.js` `presetRoots`.
+    public struct PresetRoots: Decodable, Sendable, Equatable {
+        public let name: String
+        public let dir: String
+        public let confFile: String
+        public let user: String
+        public let system: String
+        public let bundled: String
+    }
+
+    public func presetRoots(slicer: String, home: String) throws -> [PresetRoots] {
+        try runtime.call2("KhaytSlicerPresets.presetRoots(ARG0, { platform: 'darwin', home: ARG1, env: {} })",
+                          [.string(slicer), .string(home)], as: [PresetRoots].self)
+    }
+
+    /// The family a slicer belongs to (`orca`, `prusa`, …): `slicerFamily`.
+    public func slicerFamily(path: String) throws -> String {
+        try runtime.call2("KhaytSlicers.slicerFamily(ARG0)", [.string(path)], as: String.self)
+    }
+
+    /// True when the arguments that will run are the ones Khayt chose.
+    public func usesDefaultSliceArgs(template: String, slicer: String) throws -> Bool {
+        try runtime.call2("KhaytSlicers.usesDefaultArgs(ARG0, ARG1)",
+                          [.string(template), .string(slicer)], as: Bool.self)
+    }
+
+    /// False only for a project that carries its own settings. `entries` is a
+    /// 3MF's member names, nil for any other file.
+    public func needsPresets(model: String, entries: [String]?) throws -> Bool {
+        try runtime.call2("KhaytSlicerPresets.needsPresets(ARG0, ARG1)",
+                          [.string(model), entries.map { .array($0.map(JSONValue.string)) } ?? .null],
+                          as: Bool.self)
+    }
+
+    public struct PresetChoice: Decodable, Sendable {
+        public let ok: Bool
+        public let code: String?
+        public let error: String?
+        public let machine: JSONValue?
+        public let process: JSONValue?
+        public let filament: JSONValue?
+    }
+
+    /// The printer, print and filament presets for a bare-model slice, chosen
+    /// by `choosePresets` — the shared rule, walking the slicer's own preset
+    /// folders lazily (a fork ships thousands; it opens the few it needs).
+    ///
+    /// The rule reads files, and this runtime has no file system, so it is
+    /// handed one for the length of the call: read-only, and only BELOW the
+    /// three roots given, so nothing the rule is passed — a preset name, an
+    /// `inherits` — can walk it anywhere else. A file over 4 MB reads as
+    /// nothing; a preset is a few kilobytes.
+    public func choosePresets(conf: String, user: String, system: String,
+                              bundled: String) throws -> PresetChoice {
+        let roots = [user, system, bundled].filter { !$0.isEmpty }
+            .map { URL(fileURLWithPath: $0).standardizedFileURL.path }
+        let inside: (String) -> String? = { raw in
+            let path = URL(fileURLWithPath: raw).standardizedFileURL.path
+            return roots.contains { path == $0 || path.hasPrefix($0 + "/") } ? path : nil
+        }
+        let readText: @convention(block) (String) -> String? = { raw in
+            guard let path = inside(raw),
+                  let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int,
+                  size <= 4 << 20 else { return nil }
+            return try? String(contentsOfFile: path, encoding: .utf8)
+        }
+        let listDir: @convention(block) (String) -> [String] = { raw in
+            guard let path = inside(raw) else { return [] }
+            return (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
+        }
+        let isFile: @convention(block) (String) -> Bool = { raw in
+            var dir: ObjCBool = false
+            guard let path = inside(raw) else { return false }
+            return FileManager.default.fileExists(atPath: path, isDirectory: &dir) && !dir.boolValue
+        }
+        return try runtime.withBoundValues([
+            "__kioRead": readText, "__kioList": listDir, "__kioIsFile": isFile,
+        ]) {
+            try runtime.call2("""
+                (function (roots) {
+                  var io = {
+                    readText: function (p) { var t = __kioRead(p); if (t == null) throw new Error('unreadable'); return t; },
+                    listDir: function (p) { return __kioList(p); },
+                    isFile: function (p) { return __kioIsFile(p); },
+                    join: function () { return Array.prototype.slice.call(arguments).filter(Boolean).join('/'); }
+                  };
+                  return KhaytSlicerPresets.choosePresets(io, roots);
+                })(ARG0)
+                """,
+                [.object(["conf": .string(conf), "user": .string(user),
+                          "system": .string(system), "bundled": .string(bundled)])],
+                as: PresetChoice.self)
+        }
+    }
+
+    /// One chosen preset as the file the slicer loads: `presetFileJson`.
+    public func presetFileJson(kind: String, preset: JSONValue) throws -> String {
+        try runtime.call2("KhaytSlicerPresets.presetFileJson(ARG0, ARG1)",
+                          [.string(kind), preset], as: String.self)
     }
 
     /// Why a slicer that exited with an error did: its own `[error]` line
     /// (an Orca fork prints it on STDOUT, its stderr holds only a usage
     /// dump), else the likeliest line, else the exit code.
-    public func sliceFailureReason(stderr: String, stdout: String, code: Int) throws -> String {
-        try runtime.call2("KhaytSlicers.sliceFailureReason({ stderr: ARG0, stdout: ARG1, code: ARG2 })",
-                          [.string(stderr), .string(stdout), .number(Double(code))], as: String.self)
+    /// `signal` is the one that killed it, if one did — a segfault reads as
+    /// "The slicer crashed", not as an exit code.
+    public func sliceFailureReason(stderr: String, stdout: String, code: Int,
+                                   signal: String? = nil) throws -> String {
+        try runtime.call2("KhaytSlicers.sliceFailureReason({ stderr: ARG0, stdout: ARG1, code: ARG2, signal: ARG3 })",
+                          [.string(stderr), .string(stdout), .number(Double(code)),
+                           signal.map(JSONValue.string) ?? .null], as: String.self)
     }
 
     public func slicerDisplayName(path: String) throws -> String {

@@ -325,6 +325,22 @@ public final class JSRuntime {
         return try body()
     }
 
+    /// Bind any values — native functions included — as globals for the
+    /// length of `body`, cleared afterwards whatever happens. For a rule that
+    /// needs something only the host has, a file to read, without that
+    /// capability outliving the call that needed it.
+    public func withBoundValues<T>(_ values: [String: Any], _ body: () throws -> T) rethrows -> T {
+        for (name, value) in values {
+            context.setObject(value, forKeyedSubscript: name as NSString)
+        }
+        defer {
+            for name in values.keys {
+                context.setObject(JSValue(undefinedIn: context), forKeyedSubscript: name as NSString)
+            }
+        }
+        return try body()
+    }
+
     public func call2<T: Decodable>(_ expression: String, _ args: [JSONValue] = [],
                                     as type: T.Type) throws -> T {
         // ── THE ARGUMENTS NEVER BECOME SOURCE CODE ────────────────────────
