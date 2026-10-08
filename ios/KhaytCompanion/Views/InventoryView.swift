@@ -174,6 +174,9 @@ struct InventoryView: View {
         errorMessage = nil
         do {
             spools = try await api.fetchInventory()
+            #if DEBUG
+            if let id = KhaytCompanionApp.ScreenshotOpen.take("spool:") { openSpool = spools.first { $0.id == id } }
+            #endif
         } catch {
             spools = []
             errorMessage = error.localizedDescription

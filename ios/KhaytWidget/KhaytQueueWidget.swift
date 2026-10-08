@@ -167,14 +167,16 @@ struct KhaytQueueWidgetView: View {
         }
     }
 
-    private func metric(_ label: String, _ value: Int) -> some View {
+    /// `LocalizedStringKey`, not `String`: a `Text(String)` is shown as written,
+    /// and these labels were English on an Arabic phone.
+    private func metric(_ label: LocalizedStringKey, _ value: Int) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("\(value)").font(.title3.bold())
             Text(label).font(.caption2).foregroundStyle(.secondary)
         }
     }
 
-    private func statusLine(_ s: WidgetSnapshot) -> String {
+    private func statusLine(_ s: WidgetSnapshot) -> LocalizedStringKey {
         s.connected ? "LAN connected" : "Offline"
     }
 

@@ -44,7 +44,7 @@ struct QuoteSheet: View {
                         HStack(spacing: 0) {
                             numberField(L10n.tr("quote.weight"), $printWeight, unit: L10n.tr("unit.g"))
                             divider
-                            numberField(L10n.tr("quote.time"), $printTime, unit: "h")
+                            numberField(L10n.tr("quote.time"), $printTime, unit: L10n.tr("unit.h"))
                             divider
                             numberField(L10n.tr("quote.qty"), $qty, unit: nil, decimal: false)
                         }

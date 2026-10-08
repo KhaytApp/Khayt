@@ -61,6 +61,20 @@ struct KhaytCompanionApp: App {
     }
 
     #if DEBUG
+    /// `-KhaytOpen <what>` on the launch line: one screen opened once, so the
+    /// detail pages and sheets can be photographed too. Home takes `quote`,
+    /// `waste`, `expense`, `addspool`, `intake`, `settings` and `order:<id>`;
+    /// Inventory takes `spool:<id>`; Orders takes `neworder`.
+    enum ScreenshotOpen {
+        private static var used = false
+        /// The request, if it starts with `prefix` and nobody has taken it yet.
+        @MainActor static func take(_ prefix: String) -> String? {
+            guard !used, let v = UserDefaults.standard.string(forKey: "KhaytOpen"), v.hasPrefix(prefix) else { return nil }
+            used = true
+            return String(v.dropFirst(prefix.count))
+        }
+    }
+
     /// `-KhaytSampleShop YES -KhaytTab orders` on the launch line: the sample
     /// shop, opened on that tab, so every screen can be photographed from the
     /// command line (`simctl launch`) without a tap. Debug builds only.

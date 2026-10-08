@@ -368,6 +368,7 @@
 "error.invalid_order_id" = "Invalid order ID.";
 "settings.notifications.allow" = "Allow notifications";
 "unit.g" = "g";
+"unit.h" = "h";
 "inventory.remove.body" = "%@ will be removed from inventory.";
 
 /* Khayt Cloud */

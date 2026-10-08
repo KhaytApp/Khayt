@@ -270,6 +270,9 @@ struct OrdersView: View {
                 let data = try await api.fetchQueue()
                 guard generation == loadGeneration else { return }
                 queue = data
+                #if DEBUG
+                if KhaytCompanionApp.ScreenshotOpen.take("neworder") != nil { showNewOrder = true }
+                #endif
             case .history:
                 let data = try await api.fetchRecentOrders(limit: 200)
                 guard generation == loadGeneration else { return }
