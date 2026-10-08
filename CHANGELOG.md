@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) Reports → Best: top clients count delivered jobs.** A job that had
+  reached its customer was left out of the top clients list, so the shop's
+  best customers read as "1×", or were missing, beside a retention card that
+  counted all their orders. The desktop has always counted them. The
+  quarter's waterfall now calls its waste step "Failed prints" instead of
+  cutting off "Filament wasted (fail…".
+
 - **(Mac) Reports: the quarter's waterfall reads the right way in Arabic, and
   says what its last cost is.** In Arabic the chart ran left to right, so it
   opened on the side an Arabic reader finishes on; it now starts with revenue

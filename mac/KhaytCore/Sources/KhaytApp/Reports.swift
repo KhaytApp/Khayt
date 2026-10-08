@@ -1213,7 +1213,7 @@ struct Reports: View {
             // Failed prints, where there were any — the rule takes them off
             // the net, so the chart has to show the step or it does not add up.
             if row.wasteValue != 0 {
-                out.append(WaterfallStep(label: shop.words.callIt("pnl.waste"), amount: -row.wasteValue))
+                out.append(WaterfallStep(label: shop.words.callIt("mac.waterfall_waste"), amount: -row.wasteValue))
             }
             if row.depreciationValue != 0 {
                 out.append(WaterfallStep(label: shop.words.callIt("mac.pnl_depreciation"),

@@ -2233,6 +2233,9 @@ final class Words {
         // saying they are part of the bar beside them reads as counted twice.
         // Named as Settings names them, where the shop typed them in.
         "mac.waterfall_fixed": ["en": "Monthly costs", "ar": "التكاليف الشهرية"],
+        // Short: a waterfall slot holds two lines, and "Filament wasted
+        // (failed prints)" needed three — it was cut to "Filament wasted (fail…".
+        "mac.waterfall_waste": ["en": "Failed prints", "ar": "طباعات فاشلة"],
         // Captions under a quarter's Expenses figure, naming its parts. Short,
         // because three of them share one column.
         "mac.pnl_cap_monthly": ["en": "Monthly costs", "ar": "التكاليف الشهرية"],

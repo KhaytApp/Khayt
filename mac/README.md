@@ -1098,12 +1098,13 @@ failed.
 
 ## Not yet built
 
-The rest of analytics, the cloud portal, and the LAN server's printer webhook — every other LAN route a phone or a customer
-uses is here, including `/status/<id>` and the storefront and carrier webhooks;
-the printer webhook matters least, because this app polls its printers
-itself. `KhaytCore` came first
-because the alternative, screens against a half-trusted engine, is how the two
-apps come to disagree about a shop's money.
+The cloud portal, the operator lock (staff sign in with a PIN, and their access
+level limits what they can open), a site filter that narrows the board, the
+inventory and the dashboard to one location, and the LAN server's printer
+webhook — every other LAN route a phone or a customer uses is here, and the
+printer webhook matters least, because this app polls its printers itself.
+`KhaytCore` came first because the alternative, screens against a half-trusted
+engine, is how the two apps come to disagree about a shop's money.
 
 THE PARAGRAPH ABOVE IS THE LIST, and `NotYetBuiltTests` reads exactly it — the
 first paragraph of this section and nothing after it. That is the guard, and it
@@ -1112,12 +1113,13 @@ portfolio, the colour studio and the converter long after all four shipped, and
 this is the section a person reads to decide what to build next. A list of work
 that is already done is worse than no list, because it is believed.
 
-**Analytics is the one with real distance left in it.**
-`renderer/analytics.js` draws thirty-nine charts and tables — cash flow, cycle
-time, client LTV, machine P&L, a throughput heatmap, a quote funnel, aged
-receivables. `Reports.swift` draws the quarters, the best sellers, what is owed
-and the totals. What is here is the money itself; what is missing is most of
-the ways of looking at it.
+**Analytics is no longer on the list.** Every chart and table
+`renderer/analytics.js` draws has a counterpart on the Mac, most of them lifted
+into `lib/` first so both apps answer from one rule — and nearly every lift
+found an arithmetic bug in the original. The last ones arrived in October 2026:
+client retention, the per-location P&L, staff and labour. The old
+revenue-by-machine bar chart is the exception, because the machine P&L on
+Reports → By machine shows the same revenue beside what it cost.
 
 **The protocols are counted against the seven a machine can actually be set
 to** — `main.js`'s default-port table is the canonical list, and
