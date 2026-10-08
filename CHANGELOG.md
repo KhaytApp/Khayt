@@ -6198,6 +6198,42 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.61] - 2026-10-09
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Look at one site at a time, slice a customer's upload with OrcaSlicer or Bambu
+Studio, and review fixes — one of them a column alpha.60 pushed off the screen.
+
+### New
+
+- **One site at a time.** A shop with locations picks one under the shop's
+  name in the sidebar, and Jobs, the Board, Machines, Inventory and the
+  Dashboard's jobs, machines and stock narrow to it. Jobs and machines with no
+  site show at every site. Each narrowed screen says so ("Riyadh workshop only —
+  26 of 42") with an All sites button. Money and Reports stay the whole shop's,
+  and the kiosk shows its own floor. The choice is not saved: the app opens on
+  all sites.
+- **Slicing a customer's upload with OrcaSlicer or Bambu Studio.** These
+  slicers were run with PrusaSlicer's arguments, which they refuse, and a plain
+  STL carries no printer settings, which they need. The Mac now gives them their
+  own arguments and the printer you last used in them, with a print and a
+  filament profile it accepts. Snapmaker Orca's command line crashes on such a
+  slice (its bug); the quote falls back to the estimate.
+- **Jobs: an Assigned to column**, with who has each job. Hidden until a job
+  has somebody on it.
+
+### Changed and fixed
+
+- **Reports → Profit & Loss: Net Income is back on screen.** alpha.60 widened
+  the Expenses column for its captions and pushed the last column off the
+  edge. The parts of each quarter's expenses are in the figure's tooltip, and
+  the waterfall above still names each.
+- **Reports → Best: top clients count delivered jobs.** A job that had reached
+  its customer was left out, so the best customers read "1×".
+- **The waterfall's waste step** is called "Failed prints" and no longer cut off.
+
 ## [4.0.0-alpha.60] - 2026-10-07
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
