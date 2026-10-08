@@ -271,6 +271,11 @@ extension Shop {
     func restoreOffsite(_ entry: OffsiteBackup.Entry) async -> Bool {
         offsite.problem = nil
         offsite.note = nil
+        // Replacing the book is the most destructive thing the app does: owner only.
+        guard lockAllows("destructive", "create") else {
+            offsite.problem = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
+            return false
+        }
         guard let build = source.build else { offsite.problem = words.callIt("mac.move_sample"); return false }
         guard !offsite.busy else { return false }
         offsite.busy = true

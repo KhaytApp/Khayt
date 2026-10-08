@@ -1098,8 +1098,7 @@ failed.
 
 ## Not yet built
 
-The cloud portal, the operator lock (staff sign in with a PIN, and their access
-level limits what they can open), and the LAN server's printer
+The cloud portal and the LAN server's printer
 webhook — every other LAN route a phone or a customer uses is here, and the
 printer webhook matters least, because this app polls its printers itself.
 `KhaytCore` came first because the alternative, screens against a half-trusted

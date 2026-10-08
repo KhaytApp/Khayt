@@ -56,7 +56,7 @@ struct ShopWindow: View {
     /// the screens that carry their own detail — a card, or a table wide
     /// enough to read — because a panel there would repeat.
     private var wantsPanel: Bool {
-        showInspector && !shop.showingDashboard && !shop.showingBoard
+        showInspector && !shop.needsSignIn && !shop.showingDashboard && !shop.showingBoard
             && !shop.showingMachines && !shop.showingInventory
             && !shop.showingExpenses && !shop.showingWaste && !shop.showingReports
             && !shop.showingCatalogue && !shop.showingColour && !shop.showingPortfolio
@@ -115,7 +115,13 @@ struct ShopWindow: View {
     /// The content region, with no chrome of its own — shared by both shells,
     /// which is what stops this being a fork of the app.
     @ViewBuilder private var screen: some View {
-        if shop.showingDashboard {
+        // THE LOCK, in front of every screen, in both shells — this is the
+        // one place both draw their content through.
+        if shop.needsSignIn {
+            LockScreen(shop: shop)
+        } else if !shop.canShow(shop.shelf) {
+            NotAllowed(shop: shop)
+        } else if shop.showingDashboard {
             Triage(shop: shop)
         } else {
             VStack(spacing: 0) {

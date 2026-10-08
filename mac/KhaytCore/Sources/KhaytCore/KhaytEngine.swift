@@ -962,6 +962,7 @@ public actor KhaytEngine {
         // Electron app spent months not calling it at all.
         "slicers",
         "slicer-presets",
+        "rbac",
         // When this shop could have a new order printed, finished and posted —
         // and the snapshot a storefront quotes that from.
         //
@@ -3520,6 +3521,48 @@ public actor KhaytEngine {
     public func presetFileJson(kind: String, preset: JSONValue) throws -> String {
         try runtime.call2("KhaytSlicerPresets.presetFileJson(ARG0, ARG1)",
                           [.string(kind), preset], as: String.self)
+    }
+
+    // MARK: - The operator lock: who may do what (`lib/rbac.js`)
+
+    /// The permission matrix, as data: role → area → action → allowed.
+    ///
+    /// Read once and asked synchronously by the screens (a sidebar cannot
+    /// await). What it holds is the module's own `MATRIX`; the only logic on
+    /// the Swift side is the lookup, and `OperatorLockTests` holds that lookup
+    /// to `KhaytRbac.can` over every role, area and action, unknowns included.
+    public struct Rbac: Decodable, Sendable, Equatable {
+        public let roles: [String]
+        public let areas: [String]
+        public let actions: [String]
+        public let matrix: [String: [String: [String: Bool]]]
+
+        /// `KhaytRbac.can`: lock off means everything; an unknown role is the
+        /// least privileged; an unknown area or action is refused.
+        public func can(role: String, area: String, action: String, lockEnabled: Bool) -> Bool {
+            if !lockEnabled { return true }
+            let key = role.lowercased()
+            let r = matrix[key] != nil ? key : (roles.last ?? "viewer")
+            return matrix[r]?[area.lowercased()]?[action.lowercased()] == true
+        }
+    }
+
+    public func rbac() throws -> Rbac {
+        try runtime.call2("""
+            ({ roles: KhaytRbac.ROLES, areas: KhaytRbac.AREAS, actions: KhaytRbac.ACTIONS, matrix: KhaytRbac.MATRIX })
+            """, [], as: Rbac.self)
+    }
+
+    /// `KhaytRbac.can`, asked of the module itself — for the parity test.
+    public func rbacCan(role: String, area: String, action: String, lockEnabled: Bool) throws -> Bool {
+        try runtime.call2("KhaytRbac.can(ARG0, ARG1, ARG2, { lockEnabled: ARG3 })",
+                          [.string(role), .string(area), .string(action), .bool(lockEnabled)], as: Bool.self)
+    }
+
+    /// A legacy free-text role ("Admin", "Technician") as a role key.
+    public func roleFromLegacy(_ role: String, hasLock: Bool) throws -> String {
+        try runtime.call2("KhaytRbac.roleFromLegacy(ARG0, { hasLock: ARG1 })",
+                          [.string(role), .bool(hasLock)], as: String.self)
     }
 
     /// Why a slicer that exited with an error did: its own `[error]` line

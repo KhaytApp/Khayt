@@ -132,6 +132,12 @@ private struct BookMenu: View {
     @Environment(Shop.self) private var shop
 
     var body: some View {
+        // Sign out, so the next person signs in. Only while the lock is in
+        // force and somebody is signed in — otherwise there is nothing to lock.
+        Button(Words.upfront("mac.lock_now")) { shop.lockNow() }
+            .keyboardShortcut("l", modifiers: [.control, .command])
+            .disabled(!shop.lockInForce || shop.signedIn == nil)
+        Divider()
         Button(Words.upfront("mac.reload")) { shop.reload() }
             .keyboardShortcut("r")
         // The first-run setup, again — for a shop that closed it, or wants to

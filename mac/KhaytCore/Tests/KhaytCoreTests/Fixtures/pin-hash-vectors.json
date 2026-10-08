@@ -1,0 +1,404 @@
+{
+ "generatedBy": "lib/pin-hash.js (node:crypto), see PinHashTests",
+ "vectors": [
+  {
+   "pin": "1234",
+   "stored": "p2$1000$10d57c255a9ad11f074a4f2159b2d59a$f82441629ccdb25a460d3b5a7f96fbc99147e04e2ef9db8aef9b3c4adfeaa91d",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "12340",
+   "stored": "p2$1000$10d57c255a9ad11f074a4f2159b2d59a$f82441629ccdb25a460d3b5a7f96fbc99147e04e2ef9db8aef9b3c4adfeaa91d",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "1234",
+   "stored": "p2$2000$2e6bf4345c16cb0d445fbd4e1c202aee$2470df49822fa33b588bf037f1bed0579944a72f5db45e0266d3ac6989f2899a",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "12340",
+   "stored": "p2$2000$2e6bf4345c16cb0d445fbd4e1c202aee$2470df49822fa33b588bf037f1bed0579944a72f5db45e0266d3ac6989f2899a",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "0000",
+   "stored": "p2$1000$de929f046efc4a3f5f3eba0928e3f6a8$7faf4f0ec0ed10e6b17c744f766ceda23ce4e08c72d36712053581f7fa2308aa",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "00000",
+   "stored": "p2$1000$de929f046efc4a3f5f3eba0928e3f6a8$7faf4f0ec0ed10e6b17c744f766ceda23ce4e08c72d36712053581f7fa2308aa",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "0000",
+   "stored": "p2$2000$b2da119d3388f1fecdae2ff00a459b92$395d6d2972ee73a6dec57b5a2914ad62e8ab0cf05c41dcd97b7758da09058072",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "00000",
+   "stored": "p2$2000$b2da119d3388f1fecdae2ff00a459b92$395d6d2972ee73a6dec57b5a2914ad62e8ab0cf05c41dcd97b7758da09058072",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "8642",
+   "stored": "p2$1000$5c190c267289988c409b60c1918a6b83$3e708f345b6c1a69782cc40c7a82c238418243a4b3f536949533b949b0d95fdb",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "86420",
+   "stored": "p2$1000$5c190c267289988c409b60c1918a6b83$3e708f345b6c1a69782cc40c7a82c238418243a4b3f536949533b949b0d95fdb",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "8642",
+   "stored": "p2$2000$c331074d1eef1f724714c2947907a22b$17e35c0f82f2d8ebadfe6087552ec52571da8e1d33cad4525b8ff414da5fbb5c",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "86420",
+   "stored": "p2$2000$c331074d1eef1f724714c2947907a22b$17e35c0f82f2d8ebadfe6087552ec52571da8e1d33cad4525b8ff414da5fbb5c",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "13579864",
+   "stored": "p2$1000$265070955a361f3ed3736d663cc50c4a$b82235287f05ab573f20e164f12517d7ffbd2d0e6503ddf78acb7164ab728c42",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "135798640",
+   "stored": "p2$1000$265070955a361f3ed3736d663cc50c4a$b82235287f05ab573f20e164f12517d7ffbd2d0e6503ddf78acb7164ab728c42",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "13579864",
+   "stored": "p2$2000$a65a06b7cd0267428898f88cd53cfe13$3ff7f3234be71d3cf40ccc7f8db5b51513123982b80d47b2b8343b245cd1a85a",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "135798640",
+   "stored": "p2$2000$a65a06b7cd0267428898f88cd53cfe13$3ff7f3234be71d3cf40ccc7f8db5b51513123982b80d47b2b8343b245cd1a85a",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "9",
+   "stored": "p2$1000$4e3023003e10b11738ac506b9d1f2d05$aff714a1c843a2a7bf31d05874b82da8f5e26463a1a52c176a1d1110a09ceaf2",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "90",
+   "stored": "p2$1000$4e3023003e10b11738ac506b9d1f2d05$aff714a1c843a2a7bf31d05874b82da8f5e26463a1a52c176a1d1110a09ceaf2",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "9",
+   "stored": "p2$2000$24b0117d973ca9c8a617cbdf00d450b5$a14f76813621a284fd8ac52f0a6441c0c10450fba1126dae09729dc68a6c9e78",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "90",
+   "stored": "p2$2000$24b0117d973ca9c8a617cbdf00d450b5$a14f76813621a284fd8ac52f0a6441c0c10450fba1126dae09729dc68a6c9e78",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "123456789",
+   "stored": "p2$1000$1c191fd741a5dbe0ab99638b70c8e1ab$33e537ac9437fc58e13235fb1952165fd44fbe3e18b3f805b73b817be8fd617f",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "1234567890",
+   "stored": "p2$1000$1c191fd741a5dbe0ab99638b70c8e1ab$33e537ac9437fc58e13235fb1952165fd44fbe3e18b3f805b73b817be8fd617f",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "123456789",
+   "stored": "p2$2000$9fbe315c67427266a81d70cbf4decc0f$c51c06947982a95584a0a671ccd180727abc3e17b8b24f7ec503bd34790a895f",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "1234567890",
+   "stored": "p2$2000$9fbe315c67427266a81d70cbf4decc0f$c51c06947982a95584a0a671ccd180727abc3e17b8b24f7ec503bd34790a895f",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "",
+   "stored": "p2$1000$4b8ee1d847c5fe825b17653ebc46c831$6041d6e9a0b0c8fd8aca7103aad70b003d5e8567e2aa27c4e242f2d110456587",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "0",
+   "stored": "p2$1000$4b8ee1d847c5fe825b17653ebc46c831$6041d6e9a0b0c8fd8aca7103aad70b003d5e8567e2aa27c4e242f2d110456587",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "",
+   "stored": "p2$2000$f411b85cc10b6acf5075756456bba21e$d155e6aae8d27059a9904cabe12634a56dfeb76af9cbbee691dec256a458dbed",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "0",
+   "stored": "p2$2000$f411b85cc10b6acf5075756456bba21e$d155e6aae8d27059a9904cabe12634a56dfeb76af9cbbee691dec256a458dbed",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "١٢٣٤",
+   "stored": "p2$1000$80c3c22b32497f3faf7b894061563296$247cfb3dd6eadaeb47d556cd369a534ed895a303574e9847afe5b344c41736d9",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "١٢٣٤0",
+   "stored": "p2$1000$80c3c22b32497f3faf7b894061563296$247cfb3dd6eadaeb47d556cd369a534ed895a303574e9847afe5b344c41736d9",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "١٢٣٤",
+   "stored": "p2$2000$ef0542eca873f67360f63ad65d99b4d3$3159b82c0b485ac5fa6ce519ddfa41e346b24b2c660231724dca5626ea0f7a52",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "١٢٣٤0",
+   "stored": "p2$2000$ef0542eca873f67360f63ad65d99b4d3$3159b82c0b485ac5fa6ce519ddfa41e346b24b2c660231724dca5626ea0f7a52",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "KHAYT1234ABCD",
+   "stored": "p2$1000$cf3f913399ff00383b3fefddee0b5ca6$c53c1fc08034d9ed800991599134009b61557f69f1b65fdb8dca337e96aeb789",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "KHAYT1234ABCD0",
+   "stored": "p2$1000$cf3f913399ff00383b3fefddee0b5ca6$c53c1fc08034d9ed800991599134009b61557f69f1b65fdb8dca337e96aeb789",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "KHAYT1234ABCD",
+   "stored": "p2$2000$eec5b2402246d406610106537ea043b1$2f4727cb869c2236804681737c2138d7cf464b25e6d5ef75fadff1983f988a66",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "KHAYT1234ABCD0",
+   "stored": "p2$2000$eec5b2402246d406610106537ea043b1$2f4727cb869c2236804681737c2138d7cf464b25e6d5ef75fadff1983f988a66",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "4711",
+   "stored": "p2$200000$0df34c208c2b6da8b68bc37b30609b96$dfe26cfe682286d3780ac0654c999e1781ad249394e241bad588ca02829e4096",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "4712",
+   "stored": "p2$200000$0df34c208c2b6da8b68bc37b30609b96$dfe26cfe682286d3780ac0654c999e1781ad249394e241bad588ca02829e4096",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "1234",
+   "stored": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+   "ok": true,
+   "managed": true,
+   "upgrade": true
+  },
+  {
+   "pin": "1234",
+   "stored": "03AC674216F3E15C761EE1A5E255F067953623C8B388B4459E13F978D7C846F4",
+   "ok": true,
+   "managed": true,
+   "upgrade": true
+  },
+  {
+   "pin": "9999",
+   "stored": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+   "ok": false,
+   "managed": true,
+   "upgrade": true
+  },
+  {
+   "pin": "7777",
+   "stored": "41c991eb6a66242c0454191244278183ce58cf4a6bcd372f799e4b9cc01886af",
+   "ok": true,
+   "managed": true,
+   "upgrade": true
+  },
+  {
+   "pin": "7777",
+   "stored": "41C991EB6A66242C0454191244278183CE58CF4A6BCD372F799E4B9CC01886AF",
+   "ok": true,
+   "managed": true,
+   "upgrade": true
+  },
+  {
+   "pin": "9999",
+   "stored": "41c991eb6a66242c0454191244278183ce58cf4a6bcd372f799e4b9cc01886af",
+   "ok": false,
+   "managed": true,
+   "upgrade": true
+  },
+  {
+   "pin": "00001111",
+   "stored": "1dc6865af0755579bce4b2e1d4868cdedba41890e63b06a1f933551796115ae7",
+   "ok": true,
+   "managed": true,
+   "upgrade": true
+  },
+  {
+   "pin": "00001111",
+   "stored": "1DC6865AF0755579BCE4B2E1D4868CDEDBA41890E63B06A1F933551796115AE7",
+   "ok": true,
+   "managed": true,
+   "upgrade": true
+  },
+  {
+   "pin": "9999",
+   "stored": "1dc6865af0755579bce4b2e1d4868cdedba41890e63b06a1f933551796115ae7",
+   "ok": false,
+   "managed": true,
+   "upgrade": true
+  },
+  {
+   "pin": "1234",
+   "stored": "",
+   "ok": false,
+   "managed": false,
+   "upgrade": false
+  },
+  {
+   "pin": "1234",
+   "stored": "abc",
+   "ok": false,
+   "managed": false,
+   "upgrade": false
+  },
+  {
+   "pin": "1234",
+   "stored": "p2$0$00$00",
+   "ok": false,
+   "managed": true,
+   "upgrade": false
+  },
+  {
+   "pin": "1234",
+   "stored": "p2$x$00$00",
+   "ok": false,
+   "managed": false,
+   "upgrade": false
+  },
+  {
+   "pin": "1234",
+   "stored": "p2$1000$zz$00",
+   "ok": false,
+   "managed": false,
+   "upgrade": false
+  },
+  {
+   "pin": "1234",
+   "stored": "MTIzNA==",
+   "ok": false,
+   "managed": false,
+   "upgrade": false
+  },
+  {
+   "pin": "1234",
+   "stored": "__KHAYT_MASKED__",
+   "ok": false,
+   "managed": false,
+   "upgrade": false
+  },
+  {
+   "pin": "1234",
+   "stored": "p2$1000$00",
+   "ok": false,
+   "managed": false,
+   "upgrade": false
+  },
+  {
+   "pin": "1234",
+   "stored": "p2$1000$0011$",
+   "ok": false,
+   "managed": false,
+   "upgrade": false
+  },
+  {
+   "pin": "2468",
+   "stored": "p2$1000$8186c71385cb6014$d594b9d9ac0aa1849fde890eff070c9e",
+   "ok": true,
+   "managed": true,
+   "upgrade": false
+  }
+ ]
+}
