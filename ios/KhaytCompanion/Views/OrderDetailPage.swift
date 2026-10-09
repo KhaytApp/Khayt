@@ -19,6 +19,9 @@ struct OrderDetailPage: View {
     @State private var machines: [MachineInfo] = []
     @State private var isUpdating = false
     @State private var errorMessage: String?
+    @State private var payment: BookWriter.PaymentState?
+    @State private var currency: String?
+    @State private var recordingPayment = false
 
     init(order: QueueOrder, facts: OrderFacts?, onChanged: @escaping () async -> Void) {
         _order = State(initialValue: order)
@@ -35,6 +38,18 @@ struct OrderDetailPage: View {
                                onAdvance: { Task { await advance() } },
                                onSetStatus: { st in Task { await setStatus(st) } },
                                onAssignMachine: { id in Task { await assignMachine(id) } })
+            if let payment {
+                PaymentCard(state: payment, currency: currency) { recordingPayment = true }
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            }
+        }
+        .sheet(isPresented: $recordingPayment) {
+            if let payment {
+                RecordPaymentSheet(orderId: order.id, state: payment, currency: currency) {
+                    await loadPayment()
+                    await onChanged()
+                }
+            }
         }
         .background(KhaytDesign.ground.ignoresSafeArea())
         .toolbar(.visible, for: .navigationBar)
@@ -54,8 +69,20 @@ struct OrderDetailPage: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .task { machines = (try? await api.fetchMachines()) ?? [] }
+        .task {
+            machines = (try? await api.fetchMachines()) ?? []
+            await loadPayment()
+        }
         .watchesPrinters(when: order.status == "printing" && order.machineId != nil)
+    }
+
+    private func loadPayment() async {
+        currency = await api.shopCurrency()
+        payment = await api.paymentState(orderId: order.id)
+        #if DEBUG
+        // `-KhaytPaySheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
+        if payment != nil, UserDefaults.standard.bool(forKey: "KhaytPaySheet") { recordingPayment = true }
+        #endif
     }
 
     private func advance() async {

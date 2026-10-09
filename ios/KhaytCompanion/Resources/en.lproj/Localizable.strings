@@ -576,3 +576,26 @@
 "sample.pair" = "Pair with my Mac";
 "pair.pin.too_short" = "Set a longer PIN on your Mac (8+ characters) in Settings → Online, then connect again.";
 "connection.pin_too_short" = "The Mac needs a longer PIN";
+
+/* Recording a payment (shared words with the desktop: pay.*) */
+"pay.modal_title" = "Record payment";
+"pay.amount_paid" = "Amount paid";
+"pay.method" = "Method";
+"pay.method.cash" = "Cash";
+"pay.method.mada" = "Mada";
+"pay.method.transfer" = "Bank transfer";
+"pay.method.stcpay" = "STC Pay";
+"pay.method.applepay" = "Apple Pay";
+"pay.method.visa" = "Credit card";
+"pay.method.other" = "Other";
+"pay.section" = "Payment";
+"pay.status.paid" = "Paid";
+"pay.status.partial" = "Part paid";
+"pay.status.unpaid" = "Unpaid";
+"pay.owed" = "%@ owed";
+"pay.billed" = "Billed";
+"pay.total_hint" = "Everything paid on this job so far, not only today's money.";
+"pay.save" = "Save payment";
+"pay.refused" = "Recording this payment would send %@, which this phone cannot do. Record it on the Mac.";
+"pay.reach.email" = "a receipt email";
+"pay.reach.webhook" = "a webhook";

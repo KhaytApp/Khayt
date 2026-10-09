@@ -716,6 +716,33 @@ final class KhaytAPIClient: ObservableObject {
         await deliverPending()
     }
 
+    /// Where an order stands for money, by the shop's own `cashDue`. Nil
+    /// without a book, for a voided or free job, or one this phone lacks.
+    func paymentState(orderId: String) async -> BookWriter.PaymentState? {
+        guard let book, book.exists, let reader,
+              case .array(let rows)? = try? book.read()["printLog"],
+              case .object(let order)? = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(orderId) { return true }
+                  return false
+              }) else { return nil }
+        var settings: [String: JSONValue] = [:]
+        if case .object(let st)? = try? book.read()["settings"] { settings = st }
+        guard let engine = try? await reader.sharedEngine(),
+              let due = try? await engine.cashDue(order: .object(order), settings: settings) else { return nil }
+        return BookWriter.paymentState(order: order, gross: due.gross, cash: due.cash)
+    }
+
+    /// Record a payment — from the book only. No LAN route takes one, and the
+    /// rule it runs is the shop's (`BookWriter.recordPayment`).
+    func recordPayment(orderId: String, totalPaid: Double, method: String) async throws {
+        guard let book, book.exists, let reader else { throw KhaytAPIError.server(L10n.tr("alert.print.needs_book")) }
+        let engine = try await reader.sharedEngine()
+        try await BookWriter(book: book).recordPayment(orderId: orderId, totalPaid: totalPaid,
+                                                       method: method, engine: engine)
+        await refreshPendingCount()
+        await deliverPending()
+    }
+
     func updateOrderStatus(orderId: String, status: String) async throws {
         if try await writeLocally({ try $0.setOrderStatus(orderId: orderId, to: status) }) { return }
         let encodedId = try encodeOrderIdForPath(orderId)

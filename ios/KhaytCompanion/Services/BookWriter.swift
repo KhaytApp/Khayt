@@ -81,6 +81,9 @@ struct BookWriter {
         case idTaken
         /// A spool this book does not hold — gone already, or never sent.
         case noSuchSpool
+        case noSuchOrder
+        /// Recording it would owe a webhook or an email this phone cannot send.
+        case paymentWouldReach([String])
         /// An expense of nothing, which the endpoint answers 400.
         case noAmount
 
@@ -96,6 +99,11 @@ struct BookWriter {
                 return L10n.tr("error.record_not_added")
             case .noSuchSpool:
                 return L10n.tr("error.no_such_spool")
+            case .noSuchOrder:
+                return L10n.tr("alert.print.no_order")
+            case .paymentWouldReach(let channels):
+                let names = Set(channels.map { $0 == "email" ? L10n.tr("pay.reach.email") : L10n.tr("pay.reach.webhook") })
+                return L10n.format("pay.refused", ListFormatter.localizedString(byJoining: names.sorted()))
             case .noAmount:
                 return L10n.tr("error.amount_required")
             }
@@ -329,6 +337,79 @@ struct BookWriter {
         let ms = Int(now.timeIntervalSince1970 * 1000)
         return "\(prefix)-\(ms)-\(String(format: "%04x", UInt16.random(in: .min ... .max)))"
     }
+
+    // MARK: - Money received
+
+    /// Where an order stands, from the shop's own `cashDue` — computed WITH the
+    /// settings, so a shop that adds tax on top is judged against price + tax.
+    /// (`KhaytEngine.paymentStatus(of:)` takes no settings and would judge the
+    /// same order against the bare price.) Paid in full is the comparison
+    /// `statusOf` makes: what was paid reaches what is left for cash.
+    struct PaymentState: Equatable {
+        let billed: Double
+        let cashDue: Double
+        let paid: Double
+        var owed: Double { max(0, ((cashDue - paid) * 100).rounded() / 100) }
+        var status: String { paid >= cashDue - 0.005 ? "paid" : paid > 0 ? "partial" : "unpaid" }
+    }
+
+    /// `gross` and `cash` are `KhaytEngine.CashDue`'s figures.
+    static func paymentState(order: [String: JSONValue], gross: Double, cash: Double) -> PaymentState? {
+        // A voided or credited job is not collected, and a free one never was.
+        if order["voidedAt"].map({ $0 != .null }) == true || order["creditedAt"].map({ $0 != .null }) == true { return nil }
+        guard gross > 0 else { return nil }
+        var paid = 0.0
+        if case .number(let n)? = order["paidAmount"] { paid = n }
+        return PaymentState(billed: gross, cashDue: cash, paid: paid)
+    }
+
+    /// Record what a customer has paid, by the shop's own rule
+    /// (`KhaytOrderPayment.recordPayment`).
+    ///
+    /// ── THE TOTAL, NOT THE INSTALMENT ────────────────────────────────────
+    ///
+    /// The rule sets `paidAmount` to the figure it is given, capped at what the
+    /// order bills. So `totalPaid` is everything the customer has paid on this
+    /// job, as on the Mac's sheet; the caller adds the money in hand to what was
+    /// already paid.
+    ///
+    /// ── A PAYMENT THAT WOULD REACH SOMEBODY IS REFUSED HERE ──────────────
+    ///
+    /// The rule can owe a `payment_received` webhook, a `paid` order webhook and
+    /// a receipt email. This phone sends none of them, and the Mac's fold of the
+    /// phone's change sends none either — so recording it here would be a
+    /// payment the customer and the shop's integrations never hear about. The
+    /// Mac refuses a payment it cannot announce; so does this, and says where.
+    func recordPayment(orderId: String, totalPaid: Double, method: String,
+                       engine: KhaytEngine, now: Date = Date()) async throws {
+        let store = try book.read()
+        guard case .array(let rows)? = store["printLog"],
+              let order = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(orderId) { return true }
+                  return false
+              }) else { throw Refusal.noSuchOrder }
+        var settings: [String: JSONValue] = [:]
+        if case .object(let st)? = store["settings"] { settings = st }
+        var clients: [JSONValue] = []
+        if case .array(let c)? = store["clients"] { clients = c }
+
+        let reaches = try await engine.paymentOutbound(order: order, settings: settings, clients: clients)
+        if !reaches.isEmpty { throw Refusal.paymentWouldReach(reaches.map(\.channel)) }
+
+        let day = Self.localDay(now)
+        let done = try await engine.recordPayment(order: order, amount: max(0, totalPaid), method: method,
+                                                  paidAt: day, today: day, settings: settings)
+        guard case .object(let paid) = done.order else { throw Refusal.noSuchOrder }
+        try book.updateRecord(collection: "printLog", id: orderId) { record in
+            for key in ["paidAmount", "paidGross", "paymentMethod", "paidAt", "paymentStatus"] {
+                record[key] = paid[key] ?? .null
+            }
+        }
+    }
+
+    /// The Mac's list and order (`Shop.paymentMethods`, from
+    /// `renderer/order-flows.js`), so the two apps offer one set of choices.
+    static let paymentMethods = ["cash", "mada", "transfer", "stcpay", "applepay", "visa", "other"]
 
     // MARK: - Booking a roll in
 

@@ -576,3 +576,26 @@
 "sample.pair" = "اربط بجهاز الماك";
 "pair.pin.too_short" = "عيّن رمزاً أطول على جهاز الماك (٨ أحرف أو أكثر) من الإعدادات ← الاتصال، ثم اتصل مجدداً.";
 "connection.pin_too_short" = "الماك يحتاج رمزاً أطول";
+
+/* Recording a payment (shared words with the desktop: pay.*) */
+"pay.modal_title" = "تسجيل دفعة";
+"pay.amount_paid" = "المبلغ المدفوع";
+"pay.method" = "طريقة الدفع";
+"pay.method.cash" = "نقدي";
+"pay.method.mada" = "مدى";
+"pay.method.transfer" = "تحويل بنكي";
+"pay.method.stcpay" = "STC Pay";
+"pay.method.applepay" = "Apple Pay";
+"pay.method.visa" = "بطاقة ائتمانية";
+"pay.method.other" = "أخرى";
+"pay.section" = "الدفع";
+"pay.status.paid" = "مدفوع";
+"pay.status.partial" = "مدفوع جزئيًا";
+"pay.status.unpaid" = "غير مدفوع";
+"pay.owed" = "متبقٍّ %@";
+"pay.billed" = "المطلوب";
+"pay.total_hint" = "كل ما دُفع على هذا الطلب حتى الآن، لا دفعة اليوم فقط.";
+"pay.save" = "حفظ الدفعة";
+"pay.refused" = "تسجيل هذه الدفعة سيُرسل %@، وهذا لا يمكن من الهاتف. سجّلها على الماك.";
+"pay.reach.email" = "بريد إيصال";
+"pay.reach.webhook" = "إشعار ويب هوك";

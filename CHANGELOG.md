@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: record a payment at the counter.** The order page shows where the
+  job stands (paid, part paid, unpaid, and what is owed) and a "Record payment"
+  sheet: the amount (the total paid on the job, opening on paid in full) and
+  the shop's seven methods, in the desktop's words. It runs the shop's own
+  `recordPayment` rule through KhaytCore — capped at the bill, judged against
+  price + tax on a shop that adds it on top — saved on the phone and synced
+  like any edit. A payment that would owe a webhook or a receipt email is
+  refused with a sentence saying so, because the phone cannot send either and
+  the Mac's merge of the phone's change does not; the Mac refuses the same way.
+
 - **iOS: the companion needs iOS 27.** It was iOS 26. Phones still on iOS 26,
   TestFlight testers included, will not get new builds until they update. The
   iOS CI job moved to GitHub's `xcode-27` image, because `macos-latest` has only
