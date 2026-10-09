@@ -743,6 +743,74 @@ final class KhaytAPIClient: ObservableObject {
         await deliverPending()
     }
 
+    // MARK: - Printer cameras
+
+    /// A machine's still camera, as the phone can show it.
+    struct CameraSource: Equatable {
+        let url: URL
+        let rotate: Int
+        let flipH: Bool
+        let flipV: Bool
+    }
+
+    enum CameraAnswer: Equatable {
+        /// No camera set up for this machine.
+        case none
+        case available(CameraSource)
+        /// Set up, but not something this phone can show; the sentence says why.
+        case refused(String)
+    }
+
+    /// A machine's camera, decided by `lib/webcam.js` — the same rules the
+    /// desktops' snapshot proxy runs: the SNAPSHOT url only (a stream never
+    /// ends), and only from the printer's own host or a LAN address
+    /// (`assertWebcamHostAllowed`). The phone fetches it itself, on the shop's
+    /// Wi-Fi; it is not a proxy, so it adds no reach the shop did not set up.
+    ///
+    /// A camera that needs the printer's key (OctoPrint, PrusaLink, Bambu) is
+    /// refused here: the phone's copy of the book carries credentials MASKED,
+    /// and the key stays on the Mac. Moonraker's camera needs none.
+    func camera(machineId: String) async -> CameraAnswer {
+        guard let book, let reader, case .array(let rows)? = try? book.read()["machines"],
+              case .object(let machine)? = rows.first(where: {
+                  if case .object(let o) = $0, o["id"] == .string(machineId) { return true }
+                  return false
+              }), let engine = try? await reader.sharedEngine() else { return .none }
+        let json = { (v: JSONValue) -> String in
+            (try? String(decoding: JSONEncoder().encode(v), as: UTF8.self)) ?? "null"
+        }
+        let m = json(.object(machine))
+        guard let urlText = try? await engine.raw("KhaytWebcam.snapshotUrlFor(\(m))", as: String.self),
+              !urlText.isEmpty else { return .none }
+        if urlText.lowercased().hasPrefix("rtsp:") { return .refused(L10n.tr("camera.rtsp")) }
+        struct Allowed: Decodable { let ok: Bool; let reason: String? }
+        let api = json(machine["printerApi"] ?? .null)
+        guard let allowed = try? await engine.raw("KhaytWebcam.assertWebcamHostAllowed(\(json(.string(urlText))), \(api))",
+                                                  as: Allowed.self), allowed.ok,
+              let url = URL(string: urlText) else { return .refused(L10n.tr("camera.refused")) }
+        if case .object(let p)? = machine["printerApi"], case .string(let t)? = p["type"],
+           ["octoprint", "prusalink", "bambu"].contains(t.lowercased()) {
+            return .refused(L10n.tr("camera.needs_key"))
+        }
+        var w: [String: JSONValue] = [:]
+        if case .object(let o)? = machine["webcam"] { w = o }
+        func int(_ k: String) -> Int { if case .number(let n)? = w[k] { return Int(n) }; return 0 }
+        func bool(_ k: String) -> Bool { w[k] == .bool(true) }
+        return .available(CameraSource(url: url, rotate: int("rotate"), flipH: bool("flipH"), flipV: bool("flipV")))
+    }
+
+    /// Is this response a frame worth reading? `checkSnapshotHeaders`, asked
+    /// BEFORE the body is kept: a redirect, a non-image or anything over the
+    /// rule's size limit is refused, and 204/503 mean "no frame yet", not broken.
+    func snapshotHeadersOK(status: Int, contentType: String?, length: Int64) async -> (ok: Bool, reason: String?) {
+        guard let reader, let engine = try? await reader.sharedEngine() else { return (false, nil) }
+        struct Verdict: Decodable { let ok: Bool; let reason: String? }
+        let type = (try? String(decoding: JSONEncoder().encode(contentType ?? ""), as: UTF8.self)) ?? "\"\""
+        let v = try? await engine.raw("KhaytWebcam.checkSnapshotHeaders(\(status), \(type), \(length < 0 ? "null" : String(length)))",
+                                      as: Verdict.self)
+        return (v?.ok ?? false, v?.reason)
+    }
+
     func updateOrderStatus(orderId: String, status: String) async throws {
         if try await writeLocally({ try $0.setOrderStatus(orderId: orderId, to: status) }) { return }
         let encodedId = try encodeOrderIdForPath(orderId)

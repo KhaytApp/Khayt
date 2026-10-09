@@ -34,6 +34,29 @@ struct MachinesView: View {
         Dictionary(machines.compactMap { m in m.status.map { (m.id, $0) } }, uniquingKeysWith: { a, _ in a })
     }
 
+    /// Each machine's camera, as `KhaytAPIClient.camera` decided it.
+    @State private var cameras: [String: KhaytAPIClient.CameraAnswer] = [:]
+
+    @ViewBuilder
+    private func cameraLink(_ m: MachineLiveStatus) -> some View {
+        switch cameras[m.id] {
+        case .available(let source)?:
+            NavigationLink {
+                MachineCameraPage(name: m.displayName, source: source)
+            } label: {
+                Label(L10n.tr("camera.open"), systemImage: "video")
+                    .font(.khayt(14, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.brand)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+            }
+            .buttonStyle(.plain)
+        case .refused(let why)?:
+            Text(why).font(.khayt(12, relativeTo: .caption)).foregroundStyle(KhaytDesign.note).padding(.horizontal, 4)
+        default:
+            EmptyView()
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -56,6 +79,7 @@ struct MachinesView: View {
                         LiveStamp()
                         ForEach(rows) { m in
                             MachineCard(live: m, fallbackStatus: statusById[m.id])
+                            cameraLink(m)
                         }
                         if !printers.isLive {
                             Text(staleNote)
@@ -91,6 +115,9 @@ struct MachinesView: View {
         errorMessage = nil
         do {
             machines = try await api.fetchMachines()
+            var found: [String: KhaytAPIClient.CameraAnswer] = [:]
+            for m in machines { found[m.id] = await api.camera(machineId: m.id) }
+            cameras = found
         } catch {
             machines = []
             errorMessage = error.localizedDescription
