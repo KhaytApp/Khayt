@@ -372,6 +372,14 @@ struct Mesh3MFTests {
     /// Stored keys that disagree with today's rule are counted and reported,
     /// not failed: they are the migration this leaves behind, not a bug in
     /// either reader.
+    /// Run blocking work on a utility queue and wait for it without holding
+    /// the main actor or a cooperative-pool thread.
+    nonisolated static func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { done in
+            DispatchQueue.global(qos: .utility).async { done.resume(returning: work()) }
+        }
+    }
+
     @Test("the key this produces is the key Electron produces, file for file")
     func matchesElectron() async throws {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -407,16 +415,29 @@ struct Mesh3MFTests {
           catch(e){out[d+"/"+f]="error:"+e.message;}}}
         process.stdout.write(JSON.stringify(out));
         """
-        let node = Process()
-        node.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        node.arguments = ["node", "-e", script, "--", repo.path, vault.path, String(budget)]
-        let pipe = Pipe()
-        node.standardOutput = pipe
-        node.standardError = FileHandle.nullDevice
-        do { try node.run() } catch { return }   // no node on this machine: nothing to compare against
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        node.waitUntilExit()
-        guard node.terminationStatus == 0,
+        // OFF THE MAIN ACTOR, the node run and every measurement below. This
+        // suite is `@MainActor` and, on a Mac with a real vault, this is
+        // minutes of CPU: on the main thread it starved every test that needs
+        // the main actor meanwhile — the LAN server answers there, and ~60 of
+        // its tests timed out in a full run (alpha.62 re-check). CI has no
+        // vault and returns above, which is why only this Mac saw it.
+        // A dispatch queue and a continuation, not `Task.detached`: a blocking
+        // wait on the cooperative pool can starve it (memory: Swift pool
+        // starvation, the 3-thread CI pool).
+        let ran: (status: Int32, data: Data)? = await Self.offMain {
+            let node = Process()
+            node.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            node.arguments = ["node", "-e", script, "--", repo.path, vault.path, String(budget)]
+            let pipe = Pipe()
+            node.standardOutput = pipe
+            node.standardError = FileHandle.nullDevice
+            do { try node.run() } catch { return nil }   // no node on this machine
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            node.waitUntilExit()
+            return (node.terminationStatus, data)
+        }
+        guard let (status, data) = ran else { return }
+        guard status == 0,
               let electron = try? JSONDecoder().decode([String: String?].self, from: data),
               !electron.isEmpty else {
             Issue.record("node ran and produced nothing to compare against")
@@ -440,7 +461,8 @@ struct Mesh3MFTests {
             let path = vault.appending(path: relative)
             let bytes = (try? FileManager.default.attributesOfItem(atPath: path.path)[.size] as? Int) ?? 0
             if bytes > budget { skipped += 1; continue }
-            guard let m = try? Mesh.measure3MF(path) else {
+            let measured = await Self.offMain { try? Mesh.measure3MF(path) }
+            guard let m = measured else {
                 Issue.record("\(relative): Electron measured it and this could not")
                 continue
             }

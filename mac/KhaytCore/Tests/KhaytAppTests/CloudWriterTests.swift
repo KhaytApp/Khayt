@@ -416,7 +416,10 @@ struct SendToCloudWiringTests {
         guard let fn = source.range(of: "func sendToCloud(") else {
             throw Failure.gone("sendToCloud is gone")
         }
-        return source[fn.lowerBound...].prefix(7000)
+        // 9000: the staff-lock gate (alpha.62) pushed the whole-book call past
+        // 7000 characters into the function, and the window, not the wiring,
+        // was what failed.
+        return source[fn.lowerBound...].prefix(9000)
     }
 
     enum Failure: Error { case gone(String) }
