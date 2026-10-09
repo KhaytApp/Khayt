@@ -657,3 +657,8 @@
 "focus.kind.print" = "الطباعة";
 "focus.kind.intake" = "طلبات جديدة";
 "focus.kind.shop" = "الورشة";
+/* Scanning a Khayt label (lib/scan.js) */
+"scan.label.title" = "مسح ملصق";
+"scan.label.hint" = "وجّه الكاميرا إلى ملصق طلب أو بكرة من خيط.";
+"scan.label.unknown" = "هذا الرمز ليس ملصقًا من خيط.";
+"scan.label.missing" = "الطلب أو البكرة في هذا الملصق غير موجودة على هذا الهاتف.";

@@ -657,3 +657,8 @@
 "focus.kind.print" = "Prints";
 "focus.kind.intake" = "Order requests";
 "focus.kind.shop" = "Shop";
+/* Scanning a Khayt label (lib/scan.js) */
+"scan.label.title" = "Scan a label";
+"scan.label.hint" = "Point at a Khayt job or spool label.";
+"scan.label.unknown" = "That code isn't a Khayt label.";
+"scan.label.missing" = "That label's job or spool isn't on this phone.";
