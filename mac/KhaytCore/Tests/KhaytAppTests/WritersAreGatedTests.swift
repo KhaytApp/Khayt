@@ -19,6 +19,13 @@ import Testing
 /// Functions are bounded by their braces (comments and string literals
 /// skipped), so a local function is not mistaken for the one around it and an
 /// overloaded name is resolved by where the call actually is.
+// SERIALIZED, and the sources parsed ONCE (`parsed`). Each test re-read and
+// re-parsed every app source — about 22 s of CPU apiece on a fast Mac, four of
+// them at once on the cooperative pool. On CI's three-thread runner that held
+// every pool thread for minutes, and the LAN server's tests, which need the
+// pool to answer, timed out at 22 minutes (alpha.62 CI, twice). Measured, not
+// guessed: `swift test --filter WritersAreGatedTests` took 27.6 s wall here.
+@Suite(.serialized)
 struct WritersAreGatedTests {
 
     // MARK: - What counts
@@ -96,7 +103,12 @@ struct WritersAreGatedTests {
         }
     }
 
-    static func read() throws -> [Source] {
+    /// Every app source, parsed once for the whole suite.
+    static let parsed: Result<[Source], Error> = Result { try readUncached() }
+
+    static func read() throws -> [Source] { try parsed.get() }
+
+    static func readUncached() throws -> [Source] {
         let dir = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp")
