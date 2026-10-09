@@ -544,6 +544,7 @@
 
 /* Print alerts */
 "settings.notify.print_done" = "انتهاء الطباعة";
+"settings.live_activities" = "الطباعة على شاشة القفل";
 "alert.print.finished" = "انتهت الطباعة";
 "alert.print.failed" = "فشلت الطباعة";
 "alert.print.cancelled" = "أُلغيت الطباعة";

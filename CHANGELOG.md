@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: prints on the Lock Screen and in the Dynamic Island.** A Live
+  Activity per printing machine, started when the app sees the print: the job,
+  a progress bar and a countdown to the finish, which the system keeps running
+  with the app closed because it is drawn from the end time. It ends with the
+  outcome (done, failed, cancelled) and stays visible half an hour. On by
+  default; Settings → "Prints on the Lock Screen". Also fixed: pausing a print
+  raised a "Print finished" alert — paused is now a print still on the bed.
+
 - **iOS: record a payment at the counter.** The order page shows where the
   job stands (paid, part paid, unpaid, and what is owed) and a "Record payment"
   sheet: the amount (the total paid on the job, opening on paid in full) and

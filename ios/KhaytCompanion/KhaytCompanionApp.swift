@@ -36,6 +36,8 @@ struct KhaytCompanionApp: App {
     /// Held for the life of the app: it is the notification centre's delegate,
     /// which must be in place before a tapped alert launches the app.
     private let alerts: PrintAlertCenter
+    /// Held for the life of the app, like `alerts`: it follows the readings.
+    private let activities: PrintActivities
 
     init() {
         let s = ConnectionSettings()
@@ -50,6 +52,7 @@ struct KhaytCompanionApp: App {
         _channel = StateObject(wrappedValue: channel)
         let center = PrintAlertCenter(api: apiClient, settings: s, printers: printers)
         alerts = center
+        activities = PrintActivities(printers: printers, settings: s)
         channel.onEvent = { kind, at, ciphertext, session in
             await center.receive(kind: kind, ciphertext: ciphertext, dek: session.dek, at: at)
         }

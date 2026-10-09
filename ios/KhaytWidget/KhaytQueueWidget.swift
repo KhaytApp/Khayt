@@ -208,6 +208,7 @@ struct KhaytQueueWidget: Widget {
 struct KhaytWidgetBundle: WidgetBundle {
     var body: some Widget {
         KhaytQueueWidget()
+        PrintActivityWidget()
     }
 }
 

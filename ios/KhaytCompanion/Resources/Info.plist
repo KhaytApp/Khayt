@@ -20,6 +20,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NFCReaderUsageDescription</key>
@@ -29,8 +31,6 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_khayt._tcp</string>
@@ -39,6 +39,8 @@
 	<string>Khayt uses the camera to photograph and read text on filament spool labels (SKU, batch, temperatures).</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Khayt connects to your desktop app on the same Wi‑Fi to show queue, inventory, and printer status.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIAppFonts</key>
 	<array>
 		<string>SpaceGrotesk-400.ttf</string>
