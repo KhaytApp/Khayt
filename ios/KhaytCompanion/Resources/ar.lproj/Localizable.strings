@@ -648,3 +648,12 @@
 "wa.photo.remove" = "إزالة الصورة";
 "wa.share_photo" = "مشاركة مع الصورة…";
 "wa.share_photo.note" = "اختر واتساب من قائمة المشاركة، ثم محادثة العميل. تُسجَّل في سجل تواصل العميل حين تُرسل إلى واتساب.";
+/* Focus filter (ShopFocusFilter) */
+"Khayt notifications" = "إشعارات خيط";
+"Print finished or failed" = "انتهاء الطباعة أو فشلها";
+"New order requests" = "طلبات جديدة";
+"Queue, late jobs, low filament" = "الطابور والطلبات المتأخرة ونقص الخيط";
+"focus.none" = "بلا إشعارات للورشة";
+"focus.kind.print" = "الطباعة";
+"focus.kind.intake" = "طلبات جديدة";
+"focus.kind.shop" = "الورشة";

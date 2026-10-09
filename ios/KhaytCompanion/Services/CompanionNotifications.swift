@@ -133,6 +133,7 @@ final class CompanionNotifications: ObservableObject {
                                      tone: tone, unread: true, orderId: nil))
         guard isAuthorized else { return }
         let content = UNMutableNotificationContent()
+        content.filterCriteria = NotificationKind.shop
         content.title = title
         content.body = body
         content.sound = .default

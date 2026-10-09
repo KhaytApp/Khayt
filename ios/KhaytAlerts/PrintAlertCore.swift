@@ -89,11 +89,36 @@ enum PrintAlertAction: String, CaseIterable {
 }
 
 
+/// What kind of news a notification is — its `filterCriteria`, which a Focus
+/// filter (`ShopFocusFilter`) lets through or holds back. Shared by the app and
+/// the notification service extension, so a push and an in-app alert about the
+/// same print are filtered alike.
+enum NotificationKind {
+    /// A print finished, failed or was cancelled.
+    static let print = "print"
+    /// A new order request reached the shop.
+    static let intake = "intake"
+    /// The queue moved, a job is late, filament is low, the Mac went away.
+    static let shop = "shop"
+    static let all = [print, intake, shop]
+
+    /// From a push's payload (`k.kind`), for a push shown as Apple delivered it.
+    static func of(_ info: [AnyHashable: Any]) -> String {
+        guard let k = info["k"] as? [String: Any], let kind = k["kind"] as? String else { return shop }
+        switch kind {
+        case "print-finished": return print
+        case "intake": return intake
+        default: return shop
+        }
+    }
+}
+
 /// The words of a print alert.
 enum PrintAlertText {
     static func content(for event: PrintFinished, orderStatus: String?,
                         tr: (String) -> String) -> UNMutableNotificationContent {
         let c = UNMutableNotificationContent()
+        c.filterCriteria = NotificationKind.print
         switch event.outcome {
         case .finished: c.title = tr("alert.print.finished")
         case .failed: c.title = tr("alert.print.failed")
