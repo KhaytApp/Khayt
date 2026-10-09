@@ -16,3 +16,7 @@
 "Paused" = "Paused";
 "Failed" = "Failed";
 "Cancelled" = "Cancelled";
+"Log a failed print" = "Log a failed print";
+"Scan a spool" = "Scan a spool";
+"Opens Khayt on the failed-print form." = "Opens Khayt on the failed-print form.";
+"Opens Khayt on booking in a spool." = "Opens Khayt on booking in a spool.";

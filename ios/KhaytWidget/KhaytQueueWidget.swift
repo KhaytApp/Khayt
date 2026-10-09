@@ -209,6 +209,8 @@ struct KhaytWidgetBundle: WidgetBundle {
     var body: some Widget {
         KhaytQueueWidget()
         PrintActivityWidget()
+        LogWasteControl()
+        ScanSpoolControl()
     }
 }
 

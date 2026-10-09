@@ -99,38 +99,5 @@ struct FilamentLeftIntent: AppIntent {
     }
 }
 
-/// Open the app on the failed-print sheet.
-struct LogWasteIntent: AppIntent {
-    static let title: LocalizedStringResource = "Log a failed print"
-    static let description = IntentDescription("Opens Khayt on the failed-print form.")
-    static let supportedModes: IntentModes = .foreground(.immediate)
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        UserDefaults.standard.set("waste", forKey: PendingAction.key)
-        return .result()
-    }
-}
-
-/// Open the app on booking in a spool.
-struct ScanSpoolIntent: AppIntent {
-    static let title: LocalizedStringResource = "Scan a spool"
-    static let description = IntentDescription("Opens Khayt on booking in a spool.")
-    static let supportedModes: IntentModes = .foreground(.immediate)
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        UserDefaults.standard.set("addspool", forKey: PendingAction.key)
-        return .result()
-    }
-}
-
-/// A sheet an intent asked Home to open, taken once.
-enum PendingAction {
-    static let key = "khayt.pending.action"
-    static func take() -> String? {
-        guard let v = UserDefaults.standard.string(forKey: key) else { return nil }
-        UserDefaults.standard.removeObject(forKey: key)
-        return v
-    }
-}
+// "Log a failed print" and "Scan a spool" live in KhaytWidget/ShopControls.swift:
+// they are also Control Center buttons, so the widget extension compiles them too.

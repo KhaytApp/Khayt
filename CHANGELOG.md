@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: Control Center and Lock Screen buttons.** "Log a failed print" and
+  "Scan a spool" can be added to Control Center, the Lock Screen or the Action
+  button; each opens Khayt on that sheet. The request now travels through the
+  App Group, since a control may run outside the app.
+
 - **iOS: Arabic screens write Western digits.** Arabic words, numbers 0–9 —
   the Saudi convention and the desktop's guarded rule
   (`test/arabic-numerals.test.js`), which the phone's `Money` already followed.
