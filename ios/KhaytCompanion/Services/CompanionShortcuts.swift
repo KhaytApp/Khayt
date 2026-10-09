@@ -36,5 +36,29 @@ struct KhaytCompanionShortcuts: AppShortcutsProvider {
             shortTitle: "Inventory",
             systemImageName: "cylinder.split.1x2"
         )
+        AppShortcut(
+            intent: AdvanceJobIntent(),
+            phrases: ["Advance a job in \(.applicationName)", "Move a \(.applicationName) job on"],
+            shortTitle: "Advance a job",
+            systemImageName: "arrow.forward.circle"
+        )
+        AppShortcut(
+            intent: FilamentLeftIntent(),
+            phrases: ["How much filament is left in \(.applicationName)", "\(.applicationName) filament left"],
+            shortTitle: "Filament left",
+            systemImageName: "cylinder"
+        )
+        AppShortcut(
+            intent: LogWasteIntent(),
+            phrases: ["Log a failed print in \(.applicationName)"],
+            shortTitle: "Log a failed print",
+            systemImageName: "trash"
+        )
+        AppShortcut(
+            intent: ScanSpoolIntent(),
+            phrases: ["Scan a spool in \(.applicationName)"],
+            shortTitle: "Scan a spool",
+            systemImageName: "barcode.viewfinder"
+        )
     }
 }

@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: shop actions for Siri and Shortcuts.** "Advance a job" (pick a job,
+  it moves to its next stage — saved on the phone and sent on, without opening
+  the app), "Filament left" ("820 g of PLA left, on 2 spools"), "Log a failed
+  print" and "Scan a spool" (open the app on that sheet). All four also work
+  from Spotlight and the Action button.
+
 - **iOS: see a printer's camera.** On Machines, a machine with a camera set
   up offers "Camera": a still frame fetched from the printer on the shop's
   Wi-Fi every three seconds while the page is open, turned and flipped as the

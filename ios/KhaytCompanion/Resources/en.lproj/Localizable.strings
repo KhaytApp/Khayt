@@ -608,3 +608,16 @@
 "camera.needs_key" = "This camera needs the printer's key, which stays on the Mac.";
 "camera.rtsp" = "This camera only streams RTSP, which the phone can't show.";
 "camera.refused" = "This camera's address isn't the printer's, so the phone won't fetch it.";
+/* App Intents (Siri, Shortcuts, Controls). Plain-English keys are the intents' titles. */
+"intent.advance.done" = "Moved %1$@ to %2$@.";
+"intent.advance.gone" = "That job is no longer in the queue.";
+"intent.no_book" = "Khayt has no shop on this phone yet.";
+"intent.filament.one" = "%1$@ of %2$@ left, on %3$d spool(s).";
+"intent.filament.none" = "No %@ on the shelf.";
+"intent.filament.empty" = "The shelf is empty.";
+"Advance a job" = "Advance a job";
+"Filament left" = "Filament left";
+"Log a failed print" = "Log a failed print";
+"Scan a spool" = "Scan a spool";
+"Job" = "Job";
+"Material" = "Material";

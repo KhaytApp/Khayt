@@ -439,6 +439,12 @@ struct DashboardView: View {
         waiting = await waitingTask ?? []
         pulse = await pulseTask
         facts = await factsTask
+        // A sheet an App Intent asked for (Siri, Shortcuts, a Control).
+        switch PendingAction.take() {
+        case "waste": showWaste = true
+        case "addspool": showAddSpool = true
+        default: break
+        }
         #if DEBUG
         for (name, show) in [("quote", { showQuote = true }), ("waste", { showWaste = true }),
                              ("expense", { showExpense = true }), ("addspool", { showAddSpool = true }),
