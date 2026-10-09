@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: the companion needs iOS 27.** It was iOS 26. Phones still on iOS 26,
+  TestFlight testers included, will not get new builds until they update. The
+  iOS CI job moved to GitHub's `xcode-27` image, because `macos-latest` has only
+  Xcode 26 and cannot build for an iOS 27 minimum.
+
 - **iOS: on iPhone Duo's inner display, lists sit beside what you opened.**
   In regular width — the Duo unfolded, an iPad — Orders and Inventory are
   split views: the list on one side, the order or spool you picked on the

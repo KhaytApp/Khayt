@@ -57,7 +57,11 @@ on:
 jobs:
   contract:
     name: LAN server and companion models
-    runs-on: macos-latest
+    # iOS 27 is the companion's minimum (Oct 2026), so it builds with an iOS 27
+    # SDK. `macos-latest` (macos-26) tops out at Xcode 26.6 / iOS 26.5; GitHub's
+    # `xcode-27` image (public preview) has Xcode 27.0 as default and iOS 27.0
+    # simulators.
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v7
 
@@ -94,5 +98,5 @@ jobs:
           xcodebuild test \
             -scheme KhaytCompanion \
             -project ios/KhaytCompanion.xcodeproj \
-            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            -destination 'platform=iOS Simulator,name=iPhone 18 Pro,OS=27.0' \
             CODE_SIGNING_ALLOWED=NO | tail -40
