@@ -38,6 +38,9 @@ struct OperatorLockTests {
     static func shop(_ operators: [JSONValue] = staff(), on: Bool = true,
                      extra: [String: JSONValue] = [:]) async -> Shop {
         let shop = Shop()
+        // One engine for every lock suite: building one per test was most of
+        // these suites' main-actor time (see `Shop.useEngine`).
+        shop.useEngine(Self.sharedEngine)
         await shop.load(.sample)
         var settings: [String: JSONValue] = ["operatorLockEnabled": .bool(on)]
         for (k, v) in extra { settings[k] = v }
@@ -47,6 +50,10 @@ struct OperatorLockTests {
         await shop.useLockFixture(operators: operators, settings: settings)
         return shop
     }
+
+    /// Shared by every shop the lock suites build. An actor, so concurrent
+    /// suites take turns on it.
+    static let sharedEngine: KhaytEngine = try! KhaytEngine()
 
     /// Each shop has a private record (see `shop`); nothing global to clear.
     static func clearThrottle() {}

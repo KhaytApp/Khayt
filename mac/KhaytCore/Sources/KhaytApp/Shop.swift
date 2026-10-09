@@ -6051,6 +6051,16 @@ final class Shop {
     /// TESTS ONLY: the lock's inputs without a book on disk. The sample book
     /// has staff and no PINs, and must not be given any; the real book is
     /// never a test's to write. Nothing in the app calls this.
+    /// Tests: hand this shop an engine already built, so `load` skips
+    /// building its own. Starting an engine loads ~190 modules on the main
+    /// actor; a suite that builds a Shop per test paid that dozens of times,
+    /// and on CI's three cores the main actor it shares with the in-process
+    /// LAN server stalled that server's tests (alpha.62 CI). Only before the
+    /// first load — a shop never swaps engines under itself.
+    func useEngine(_ shared: KhaytEngine) {
+        if engine == nil { engine = shared }
+    }
+
     func useLockFixture(operators: [JSONValue], settings: [String: JSONValue]) async {
         operatorRows = operators
         settingsValue = .object(settings)
