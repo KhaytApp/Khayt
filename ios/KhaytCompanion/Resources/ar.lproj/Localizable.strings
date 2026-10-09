@@ -608,3 +608,16 @@
 "camera.needs_key" = "هذه الكاميرا تحتاج مفتاح الطابعة، وهو يبقى على الماك.";
 "camera.rtsp" = "هذه الكاميرا تبث RTSP فقط، ولا يستطيع الهاتف عرضه.";
 "camera.refused" = "عنوان هذه الكاميرا ليس عنوان الطابعة، فلن يجلبه الهاتف.";
+/* App Intents (Siri, Shortcuts, Controls). Plain-English keys are the intents' titles. */
+"intent.advance.done" = "نُقل %1$@ إلى %2$@.";
+"intent.advance.gone" = "هذا الطلب لم يعد في الطابور.";
+"intent.no_book" = "لا توجد ورشة في خيط على هذا الهاتف بعد.";
+"intent.filament.one" = "متبقٍّ %1$@ من %2$@، على %3$d بكرة.";
+"intent.filament.none" = "لا يوجد %@ على الرف.";
+"intent.filament.empty" = "الرف فارغ.";
+"Advance a job" = "تقديم طلب";
+"Filament left" = "الخيط المتبقي";
+"Log a failed print" = "تسجيل طباعة فاشلة";
+"Scan a spool" = "مسح بكرة";
+"Job" = "الطلب";
+"Material" = "المادة";
