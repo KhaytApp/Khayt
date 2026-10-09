@@ -76,6 +76,10 @@ extension Shop {
     @discardableResult
     func publishPortal(_ id: Order.ID, deposit: String? = nil, payUrl: String? = nil) async -> String? {
         moveProblem = nil
+        // The staff lock (#1788): putting a job in front of its customer is
+        // editing the job. The portal was built beside the lock, not on it,
+        // and every customer-facing write here went round it (alpha.62 review).
+        guard permitted("orders", "edit") else { return nil }
         guard let build = source.build else { moveProblem = words.callIt("mac.move_sample"); return nil }
         guard let engine else { moveProblem = words.callIt("mac.move_no_engine"); return nil }
         guard portalReachable else { moveProblem = words.callIt("cloud.portal_need_connect"); return nil }
@@ -154,6 +158,7 @@ extension Shop {
     /// Take a job's link down; the job stops refreshing it.
     func unpublishPortal(_ id: Order.ID) async {
         moveProblem = nil
+        guard permitted("orders", "edit") else { return }
         guard let build = source.build, let engine, let tok = portalToken(id) else { return }
         guard cloudRoleCanWrite else { moveProblem = words.callIt("mac.portal_viewer"); return }
         do {
@@ -198,6 +203,8 @@ extension Shop {
 
     /// Answer the customer, as the shop. A viewer cannot; the sheet hides it.
     func replyOnPortal(_ id: Order.ID, text: String) async throws {
+        // A message to the customer, in the shop's name: the lock's edit.
+        guard permitted("orders", "edit") else { throw CocoaError(.userCancelled) }
         let said = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !said.isEmpty, let engine, let tok = portalToken(id) else { return }
         let creds = try await portalCredentials()
