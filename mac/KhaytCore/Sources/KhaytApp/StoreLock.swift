@@ -166,6 +166,7 @@ enum StoreLock {
     /// ownership unconditionally on startup, and deleting its claim on our way
     /// out would leave the book looking unowned while it is being written to.
     static func release(_ record: Record?, for build: StoreReader.Build?) {
+        // lock: system — removes this Mac's own claim on the book as it lets go.
         guard let record, let build, let current = read(for: build) else { return }
         guard current.pid == record.pid,
               host(current.host) == host(record.host) else { return }

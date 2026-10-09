@@ -59,6 +59,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     an old "Admin" who is the last owner is refused like demoting them. With
     the lock on, asking Siri "what is printing" says how many and names no
     job. A kiosk already open stays open: it is the floor's display.
+  - A third pass: a smart plug's automatic switch-off works again with the
+    lock on and nobody signed in (it had been refused, every minute), while
+    switching a plug by hand still asks. Listing a product on the web store
+    from its sheet asks what the web store switch asks. The dashboard's money
+    figures, the ledger view, what is owed and Ask the Book are hidden from
+    staff who may not see the shop's figures. The kiosk no longer has a
+    Window-menu item that opened it behind the lock, Spotlight holds none of
+    the library while the lock is on, and the classic sidebar shows no counts
+    behind the sign-in screen. Rescanning linked folders, freeing up space,
+    attaching a product's document and the library's file moves and
+    deletions each ask the lock too, and the build test now checks that a
+    function gated by its callers names every one of them.
 
 - **iOS: first steps for iPhone Duo, and fixes from a pass over every detail
   screen.**

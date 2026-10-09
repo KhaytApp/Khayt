@@ -204,6 +204,7 @@ private struct BookMenu: View {
         // feature off, is an advertisement in a menu.
         if shop.aiAssistantAllowed {
             Button(Words.upfront("mac.ask_the_book") + "\u{2026}") { shop.askingTheBook = true }
+                .disabled(!shop.lockAllows("analytics", "view"))
             Button(Words.upfront("camp.title") + "\u{2026}") { shop.planningCampaign = true }
         }
 

@@ -105,6 +105,8 @@ enum ImportCommand {
 
     /// Returns the process's exit code: 0 when everything asked for arrived.
     static func run(_ options: Options) async -> Int32 {
+        // lock: system — `khayt import` in Terminal: whoever has the Mac's shell has the
+        // book's files already; the staff lock guards the app's window, not the disk.
         guard let source = Shop.available.first(where: \.isReal),
               let build = source.build else {
             complain("There is no Khayt book on this Mac to import into.")

@@ -1337,7 +1337,7 @@ final class Shop {
         guard case .store(let build) = source, !linkedScannedBooks.contains(build.rawValue),
               !linkedFolders.isEmpty else { return }
         linkedScannedBooks.insert(build.rawValue)
-        Task { [weak self] in await self?.rescanLinkedFolders() }
+        Task { [weak self] in await self?.rescanLinkedFolders(byPerson: false) }
     }
 
     /// The books whose slicer figures this launch has already read.
@@ -3885,6 +3885,12 @@ final class Shop {
 
     /// Ask the assistant, keeping the conversation so "and last month?" works.
     func ask(_ question: String) async {
+        // ASK THE BOOK answers from a summary of the shop's money — revenue,
+        // margins, who owes what — so it is the shop's figures by another
+        // door, and asks what Reports asks (`analytics`; alpha.62 re-check,
+        // round 3). Refused, not answered from a stripped summary: an
+        // assistant without the money answers money questions wrongly.
+        guard lockAllows("analytics", "view") else { askingTheBook = false; return }
         let said = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !said.isEmpty, !asking else { return }
         asking = true
@@ -4154,6 +4160,15 @@ final class Shop {
                      unlinkingDocs droppedDocs: [String] = []) async {
         moveProblem = nil
         guard permitted("inventory", "edit") else { return }
+        // Whether a product is LISTED on the web store is the store's setting,
+        // not the product's: `setOnWebStore` asks settings/edit, and the same
+        // switch on the product sheet went round it through this save
+        // (alpha.62 re-check, round 3). A new product starts listed.
+        let stored = productRows.first { Self.recordId($0) == product.id }.flatMap(Self.asObject)
+        let wasListed = stored?["storefrontHidden"] != .bool(true)
+        if product.onWebStore != wasListed {
+            guard permitted("settings", "edit") else { return }
+        }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -11273,6 +11288,17 @@ final class Shop {
     /// power is never cut while the printer is printing, paused, silent or hot.
     func switchPlug(_ machine: Machine, on: Bool) async {
         guard permitted("orders", "edit") else { plugProblem[machine.id] = moveProblem; return }
+        await performPlugSwitch(machine, on: on)
+    }
+
+    /// The switch itself, with no lock: `switchPlug` asks for a person, and
+    /// `plugTick` calls this for the shop's own auto-off rule — which is the
+    /// owner's standing choice and must run whoever is signed in. Gating it
+    /// refused the minute's auto-off with the lock on and nobody at the Mac,
+    /// and said "sign in first" every minute (alpha.62 re-check, round 3).
+    func performPlugSwitch(_ machine: Machine, on: Bool) async {
+        // lock: system — the shop's own auto-off rule (plugTick), or a person
+        // already let through by switchPlug.
         guard let engine, let record = await plugRecord(machine.id) else { return }
         plugProblem[machine.id] = nil
         if !on {
@@ -11340,7 +11366,7 @@ final class Shop {
                   (try? await engine.plugAutoOffDue(machine: record, live: live,
                                                     finishedAt: printEndedAt[machine.id], now: now)) == true
             else { continue }
-            await switchPlug(machine, on: false)
+            await performPlugSwitch(machine, on: false)
             if plugStates[machine.id]?.on == false {
                 // Once per print: the next one sets a new end.
                 printEndedAt[machine.id] = nil
@@ -16276,6 +16302,7 @@ final class Shop {
     /// already reports — rather than going for good. Found by a file-safety
     /// scan; the Finder can still delete it by hand.
     nonisolated static func trash(_ url: URL) throws {
+        // lock: callers — moveStrandedFiles, unlinkFolder, deleteLibraryFiles
         try FileManager.default.trashItem(at: url, resultingItemURL: nil)
     }
 

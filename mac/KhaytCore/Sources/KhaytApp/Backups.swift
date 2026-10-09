@@ -112,6 +112,7 @@ enum Backups {
     /// (pre-upgrade) backups and anything in `except` are never deleted.
     /// `lib/upgrade-backup.js backupsToDelete` decides, for both apps.
     static func rotate(directory: URL, engine: KhaytEngine?, keep: Int, except: [String] = []) async throws {
+        // lock: system — the app's own backup rotation, keeping the newest on every save.
         guard let engine else { return }
         for name in try await engine.backupsToDelete(all(in: directory), except: except) {
             try? FileManager.default.removeItem(at: directory.appending(path: name))

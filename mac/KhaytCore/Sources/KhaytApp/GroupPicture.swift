@@ -214,6 +214,7 @@ extension Shop {
     /// for nobody. A file is only ever trashed when NO entry names it, and
     /// the Trash is the Finder's own way back.
     func settleGroupPictures(_ change: GroupCoverChange) {
+        // lock: callers — writeGroupCover, setGroupKind, editFiles, restore
         guard let roots = libraryRoots else { return }
         GroupPictures.settle(change, roots: roots.roots, primary: roots.primary)
     }
@@ -239,6 +240,7 @@ extension GroupPictures {
     @MainActor static var inTrash: [String: URL] = [:]
 
     @MainActor static func settle(_ change: GroupCoverChange, roots: [String], primary: String) {
+        // lock: callers — settleGroupPictures
         for rel in change.dropped {
             guard let url = url(of: rel, roots: roots) else { continue }
             var landed: NSURL?

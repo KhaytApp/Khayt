@@ -49,6 +49,12 @@ struct KhaytApp: App {
             KioskWindow(shop: shop)
         }
         .defaultSize(width: 1280, height: 760)
+        // No item of its own in the Window menu: a `Window` scene gets one by
+        // default, and it opened the kiosk from behind the staff lock. It is
+        // opened only by View ▸ Open Kiosk (`openWindow`), which the lock
+        // disables. Apple: "Removes all commands defined by the modified
+        // scene"; the window can still be opened programmatically.
+        .commandsRemoved()
     }
 
     /// The shop's window, with no title bar of its own.

@@ -167,6 +167,7 @@ enum Restore {
     /// this ever runs against a shop's live book.
     @discardableResult
     static func restore(backup source: URL, storeURL: URL,
+        // lock: callers — restore, restoreOffsite
                         owns: () -> Bool, whoHasIt: () -> String?,
                         protect: () async throws -> Void,
                         forgetCloudView: () -> Void,
@@ -377,6 +378,7 @@ enum Restore {
     /// The same, by path. Only `cloud-view-*.json` goes: the folder is the
     /// app's cache directory and nothing else in it is this restore's to delete.
     static func forgetCloudViewFiles(in directory: URL) {
+        // lock: system — drops the app's own cached cloud views, never the book.
         let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
         for name in names where name.hasPrefix("cloud-view-") && name.hasSuffix(".json") {
             try? FileManager.default.removeItem(at: directory.appending(path: name))

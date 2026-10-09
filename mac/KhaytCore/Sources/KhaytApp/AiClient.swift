@@ -99,6 +99,8 @@ enum AiClient {
     static func ask(_ question: String, history: [JSONValue],
                     shop: Shop) async throws -> String {
         guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        // The book's money leaves for the provider here: asked again at the door.
+        guard shop.lockAllows("analytics", "view") else { throw Failure.refused("not allowed") }
         let settings = shop.settingsDict
 
         var key = ""

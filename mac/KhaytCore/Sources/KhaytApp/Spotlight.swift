@@ -137,14 +137,21 @@ final class Spotlight {
     /// and still on disk, but it is not one of the things the shop is choosing
     /// between — and `Shop.reveal` can still show one, for the case where
     /// somebody finds it another way.
+    ///
+    /// AND NOTHING WHILE THE STAFF LOCK IS ON: Spotlight answers anybody at
+    /// the Mac, signed in or not, so the library's names in it were the book
+    /// behind the lock. nil also EMPTIES the index, so switching the lock on
+    /// takes out what was there (alpha.62 re-check, round 3).
     static func indexable(source: Shop.Source, files: [LibraryFile],
-                          wanted: Bool = Spotlight.wanted) -> [LibraryFile]? {
-        guard wanted, source.isReal else { return nil }
+                          wanted: Bool = Spotlight.wanted,
+                          lockOn: Bool = false) -> [LibraryFile]? {
+        guard wanted, source.isReal, !lockOn else { return nil }
         return files.filter { !$0.isArchived }
     }
 
     func reindex(shop: Shop) {
-        guard let files = Self.indexable(source: shop.source, files: shop.files) else {
+        guard let files = Self.indexable(source: shop.source, files: shop.files,
+                                         lockOn: shop.lockSwitchedOn) else {
             // Not an early return with nothing done: a book that WAS indexed
             // and is now the sample must stop being findable, or a shop that
             // closed its book still has it in Spotlight.

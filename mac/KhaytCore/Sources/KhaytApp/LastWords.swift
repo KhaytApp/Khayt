@@ -128,6 +128,7 @@ enum LastWords {
 
     /// Forget it — once a shop has been shown it, it is not news any more.
     static func clear(for build: StoreReader.Build) {
+        // lock: system — the app's own note of how it last quit, not the shop's.
         try? FileManager.default.removeItem(at: file(for: build))
     }
 }

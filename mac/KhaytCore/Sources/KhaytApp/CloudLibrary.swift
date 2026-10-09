@@ -412,6 +412,7 @@ enum CloudLibrary {
     /// the field is a first guess, not a promise. Trying the second is safe:
     /// the hash below refuses anything that is not these exact bytes.
     static func bringBack(_ model: URL, remotes: (KhaytEngine.Sidecar) async -> [LibraryRemote],
+        // lock: system — removes only its own half-written .part download.
                           engine: KhaytEngine) async throws {
         let fm = FileManager.default
         if fm.fileExists(atPath: model.path) { return }
@@ -686,6 +687,9 @@ extension Shop {
     func freeUpSpace(only confirmed: Set<String>) async {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
+        // Deleting this Mac's copies of the library's files is the storage
+        // setting's business (the staff lock): it went unasked.
+        guard permitted("settings", "edit") else { cloudLibraryProblem = moveProblem; return }
         guard let engine, let config = await cloudConfig(), let roots = libraryRoots else {
             cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return
         }

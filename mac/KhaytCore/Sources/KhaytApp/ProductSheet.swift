@@ -327,6 +327,8 @@ struct ProductSheet: View {
                     Text(shop.words.callIt("mac.ws_state")).gridColumnAlignment(.trailing)
                         .foregroundStyle(.secondary)
                     Toggle(shop.words.callIt("mac.ws_show"), isOn: $draft.onWebStore)
+                        // The web store's setting (see `saveProduct`).
+                        .disabled(!shop.lockAllows("settings", "edit"))
                 }
             }
 
@@ -546,6 +548,12 @@ struct ProductSheet: View {
     private func attach() {
         guard let build = shop.source.build else {
             docProblem = shop.words.callIt("mac.move_sample"); return
+        }
+        // The file lands in the product's folder at once, before Save — so it
+        // answers to the lock here, as the save will (inventory/edit).
+        guard shop.lockAllows("inventory", "edit") else {
+            docProblem = shop.words.callIt(shop.needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
+            return
         }
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true

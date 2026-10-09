@@ -236,7 +236,10 @@ struct ShopWindow: View {
                         // models downloaded from one site share one answer.
                         ProvenanceMenu(shop: shop)
                     }
-                } else { OwedSummary(shop: shop) }
+                } else if shop.lockAllows("analytics", "view") {
+                    // What is owed is the shop's money (`analytics`).
+                    OwedSummary(shop: shop)
+                }
             }
             // IMPORT, ON THE SCREEN IT IMPORTS INTO.
             //

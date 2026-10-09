@@ -159,6 +159,7 @@ enum LibraryMove {
     /// Trash). `moveOne` in the other app, step for step.
     @discardableResult
     static func moveOne(_ src: URL, to destDir: URL, filename: String,
+        // lock: callers — moveStrandedFiles
                         trash: (URL) throws -> Void) throws -> (action: String, name: String) {
         let fm = FileManager.default
         let target = destDir.appending(path: filename)
@@ -241,6 +242,7 @@ extension Shop {
     /// in — copied, read back, compared, and only then the original to the
     /// Trash. Nothing is overwritten; a failure leaves that file where it was.
     func moveStrandedFiles() async {
+        // lock: callers — moveLibrary
         guard let roots = libraryRoots else { return }
         let primary = roots.primary
         let from = LibraryMove.sources(roots: roots.roots, primary: primary, mirror: roots.mirror)
