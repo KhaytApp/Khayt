@@ -164,6 +164,10 @@ final class ConnectionSettings: ObservableObject {
     @Published var notifyPrintDone: Bool {
         didSet { UserDefaults.standard.set(notifyPrintDone, forKey: Keys.notifyPrintDone) }
     }
+    /// Prints in progress as Live Activities (Lock Screen, Dynamic Island).
+    @Published var liveActivities: Bool {
+        didSet { UserDefaults.standard.set(liveActivities, forKey: Keys.liveActivities) }
+    }
 
     enum Keys {
         static let host = "khayt.host"
@@ -178,6 +182,7 @@ final class ConnectionSettings: ObservableObject {
         static let notifyOverdue = "khayt.notify.overdue"
         static let notifyLowStock = "khayt.notify.lowstock"
         static let notifyPrintDone = "khayt.notify.printdone"
+        static let liveActivities = "khayt.liveActivities"
         static let sampleShop = "khayt.sampleShop"
     }
 
@@ -196,6 +201,7 @@ final class ConnectionSettings: ObservableObject {
         notifyOverdue = defaults.object(forKey: Keys.notifyOverdue) as? Bool ?? true
         notifyLowStock = defaults.object(forKey: Keys.notifyLowStock) as? Bool ?? true
         notifyPrintDone = defaults.object(forKey: Keys.notifyPrintDone) as? Bool ?? true
+        liveActivities = defaults.object(forKey: Keys.liveActivities) as? Bool ?? true
         isSampleShop = defaults.bool(forKey: Keys.sampleShop)
         L10n.setLanguage(appLanguage)
     }

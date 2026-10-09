@@ -86,6 +86,17 @@
 			);
 			target = T10000000000000000000001 /* KhaytCompanion */;
 		};
+		WGT000000000000000000090 /* Exceptions for "KhaytWidget" folder in "KhaytCompanion" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"/Localized: Localizable.strings",
+				Info.plist,
+				KhaytQueueWidget.swift,
+				KhaytWidget.entitlements,
+				PrintActivityWidget.swift,
+			);
+			target = T10000000000000000000001 /* KhaytCompanion */;
+		};
 		WGT000000000000000000003 /* Exceptions for "KhaytWidget" folder in "KhaytWidgetExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -123,6 +134,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				WGT000000000000000000003 /* Exceptions for "KhaytWidget" folder in "KhaytWidgetExtension" target */,
+				WGT000000000000000000090 /* Exceptions for "KhaytWidget" folder in "KhaytCompanion" target */,
 			);
 			path = KhaytWidget;
 			sourceTree = "<group>";
@@ -230,6 +242,7 @@
 			fileSystemSynchronizedGroups = (
 				SR1000000000000000000001 /* KhaytCompanion */,
 				NSE000000000000000000002 /* KhaytAlerts */,
+				WGT000000000000000000002 /* KhaytWidget */,
 			);
 			name = KhaytCompanion;
 			packageProductDependencies = (

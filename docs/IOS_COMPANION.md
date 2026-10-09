@@ -65,6 +65,24 @@ which; do not assume a route exists on both.
 | **Shortcuts** | Siri / Shortcuts: open queue, open inventory |
 | **Localization** | English + Arabic strings, RTL layout for Arabic |
 
+## Live Activities
+
+`PrintActivities` starts one Live Activity per printing machine, from the live
+readings the app already receives, and ends it with the outcome
+`FinishDetector` would give. The rules are `PrintActivityPlan`, which is pure
+and tested in `PrintActivityTests`.
+
+- The state carries the print's END time, so `Text(timerInterval:)` counts down
+  with the app closed and no update arriving.
+- The type is `KhaytWidget/PrintActivity.swift`, compiled into both the app and
+  the widget extension: the KhaytWidget folder is a member of the app target,
+  with exceptions.
+- Apple allows starting one only while the app is in the foreground. Starting
+  and updating one with the app closed needs ActivityKit push from Khayt Cloud,
+  which isn't built yet.
+- A Live Activity lasts at most 8 hours, so a longer print's activity ends
+  before the print does.
+
 ## LAN API
 
 Endpoints, and **which desktop serves them** — see [LAN_API.md](./LAN_API.md) for

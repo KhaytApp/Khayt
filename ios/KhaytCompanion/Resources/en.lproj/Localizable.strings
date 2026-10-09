@@ -544,6 +544,7 @@
 
 /* Print alerts */
 "settings.notify.print_done" = "Print finished";
+"settings.live_activities" = "Prints on the Lock Screen";
 "alert.print.finished" = "Print finished";
 "alert.print.failed" = "Print failed";
 "alert.print.cancelled" = "Print cancelled";

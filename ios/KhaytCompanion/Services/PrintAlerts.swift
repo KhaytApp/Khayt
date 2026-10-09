@@ -15,6 +15,7 @@ struct FinishDetector {
         var ended: [PrintFinished] = []
         for (id, r) in readings {
             let isPrinting = r.isPrinting
+            if r.isPaused { continue }      // still on the bed: neither started nor ended
             if isPrinting {
                 if printing[id] == nil { printing[id] = (now, r.filename) }
                 continue

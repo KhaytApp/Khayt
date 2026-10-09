@@ -13,3 +13,6 @@
 "ETA %@" = "Done in %@";
 "Open app on shop Wi‑Fi" = "Open Khayt on the shop's Wi‑Fi";
 "%lld%%" = "%lld%%";
+"Paused" = "Paused";
+"Failed" = "Failed";
+"Cancelled" = "Cancelled";

@@ -268,6 +268,9 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
     var displayName: String { name ?? id }
 
     var isPrinting: Bool { (state ?? "").lowercased().contains("print") }
+    /// Paused is a print still on the bed, not an ending — a pause raised a
+    /// "Print finished" alert while `isPrinting` was the only question asked.
+    var isPaused: Bool { (state ?? "").lowercased().contains("pause") }
     var hasError: Bool { !(error ?? "").isEmpty }
     var isOnline: Bool { hasPrinterApi && (state != nil || hasError) }
 
