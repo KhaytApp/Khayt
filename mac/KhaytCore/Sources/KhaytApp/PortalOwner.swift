@@ -178,7 +178,11 @@ extension Shop {
     /// What the customer did with a quote's link. An approval moves a job
     /// still a quote to Pending through `moveJob` — the status rule, with
     /// everything a move owes outward — as the desktop's "Check response" did.
-    func checkPortalResponse(_ id: Order.ID) async -> KhaytEngine.PortalResponse? {
+    /// `moved` is whether the job actually reached Pending — not whether the
+    /// rule said it should. A view-only cloud role, the staff lock or the
+    /// status rule itself can each refuse the move, and the sheet said
+    /// "moved to Pending" regardless (alpha.62 review).
+    func checkPortalResponse(_ id: Order.ID) async -> (said: KhaytEngine.PortalResponse, moved: Bool)? {
         moveProblem = nil
         guard let engine, let tok = portalToken(id), let raw = portalRecord(id) else { return nil }
         do {
@@ -186,8 +190,12 @@ extension Shop {
             let items = try await PortalClient.listPublished(baseUrl: creds.url, shopId: creds.shopId,
                                                              token: creds.token, engine: engine)
             let said = try await engine.portalResponse(items: items, pubToken: tok, order: .object(raw))
-            if said.advance, cloudRoleCanWrite { await moveJob(id, to: .pending) }
-            return said
+            var moved = false
+            if said.advance, cloudRoleCanWrite {
+                await moveJob(id, to: .pending)
+                moved = orders.first(where: { $0.id == id })?.status == "pending"
+            }
+            return (said, moved)
         } catch {
             moveProblem = portalSentence(error); return nil
         }

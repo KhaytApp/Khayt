@@ -204,6 +204,7 @@ extension Shop {
     /// so a move that stops half way leaves every file findable: the old
     /// folder is remembered, and a model is read from wherever it is.
     func moveLibrary(to folder: URL) async {
+        guard permitted("settings", "edit") else { return }
         libraryMoveProblem = nil
         libraryMoveNote = nil
         guard let build = source.build, StoreLock.weOwnIt(build) else {

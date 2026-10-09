@@ -923,6 +923,7 @@ extension Shop {
     /// sealed on the way in.
     private func writeDrive(clientId: String? = nil, clientSecret: String? = nil, refreshToken: String? = nil,
                             folderName: String? = nil, enabled: Bool? = nil, bucketOff: Bool = false) async throws {
+        guard permitted("settings", "edit") else { throw Shop.MoveRefused(sentence: moveProblem ?? "") }
         guard let build = source.build else { throw S3.Failure.notConfigured }
         var sealedSecret: String?
         if let clientSecret { sealedSecret = clientSecret.isEmpty ? "" : try await Secrets.seal(clientSecret, for: build) }
@@ -1057,6 +1058,7 @@ extension Shop {
     /// bucket" / "Use Google Drive instead" with the other one ready. Each
     /// one's copy switch stays as the shop left it.
     func chooseLibraryRemote(_ remote: CloudLibrary.Remote) async {
+        guard permitted("settings", "edit") else { return }
         cloudLibraryProblem = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
         // Models moved to the remote being left would be stranded there:
@@ -1087,6 +1089,7 @@ extension Shop {
     /// so nothing typed can be lost between the two (the "all I got was
     /// saved" report that Save once caused).
     func setLibraryOptions(_ options: CloudLibrary.Options) async {
+        guard permitted("settings", "edit") else { return }
         cloudLibraryProblem = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
         do {
@@ -1140,6 +1143,7 @@ extension Shop {
     /// switches and are left as they are; see `setLibraryOptions`.
     func saveCloudLibrary(provider: String, endpoint: String, bucket: String, region: String,
                           prefix: String, accessKeyId: String, typedSecret: String) async {
+        guard permitted("settings", "edit") else { return }
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }

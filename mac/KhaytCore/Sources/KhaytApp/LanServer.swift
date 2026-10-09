@@ -2297,6 +2297,7 @@ extension Shop {
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
         guard let engine else { throw CocoaError(.fileWriteUnknown) }
         var result: KhaytEngine.Folded?
+        // lock: system — a paired phone's changes; the LAN server gates them with the owner LAN PIN and the phone-writable allowlist.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2314,6 +2315,7 @@ extension Shop {
 
     func recordIntake(_ entry: JSONValue) async throws {
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
+        // lock: system — a customer's request through the LAN intake form; the intake has its own session and rate limits.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2339,6 +2341,7 @@ extension Shop {
         let now = Date()
         let id = LanServer.uniqueId(platform)
         var written: JSONValue?
+        // lock: system — a signed storefront webhook (Salla/Zid); authenticated by its HMAC secret.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2390,6 +2393,7 @@ extension Shop {
     func recordCarrierEvent(_ event: JSONValue, at: String) async throws -> JSONValue? {
         guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
         var moved: JSONValue?
+        // lock: system — a signed carrier webhook; authenticated by its secret.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2428,6 +2432,7 @@ extension Shop {
         guard let base = lanURL, let build = source.build else { return nil }
         var token = ""
         do {
+            // lock: system — mints the quote link's token on first ask; who may copy the link is the inspector's business.
             try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
                 if case .string(let had)? = record["quoteApprovalToken"], !had.isEmpty {
                     token = had
@@ -2450,6 +2455,7 @@ extension Shop {
     func approveQuote(_ jobId: String, nowIso: String) async throws -> JSONValue? {
         guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
         var approved: JSONValue?
+        // lock: system — a customer approving their own quote through the tokened LAN page.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2528,6 +2534,7 @@ extension Shop {
         guard let base = lanURL, let build = source.build else { return nil }
         var token = ""
         do {
+            // lock: system — mints the tracking link's token on first ask; who may copy the link is the inspector's business.
             try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
                 if case .string(let had)? = record["trackingToken"], !had.isEmpty {
                     token = had
@@ -2549,6 +2556,7 @@ extension Shop {
     func recordSurvey(token: String, rating: Double, comment: String?, nowIso: String) async throws -> Bool {
         guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
         var written = false
+        // lock: system — a customer's survey through the tokened LAN page.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2580,6 +2588,7 @@ extension Shop {
         let minted = LanServer.randomToken(bytes: 16)
         guard let sealed = try? await Secrets.seal(minted, for: build) else { return "" }
         do {
+            // lock: system — the calendar feed's token, minted when the LAN server starts.
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },

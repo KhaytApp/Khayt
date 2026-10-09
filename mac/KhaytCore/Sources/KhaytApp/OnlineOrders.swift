@@ -192,6 +192,7 @@ extension Shop {
     /// A drain that fails is reported and the write stands. It is not retried
     /// silently — see `never loop a destructive probe`.
     func recordOnlineOrder(_ order: OnlineOrder, fetch: CloudIntake.Fetch? = nil) async {
+        guard permitted("orders", "create") else { return }
         guard case .store = source else { return }
         onlineProblem = nil
         onlineBusy = true
@@ -249,6 +250,7 @@ extension Shop {
         var outcome: Recorded = .alreadyThere
         var owed: [KhaytEngine.WebhookDelivery] = []
         do {
+            // lock: system — its callers decide: recordOnlineOrder asks orders/create; the web-store pass is automatic (a rule the owner switched on).
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },

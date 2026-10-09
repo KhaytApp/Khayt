@@ -176,6 +176,7 @@ extension Shop {
     }
 
     private func writeGroupCover(_ cover: GroupCover?, for path: String, in build: StoreReader.Build) async {
+        guard permitted("inventory", "edit") else { return }
         var covers = GroupCoverChange()
         var undo = LibraryUndo()
         do {

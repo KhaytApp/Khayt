@@ -304,6 +304,7 @@ enum ImportCommand {
         // of a one-megabyte book is four hundred and forty-five rewrites of it.
         if !drawn.isEmpty || !measured.isEmpty {
             do {
+                // lock: system — the `khayt import` command line, run by the shop's own user in Terminal; no window, no one signed in.
                 try StoreWriter.update(storeURL: build.storeURL,
                                        owns: { StoreLock.weOwnIt(build) },
                                        whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in
@@ -404,6 +405,7 @@ enum ImportCommand {
             return 2
         }
         do {
+            // lock: system — the `khayt import` command line, run by the shop's own user in Terminal; no window, no one signed in.
             try StoreWriter.update(storeURL: build.storeURL,
                                    owns: { StoreLock.weOwnIt(build) },
                                    whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in

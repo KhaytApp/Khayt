@@ -385,6 +385,7 @@ enum LibraryImport {
                                  parsed: await SlicerFigures.read(destination, engine: engine) ?? [:],
                                  externalPath: inPlace ? source.standardizedFileURL.path : nil)
         do {
+            // lock: system — its callers decide: convertModel and addModelToLibrary ask inventory/create.
             try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
                 var rows: [JSONValue] = []
                 if case .array(let existing)? = root["printFiles"] { rows = existing }

@@ -555,6 +555,11 @@ final class Shop {
     func load(_ next: Source, asOf pinned: Date? = nil) async {
         let day = pinned ?? Date()
         clock = pinned
+        // ANOTHER BOOK: its staff are not this one's. Closed until its levels
+        // are read (`lockReady`), and nobody signed in. A reload of the same
+        // book keeps both — every write reloads, and a sign-in screen flashing
+        // after each would be the lock punishing the person it let in.
+        if source != next { lockReady = false; lockSessionId = nil }
         source = next
         problem = nil
         skipped = []
@@ -1379,6 +1384,7 @@ final class Shop {
             do {
                 // `recordingDeletes: false`: nothing is deleted here, and the
                 // automatic stamp must not run — see `applySlicerFigures`.
+                // lock: system — background: the slicer's own figures read out of files already in the library.
                 try StoreWriter.update(build, recordingDeletes: false) { root in
                     Self.applySlicerFigures(found, extOf: extOf, to: &root)
                 }
@@ -1406,6 +1412,7 @@ final class Shop {
                                  engine: KhaytEngine) async {
         guard let reader = try? await engine.geometryReader() else { return }
         do {
+            // lock: system — background: files re-measured because the measuring rule changed.
             try StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },
@@ -1444,6 +1451,7 @@ final class Shop {
             guard let self else { return }
             var created: [String] = []
             do {
+                // lock: system — background: a recurring order falling due, which the shop set up.
                 try await StoreWriter.update(
                     storeURL: build.storeURL,
                     owns: { StoreLock.weOwnIt(build) },
@@ -1480,6 +1488,7 @@ final class Shop {
     /// sheet somewhere else is holding.
     func addCommunication(_ entry: CommEntry, to clientId: String) async {
         moveProblem = nil
+        guard permitted("clients", "edit") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -1503,8 +1512,8 @@ final class Shop {
     /// Take one line out of a customer's log. The FIRST line equal to it: two
     /// identical quick notes are two lines, and deleting one deletes one.
     func removeCommunication(_ entry: CommEntry, from clientId: String) async {
-        guard permitted("clients", "delete") else { return }
         moveProblem = nil
+        guard permitted("clients", "delete") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -1713,6 +1722,7 @@ final class Shop {
 
     /// Say what a group is: one print in parts, or separate prints.
     func setGroupKind(_ path: String, _ kind: GroupKind) async {
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build, !path.isEmpty, groupKind(path) != kind else { return }
         do {
             var covers = GroupCoverChange()
@@ -1968,6 +1978,7 @@ final class Shop {
     func editFiles(_ ids: Set<LibraryFile.ID>, named actionName: String,
                            alsoRoot: ((inout [String: JSONValue]) -> Void)? = nil,
                            change: @escaping (inout [String: JSONValue]) -> Void) -> Bool {
+        guard permitted("inventory", "edit") else { return false }
         guard let build = source.build, !ids.isEmpty else { return false }
         var undo = LibraryUndo()
         var covers = GroupCoverChange()
@@ -1998,6 +2009,7 @@ final class Shop {
     }
 
     private func restore(_ snapshot: LibraryUndo, named actionName: String) {
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build else { return }
         var redo = LibraryUndo()
         var covers = GroupCoverChange()
@@ -2084,6 +2096,7 @@ final class Shop {
     func recordQcFailure(_ id: Order.ID, failureType: String, reason: String,
                          weight: Double) async {
         moveProblem = nil
+        guard permitted("orders", "edit") else { return }
         moveNotices = []
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -2322,8 +2335,8 @@ final class Shop {
     /// Khayt's own rule and because a customer with a phone number and no name
     /// is not a customer anyone can find again.
     func saveCustomer(_ client: Client) async {
-        guard permitted("clients", "edit") else { return }
         moveProblem = nil
+        guard permitted("clients", "edit") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -2740,6 +2753,7 @@ final class Shop {
     /// offered. `lib/printer-relocate.js` draws that line and this does not
     /// redraw it.
     func applyRelocation(_ move: KhaytEngine.Relocation) async {
+        guard permitted("orders", "edit") else { return }
         relocateProblem = nil
         guard let engine, let build = source.build else {
             relocateProblem = words.callIt("mac.move_sample"); return
@@ -2781,6 +2795,7 @@ final class Shop {
     /// chose — and the catalog entry when it recognised the model, which is
     /// what fills in the bed, the nozzle and what it costs to run.
     func addFound(_ printer: KhaytEngine.FoundPrinter) async {
+        guard permitted("inventory", "create") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -2949,6 +2964,7 @@ final class Shop {
     /// operator's. It also re-reads inside the write, so a job assigned by hand
     /// since the panel was drawn is never overwritten by a stale suggestion.
     func accept(_ proposal: KhaytEngine.DispatchProposal) async {
+        guard permitted("orders", "edit") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -3031,6 +3047,7 @@ final class Shop {
     /// written down as one — stamped on the machine, and compared against when
     /// that machine last finished a print.
     func markBedClear(_ machine: Machine) async {
+        guard permitted("orders", "edit") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -3165,6 +3182,7 @@ final class Shop {
     /// was printed, and `materialDeducted` stays false on a record that never
     /// consumed anything.
     func sellFromShelf(_ product: Product, count: Int = 1) async {
+        guard permitted("orders", "create") else { return }
         guard case .store(let build) = source, let engine, count > 0 else { return }
         let onShelf = stockCount(of: product.id)
         guard let onShelf, onShelf >= count else {
@@ -4126,6 +4144,7 @@ final class Shop {
                      tiers: [JSONValue]? = nil, docs: [JSONValue]? = nil,
                      unlinkingDocs droppedDocs: [String] = []) async {
         moveProblem = nil
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -4865,6 +4884,7 @@ final class Shop {
     /// REPLACED rather than duplicated, compared without case, and the id is
     /// kept so anything pointing at it still does.
     func savePreset(name: String, rates: [String: Double]) async -> String? {
+        guard permitted("settings", "edit") else { return moveProblem }
         let wanted = name.trimmingCharacters(in: .whitespaces)
         guard !wanted.isEmpty, let build = source.build else {
             moveProblem = words.callIt(source.build == nil ? "mac.move_sample" : "mac.product_need_name")
@@ -5362,7 +5382,7 @@ final class Shop {
         guard permitted("invoicing", "edit") else { return }
         var owed: [KhaytEngine.WebhookDelivery] = []
         var mail: OrderEmail?
-        let wrote = await writeToOneOrder(id, named: words.callIt("pay.modal_title")) { order, engine, root in
+        let wrote = await writeToOneOrder(id, named: words.callIt("pay.modal_title"), as: .person("invoicing", "edit")) { order, engine, root in
             let settings = Self.settings(root)
             let clients = Self.rows(root, "clients")
             let reaches = (try? await engine.paymentOutbound(
@@ -5470,7 +5490,7 @@ final class Shop {
     /// `fields` holds only what the shop changed — `EditJobSheet.fields`.
     func editJob(_ id: Order.ID, fields: [String: JSONValue]) async {
         guard permitted("orders", "edit") else { return }
-        await writeToOneOrder(id, named: words.callIt("mac.edit_job")) { order, engine, _ in
+        await writeToOneOrder(id, named: words.callIt("mac.edit_job"), as: .person("orders", "edit")) { order, engine, _ in
             let out = try await engine.editJob(
                 order: order, fields: fields,
                 now: Date(), editId: Self.uid("edit"))
@@ -5484,7 +5504,7 @@ final class Shop {
     /// itself — or as business again. It leaves revenue, order counts and the
     /// reports; it still wears the nozzle and still took the machine's time.
     func setNonBusiness(_ id: Order.ID, _ on: Bool) async {
-        await writeToOneOrder(id, named: words.callIt("mac.not_business")) { order, engine, _ in
+        await writeToOneOrder(id, named: words.callIt("mac.not_business"), as: .person("orders", "edit")) { order, engine, _ in
             OneOrderEdit(order: try await engine.setNonBusiness(order, on: on))
         }
     }
@@ -5497,6 +5517,7 @@ final class Shop {
     /// another machine since the card was drawn is left alone.
     func markNotBusiness(_ ids: [Order.ID]) async {
         moveProblem = nil
+        guard permitted("orders", "edit") else { return }
         guard !ids.isEmpty else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -5574,7 +5595,7 @@ final class Shop {
             ? await partEditCost(raw: rawPart(orderId, partId: partId), now, opened: opened)
             : (nil, nil)
 
-        await writeToOneOrder(orderId, named: words.callIt("mac.edit_part")) { order, _, _ in
+        await writeToOneOrder(orderId, named: words.callIt("mac.edit_part"), as: .person("orders", "edit")) { order, _, _ in
             OneOrderEdit(order: Self.orderWithPartEdited(
                 order, partId: partId, now, opened: opened, spool: spool, costed: costed))
         }
@@ -5751,7 +5772,7 @@ final class Shop {
     /// `deliveredAt`. Setting a status here would take it out of the very
     /// column the action feeds — see `KhaytOrderStatus.stageOf`.
     func markDelivered(_ id: Order.ID) async {
-        await writeToOneOrder(id, named: words.callIt("queue.delivered")) { order, engine, _ in
+        await writeToOneOrder(id, named: words.callIt("queue.delivered"), as: .person("orders", "edit")) { order, engine, _ in
             let out = try await engine.markDelivered(order: order, now: Date())
             guard out.ok, let changed = out.order else {
                 throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
@@ -5769,7 +5790,7 @@ final class Shop {
     /// rule; this is the same call Khayt makes.
     func markShipped(_ id: Order.ID) async {
         var owed: [KhaytEngine.WebhookDelivery] = []
-        let wrote = await writeToOneOrder(id, named: words.callIt("queue.shipped")) { order, engine, root in
+        let wrote = await writeToOneOrder(id, named: words.callIt("queue.shipped"), as: .person("orders", "edit")) { order, engine, root in
             let out = try await engine.markShipped(order: order, now: Date())
             guard out.ok, let changed = out.order else {
                 throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
@@ -5810,7 +5831,7 @@ final class Shop {
     /// a parcel cannot leave before the thing in it is made.
     func ship(_ id: Order.ID, carrier: String, service: String?, trackingNumber: String) async {
         var owed: [KhaytEngine.WebhookDelivery] = []
-        let wrote = await writeToOneOrder(id, named: words.callIt("ship.title")) { order, engine, root in
+        let wrote = await writeToOneOrder(id, named: words.callIt("ship.title"), as: .person("orders", "edit")) { order, engine, root in
             guard case .object(let o) = order, o["status"] == .string("completed"),
                   o["deliveredAt"] == nil || o["deliveredAt"] == .null else {
                 throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
@@ -5829,7 +5850,7 @@ final class Shop {
     /// A parcel already sent: a corrected tracking number, or a status picked
     /// by hand. Never moves it backwards — `carriers.advanceShippingStatus`.
     func updateShipment(_ id: Order.ID, status: String?, trackingNumber: String) async {
-        let wrote = await writeToOneOrder(id, named: words.callIt("ship.manage_title")) { order, engine, _ in
+        let wrote = await writeToOneOrder(id, named: words.callIt("ship.manage_title"), as: .person("orders", "edit")) { order, engine, _ in
             OneOrderEdit(order: try await engine.shipmentUpdate(order: order, status: status,
                                                                 trackingNumber: trackingNumber, at: Date()).order)
         }
@@ -5845,21 +5866,28 @@ final class Shop {
     /// Undo a payment: the money was never received, or was recorded against
     /// the wrong job. Nothing leaves the shop, so nothing is refused.
     func clearPayment(_ id: Order.ID) async {
-        await writeToOneOrder(id, named: words.callIt("mac.clear_payment")) { order, engine, _ in
+        let wrote = await writeToOneOrder(id, named: words.callIt("mac.clear_payment"), as: .person("invoicing", "edit")) { order, engine, _ in
             OneOrderEdit(order: try await engine.clearPayment(order: order).order)
         }
+        // The customer's page showed it paid, as recording it republished it.
+        if wrote { await republishPortalIfPublished(id) }
     }
 
     /// The shape both money edits share: one order, changed by the shared rules,
     /// written and stamped inside the same swap every other edit uses.
     /// True when the edit reached the book — what lets a caller send what the
     /// edit owes outward only for a change that was actually kept.
+    ///
+    /// `gate` is REQUIRED: what the edit is, to the staff lock. Every money
+    /// and order edit funnels through here, and before the alpha.62 review
+    /// half of them asked nothing — a viewer could clear a payment.
     @discardableResult
-    private func writeToOneOrder(_ id: Order.ID, named actionName: String,
+    private func writeToOneOrder(_ id: Order.ID, named actionName: String, as gate: LockGate,
                                  change: @escaping (JSONValue, KhaytEngine, [String: JSONValue])
                                  async throws -> OneOrderEdit) async -> Bool {
         moveProblem = nil
         moveNotices = []
+        guard permitted(gate) else { return false }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return false
         }
@@ -5967,9 +5995,20 @@ final class Shop {
     /// is in the book, the other app writes it, and a field in the book is a
     /// field any copy of the book can set. Nobody signs in here by editing a
     /// file somewhere else. Gone on quit, so a relaunch asks again.
-    var lockSessionId: String?
+    var lockSessionId: String? {
+        // EVERY change of who is at this Mac drops what the last person could
+        // undo: an owner who demoted somebody and pressed Lock left an Undo
+        // that put the old access level back for whoever walked up
+        // (alpha.62 review). Undo is the person's, not the Mac's.
+        didSet { if lockSessionId != oldValue { undoManager?.removeAllActions() } }
+    }
     /// `lib/rbac.js`'s matrix, read from the engine with the book.
     var rbac: KhaytEngine.Rbac?
+    /// True once the matrix and every operator's level have been read for the
+    /// book on screen. Until then a switched-on lock refuses everything: the
+    /// first load published the operators before their levels were read, and
+    /// for that moment the lock was not "in force" — open (alpha.62 review).
+    var lockReady = false
     /// Each operator's access level under the lock: `roleKey`, else the
     /// shared `roleFromLegacy` with the lock on.
     var lockRoles: [String: String] = [:]
@@ -6036,6 +6075,7 @@ final class Shop {
     ///
     /// Returns the number drafted, or nil with `moveProblem` set.
     func draftWhatIsLow() async -> Int? {
+        guard permitted("inventory", "create") else { return nil }
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             moveProblem = words.callIt("mac.read_only"); return nil
         }
@@ -6120,6 +6160,7 @@ final class Shop {
     ///
     /// Returns nil when it worked, or what to tell the shop.
     func draftOrder(for itemId: String, consumable: Bool) async -> String? {
+        guard permitted("inventory", "create") else { return moveProblem }
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             return words.callIt("mac.read_only")
         }
@@ -6188,6 +6229,7 @@ final class Shop {
     /// opened is also the moment somebody is holding the invoice.
     func receiveGoods(_ id: String, quantity: Double, notes: String,
                       invoice: Bill = Bill()) async -> String? {
+        guard permitted("inventory", "edit") else { return moveProblem }
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             return words.callIt("mac.read_only")
         }
@@ -6337,6 +6379,7 @@ final class Shop {
     /// Through `spool-edit.js` like every other change to a spool, so the one
     /// rule that decides what a spool record may hold keeps deciding it.
     func markDried(_ id: String, on day: String? = nil) async -> String? {
+        guard permitted("inventory", "edit") else { return moveProblem }
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             return words.callIt("mac.read_only")
         }
@@ -6411,6 +6454,7 @@ final class Shop {
     /// The rule decides the figure and refuses an order that no longer looks
     /// affected — which is what makes a list read a minute ago harmless.
     func correctOrderPrice(_ id: String) async -> String? {
+        guard permitted("invoicing", "edit") else { return moveProblem }
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             return words.callIt("mac.read_only")
         }
@@ -6445,6 +6489,9 @@ final class Shop {
         _ id: String,
         change: @escaping (JSONValue, KhaytEngine) async throws -> JSONValue
     ) async -> String? {
+        // Every purchase-order change is stock: one area, asked here for all
+        // of them (the staff lock — see OperatorLock.swift).
+        guard permitted("inventory", "edit") else { return moveProblem }
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             return words.callIt("mac.read_only")
         }
@@ -6519,6 +6566,7 @@ final class Shop {
     /// for.
     func logPurchase(_ entry: [String: JSONValue], against supplierId: String) async {
         moveProblem = nil
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -6587,6 +6635,7 @@ final class Shop {
 
     func saveSupplier(_ supplier: Supplier) async {
         moveProblem = nil
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -6647,8 +6696,8 @@ final class Shop {
     /// not permission to rewrite what happened — which is why the name is
     /// written onto the order rather than looked up through the id.
     func deleteSupplier(_ id: String) async {
-        guard permitted("inventory", "delete") else { return }
         moveProblem = nil
+        guard permitted("inventory", "delete") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -6720,7 +6769,7 @@ final class Shop {
         guard let undoManager, let build = source.build,
               case .string(let id)? = record["id"] else { return }
         undoManager.setActionName(words.callIt("sup.deleted"))
-        undoManager.registerUndo(withTarget: self) { shop in
+        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
             do {
                 try StoreWriter.update(build) { root in
                     var rows = Self.rows(root, "suppliers")
@@ -6769,8 +6818,8 @@ final class Shop {
     /// shows and nothing else, so whatever else a record carries survives.
     /// The id is `LOC-…` from the same `uid` the other app uses.
     func saveLocation(id: String?, name: String, address: String) async {
-        guard permitted("settings", "edit") else { return }
         moveProblem = nil
+        guard permitted("settings", "edit") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -6831,8 +6880,8 @@ final class Shop {
     /// empty string `lib/machine-edit.js` and `lib/expense-book.js` write for
     /// "none", and an undo puts the row back and points them at it again.
     func deleteLocation(_ id: String) async {
-        guard permitted("settings", "edit") else { return }
         moveProblem = nil
+        guard permitted("settings", "edit") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -6914,7 +6963,7 @@ final class Shop {
         guard let undoManager, let build = source.build,
               case .string(let id)? = record["id"] else { return }
         undoManager.setActionName(words.callIt("set.locations"))
-        undoManager.registerUndo(withTarget: self) { shop in
+        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
             do {
                 try StoreWriter.update(build) { root in
                     Self.relinkingLocation(&root, record: record, id: id, unlinked: unlinked)
@@ -6976,8 +7025,13 @@ final class Shop {
     /// anything this app does not know stay exactly as they were. The id is
     /// `OP-…` from the same `uid` the other app uses.
     func saveOperator(id: String?, _ fields: ShopOperator.Fields, opened: ShopOperator.Fields?) async {
-        guard permitted("security", "edit") else { return }
         moveProblem = nil
+        guard permitted("security", "edit") else { return }
+        // Before anything else can answer: whether the change is allowed at
+        // all is the first question, not one a read-only book gets to skip.
+        if let id, leavesNoOwner(id, stillOwner: fields.active && fields.roleKey == "owner") {
+            moveProblem = words.callIt("mac.lock_last_owner"); return
+        }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -7049,8 +7103,12 @@ final class Shop {
     /// to say.
     @discardableResult
     func deleteOperator(_ id: String) async -> String? {
-        guard permitted("security", "edit") else { return nil }
         moveProblem = nil
+        guard permitted("security", "edit") else { return nil }
+        // Removed OR made inactive, they are no longer an owner who can sign in.
+        if leavesNoOwner(id, stillOwner: false) {
+            moveProblem = words.callIt("mac.lock_last_owner"); return nil
+        }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return nil
         }
@@ -7108,7 +7166,7 @@ final class Shop {
     /// The other app's editor writes `operatorId` and removes it for nobody;
     /// so does this.
     func setJobOperator(_ jobId: Order.ID, _ operatorId: String?) async {
-        await writeToOneOrder(jobId, named: words.callIt("op.assigned")) { order, _, _ in
+        await writeToOneOrder(jobId, named: words.callIt("op.assigned"), as: .person("orders", "edit")) { order, _, _ in
             OneOrderEdit(order: Self.withOperator(order, operatorId))
         }
     }
@@ -7126,6 +7184,7 @@ final class Shop {
     /// operator's rate today: a raise next year does not reprice this work.
     func logTime(jobId: String, operatorId: String, hours: Double, day: String, notes: String) async {
         moveProblem = nil
+        guard permitted("logs", "create") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -7174,8 +7233,8 @@ final class Shop {
 
     /// Take a time entry off. Undo puts it back where it was.
     func deleteTimeEntry(_ id: String) async {
-        guard permitted("logs", "delete") else { return }
         moveProblem = nil
+        guard permitted("logs", "delete") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -7232,7 +7291,7 @@ final class Shop {
     /// figure should be, and the rule refuses an order that no longer looks
     /// affected, which is what makes a list read a minute ago harmless.
     func restoreDeposit(_ id: Order.ID) async {
-        await writeToOneOrder(id, named: words.callIt("dep.restore_btn")) { _, engine, root in
+        await writeToOneOrder(id, named: words.callIt("dep.restore_btn"), as: .person("invoicing", "edit")) { _, engine, root in
             let out = try await engine.restoreDeposit(orders: Self.rows(root, "printLog"),
                                                       orderId: id, settings: Self.settings(root))
             guard out.ok, let repaired = out.order else {
@@ -7269,7 +7328,7 @@ final class Shop {
     /// price − paidAmount bills a customer for a credit note they were already
     /// given, and one built on the gross price bills the deposit twice.
     func makePlan(_ id: Order.ID) async {
-        await writeToOneOrder(id, named: words.callIt("inst.generate")) { order, engine, root in
+        await writeToOneOrder(id, named: words.callIt("inst.generate"), as: .person("invoicing", "edit")) { order, engine, root in
             let owed = try await engine.owedRaw(order: order, settings: Self.settings(root))
             guard case .object(var record) = order else {
                 throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
@@ -7318,7 +7377,7 @@ final class Shop {
     /// a row clears the ROW, and the notice says where the cash figure is
     /// corrected. An immediate mis-tap is ⌘Z, which puts both back.
     func collect(_ id: Order.ID, rowId: String, collected: Bool) async {
-        await writeToOneOrder(id, named: words.callIt("inst.mark_paid")) { order, engine, root in
+        await writeToOneOrder(id, named: words.callIt("inst.mark_paid"), as: .person("invoicing", "edit")) { order, engine, root in
             guard case .object(var record) = order,
                   case .array(let rows)? = record["instalments"] else {
                 throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
@@ -7363,7 +7422,7 @@ final class Shop {
     /// it is meaningless without one, and a stale base left behind would be
     /// added to the next plan's collections.
     func dropPlan(_ id: Order.ID) async {
-        await writeToOneOrder(id, named: words.callIt("common.remove")) { order, _, _ in
+        await writeToOneOrder(id, named: words.callIt("common.remove"), as: .person("invoicing", "edit")) { order, _, _ in
             guard case .object(var record) = order else {
                 throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
             }
@@ -7423,7 +7482,7 @@ final class Shop {
         }
         let comment = comment.trimmingCharacters(in: .whitespacesAndNewlines)
         let now = ISO8601DateFormatter().string(from: Date())
-        await writeToOneOrder(id, named: words.callIt("ord.record_survey")) { order, _, _ in
+        await writeToOneOrder(id, named: words.callIt("ord.record_survey"), as: .person("orders", "edit")) { order, _, _ in
             guard case .object(var o) = order else {
                 throw MoveRefused(sentence: self.words.callIt("mac.move_refused"))
             }
@@ -7748,6 +7807,8 @@ final class Shop {
     /// undoable; the write itself is one transaction either way.
     private func writeKits(_ build: StoreReader.Build, named actionName: String,
                            change: @escaping (inout [String: JSONValue]) -> Void) async {
+        // Kits are stock; every kit change asks the one area (the staff lock).
+        guard permitted("inventory", "edit") else { writeProblem = moveProblem; return }
         do {
             try StoreWriter.update(
                 storeURL: build.storeURL,
@@ -8210,6 +8271,7 @@ final class Shop {
     /// the same rule the Electron page says it with — a warning, not a refusal:
     /// the money has already been spent.
     func addExpense(_ input: [String: JSONValue]) async {
+        guard permitted("invoicing", "create") else { return }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -8267,6 +8329,7 @@ final class Shop {
     /// wasted 200g while the spool still holds them has told the shop it has
     /// filament it has already thrown away.
     func logWaste(_ input: [String: JSONValue]) async {
+        guard permitted("inventory", "create") else { return }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -8674,6 +8737,7 @@ final class Shop {
     /// status, not its queue position. The scheduler proposes a printer; moving
     /// the card is still the operator's.
     func applySchedule() async {
+        guard permitted("orders", "edit") else { return }
         guard let plan = schedulePlan, !plan.assignments.isEmpty else { return }
         guard let build = source.build else {
             scheduleProblem = words.callIt("mac.move_sample"); return
@@ -8791,6 +8855,7 @@ final class Shop {
     /// its book sitting in a temp folder.
     func exportForSharing() async {
         spendProblem = nil
+        guard permitted("settings", "view") else { spendProblem = moveProblem; return }
         spendNote = nil
         guard let build = source.build, let engine else {
             spendProblem = words.callIt("mac.move_sample"); return
@@ -8836,6 +8901,7 @@ final class Shop {
     /// spreadsheet opens a CSV and runs what looks like a formula.
     func exportEverythingAsCsv() async {
         spendProblem = nil
+        guard permitted("settings", "view") else { spendProblem = moveProblem; return }
         spendNote = nil
         guard let build = source.build, let engine else {
             spendProblem = words.callIt("mac.move_sample"); return
@@ -8963,6 +9029,7 @@ final class Shop {
     /// somewhere to put a pair of files is a dialogue nobody finishes.
     func exportForAccounting(format: String) async {
         spendProblem = nil
+        guard permitted("settings", "view") else { spendProblem = moveProblem; return }
         spendNote = nil
         guard let engine else {
             spendProblem = words.callIt("mac.move_sample"); return
@@ -9419,6 +9486,7 @@ final class Shop {
     /// end-to-end encrypted.
     func signInToCloud(url: String, email: String, password: String,
                        passphrase: String) async {
+        guard permitted("cloud", "edit") else { return }
         cloudProblem = nil
         cloudBusy = true
         defer { cloudBusy = false }
@@ -9843,6 +9911,7 @@ final class Shop {
     ///   and after a merge the book has only moved FORWARD — so the view stays
     ///   valid and nothing here has to reach into another app's bookkeeping.
     func pullFromCloud() async {
+        guard permitted("cloud", "edit") else { return }
         cloudProblem = nil
         cloudSent = nil
         cloudPulled = nil
@@ -9967,6 +10036,7 @@ final class Shop {
         var merged: KhaytEngine.Merged?
         var losses: [SyncLoss] = []
         var book: [String: JSONValue] = [:]
+        // lock: system — cloud sync, after a merge the person (or auto-sync) started; the push sends what is already in the book.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -10025,6 +10095,7 @@ final class Shop {
     /// both an order and a print. That rule is `lib/moonraker-history.js`'s and
     /// is not restated here.
     func importPrinterHistory(_ machine: Machine) async {
+        guard permitted("orders", "create") else { return }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -10376,6 +10447,7 @@ final class Shop {
     /// where to put it has already spent the time before the shop can change
     /// its mind, and a shop that cancels should have cost nothing.
     func convertModel(_ file: LibraryFile, targetId: String?) async {
+        guard permitted("inventory", "create") else { return }
         clearLastOutcome()
         guard let source = modelFile(for: file) else {
             convertProblem = words.callIt("mac.not_found"); return
@@ -10475,6 +10547,7 @@ final class Shop {
     /// So the record keeps everything it had, gains the date and the id of what
     /// replaced it, and stops being offered. The file stays where it is.
     func supersede(_ original: LibraryFile, with replacement: String) async {
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build else { return }
         let now = ISO8601DateFormatter().string(from: Date())
         do {
@@ -10494,6 +10567,7 @@ final class Shop {
     /// The other half, because a one-way door is not a decision a shop should
     /// have to be sure about before it makes it.
     func unarchive(_ file: LibraryFile) async {
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build else { return }
         do {
             try StoreWriter.updateRecord(build, collection: "printFiles", id: file.id) { record in
@@ -10535,6 +10609,7 @@ final class Shop {
     /// Returns nil when the card was issued, or what to tell the shop.
     func issueGiftCard(code: String, balance: Double,
                        issuedTo: String?, expires: Date?) async -> String? {
+        guard permitted("invoicing", "create") else { return moveProblem }
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             return words.callIt("mac.read_only")
         }
@@ -10580,6 +10655,7 @@ final class Shop {
 
     /// The same, for a file that arrived some other way.
     func addModelToLibrary(_ url: URL) async {
+        guard permitted("inventory", "create") else { return }
         importing = true
         defer { importing = false }
         do {
@@ -10684,6 +10760,7 @@ final class Shop {
     /// `opened` is the list as the pane opened it.
     func saveSlicers(_ list: [KhaytEngine.Slicer], defaultId: String,
                      opened: (list: [KhaytEngine.Slicer], defaultId: String)?) async {
+        guard permitted("settings", "edit") else { return }
         settingsProblem = nil
         settingsNote = nil
         guard let build = source.build else {
@@ -10783,6 +10860,7 @@ final class Shop {
 
     /// `opened` is the list before this change.
     func saveReports(_ list: [KhaytEngine.SavedReport], opened: [KhaytEngine.SavedReport]?) async {
+        guard permitted("settings", "edit") else { return }
         settingsProblem = nil
         settingsNote = nil
         guard let build = source.build else {
@@ -11119,6 +11197,7 @@ final class Shop {
               let fields = try? await engine.energyJobFields(reading, at: Self.isoNow(now)),
               !fields.isEmpty else { return }
         do {
+            // lock: system — background: a finished print's energy, measured by the meter or camera.
             try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
                 for (key, value) in fields { record[key] = value }
             }
@@ -11476,6 +11555,7 @@ final class Shop {
     /// fetching first, then one write for the whole import, so a network
     /// failure halfway leaves the shelf untouched.
     func importFromSpoolman(_ address: String) async throws -> String {
+        guard permitted("inventory", "create") else { throw MoveRefused(sentence: moveProblem ?? "") }
         guard let build = source.build else { throw MoveRefused(sentence: words.callIt("mac.move_sample")) }
         guard let engine else { throw MoveRefused(sentence: words.callIt("mac.move_no_engine")) }
         let base = try await SpoolmanImport.base(address, engine: engine)
@@ -11577,6 +11657,7 @@ final class Shop {
     /// `keptEdit`. Nil for a new spool.
     func saveSpool(_ input: [String: JSONValue], id: Spool.ID?,
                    opened: [String: JSONValue]?) async {
+        guard permitted("inventory", "edit") else { return }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -11693,6 +11774,7 @@ final class Shop {
     /// `opened` is the sheet's input for the item as it opened. Nil for a new one.
     func saveConsumable(_ input: [String: JSONValue], id: Consumable.ID?,
                         opened: [String: JSONValue]?) async {
+        guard permitted("inventory", "edit") else { return }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -11752,7 +11834,7 @@ final class Shop {
         guard let undoManager, let build = source.build,
               case .string(let id)? = record["id"] else { return }
         undoManager.setActionName(words.callIt("cons.title"))
-        undoManager.registerUndo(withTarget: self) { shop in
+        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
             do {
                 try StoreWriter.update(build) { root in
                     var shelf = Self.rows(root, "consumables")
@@ -11934,7 +12016,7 @@ final class Shop {
             for key in ["images", "imagePath", "thumbnail"] { restored.removeValue(forKey: key) }
         }
         undoManager.setActionName(words.callIt("pe.deleted"))
-        undoManager.registerUndo(withTarget: self) { shop in
+        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
             do {
                 try StoreWriter.update(build) { root in
                     var rows = Self.rows(root, "products")
@@ -11991,7 +12073,7 @@ final class Shop {
         guard let undoManager, let build = source.build,
               case .string(let id)? = record["id"] else { return }
         undoManager.setActionName(words.callIt("inv.removed"))
-        undoManager.registerUndo(withTarget: self) { shop in
+        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
             do {
                 try StoreWriter.update(build) { root in
                     var shelf = Self.rows(root, "inventory")
@@ -12071,6 +12153,7 @@ final class Shop {
     /// it opened — nil for a new one.
     func saveMachine(_ input: [String: JSONValue], id: Machine.ID?, catalogId: String?,
                      opened: [String: JSONValue]?) async {
+        guard permitted("inventory", "edit") else { return }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -12244,6 +12327,7 @@ final class Shop {
     /// did not ask for.
     @discardableResult
     func finishSetup(_ setup: ShopSetup) async -> Bool {
+        guard permitted("settings", "edit") else { return false }
         setupProblem = nil
         let held = ShopSetup.settingsReading(settingsDict)
         guard setup.writesAnything(currentCurrency: held.currency, currentlyChargesVat: held.chargesVat,
@@ -12594,6 +12678,7 @@ final class Shop {
     /// and the photograph disappears again. Nil when it worked, else why not.
     private func attachJobPhoto(_ made: (thumb: String, full: Data), jobId: String,
                                 build: StoreReader.Build, folder: URL) -> String? {
+        guard permitted("orders", "edit") else { return moveProblem }
         do {
             // The index the other app uses is the position in the job's own
             // list, so it is read from the record rather than counted from the
@@ -12757,6 +12842,7 @@ final class Shop {
     /// none. The file goes down before the record, as everywhere else.
     @discardableResult
     func useAsProductPhoto(_ snap: Snapshot) async -> ProductPhotoResult {
+        guard permitted("inventory", "edit") else { return .failed }
         guard let build = source.build, canWrite, let engine,
               let job = orders.first(where: { $0.id == snap.orderId }),
               let productId = job.productId, let row = productOf(job) else {
@@ -13745,6 +13831,11 @@ final class Shop {
     /// deduction — all of that stays, and a field someone else wrote since is
     /// left and named rather than overwritten with a stale copy.
     private func restoreMove(_ snapshot: [ChangedRecord], named actionName: String) {
+        // An undo is a write, and it answers to the lock like the edit it
+        // reverses: whoever is here must be allowed to edit every kind of
+        // record it puts back (the stack is also dropped on every change of
+        // who is signed in — see `lockSessionId`).
+        guard permittedRestoring(snapshot.map(\.collection)) else { return }
         guard let build = source.build else { return }
         var outcome = UndoOutcome()
         do {
@@ -13763,7 +13854,9 @@ final class Shop {
     }
 
     /// The shared shape of every edit: check we may write, do it, re-read.
-    private func write(_ change: (inout [String: JSONValue]) -> Void) {
+    /// `gate` is what the edit is to the staff lock, and it is required.
+    private func write(as gate: LockGate, _ change: (inout [String: JSONValue]) -> Void) {
+        guard permitted(gate) else { writeProblem = moveProblem; return }
         guard let build = source.build else { return }
         do {
             try StoreWriter.update(build) { root in change(&root) }
@@ -13813,7 +13906,7 @@ final class Shop {
         // `uid('WATPL')`, the other app's own shape, so a template made here
         // looks like one made there to anything that sorts or dedupes ids.
         let wanted = id ?? Self.uid("WATPL")
-        write { root in
+        write(as: .person("settings", "edit")) { root in
             var rows = Self.rows(root, MessageTemplate.collection)
             // `milestone` and `lang` only when set: the WhatsApp milestone
             // updates read them (`lib/whatsapp-message.js:templateFor`), and a
@@ -13866,10 +13959,10 @@ final class Shop {
 
     /// Take one off the list. An id nobody has is not an error.
     func deleteTemplate(_ id: String) {
-        guard permitted("settings", "edit") else { return }
         writeProblem = nil
+        guard permitted("settings", "edit") else { return }
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
-        write { root in
+        write(as: .person("settings", "edit")) { root in
             let rows = Self.rows(root, MessageTemplate.collection)
                 .filter { Self.recordId($0) != id }
             root[MessageTemplate.collection] = .array(rows)
@@ -13911,7 +14004,7 @@ final class Shop {
             writeProblem = String(describing: error)
             return
         }
-        write { root in
+        write(as: .person("settings", "edit")) { root in
             var settings = Self.settings(root)
             settings["bizLogo"] = .string(uri)
             root["settings"] = .object(settings)
@@ -13922,7 +14015,7 @@ final class Shop {
     func clearLogo() {
         writeProblem = nil
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
-        write { root in
+        write(as: .person("settings", "edit")) { root in
             var settings = Self.settings(root)
             // The EMPTY STRING, which is what `settings-edit` writes for an
             // absent one — not a removed key, which a merge could resurrect
@@ -13988,7 +14081,7 @@ final class Shop {
         }
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
         guard wanted != mode else { return }
-        write { root in
+        write(as: .person("settings", "edit")) { root in
             var settings = Self.settings(root)
             settings["mode"] = .string(wanted)
             root["settings"] = .object(settings)
@@ -14035,7 +14128,7 @@ final class Shop {
         // All three fields, the other app's own shape — `productionPaused`,
         // `pauseReason`, `pausedAt`. A pause that set only the flag would leave
         // a stale reason from the last one on the banner.
-        write { root in
+        write(as: .person("orders", "edit")) { root in
             var settings = Self.settings(root)
             settings["productionPaused"] = .bool(true)
             settings["pauseReason"] = .string(reason)
@@ -14047,7 +14140,7 @@ final class Shop {
     func resumeProduction() {
         writeProblem = nil
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
-        write { root in
+        write(as: .person("orders", "edit")) { root in
             var settings = Self.settings(root)
             settings["productionPaused"] = .bool(false)
             settings["pauseReason"] = .string("")
@@ -14171,6 +14264,7 @@ final class Shop {
     private func store(_ analysis: [String: JSONValue], for id: String, hash: String?) {
         guard let build = source.build else { return }
         do {
+            // lock: system — a file's measured analysis cached on its record; nothing a person typed.
             try StoreWriter.update(build) { root in
                 Self.edit(&root, ids: [id]) { record in
                     var held: [String: JSONValue] = ["analysis": .object(analysis)]
@@ -14729,6 +14823,7 @@ final class Shop {
         // source typed while the zips were being read is the shop's, and
         // wins. Found by the September 2026 scan.
         do {
+            // lock: system — background: where a model came from, read out of the files themselves.
             try StoreWriter.update(build) { root in
                 guard case .array(var rows)? = root["printFiles"] else { return }
                 for i in rows.indices {
@@ -15881,6 +15976,7 @@ final class Shop {
     /// Returns what to tell the shop.
     func sendCampaign(_ body: String, subject: String = "",
                       to recipients: [KhaytEngine.Recipient]) async -> String {
+        guard permitted("clients", "edit") else { return moveProblem ?? "" }
         guard !recipients.isEmpty else { return words.callIt("camp.none") }
         guard !body.trimmingCharacters(in: .whitespaces).isEmpty else {
             return words.callIt("camp.need_body")
@@ -15994,6 +16090,7 @@ final class Shop {
     private func recordCampaign(reached: Int, sent: Int, failed: Int) async {
         guard let build = source.build else { return }
         do {
+            // lock: system — the record of a campaign the person just sent (`sendCampaign` asks clients/edit).
             try StoreWriter.update(build) { root in
                 var settings: [String: JSONValue] = [:]
                 if case .object(let s)? = root["settings"] { settings = s }
@@ -16028,6 +16125,7 @@ final class Shop {
     ///
     /// Returns nil when it worked, or what to tell the shop.
     func redeemPoints(_ clientId: String) async -> String? {
+        guard permitted("invoicing", "edit") else { return moveProblem }
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             return words.callIt("mac.read_only")
         }
@@ -16653,6 +16751,7 @@ final class Shop {
     /// The shop confirmed the preview: write it. Each product re-priced here
     /// is a price the shop chose, so a live web store may follow it.
     func applySpoolRepair(_ changes: [SpoolRepairChange]) async {
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build, canMoveJobs, !changes.isEmpty else { return }
         var done: [String] = []
         do {
@@ -16691,6 +16790,7 @@ final class Shop {
         // Asked before writing, so an ordinary load of an ordinary book does
         // not open the store for writing at all.
         guard rawHasStrandedLog else { return }
+        // lock: system — migration: a service log stranded by an old build, moved where the app reads it.
         try? StoreWriter.update(build) { root in
             _ = ServiceLogEdit.rescueStranded(&root)
         }
@@ -16701,6 +16801,7 @@ final class Shop {
     private(set) var rawHasStrandedLog = false
 
     func markMaintenanceDone(_ taskId: String, on machine: Machine) async {
+        guard permitted("inventory", "edit") else { return }
         guard let engine, let build = source.build, canMoveJobs else { return }
         guard let task = maintTaskRows.first(where: {
             if case .object(let o) = $0, case .string(let id)? = o["id"] { return id == taskId }
@@ -16779,6 +16880,7 @@ final class Shop {
     func addMaintenanceTask(machineId: String, name: String,
                             intervalHours: Double, intervalDays: Double) async {
         writeProblem = nil
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build, canMoveJobs else {
             writeProblem = words.callIt("mac.move_sample"); return
         }
@@ -16816,6 +16918,7 @@ final class Shop {
                              intervalHours: Double, intervalDays: Double,
                              opened: MaintenanceTaskEdit.Opened?) async {
         writeProblem = nil
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build, canMoveJobs else {
             writeProblem = words.callIt("mac.move_sample"); return
         }
@@ -16849,8 +16952,8 @@ final class Shop {
     /// Stop tracking a task. The services already logged against the machine
     /// stay: a schedule is a plan, and deleting a plan does not unmake the work.
     func deleteMaintenanceTask(_ taskId: String) async {
-        guard permitted("inventory", "delete") else { return }
         writeProblem = nil
+        guard permitted("inventory", "delete") else { return }
         guard let build = source.build, canMoveJobs else {
             writeProblem = words.callIt("mac.move_sample"); return
         }
@@ -16875,6 +16978,7 @@ final class Shop {
     func addServiceEntry(machineId: String, date: Date, note: String, cost: Double,
                          alsoAnExpense: Bool) async {
         writeProblem = nil
+        guard permitted("inventory", "edit") else { return }
         guard let build = source.build, canMoveJobs else {
             writeProblem = words.callIt("mac.move_sample"); return
         }
@@ -16930,8 +17034,8 @@ final class Shop {
     /// have seen it, and deleting a line from a maintenance history is not a
     /// statement that the money was never spent.
     func deleteServiceEntry(_ entryId: String) async {
-        guard permitted("inventory", "delete") else { return }
         writeProblem = nil
+        guard permitted("inventory", "delete") else { return }
         guard let build = source.build, canMoveJobs else {
             writeProblem = words.callIt("mac.move_sample"); return
         }

@@ -29,6 +29,7 @@ extension Shop {
         guard var pending = liveRestoreMarker(build) else { return false }
         let keepAt = SyncLosses.fileURL(for: build.storeURL)
         var losses: [SyncLoss] = []
+        // lock: system — cloud sync's safety net, keeping what a merge would have dropped.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -104,6 +105,9 @@ extension Shop {
     /// Put one kept record back in the book.
     func putBackSyncLoss(_ loss: SyncLoss) async {
         moveProblem = nil
+        // A record of ANY collection comes back here — staff included — so it
+        // asks the area that collection belongs to (the staff lock).
+        guard permittedRestoring([loss.collection]) else { return }
         guard let build = source.build else { moveProblem = words.callIt("mac.move_sample"); return }
         do {
             try await StoreWriter.update(

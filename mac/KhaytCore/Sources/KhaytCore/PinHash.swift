@@ -32,12 +32,22 @@ public enum PinHash {
     /// future raise and nothing near that.
     public static let maxIterations = 10_000_000
 
+    /// ASCII hex in whole bytes, at least one. `Character.isHexDigit` also
+    /// takes the fullwidth Ａ-Ｆ the JavaScript refuses, and an odd or empty run
+    /// decodes to no key at all — a hash that can never verify, which read as a
+    /// PIN that is SET, so its owner counted towards the lock being in force
+    /// and the shop was locked out bar the recovery code (alpha.62 review).
+    /// Stricter than `lib/pin-hash.js` on purpose: such a hash is "unreadable"
+    /// here, never "set".
+    static func isHexBytes(_ s: Substring) -> Bool {
+        !s.isEmpty && s.count % 2 == 0 && s.allSatisfy { $0.isASCII && $0.isHexDigit }
+    }
+
     public static func isPbkdf2(_ stored: String) -> Bool {
         let parts = stored.split(separator: "$", omittingEmptySubsequences: false)
         guard parts.count == 4, parts[0] == Substring(prefix),
               !parts[1].isEmpty, parts[1].allSatisfy({ $0.isASCII && $0.isNumber }),
-              !parts[2].isEmpty, parts[2].allSatisfy(\.isHexDigit),
-              !parts[3].isEmpty, parts[3].allSatisfy(\.isHexDigit) else { return false }
+              isHexBytes(parts[2]), isHexBytes(parts[3]) else { return false }
         return true
     }
 

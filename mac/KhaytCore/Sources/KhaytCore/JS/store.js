@@ -41,6 +41,9 @@
     mask(s.eventWebhooks, 'secret');
     mask(s.ai, 'apiKey');
     mask(s.cloud, 'token');
+    // The PIN-reset code's hash: a twelve-character code, but the hash is
+    // offline-guessable at leisure by whoever holds the file (alpha.62 review).
+    mask(s, 'recoveryCodeHash');
     // The shop's data key, wrapped by its passphrase, with the KDF parameters:
     // whoever holds it can guess the passphrase offline, and the passphrase
     // opens the cloud copy. DELETED, not masked (a string where an object is
@@ -146,6 +149,20 @@
     });
   }
 
+  /**
+   * Staff PIN hashes, MASKED in an export. A four-digit PIN behind its hash
+   * is a lookup for whoever holds the file — the "redacted" copy a shop posts
+   * to a support thread carried every one (alpha.62 review). Masked rather
+   * than deleted: an operator with no hash is a free sign-in in the desktop
+   * app, while the mask is refused there (ops-locations.js, #1769).
+   */
+  function redactOperatorsForExport(arr) {
+    return (arr || []).map(op => {
+      if (!op || typeof op !== 'object' || !op.pinHash) return op;
+      return { ...op, pinHash: STORE_SECRET_MASK };
+    });
+  }
+
   /** Plain snapshot of all persisted collections (shallow object of live arrays). */
   function buildSnapshot(collections) {
     // Stamp the schema version INTO the file. STORE_VERSION existed but only ever reached
@@ -164,6 +181,9 @@
       settings: redactSecrets ? redactSettingsForExport(snap.settings) : snap.settings,
       machines: redactSecrets ? redactMachinesForExport(snap.machines) : snap.machines,
       printLog: redactSecrets ? redactOrdersForExport(snap.printLog) : snap.printLog,
+      ...(snap.operators !== undefined
+        ? { operators: redactSecrets ? redactOperatorsForExport(snap.operators) : snap.operators }
+        : {}),
     };
   }
 
@@ -172,6 +192,7 @@
     SECRET_MASK: STORE_SECRET_MASK,
     redactSettingsForExport,
     redactMachinesForExport,
+    redactOperatorsForExport,
     redactOrdersForExport,
     buildSnapshot,
     buildExportPayload,

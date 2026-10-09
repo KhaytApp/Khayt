@@ -360,6 +360,7 @@ final class PrinterWatch {
             // empty on every launch, so writing it as the whole cache replaced
             // every completion saved before the restart with the one job this
             // session had seen — the measurement persisting exists to keep.
+            // lock: system — a printer's own report of a finished print.
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },

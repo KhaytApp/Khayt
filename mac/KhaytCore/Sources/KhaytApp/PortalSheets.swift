@@ -96,12 +96,15 @@ struct CustomerLinkSection: View {
     private func check() async {
         busy = true
         defer { busy = false }
-        guard let r = await shop.checkPortalResponse(job.id) else { said = shop.moveProblem; return }
+        guard let checked = await shop.checkPortalResponse(job.id) else { said = shop.moveProblem; return }
+        let r = checked.said
         let words = shop.words
         var line: String
         switch r.response {
         case "approved":
-            line = words.callIt(r.advance ? "cloud.portal_approved_advanced" : "cloud.portal_approved")
+            // "…moved to Pending" only when it was; a refused move says why.
+            line = words.callIt(checked.moved ? "cloud.portal_approved_advanced" : "cloud.portal_approved")
+            if r.advance, !checked.moved, let why = shop.moveProblem { line += " · " + why }
         case "declined": line = words.callIt("cloud.portal_declined")
         default: line = words.callIt(r.paid ? "cloud.portal_deposit_paid" : "cloud.portal_no_response")
         }

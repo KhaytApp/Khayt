@@ -23,6 +23,7 @@ extension Shop {
     }
 
     private func writeLinked(_ paths: [String]) throws {
+        guard permitted("settings", "edit") else { throw Shop.MoveRefused(sentence: moveProblem ?? "") }
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
         try StoreWriter.update(build) { root in
             var settings = Self.settings(root)
@@ -55,6 +56,7 @@ extension Shop {
     /// Stop indexing a folder. Its models leave the library; its FILES are
     /// not touched.
     func unlinkFolder(_ path: String) async {
+        guard permitted("settings", "edit") else { return }
         libraryMoveProblem = nil
         guard let build = source.build else { return }
         do {

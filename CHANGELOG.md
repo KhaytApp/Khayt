@@ -27,6 +27,28 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   unchanged, and the open order or spool survives folding and unfolding.
   Checked on the iPhone Duo simulator (Xcode 27.1 RC, iOS 27.1 SDK).
 
+- **alpha.62 security review: the staff lock now holds everywhere (Mac).**
+  - Every change to the book asks the lock: a person's access level decides
+    issuing a gift card, clearing a payment, changing the VAT or the shop's
+    setup, signing in to the cloud, editing products, stock and machines —
+    about a hundred actions that had asked nothing. A test fails the build if
+    a new one is added without asking.
+  - While nobody is signed in, the menu bar is off too (it stayed live behind
+    the sign-in screen), and Undo is cleared whenever the person at the Mac
+    changes — an owner's undo is no longer left for the next person.
+  - The last owner who can sign in cannot be demoted, made inactive or
+    removed while the lock is on; that switched the lock off without a PIN.
+  - Wrong PINs count in a row until a right one; nine a minute used to slip
+    under the pause for ever.
+  - The lock stays closed until it has read the shop's staff, instead of
+    being open for a moment when the book first opens.
+  - Exporting a copy of the book (and the desktop app's export) masks staff
+    PIN hashes and the recovery-code hash.
+  - A deposit typed with a decimal comma ("12,50") is refused rather than read
+    as 1250. "Check response" says a quote moved to Pending only when it did.
+    Clearing a payment updates the customer's page. A cloud server's answer
+    is read up to 4 MB.
+
 - **iOS: first steps for iPhone Duo, and fixes from a pass over every detail
   screen.**
   - The tab bar is the system's `TabView` now. On iPhone Duo only system bars
@@ -102,7 +124,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   cloud, or manage staff and PINs. Lock (⌃⌘L, or the shop card) signs out.
   Owners set each person's PIN (4 to 8 digits), can make a recovery code for
   a forgotten PIN, and switching it off asks for an owner's PIN. Ten wrong
-  PINs in a row pause the pad for a minute, longer each time. It uses the
+  PINs in a row close the pad for a minute; after that each wrong one closes
+  it again, for longer each time, until a right PIN. It uses the
   same access levels and PINs as the desktop app, so a shop that already
   uses its operator lock keeps its staff and PINs. It keeps staff to their
   part of the app; it is not encryption of the book.

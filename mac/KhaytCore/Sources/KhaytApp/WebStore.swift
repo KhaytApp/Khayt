@@ -649,6 +649,7 @@ struct StorefrontDraft: Equatable {
 extension Shop {
     /// Show or hide one product on the web store.
     func setOnWebStore(_ id: String, _ on: Bool) async {
+        guard permitted("settings", "edit") else { return }
         guard let build = source.build else { return }
         do {
             try StoreWriter.updateRecord(build, collection: "products", id: id) { record in
@@ -679,6 +680,7 @@ extension Shop {
     /// a promo the other app wrote with a field of its own, a promo this pane
     /// would filter out, a lead time of `"3"`.
     func saveStorefront(_ draft: StorefrontDraft, opened: StorefrontDraft?) async {
+        guard permitted("settings", "edit") else { return }
         guard let build = source.build else { return }
         do {
             try StoreWriter.update(build) { root in
