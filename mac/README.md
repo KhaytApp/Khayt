@@ -771,10 +771,13 @@ and is not fatal — the job is finished, the book says so, and undoing a correc
 write because a message did not go out is the wrong trade; the shop is told, and
 can send it by hand.
 
-Webhooks, email and the portal are still refused. The webhook bus has
-subscriptions, a delivery log, retries with backoff that survive a quit, and a
-410-Gone rule; doing that badly means a shop's ERP counting a job twice, which
-is a real invoice. Refusing is the honest answer until it is done properly.
+Webhooks, email and the customer's portal link all go out from here now: the
+webhook bus (subscriptions, a delivery log, retries that survive a quit, the
+410-Gone rule) through `WebhookClient`, mail through `EmailClient`/`SmtpClient`,
+and the portal through `PortalClient`, which also publishes a job's link the
+first time, takes it down, reads what the customer did with a quote and the
+conversation behind it (`PortalOwner.swift`, `lib/portal-owner.js`). A move is
+refused only for a channel this app still cannot carry, and says which.
 
 **The chat id is fixed.** Khayt stripped every chat id with `[^0-9@-]`, which
 keeps the `@` and throws the name away — so a shop that typed `@khaytshop` was
@@ -1098,7 +1101,7 @@ failed.
 
 ## Not yet built
 
-The cloud portal and the LAN server's printer
+The LAN server's printer
 webhook — every other LAN route a phone or a customer uses is here, and the
 printer webhook matters least, because this app polls its printers itself.
 `KhaytCore` came first because the alternative, screens against a half-trusted

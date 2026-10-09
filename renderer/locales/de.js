@@ -3603,6 +3603,8 @@
   "cloud.deposit_amount": "Anzufordernde Anzahlung (optional)",
   "cloud.deposit_payurl": "Zahlungslink (optional)",
   "cloud.deposit_hint": "Fügen Sie einen Zahlungslink eines beliebigen Anbieters ein. Der Kunde zahlt dort; „bezahlt“ wird über den Webhook Ihres Anbieters aktualisiert. Für keine Anzahlung leer lassen.",
+  "cloud.deposit_bad_url": "Der Zahlungslink muss mit https:// beginnen",
+  "cloud.deposit_bad_amount": "Die Anzahlung muss ein positiver Betrag sein",
   "cloud.deposit_publish": "Link veröffentlichen",
   "cloud.portal_deposit_paid": "Anzahlung bezahlt",
   "ai.assistant_btn": "AI fragen",

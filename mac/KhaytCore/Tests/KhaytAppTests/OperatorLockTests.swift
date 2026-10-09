@@ -237,6 +237,30 @@ struct OperatorLockTests {
                 && !Shop.isValidPin("١٢٣٤"))
     }
 
+    @Test("the customer link answers to the lock: nobody signed in, or a viewer, cannot publish, unpublish or reply")
+    func portalAnswersToTheLock() async throws {
+        let shop = await Self.shop()
+        let job = try #require(shop.orders.first?.id)
+        // Locked: nobody signed in.
+        #expect(await shop.publishPortal(job) == nil)
+        #expect(shop.moveProblem != nil)
+        await shop.unpublishPortal(job)
+        #expect(shop.moveProblem != nil)
+        await #expect(throws: (any Error).self) { try await shop.replyOnPortal(job, text: "hello") }
+        // A viewer reads orders and edits nothing.
+        #expect(await shop.signIn("OP-v", pin: "4444") == .ok)
+        #expect(!shop.lockAllows("orders", "edit"))
+        #expect(await shop.publishPortal(job) == nil)
+        #expect(shop.moveProblem == shop.words.callIt("mac.lock_not_allowed"))
+        // An operator gets past the LOCK — and on to the portal's own checks
+        // (this sample has no cloud), which is the next refusal, not this one.
+        shop.lockNow()
+        #expect(await shop.signIn("OP-x", pin: "3333") == .ok)
+        _ = await shop.publishPortal(job)
+        #expect(shop.moveProblem != shop.words.callIt("mac.lock_not_allowed"))
+        #expect(shop.moveProblem != shop.words.callIt("mac.lock_sign_in_first"))
+    }
+
     @Test("every privileged write refuses while nobody is signed in")
     func writesRefuseWhenLocked() async {
         let shop = await Self.shop()

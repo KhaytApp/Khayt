@@ -3604,6 +3604,8 @@
   "cloud.deposit_amount": "Deposit to request (optional)",
   "cloud.deposit_payurl": "Payment link (optional)",
   "cloud.deposit_hint": "Paste a payment link from any provider. The customer pays there; “paid” updates via your provider webhook. Leave blank for no deposit.",
+  "cloud.deposit_bad_url": "The payment link must start with https://",
+  "cloud.deposit_bad_amount": "The deposit must be a positive amount",
   "cloud.deposit_publish": "Publish link",
   "cloud.portal_deposit_paid": "deposit paid",
   "ai.assistant_btn": "Ask AI",

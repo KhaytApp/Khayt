@@ -17,9 +17,10 @@ import KhaytCore
 /// Electron app runs — and `Shop.moveJob` performs them. This file decides what
 /// a person sees and nothing else.
 ///
-/// A move that would send a webhook, a Telegram message, an email or a portal
-/// refresh is REFUSED rather than half-made, and says which. None of those can
-/// be sent from here and none of them can be sent afterwards.
+/// What a move owes outward — a webhook, a Telegram message, an email, the
+/// customer's portal page — is sent by `Shop.moveJob` after the write. A move
+/// is REFUSED rather than half-made only for a channel this app cannot carry,
+/// and says which.
 struct Kanban: View {
     @Bindable var shop: Shop
 

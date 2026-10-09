@@ -162,6 +162,7 @@
  "printLog": [
   {
    "id": "ORD-01000",
+   "cloudPublished": true,
    "operatorId": "OP-sample-noura",
    "trackingToken": "trk-sample01",
    "date": "2026-07-02",
@@ -452,6 +453,8 @@
   },
   {
    "id": "ORD-01005",
+   "cloudDeposit": 150,
+   "cloudPayUrl": "https://pay.example.com/tuwaiq/ord-01005",
    "date": "2026-08-22",
    "status": "quote",
    "project": "Drone arm v4",

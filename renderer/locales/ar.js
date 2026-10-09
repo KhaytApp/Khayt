@@ -3609,6 +3609,8 @@
   "cloud.deposit_amount": "العربون المطلوب (اختياري)",
   "cloud.deposit_payurl": "رابط الدفع (اختياري)",
   "cloud.deposit_hint": "الصق رابط دفع من أي مزوّد. يدفع العميل هناك؛ وتتحدّث حالة «مدفوع» عبر ويب-هوك المزوّد. اتركه فارغاً لعدم طلب عربون.",
+  "cloud.deposit_bad_url": "يجب أن يبدأ رابط الدفع بـ https://",
+  "cloud.deposit_bad_amount": "يجب أن يكون العربون مبلغًا موجبًا",
   "cloud.deposit_publish": "نشر الرابط",
   "cloud.portal_deposit_paid": "تم دفع العربون",
   "ai.assistant_btn": "اسأل الذكاء",

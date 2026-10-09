@@ -255,6 +255,7 @@ public actor KhaytEngine {
         // three travel together — without them `wouldRefresh` cannot judge a
         // trial and says yes, which is safe but is not the true answer.
         "portal-refresh",
+        "portal-owner",
         "portal-trial",
         "cloud-plans",
         "order-email",
@@ -7920,6 +7921,122 @@ public actor KhaytEngine {
     public func portalPath(shopId: String, pubToken: String) throws -> String {
         try runtime.call2("KhaytPortalRefresh.pathFor(ARG0, ARG1)",
                           [.string(shopId), .string(pubToken)], as: String.self)
+    }
+
+    // MARK: - The shop's side of the portal (`lib/portal-owner.js`)
+
+    /// The owner routes: `list`, `item`, `messages`, `reply`.
+    public func portalOwnerPath(_ route: String, shopId: String, pubToken: String = "") throws -> String {
+        try runtime.call2("KhaytPortalOwner.paths[ARG0](ARG1, ARG2)",
+                          [.string(route), .string(shopId), .string(pubToken)], as: String.self)
+    }
+
+    /// The page a customer is sent: `<cloud>/p/<token>`, or "" when either is missing.
+    public func portalUrl(baseUrl: String, pubToken: String) throws -> String {
+        try runtime.call2("KhaytPortalOwner.portalUrl(ARG0, ARG1)",
+                          [.string(baseUrl), .string(pubToken)], as: String.self)
+    }
+
+    public struct PortalTrialGate: Decodable, Sendable, Equatable {
+        public struct State: Decodable, Sendable, Equatable {
+            public let state: String
+            public let available: Bool
+            public let daysLeft: Double?
+            public let trialDays: Double?
+        }
+        public let allowed: Bool
+        /// The timestamp to start the trial with, when publishing starts it.
+        public let startAt: String?
+        public let state: State?
+    }
+
+    /// May this shop publish now, and does publishing start the trial clock?
+    public func portalTrialGate(cloud: [String: JSONValue], now: Date) throws -> PortalTrialGate {
+        try runtime.call2("KhaytPortalOwner.trialGate(ARG0, ARG1)",
+                          [.object(cloud), .number(now.timeIntervalSince1970 * 1000)],
+                          as: PortalTrialGate.self)
+    }
+
+    public struct DepositForm: Decodable, Sendable, Equatable {
+        public let ok: Bool
+        public let error: String?
+        public let cloudDeposit: Double?
+        public let cloudPayUrl: String?
+        public let lastPayUrl: String?
+    }
+
+    /// A quote's deposit and pay link, as typed: a positive amount or none,
+    /// an http(s) link or none.
+    public func portalDepositForm(deposit: String, payUrl: String) throws -> DepositForm {
+        try runtime.call2("KhaytPortalOwner.depositForm(ARG0, ARG1)",
+                          [.string(deposit), .string(payUrl)], as: DepositForm.self)
+    }
+
+    public struct PortalResponse: Decodable, Sendable, Equatable {
+        public let found: Bool
+        /// `none` | `approved` | `declined`
+        public let response: String
+        public let paid: Bool
+        /// Move the job on: approved, and still a quote.
+        public let advance: Bool
+        public let note: String?
+    }
+
+    /// What the customer did with this link, from `GET /published`'s items.
+    public func portalResponse(items: JSONValue, pubToken: String, order: JSONValue) throws -> PortalResponse {
+        try runtime.call2("KhaytPortalOwner.responseFor(ARG0, ARG1, ARG2)",
+                          [items, .string(pubToken), order], as: PortalResponse.self)
+    }
+
+    public struct PortalError: Decodable, Sendable, Equatable {
+        /// `viewer` | `other_shop` | `too_large` | `not_this_shop` | `rate` | `bad_request` | `server`
+        public let code: String
+        public let text: String
+    }
+
+    public func portalError(status: Int, body: JSONValue) throws -> PortalError {
+        try runtime.call2("KhaytPortalOwner.errorFor(ARG0, ARG1)",
+                          [.number(Double(status)), body], as: PortalError.self)
+    }
+
+    /// Published, but the customer's address not linked (the day's cap): the note, else nil.
+    public func portalLinkNote(body: JSONValue) throws -> String? {
+        try runtime.call2("KhaytPortalOwner.linkNote(ARG0)", [body], as: String?.self)
+    }
+
+    public struct PortalMessage: Decodable, Sendable, Equatable, Hashable {
+        /// `shop` | `customer`
+        public let from: String
+        public let text: String
+        public let at: Double
+
+        public init(from: String, text: String, at: Double) {
+            self.from = from; self.text = text; self.at = at
+        }
+    }
+
+    /// A thread, oldest first, with nothing in it a screen cannot draw.
+    public func portalThread(body: JSONValue) throws -> [PortalMessage] {
+        try runtime.call2("KhaytPortalOwner.threadFrom(ARG0)", [body], as: [PortalMessage].self)
+    }
+
+    /// The publish request for a job — what `requestFor` builds, but without
+    /// asking whether it is already published: the first publish is the one
+    /// that makes it so. Nil when the order cannot be built.
+    public func portalPayload(order: JSONValue, settings: [String: JSONValue],
+                              clients: [JSONValue], shopName: String,
+                              shopAddress: String, stages: [String]) throws -> PortalRefresh? {
+        try runtime.call2("""
+            (function (o, ctx) {
+              if (!o || !o.trackingToken) return null;
+              var built = KhaytPortalRefresh.payloadFor(o, ctx);
+              return { kind: built.kind, payload: built.payload,
+                       customerEmail: built.customerEmail, pubToken: String(o.trackingToken) };
+            })(ARG0, { settings: ARG1, clients: ARG2, shopName: ARG3, shopAddress: ARG4, stages: ARG5 })
+            """,
+            [order, .object(settings), .array(clients), .string(shopName),
+             .string(shopAddress), .array(stages.map { .string($0) })],
+            as: PortalRefresh?.self)
     }
 
     /// Can an app that speaks only HTTPS carry this mail provider?

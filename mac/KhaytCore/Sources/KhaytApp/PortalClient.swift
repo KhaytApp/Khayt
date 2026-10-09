@@ -34,6 +34,9 @@ enum PortalClient {
         case redirected
         case unreachable(String)
         case refused(Int, String)
+        /// A refusal `lib/portal-owner.js errorFor` has named: `code` is what it
+        /// means (`viewer`, `other_shop`, …), `text` the server's own words.
+        case owner(KhaytEngine.PortalError)
 
         var errorDescription: String? {
             switch self {
@@ -42,8 +45,104 @@ enum PortalClient {
             case .unreachable(let why): return why
             case .refused(let code, let why):
                 return why.isEmpty ? "The cloud refused the update (HTTP \(code))" : why
+            case .owner(let said): return said.text
             }
         }
+    }
+
+    // MARK: - The owner calls
+
+    /// Publish a job's link for the first time — the same PUT a republish
+    /// sends. Returns the note when the link went up but the customer's
+    /// address was not linked (the shop's daily allowance of new addresses).
+    static func publish(_ request: PortalRefresh, baseUrl: String, shopId: String,
+                        token: String, engine: KhaytEngine,
+                        session: URLSession? = nil) async throws -> String? {
+        var body: [String: JSONValue] = ["kind": .string(request.kind), "payload": request.payload]
+        if !request.customerEmail.isEmpty { body["customerEmail"] = .string(request.customerEmail) }
+        let path = try await engine.portalOwnerPath("item", shopId: shopId, pubToken: request.pubToken)
+        let reply = try await send("PUT", path, body: .object(body), baseUrl: baseUrl, token: token,
+                                   engine: engine, session: session)
+        return try? await engine.portalLinkNote(body: reply)
+    }
+
+    /// Take a job's link down.
+    static func unpublish(pubToken: String, baseUrl: String, shopId: String, token: String,
+                          engine: KhaytEngine, session: URLSession? = nil) async throws {
+        let path = try await engine.portalOwnerPath("item", shopId: shopId, pubToken: pubToken)
+        _ = try await send("DELETE", path, body: nil, baseUrl: baseUrl, token: token,
+                           engine: engine, session: session)
+    }
+
+    /// Every published item with what its customer did: `{ items: [...] }`.
+    static func listPublished(baseUrl: String, shopId: String, token: String,
+                              engine: KhaytEngine, session: URLSession? = nil) async throws -> JSONValue {
+        let path = try await engine.portalOwnerPath("list", shopId: shopId)
+        let reply = try await send("GET", path, body: nil, baseUrl: baseUrl, token: token,
+                                   engine: engine, session: session)
+        if case .object(let o) = reply, let items = o["items"] { return items }
+        return .array([])
+    }
+
+    /// The conversation behind a link — the OWNER's route, never the
+    /// customer's (`lib/portal-owner.js paths.messages`).
+    static func messages(pubToken: String, baseUrl: String, shopId: String, token: String,
+                         engine: KhaytEngine, session: URLSession? = nil) async throws -> [KhaytEngine.PortalMessage] {
+        let path = try await engine.portalOwnerPath("messages", shopId: shopId, pubToken: pubToken)
+        let reply = try await send("GET", path, body: nil, baseUrl: baseUrl, token: token,
+                                   engine: engine, session: session)
+        return try await engine.portalThread(body: reply)
+    }
+
+    /// Answer the customer, as the shop.
+    static func reply(pubToken: String, text: String, baseUrl: String, shopId: String, token: String,
+                      engine: KhaytEngine, session: URLSession? = nil) async throws {
+        let path = try await engine.portalOwnerPath("reply", shopId: shopId, pubToken: pubToken)
+        _ = try await send("POST", path, body: .object(["text": .string(text)]), baseUrl: baseUrl,
+                           token: token, engine: engine, session: session)
+    }
+
+    /// One owner request, with every rule `republish` keeps: the address
+    /// validated and https only, the bearer in the header and nowhere else,
+    /// redirects refused, ten seconds. A non-200 is named by
+    /// `lib/portal-owner.js errorFor`.
+    private static func send(_ method: String, _ path: String, body: JSONValue?, baseUrl: String,
+                             token: String, engine: KhaytEngine,
+                             session: URLSession?) async throws -> JSONValue {
+        let base: String
+        do {
+            base = try await engine.cloudBaseUrl(baseUrl)
+            try CloudSignIn.requireHttps(base)
+        } catch {
+            throw Failure.badAddress((error as? LocalizedError)?.errorDescription
+                                     ?? String(describing: error))
+        }
+        guard !path.isEmpty, let url = URL(string: base + path) else {
+            throw Failure.badAddress("That address cannot be read")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.timeoutInterval = timeout
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "content-type")
+            request.httpBody = try JSONEncoder().encode(body)
+        }
+        if !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "authorization") }
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await (session ?? Self.session).data(for: request)
+        } catch {
+            throw Failure.unreachable(error.localizedDescription)
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if (300..<400).contains(status) { throw Failure.redirected }
+        let json = (try? JSONDecoder().decode(JSONValue.self, from: data)) ?? .null
+        guard status == 200 else {
+            if let said = try? await engine.portalError(status: status, body: json) { throw Failure.owner(said) }
+            throw Failure.refused(status, serverReason(data))
+        }
+        return json
     }
 
     /// Republish one job's portal item, and wait for the cloud to take it.

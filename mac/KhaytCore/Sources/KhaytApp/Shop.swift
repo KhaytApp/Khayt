@@ -5423,6 +5423,11 @@ final class Shop {
         guard wrote else { return }
         if let mail { await post(mail) }
         if !owed.isEmpty { await fire(owed) }
+        // The customer's page shows the balance. A payment is counted as one
+        // this app CAN carry to the portal (`channelsThisAppCannotSend`
+        // waves it through), and then nothing carried it: the page went on
+        // asking for money already paid.
+        await republishPortalIfPublished(id)
     }
 
     /// The email a recorded payment owes the customer, or nil when it owes
@@ -5816,15 +5821,19 @@ final class Shop {
             return OneOrderEdit(order: shipped, activity: "\(id) → shipped")
         }
         if wrote, !owed.isEmpty { await fire(owed) }
+        // And the customer's page, which shows the parcel (order-flows.js
+        // republishes after shipping, so the page shows the carrier and number).
+        if wrote { await republishPortalIfPublished(id) }
     }
 
     /// A parcel already sent: a corrected tracking number, or a status picked
     /// by hand. Never moves it backwards — `carriers.advanceShippingStatus`.
     func updateShipment(_ id: Order.ID, status: String?, trackingNumber: String) async {
-        await writeToOneOrder(id, named: words.callIt("ship.manage_title")) { order, engine, _ in
+        let wrote = await writeToOneOrder(id, named: words.callIt("ship.manage_title")) { order, engine, _ in
             OneOrderEdit(order: try await engine.shipmentUpdate(order: order, status: status,
                                                                 trackingNumber: trackingNumber, at: Date()).order)
         }
+        if wrote { await republishPortalIfPublished(id) }
     }
 
     /// The carriers the Ship sheet offers, Manual last and always there.
@@ -13249,7 +13258,7 @@ final class Shop {
     /// finished and the book says so. But a stale page is the failure mode this
     /// whole refusal existed to prevent — a customer reading "Printing" about a
     /// job that was collected yesterday — so it is said out loud.
-    private func refresh(_ portal: PortalRefresh) async {
+    func refresh(_ portal: PortalRefresh) async {
         guard let engine else { return }
         do {
             var cloud: [String: JSONValue] = [:]
