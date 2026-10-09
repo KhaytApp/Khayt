@@ -621,3 +621,25 @@
 "Scan a spool" = "Scan a spool";
 "Job" = "Job";
 "Material" = "Material";
+/* WhatsApp updates to customers (the Mac's own words) */
+"wa.update" = "WhatsApp update";
+"wa.update_due" = "Tell the customer: %@";
+"wa.update_sent" = "%1$@ update opened in WhatsApp on %2$@";
+"wa.m.received" = "Order received";
+"wa.m.ready" = "Ready";
+"wa.m.shipped" = "Shipped";
+"wa.m.delivered" = "Delivered";
+"wa.to" = "To %@";
+"wa.logged_note" = "Opening WhatsApp writes this message to the customer's log. WhatsApp sends nothing until you press send there.";
+"wa.default_words" = "Khayt's default words. Your shop's own WhatsApp templates are on the Mac, in Settings › Integrations.";
+"wa.open" = "Open WhatsApp";
+"wa.language" = "Language";
+"wa.lang.ar" = "Arabic";
+"wa.lang.en" = "English";
+"wa.reason.no_phone" = "This customer has no phone number on file.";
+"wa.reason.no_customer" = "This job has no customer record, so there is no number to send to.";
+"wa.reason.too_short" = "The phone number is too short to be a WhatsApp number.";
+"wa.reason.too_long" = "The phone number is too long to be a WhatsApp number.";
+"wa.reason.no_country_code" = "Add the country code to this number (for example +971…). Only Saudi numbers can be written without one.";
+"wa.reason.bad_saudi_number" = "This is not a Saudi mobile or landline number. 800 and 9200 numbers have no WhatsApp.";
+"wa.reason.no_milestone" = "A quote or a cancelled job has no update to send.";

@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: tell the customer on WhatsApp.** The order page offers the update a
+  job is due — received, ready, shipped, delivered — and opens WhatsApp on the
+  customer's number with the message typed, in the customer's language
+  (switchable), editable. It is the shared `lib/whatsapp-message.js` the Mac
+  uses: the number made international for `wa.me` or refused with the reason,
+  and the line written to the customer's log when WhatsApp opens, so the job
+  then says when that update went. The shop's own saved templates are used
+  when the phone's book carries them; until then it is Khayt's default words.
+
 - **iOS: shop actions for Siri and Shortcuts.** "Advance a job" (pick a job,
   it moves to its next stage — saved on the phone and sent on, without opening
   the app), "Filament left" ("820 g of PLA left, on 2 spools"), "Log a failed

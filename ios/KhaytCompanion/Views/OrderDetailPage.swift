@@ -22,6 +22,8 @@ struct OrderDetailPage: View {
     @State private var payment: BookWriter.PaymentState?
     @State private var currency: String?
     @State private var recordingPayment = false
+    @State private var whatsApp: KhaytAPIClient.WhatsAppOffer?
+    @State private var writingWhatsApp = false
 
     init(order: QueueOrder, facts: OrderFacts?, onChanged: @escaping () async -> Void) {
         _order = State(initialValue: order)
@@ -42,6 +44,10 @@ struct OrderDetailPage: View {
                 PaymentCard(state: payment, currency: currency) { recordingPayment = true }
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
+            if let whatsApp {
+                WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            }
         }
         .sheet(isPresented: $recordingPayment) {
             if let payment {
@@ -50,6 +56,9 @@ struct OrderDetailPage: View {
                     await onChanged()
                 }
             }
+        }
+        .sheet(isPresented: $writingWhatsApp, onDismiss: { Task { whatsApp = await api.whatsAppOffer(orderId: order.id) } }) {
+            WhatsAppSheet(orderId: order.id)
         }
         .background(KhaytDesign.ground.ignoresSafeArea())
         .toolbar(.visible, for: .navigationBar)
@@ -72,6 +81,11 @@ struct OrderDetailPage: View {
         .task {
             machines = (try? await api.fetchMachines()) ?? []
             await loadPayment()
+            whatsApp = await api.whatsAppOffer(orderId: order.id)
+            #if DEBUG
+            // `-KhaytWASheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
+            if whatsApp != nil, UserDefaults.standard.bool(forKey: "KhaytWASheet") { writingWhatsApp = true }
+            #endif
         }
         .watchesPrinters(when: order.status == "printing" && order.machineId != nil)
     }
