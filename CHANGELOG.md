@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: see a printer's camera.** On Machines, a machine with a camera set
+  up offers "Camera": a still frame fetched from the printer on the shop's
+  Wi-Fi every three seconds while the page is open, turned and flipped as the
+  desk has it. The rules are `lib/webcam.js`'s — the snapshot never the
+  stream, only from the printer's own host or the LAN, no redirects, images of
+  a sane size only. A camera that needs the printer's key (OctoPrint,
+  PrusaLink, Bambu) says so: the key stays on the Mac.
+
 - **iOS: prints on the Lock Screen and in the Dynamic Island.** A Live
   Activity per printing machine, started when the app sees the print: the job,
   a progress bar and a countdown to the finish, which the system keeps running

@@ -600,3 +600,11 @@
 "pay.refused" = "Recording this payment would send %@, which this phone cannot do. Record it on the Mac.";
 "pay.reach.email" = "a receipt email";
 "pay.reach.webhook" = "a webhook";
+/* Printer cameras (lib/webcam.js) */
+"camera.open" = "Camera";
+"camera.at" = "Frame from %@";
+"camera.offline" = "The camera didn't answer. It is reached on the shop's Wi-Fi.";
+"camera.no_frame" = "The camera is on but has no frame yet.";
+"camera.needs_key" = "This camera needs the printer's key, which stays on the Mac.";
+"camera.rtsp" = "This camera only streams RTSP, which the phone can't show.";
+"camera.refused" = "This camera's address isn't the printer's, so the phone won't fetch it.";
