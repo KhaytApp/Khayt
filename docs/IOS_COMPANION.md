@@ -4,6 +4,11 @@ Native iPhone client. The desktop remains the **book of record** — `khayt-stor
 lives there, and that is the copy a shop backs up and bills from — but the phone is
 no longer a live view of it.
 
+**Minimum iOS: 27** (since Oct 2026). Nothing below iOS 27 is supported, so
+no `#available` checks for older versions. CI builds and tests on GitHub's
+`xcode-27` image (Xcode 27.0, iPhone 18 Pro on iOS 27.0); `macos-latest` has
+only Xcode 26.
+
 ## How it actually works now
 
 Three things changed the shape of this app, and anything written before them is
