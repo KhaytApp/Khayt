@@ -37,40 +37,68 @@ struct InventoryView: View {
         return list.sorted { ($0.remainingGrams ?? 0) < ($1.remainingGrams ?? 0) }
     }
 
+    /// Side by side in regular width, pushed in compact — see `OrdersView`.
+    @Environment(\.horizontalSizeClass) private var widthClass
+    private var isSplit: Bool { widthClass == .regular }
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    search
-                    chips
-                    list
-                    if api.holdsAll("inventory"), !spools.isEmpty {
-                        wholeLine
+        if isSplit {
+            NavigationSplitView {
+                listPage
+                    .navigationSplitViewColumnWidth(min: 340, ideal: 400)
+            } detail: {
+                NavigationStack {
+                    if let spool = openSpool {
+                        detailPage(spool)
+                    } else {
+                        ContentUnavailableView(L10n.tr("inventory.pick"), systemImage: "cylinder",
+                                               description: Text(L10n.tr("inventory.pick.sub")))
+                            .background(KhaytDesign.ground.ignoresSafeArea())
                     }
                 }
-                .padding(.bottom, 18)
             }
-            .scrollIndicators(.hidden)
-            .scrollDismissesKeyboard(.immediately)
-            .khaytScreen(title: L10n.tr("tab.inventory"))
-            .background(KhaytDesign.ground.ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showAddSpool = true } label: { Image(systemName: "plus") }
-                        .accessibilityLabel(L10n.tr("spool.add.title"))
+        } else {
+            NavigationStack {
+                listPage
+                    .navigationDestination(item: $openSpool) { detailPage($0) }
+            }
+        }
+    }
+
+    private func detailPage(_ spool: InventorySpool) -> some View {
+        SpoolDetailPage(spool: spool) { await load() }
+            .id(spool.id)
+    }
+
+    private var listPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                search
+                chips
+                list
+                if api.holdsAll("inventory"), !spools.isEmpty {
+                    wholeLine
                 }
             }
-            .sheet(isPresented: $showAddSpool) {
-                AddSpoolSheet { Task { await load() } }
-            }
-            .navigationDestination(item: $openSpool) { spool in
-                SpoolDetailPage(spool: spool) { await load() }
-            }
-            .refreshable { await load() }
-            .task { await load() }
-            .onAppear { takeLowStockRequest() }
-            .onChange(of: ordersNav.lowStockRequest) { _, _ in takeLowStockRequest() }
+            .padding(.bottom, 18)
         }
+        .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.immediately)
+        .khaytScreen(title: L10n.tr("tab.inventory"))
+        .background(KhaytDesign.ground.ignoresSafeArea())
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showAddSpool = true } label: { Image(systemName: "plus") }
+                    .accessibilityLabel(L10n.tr("spool.add.title"))
+            }
+        }
+        .sheet(isPresented: $showAddSpool) {
+            AddSpoolSheet { Task { await load() } }
+        }
+        .refreshable { await load() }
+        .task { await load() }
+        .onAppear { takeLowStockRequest() }
+        .onChange(of: ordersNav.lowStockRequest) { _, _ in takeLowStockRequest() }
     }
 
     // MARK: - Parts
@@ -148,6 +176,9 @@ struct InventoryView: View {
                 ForEach(displayed) { spool in
                     Button { openSpool = spool } label: { SpoolRow(spool: spool) }
                         .buttonStyle(.plain)
+                        .overlay(RoundedRectangle(cornerRadius: 11)
+                            .strokeBorder(KhaytDesign.brand, lineWidth: 2)
+                            .opacity(isSplit && openSpool?.id == spool.id ? 1 : 0))
                 }
             }
             .padding(.horizontal, 16)
@@ -174,6 +205,9 @@ struct InventoryView: View {
         errorMessage = nil
         do {
             spools = try await api.fetchInventory()
+            // A spool removed from its own page: in the split view `dismiss()`
+            // has no stack to pop, so the page is closed by forgetting it here.
+            if let open = openSpool, !spools.contains(where: { $0.id == open.id }) { openSpool = nil }
             #if DEBUG
             if let id = KhaytCompanionApp.ScreenshotOpen.take("spool:") { openSpool = spools.first { $0.id == id } }
             #endif

@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: on iPhone Duo's inner display, lists sit beside what you opened.**
+  In regular width — the Duo unfolded, an iPad — Orders and Inventory are
+  split views: the list on one side, the order or spool you picked on the
+  other, with the picked row outlined. Home puts the shop's figures beside its
+  alerts and jobs. Compact width (any other iPhone, the Duo folded) is
+  unchanged, and the open order or spool survives folding and unfolding.
+  Checked on the iPhone Duo simulator (Xcode 27.1 RC, iOS 27.1 SDK).
+
 - **iOS: first steps for iPhone Duo, and fixes from a pass over every detail
   screen.**
   - The tab bar is the system's `TabView` now. On iPhone Duo only system bars
