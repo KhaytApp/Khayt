@@ -20,8 +20,12 @@ import KhaytCore
 struct LanSecurityReviewTests {
 
     /// A server that is never started: requests go straight to `respond`.
+    /// `now`: a fixed clock, for a test that counts failures inside the
+    /// lockout window. On the real clock a slow runner can let the window
+    /// lapse between the tenth wrong PIN and the check — which is what failed
+    /// `linkLocalLockoutIsPerDevice` on a loaded CI run (alpha.62).
     static func server(pin: String = "24682468", exposed: Bool = false,
-                       measureDelay: TimeInterval = 0,
+                       measureDelay: TimeInterval = 0, now: Date? = nil,
                        book: (([String: JSONValue]) -> [String: JSONValue])? = nil) async throws -> LanServer {
         let shop = Shop()
         await shop.load(.sample)
@@ -29,6 +33,7 @@ struct LanSecurityReviewTests {
         let store = book.map { $0(shop.lanBook) } ?? shop.lanBook
         var host = LanServer.Host(store: { store }, pin: pin, engine: engine)
         host.exposedBeyondLan = exposed
+        if let now { host.now = { now } }
         host.intakeToken = "intake-token-for-tests"
         host.pricing = { store }
         host.measure = { _, _ in
@@ -91,7 +96,7 @@ struct LanSecurityReviewTests {
 
     @Test("exposed beyond the LAN, the whole-server budget is still armed")
     func globalLockoutWhenExposed() async throws {
-        let server = try await Self.server(exposed: true)
+        let server = try await Self.server(exposed: true, now: Date(timeIntervalSince1970: 1_788_000_000))
         for i in 0..<50 {
             _ = await server.respond(to: Self.get("/api/queue", from: "10.0.\(i).1",
                                                   headers: ["x-khayt-pin": "wrong-\(i)"]))
@@ -105,7 +110,7 @@ struct LanSecurityReviewTests {
 
     @Test("sixteen wrong PINs sent at once are sixteen, not one")
     func parallelGuessesAllCount() async throws {
-        let server = try await Self.server()
+        let server = try await Self.server(now: Date(timeIntervalSince1970: 1_788_000_000))
         let guesses = (0..<16).map { i in
             Task { @MainActor in
                 await server.respond(to: Self.get("/api/queue", from: "192.168.1.66",
@@ -122,7 +127,7 @@ struct LanSecurityReviewTests {
 
     @Test("a visitor rotating through its IPv6 /64 is one visitor to the survey limit")
     func surveyLimitPerPrefix() async throws {
-        let server = try await Self.server()
+        let server = try await Self.server(now: Date(timeIntervalSince1970: 1_788_000_000))
         var limited = false
         for i in 1...40 {
             let r = await server.respond(to: LanServer.Request(
@@ -136,7 +141,7 @@ struct LanSecurityReviewTests {
 
     @Test("so is it to the estimate limit")
     func estimateLimitPerPrefix() async throws {
-        let server = try await Self.server(book: LanServerTests.quotingBook)
+        let server = try await Self.server(now: Date(timeIntervalSince1970: 1_788_000_000), book: LanServerTests.quotingBook)
         var statuses: [Int] = []
         for i in 1...14 {
             let r = await server.respond(to: LanServer.Request(

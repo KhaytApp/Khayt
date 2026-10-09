@@ -45,7 +45,9 @@ struct Alpha58SecurityTests {
 
     @Test("ten wrong PINs from one phone on the Wi-Fi do not lock the owner's iPhone out")
     func linkLocalLockoutIsPerDevice() async throws {
-        let server = try await LanSecurityReviewTests.server()
+        // A fixed clock: twelve guesses and the check must land in one lockout
+        // window however slow the runner is (it lapsed on a loaded CI run).
+        let server = try await LanSecurityReviewTests.server(now: Date(timeIntervalSince1970: 1_788_000_000))
         for i in 0..<12 {
             _ = await server.respond(to: LanSecurityReviewTests.get(
                 "/api/queue", from: "fe80::bad%en0", headers: ["x-khayt-pin": "wrong-\(i)"]))
