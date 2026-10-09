@@ -53,6 +53,13 @@ enum Ask {
         return nil
     }
 
+    /// `settings.operatorLockEnabled` in the book.
+    static func lockOn(_ root: [String: JSONValue]) -> Bool {
+        guard case .object(let settings)? = root["settings"],
+              case .bool(true)? = settings["operatorLockEnabled"] else { return false }
+        return true
+    }
+
     static func rows(_ root: [String: JSONValue], _ key: String) -> [JSONValue] {
         if case .array(let rows)? = root[key] { return rows }
         return []
@@ -93,6 +100,12 @@ enum Ask {
 
         let running = jobs.filter { field($0, "status") == "printing" }
         guard !running.isEmpty else { return words.callIt("mac.nothing_printing") }
+        // WITH THE STAFF LOCK ON: the number, and nothing that names a job or
+        // a customer's project. An intent reads the book, not the window, so it
+        // cannot know who is signed in — and Siri answers a locked Mac. "Two
+        // printing" is a fact about the floor; "Museum replica for Najd" is
+        // the book (alpha.62 re-check). "What is waiting" was counts already.
+        if Self.lockOn(root) { return words.counting(running.count, "mac.printing_count") }
 
         // The job AND the machine: either alone leaves the obvious follow-up
         // unanswered.

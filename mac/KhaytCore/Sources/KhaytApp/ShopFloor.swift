@@ -1688,7 +1688,7 @@ private struct Live: View {
                 }
             }
             .buttonStyle(.bordered).controlSize(.small)
-            .disabled(!shop.canMoveJobs)
+            .disabled(!shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
             if let problem = shop.plugProblem[machine.id] {
                 Text(problem).font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1749,7 +1749,7 @@ private struct Live: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .disabled(busy || !shop.canMoveJobs)
+        .disabled(busy || !shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
 
         if let problem = shop.printerProblem[machine.id] {
             // The printer's refusal in the vocabulary of somebody who has to

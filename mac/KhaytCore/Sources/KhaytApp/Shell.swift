@@ -486,6 +486,9 @@ struct ShellSidebar: View {
                                + shop.words.callIt("mac.cloud_line_hint"))
                     .contentShape(Rectangle())
                     .onTapGesture {
+                        // The cloud is the owner's (`cloud` in lib/rbac.js), and
+                        // nothing at all while nobody is signed in.
+                        guard shop.lockAllows("cloud", "edit") else { return }
                         if shop.cloudUnlocked { shop.checkingCloud = true } else { shop.signingIntoCloud = true }
                     }
                     .contextMenu {
@@ -496,15 +499,18 @@ struct ShellSidebar: View {
                         Divider()
                         Button(shop.words.callIt("mac.cloud_sign_out") + "\u{2026}") { shop.confirmingSignOut = true }
                     }
+                    .disabled(!shop.lockAllows("cloud", "edit"))
             }
             if let crash = shop.lastCrash {
                 // Clicking it says it has been read.
                 noticeLine(shop.words.callIt("mac.last_crash"),
                            "exclamationmark.bubble", Role.lateOnNavy, help: crash)
                     .onTapGesture { shop.forgetLastCrash() }
-                    // A crash is what a report is for — see `Feedback`.
+                    // A crash is what a report is for — see `Feedback`. Not
+                    // from behind the lock: a report can carry the book.
                     .contextMenu {
                         Button(shop.words.callIt("mac.feedback_menu")) { shop.askForFeedback() }
+                            .disabled(shop.needsSignIn)
                     }
             }
         }
@@ -580,7 +586,11 @@ private struct NavRow: View {
                 .foregroundStyle(Role.onNavy)
                 .lineLimit(1)
             Spacer(minLength: Space.xs)
-            if item.alarm > 0 {
+            // No counts, alarms or dots while nobody is signed in: the book's
+            // numbers are not the sign-in screen's to show.
+            if shop.needsSignIn {
+                EmptyView()
+            } else if item.alarm > 0 {
                 HStack(spacing: 2) {
                     Text(ShopState.stockOut.glyph)
                     Figure(value: Double(item.alarm), size: 9.5, weight: .bold,
@@ -613,7 +623,9 @@ private struct NavRow: View {
             }
         }
         .contentShape(Rectangle())
-        .onTapGesture { shop.shelf = item.shelf }
+        // Inert behind the lock, so the sidebar cannot pick a screen the
+        // sign-in screen is standing in front of (alpha.62 re-check).
+        .onTapGesture { if !shop.needsSignIn { shop.shelf = item.shelf } }
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }

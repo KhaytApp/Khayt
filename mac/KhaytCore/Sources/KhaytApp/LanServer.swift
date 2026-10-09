@@ -2429,10 +2429,13 @@ extension Shop {
     /// written into the book so the server recognises it. Nil while the
     /// server is off: a link nobody can open is worse than none.
     func quoteLink(for jobId: String) async -> String? {
+        // Minting a customer-facing link into the job is editing it (the
+        // staff lock); the note that said "the inspector decides" was not
+        // true — the inspector asked only whether the book was writable.
+        guard permitted("orders", "edit") else { return nil }
         guard let base = lanURL, let build = source.build else { return nil }
         var token = ""
         do {
-            // lock: system — mints the quote link's token on first ask; who may copy the link is the inspector's business.
             try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
                 if case .string(let had)? = record["quoteApprovalToken"], !had.isEmpty {
                     token = had
@@ -2531,10 +2534,13 @@ extension Shop {
     /// job, and the job's own tracking token — minted into the job the first
     /// time, as the Electron renderer's `ensureTrackingToken` mints it.
     func trackingLink(for jobId: String) async -> String? {
+        // Minting a customer-facing link into the job is editing it (the
+        // staff lock); the note that said "the inspector decides" was not
+        // true — the inspector asked only whether the book was writable.
+        guard permitted("orders", "edit") else { return nil }
         guard let base = lanURL, let build = source.build else { return nil }
         var token = ""
         do {
-            // lock: system — mints the tracking link's token on first ask; who may copy the link is the inspector's business.
             try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
                 if case .string(let had)? = record["trackingToken"], !had.isEmpty {
                     token = had

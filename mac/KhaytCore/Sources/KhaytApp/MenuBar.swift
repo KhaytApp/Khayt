@@ -182,7 +182,10 @@ struct FloorPanel: View {
                     openWindow(id: "shop")
                     NSApp.activate(ignoringOtherApps: true)
                 }
-                if !shop.schedulableRows.isEmpty && !shop.machines.isEmpty {
+                // Planning the floor is editing jobs; and nothing that opens a
+                // sheet over the sign-in screen (alpha.62 re-check).
+                if !shop.schedulableRows.isEmpty && !shop.machines.isEmpty
+                    && shop.lockAllows("orders", "edit") {
                     MenuLine(text: shop.words.callIt("sched.suggest_btn"), key: nil) {
                         openWindow(id: "shop")
                         NSApp.activate(ignoringOtherApps: true)

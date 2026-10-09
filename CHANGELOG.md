@@ -48,6 +48,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     as 1250. "Check response" says a quote moved to Pending only when it did.
     Clearing a payment updates the customer's page. A cloud server's answer
     is read up to 4 MB.
+  - A second pass closed the rest: the classic window shows the sign-in
+    screen too, and its toolbar, the title-bar buttons, the sidebar, the
+    menu-bar extra and the cloud and crash notices do nothing behind it; any
+    sheet open when the person changes is closed. Pausing, cancelling,
+    sending to and powering printers, publishing the web store, copying a
+    customer link, checking or sending to the cloud, adding models to the
+    library and attaching the book to a feedback report each ask the lock,
+    and edit buttons are hidden from somebody who may not use them. Renaming
+    an old "Admin" who is the last owner is refused like demoting them. With
+    the lock on, asking Siri "what is printing" says how many and names no
+    job. A kiosk already open stays open: it is the floor's display.
 
 - **iOS: first steps for iPhone Duo, and fixes from a pass over every detail
   screen.**

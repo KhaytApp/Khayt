@@ -2861,6 +2861,11 @@ final class Shop {
     var droppingFrom: Machine?
 
     func tell(_ machine: Machine, _ verb: PrinterControl.Verb) async {
+        // A printer is told what to do by somebody running the floor —
+        // `orders`/`edit` in lib/rbac.js, which an operator has and a viewer
+        // does not (alpha.62 re-check: pause, cancel, send, drop and power
+        // asked nothing).
+        guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
         guard let engine else { return }
         printerProblem[machine.id] = nil
         printerBusy.insert(machine.id)
@@ -2906,6 +2911,7 @@ final class Shop {
     /// opened now and dropped when this returns.
     func sendToPrinter(_ file: URL, machineId: String, startPrint: Bool) async {
         guard let engine, let machine = machines.first(where: { $0.id == machineId }) else { return }
+        guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
         sendNote = nil
         printerProblem[machine.id] = nil
         printerBusy.insert(machine.id)
@@ -2925,6 +2931,8 @@ final class Shop {
 
     /// What is on a machine's plate, for the sheet that offers to drop one.
     func plate(of machine: Machine) async -> KhaytEngine.Plate? {
+        // lock: system — a READ: what is on the plate, asked of the printer;
+        // dropping an object is `drop`, which asks the lock.
         guard let engine else { return nil }
         do { return try await PrinterControl.plate(of: machine, engine: engine, build: source.build) }
         catch { printerProblem[machine.id] = String(describing: error); return nil }
@@ -2933,6 +2941,7 @@ final class Shop {
     /// Drop one object from a running print. NOT UNDOABLE — the caller has
     /// already asked; see `lib/exclude-object.js`.
     func drop(_ object: String, on machine: Machine) async {
+        guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
         guard let engine else { return }
         printerProblem[machine.id] = nil
         printerBusy.insert(machine.id)
@@ -6000,7 +6009,14 @@ final class Shop {
         // undo: an owner who demoted somebody and pressed Lock left an Undo
         // that put the old access level back for whoever walked up
         // (alpha.62 review). Undo is the person's, not the Mac's.
-        didSet { if lockSessionId != oldValue { undoManager?.removeAllActions() } }
+        didSet {
+            guard lockSessionId != oldValue else { return }
+            undoManager?.removeAllActions()
+            // And every sheet or dialog the last person had open: a sheet
+            // stays on screen over the sign-in screen otherwise, half filled
+            // in, for whoever walks up (alpha.62 re-check).
+            dismissEverySheet()
+        }
     }
     /// `lib/rbac.js`'s matrix, read from the engine with the book.
     var rbac: KhaytEngine.Rbac?
@@ -6963,7 +6979,7 @@ final class Shop {
         guard let undoManager, let build = source.build,
               case .string(let id)? = record["id"] else { return }
         undoManager.setActionName(words.callIt("set.locations"))
-        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
+        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("settings", "edit") else { return }
             do {
                 try StoreWriter.update(build) { root in
                     Self.relinkingLocation(&root, record: record, id: id, unlinked: unlinked)
@@ -7029,8 +7045,11 @@ final class Shop {
         guard permitted("security", "edit") else { return }
         // Before anything else can answer: whether the change is allowed at
         // all is the first question, not one a read-only book gets to skip.
-        if let id, leavesNoOwner(id, stillOwner: fields.active && fields.roleKey == "owner") {
-            moveProblem = words.callIt("mac.lock_last_owner"); return
+        if let id {
+            let level = await lockLevelAfterSave(id, fields, opened: opened)
+            if leavesNoOwner(id, stillOwner: fields.active && level == "owner") {
+                moveProblem = words.callIt("mac.lock_last_owner"); return
+            }
         }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -9428,6 +9447,8 @@ final class Shop {
     /// Lock the cloud again: drop the data key and stop syncing until somebody
     /// unlocks it. The shop's own choice, from the menu bar.
     func forgetCloudKey() {
+        // The cloud is the owner's (lib/rbac.js `cloud`).
+        guard permitted("cloud", "edit") else { return }
         // Off this Mac as well: "Lock" means the next launch asks again.
         if let shopId = cloudShopId { Task { await CloudKeyMemory.forget(shopId: shopId) } }
         // And no restore this session: the Keychain delete runs off the main
@@ -9655,6 +9676,7 @@ final class Shop {
     }
 
     func checkCloud(passphrase: String) async {
+        guard permitted("cloud", "edit") else { cloudProblem = moveProblem; return }
         cloudProblem = nil
         cloudCheck = nil
         cloudBusy = true
@@ -9731,7 +9753,11 @@ final class Shop {
     ///
     /// It appends and never replaces. See `CloudWriter` for why that line is
     /// where the danger lives.
-    func sendToCloud() async {
+    /// `byPerson: false` is auto-sync, which runs whoever is signed in — the
+    /// owner switched it on, and a lock must not stop a shop's book reaching
+    /// its own cloud. A person pressing Send asks the lock (`cloud`).
+    func sendToCloud(byPerson: Bool = true) async {
+        if byPerson { guard permitted("cloud", "edit") else { cloudProblem = moveProblem; return } }
         cloudProblem = nil
         cloudSent = nil
         guard !restoreInProgress else { cloudProblem = words.callIt("mac.restore_wait_sync"); return }
@@ -10198,6 +10224,8 @@ final class Shop {
     /// Ask for a file and add it.
     func addModelToLibrary() async {
         clearLastOutcome()
+        // Adding to the library is adding stock (the staff lock).
+        guard permitted("inventory", "create") else { importProblem = moveProblem; return }
         guard source.build != nil else {
             importProblem = words.callIt("mac.move_sample"); return
         }
@@ -10320,6 +10348,7 @@ final class Shop {
     func addModelsToLibrary(_ chosen: [URL], movesOriginals: Bool? = nil) async {
         let keepOriginal = !(movesOriginals ?? importMovesOriginals)
         clearLastOutcome()
+        guard permitted("inventory", "create") else { importProblem = moveProblem; return }
         importCancelled = false
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             importProblem = LibraryImport.Failure.notOurs.description; return
@@ -11042,7 +11071,7 @@ final class Shop {
 
         syncInFlight = true
         syncStatus = .syncing
-        await sendToCloud()
+        await sendToCloud(byPerson: false)
         syncInFlight = false
 
         // The gate's state is what the LAST send found, not what any send ever
@@ -11228,6 +11257,8 @@ final class Shop {
 
     /// Ask a plug whether it is on.
     func readPlug(_ machine: Machine) async {
+        // lock: system — a READ: whether the plug is on; switching it is
+        // `switchPlug`, which asks the lock.
         guard let engine, let record = await plugRecord(machine.id),
               let request = try? await engine.plugRequest(machine: record, action: "status") else { return }
         do {
@@ -11241,6 +11272,7 @@ final class Shop {
     /// Switch a machine's plug. Off goes through the shared rule, every time:
     /// power is never cut while the printer is printing, paused, silent or hot.
     func switchPlug(_ machine: Machine, on: Bool) async {
+        guard permitted("orders", "edit") else { plugProblem[machine.id] = moveProblem; return }
         guard let engine, let record = await plugRecord(machine.id) else { return }
         plugProblem[machine.id] = nil
         if !on {
@@ -13055,7 +13087,12 @@ final class Shop {
 
     /// Whether a job may be moved at all: a real book, held by this app, with
     /// the shared rules running. The sample shop is for looking at.
-    var canMoveJobs: Bool { source.isReal && ownership != nil }
+    /// May this window change jobs: a real book this app owns, AND a person the
+    /// staff lock allows to edit jobs. The lock was asked by the functions
+    /// behind ~150 buttons but not by this, so a viewer saw every edit button
+    /// live and was refused on the click (alpha.62 re-check). The functions
+    /// still ask for themselves (`LockGate`); this is what the buttons show.
+    var canMoveJobs: Bool { source.isReal && ownership != nil && lockAllows("orders", "edit") }
 
 
     // ── WHICH COLUMNS WOULD TAKE THE CARD IN THE AIR ──────────────────────────
@@ -16090,7 +16127,7 @@ final class Shop {
     private func recordCampaign(reached: Int, sent: Int, failed: Int) async {
         guard let build = source.build else { return }
         do {
-            // lock: system — the record of a campaign the person just sent (`sendCampaign` asks clients/edit).
+            // lock: callers — sendCampaign
             try StoreWriter.update(build) { root in
                 var settings: [String: JSONValue] = [:]
                 if case .object(let s)? = root["settings"] { settings = s }

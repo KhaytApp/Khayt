@@ -79,6 +79,8 @@ extension Shop {
     /// read-only must not write, and would be refused if it tried.
     @discardableResult
     func recordPaidWebStoreOrders(fetch: CloudIntake.Fetch? = nil) async -> Int {
+        // lock: system — automatic: the web-store pass the owner switched on,
+        // run on a timer, never a person's click.
         guard case .store(let build) = source, cloudConnected, let engine,
               StoreLock.weOwnIt(build), !webStoreAutoBusy else { return 0 }
         webStoreAutoBusy = true

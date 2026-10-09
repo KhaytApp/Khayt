@@ -145,8 +145,9 @@ extension Shop {
         switch c {
         case "printLog", "waitingList", "recurringOrders", "orderTemplates", "presets": "orders"
         case "inventory", "consumables", "products", "suppliers", "purchaseOrders", "purchaseLog",
-             "kits", "wasteLog", "machines", "printFiles", "maintenanceTasks", "hub_maint_log_v1",
-             "locations": "inventory"
+             "kits", "wasteLog", "machines", "printFiles", "maintenanceTasks", "hub_maint_log_v1": "inventory"
+        // Sites are made and removed in Settings (`saveLocation` asks settings).
+        case "locations": "settings"
         case "clients", "communications": "clients"
         case "expenses", "giftCards", "invoices": "invoicing"
         case "timeEntries", "activityLog", "auditLog": "logs"
@@ -159,6 +160,32 @@ extension Shop {
     func permittedRestoring(_ collections: some Sequence<String>) -> Bool {
         for c in Set(collections) where !permitted(Self.lockArea(ofCollection: c), "edit") { return false }
         return true
+    }
+
+    /// Every sheet and dialog the window can raise, put away. Called on every
+    /// change of who is signed in. The list is every `Shop` flag a
+    /// `.sheet`/`.confirmationDialog`/`.alert` is bound to;
+    /// `SheetsDismissOnLockTests` reads the sources and fails if one is added
+    /// without being put here.
+    func dismissEverySheet() {
+        addingConsumable = false; addingExpense = false; addingMachine = false; addingSpool = false
+        askingTheBook = false; checkingCloud = false; confirmingSignOut = false
+        findingPrinters = false; importingSpoolman = false; issuingGiftCard = false
+        loggingWaste = false; namingGroup = false; pausingProduction = false
+        planningBatch = false; planningCampaign = false; reviewingDeposits = false
+        reviewingSyncLosses = false; scanning = false; schedulingWork = false
+        sendingFeedback = false; settingUpShop = false; showingOnlineOrders = false
+        showingSpoolRepair = false; showingWebStore = false; signingIntoCloud = false
+        takingAJob = false
+        billingOrder = nil; confirmingCancel = nil; draftingFor = nil; droppingFrom = nil
+        editingConsumable = nil; editingCustomer = nil; editingMachine = nil
+        editingProduct = nil; editingSpool = nil; editingSupplier = nil; editingTemplate = nil
+        loggingPurchaseFor = nil; messagingFor = nil; movingGroups = nil
+        pendingCompletion = nil; pendingEdit = nil; pendingHold = nil; pendingInvoice = nil
+        pendingLabels = nil; pendingLibraryDelete = nil; pendingPayment = nil
+        pendingQcFail = nil; pendingSend = nil; pendingShipment = nil
+        planFor = nil; ratingFor = nil; receivingGoods = nil; restoring = nil
+        showingHistoryFor = nil; spoolHistoryFor = nil
     }
 
     /// The screen a shelf is gated on, under the lock.
@@ -394,6 +421,23 @@ extension Shop {
         return lockOwners.map(\.id) == [id]
     }
 
+    /// The access level the LOCK will read for this person once `fields` are
+    /// saved — not the level the editor shows. A legacy record has no
+    /// `roleKey`; the lock reads its job title (`roleFromLegacy`, lock on), so
+    /// renaming "Admin" demoted the last owner without touching the level
+    /// picker, and the guard asked the picker (alpha.62 re-check). Writing the
+    /// shown level on every save is NOT the fix: the editor shows a blank
+    /// title as "owner" (the other app's lock-off reading) where the lock
+    /// reads "operator", and that would promote people.
+    func lockLevelAfterSave(_ id: String, _ fields: ShopOperator.Fields,
+                            opened: ShopOperator.Fields?) async -> String {
+        // The picker moved: that is an explicit level, and it is written.
+        if let opened, opened.roleKey != fields.roleKey { return fields.roleKey }
+        if let stored = shopOperator(id)?.roleKey { return stored }
+        guard let engine else { return "viewer" }
+        return (try? await engine.roleFromLegacy(fields.role, hasLock: true)) ?? "viewer"
+    }
+
     /// Switch the lock on. Needs an owner who can sign in, or it would not be
     /// in force; whoever switches it on then signs in like everybody else.
     func switchLockOn() async {
@@ -407,6 +451,8 @@ extension Shop {
     /// because a Mac left signed in is not proof of who is at it.
     func switchLockOff(ownerPin: String, now: Date = Date()) async -> SignInResult {
         moveProblem = nil
+        // lock: system — gated by an OWNER'S PIN, verified below, not by
+        // whoever is signed in: a Mac left signed in is not proof of who is at it.
         if let until = await lockCooldown(now: now) { return .coolingDown(until: until) }
         let hashes = lockOwners.compactMap { rawPinHash($0.id) }
         let ok = await Task.detached(priority: .userInitiated) {
@@ -425,8 +471,7 @@ extension Shop {
     private func writeLockSwitch(_ on: Bool) async {
         guard let build = source.build else { moveProblem = words.callIt("mac.move_sample"); return }
         do {
-            // lock: system — its two callers decide: switchLockOn asks
-            // security/edit, switchLockOff asks an owner's PIN.
+            // lock: callers — switchLockOn, switchLockOff
             try StoreWriter.update(build) { root in
                 var settings: [String: JSONValue] = [:]
                 if case .object(let s)? = root["settings"] { settings = s }

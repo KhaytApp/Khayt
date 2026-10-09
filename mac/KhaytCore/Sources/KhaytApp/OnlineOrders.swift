@@ -250,7 +250,7 @@ extension Shop {
         var outcome: Recorded = .alreadyThere
         var owed: [KhaytEngine.WebhookDelivery] = []
         do {
-            // lock: system — its callers decide: recordOnlineOrder asks orders/create; the web-store pass is automatic (a rule the owner switched on).
+            // lock: callers — recordOnlineOrder, recordPaidWebStoreOrders
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },

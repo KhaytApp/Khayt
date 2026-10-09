@@ -65,6 +65,18 @@ struct ScreenActions: View {
     @SceneStorage("catalogue.layout") private var catalogueLayout: Catalogue.Layout = .table
 
     var body: some View {
+        // NOTHING while the lock stands in front of the screen, or the screen
+        // is one this person may not open: the title strip's buttons opened
+        // New Job, gift cards, Spoolman, Add printer and the scheduler as
+        // sheets OVER the sign-in screen (alpha.62 re-check).
+        if shop.needsSignIn || !shop.canShow(shop.shelf) {
+            EmptyView()
+        } else {
+            actions
+        }
+    }
+
+    private var actions: some View {
         HStack(spacing: Space.sm) {
             if shop.showingBoard || isJobs {
                 plus("mac.new_job", enabled: shop.canMoveJobs) { shop.takingAJob = true }

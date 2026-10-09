@@ -263,6 +263,10 @@ extension Shop {
         // request after this line ran in a cancelled task, so URLSession threw
         // and the store was never sent. A newer change still cancels it, from
         // `webStoreFollow`, and schedules the publish that replaces it.
+        // A person publishing the shop's prices is changing a setting (the
+        // staff lock). The AUTOMATIC republish is the owner's standing
+        // choice, run after an allowed edit — not asked again.
+        if !automatic { guard permitted("settings", "edit") else { return } }
         if !automatic { webStoreRepublish?.cancel() }
         guard let engine, let build = source.build else { return }
         webStoreBusy = true
@@ -360,6 +364,7 @@ extension Shop {
 
     /// Take the store offline.
     func unpublishWebStore() async {
+        guard permitted("settings", "edit") else { return }
         guard let build = source.build else { return }
         webStoreRepublish?.cancel()
         webStoreBusy = true
@@ -878,7 +883,7 @@ struct WebStoreSheet: View {
                 Spacer()
                 if shop.webStoreLive != false {
                     Button(shop.words.callIt("store.unpublish"), role: .destructive) { askingOffline = true }
-                        .disabled(shop.webStoreBusy)
+                        .disabled(shop.webStoreBusy || !shop.lockAllows("settings", "edit"))
                 }
                 Button(shop.words.callIt("common.close")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -886,7 +891,7 @@ struct WebStoreSheet: View {
                     Task { await shop.publishWebStore(withPhotos: photos) }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(shop.webStoreBusy || count == 0)
+                .disabled(shop.webStoreBusy || count == 0 || !shop.lockAllows("settings", "edit"))
             }
             .padding()
         }

@@ -17,6 +17,15 @@ import KhaytCore
 /// does not, the clock against the job's estimate, and the caption under the
 /// bar says which.
 ///
+/// ── AND THE STAFF LOCK ────────────────────────────────────────────────────
+///
+/// A kiosk already open stays open when the shop's window is locked, on
+/// purpose: it is the floor's display, read across the room by whoever is
+/// there, and it shows what any of them can see by walking to the printers —
+/// the machine, the job on it, how far along. Nothing on it changes the book.
+/// Opening a NEW one goes through the menu, which is disabled while nobody is
+/// signed in. Decided in the alpha.62 re-check.
+///
 /// ── THE LAYOUT IS A FIXED GRID, NOT A LAZY ONE ────────────────────────────
 ///
 /// Every card is on screen at once and nothing scrolls: a kiosk nobody can

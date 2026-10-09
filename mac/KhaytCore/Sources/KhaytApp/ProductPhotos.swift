@@ -552,6 +552,8 @@ extension Shop {
     func registerPicturesPutBack(_ trashed: [ProductPhotos.Trashed], in build: StoreReader.Build) {
         guard let undoManager, !trashed.isEmpty else { return }
         undoManager.registerUndo(withTarget: self) { shop in
+            // A product edit's undo, asked as one (the staff lock).
+            guard shop.permitted("inventory", "edit") else { return }
             let back = ProductPhotos.putBack(trashed, in: build)
             shop.registerPicturesTrashAgain(back, in: build)
         }
@@ -560,6 +562,7 @@ extension Shop {
     private func registerPicturesTrashAgain(_ names: [String], in build: StoreReader.Build) {
         guard let undoManager, !names.isEmpty else { return }
         undoManager.registerUndo(withTarget: self) { shop in
+            guard shop.permitted("inventory", "edit") else { return }
             let again = names.compactMap { ProductPhotos.trash($0, in: build) }
             shop.registerPicturesPutBack(again, in: build)
         }
