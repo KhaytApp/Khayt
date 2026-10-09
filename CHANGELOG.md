@@ -6309,6 +6309,40 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.62] - 2026-10-10
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Staff sign-in, and the customer's cloud link — the last of what the desktop
+app could do that the Mac could not, apart from the printer webhook.
+
+### New
+
+- **Staff sign-in (the operator lock).** Settings → Operations → Staff
+  sign-in. With it on, the Mac asks who you are and your PIN, and each
+  person's access level decides what they can open and change — the same
+  levels as the desktop app, from the same rule. Every change to the book,
+  every printer and plug control, every export and the menus all ask; Lock
+  (⌃⌘L, or the lock beside your name in the sidebar) hands the Mac back.
+  Turning it off needs an owner's PIN, and the last owner cannot be demoted or
+  removed. Ten wrong PINs in a row close the pad for a minute, longer each
+  time after. Who is signed in is this Mac's alone: nothing in the book, a
+  backup or a sync can sign anyone in. PINs typed in Arabic digits work.
+  The lock is only in force once an owner has a PIN this Mac can check, so a
+  shop is never locked out of its own Mac; Settings says when it is not.
+- **The customer's cloud link.** In a job's panel, with the shop connected to
+  Khayt Cloud: publish the job's link (copied for you), a quote with an
+  optional deposit and pay link, Check response (an approved quote moves to
+  Pending), read and answer the customer's messages, and take the link down
+  (asked first). The page follows payments and shipping. A view-only cloud
+  member, and anyone the lock refuses, gets no buttons that write.
+
+### Changed and fixed
+
+- **Exports and feedback no longer carry PIN hashes**, in either app.
+- **A deposit typed as "12,50"** is refused instead of saved as 1250.
+
 ## [4.0.0-alpha.61] - 2026-10-09
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
