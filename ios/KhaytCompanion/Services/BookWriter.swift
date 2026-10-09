@@ -411,6 +411,20 @@ struct BookWriter {
     /// `renderer/order-flows.js`), so the two apps offer one set of choices.
     static let paymentMethods = ["cash", "mada", "transfer", "stcpay", "applepay", "visa", "other"]
 
+    // MARK: - The customer's log
+
+    /// Append a line to a customer's communications log (`commLog`), stamped
+    /// so it travels. The entry is built by the shared rule — see
+    /// `KhaytAPIClient.logWhatsApp`.
+    func addCommEntry(clientId: String, entry: JSONValue) throws {
+        try book.updateRecord(collection: "clients", id: clientId) { record in
+            var log: [JSONValue] = []
+            if case .array(let had)? = record["commLog"] { log = had }
+            log.append(entry)
+            record["commLog"] = .array(log)
+        }
+    }
+
     // MARK: - Booking a roll in
 
     /// Put a roll on the shelf.

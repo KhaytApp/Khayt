@@ -45,7 +45,11 @@ enum SampleShop {
 
         return [
             "settings": .object([
-                "shopName": .string(label), "currency": .string("USD"),
+                // `bizEn` / `bizAr` are the shop's name as the desk stores it —
+                // what a customer message signs with. Without them the WhatsApp
+                // update read "thank you for your order with ."
+                "shopName": .string(label), "bizEn": .string(label), "bizAr": .string("ورشة الطباعة التجريبية"),
+                "currency": .string("USD"),
                 "enableVat": .bool(false), "language": .string("en"),
             ]),
             "machines": .array([

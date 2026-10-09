@@ -54,8 +54,9 @@ final class KhaytAPIClient: ObservableObject {
     /// Optional because a build without its App Group container has neither, and
     /// because the companion still has to work against the Electron desktop,
     /// which does not serve `/api/store` and so never fills one.
-    private let book: CompanionBook?
-    private let reader: BookReader?
+    // Internal, not private: the WhatsApp extension (WhatsAppUpdates.swift) reads the book too.
+    let book: CompanionBook?
+    let reader: BookReader?
     /// Guards against a burst of screens each starting their own refresh.
     private var refreshing = false
     private var lastRefresh: Date?
