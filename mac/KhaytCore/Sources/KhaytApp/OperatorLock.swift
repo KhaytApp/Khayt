@@ -292,7 +292,7 @@ extension Shop {
         guard let stored = rawPinHash(id), shopOperator(id)?.active == true else { return .noPin }
         // PBKDF2 at 200,000 rounds is a noticeable fraction of a second: off
         // the main actor, so the pad does not freeze while it checks.
-        let ok = await Task.detached(priority: .userInitiated) { PinHash.verify(pin, stored) }.value
+        let ok = await PinWork.run { PinHash.verify(pin, stored) }
         guard ok else {
             await recordWrongPin(now: now)
             if let until = await lockCooldown(now: now) { return .coolingDown(until: until) }
@@ -309,7 +309,7 @@ extension Shop {
 
     private func upgradePin(_ id: String, from stored: String, pin: String) async {
         guard let build = source.build,
-              let fresh = await Task.detached(priority: .userInitiated, operation: { PinHash.hash(pin) }).value
+              let fresh = await PinWork.run({ PinHash.hash(pin) })
         else { return }
         // Never fail the sign-in over the upgrade: the PIN was right, and the
         // next correct one tries again.
@@ -329,7 +329,7 @@ extension Shop {
               let owner = lockOwners.first else { return .noPin }
         let plain = Self.normalizeRecoveryCode(code)
         guard plain.count == 12 else { await recordWrongPin(now: now); return .wrong }
-        let ok = await Task.detached(priority: .userInitiated) { PinHash.verify(plain, stored) }.value
+        let ok = await PinWork.run { PinHash.verify(plain, stored) }
         guard ok else {
             await recordWrongPin(now: now)
             if let until = await lockCooldown(now: now) { return .coolingDown(until: until) }
@@ -400,7 +400,7 @@ extension Shop {
         }
         var hash = ""
         if let pin {
-            guard let h = await Task.detached(priority: .userInitiated, operation: { PinHash.hash(pin) }).value
+            guard let h = await PinWork.run({ PinHash.hash(pin) })
             else { moveProblem = words.callIt("mac.lock_failed"); return }
             hash = h
         }
@@ -455,9 +455,9 @@ extension Shop {
         // whoever is signed in: a Mac left signed in is not proof of who is at it.
         if let until = await lockCooldown(now: now) { return .coolingDown(until: until) }
         let hashes = lockOwners.compactMap { rawPinHash($0.id) }
-        let ok = await Task.detached(priority: .userInitiated) {
+        let ok = await PinWork.run {
             hashes.contains { PinHash.verify(ownerPin, $0) }
-        }.value
+        }
         guard ok else {
             await recordWrongPin(now: now)
             if let until = await lockCooldown(now: now) { return .coolingDown(until: until) }
@@ -491,7 +491,7 @@ extension Shop {
         guard let build = source.build else { moveProblem = words.callIt("mac.move_sample"); return nil }
         guard let code = Self.generateRecoveryCode() else { moveProblem = words.callIt("mac.lock_failed"); return nil }
         let plain = Self.normalizeRecoveryCode(code)
-        guard let hash = await Task.detached(priority: .userInitiated, operation: { PinHash.hash(plain) }).value
+        guard let hash = await PinWork.run({ PinHash.hash(plain) })
         else { moveProblem = words.callIt("mac.lock_failed"); return nil }
         do {
             try StoreWriter.update(build) { root in
@@ -510,5 +510,22 @@ extension Shop {
     var hasRecoveryCode: Bool {
         if case .string(let h)? = settingsDict["recoveryCodeHash"] { return PinHash.isManaged(h) }
         return false
+    }
+}
+
+/// PIN hashing off the main actor AND off the cooperative pool.
+///
+/// A PIN check is 200,000 rounds of PBKDF2 — tens of milliseconds of
+/// blocking CPU, more on a slow machine. It ran in `Task.detached`, which
+/// borrows a cooperative-pool thread for all of it: on a three-thread CI
+/// runner, hashes from the lock's tests held the pool while the LAN server's
+/// tests waited 22 minutes for a thread and timed out (alpha.62 CI). A
+/// dispatch queue and a continuation hold no pool thread while they wait —
+/// the pattern memory calls swift-pool-starvation, and `Mesh3MFTests.offMain`.
+enum PinWork {
+    static func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { done in
+            DispatchQueue.global(qos: .userInitiated).async { done.resume(returning: work()) }
+        }
     }
 }
