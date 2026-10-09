@@ -9,6 +9,18 @@ struct Sidebar: View {
     @Bindable var shop: Shop
 
     var body: some View {
+        // NOTHING behind the lock: the shelves' counts, the pipeline's stage
+        // totals and the library's group names are the book, and the classic
+        // sidebar showed them beside the sign-in screen (alpha.62 re-check,
+        // round 3). The new shell's rows are inert and countless the same way.
+        if shop.needsSignIn {
+            List { EmptyView() }
+        } else {
+            shelves
+        }
+    }
+
+    private var shelves: some View {
         List(selection: $shop.shelf) {
             Section {
                 // Which site, first: the classic sidebar had no picker, so a
@@ -16,6 +28,7 @@ struct Sidebar: View {
                 // only ever offered the way back (alpha.61 review). Untagged,
                 // so it is never a selectable row.
                 SitePicker(shop: shop)
+                SignedInRow(shop: shop)
                 // First, and above the pipeline: it is the screen a shop opens
                 // the app to look at.
                 // Nothing at all when nothing needs a person, rather than a

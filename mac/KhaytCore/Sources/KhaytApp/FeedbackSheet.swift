@@ -56,12 +56,16 @@ struct FeedbackSheet: View {
                     .padding(.leading, 20)
             }
 
+            // THE BOOK only for somebody the lock lets export it: attaching it
+            // here was Export by another door (alpha.62 re-check).
+            if shop.lockAllows("settings", "view") {
             VStack(alignment: .leading, spacing: 4) {
                 Toggle(shop.words.callIt("mac.feedback_book"), isOn: $book)
                 Text(shop.words.callIt("mac.feedback_book_note"))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading, 20)
+            }
             }
 
             Text(shop.words.callIt("mac.feedback_diag_note"))
@@ -128,7 +132,9 @@ struct FeedbackSheet: View {
                                    screenshot: screenshot ? capture?.png : nil,
                                    book: nil)
         bookLeftOut = false
-        if book {
+        // Asked again at send, not only at drawing: the toggle's state can
+        // outlive a change of who is signed in.
+        if book, shop.lockAllows("settings", "view") {
             if let root = try? Feedback.storedBook(shop) {
                 parts.book = await Feedback.maskedBook(root, engine: shop.engine)
             }

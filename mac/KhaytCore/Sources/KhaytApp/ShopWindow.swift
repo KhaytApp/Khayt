@@ -115,22 +115,35 @@ struct ShopWindow: View {
     /// The content region, with no chrome of its own — shared by both shells,
     /// which is what stops this being a fork of the app.
     @ViewBuilder private var screen: some View {
-        // THE LOCK, in front of every screen, in both shells — this is the
-        // one place both draw their content through.
-        if shop.needsSignIn {
-            LockScreen(shop: shop)
-        } else if !shop.canShow(shop.shelf) {
-            NotAllowed(shop: shop)
-        } else if shop.showingDashboard {
-            Triage(shop: shop)
-        } else {
-            VStack(spacing: 0) {
+        lockedOr {
+            if shop.showingDashboard {
+                Triage(shop: shop)
+            } else {
                 EngineBanner(shop: shop)
                 MoveBanners(shop: shop)
                 SpendBanner(shop: shop)
                 classicScreens
             }
         }
+    }
+
+    /// THE LOCK, in front of every screen, in BOTH shells — the sign-in
+    /// screen while nobody is signed in, "not allowed" for a screen the
+    /// person's level does not open, and only otherwise the content. What
+    /// it picks is `ShopWindow.gate(for:)`, which a test asks directly.
+    @ViewBuilder private func lockedOr<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        switch Self.gate(for: shop) {
+        case .signIn: LockScreen(shop: shop)
+        case .notAllowed: NotAllowed(shop: shop)
+        case .content: VStack(spacing: 0) { content() }
+        }
+    }
+
+    /// What either shell's detail column draws for the shop as it is.
+    enum Gate: Equatable { case signIn, notAllowed, content }
+    static func gate(for shop: Shop) -> Gate {
+        if shop.needsSignIn { return .signIn }
+        return shop.canShow(shop.shelf) ? .content : .notAllowed
     }
 
     /// Every screen but the Dashboard, shared by both shells.
@@ -190,43 +203,7 @@ struct ShopWindow: View {
             }
     }
 
-    private var classic: some View {
-        NavigationSplitView {
-            Sidebar(shop: shop)
-                // 190 was under every published minimum for a Mac source list
-                // (225-275), and the app was paying for it: `SidebarLayoutTests`
-                // caps every sidebar label at 22 characters because they
-                // truncate, which is a test managing the symptom of a column
-                // too narrow to hold its own words. Arabic is the tighter of
-                // the two languages and set the cap.
-                //
-                // The extra 25 points come out of a detail pane that is
-                // hundreds wide and, on the dashboard, capped anyway.
-                .navigationSplitViewColumnWidth(min: 225, ideal: 240, max: 340)
-        } detail: {
-            VStack(spacing: 0) {
-                // What the last move said, above whatever screen you are on.
-                //
-                // It used to live inside the board, which is where a drag
-                // starts — but ⇧⌘H and the Job menu move a job from the table
-                // too, and there a refusal appeared nowhere at all. A move that
-                // did not happen and said nothing is the worst of the three
-                // possible outcomes.
-                EngineBanner(shop: shop)
-                MoveBanners(shop: shop)
-                SpendBanner(shop: shop)
-
-                classicScreens
-            }
-        }
-        // The detail panel, the search field and the menu-bar plumbing —
-        // here rather than inside `detail`, for the reason `WindowPanels`
-        // gives. Both shells apply it.
-        .modifier(panels)
-        // On the window rather than the board, because ⇧⌘H and the Job menu
-        // reach a job from the table too, and the sheet has to be somewhere all
-        // of them can raise it.
-        .toolbar {
+    @ToolbarContentBuilder private var classicToolbar: some ToolbarContent {
             ToolbarItem(placement: .navigation) {
                 // Which book is open, always visible. Mistaking the sample for
                 // the shop's real position is the one error this app must not
@@ -259,7 +236,10 @@ struct ShopWindow: View {
                         // models downloaded from one site share one answer.
                         ProvenanceMenu(shop: shop)
                     }
-                } else { OwedSummary(shop: shop) }
+                } else if shop.lockAllows("analytics", "view") {
+                    // What is owed is the shop's money (`analytics`).
+                    OwedSummary(shop: shop)
+                }
             }
             // IMPORT, ON THE SCREEN IT IMPORTS INTO.
             //
@@ -290,6 +270,55 @@ struct ShopWindow: View {
                 // have" — it is already a button, so this does not say so.
                 .accessibilityLabel(shop.words.callIt(showInspector ? "mac.hide_details" : "mac.show_details"))
             }
+    }
+
+    private var classic: some View {
+        NavigationSplitView {
+            Sidebar(shop: shop)
+                // 190 was under every published minimum for a Mac source list
+                // (225-275), and the app was paying for it: `SidebarLayoutTests`
+                // caps every sidebar label at 22 characters because they
+                // truncate, which is a test managing the symptom of a column
+                // too narrow to hold its own words. Arabic is the tighter of
+                // the two languages and set the cap.
+                //
+                // The extra 25 points come out of a detail pane that is
+                // hundreds wide and, on the dashboard, capped anyway.
+                .navigationSplitViewColumnWidth(min: 225, ideal: 240, max: 340)
+        } detail: {
+            VStack(spacing: 0) {
+                // What the last move said, above whatever screen you are on.
+                //
+                // It used to live inside the board, which is where a drag
+                // starts — but ⇧⌘H and the Job menu move a job from the table
+                // too, and there a refusal appeared nowhere at all. A move that
+                // did not happen and said nothing is the worst of the three
+                // possible outcomes.
+                // THE LOCK, here too. The classic shell drew its screens
+                // straight from `classicScreens` and never passed through
+                // `screen`, so with the lock on and nobody signed in it showed
+                // the whole book (alpha.62 re-check). `lockedOr` is the one
+                // gate both shells draw through.
+                lockedOr {
+                    EngineBanner(shop: shop)
+                    MoveBanners(shop: shop)
+                    SpendBanner(shop: shop)
+                    classicScreens
+                }
+            }
+        }
+        // The detail panel, the search field and the menu-bar plumbing —
+        // here rather than inside `detail`, for the reason `WindowPanels`
+        // gives. Both shells apply it.
+        .modifier(panels)
+        // On the window rather than the board, because ⇧⌘H and the Job menu
+        // reach a job from the table too, and the sheet has to be somewhere all
+        // of them can raise it.
+        .toolbar {
+            // NOTHING in the classic toolbar while nobody is signed in: the
+            // book switcher, Import and the money summary sat live above the
+            // sign-in screen (alpha.62 re-check).
+            if !shop.needsSignIn { classicToolbar }
         }
         // No `.environment(\.layoutDirection, …)` here on purpose: that line
         // loops SwiftUI's split view until AppKit aborts. The window is mirrored

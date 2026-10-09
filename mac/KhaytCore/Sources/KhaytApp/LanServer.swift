@@ -2297,6 +2297,7 @@ extension Shop {
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
         guard let engine else { throw CocoaError(.fileWriteUnknown) }
         var result: KhaytEngine.Folded?
+        // lock: system — a paired phone's changes; the LAN server gates them with the owner LAN PIN and the phone-writable allowlist.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2314,6 +2315,7 @@ extension Shop {
 
     func recordIntake(_ entry: JSONValue) async throws {
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
+        // lock: system — a customer's request through the LAN intake form; the intake has its own session and rate limits.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2339,6 +2341,7 @@ extension Shop {
         let now = Date()
         let id = LanServer.uniqueId(platform)
         var written: JSONValue?
+        // lock: system — a signed storefront webhook (Salla/Zid); authenticated by its HMAC secret.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2390,6 +2393,7 @@ extension Shop {
     func recordCarrierEvent(_ event: JSONValue, at: String) async throws -> JSONValue? {
         guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
         var moved: JSONValue?
+        // lock: system — a signed carrier webhook; authenticated by its secret.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2425,6 +2429,10 @@ extension Shop {
     /// written into the book so the server recognises it. Nil while the
     /// server is off: a link nobody can open is worse than none.
     func quoteLink(for jobId: String) async -> String? {
+        // Minting a customer-facing link into the job is editing it (the
+        // staff lock); the note that said "the inspector decides" was not
+        // true — the inspector asked only whether the book was writable.
+        guard permitted("orders", "edit") else { return nil }
         guard let base = lanURL, let build = source.build else { return nil }
         var token = ""
         do {
@@ -2450,6 +2458,7 @@ extension Shop {
     func approveQuote(_ jobId: String, nowIso: String) async throws -> JSONValue? {
         guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
         var approved: JSONValue?
+        // lock: system — a customer approving their own quote through the tokened LAN page.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2525,6 +2534,10 @@ extension Shop {
     /// job, and the job's own tracking token — minted into the job the first
     /// time, as the Electron renderer's `ensureTrackingToken` mints it.
     func trackingLink(for jobId: String) async -> String? {
+        // Minting a customer-facing link into the job is editing it (the
+        // staff lock); the note that said "the inspector decides" was not
+        // true — the inspector asked only whether the book was writable.
+        guard permitted("orders", "edit") else { return nil }
         guard let base = lanURL, let build = source.build else { return nil }
         var token = ""
         do {
@@ -2549,6 +2562,7 @@ extension Shop {
     func recordSurvey(token: String, rating: Double, comment: String?, nowIso: String) async throws -> Bool {
         guard let build = source.build, let engine else { throw CocoaError(.fileWriteNoPermission) }
         var written = false
+        // lock: system — a customer's survey through the tokened LAN page.
         try await StoreWriter.update(
             storeURL: build.storeURL,
             owns: { StoreLock.weOwnIt(build) },
@@ -2580,6 +2594,7 @@ extension Shop {
         let minted = LanServer.randomToken(bytes: 16)
         guard let sealed = try? await Secrets.seal(minted, for: build) else { return "" }
         do {
+            // lock: system — the calendar feed's token, minted when the LAN server starts.
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },

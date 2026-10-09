@@ -100,9 +100,19 @@
     const payRaw = String(payUrlText == null ? '' : payUrlText).trim();
     let cloudDeposit = null;
     if (depRaw) {
+      // A plain decimal, or one with proper thousands grouping — and nothing
+      // else. Every comma was stripped, so "12,50" (a decimal comma) became
+      // 1250 and "1,5" became 15; `Number` also took "0x10" as 16. A comma
+      // that is not a thousands separator is refused, not guessed at.
+      const plain = /^\d+(\.\d+)?$/.test(depRaw);
+      const grouped = /^\d{1,3}(,\d{3})+(\.\d+)?$/.test(depRaw);
+      if (!plain && !grouped) return { ok: false, error: 'deposit' };
       const n = Number(depRaw.replace(/,/g, ''));
       if (!Number.isFinite(n) || n < 0) return { ok: false, error: 'deposit' };
-      cloudDeposit = n > 0 ? Math.round(n * 100) / 100 : null;
+      const cents = Math.round(n * 100) / 100;
+      // Under a cent rounds to nothing: say so rather than store no deposit.
+      if (n > 0 && cents === 0) return { ok: false, error: 'deposit' };
+      cloudDeposit = cents > 0 ? cents : null;
     }
     const cloudPayUrl = payRaw ? httpUrl(payRaw) : '';
     if (payRaw && !cloudPayUrl) return { ok: false, error: 'pay_url' };

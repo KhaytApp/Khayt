@@ -105,6 +105,8 @@ enum ImportCommand {
 
     /// Returns the process's exit code: 0 when everything asked for arrived.
     static func run(_ options: Options) async -> Int32 {
+        // lock: system — `khayt import` in Terminal: whoever has the Mac's shell has the
+        // book's files already; the staff lock guards the app's window, not the disk.
         guard let source = Shop.available.first(where: \.isReal),
               let build = source.build else {
             complain("There is no Khayt book on this Mac to import into.")
@@ -304,6 +306,7 @@ enum ImportCommand {
         // of a one-megabyte book is four hundred and forty-five rewrites of it.
         if !drawn.isEmpty || !measured.isEmpty {
             do {
+                // lock: system — the `khayt import` command line, run by the shop's own user in Terminal; no window, no one signed in.
                 try StoreWriter.update(storeURL: build.storeURL,
                                        owns: { StoreLock.weOwnIt(build) },
                                        whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in
@@ -404,6 +407,7 @@ enum ImportCommand {
             return 2
         }
         do {
+            // lock: system — the `khayt import` command line, run by the shop's own user in Terminal; no window, no one signed in.
             try StoreWriter.update(storeURL: build.storeURL,
                                    owns: { StoreLock.weOwnIt(build) },
                                    whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in

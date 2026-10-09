@@ -23,18 +23,32 @@ struct Triage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            MoneyMasthead(shop: shop, mode: $mode)
+            // THE MONEY — what is owed, the month's net, gross, cost of goods,
+            // and the Ledger of every payment — only for a level that may see
+            // the shop's figures (`analytics` in lib/rbac.js: owner and
+            // manager). An operator works the floor from the triage board;
+            // the strip and the ledger were the P&L by another door
+            // (alpha.62 re-check, round 3).
+            if shop.lockAllows("analytics", "view") {
+                MoneyMasthead(shop: shop, mode: $mode)
+            }
             if shop.orders.isEmpty && shop.machines.isEmpty {
                 // §6: never a blank screen. What the thing is for, why it
                 // matters, one obvious next step, one escape hatch.
                 FirstRun(shop: shop)
             } else {
-                switch mode {
+                switch Self.shownMode(mode, shop: shop) {
                 case .triage: TriageBoard(shop: shop)
                 case .ledger: Ledger(shop: shop)
                 }
             }
         }
+    }
+
+    /// The Ledger only for somebody who may see the money — whatever the
+    /// window remembered from the last person.
+    static func shownMode(_ mode: Mode, shop: Shop) -> Mode {
+        shop.lockAllows("analytics", "view") ? mode : .triage
     }
 }
 

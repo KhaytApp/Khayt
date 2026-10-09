@@ -16,6 +16,12 @@ struct CustomerLinkSection: View {
     @State private var talking = false
     @State private var busy = false
     @State private var said: String?
+    @State private var confirmingUnpublish = false
+
+    /// May this person, here, change what the customer sees? The cloud role
+    /// AND the staff lock: a lock viewer was shown the buttons and refused on
+    /// the click (alpha.62 review).
+    private var mayWrite: Bool { shop.cloudRoleCanWrite && shop.lockAllows("orders", "edit") }
 
     var body: some View {
         if shop.portalReachable, shop.canMoveJobs {
@@ -26,14 +32,16 @@ struct CustomerLinkSection: View {
                         Button(shop.words.callIt("cloud.portal_check")) { Task { await check() } }
                             .disabled(busy)
                     }
-                    Button(shop.words.callIt("pm.title")) { talking = true }
-                    if shop.cloudRoleCanWrite {
+                    Button(shop.words.callIt("mac.portal_messages")) { talking = true }
+                    if mayWrite {
+                        // ASKED FIRST: one misclick beside "Copy customer link"
+                        // broke a link the customer already had.
                         Button(shop.words.callIt("cloud.portal_unpublish"), role: .destructive) {
-                            Task { busy = true; await shop.unpublishPortal(job.id); busy = false; said = nil }
+                            confirmingUnpublish = true
                         }
                         .disabled(busy)
                     }
-                } else if shop.cloudRoleCanWrite {
+                } else if mayWrite {
                     Button(shop.words.callIt(job.status == "quote" ? "mac.portal_publish_quote" : "mac.portal_publish")) {
                         if job.status == "quote" { asking = true } else { Task { await publish(nil, nil) } }
                     }
@@ -52,6 +60,17 @@ struct CustomerLinkSection: View {
                 }
             }
             .sheet(isPresented: $talking) { PortalMessagesSheet(shop: shop, job: job) }
+            .confirmationDialog(
+                shop.words.callIt("mac.portal_unpublish_q", ["job": .string(shop.shownTitle(of: job))]),
+                isPresented: $confirmingUnpublish, titleVisibility: .visible
+            ) {
+                Button(shop.words.callIt("cloud.portal_unpublish"), role: .destructive) {
+                    Task { busy = true; await shop.unpublishPortal(job.id); busy = false; said = nil }
+                }
+                Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+            } message: {
+                Text(shop.words.callIt("mac.portal_unpublish_why"))
+            }
         }
     }
 
@@ -77,12 +96,15 @@ struct CustomerLinkSection: View {
     private func check() async {
         busy = true
         defer { busy = false }
-        guard let r = await shop.checkPortalResponse(job.id) else { said = shop.moveProblem; return }
+        guard let checked = await shop.checkPortalResponse(job.id) else { said = shop.moveProblem; return }
+        let r = checked.said
         let words = shop.words
         var line: String
         switch r.response {
         case "approved":
-            line = words.callIt(r.advance ? "cloud.portal_approved_advanced" : "cloud.portal_approved")
+            // "…moved to Pending" only when it was; a refused move says why.
+            line = words.callIt(checked.moved ? "cloud.portal_approved_advanced" : "cloud.portal_approved")
+            if r.advance, !checked.moved, let why = shop.moveProblem { line += " · " + why }
         case "declined": line = words.callIt("cloud.portal_declined")
         default: line = words.callIt(r.paid ? "cloud.portal_deposit_paid" : "cloud.portal_no_response")
         }
@@ -116,7 +138,7 @@ struct QuoteLinkSheet: View {
                 PortalField(placeholder: "https://", text: $payUrl)
                     .environment(\.layoutDirection, .leftToRight)   // an address reads left to right
             }
-            Text(words.callIt("cloud.deposit_hint"))
+            Text(words.callIt("mac.deposit_hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         } footer: {
@@ -167,7 +189,7 @@ struct PortalMessagesSheet: View {
     var body: some View {
         let words = shop.words
         SheetFrame(width: 440) {
-            Text(words.callIt("pm.title") + " · " + Figure.isolated(job.id)).font(.headline)
+            Text(words.callIt("mac.portal_messages") + " · " + Figure.isolated(job.id)).font(.headline)
             if let problem {
                 Text(problem).foregroundStyle(Khayt.late).font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
@@ -184,7 +206,10 @@ struct PortalMessagesSheet: View {
                         .font(.callout)
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .foregroundStyle(mine ? Color.white : Color.primary)
-                        .background(mine ? Khayt.brand : Color.secondary.opacity(0.12),
+                        // The DEEP step in both modes: the brand's dark-mode
+                        // light blue put white text at about 3.2:1; this is
+                        // about 7.7:1 (alpha.62 review).
+                        .background(mine ? Color(nsColor: NSColor(hex: 0x0B54AD)) : Color.secondary.opacity(0.12),
                                     in: RoundedRectangle(cornerRadius: 10))
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
@@ -193,7 +218,7 @@ struct PortalMessagesSheet: View {
             }
         } footer: {
             VStack(alignment: .leading, spacing: 10) {
-                if shop.cloudRoleCanWrite {
+                if shop.cloudRoleCanWrite && shop.lockAllows("orders", "edit") {
                     HStack {
                         PortalField(placeholder: words.callIt("pm.reply_ph"), text: $draft) {
                             Task { await send() }

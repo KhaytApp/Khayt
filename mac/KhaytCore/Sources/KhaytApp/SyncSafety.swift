@@ -164,6 +164,7 @@ enum RestoreGuard {
     }
 
     static func clear(for storeURL: URL) {
+        // lock: system — the sync's own pending marker, cleared once it is carried up.
         try? FileManager.default.removeItem(at: pendingURL(for: storeURL))
     }
 
@@ -487,6 +488,7 @@ enum SyncLosses {
     }
 
     private static func prune(folder: URL, now: Date, keep: URL?) {
+        // lock: system — ages out the sync's own safety copies on a fixed rule.
         let fm = FileManager.default
         guard let names = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey],
                                                       options: [.skipsHiddenFiles]) else { return }

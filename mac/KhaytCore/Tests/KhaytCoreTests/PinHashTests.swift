@@ -75,4 +75,21 @@ struct PinHashTests {
             #expect(!PinHash.isManaged(stored))
         }
     }
+
+    @Test("a PIN typed in Arabic or Persian digits is the same PIN, and an old Arabic-character hash still opens")
+    func arabicDigits() throws {
+        let stored = try #require(PinHash.hash("1234", iterations: 1000))
+        #expect(PinHash.verify("١٢٣٤", stored))
+        #expect(PinHash.verify("۱۲۳۴", stored))
+        #expect(PinHash.verify("1234", stored))
+        #expect(!PinHash.verify("١٢٣٥", stored))
+        // Hashed from the Arabic characters themselves, before normalising.
+        let salt: [UInt8] = Array(repeating: 7, count: 16)
+        let raw = try #require(PinHash.pbkdf2("١٢٣٤", salt: salt, iterations: 1000, length: 32))
+        let old = "p2$1000$" + salt.map { String(format: "%02x", $0) }.joined()
+            + "$" + raw.map { String(format: "%02x", $0) }.joined()
+        #expect(PinHash.verify("١٢٣٤", old))
+        #expect(PinHash.normalize("٠١٢٣٤٥٦٧٨٩") == "0123456789")
+        #expect(PinHash.normalize("۰۱۲۳۴۵۶۷۸۹") == "0123456789")
+    }
 }

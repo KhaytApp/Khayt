@@ -131,7 +131,7 @@ enum PortalClient {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await (session ?? Self.session).data(for: request)
+            (data, response) = try await Self.fetchCapped(request, session: session)
         } catch {
             throw Failure.unreachable(error.localizedDescription)
         }
@@ -195,13 +195,33 @@ enum PortalClient {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await (session ?? Self.session).data(for: request)
+            (data, response) = try await Self.fetchCapped(request, session: session)
         } catch {
             throw Failure.unreachable(error.localizedDescription)
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if (300..<400).contains(status) { throw Failure.redirected }
         guard status == 200 else { throw Failure.refused(status, serverReason(data)) }
+    }
+
+    /// The most of a response this reads. A portal answer is a few kilobytes;
+    /// the address is the shop's own setting and can be any server, and
+    /// `data(for:)` buffered whatever it sent (alpha.62 review).
+    static let maxResponse = 4 << 20
+
+    /// `data(for:)`, read as a stream and stopped at `maxResponse`.
+    static func fetchCapped(_ request: URLRequest, session: URLSession?) async throws -> (Data, URLResponse) {
+        let (bytes, response) = try await (session ?? Self.session).bytes(for: request)
+        if response.expectedContentLength > Int64(maxResponse) {
+            throw Failure.unreachable("The server's answer is too large")
+        }
+        var data = Data()
+        data.reserveCapacity(min(maxResponse, max(0, Int(response.expectedContentLength))))
+        for try await byte in bytes {
+            data.append(byte)
+            if data.count > maxResponse { throw Failure.unreachable("The server's answer is too large") }
+        }
+        return (data, response)
     }
 
     /// A session that does NOT follow redirects.

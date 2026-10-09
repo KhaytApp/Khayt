@@ -13,7 +13,6 @@ import KhaytCore
 //   - the role a legacy record without `roleKey` gets, `roleFromLegacy`;
 //   - the PIN format, `lib/pin-hash.js` (ported: `PinHash`, held to the
 //     module by vectors the module wrote);
-//   - the wrong-PIN bucket, `lib/lan-auth.js` `bumpFailure`/`isLockedOut`;
 //   - the book's fields: `settings.operatorLockEnabled`, `operators[].pinHash`,
 //     `operators[].roleKey`, `settings.recoveryCodeHash`.
 //
@@ -34,8 +33,11 @@ import KhaytCore
 //    is reported as not in force rather than locking the shop out of its own
 //    Mac. Settings says so.
 // 5. WRONG PINS ARE THROTTLED, which the other app does not do: ten wrong in a
-//    row lock the pad for a minute, doubling each time to fifteen minutes.
-//    Kept in this Mac's defaults, not the book, so quitting does not reset it.
+//    row close the pad for a minute; after that every wrong one closes it
+//    again, for twice as long each time up to fifteen minutes, until a right
+//    PIN. Kept in this Mac's defaults, not the book, so quitting does not
+//    reset it (the same user can delete those defaults — and can also edit
+//    the book's file: the lock is not encryption, see below).
 // 6. A LEGACY ROLE IS READ WITH THE LOCK ON (`hasLock: true`): a record with
 //    no role is an operator, not the owner the other app takes it for.
 //
@@ -83,7 +85,10 @@ extension Shop {
     }
 
     /// Switched on AND somebody can sign in as the owner — see (4) above.
-    var lockInForce: Bool { lockSwitchedOn && !lockOwners.isEmpty }
+    /// Switched on but not yet READ (`lockReady`) counts as in force: the
+    /// levels decide who the owners are, and before they are read the answer
+    /// was "nobody", which made the lock not in force — open (alpha.62 review).
+    var lockInForce: Bool { lockSwitchedOn && (!lockReady || !lockOwners.isEmpty) }
 
     /// The operator signed in on this Mac, if they still exist and are active.
     var signedIn: ShopOperator? {
@@ -112,6 +117,77 @@ extension Shop {
         return false
     }
 
+    /// What a write to the book IS, to the lock — required by every Shop write
+    /// helper (`writeToOneOrder`, `write`, `writeKits`, …), so a new writer
+    /// cannot be added without saying. `WritersAreGatedTests` holds every
+    /// direct `StoreWriter` call in the app to a `permitted` or a `.system`.
+    enum LockGate: Equatable {
+        /// A person's action, allowed by `lib/rbac.js` for `area`/`action`.
+        case person(_ area: String, _ action: String)
+        /// Not a person's action — a merge, a reading, a migration — with why.
+        /// Never refused: the lock gates people, not the book keeping itself.
+        case system(_ why: String)
+    }
+
+    /// `permitted(area, action)` for a gate; a `.system` write passes.
+    func permitted(_ gate: LockGate) -> Bool {
+        switch gate {
+        case .person(let area, let action): permitted(area, action)
+        case .system: true
+        }
+    }
+
+    /// The area a collection's records belong to, for writes that put back
+    /// whatever they were given (undo, a sync loss): the most demanding area
+    /// any of the records touches is asked. Staff and the lock's own settings
+    /// are `security`; anything unknown is the owner's (`settings`).
+    static func lockArea(ofCollection c: String) -> String {
+        switch c {
+        case "printLog", "waitingList", "recurringOrders", "orderTemplates", "presets": "orders"
+        case "inventory", "consumables", "products", "suppliers", "purchaseOrders", "purchaseLog",
+             "kits", "wasteLog", "machines", "printFiles", "maintenanceTasks", "hub_maint_log_v1": "inventory"
+        // Sites are made and removed in Settings (`saveLocation` asks settings).
+        case "locations": "settings"
+        case "clients", "communications": "clients"
+        case "expenses", "giftCards", "invoices": "invoicing"
+        case "timeEntries", "activityLog", "auditLog": "logs"
+        case "operators": "security"
+        default: "settings"
+        }
+    }
+
+    /// May whoever is here put back records of these collections?
+    func permittedRestoring(_ collections: some Sequence<String>) -> Bool {
+        for c in Set(collections) where !permitted(Self.lockArea(ofCollection: c), "edit") { return false }
+        return true
+    }
+
+    /// Every sheet and dialog the window can raise, put away. Called on every
+    /// change of who is signed in. The list is every `Shop` flag a
+    /// `.sheet`/`.confirmationDialog`/`.alert` is bound to;
+    /// `SheetsDismissOnLockTests` reads the sources and fails if one is added
+    /// without being put here.
+    func dismissEverySheet() {
+        addingConsumable = false; addingExpense = false; addingMachine = false; addingSpool = false
+        askingTheBook = false; checkingCloud = false; confirmingSignOut = false
+        findingPrinters = false; importingSpoolman = false; issuingGiftCard = false
+        loggingWaste = false; namingGroup = false; pausingProduction = false
+        planningBatch = false; planningCampaign = false; reviewingDeposits = false
+        reviewingSyncLosses = false; scanning = false; schedulingWork = false
+        sendingFeedback = false; settingUpShop = false; showingOnlineOrders = false
+        showingSpoolRepair = false; showingWebStore = false; signingIntoCloud = false
+        takingAJob = false
+        billingOrder = nil; confirmingCancel = nil; draftingFor = nil; droppingFrom = nil
+        editingConsumable = nil; editingCustomer = nil; editingMachine = nil
+        editingProduct = nil; editingSpool = nil; editingSupplier = nil; editingTemplate = nil
+        loggingPurchaseFor = nil; messagingFor = nil; movingGroups = nil
+        pendingCompletion = nil; pendingEdit = nil; pendingHold = nil; pendingInvoice = nil
+        pendingLabels = nil; pendingLibraryDelete = nil; pendingPayment = nil
+        pendingQcFail = nil; pendingSend = nil; pendingShipment = nil
+        planFor = nil; ratingFor = nil; receivingGoods = nil; restoring = nil
+        showingHistoryFor = nil; spoolHistoryFor = nil
+    }
+
     /// The screen a shelf is gated on, under the lock.
     static func lockArea(of shelf: Shelf) -> String? {
         switch shelf {
@@ -124,8 +200,12 @@ extension Shop {
     /// Read the matrix and every operator's level. With the book, after the
     /// operators are read.
     func refreshLock() async {
-        guard let engine else { rbac = nil; lockRoles = [:]; return }
+        // No engine, no matrix: NOT ready, so a switched-on lock stays closed.
+        // It returned with no roles here, which emptied the owners and made
+        // the lock not in force — open on the one failure that should shut it.
+        guard let engine else { rbac = nil; lockRoles = [:]; lockReady = false; return }
         rbac = try? await engine.rbac()
+        defer { lockReady = rbac != nil }
         var roles: [String: String] = [:]
         for op in operators {
             if let key = op.roleKey {
@@ -151,28 +231,46 @@ extension Shop {
     private static let failuresKey = "khayt.lock.failures"
     private static let lockoutsKey = "khayt.lock.lockouts"
 
-    func lockFailures() -> KhaytEngine.LanFailures? {
-        let d = lockDefaults
-        guard let rec = d.dictionary(forKey: Self.failuresKey),
-              let c = rec["count"] as? Double, let r = rec["resetAt"] as? Double else { return nil }
-        return KhaytEngine.LanFailures(count: c, resetAt: r)
+    /// Wrong PINs before the pad cools down.
+    static let lockTries = 10
+
+    /// The wrong-PIN record: how many in a row since the last right one, and
+    /// when the pad opens again (epoch ms, 0 when it is open).
+    ///
+    /// CONSECUTIVE, reset only by a right PIN. It reused the LAN server's
+    /// windowed bucket, whose count expired a cooldown after the FIRST wrong
+    /// PIN — so nine guesses a minute never tripped it, 12,960 a day, and
+    /// every four-digit PIN fell inside a day (alpha.62 review). Now ten in a
+    /// row close the pad, each closing longer than the last up to fifteen
+    /// minutes, and waiting a closing out does not give the ten back.
+    struct LockFailures: Equatable { var count: Int; var until: Double }
+
+    func lockFailures() -> LockFailures {
+        let rec = lockDefaults.dictionary(forKey: Self.failuresKey)
+        return LockFailures(count: rec?["count"] as? Int ?? 0, until: rec?["until"] as? Double ?? 0)
     }
 
     /// When the pad opens again, if it is cooling down.
     func lockCooldown(now: Date = Date()) async -> Date? {
-        guard let engine, let rec = lockFailures(),
-              (try? await engine.lanIsLockedOut(rec, now: now)) == true else { return nil }
-        return Date(timeIntervalSince1970: rec.resetAt / 1000)
+        let rec = lockFailures()
+        let at = now.timeIntervalSince1970 * 1000
+        return rec.until > at ? Date(timeIntervalSince1970: rec.until / 1000) : nil
     }
 
     private func recordWrongPin(now: Date) async {
-        guard let engine else { return }
         let d = lockDefaults
-        let lockouts = d.integer(forKey: Self.lockoutsKey)
-        let ms = min(Self.lockMaxCooldown, Self.lockBaseCooldown * pow(2, Double(lockouts)))
-        guard let next = try? await engine.lanBumpFailure(lockFailures(), now: now, lockoutMs: ms) else { return }
-        d.set(["count": next.count, "resetAt": next.resetAt], forKey: Self.failuresKey)
-        if (try? await engine.lanIsLockedOut(next, now: now)) == true { d.set(lockouts + 1, forKey: Self.lockoutsKey) }
+        var rec = lockFailures()
+        rec.count += 1
+        if rec.count >= Self.lockTries {
+            let lockouts = d.integer(forKey: Self.lockoutsKey)
+            let ms = min(Self.lockMaxCooldown, Self.lockBaseCooldown * pow(2, Double(lockouts)))
+            rec.until = now.timeIntervalSince1970 * 1000 + ms
+            // One more try after a cooldown, not ten: the count stays at the
+            // threshold until a right PIN, so each wrong one closes it again.
+            rec.count = Self.lockTries - 1
+            d.set(lockouts + 1, forKey: Self.lockoutsKey)
+        }
+        d.set(["count": rec.count, "until": rec.until], forKey: Self.failuresKey)
     }
 
     private func clearWrongPins() {
@@ -194,7 +292,7 @@ extension Shop {
         guard let stored = rawPinHash(id), shopOperator(id)?.active == true else { return .noPin }
         // PBKDF2 at 200,000 rounds is a noticeable fraction of a second: off
         // the main actor, so the pad does not freeze while it checks.
-        let ok = await Task.detached(priority: .userInitiated) { PinHash.verify(pin, stored) }.value
+        let ok = await PinWork.run { PinHash.verify(pin, stored) }
         guard ok else {
             await recordWrongPin(now: now)
             if let until = await lockCooldown(now: now) { return .coolingDown(until: until) }
@@ -211,10 +309,12 @@ extension Shop {
 
     private func upgradePin(_ id: String, from stored: String, pin: String) async {
         guard let build = source.build,
-              let fresh = await Task.detached(priority: .userInitiated, operation: { PinHash.hash(pin) }).value
+              let fresh = await PinWork.run({ PinHash.hash(pin) })
         else { return }
         // Never fail the sign-in over the upgrade: the PIN was right, and the
         // next correct one tries again.
+        // lock: system — the PIN was just verified; this re-hashes that same
+        // PIN, guarded on the stored hash not having changed meanwhile.
         try? StoreWriter.update(build) { root in
             Self.writePinHash(into: &root, id: id, hash: fresh, onlyIf: stored)
         }
@@ -229,7 +329,7 @@ extension Shop {
               let owner = lockOwners.first else { return .noPin }
         let plain = Self.normalizeRecoveryCode(code)
         guard plain.count == 12 else { await recordWrongPin(now: now); return .wrong }
-        let ok = await Task.detached(priority: .userInitiated) { PinHash.verify(plain, stored) }.value
+        let ok = await PinWork.run { PinHash.verify(plain, stored) }
         guard ok else {
             await recordWrongPin(now: now)
             if let until = await lockCooldown(now: now) { return .coolingDown(until: until) }
@@ -264,8 +364,11 @@ extension Shop {
     // MARK: Writes (owner only)
 
     /// 4 to 8 digits — `isValidPin` in the other app.
+    /// 4 to 8 digits, typed on any keyboard: Arabic-Indic and Persian
+    /// digits count (`PinHash.normalize`), as the Arabic layout types them.
     static func isValidPin(_ pin: String) -> Bool {
-        (4...8).contains(pin.count) && pin.allSatisfy { $0.isASCII && $0.isNumber }
+        let digits = PinHash.normalize(pin)
+        return (4...8).contains(digits.count) && digits.allSatisfy { $0.isASCII && $0.isNumber }
     }
 
     static func writePinHash(into root: inout [String: JSONValue], id: String, hash: String,
@@ -297,7 +400,7 @@ extension Shop {
         }
         var hash = ""
         if let pin {
-            guard let h = await Task.detached(priority: .userInitiated, operation: { PinHash.hash(pin) }).value
+            guard let h = await PinWork.run({ PinHash.hash(pin) })
             else { moveProblem = words.callIt("mac.lock_failed"); return }
             hash = h
         }
@@ -305,6 +408,34 @@ extension Shop {
             try StoreWriter.update(build) { root in Self.writePinHash(into: &root, id: id, hash: hash) }
             await load(source)
         } catch { moveProblem = String(describing: error) }
+    }
+
+    /// Would this change leave the lock switched on with nobody who can sign
+    /// in as the owner? Demoting, deactivating or removing the last such owner
+    /// emptied `lockOwners`, the lock stopped being "in force", and every
+    /// screen opened — the switch-off that `switchLockOff` asks a PIN for,
+    /// done without one (alpha.62 review). `stillOwner` is what the person
+    /// will be after the change.
+    func leavesNoOwner(_ id: String, stillOwner: Bool) -> Bool {
+        guard lockSwitchedOn, !stillOwner else { return false }
+        return lockOwners.map(\.id) == [id]
+    }
+
+    /// The access level the LOCK will read for this person once `fields` are
+    /// saved — not the level the editor shows. A legacy record has no
+    /// `roleKey`; the lock reads its job title (`roleFromLegacy`, lock on), so
+    /// renaming "Admin" demoted the last owner without touching the level
+    /// picker, and the guard asked the picker (alpha.62 re-check). Writing the
+    /// shown level on every save is NOT the fix: the editor shows a blank
+    /// title as "owner" (the other app's lock-off reading) where the lock
+    /// reads "operator", and that would promote people.
+    func lockLevelAfterSave(_ id: String, _ fields: ShopOperator.Fields,
+                            opened: ShopOperator.Fields?) async -> String {
+        // The picker moved: that is an explicit level, and it is written.
+        if let opened, opened.roleKey != fields.roleKey { return fields.roleKey }
+        if let stored = shopOperator(id)?.roleKey { return stored }
+        guard let engine else { return "viewer" }
+        return (try? await engine.roleFromLegacy(fields.role, hasLock: true)) ?? "viewer"
     }
 
     /// Switch the lock on. Needs an owner who can sign in, or it would not be
@@ -320,11 +451,13 @@ extension Shop {
     /// because a Mac left signed in is not proof of who is at it.
     func switchLockOff(ownerPin: String, now: Date = Date()) async -> SignInResult {
         moveProblem = nil
+        // lock: system — gated by an OWNER'S PIN, verified below, not by
+        // whoever is signed in: a Mac left signed in is not proof of who is at it.
         if let until = await lockCooldown(now: now) { return .coolingDown(until: until) }
         let hashes = lockOwners.compactMap { rawPinHash($0.id) }
-        let ok = await Task.detached(priority: .userInitiated) {
+        let ok = await PinWork.run {
             hashes.contains { PinHash.verify(ownerPin, $0) }
-        }.value
+        }
         guard ok else {
             await recordWrongPin(now: now)
             if let until = await lockCooldown(now: now) { return .coolingDown(until: until) }
@@ -338,6 +471,7 @@ extension Shop {
     private func writeLockSwitch(_ on: Bool) async {
         guard let build = source.build else { moveProblem = words.callIt("mac.move_sample"); return }
         do {
+            // lock: callers — switchLockOn, switchLockOff
             try StoreWriter.update(build) { root in
                 var settings: [String: JSONValue] = [:]
                 if case .object(let s)? = root["settings"] { settings = s }
@@ -357,7 +491,7 @@ extension Shop {
         guard let build = source.build else { moveProblem = words.callIt("mac.move_sample"); return nil }
         guard let code = Self.generateRecoveryCode() else { moveProblem = words.callIt("mac.lock_failed"); return nil }
         let plain = Self.normalizeRecoveryCode(code)
-        guard let hash = await Task.detached(priority: .userInitiated, operation: { PinHash.hash(plain) }).value
+        guard let hash = await PinWork.run({ PinHash.hash(plain) })
         else { moveProblem = words.callIt("mac.lock_failed"); return nil }
         do {
             try StoreWriter.update(build) { root in
@@ -376,5 +510,22 @@ extension Shop {
     var hasRecoveryCode: Bool {
         if case .string(let h)? = settingsDict["recoveryCodeHash"] { return PinHash.isManaged(h) }
         return false
+    }
+}
+
+/// PIN hashing off the main actor AND off the cooperative pool.
+///
+/// A PIN check is 200,000 rounds of PBKDF2 — tens of milliseconds of
+/// blocking CPU, more on a slow machine. It ran in `Task.detached`, which
+/// borrows a cooperative-pool thread for all of it: on a three-thread CI
+/// runner, hashes from the lock's tests held the pool while the LAN server's
+/// tests waited 22 minutes for a thread and timed out (alpha.62 CI). A
+/// dispatch queue and a continuation hold no pool thread while they wait —
+/// the pattern memory calls swift-pool-starvation, and `Mesh3MFTests.offMain`.
+enum PinWork {
+    static func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { done in
+            DispatchQueue.global(qos: .userInitiated).async { done.resume(returning: work()) }
+        }
     }
 }

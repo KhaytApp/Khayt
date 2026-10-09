@@ -216,7 +216,16 @@ struct LanServerTests {
             //
             // See `LanStallTests.patience` for the same correction and the
             // same reasoning.
-            config.timeoutIntervalForRequest = 60
+            //
+            // THREE HUNDRED, not sixty (Oct 2026). The server answers on the
+            // main actor, which every `@MainActor` suite in the bundle shares;
+            // the staff-lock suites added a few dozen more tests that each
+            // build and load a whole sample Shop there. On CI's three cores a
+            // request then waited past sixty seconds for its turn, and four
+            // LAN tests failed with -1001 on a working server — one run in
+            // three. Still a ceiling, not a target: a request that does not
+            // come back in five minutes is a real hang.
+            config.timeoutIntervalForRequest = 300
             config.httpShouldSetCookies = false
             config.httpCookieAcceptPolicy = .never
             return URLSession(configuration: config, delegate: NoRedirect(), delegateQueue: nil)

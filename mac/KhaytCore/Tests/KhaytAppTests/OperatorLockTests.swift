@@ -38,6 +38,9 @@ struct OperatorLockTests {
     static func shop(_ operators: [JSONValue] = staff(), on: Bool = true,
                      extra: [String: JSONValue] = [:]) async -> Shop {
         let shop = Shop()
+        // One engine for every lock suite: building one per test was most of
+        // these suites' main-actor time (see `Shop.useEngine`).
+        shop.useEngine(Self.sharedEngine)
         await shop.load(.sample)
         var settings: [String: JSONValue] = ["operatorLockEnabled": .bool(on)]
         for (k, v) in extra { settings[k] = v }
@@ -47,6 +50,10 @@ struct OperatorLockTests {
         await shop.useLockFixture(operators: operators, settings: settings)
         return shop
     }
+
+    /// Shared by every shop the lock suites build. An actor, so concurrent
+    /// suites take turns on it.
+    static let sharedEngine: KhaytEngine = try! KhaytEngine()
 
     /// Each shop has a private record (see `shop`); nothing global to clear.
     static func clearThrottle() {}
@@ -233,8 +240,10 @@ struct OperatorLockTests {
         else { return }
         #expect(after["pinHash"] == .string(stored))
         #expect(Shop.isValidPin("1234") && Shop.isValidPin("12345678"))
-        #expect(!Shop.isValidPin("123") && !Shop.isValidPin("123456789") && !Shop.isValidPin("12a4")
-                && !Shop.isValidPin("١٢٣٤"))
+        #expect(!Shop.isValidPin("123") && !Shop.isValidPin("123456789") && !Shop.isValidPin("12a4"))
+        // Typed on the Arabic layout: the same PIN, not a refused one.
+        #expect(Shop.isValidPin("١٢٣٤") && Shop.isValidPin("۱۲۳۴"))
+        #expect(!Shop.isValidPin("١٢٣"))
     }
 
     @Test("the customer link answers to the lock: nobody signed in, or a viewer, cannot publish, unpublish or reply")

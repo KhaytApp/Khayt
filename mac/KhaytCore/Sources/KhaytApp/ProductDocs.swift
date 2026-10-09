@@ -76,6 +76,7 @@ enum ProductDocs {
     /// be moved, renamed or deleted without the product losing its papers —
     /// which is what a path into somebody's Downloads folder would mean.
     static func attach(_ source: URL, productId: String,
+        // lock: callers — attach
                        in build: StoreReader.Build) throws -> Attached {
         let dir = folder(build)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -116,6 +117,7 @@ enum ProductDocs {
 
     /// Unlink one nobody references any more.
     static func delete(_ name: String, in build: StoreReader.Build) {
+        // lock: callers — saveProduct
         guard let at = resolve(name, in: build) else { return }
         // The Trash, not deleted, like the product photos beside it.
         try? FileManager.default.trashItem(at: at, resultingItemURL: nil)

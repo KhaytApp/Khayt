@@ -23,6 +23,7 @@ extension Shop {
     }
 
     private func writeLinked(_ paths: [String]) throws {
+        guard permitted("settings", "edit") else { throw Shop.MoveRefused(sentence: moveProblem ?? "") }
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
         try StoreWriter.update(build) { root in
             var settings = Self.settings(root)
@@ -55,6 +56,7 @@ extension Shop {
     /// Stop indexing a folder. Its models leave the library; its FILES are
     /// not touched.
     func unlinkFolder(_ path: String) async {
+        guard permitted("settings", "edit") else { return }
         libraryMoveProblem = nil
         guard let build = source.build else { return }
         do {
@@ -85,7 +87,14 @@ extension Shop {
     /// Index what is new in every linked folder, in place. A file already
     /// indexed (by its path) is left alone; one whose bytes the library
     /// already holds is counted as a duplicate, as an import would.
-    func rescanLinkedFolders() async {
+    ///
+    /// `byPerson: false` is the once-per-book pass on load (`rescanLinkedIfDue`),
+    /// which indexes folders the owner already linked and runs whoever is at
+    /// the Mac. A person pressing Rescan adds to the library: inventory/create.
+    func rescanLinkedFolders(byPerson: Bool = true) async {
+        if byPerson { guard permitted("inventory", "create") else { return } }
+        // lock: system — when !byPerson: indexing folders the owner linked,
+        // once per book on load.
         guard let build = source.build, StoreLock.weOwnIt(build), let roots = libraryRoots, let engine else { return }
         let folders = linkedFolders.filter { FileManager.default.fileExists(atPath: $0) }
         guard !folders.isEmpty, !libraryMoveBusy else { return }

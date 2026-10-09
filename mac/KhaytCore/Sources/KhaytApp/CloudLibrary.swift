@@ -412,6 +412,7 @@ enum CloudLibrary {
     /// the field is a first guess, not a promise. Trying the second is safe:
     /// the hash below refuses anything that is not these exact bytes.
     static func bringBack(_ model: URL, remotes: (KhaytEngine.Sidecar) async -> [LibraryRemote],
+        // lock: system — removes only its own half-written .part download.
                           engine: KhaytEngine) async throws {
         let fm = FileManager.default
         if fm.fileExists(atPath: model.path) { return }
@@ -686,6 +687,9 @@ extension Shop {
     func freeUpSpace(only confirmed: Set<String>) async {
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
+        // Deleting this Mac's copies of the library's files is the storage
+        // setting's business (the staff lock): it went unasked.
+        guard permitted("settings", "edit") else { cloudLibraryProblem = moveProblem; return }
         guard let engine, let config = await cloudConfig(), let roots = libraryRoots else {
             cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return
         }
@@ -923,6 +927,7 @@ extension Shop {
     /// sealed on the way in.
     private func writeDrive(clientId: String? = nil, clientSecret: String? = nil, refreshToken: String? = nil,
                             folderName: String? = nil, enabled: Bool? = nil, bucketOff: Bool = false) async throws {
+        guard permitted("settings", "edit") else { throw Shop.MoveRefused(sentence: moveProblem ?? "") }
         guard let build = source.build else { throw S3.Failure.notConfigured }
         var sealedSecret: String?
         if let clientSecret { sealedSecret = clientSecret.isEmpty ? "" : try await Secrets.seal(clientSecret, for: build) }
@@ -1057,6 +1062,7 @@ extension Shop {
     /// bucket" / "Use Google Drive instead" with the other one ready. Each
     /// one's copy switch stays as the shop left it.
     func chooseLibraryRemote(_ remote: CloudLibrary.Remote) async {
+        guard permitted("settings", "edit") else { return }
         cloudLibraryProblem = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
         // Models moved to the remote being left would be stranded there:
@@ -1087,6 +1093,7 @@ extension Shop {
     /// so nothing typed can be lost between the two (the "all I got was
     /// saved" report that Save once caused).
     func setLibraryOptions(_ options: CloudLibrary.Options) async {
+        guard permitted("settings", "edit") else { return }
         cloudLibraryProblem = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
         do {
@@ -1140,6 +1147,7 @@ extension Shop {
     /// switches and are left as they are; see `setLibraryOptions`.
     func saveCloudLibrary(provider: String, endpoint: String, bucket: String, region: String,
                           prefix: String, accessKeyId: String, typedSecret: String) async {
+        guard permitted("settings", "edit") else { return }
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }

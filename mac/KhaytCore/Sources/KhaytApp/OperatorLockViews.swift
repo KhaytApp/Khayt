@@ -69,6 +69,15 @@ struct LockScreen: View {
             }
             .buttonStyle(.link)
             .disabled(!useRecovery && !shop.hasRecoveryCode)
+            // THE WAY BACK, said. A shop that never made a recovery code saw a
+            // greyed-out link and nothing else, and an owner who forgot their
+            // PIN had no idea what to do (alpha.62 review).
+            if !useRecovery {
+                Text(words.callIt(shop.hasRecoveryCode ? "mac.lock_forgot" : "mac.lock_forgot_no_code"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(width: 300)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -122,7 +131,7 @@ struct NotAllowed: View {
                 Text(shop.words.callIt("mac.lock_signed_in_as", ["name": .string(op.name)]))
                     .font(.callout).foregroundStyle(.secondary)
             }
-            Button(shop.words.callIt("op.switch")) { shop.lockNow() }
+            Button(shop.words.callIt("mac.lock_switch_person")) { shop.lockNow() }
         }
         .frame(maxWidth: 360)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -327,5 +336,37 @@ struct RecoveryCodeSheet: View {
         }
         .padding(20)
         .frame(width: 380)
+    }
+}
+
+/// Who is signed in, and the way to lock, where the hand already is: under
+/// the site picker in both sidebars. On a shared Mac the next person used to
+/// act as the previous one without knowing it — the name was only in Settings
+/// (alpha.62 review). Nothing at all while the lock is not in force.
+struct SignedInRow: View {
+    let shop: Shop
+
+    var body: some View {
+        if shop.lockInForce, let who = shop.signedIn {
+            HStack(spacing: 6) {
+                Image(systemName: "person.crop.circle")
+                    .foregroundStyle(.secondary)
+                Text(shop.words.callIt("mac.lock_signed_in_as", ["name": .string(who.name)]))
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 4)
+                Button {
+                    shop.lockNow()
+                } label: {
+                    Image(systemName: "lock")
+                }
+                .buttonStyle(.borderless)
+                .help(shop.words.callIt("mac.lock_now"))
+                .accessibilityLabel(shop.words.callIt("mac.lock_now"))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+        }
     }
 }

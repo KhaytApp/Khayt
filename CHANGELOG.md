@@ -27,6 +27,51 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   unchanged, and the open order or spool survives folding and unfolding.
   Checked on the iPhone Duo simulator (Xcode 27.1 RC, iOS 27.1 SDK).
 
+- **alpha.62 security review: the staff lock now holds everywhere (Mac).**
+  - Every change to the book asks the lock: a person's access level decides
+    issuing a gift card, clearing a payment, changing the VAT or the shop's
+    setup, signing in to the cloud, editing products, stock and machines —
+    about a hundred actions that had asked nothing. A test fails the build if
+    a new one is added without asking.
+  - While nobody is signed in, the menu bar is off too (it stayed live behind
+    the sign-in screen), and Undo is cleared whenever the person at the Mac
+    changes — an owner's undo is no longer left for the next person.
+  - The last owner who can sign in cannot be demoted, made inactive or
+    removed while the lock is on; that switched the lock off without a PIN.
+  - Wrong PINs count in a row until a right one; nine a minute used to slip
+    under the pause for ever.
+  - The lock stays closed until it has read the shop's staff, instead of
+    being open for a moment when the book first opens.
+  - Exporting a copy of the book (and the desktop app's export) masks staff
+    PIN hashes and the recovery-code hash.
+  - A deposit typed with a decimal comma ("12,50") is refused rather than read
+    as 1250. "Check response" says a quote moved to Pending only when it did.
+    Clearing a payment updates the customer's page. A cloud server's answer
+    is read up to 4 MB.
+  - A second pass closed the rest: the classic window shows the sign-in
+    screen too, and its toolbar, the title-bar buttons, the sidebar, the
+    menu-bar extra and the cloud and crash notices do nothing behind it; any
+    sheet open when the person changes is closed. Pausing, cancelling,
+    sending to and powering printers, publishing the web store, copying a
+    customer link, checking or sending to the cloud, adding models to the
+    library and attaching the book to a feedback report each ask the lock,
+    and edit buttons are hidden from somebody who may not use them. Renaming
+    an old "Admin" who is the last owner is refused like demoting them. With
+    the lock on, asking Siri "what is printing" says how many and names no
+    job. A kiosk already open stays open: it is the floor's display.
+  - A third pass: a smart plug's automatic switch-off works again with the
+    lock on and nobody signed in (it had been refused, every minute), while
+    switching a plug by hand still asks. Listing a product on the web store
+    from its sheet asks what the web store switch asks. The dashboard's money
+    figures, the ledger view, what is owed and Ask the Book are hidden from
+    staff who may not see the shop's figures. The kiosk no longer has a
+    Window-menu item that opened it behind the lock, Spotlight holds none of
+    the library while the lock is on, and the classic sidebar shows no counts
+    behind the sign-in screen. Rescanning linked folders, freeing up space,
+    attaching a product's document and the library's file moves and
+    deletions each ask the lock too, and the build test now checks that a
+    function gated by its callers names every one of them.
+
 - **iOS: first steps for iPhone Duo, and fixes from a pass over every detail
   screen.**
   - The tab bar is the system's `TabView` now. On iPhone Duo only system bars
@@ -102,7 +147,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   cloud, or manage staff and PINs. Lock (⌃⌘L, or the shop card) signs out.
   Owners set each person's PIN (4 to 8 digits), can make a recovery code for
   a forgotten PIN, and switching it off asks for an owner's PIN. Ten wrong
-  PINs in a row pause the pad for a minute, longer each time. It uses the
+  PINs in a row close the pad for a minute; after that each wrong one closes
+  it again, for longer each time, until a right PIN. It uses the
   same access levels and PINs as the desktop app, so a shop that already
   uses its operator lock keeps its staff and PINs. It keeps staff to their
   part of the app; it is not encryption of the book.
@@ -6262,6 +6308,40 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-alpha.62] - 2026-10-10
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Staff sign-in, and the customer's cloud link — the last of what the desktop
+app could do that the Mac could not, apart from the printer webhook.
+
+### New
+
+- **Staff sign-in (the operator lock).** Settings → Operations → Staff
+  sign-in. With it on, the Mac asks who you are and your PIN, and each
+  person's access level decides what they can open and change — the same
+  levels as the desktop app, from the same rule. Every change to the book,
+  every printer and plug control, every export and the menus all ask; Lock
+  (⌃⌘L, or the lock beside your name in the sidebar) hands the Mac back.
+  Turning it off needs an owner's PIN, and the last owner cannot be demoted or
+  removed. Ten wrong PINs in a row close the pad for a minute, longer each
+  time after. Who is signed in is this Mac's alone: nothing in the book, a
+  backup or a sync can sign anyone in. PINs typed in Arabic digits work.
+  The lock is only in force once an owner has a PIN this Mac can check, so a
+  shop is never locked out of its own Mac; Settings says when it is not.
+- **The customer's cloud link.** In a job's panel, with the shop connected to
+  Khayt Cloud: publish the job's link (copied for you), a quote with an
+  optional deposit and pay link, Check response (an approved quote moves to
+  Pending), read and answer the customer's messages, and take the link down
+  (asked first). The page follows payments and shipping. A view-only cloud
+  member, and anyone the lock refuses, gets no buttons that write.
+
+### Changed and fixed
+
+- **Exports and feedback no longer carry PIN hashes**, in either app.
+- **A deposit typed as "12,50"** is refused instead of saved as 1250.
 
 ## [4.0.0-alpha.61] - 2026-10-09
 

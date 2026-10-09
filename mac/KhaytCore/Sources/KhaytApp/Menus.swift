@@ -31,10 +31,19 @@ struct KhaytCommands: Commands {
     let shop: Shop
 
     var body: some Commands {
+        // ── NOTHING FROM THE MENU BAR WHILE NOBODY IS SIGNED IN ───────────
+        //
+        // The sign-in screen replaced the window's content and nothing else:
+        // the menus stayed live behind it, so a person at a locked Mac could
+        // export the book, set the shop up again, or sign it in to a cloud
+        // server of their choosing (alpha.62 review). Every command that
+        // touches the book is disabled while `needsSignIn` — a disabled item's
+        // shortcut does not fire either — and each write it reaches is gated
+        // on its own as well (`LockGate`). About and Check for Updates stay.
         // ⌘N takes a job. It IS the new-document gesture for this app: the
         // thing a shop makes is an order, and the File menu is where a Mac user
         // looks for "new".
-        CommandGroup(replacing: .newItem) { NewJobCommand().environment(shop) }
+        CommandGroup(replacing: .newItem) { NewJobCommand().environment(shop).disabled(shop.needsSignIn) }
 
         CommandGroup(replacing: .appInfo) {
             Button(shop.words.callIt("mac.about_khayt")) { About.show() }
@@ -50,9 +59,9 @@ struct KhaytCommands: Commands {
         CommandGroup(after: .sidebar) {
             DetailsCommand()
             Divider()
-            SortMenu().environment(shop)
+            SortMenu().environment(shop).disabled(shop.needsSignIn)
             Divider()
-            KioskCommand()
+            KioskCommand().disabled(shop.needsSignIn)
         }
 
         // Find, where every Mac app keeps it. `.searchable` puts the field in
@@ -60,7 +69,7 @@ struct KhaytCommands: Commands {
         // with the mouse is a search box in the wrong app.
         CommandGroup(after: .pasteboard) {
             Divider()
-            FindCommand()
+            FindCommand().disabled(shop.needsSignIn)
         }
 
         // `Words.upfront`, not `shop.words`: these titles are built with the
@@ -72,13 +81,13 @@ struct KhaytCommands: Commands {
         CommandGroup(replacing: .help) {
             HelpCommand()
             // A tester's report, with what it takes to reproduce it — see `Feedback`.
-            Button(Words.upfront("mac.feedback_menu")) { shop.askForFeedback() }
+            Button(Words.upfront("mac.feedback_menu")) { shop.askForFeedback() }.disabled(shop.needsSignIn)
         }
 
-        CommandMenu(Text(Words.upfront("mac.menu_book"))) { BookMenu().environment(shop) }
-        CommandMenu(Text(Words.upfront("mac.menu_go"))) { GoMenu().environment(shop) }
-        CommandMenu(Text(Words.upfront("mac.menu_job"))) { JobMenu().environment(shop) }
-        CommandMenu(Text(Words.upfront("mac.menu_model"))) { ModelMenu().environment(shop) }
+        CommandMenu(Text(Words.upfront("mac.menu_book"))) { BookMenu().environment(shop).disabled(shop.needsSignIn) }
+        CommandMenu(Text(Words.upfront("mac.menu_go"))) { GoMenu().environment(shop).disabled(shop.needsSignIn) }
+        CommandMenu(Text(Words.upfront("mac.menu_job"))) { JobMenu().environment(shop).disabled(shop.needsSignIn) }
+        CommandMenu(Text(Words.upfront("mac.menu_model"))) { ModelMenu().environment(shop).disabled(shop.needsSignIn) }
     }
 }
 
@@ -195,6 +204,7 @@ private struct BookMenu: View {
         // feature off, is an advertisement in a menu.
         if shop.aiAssistantAllowed {
             Button(Words.upfront("mac.ask_the_book") + "\u{2026}") { shop.askingTheBook = true }
+                .disabled(!shop.lockAllows("analytics", "view"))
             Button(Words.upfront("camp.title") + "\u{2026}") { shop.planningCampaign = true }
         }
 

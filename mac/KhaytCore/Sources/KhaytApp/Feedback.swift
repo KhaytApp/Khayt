@@ -328,6 +328,7 @@ enum Feedback {
     /// draft still needs. Only this app's own `Khayt-feedback-*` folders, and
     /// only folders.
     static func sweepOldDrafts(in folder: URL = FileManager.default.temporaryDirectory,
+        // lock: system — tidies the app's own week-old report drafts in the temporary folder.
                                olderThan age: TimeInterval = 24 * 60 * 60, now: Date = Date()) {
         let fm = FileManager.default
         let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey]

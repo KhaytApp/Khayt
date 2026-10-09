@@ -339,6 +339,7 @@ enum ProductPhotos {
     /// `basename` again, because this deletes: the path comes off a store
     /// record, and a record can arrive from a sync with anything in it.
     static func delete(_ name: String, in build: StoreReader.Build) {
+        // lock: callers — deleteProduct
         let leaf = (name as NSString).lastPathComponent
         guard !leaf.isEmpty, leaf != ".", leaf != ".." else { return }
         // The Trash, not deleted: Undo on the product brings the record back,
@@ -427,6 +428,7 @@ enum ProductPhotos {
     /// To the Trash, saying where it went. Nil when there was nothing there,
     /// or the Trash would not take it.
     static func trash(_ name: String, in build: StoreReader.Build) -> Trashed? {
+        // lock: callers — saveProduct, registerPicturesTrashAgain
         let leaf = (name as NSString).lastPathComponent
         guard !leaf.isEmpty, leaf != ".", leaf != ".." else { return nil }
         var landed: NSURL?
@@ -452,6 +454,7 @@ enum ProductPhotos {
     /// Take away a file THIS save wrote, when the save did not go through —
     /// no record names it, and the original it was to replace is untouched.
     static func discard(_ name: String, in build: StoreReader.Build) {
+        // lock: callers — saveProduct
         let leaf = (name as NSString).lastPathComponent
         guard !leaf.isEmpty, leaf != ".", leaf != ".." else { return }
         try? FileManager.default.removeItem(at: folder(build).appending(path: leaf))
@@ -552,6 +555,8 @@ extension Shop {
     func registerPicturesPutBack(_ trashed: [ProductPhotos.Trashed], in build: StoreReader.Build) {
         guard let undoManager, !trashed.isEmpty else { return }
         undoManager.registerUndo(withTarget: self) { shop in
+            // A product edit's undo, asked as one (the staff lock).
+            guard shop.permitted("inventory", "edit") else { return }
             let back = ProductPhotos.putBack(trashed, in: build)
             shop.registerPicturesTrashAgain(back, in: build)
         }
@@ -560,6 +565,7 @@ extension Shop {
     private func registerPicturesTrashAgain(_ names: [String], in build: StoreReader.Build) {
         guard let undoManager, !names.isEmpty else { return }
         undoManager.registerUndo(withTarget: self) { shop in
+            guard shop.permitted("inventory", "edit") else { return }
             let again = names.compactMap { ProductPhotos.trash($0, in: build) }
             shop.registerPicturesPutBack(again, in: build)
         }
