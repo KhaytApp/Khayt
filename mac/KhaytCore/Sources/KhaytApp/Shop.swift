@@ -632,6 +632,7 @@ final class Shop {
             // A shop that has just switched to Simple must not be left looking
             // at a screen that is no longer theirs.
             if shelf == .reports, !has("analytics") { shelf = .dashboard }
+            if !canShow(shelf) { shelf = .dashboard }
             if shelf == .expenses, !has("expenses") { shelf = .dashboard }
             lanBook = Self.lanBook(from: root)
             pricingBook = Self.pricingBook(from: root)
@@ -667,6 +668,7 @@ final class Shop {
             locationRows = Self.rows(root, "locations")
             operatorRows = Self.rows(root, "operators")
             timeEntryRows = Self.rows(root, "timeEntries")
+            await refreshLock()
             // What has been ordered and not yet arrived. Read raw for the same
             // reason the consumables are: the rule reads fields this app has no
             // model for, and deciding which of them matter belongs in the rule.
@@ -1501,6 +1503,7 @@ final class Shop {
     /// Take one line out of a customer's log. The FIRST line equal to it: two
     /// identical quick notes are two lines, and deleting one deletes one.
     func removeCommunication(_ entry: CommEntry, from clientId: String) async {
+        guard permitted("clients", "delete") else { return }
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -2319,6 +2322,7 @@ final class Shop {
     /// Khayt's own rule and because a customer with a phone number and no name
     /// is not a customer anyone can find again.
     func saveCustomer(_ client: Client) async {
+        guard permitted("clients", "edit") else { return }
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -5198,6 +5202,10 @@ final class Shop {
 
     /// Can this shop reach that screen at all?
     func canShow(_ shelf: Shelf) -> Bool {
+        // The operator lock first: a screen the person signed in may not see
+        // is not reachable by ANY path that asks here — the sidebars, the menu
+        // bar, a window restoring onto it, and the content switch itself.
+        if let area = Self.lockArea(of: shelf), !lockAllows(area, "view") { return false }
         guard let gate = Self.gate(of: shelf) else { return true }
         return has(gate)
     }
@@ -5235,6 +5243,7 @@ final class Shop {
     func createJob(_ input: [String: JSONValue]) async {
         moveProblem = nil
         moveNotices = []
+        guard permitted("orders", "create") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
@@ -5350,6 +5359,7 @@ final class Shop {
     /// the ownership check, the atomic swap and the undo are the ones already
     /// proven rather than a second set written for money.
     func recordPayment(_ id: Order.ID, amount: Double, method: String, paidAt: Date) async {
+        guard permitted("invoicing", "edit") else { return }
         var owed: [KhaytEngine.WebhookDelivery] = []
         var mail: OrderEmail?
         let wrote = await writeToOneOrder(id, named: words.callIt("pay.modal_title")) { order, engine, root in
@@ -5454,6 +5464,7 @@ final class Shop {
     ///
     /// `fields` holds only what the shop changed — `EditJobSheet.fields`.
     func editJob(_ id: Order.ID, fields: [String: JSONValue]) async {
+        guard permitted("orders", "edit") else { return }
         await writeToOneOrder(id, named: words.callIt("mac.edit_job")) { order, engine, _ in
             let out = try await engine.editJob(
                 order: order, fields: fields,
@@ -5938,6 +5949,34 @@ final class Shop {
 
     /// Hours the staff logged against jobs (`store.timeEntries`), raw.
     private(set) var timeEntryRows: [JSONValue] = []
+
+    // ── THE OPERATOR LOCK (see OperatorLock.swift) ───────────────────────
+
+    /// Who is signed in on THIS Mac, by operator id — nil is nobody.
+    ///
+    /// Memory only, and deliberately not `settings.activeOperatorId`: that one
+    /// is in the book, the other app writes it, and a field in the book is a
+    /// field any copy of the book can set. Nobody signs in here by editing a
+    /// file somewhere else. Gone on quit, so a relaunch asks again.
+    var lockSessionId: String?
+    /// `lib/rbac.js`'s matrix, read from the engine with the book.
+    var rbac: KhaytEngine.Rbac?
+    /// Each operator's access level under the lock: `roleKey`, else the
+    /// shared `roleFromLegacy` with the lock on.
+    var lockRoles: [String: String] = [:]
+
+    /// Where this Mac keeps the wrong-PIN record. `.standard` in the app; a
+    /// test gives each shop its own, so two tests never share a count.
+    var lockDefaults: UserDefaults = .standard
+
+    /// TESTS ONLY: the lock's inputs without a book on disk. The sample book
+    /// has staff and no PINs, and must not be given any; the real book is
+    /// never a test's to write. Nothing in the app calls this.
+    func useLockFixture(operators: [JSONValue], settings: [String: JSONValue]) async {
+        operatorRows = operators
+        settingsValue = .object(settings)
+        await refreshLock()
+    }
 
     /// What is low and has not already been ordered.
     private(set) var needsOrdering: [KhaytEngine.ToOrder] = []
@@ -6599,6 +6638,7 @@ final class Shop {
     /// not permission to rewrite what happened — which is why the name is
     /// written onto the order rather than looked up through the id.
     func deleteSupplier(_ id: String) async {
+        guard permitted("inventory", "delete") else { return }
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -6720,6 +6760,7 @@ final class Shop {
     /// shows and nothing else, so whatever else a record carries survives.
     /// The id is `LOC-…` from the same `uid` the other app uses.
     func saveLocation(id: String?, name: String, address: String) async {
+        guard permitted("settings", "edit") else { return }
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -6781,6 +6822,7 @@ final class Shop {
     /// empty string `lib/machine-edit.js` and `lib/expense-book.js` write for
     /// "none", and an undo puts the row back and points them at it again.
     func deleteLocation(_ id: String) async {
+        guard permitted("settings", "edit") else { return }
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -6925,6 +6967,7 @@ final class Shop {
     /// anything this app does not know stay exactly as they were. The id is
     /// `OP-…` from the same `uid` the other app uses.
     func saveOperator(id: String?, _ fields: ShopOperator.Fields, opened: ShopOperator.Fields?) async {
+        guard permitted("security", "edit") else { return }
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -6997,6 +7040,7 @@ final class Shop {
     /// to say.
     @discardableResult
     func deleteOperator(_ id: String) async -> String? {
+        guard permitted("security", "edit") else { return nil }
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return nil
@@ -7121,6 +7165,7 @@ final class Shop {
 
     /// Take a time entry off. Undo puts it back where it was.
     func deleteTimeEntry(_ id: String) async {
+        guard permitted("logs", "delete") else { return }
         moveProblem = nil
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
@@ -8273,6 +8318,7 @@ final class Shop {
     /// came from. It is deleted anyway: leaving a row a shop cannot remove is
     /// worse than a shelf figure it can correct.
     func deleteWaste(_ id: String) async {
+        guard permitted("inventory", "delete") else { return }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -9265,6 +9311,7 @@ final class Shop {
     /// `settings.cloud.enabled = false`. The book and the cloud copy both stay,
     /// and the address and email are kept so signing in again is two fields.
     func signOutOfCloud() async {
+        guard permitted("cloud", "edit") else { return }
         forgetCloudKey()
         guard let build = source.build else { return }
         do {
@@ -9293,6 +9340,7 @@ final class Shop {
     /// app does not ask for the passphrase again. Only while the book's keyset
     /// is the one that key came from; see `CloudKeyMemory`.
     func restoreCloudKey() async {
+        guard permitted("cloud", "edit") else { return }
         guard Self.rememberCloudKey,
               cloudDek == nil, !cloudLockedByShop, Self.cloudConnected(settingsDict), let shopId = cloudShopId,
               let print = CloudKeyMemory.fingerprint(of: cloudKeyset()) else { return }
@@ -11385,6 +11433,7 @@ final class Shop {
     /// carries forward the credentials and the completion history a backup
     /// cannot contain. What is left here is saying which of those happened.
     func restore(_ candidate: Restore.Candidate) async {
+        guard permitted("destructive", "create") else { return }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -11579,6 +11628,7 @@ final class Shop {
     /// its price history and its usage with it, and nothing else in the book
     /// can reconstruct them.
     func deleteSpool(_ id: Spool.ID) async {
+        guard permitted("inventory", "delete") else { return }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -11716,6 +11766,7 @@ final class Shop {
     /// with, which reads back as an item no longer on the shelf rather than as
     /// a changed history.
     func deleteConsumable(_ id: Consumable.ID) async {
+        guard permitted("inventory", "delete") else { return }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
@@ -11786,6 +11837,7 @@ final class Shop {
     /// so: an invoice is what was actually charged, and a catalogue tidy-up is
     /// not permission to rewrite it.
     func deleteProduct(_ id: String) async {
+        guard permitted("inventory", "delete") else { return }
         productProblem = nil
         productNote = nil
         guard let build = source.build else {
@@ -12358,6 +12410,11 @@ final class Shop {
                       country: String? = nil) async {
         settingsProblem = nil
         settingsNote = nil
+        // The operator lock: a manager reads Settings and changes nothing.
+        guard lockAllows("settings", "edit") else {
+            settingsProblem = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
+            return
+        }
         guard let build = source.build else {
             settingsProblem = words.callIt("mac.settings_sample"); return
         }
@@ -13074,6 +13131,7 @@ final class Shop {
                  actuals: Actuals? = nil) async {
         moveProblem = nil
         moveNotices = []
+        guard permitted("orders", "edit") else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample")
             return
@@ -13799,6 +13857,7 @@ final class Shop {
 
     /// Take one off the list. An id nobody has is not an error.
     func deleteTemplate(_ id: String) {
+        guard permitted("settings", "edit") else { return }
         writeProblem = nil
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
         write { root in
@@ -16077,6 +16136,7 @@ final class Shop {
     }
 
     func deleteLibraryFile(_ file: LibraryFile) async {
+        guard permitted("inventory", "delete") else { return }
         await deleteLibraryFiles([file])
     }
 
@@ -16161,6 +16221,7 @@ final class Shop {
     /// model, so a delete of fifty is one change to sync and one undo-free
     /// moment rather than fifty.
     func deleteLibraryFiles(_ files: [LibraryFile]) async {
+        guard permitted("inventory", "delete") else { return }
         clearLastOutcome()
         pendingLibraryDelete = nil
         pendingLibraryDeletes = []
@@ -16779,6 +16840,7 @@ final class Shop {
     /// Stop tracking a task. The services already logged against the machine
     /// stay: a schedule is a plan, and deleting a plan does not unmake the work.
     func deleteMaintenanceTask(_ taskId: String) async {
+        guard permitted("inventory", "delete") else { return }
         writeProblem = nil
         guard let build = source.build, canMoveJobs else {
             writeProblem = words.callIt("mac.move_sample"); return
@@ -16859,6 +16921,7 @@ final class Shop {
     /// have seen it, and deleting a line from a maintenance history is not a
     /// statement that the money was never spent.
     func deleteServiceEntry(_ entryId: String) async {
+        guard permitted("inventory", "delete") else { return }
         writeProblem = nil
         guard let build = source.build, canMoveJobs else {
             writeProblem = words.callIt("mac.move_sample"); return

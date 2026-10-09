@@ -69,8 +69,20 @@ struct SettingsWindow: View {
             .listStyle(.sidebar)
             .frame(width: 200)
             Divider()
-            pane(shop.settingsPane)
-                .frame(width: 600)
+            Group {
+                if shop.needsSignIn {
+                    LockScreen(shop: shop)
+                } else if !shop.lockAllows("settings", "view") {
+                    NotAllowed(shop: shop)
+                } else {
+                    // A manager reads Settings and changes nothing: every
+                    // control in the pane is disabled, and `saveSettings`
+                    // refuses on its own as well.
+                    pane(shop.settingsPane)
+                        .disabled(!shop.lockAllows("settings", "edit"))
+                }
+            }
+            .frame(width: 600)
         }
         .frame(height: 640)
         .navigationTitle(shop.words.callIt(shop.settingsPane.wordKey))
@@ -886,6 +898,7 @@ struct OperationsPane: View {
                 // them. The other app keeps them on its Operations page too.
                 Section { LocationsSection(shop: shop) }
                 Section { OperatorsSection(shop: shop) }
+                Section { LockSection(shop: shop) }
                 Section(shop.words.callIt("set.ops_section")) {
                     numberRow("set.min_margin", $draft.minMarginPct)
                     numberRow("set.quote_validity", $draft.quoteValidityDays)

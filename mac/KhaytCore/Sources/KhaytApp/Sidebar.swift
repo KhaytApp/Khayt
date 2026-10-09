@@ -120,16 +120,18 @@ struct Sidebar: View {
                     count: shop.wasteLog.count, selected: shop.shelf == .waste)
                     .tag(Shop.Shelf.waste)
                 // No count: a quarter is not a thing a shop has a number of.
-                if shop.has("analytics") {
+                if shop.canShow(.reports) {
                     Row(title: shop.words.callIt("mac.nav_reports"), mark: .reports,
                         count: nil, selected: shop.shelf == .reports)
                         .tag(Shop.Shelf.reports)
                 }
             }
-            Section(shop.words.callIt("mac.people")) {
-                Row(title: shop.words.callIt("tab.clients"), mark: .clients, count: shop.customers.count,
-                    selected: shop.shelf == .customers)
-                    .tag(Shop.Shelf.customers)
+            if shop.canShow(.customers) {
+                Section(shop.words.callIt("mac.people")) {
+                    Row(title: shop.words.callIt("tab.clients"), mark: .clients, count: shop.customers.count,
+                        selected: shop.shelf == .customers)
+                        .tag(Shop.Shelf.customers)
+                }
             }
             // The models, below the work. A group is a set that belongs
             // together — the seven Saudi Kings, offered as one collection —

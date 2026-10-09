@@ -347,6 +347,14 @@ struct ShellSidebar: View {
     /// menu that switches it — the same items the toolbar offered.
     private var book: some View {
         Menu {
+            if shop.lockInForce, shop.signedIn != nil {
+                Button {
+                    shop.lockNow()
+                } label: {
+                    Label(shop.words.callIt("mac.lock_now"), systemImage: "lock")
+                }
+                Divider()
+            }
             ForEach(Shop.available) { source in
                 Button {
                     Task { await shop.load(source) }
@@ -378,6 +386,13 @@ struct ShellSidebar: View {
                 .font(TypeScale.body(9.5))
                 .foregroundStyle(Role.onNavy3)
                 .lineLimit(1)
+                // Who is at this Mac, while the lock is in force.
+                if shop.lockInForce, let op = shop.signedIn {
+                    Label(op.name, systemImage: "person.badge.key")
+                        .font(TypeScale.body(9.5))
+                        .foregroundStyle(Role.onNavy)
+                        .lineLimit(1)
+                }
             }
             .padding(.horizontal, Space.md)
             .padding(.vertical, 8)
