@@ -233,8 +233,10 @@ struct OperatorLockTests {
         else { return }
         #expect(after["pinHash"] == .string(stored))
         #expect(Shop.isValidPin("1234") && Shop.isValidPin("12345678"))
-        #expect(!Shop.isValidPin("123") && !Shop.isValidPin("123456789") && !Shop.isValidPin("12a4")
-                && !Shop.isValidPin("١٢٣٤"))
+        #expect(!Shop.isValidPin("123") && !Shop.isValidPin("123456789") && !Shop.isValidPin("12a4"))
+        // Typed on the Arabic layout: the same PIN, not a refused one.
+        #expect(Shop.isValidPin("١٢٣٤") && Shop.isValidPin("۱۲۳۴"))
+        #expect(!Shop.isValidPin("١٢٣"))
     }
 
     @Test("the customer link answers to the lock: nobody signed in, or a viewer, cannot publish, unpublish or reply")

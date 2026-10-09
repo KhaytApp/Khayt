@@ -264,8 +264,11 @@ extension Shop {
     // MARK: Writes (owner only)
 
     /// 4 to 8 digits — `isValidPin` in the other app.
+    /// 4 to 8 digits, typed on any keyboard: Arabic-Indic and Persian
+    /// digits count (`PinHash.normalize`), as the Arabic layout types them.
     static func isValidPin(_ pin: String) -> Bool {
-        (4...8).contains(pin.count) && pin.allSatisfy { $0.isASCII && $0.isNumber }
+        let digits = PinHash.normalize(pin)
+        return (4...8).contains(digits.count) && digits.allSatisfy { $0.isASCII && $0.isNumber }
     }
 
     static func writePinHash(into root: inout [String: JSONValue], id: String, hash: String,

@@ -122,3 +122,16 @@ test('a wrong PIN against a legacy hash upgrades nothing', () => {
   assert.match(main, /ok && needsUpgrade\(/,
     'the upgrade must be gated on the verify succeeding');
 });
+
+test('a PIN typed in Arabic or Persian digits is the same PIN; an old Arabic-character hash still opens', () => {
+  const P = require('../lib/pin-hash.js');
+  const crypto = require('crypto');
+  const h = P.hashPin('1234', 1000);
+  assert.equal(P.verifyPin('\u0661\u0662\u0663\u0664', h), true);
+  assert.equal(P.verifyPin('\u06F1\u06F2\u06F3\u06F4', h), true);
+  assert.equal(P.verifyPin('1235', h), false);
+  const salt = Buffer.alloc(16, 7);
+  const old = 'p2$1000$' + salt.toString('hex') + '$' + crypto.pbkdf2Sync('\u0661\u0662\u0663\u0664', salt, 1000, 32, 'sha256').toString('hex');
+  assert.equal(P.verifyPin('\u0661\u0662\u0663\u0664', old), true);
+  assert.equal(P.normalizePin('\u0660\u0669'), '09');
+});

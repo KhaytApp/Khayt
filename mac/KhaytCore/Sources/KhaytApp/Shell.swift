@@ -299,6 +299,7 @@ struct ShellSidebar: View {
             book
             // Under the book's name: which shop, then which of its sites.
             SitePicker(shop: shop)
+            SignedInRow(shop: shop)
             group("mac.group_shop", [
                 .init(.dashboard, "mac.dashboard"),
                 // The site's count when narrowed — the picker directly above

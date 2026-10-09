@@ -51,16 +51,39 @@ public enum PinHash {
     /// Should a correct PIN re-hash this one into the salted format?
     public static func needsUpgrade(_ stored: String) -> Bool { isLegacySha256(stored) }
 
-    /// A new salted hash, in the format above.
+    /// A PIN as its digits, whichever keyboard typed them — Arabic-Indic
+    /// (٠-٩) and Persian (۰-۹) to 0-9. `lib/pin-hash.js` `normalizePin`,
+    /// exactly: the Arabic layout types the first, and the same PIN typed two
+    /// ways was refused when set and counted wrong at sign-in.
+    public static func normalize(_ plain: String) -> String {
+        String(String.UnicodeScalarView(plain.unicodeScalars.map { s -> Unicode.Scalar in
+            switch s.value {
+            case 0x0660...0x0669: return Unicode.Scalar(s.value - 0x0660 + 0x30)!
+            case 0x06F0...0x06F9: return Unicode.Scalar(s.value - 0x06F0 + 0x30)!
+            default: return s
+            }
+        }))
+    }
+
+    /// A new salted hash, in the format above, of the PIN's digits.
     public static func hash(_ plain: String, iterations: Int = iterations) -> String? {
         var salt = [UInt8](repeating: 0, count: 16)
         guard SecRandomCopyBytes(kSecRandomDefault, salt.count, &salt) == errSecSuccess,
-              let dk = pbkdf2(plain, salt: salt, iterations: iterations, length: keyLength) else { return nil }
+              let dk = pbkdf2(normalize(plain), salt: salt, iterations: iterations, length: keyLength) else { return nil }
         return "\(prefix)$\(iterations)$\(hex(salt))$\(hex(dk))"
     }
 
-    /// Does `plain` match `stored`? Constant time in the compare.
+    /// Does `plain` match `stored`? The digits first, then — when they
+    /// differ — the text as typed, so a PIN hashed from Arabic digits before
+    /// `normalize` still opens (the JavaScript's order). Constant time in each
+    /// compare.
     public static func verify(_ plain: String, _ stored: String) -> Bool {
+        let digits = normalize(plain)
+        if verifyExact(digits, stored) { return true }
+        return digits != plain && verifyExact(plain, stored)
+    }
+
+    static func verifyExact(_ plain: String, _ stored: String) -> Bool {
         if isPbkdf2(stored) {
             let parts = stored.split(separator: "$", omittingEmptySubsequences: false)
             // `parseInt` in the JavaScript: "0" and anything unparseable fail.

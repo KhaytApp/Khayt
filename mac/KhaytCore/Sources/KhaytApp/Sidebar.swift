@@ -16,6 +16,7 @@ struct Sidebar: View {
                 // only ever offered the way back (alpha.61 review). Untagged,
                 // so it is never a selectable row.
                 SitePicker(shop: shop)
+                SignedInRow(shop: shop)
                 // First, and above the pipeline: it is the screen a shop opens
                 // the app to look at.
                 // Nothing at all when nothing needs a person, rather than a
