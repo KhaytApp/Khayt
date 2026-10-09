@@ -47,20 +47,22 @@ struct DashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header
-                    counts.padding(.top, 14)
-                    section(L10n.tr("pulse.money"))
-                    money
-                    section(L10n.tr("home.pipeline"), trailing: L10n.tr("pulse.tap_to_filter"))
-                    lanes
-                    alerts.padding(.top, 16)
-                    section(laneTitle, trailing: L10n.format("pulse.jobs", laneJobs.count))
-                    jobs
-                    Text(L10n.tr("pulse.swipe_hint"))
-                        .font(.khayt(11.5, relativeTo: .caption2))
-                        .foregroundStyle(KhaytDesign.note)
-                        .frame(maxWidth: .infinity)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 14)
+                    // Regular width — iPhone Duo's inner display — puts the
+                    // shop's figures beside its work: the same sections, in the
+                    // same order, rearranged into two columns where there is
+                    // room (Apple's iPhone Duo design talk: a stacked layout
+                    // "that rearranges itself into a two-column layout").
+                    if widthClass == .regular {
+                        HStack(alignment: .top, spacing: 0) {
+                            VStack(alignment: .leading, spacing: 0) { figures }
+                                .frame(maxWidth: .infinity, alignment: .top)
+                            VStack(alignment: .leading, spacing: 0) { work.padding(.top, 14) }
+                                .frame(maxWidth: .infinity, alignment: .top)
+                        }
+                    } else {
+                        figures
+                        work
+                    }
                 }
                 .padding(.bottom, 18)
             }
@@ -80,6 +82,30 @@ struct DashboardView: View {
                 OrderDetailPage(order: order, facts: facts[order.id]) { await load() }
             }
         }
+    }
+
+    // MARK: - The two halves of Home
+
+    /// The shop's numbers: counts, money and the pipeline.
+    @ViewBuilder private var figures: some View {
+        counts.padding(.top, 14)
+        section(L10n.tr("pulse.money"))
+        money
+        section(L10n.tr("home.pipeline"), trailing: L10n.tr("pulse.tap_to_filter"))
+        lanes
+    }
+
+    /// What needs doing: the alerts and the jobs in the chosen lane.
+    @ViewBuilder private var work: some View {
+        alerts.padding(.top, 16)
+        section(laneTitle, trailing: L10n.format("pulse.jobs", laneJobs.count))
+        jobs
+        Text(L10n.tr("pulse.swipe_hint"))
+            .font(.khayt(11.5, relativeTo: .caption2))
+            .foregroundStyle(KhaytDesign.note)
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
+            .padding(.top, 14)
     }
 
     // MARK: - Header

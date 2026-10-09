@@ -68,47 +68,81 @@ struct OrdersView: View {
         }
     }
 
+    /// Regular width — iPhone Duo's inner display, an iPad — shows the list and
+    /// the open order side by side, as Apple's iPhone Duo design talk
+    /// recommends ("split views are a great option"). Compact width keeps the
+    /// pushed page it always had. The open order is one piece of state, so
+    /// folding or unfolding keeps it open in whichever form fits.
+    @Environment(\.horizontalSizeClass) private var widthClass
+    private var isSplit: Bool { widthClass == .regular }
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    segmentPicker
-                    chipRow
-                    list
-                    if segment == .history, let window = api.historyWindow {
-                        windowLine(window)
+        if isSplit {
+            NavigationSplitView {
+                listPage
+                    .navigationSplitViewColumnWidth(min: 340, ideal: 420)
+            } detail: {
+                NavigationStack {
+                    if let order = openOrder {
+                        detailPage(order)
+                    } else {
+                        ContentUnavailableView(L10n.tr("orders.pick"), systemImage: "rectangle.stack",
+                                               description: Text(L10n.tr("orders.pick.sub")))
+                            .background(KhaytDesign.ground.ignoresSafeArea())
                     }
                 }
-                .padding(.bottom, 18)
             }
-            .scrollIndicators(.hidden)
-            .khaytScreen(title: L10n.tr("tab.orders"))
-            .background(KhaytDesign.ground.ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { showIntake = true } label: { Image(systemName: "tray.and.arrow.down") }
-                        .accessibilityLabel(L10n.tr("intake.title"))
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showNewOrder = true } label: { Image(systemName: "plus") }
-                        .accessibilityLabel(L10n.tr("order.new.title"))
-                }
+        } else {
+            NavigationStack {
+                listPage
+                    .navigationDestination(item: $openOrder) { detailPage($0) }
             }
-            .sheet(isPresented: $showIntake) { IntakeView() }
-            .sheet(isPresented: $showNewOrder) {
-                NewOrderSheet(machines: machines) { Task { await load() } }
-            }
-            .navigationDestination(item: $openOrder) { order in
-                OrderDetailPage(order: order, facts: facts[order.id]) { await load() }
-            }
-            .refreshable { await load() }
-            .task(id: segment) { await load() }
-            .watchesPrinters(when: segment == .active
-                             && queue.contains { $0.status == "printing" && $0.machineId != nil })
-            .onAppear { applyExternalFilters() }
-            .onChange(of: ordersNav.pendingStatusFilter) { _, _ in applyExternalFilters() }
-            .onChange(of: ordersNav.ordersTabRequest) { _, _ in applyExternalFilters() }
         }
+    }
+
+    /// `.id`: the page keeps the order it was opened with in its own state, so
+    /// picking another row in the split view must make a new page.
+    private func detailPage(_ order: QueueOrder) -> some View {
+        OrderDetailPage(order: order, facts: facts[order.id]) { await load() }
+            .id(order.id)
+    }
+
+    private var listPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                segmentPicker
+                chipRow
+                list
+                if segment == .history, let window = api.historyWindow {
+                    windowLine(window)
+                }
+            }
+            .padding(.bottom, 18)
+        }
+        .scrollIndicators(.hidden)
+        .khaytScreen(title: L10n.tr("tab.orders"))
+        .background(KhaytDesign.ground.ignoresSafeArea())
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { showIntake = true } label: { Image(systemName: "tray.and.arrow.down") }
+                    .accessibilityLabel(L10n.tr("intake.title"))
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showNewOrder = true } label: { Image(systemName: "plus") }
+                    .accessibilityLabel(L10n.tr("order.new.title"))
+            }
+        }
+        .sheet(isPresented: $showIntake) { IntakeView() }
+        .sheet(isPresented: $showNewOrder) {
+            NewOrderSheet(machines: machines) { Task { await load() } }
+        }
+        .refreshable { await load() }
+        .task(id: segment) { await load() }
+        .watchesPrinters(when: segment == .active
+                         && queue.contains { $0.status == "printing" && $0.machineId != nil })
+        .onAppear { applyExternalFilters() }
+        .onChange(of: ordersNav.pendingStatusFilter) { _, _ in applyExternalFilters() }
+        .onChange(of: ordersNav.ordersTabRequest) { _, _ in applyExternalFilters() }
     }
 
     private func applyExternalFilters() {
@@ -222,6 +256,10 @@ struct OrdersView: View {
                     } onOpen: {
                         openOrder = order
                     }
+                    // In the split view the open order is beside the list; say which.
+                    .overlay(RoundedRectangle(cornerRadius: 11)
+                        .strokeBorder(KhaytDesign.brand, lineWidth: 2)
+                        .opacity(isSplit && openOrder?.id == order.id ? 1 : 0))
                 }
             }
             .padding(.horizontal, 16)
@@ -272,6 +310,7 @@ struct OrdersView: View {
                 queue = data
                 #if DEBUG
                 if KhaytCompanionApp.ScreenshotOpen.take("neworder") != nil { showNewOrder = true }
+                if let id = KhaytCompanionApp.ScreenshotOpen.take("pick:") { openOrder = data.first { $0.id == id } }
                 #endif
             case .history:
                 let data = try await api.fetchRecentOrders(limit: 200)

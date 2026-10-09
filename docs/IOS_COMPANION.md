@@ -147,12 +147,17 @@ for iPhone Duo" tech talks and the iPhone Duo group-lab Q&A on the forums.
   `UIDevice.orientation` or `userInterfaceIdiom`. The inner display ignores
   `UISupportedInterfaceOrientations`, so layout follows size classes only.
 
-**Waiting on Xcode 27.1** (this Mac has 27.0):
-- Building with the iOS 27.1 SDK. Older SDKs run letterboxed at an iPhone-mini
-  aspect ratio, and 27.0 still leaves some letterboxing.
-- Device Hub's Duo simulator, for checking every pose. Until then the iPad
-  simulator stands in for the inner display: it has the same size classes, but
-  it runs the iPad idiom with a top tab bar, which the Duo does not.
+**Split views in regular width (Oct 2026).** Orders and Inventory use
+`NavigationSplitView` when the horizontal size class is regular, and keep
+their pushed page in compact. Home rearranges into two columns. Built with
+Xcode 27.1 RC (`/Applications/Xcode-27.1.app`, beside the App Store 27.0) and
+checked on the iPhone Duo simulator, folded and unfolded. Posture changes only
+from Device Hub. When unfolded, `simctl io screenshot` needs
+`--display=<inner UUID>` (`simctl io <dev> enumerate`).
+
+**Still to do:**
+- Shipping builds from Xcode 27.1. The App Store has only 27.0; the RC is accepted for submission.
+- The partially folded pose.
 - `ReservedRegion` for the hinge, and whether `defaultAdaptableTabBarPlacement`
   opens the sidebar on the inner display. Its published doc says iPadOS only.
 - Duo screenshots, which App Store Connect requires from April 2027.

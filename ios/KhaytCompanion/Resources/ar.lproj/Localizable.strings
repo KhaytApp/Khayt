@@ -183,6 +183,10 @@
 /* Redesign: order and spool rows (design/iOS UI/khayt-i18n.jsx) */
 "orders.late" = "متأخر";
 "orders.queue_clear" = "الطابور فارغ";
+"orders.pick" = "اختر طلبًا";
+"orders.pick.sub" = "تُفتح صفحته هنا، بجانب القائمة.";
+"inventory.pick" = "اختر بكرة";
+"inventory.pick.sub" = "تُفتح صفحتها هنا، بجانب الرف.";
 "orders.queue_clear.sub" = "كل شيء منجز — لا طلبات نشطة";
 "orders.no_completed" = "لا طلبات مكتملة";
 "orders.no_completed.sub" = "ستظهر الطلبات المكتملة هنا";

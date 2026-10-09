@@ -64,7 +64,7 @@ struct KhaytCompanionApp: App {
     /// `-KhaytOpen <what>` on the launch line: one screen opened once, so the
     /// detail pages and sheets can be photographed too. Home takes `quote`,
     /// `waste`, `expense`, `addspool`, `intake`, `settings` and `order:<id>`;
-    /// Inventory takes `spool:<id>`; Orders takes `neworder`.
+    /// Inventory takes `spool:<id>`; Orders takes `neworder` and `pick:<id>`.
     enum ScreenshotOpen {
         private static var used = false
         /// The request, if it starts with `prefix` and nobody has taken it yet.
