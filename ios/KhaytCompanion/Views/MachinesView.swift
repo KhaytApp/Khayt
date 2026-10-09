@@ -25,7 +25,7 @@ struct MachinesView: View {
     /// off" are different things to a shop deciding whether to drive in.
     private var staleNote: String {
         if let reported = printers.reportedAt {
-            return L10n.format("machines.reported", reported.formatted(.relative(presentation: .named)))
+            return L10n.format("machines.reported", reported.formatted(.relative(presentation: .named).locale(L10n.locale)))
         }
         return L10n.tr("machines.stale")
     }
@@ -230,7 +230,7 @@ private struct MachineCard: View {
                 // What a shop plans by: how long, and what time on the clock.
                 if let eta = live.etaLocalized, let done = live.finishesAt() {
                     Text(L10n.format("machines.left_until", eta,
-                                done.formatted(date: .omitted, time: .shortened)))
+                                done.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale))))
                         .font(.khayt(12.5, relativeTo: .caption).monospacedDigit())
                         .foregroundStyle(KhaytDesign.note)
                         .padding(.top, 7)

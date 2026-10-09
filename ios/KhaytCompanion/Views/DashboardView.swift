@@ -245,7 +245,7 @@ struct DashboardView: View {
     /// captioned with where the answer lives. It keeps its slot and size.
     private func moneyFigure(_ value: Double?, _ label: String, note: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(value.map { $0.formatted(.number.precision(.fractionLength(0))) } ?? "—")
+            Text(value.map { $0.formatted(.number.precision(.fractionLength(0)).locale(L10n.locale)) } ?? "—")
                 .font(.khayt(25, .semibold, relativeTo: .title).monospacedDigit())
                 .foregroundStyle(value == nil ? KhaytDesign.note : tint)
                 .lineLimit(1).minimumScaleFactor(0.6)

@@ -76,8 +76,8 @@ private struct FeedRow: View {
 
     private var when: String {
         Calendar.current.isDateInToday(item.at)
-            ? item.at.formatted(date: .omitted, time: .shortened)
-            : item.at.formatted(.relative(presentation: .named))
+            ? item.at.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale))
+            : item.at.formatted(.relative(presentation: .named).locale(L10n.locale))
     }
 
     var body: some View {

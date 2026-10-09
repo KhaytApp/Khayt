@@ -62,7 +62,7 @@ struct SettingsView: View {
         if health.macInReach {
             headline = L10n.tr("settings.mac_in_reach")
         } else if let asOf = api.bookAsOf {
-            headline = L10n.format("settings.mac_away_since", asOf.formatted(date: .omitted, time: .shortened))
+            headline = L10n.format("settings.mac_away_since", asOf.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale)))
         } else {
             headline = L10n.tr("settings.mac_away")
         }
@@ -102,8 +102,8 @@ struct SettingsView: View {
                     let held = scope.collections[row.0]!
                     settingRow(row.1, last: i == shown.count - 1) {
                         Text(held.whole || held.available == nil
-                             ? held.sent.formatted()
-                             : "\(held.sent.formatted()) / \(held.available!.formatted())")
+                             ? held.sent.formatted(.number.locale(L10n.locale))
+                             : "\(held.sent.formatted(.number.locale(L10n.locale))) / \(held.available!.formatted(.number.locale(L10n.locale)))")
                             .font(.khayt(14, .medium, relativeTo: .subheadline).monospacedDigit())
                             .foregroundStyle(held.whole ? KhaytDesign.ink : KhaytDesign.attention)
                             .environment(\.layoutDirection, .leftToRight)
@@ -300,7 +300,7 @@ struct SettingsView: View {
                 settingRow(L10n.tr("cloud.role")) { value(session.role) }
                 if let mark = api.lastSync {
                     settingRow(L10n.tr("cloud.last_sync")) {
-                        value(L10n.format(mark.route == .cloud ? "cloud.via_cloud" : "cloud.via_mac", mark.at.formatted(date: .omitted, time: .shortened)))
+                        value(L10n.format(mark.route == .cloud ? "cloud.via_cloud" : "cloud.via_mac", mark.at.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale))))
                     }
                 }
                 if let problem = api.cloudProblem {

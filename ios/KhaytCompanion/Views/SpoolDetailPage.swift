@@ -120,7 +120,7 @@ struct SpoolDetailPage: View {
                 showAdjust = true
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text(remaining.formatted())
+                    Text(remaining.formatted(.number.locale(L10n.locale)))
                         .font(.khayt(34, .semibold, relativeTo: .largeTitle).monospacedDigit())
                         .foregroundStyle(low ? KhaytDesign.attention : KhaytDesign.ink)
                     Text(L10n.tr("spool.detail.g_remaining"))

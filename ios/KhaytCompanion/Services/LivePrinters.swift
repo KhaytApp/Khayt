@@ -157,7 +157,7 @@ final class LivePrinters: ObservableObject {
 extension MachineLiveStatus {
     /// "2 hr, 14 min" / "45 min", in the reader's language — the desktop's
     /// `2h 14m` was English letters on an Arabic screen.
-    var etaLocalized: String? { eta(in: L10n.currentLanguage.locale ?? .current) }
+    var etaLocalized: String? { eta(in: L10n.locale) }
 
     func eta(in locale: Locale) -> String? {
         guard let secs = timeRemaining, secs > 0 else { return nil }

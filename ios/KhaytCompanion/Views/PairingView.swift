@@ -323,12 +323,12 @@ struct PairingView: View {
                 VStack(spacing: 0) {
                     pullRow(L10n.tr("pair.pull.settings"), value: summary.settings ? "✓" : "—",
                             tone: summary.settings ? KhaytDesign.done : KhaytDesign.note)
-                    pullRow(L10n.tr("pair.pull.open_orders"), value: summary.openOrders.formatted())
-                    pullRow(L10n.tr("pair.pull.newest_finished"), value: summary.newestFinished.formatted(),
+                    pullRow(L10n.tr("pair.pull.open_orders"), value: summary.openOrders.formatted(.number.locale(L10n.locale)))
+                    pullRow(L10n.tr("pair.pull.newest_finished"), value: summary.newestFinished.formatted(.number.locale(L10n.locale)),
                             tone: summary.finishedWindowed ? KhaytDesign.attention : KhaytDesign.ink)
-                    pullRow(L10n.tr("tab.clients"), value: summary.clients.formatted())
-                    pullRow(L10n.tr("tab.inventory"), value: summary.inventory.formatted())
-                    pullRow(L10n.tr("tab.machines"), value: summary.machines.formatted(), last: true)
+                    pullRow(L10n.tr("tab.clients"), value: summary.clients.formatted(.number.locale(L10n.locale)))
+                    pullRow(L10n.tr("tab.inventory"), value: summary.inventory.formatted(.number.locale(L10n.locale)))
+                    pullRow(L10n.tr("tab.machines"), value: summary.machines.formatted(.number.locale(L10n.locale)), last: true)
                 }
                 .background(KhaytDesign.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 14))

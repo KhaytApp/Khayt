@@ -100,7 +100,7 @@ struct ClientsView: View {
     /// the whole order history did too.
     private var windowLine: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(L10n.format("clients.window.count", clients.count.formatted()))
+            Text(L10n.format("clients.window.count", clients.count.formatted(.number.locale(L10n.locale))))
                 .font(.khayt(12.5, .semibold, relativeTo: .footnote).monospacedDigit())
                 .foregroundStyle(KhaytDesign.ink)
             if totalsByName == nil {
@@ -171,13 +171,13 @@ private struct ClientRow: View {
                     .font(.khayt(15, .medium, relativeTo: .body))
                     .foregroundStyle(KhaytDesign.ink)
                     .lineLimit(1)
-                Text(L10n.format("clients.open", open.formatted()))
+                Text(L10n.format("clients.open", open.formatted(.number.locale(L10n.locale))))
                     .font(.khayt(12.5, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.note)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
-                Text(total.map { $0.formatted() } ?? "—")
+                Text(total.map { $0.formatted(.number.locale(L10n.locale)) } ?? "—")
                     .font(.khayt(15, .semibold, relativeTo: .body).monospacedDigit())
                     .foregroundStyle(total == nil ? KhaytDesign.note : KhaytDesign.ink)
                 Text(L10n.tr(total == nil ? "pulse.on_the_mac" : "clients.orders"))

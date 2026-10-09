@@ -80,19 +80,38 @@ enum L10n {
         String(format: tr(key), locale: locale, n)
     }
 
-    /// The app's language as a locale — what every number and date is written in.
-    static var locale: Locale { currentLanguage.locale ?? Locale.current }
+    /// The app's language as a locale — what every number and date is written
+    /// in — with WESTERN digits, whatever the language.
+    ///
+    /// ── ARABIC WORDS, WESTERN DIGITS ──────────────────────────────────────
+    ///
+    /// Saudi products write numbers 0–9: codepoint scans of Al Rajhi, SNB,
+    /// Absher, Tawakkalna, Salla, STC and SAMA find Western digits on
+    /// essentially every figure, and the desktop guards the same rule
+    /// (`test/arabic-numerals.test.js`); `Money` already pinned it. A bare
+    /// `ar` locale resolves to the `arab` numbering system and leaks ٠–٩ —
+    /// which this app did, half the time, until the same numbering was forced
+    /// on every number it writes (Oct 2026; an earlier pass forced the other
+    /// way, in error).
+    static var locale: Locale { latinDigits(currentLanguage.locale ?? Locale.current) }
+
+    /// `base`, with the `latn` numbering system: month names and plural rules
+    /// stay the language's own, the digits are 0–9.
+    static func latinDigits(_ base: Locale) -> Locale {
+        var parts = Locale.Components(locale: base)
+        parts.numberingSystem = Locale.NumberingSystem("latn")
+        return Locale(components: parts)
+    }
 
     /// `String(format:)` in the app's language. A bare `String(format: tr(k), n)`
-    /// writes `n` in Western digits whatever the language, beside SwiftUI
-    /// `Text` interpolation that writes Arabic-Indic — so one Arabic screen
-    /// read "5 غير مدفوع" over "٥١٥". The desktop writes Arabic-Indic
-    /// throughout, and so does this.
+    /// ignores the app's language for plural-free text but SwiftUI `Text`
+    /// interpolation follows the environment locale, so the two disagreed.
+    /// Both now go through `locale`, and both write Western digits.
     static func format(_ key: String, _ args: CVarArg...) -> String {
         String(format: tr(key), locale: locale, arguments: args)
     }
 
-    /// "640 g" / "٦٤٠ غ" — the number and the unit both in the app's language.
+    /// "640 g" / "640 غ" — the unit in the app's language, the digits Western.
     static func grams(_ n: Int) -> String {
         "\(n.formatted(.number.locale(locale).grouping(.never))) \(tr("unit.g"))"
     }
@@ -105,7 +124,9 @@ struct CompanionLocaleModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .environment(\.layoutDirection, settings.appLanguage.layoutDirection)
-            .environment(\.locale, settings.appLanguage.locale ?? Locale.current)
+            // Western digits for every `Text` that formats a number or date —
+            // see `L10n.locale`.
+            .environment(\.locale, L10n.latinDigits(settings.appLanguage.locale ?? Locale.current))
             .onAppear { L10n.setLanguage(settings.appLanguage) }
             .onChange(of: settings.appLanguage) { _, lang in
                 L10n.setLanguage(lang)

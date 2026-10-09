@@ -119,7 +119,7 @@ private struct IntakeCard: View {
 
     private var when: String? {
         guard let raw = item.submittedAt ?? item.reminderDate, let date = DueDateParser.parse(raw) else { return nil }
-        return date.formatted(.relative(presentation: .named))
+        return date.formatted(.relative(presentation: .named).locale(L10n.locale))
     }
 
     private var want: String {

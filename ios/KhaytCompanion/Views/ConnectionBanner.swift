@@ -74,7 +74,7 @@ struct ConnectionBanner: View {
     private var pending: String { L10n.format("sync.pending", api.pendingCount) }
 
     private var asOf: String {
-        let when = api.bookAsOf.map { $0.formatted(date: .omitted, time: .shortened) } ?? "—"
+        let when = api.bookAsOf.map { $0.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale)) } ?? "—"
         return L10n.format("connection.as_of", when)
     }
 

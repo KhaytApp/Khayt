@@ -33,21 +33,44 @@ final class LocalizationCompletenessTests: XCTestCase {
     }
 
     /// One Arabic screen read "5 غير مدفوع" under "٥١٥" and "١٢٠ g" beside
-    /// "180 غ": a bare `String(format:)` writes Western digits whatever the
-    /// language, and a literal " g" is English on every screen. `L10n.format`
-    /// and `L10n.grams` write both in the app's language. A deliberate
-    /// exception names its locale on the same line.
+    /// "180 غ": formatters that ignored the app's locale beside ones that
+    /// followed it, and a literal " g" that is English on every screen.
+    /// `L10n.format` and `L10n.grams` go through one locale (Western digits,
+    /// the language's words). A deliberate exception names its locale.
     func testNumbersAreWrittenInTheAppsLanguage() throws {
         var bare: [String] = [], grams: [String] = []
         for (name, text) in try swiftSources() where name != "L10n.swift" {
             for (i, line) in text.components(separatedBy: "\n").enumerated() {
                 if line.contains("String(format: L10n.tr("), !line.contains("locale:") { bare.append("\(name):\(i + 1)") }
+                // `.formatted` with no locale reads the SYSTEM locale — a Saudi
+                // phone's ar_SA writes ٠–٩ whatever the app's language.
+                if line.range(of: #"\.formatted\((\)|date:|\.number|\.relative)"#, options: .regularExpression) != nil,
+                   !line.contains("locale") { bare.append("\(name):\(i + 1)") }
                 if line.range(of: #"\) g"|"g"\)|unit: "[a-z%]+""#, options: .regularExpression) != nil { grams.append("\(name):\(i + 1)") }
                 if line.range(of: #"(^|[^A-Za-z])Text\((String\(|.*String\.init)"#, options: .regularExpression) != nil { bare.append("\(name):\(i + 1)") }
             }
         }
         XCTAssertEqual(bare, [], "use L10n.format, which writes the numbers in the app's language")
         XCTAssertEqual(grams, [], "use L10n.grams / L10n.tr(\"unit.…\") — a unit is a word in Arabic")
+    }
+
+    /// Arabic words, Western digits — the Saudi convention and the desktop's
+    /// rule (`test/arabic-numerals.test.js`). A bare `ar` locale writes ٠–٩.
+    func testArabicWritesWesternDigits() {
+        let before = L10n.currentLanguage
+        defer { L10n.setLanguage(before) }
+        L10n.setLanguage(.ar)
+        let arabicIndic = CharacterSet(charactersIn: "٠١٢٣٤٥٦٧٨٩٫٬")
+        let samples = [
+            L10n.grams(640),
+            515.formatted(.number.locale(L10n.locale)),
+            Date(timeIntervalSince1970: 1_791_000_000).formatted(.dateTime.day().month().locale(L10n.locale)),
+            String(format: "%d", locale: L10n.locale, 7),
+        ]
+        for s in samples {
+            XCTAssertNil(s.rangeOfCharacter(from: arabicIndic), "Arabic-Indic digits in \(s)")
+        }
+        XCTAssertTrue(L10n.grams(640).hasSuffix("غ"), "the unit stays Arabic")
     }
 
     func testEnglishAndArabicHoldTheSameKeys() throws {
