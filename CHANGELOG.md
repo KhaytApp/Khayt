@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: photos on the customer's tracking page.** A published order's page
+  now has a Photos card: take or choose a photo of the finished part and it
+  appears on the customer's `/p/{token}` page (khayt-cloud #111), up to six,
+  each removable. The phone redraws the pixels upright and sends a JPEG
+  within 2 MB, because the cloud strips EXIF (and the orientation with it).
+  The phone uses its own Khayt Cloud sign-in. An order the Mac has not
+  published shows no card, a signed-out phone is told to sign in, and a
+  viewer sees the photos but can't change them.
+
 - **iOS: quote a customer's model file.** A model sent over WhatsApp, Mail
   or Files opens in Khayt (STL, OBJ, 3MF, G-code), or is picked from Home's +
   menu → "Quote a file". The Mac prices it the way its intake form prices a
