@@ -14,3 +14,7 @@
 "Paused" = "متوقفة مؤقتًا";
 "Failed" = "فشلت";
 "Cancelled" = "أُلغيت";
+"Log a failed print" = "تسجيل طباعة فاشلة";
+"Scan a spool" = "مسح بكرة";
+"Opens Khayt on the failed-print form." = "يفتح خيط على نموذج الطباعة الفاشلة.";
+"Opens Khayt on booking in a spool." = "يفتح خيط على إضافة بكرة.";

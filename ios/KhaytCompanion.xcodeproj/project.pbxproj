@@ -94,6 +94,7 @@
 				KhaytQueueWidget.swift,
 				KhaytWidget.entitlements,
 				PrintActivityWidget.swift,
+				ShopControlWidgets.swift,
 			);
 			target = T10000000000000000000001 /* KhaytCompanion */;
 		};
