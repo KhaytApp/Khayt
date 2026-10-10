@@ -698,3 +698,74 @@
 
 /* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
 "settings.live_activities.mac" = "To keep prints moving on the Lock Screen while this app is closed, turn on “Send print progress to my iPhone (Live Activities)” in Khayt on the Mac (Settings ▸ Integrations ▸ iPhone), and sign this phone in to Khayt Cloud.";
+
+/* The calculator — priced on the phone from the shop's own book. */
+"tab.calculator" = "Calculator";
+"home.action.calculator" = "Calculator";
+"calc.title" = "Calculator";
+"calc.part" = "The part";
+"calc.printer" = "Printer";
+"calc.pieces" = "Magnets, inserts and other pieces";
+"calc.price" = "Margin and fees";
+"calc.charge" = "What to charge";
+"calc.each" = "%@ each";
+"calc.nothing" = "Put in a weight or a print time and this works out what the job costs you and what to charge for it.";
+"calc.cost" = "Costs you";
+"calc.keeps" = "You keep";
+"calc.per_piece" = "Where one piece's cost goes";
+"calc.add_colour" = "Add filament / colour";
+"calc.remove_colour" = "Remove this colour";
+"calc.purge" = "Purge and prime tower";
+"calc.colour_n" = "Colour %lld";
+"calc.filament" = "Filament";
+"calc.no_spool" = "No filament";
+"calc.no_spool_price" = "That spool has no price, so the plastic is not counted. Add what it cost on the spool's page.";
+"calc.machine" = "Machine";
+"calc.any_machine" = "Any machine";
+"calc.preset" = "Printer preset";
+"calc.default_rates" = "Khayt's defaults";
+"calc.rates" = "Cost rates";
+"calc.rates_edited" = "edited";
+"calc.rates_reset" = "Reset to the preset";
+"calc.rate.laborRate" = "Labor rate";
+"calc.rate.prepTime" = "Slicer / prep time";
+"calc.rate.postTime" = "Post-processing / assembly";
+"calc.rate.wearRate" = "Wear & tear";
+"calc.rate.powerDraw" = "Power draw";
+"calc.rate.elecRate" = "Electricity";
+"calc.rate.failureRate" = "Failure buffer";
+"calc.add_piece" = "Add a piece";
+"calc.remove_piece" = "Remove this piece";
+"calc.share" = "Send the price";
+"calc.make_order" = "Make it a quote";
+"calc.share.price" = "Price: %@";
+"calc.share.each" = "For %lld pieces — %@ each";
+"calc.share.rush" = "Includes the rush fee.";
+
+/* The receipt's ZATCA QR, on the expense sheet. */
+"exp.vat" = "VAT you reclaim";
+"exp.qr.scan" = "Scan the receipt's QR";
+"exp.qr.why" = "A Saudi tax invoice's QR gives the seller, the total and the VAT, so nothing has to be typed. A photo of the receipt is read too.";
+"exp.qr.title" = "Receipt QR";
+"exp.qr.hint" = "Point at the QR on the tax invoice";
+"exp.qr.vat_number" = "VAT no. %@";
+"exp.qr.supplier" = "One of your suppliers";
+"exp.qr.new_supplier" = "Not one of your suppliers yet — add them on the Mac so the next receipt matches.";
+"exp.qr.filled" = "Filled in from a receipt — check it, then choose the category.";
+"exp.qr.photo_stays" = "The figures come from the QR, so this expense is saved on the phone and the photo is not sent.";
+"exp.qr.duplicate" = "This receipt is already in your expenses, so it is not offered again.";
+"exp.qr.note" = "%@ · VAT no. %@";
+"exp.qr.reason.empty" = "The code is empty.";
+"exp.qr.reason.too_long" = "The code is far longer than a tax invoice's.";
+"exp.qr.reason.not_base64" = "This code is not a tax invoice's — it may be a link or a payment code.";
+"exp.qr.reason.truncated" = "The code is cut short.";
+"exp.qr.reason.bad_tag" = "The code holds a field a tax invoice does not have.";
+"exp.qr.reason.not_utf8" = "The seller's name in the code cannot be read.";
+"exp.qr.reason.missing_tag" = "The code is missing the seller, VAT number, time, total or VAT.";
+"exp.qr.reason.bad_vat_number" = "The seller's VAT number is not a Saudi one (15 digits, starting and ending in 3).";
+"exp.qr.reason.bad_amount" = "The total or the VAT in the code is not an amount.";
+"exp.qr.reason.vat_over_total" = "The code says the VAT is more than the total.";
+"exp.qr.reason.bad_timestamp" = "The invoice date in the code cannot be read.";
+
+"Price a part" = "Price a part";
+"home.calculator.sub" = "What a part costs you, and what to charge for it";

@@ -79,7 +79,7 @@ struct DashboardView: View {
             .watchesPrinters(when: queue.contains { $0.status == "printing" && $0.machineId != nil })
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showAddSpool) { AddSpoolSheet { Task { await load() } } }
-            .sheet(isPresented: $showQuote) { QuoteSheet() }
+            .sheet(isPresented: $showQuote) { CalculatorScreen(asSheet: true) }
             .sheet(isPresented: $showWaste) { LogWasteSheet() }
             .sheet(isPresented: $showExpense) { ExpenseSheet() }
             .sheet(isPresented: $showIntake) { IntakeView() }
@@ -108,6 +108,7 @@ struct DashboardView: View {
         counts.padding(.top, 14)
         section(L10n.tr("pulse.money"))
         money
+        if widthClass == .compact { calculatorRow }
         section(L10n.tr("home.pipeline"), trailing: L10n.tr("pulse.tap_to_filter"))
         lanes
     }
@@ -186,7 +187,7 @@ struct DashboardView: View {
             .accessibilityLabel(L10n.tr("feed.title"))
             .accessibilityValue(feed.unreadCount > 0 ? L10n.format("feed.unread_count", feed.unreadCount) : "")
             Menu {
-                Button { showQuote = true } label: { Label(L10n.tr("home.action.quote"), systemImage: "tag") }
+                Button { showQuote = true } label: { Label(L10n.tr("home.action.calculator"), systemImage: "function") }
                 Button { showWaste = true } label: { Label(L10n.tr("home.action.waste"), systemImage: "trash") }
                 Button { showExpense = true } label: { Label(L10n.tr("home.action.expense"), systemImage: "doc.text.viewfinder") }
                 Button { showAddSpool = true } label: { Label(L10n.tr("home.action.add_spool"), systemImage: "cylinder") }
@@ -259,6 +260,42 @@ struct DashboardView: View {
     }
 
     private var currencyNote: String { pulse?.currency.map(Money.mark) ?? "" }
+
+    /// The calculator, one tap from Home: a shop asked "what would this cost?"
+    /// over the counter reaches for it daily, and the header has no room left
+    /// (a fourth button cut the shop's name to "Shop…"). In regular width it
+    /// is a tab of its own (`MainTabView.calculatorTab`).
+    private var calculatorRow: some View {
+        Button { showQuote = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "function")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(KhaytDesign.brand)
+                    .frame(width: 36, height: 36)
+                    .background(KhaytDesign.brand.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.tr("tab.calculator"))
+                        .font(.khayt(15, .semibold, relativeTo: .body))
+                        .foregroundStyle(KhaytDesign.ink)
+                    Text(L10n.tr("home.calculator.sub"))
+                        .font(.khayt(12.5, relativeTo: .footnote))
+                        .foregroundStyle(KhaytDesign.note)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.forward")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(KhaytDesign.surface, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(KhaytDesign.hairline, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+    }
 
     /// A figure, or the design's deferred figure: an em-dash in quiet ink,
     /// captioned with where the answer lives. It keeps its slot and size.
@@ -462,6 +499,7 @@ struct DashboardView: View {
         switch PendingAction.take() {
         case "waste": showWaste = true
         case "addspool": showAddSpool = true
+        case "calculator": showQuote = true
         default: break
         }
         #if DEBUG

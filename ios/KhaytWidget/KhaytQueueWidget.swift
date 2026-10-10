@@ -211,6 +211,7 @@ struct KhaytWidgetBundle: WidgetBundle {
         PrintActivityWidget()
         LogWasteControl()
         ScanSpoolControl()
+        CalculatorControl()
     }
 }
 

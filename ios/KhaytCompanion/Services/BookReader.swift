@@ -73,6 +73,11 @@ actor BookReader {
         return records
     }
 
+    /// The book as it sits on the phone, for the readers that work it out with
+    /// the engine themselves — the calculator and the receipt scanner
+    /// (`PhoneCalculator.swift`, `ReceiptScan.swift`).
+    func wholeBook() throws -> [String: JSONValue] { try book.read() }
+
     /// The shop's currency code from its settings, or nil when it has none.
     func shopCurrency() throws -> String? {
         guard case .object(let settings)? = try book.read()["settings"],

@@ -37,7 +37,7 @@ import KhaytCore
     @Test("history is left on the Mac, and the phone is told which parts")
     func historyStaysBehind() {
         let cut = BookScope.take(from: shop(orders: []))
-        for left in ["printFiles", "products", "expenses", "auditLog"] {
+        for left in ["printFiles", "products", "auditLog"] {
             #expect(cut.store[left] == nil, "\(left) travelled and no screen shows it")
             #expect(cut.taken.omitted.contains(left),
                     "\(left) was withheld silently — the phone cannot tell that from empty")
@@ -104,5 +104,53 @@ import KhaytCore
         #expect(cut.taken.isWhole("inventory"))
         #expect(cut.taken.collections["inventory"]?.sent == 0)
         #expect(!cut.taken.omitted.contains("inventory"))
+    }
+}
+
+/// What the phone's calculator and receipt scanner need (Oct 2026).
+@Suite struct BookScopeCalculatorTests {
+
+    private func expense(_ id: String, _ date: String) -> JSONValue {
+        .object(["id": .string(id), "date": .string(date), "amount": .number(10)])
+    }
+
+    @Test("presets, consumables and suppliers travel whole")
+    func calculatorCollectionsTravel() {
+        let store: [String: JSONValue] = [
+            "printers": .array([.object(["id": .string("pr1")])]),
+            "consumables": .array([.object(["id": .string("c1")])]),
+            "suppliers": .array([.object(["id": .string("sup1"), "vat": .string("300000000000003")])]),
+        ]
+        let cut = BookScope.take(from: store)
+        for name in ["printers", "consumables", "suppliers"] {
+            #expect(cut.taken.isWhole(name), "\(name) did not travel whole")
+            #expect(!cut.taken.omitted.contains(name))
+        }
+    }
+
+    @Test("expenses: the newest by day, wherever a row sits in the list")
+    func newestExpensesByDayNotPosition() {
+        // 1,200 expenses newest-first, then a recent one folded in at the END —
+        // where a phone's fold or an import can put it. A plain prefix drops it,
+        // and the receipt scanner's duplicate check then misses a fresh receipt.
+        var rows: [JSONValue] = []
+        for i in 0..<1_200 {
+            let day = Calendar(identifier: .gregorian).date(byAdding: .day, value: -i - 1,
+                                                             to: Date(timeIntervalSince1970: 1_790_000_000))!
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(identifier: "UTC")
+            rows.append(expense("E\(i)", f.string(from: day)))
+        }
+        rows.append(expense("LATE-FOLD", "2026-09-21"))
+        let cut = BookScope.take(from: ["expenses": .array(rows)])
+        guard case .array(let kept)? = cut.store["expenses"] else { Issue.record("no expenses"); return }
+        let ids = kept.compactMap { row -> String? in
+            guard case .object(let o) = row, case .string(let id)? = o["id"] else { return nil }
+            return id
+        }
+        #expect(kept.count == 1_000)
+        #expect(ids.contains("LATE-FOLD"))
+        #expect(!ids.contains("E1199"))
+        #expect(cut.taken.collections["expenses"] == .init(whole: false, sent: 1_000, available: 1_201))
     }
 }

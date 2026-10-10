@@ -6,6 +6,9 @@ import VisionKit
 /// that reads what `lib/labels.js` writes (`KHAYT-ORDER:`, `KHAYT-SPOOL:`, or
 /// the order's tracking link when the shop's cloud is on).
 struct LabelScanner: View {
+    /// The receipt scanner reads a different QR with the same camera.
+    var title = L10n.tr("scan.label.title")
+    var hint = L10n.tr("scan.label.hint")
     let onCode: (String) -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -20,7 +23,7 @@ struct LabelScanner: View {
                     }
                     .ignoresSafeArea(edges: .horizontal)
                     .overlay(alignment: .bottom) {
-                        Text(L10n.tr("scan.label.hint"))
+                        Text(hint)
                             .font(.khayt(13.5, .medium, relativeTo: .subheadline))
                             .padding(.horizontal, 14).padding(.vertical, 9)
                             .background(.ultraThinMaterial, in: Capsule())
@@ -31,7 +34,7 @@ struct LabelScanner: View {
                                            description: Text(L10n.tr("barcode.unavailable.sub")))
                 }
             }
-            .navigationTitle(L10n.tr("scan.label.title"))
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(L10n.tr("common.cancel")) { dismiss() } }

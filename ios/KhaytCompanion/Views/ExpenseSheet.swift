@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import KhaytCore
 
 /**
  * Photograph a receipt and file the expense on the spot.
@@ -24,22 +25,43 @@ struct ExpenseSheet: View {
     @State private var showCamera = false
     @State private var isSaving = false
     @State private var error: String?
+    // Read off the receipt's ZATCA QR — see `ReceiptScan.swift`.
+    @State private var fromReceipt: KhaytEngine.ReceiptDraft?
+    @State private var vatAmount = ""
+    @State private var receiptSays: String?
+    @State private var scanningQR = false
+    @State private var reclaimsTax = false
 
     // The desktop's own categories, so the phone cannot invent one that never
     // appears in a report.
     private let categories = ["filament", "resin", "parts", "tools", "rent", "power", "shipping", "other"]
 
-    private var canSave: Bool { (Double(amount.trimmingCharacters(in: .whitespaces)) ?? 0) > 0 }
+    /// An amount and a category: a receipt fills the first and never the
+    /// second, because it does not say what the money was for.
+    private var canSave: Bool {
+        (Double(amount.trimmingCharacters(in: .whitespaces)) ?? 0) > 0 && !category.isEmpty
+    }
+
+    /// The QR route needs the book: the shared rule and the shop's suppliers live there.
+    private var canReadReceipts: Bool { api.holdsBook && api.reader != nil }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    if canReadReceipts { receiptQRCard }
                     V2FieldCard {
                         V2Field(label: L10n.tr("exp.amount")) {
                             TextField("", text: $amount, prompt: Text(verbatim: "0.00"))
                                 .keyboardType(.decimalPad)
                                 .font(.khayt(26, .semibold, relativeTo: .title).monospacedDigit())
+                        }
+                        if fromReceipt != nil && reclaimsTax {
+                            V2Field(label: L10n.tr("exp.vat")) {
+                                TextField("", text: $vatAmount, prompt: Text(verbatim: "0.00"))
+                                    .keyboardType(.decimalPad)
+                                    .monospacedDigit()
+                            }
                         }
                         V2Field(label: L10n.tr("exp.category")) {
                             V2Chips(options: categories, selection: $category) { L10n.tr("exp.cat.\($0)") }
@@ -71,8 +93,112 @@ struct ExpenseSheet: View {
                 }
             }
             .sheet(isPresented: $showCamera) { LabelCameraPicker(image: $receipt) }
+            .sheet(isPresented: $scanningQR) {
+                LabelScanner(title: L10n.tr("exp.qr.title"), hint: L10n.tr("exp.qr.hint")) { code in
+                    Task { await read([code]) }
+                }
+            }
+            // A photographed receipt is searched for its QR, so one photo does both.
+            .onChange(of: receipt) { _, picture in
+                guard let picture, fromReceipt == nil, canReadReceipts else { return }
+                Task {
+                    let codes = await ReceiptQR.payloadsAsync(in: picture)
+                    if !codes.isEmpty { await read(codes, quietIfNone: true) }
+                }
+            }
+            .task {
+                if let reader = api.reader, canReadReceipts { reclaimsTax = await reader.reclaimsTax() }
+                #if DEBUG
+                // `-KhaytReceipt <QR text>` on the launch line, for screenshots.
+                if let code = UserDefaults.standard.string(forKey: "KhaytReceipt") { await read([code]) }
+                #endif
+            }
         }
     }
+
+    // MARK: - The receipt's QR
+
+    @ViewBuilder
+    private var receiptQRCard: some View {
+        if let draft = fromReceipt {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(Self.isolated(draft.supplier?.name ?? draft.sellerName))
+                    .font(.khayt(15.5, .semibold, relativeTo: .body))
+                    .foregroundStyle(KhaytDesign.ink)
+                Text(L10n.format("exp.qr.vat_number", Self.isolated(draft.vatNumber)) + " · " + Self.isolated(draft.draft.date))
+                    .font(.khayt(13, relativeTo: .footnote).monospacedDigit())
+                    .foregroundStyle(KhaytDesign.note)
+                Text(L10n.tr(draft.supplier != nil ? "exp.qr.supplier" : "exp.qr.new_supplier"))
+                    .font(.khayt(13, relativeTo: .footnote))
+                    .foregroundStyle(KhaytDesign.note)
+                V2Note(text: L10n.tr("exp.qr.filled"))
+                if receipt != nil { V2Note(text: L10n.tr("exp.qr.photo_stays"), tone: KhaytDesign.attention) }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card()
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Button { scanningQR = true } label: {
+                    Label(L10n.tr("exp.qr.scan"), systemImage: "qrcode.viewfinder")
+                        .font(.khayt(15.5, .semibold, relativeTo: .body))
+                        .foregroundStyle(KhaytDesign.brand)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(KhaytDesign.brand.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(KhaytDesign.brand, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                V2Note(text: receiptSays ?? L10n.tr("exp.qr.why"),
+                       tone: receiptSays == nil ? KhaytDesign.note : KhaytDesign.attention)
+            }
+        }
+    }
+
+    /// Read every code found; the first that is a receipt not already filed
+    /// fills the form. A receipt already in the books is said, never offered:
+    /// the same receipt filed twice is the same money counted twice.
+    private func read(_ codes: [String], quietIfNone: Bool = false) async {
+        guard let reader = api.reader else { return }
+        var reason: String?
+        var duplicate = false
+        for code in codes {
+            switch try? await reader.readReceipt(code) {
+            case .draft(let d)?:
+                if d.duplicateOf != nil { duplicate = true; continue }
+                apply(d)
+                return
+            case .refused(let why)?:
+                reason = reason ?? why
+            case nil:
+                reason = reason ?? "not_base64"
+            }
+        }
+        if duplicate {
+            receiptSays = L10n.tr("exp.qr.duplicate")
+        } else if !quietIfNone {
+            receiptSays = L10n.tr("exp.qr.reason.\(reason ?? "not_base64")")
+        }
+    }
+
+    private func apply(_ d: KhaytEngine.ReceiptDraft) {
+        fromReceipt = d
+        receiptSays = nil
+        amount = Self.halala(d.draft.amount)
+        vatAmount = Self.halala(d.draft.vatAmount)
+        note = L10n.format("exp.qr.note", d.supplier?.name ?? d.sellerName, d.vatNumber)
+        // Filled in, not filed: the category is the person's to choose.
+        category = ""
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    /// To the halala, in Western digits — a QR may write six decimals.
+    static func halala(_ x: Double) -> String {
+        String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), (x * 100).rounded() / 100)
+    }
+
+    /// A seller's name or a number in its own direction, so an Arabic name in
+    /// an English sheet (or the other way round) does not reorder what is beside it.
+    static func isolated(_ s: String) -> String { "\u{2068}" + s + "\u{2069}" }
 
     @ViewBuilder
     private var receiptCard: some View {
@@ -125,12 +251,17 @@ struct ExpenseSheet: View {
             base64 = data.base64EncodedString()
         }
 
-        let payload = ExpenseDraft(
+        var payload = ExpenseDraft(
             amount: Double(amount.trimmingCharacters(in: .whitespaces)) ?? 0,
             category: category,
             note: note.trimmingCharacters(in: .whitespaces),
             receiptBase64: base64
         )
+        if let d = fromReceipt {
+            payload.vatAmount = reclaimsTax ? Double(vatAmount.trimmingCharacters(in: .whitespaces)) ?? 0 : 0
+            payload.date = d.draft.date
+            payload.receiptRef = d.draft.receiptRef
+        }
         do {
             try await api.addExpense(payload)
             dismiss()

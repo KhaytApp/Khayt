@@ -623,7 +623,10 @@ final class KhaytAPIClient: ObservableObject {
     /// A receipt is a file the desk stores and points at, so one with a photo
     /// still needs a desktop that serves `/api/expense`.
     func addExpense(_ draft: ExpenseDraft) async throws {
-        if draft.receiptBase64 == nil,
+        // One read off a receipt's QR goes into the book whatever else it has:
+        // its VAT and its identity are what the shop's tax return and the
+        // duplicate check need, and `/api/expense` carries neither.
+        if draft.receiptBase64 == nil || draft.receiptRef != nil,
            try await writeLocally({ try $0.addExpense(draft) }) { return }
         let body = try JSONEncoder().encode(draft)
         let (data, response) = try await request(

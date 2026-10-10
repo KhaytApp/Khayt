@@ -24,8 +24,9 @@ misleading:
    `printLog` is about half of a real store and `printFiles` another quarter, all
    of it history no companion screen has ever shown. What travels is
    `BookScope.workingSet` — the settings, every *unfinished* order whatever its
-   age, the newest 200 finished ones, and the clients, spools, machines and
-   waiting list. The phone reads from that, so the screens work with the Mac
+   age, the newest 200 finished ones, the clients, spools, machines and
+   waiting list, and — for the calculator and the receipt scanner — the presets,
+   consumables, suppliers and the newest 1,000 expenses. The phone reads from that, so the screens work with the Mac
    switched off.
 
    It is **partial, and it knows it.** A scope file beside the book records which

@@ -315,9 +315,17 @@ struct BookWriter {
         let amount = draft.amount.isFinite ? max(0, draft.amount) : 0
         guard amount > 0 else { throw Refusal.noAmount }
         let category = String(draft.category.trimmingCharacters(in: .whitespacesAndNewlines).prefix(60))
-        let record: [String: JSONValue] = [
+        // A receipt's own day, when it was read off one — never a future day,
+        // and never anything that is not a plain yyyy-MM-dd.
+        let today = Self.localDay(now)
+        let day: String = {
+            guard let d = draft.date, d.count == 10, d.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil,
+                  d <= today else { return today }
+            return d
+        }()
+        var record: [String: JSONValue] = [
             "id": .string(Self.lanId("EXP", now: now)),
-            "date": .string(Self.localDay(now)),
+            "date": .string(day),
             "category": .string(category.isEmpty ? "other" : category),
             "amount": .number(amount),
             "note": .string(String(draft.note.trimmingCharacters(in: .whitespacesAndNewlines).prefix(500))),
@@ -327,6 +335,14 @@ struct BookWriter {
             "nextDue": .null,
             "locationId": .string(""),
         ]
+        // As the Mac's sheet writes them: never more VAT than was paid, never
+        // negative, and the receipt's identity for the duplicate check.
+        if let vat = draft.vatAmount, vat.isFinite {
+            record["vatAmount"] = .number(min(max(0, vat), amount))
+        }
+        if let ref = draft.receiptRef?.trimmingCharacters(in: .whitespacesAndNewlines), !ref.isEmpty {
+            record["receiptRef"] = .string(String(ref.prefix(300)))
+        }
         try book.insertRecord(collection: "expenses", atFront: true) { _ in record }
         return record
     }

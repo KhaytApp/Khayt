@@ -247,78 +247,23 @@ final class CalculatorModel {
     static func costInput(lines: [FilamentLine], purge: Double, hours: Double, qty: Int,
                           spools: [Spool], consumables: [ConsumableLine],
                           shelf: [Consumable], extra: [String: JSONValue] = [:]) -> JSONValue {
+        // The shape is KhaytCore's (`CalculatorPart`), shared with the phone's
+        // calculator: one copy of how purge, colours and pieces become a part.
         let spool: (String?) -> Spool? = { id in id.flatMap { id in spools.first { $0.id == id } } }
-        let used = lines.filter { number($0.grams) > 0 }
-        var part: [String: JSONValue]
-        if used.count > 1 {
-            // Purge shared by weight: each colour carries its share, so the
-            // shelf loses what the printer really flushed, spool by spool.
-            let printed = used.reduce(0) { $0 + number($1.grams) }
-            var colours: [JSONValue] = []
-            var totalCost = 0.0, totalGrams = 0.0
-            var materials: [String] = []
-            var dominant: (id: String, grams: Double)?
-            for line in used {
-                let g = number(line.grams) + (printed > 0 ? purge * number(line.grams) / printed : 0)
-                let s = spool(line.spoolId)
-                let perGram = s.map { ($0.cost ?? 0) / max(1, $0.spoolWeight ?? 1000) } ?? 0
-                var c: [String: JSONValue] = ["grams": .number(g), "cost": .number(perGram * g)]
-                if let s {
-                    c["filamentId"] = .string(s.id)
-                    c["material"] = .string(s.material)
-                    if !materials.contains(s.material) { materials.append(s.material) }
-                    if g > (dominant?.grams ?? -1) { dominant = (s.id, g) }
-                }
-                if let hex = line.hex ?? s?.color, !hex.isEmpty { c["hex"] = .string(hex) }
-                colours.append(.object(c))
-                totalCost += perGram * g
-                totalGrams += g
-            }
-            part = extra
-            part["colours"] = .array(colours)
-            part["printWeight"] = .number(totalGrams)
-            part["spoolCost"] = .number(totalCost)
-            part["spoolWeight"] = .number(max(1, totalGrams))
-            part["printTime"] = .number(max(0, hours))
-            part["qty"] = .number(Double(max(1, qty)))
-            if let dominant { part["filamentId"] = .string(dominant.id) }
-            if !materials.isEmpty { part["material"] = .string(materials.joined(separator: " + ")) }
-            if purge > 0 { part["purgeGrams"] = .number(purge) }
-        } else {
-            let line = used.first ?? lines.first
-            var withPurge = extra
-            // One filament: the purge is that spool's, charged as support is.
-            if purge > 0 { withPurge["supportWeight"] = .number(purge) }
-            guard case .object(let o) = Shop.costInput(spool: spool(line?.spoolId),
-                                                         grams: number(line?.grams ?? ""),
-                                                         hours: hours, qty: qty, extra: withPurge)
-            else { return .object([:]) }
-            part = o
-        }
         let pieces = consumableRows(consumables.compactMap { line in
             line.consumableId.map { (id: $0, qty: line.qty) }
         }, shelf: shelf)
-        if !pieces.isEmpty { part["consumables"] = .array(pieces) }
-        return .object(part)
+        return CalculatorPart.input(
+            lines: lines.map { CalculatorPart.Line(spool: spool($0.spoolId)?.costing,
+                                                   grams: number($0.grams), hex: $0.hex) },
+            purge: purge, hours: hours, qty: qty, pieces: pieces, extra: extra)
     }
 
-    /// Consumable lines as a part records them. `unitCost` is written beside
-    /// the id so a host without the shelf in reach still costs the magnet at
-    /// what it cost, never at nothing; `name` so the other app can show it.
+    /// Consumable lines as a part records them — `CalculatorPart.consumableRows`.
     static func consumableRows(_ uses: [(id: String, qty: Double)], shelf: [Consumable]) -> [JSONValue] {
-        uses.compactMap { use in
-            // Finite and at most 9,999: `.number(inf)` makes JSONEncoder
-            // throw, and the whole book write with it.
-            guard !use.id.isEmpty, use.qty.isFinite, use.qty > 0 else { return nil }
-            var row: [String: JSONValue] = ["consumableId": .string(use.id),
-                                            "qty": .number(Swift.min(9999, use.qty))]
-            if let item = shelf.first(where: { $0.id == use.id }) {
-                let cost = item.cost ?? 0
-                row["unitCost"] = .number(cost.isFinite ? max(0, cost) : 0)
-                if let name = item.name, !name.isEmpty { row["name"] = .string(name) }
-            }
-            return .object(row)
-        }
+        CalculatorPart.consumableRows(uses, shelf: shelf.map {
+            CalculatorPart.ShelfItem(id: $0.id, name: $0.name, cost: $0.cost)
+        })
     }
 
     /// What the consumables add per printed piece, for the line beside them.
@@ -433,5 +378,12 @@ final class CalculatorModel {
             if d < (best?.d ?? .infinity) { best = (s.id, d) }
         }
         return best?.id
+    }
+}
+
+extension Spool {
+    /// This spool, as far as costing needs it — `CalculatorPart.Spool`.
+    var costing: CalculatorPart.Spool {
+        CalculatorPart.Spool(id: id, material: material, cost: cost, spoolWeight: spoolWeight, color: color)
     }
 }

@@ -60,5 +60,11 @@ struct KhaytCompanionShortcuts: AppShortcutsProvider {
             shortTitle: "Scan a spool",
             systemImageName: "barcode.viewfinder"
         )
+        AppShortcut(
+            intent: OpenCalculatorIntent(),
+            phrases: ["Price a part in \(.applicationName)", "Open the \(.applicationName) calculator"],
+            shortTitle: "Price a part",
+            systemImageName: "function"
+        )
     }
 }

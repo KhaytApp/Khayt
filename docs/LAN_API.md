@@ -169,6 +169,8 @@ so the Mac and the phone cannot disagree about it):
 | `settings` | always, in full — nothing can be priced without it |
 | `printLog` | every **unfinished** order whatever its age, plus the newest 200 finished |
 | `clients`, `inventory`, `machines`, `waitingList`, `waTemplates` | in full, up to a ceiling |
+| `printers` (calculator presets), `consumables`, `suppliers` | in full, up to a ceiling — the phone's calculator and receipt scanner |
+| `expenses` | the newest 1,000 **by day** (not list position) — the receipt scanner's duplicate check |
 | everything else | stays on the Mac |
 
 An order is finished at `completed`, `shipped`, `delivered` or `cancelled`.

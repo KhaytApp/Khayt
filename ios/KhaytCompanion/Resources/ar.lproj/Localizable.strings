@@ -698,3 +698,74 @@
 
 /* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
 "settings.live_activities.mac" = "لتبقى الطباعة محدّثة على شاشة القفل والتطبيق مغلق، فعّل «إرسال تقدّم الطباعة إلى iPhone (الأنشطة المباشرة)» في خيط على الـMac (الإعدادات ▸ التكاملات ▸ الآيفون)، وسجّل دخول هذا الهاتف إلى Khayt Cloud.";
+
+/* The calculator — priced on the phone from the shop's own book. */
+"tab.calculator" = "الحاسبة";
+"home.action.calculator" = "الحاسبة";
+"calc.title" = "الحاسبة";
+"calc.part" = "القطعة";
+"calc.printer" = "الطابعة";
+"calc.pieces" = "مغناطيس وحشوات وقطع أخرى";
+"calc.price" = "الهامش والرسوم";
+"calc.charge" = "كم تطلب";
+"calc.each" = "%@ للقطعة";
+"calc.nothing" = "أدخل وزناً أو زمن طباعة ليحسب تكلفة العمل والسعر المناسب له.";
+"calc.cost" = "التكلفة عليك";
+"calc.keeps" = "ما يبقى لك";
+"calc.per_piece" = "أين تذهب تكلفة القطعة الواحدة";
+"calc.add_colour" = "أضف خيطًا / لونًا";
+"calc.remove_colour" = "إزالة هذا اللون";
+"calc.purge" = "التنظيف وبرج التهيئة";
+"calc.colour_n" = "اللون %lld";
+"calc.filament" = "الخيط";
+"calc.no_spool" = "بلا خيط";
+"calc.no_spool_price" = "هذه البكرة بلا سعر، لذا لا تُحسب تكلفة المادة. أضف سعرها في صفحة البكرة.";
+"calc.machine" = "الطابعة";
+"calc.any_machine" = "أي طابعة";
+"calc.preset" = "إعداد مسبق للطابعة";
+"calc.default_rates" = "الإعدادات الافتراضية";
+"calc.rates" = "أسعار التكلفة";
+"calc.rates_edited" = "مُعدَّل";
+"calc.rates_reset" = "إعادة إلى الإعداد المسبق";
+"calc.rate.laborRate" = "سعر ساعة العمل";
+"calc.rate.prepTime" = "وقت السلايسر والتحضير";
+"calc.rate.postTime" = "ما بعد الطباعة والتجميع";
+"calc.rate.wearRate" = "تآكل واستهلاك";
+"calc.rate.powerDraw" = "استهلاك الطاقة";
+"calc.rate.elecRate" = "الكهرباء";
+"calc.rate.failureRate" = "هامش الفشل";
+"calc.add_piece" = "إضافة قطعة";
+"calc.remove_piece" = "إزالة هذه القطعة";
+"calc.share" = "إرسال السعر";
+"calc.make_order" = "اجعله عرض سعر";
+"calc.share.price" = "السعر: %@";
+"calc.share.each" = "لعدد %lld قطع — %@ للقطعة";
+"calc.share.rush" = "يشمل رسوم الاستعجال.";
+
+/* The receipt's ZATCA QR, on the expense sheet. */
+"exp.vat" = "الضريبة المستردة";
+"exp.qr.scan" = "امسح رمز QR في الإيصال";
+"exp.qr.why" = "يعطي رمز QR في الفاتورة الضريبية السعودية البائعَ والإجمالي والضريبة، فلا حاجة للكتابة. وتُقرأ صورة الإيصال أيضاً.";
+"exp.qr.title" = "رمز الإيصال";
+"exp.qr.hint" = "وجّه الكاميرا إلى رمز QR في الفاتورة الضريبية";
+"exp.qr.vat_number" = "الرقم الضريبي %@";
+"exp.qr.supplier" = "من مورّديك";
+"exp.qr.new_supplier" = "ليس من مورّديك بعد — أضفه على الـMac لتُطابَق إيصالاته القادمة.";
+"exp.qr.filled" = "عُبّئ من إيصال — راجعه ثم اختر الفئة.";
+"exp.qr.photo_stays" = "الأرقام من رمز QR، لذا يُحفظ هذا المصروف على الهاتف ولا تُرسل الصورة.";
+"exp.qr.duplicate" = "هذا الإيصال مسجّل في مصروفاتك، لذا لا يُعرض مرة أخرى.";
+"exp.qr.note" = "%@ · الرقم الضريبي %@";
+"exp.qr.reason.empty" = "الرمز فارغ.";
+"exp.qr.reason.too_long" = "الرمز أطول بكثير من رمز فاتورة ضريبية.";
+"exp.qr.reason.not_base64" = "هذا الرمز ليس رمز فاتورة ضريبية — قد يكون رابطاً أو رمز دفع.";
+"exp.qr.reason.truncated" = "الرمز مقطوع.";
+"exp.qr.reason.bad_tag" = "يحتوي الرمز على حقل ليس في الفاتورة الضريبية.";
+"exp.qr.reason.not_utf8" = "تعذّرت قراءة اسم البائع في الرمز.";
+"exp.qr.reason.missing_tag" = "ينقص الرمز البائع أو الرقم الضريبي أو الوقت أو الإجمالي أو الضريبة.";
+"exp.qr.reason.bad_vat_number" = "الرقم الضريبي للبائع ليس سعودياً (15 رقماً تبدأ وتنتهي بالرقم 3).";
+"exp.qr.reason.bad_amount" = "الإجمالي أو الضريبة في الرمز ليس مبلغاً.";
+"exp.qr.reason.vat_over_total" = "يقول الرمز إن الضريبة أكبر من الإجمالي.";
+"exp.qr.reason.bad_timestamp" = "تعذّرت قراءة تاريخ الفاتورة في الرمز.";
+
+"Price a part" = "تسعير قطعة";
+"home.calculator.sub" = "تكلفة القطعة عليك، وكم تطلب مقابلها";
