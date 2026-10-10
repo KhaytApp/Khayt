@@ -41,6 +41,38 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   about a minute. `KHAYT_PARITY_ALL=1` still runs everything. CI has no vault
   and was never affected.
 
+- **alpha.64 review fixes (Mac + shared).** Five things the pre-release review
+  found, fixed:
+  - **An assistant no longer sees phone numbers or emails you typed into a
+    project, a stock label or a model's title, folder or tags.** `khayt-mcp`
+    used to take only customer names out of that text, so "Nouf 0551234567,
+    pickup Thursday" passed the number along. Now every piece of text it hands
+    an assistant also has emails, phone numbers, IBANs and long numbers taken
+    out, using the same rule that cleans crash reports, and any phone or email
+    on a customer's record is taken out as it is written there. This holds
+    whether or not you share customer names.
+  - **Customer names written the way people write them are now recognised.**
+    With names not shared, "هدية لنوف الدوسري", "ونوف الدوسري", "نوف الدوسرى",
+    "Nouf  Al-Dossari" and "Nouf Al Dossari" all used to slip through for the
+    customer "Nouf Al-Dossari" / "نوف الدوسري". Matching now ignores ى/ي, ة/ه
+    and the forms of alef, tatweel and vowel marks, extra spaces, hyphens and
+    case, and allows a single attached و ف ب ل ك in front of the name. A name
+    inside a longer word is still left alone.
+  - **Accounting exports can no longer carry a spreadsheet formula.** A
+    customer name or note starting with `=`, `+`, `-` or `@` (which customers
+    can type through the web store and the portal) now gets a leading `'` in
+    every export format, Wafeq and Daftra included, so a spreadsheet will not
+    run it. Amounts are never touched, so a refund still reads `-12.00`. This is
+    shared code: the Windows and Linux desktop app's exports get the same fix.
+  - **The crash-report card now says what is really taken out:** emails, phone
+    numbers, long numbers and file paths. It used to say "names and numbers",
+    and the cleaner does not remove names.
+  - **Turning crash reports or usage counts off now always clears what is
+    queued on the Mac**, including when you turn them off in the Windows/Linux
+    app on the same book, and an event being queued at that moment can no
+    longer put the queue back. Flicking the two switches in Settings quickly no
+    longer turns the other one back off.
+
 - **(Maintainers) The Mac's road to beta is written down.** `mac/BETA.md` lists
   what has to be true before `4.0.0-beta.1`: crash reports live and read, a
   week on the shop's real book, the features shipped untried tried for real,
@@ -55,8 +87,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   again. Both are off until you turn them on, and Settings ▸ Preferences has
   the two switches for good, with "View what's collected" showing exactly
   what's waiting to go. Reports are cleaned by the same rule the Electron
-  desktop app uses: no names, numbers, file paths, orders, customers, prices
-  or files. Turning a switch off deletes anything queued at once. (#1789)
+  desktop app uses: emails, phone numbers, long numbers and file paths are
+  taken out, and orders, customers, prices and files are never sent. Turning a switch off deletes anything queued at once. (#1789)
 - **Crash reports with a long stack are no longer thrown away.** A report
   whose stack ran past 4,000 characters was refused whole by Khayt Cloud. The
   stack is now cut to fit, keeping complete lines.

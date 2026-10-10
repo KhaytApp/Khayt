@@ -51,13 +51,29 @@ struct TelemetryConsent: Equatable, Sendable {
     /// `persist` in `renderer/settings.js`, rule for rule: an install id is made
     /// on the first opt-in and kept while either stream is on; the consent time
     /// is the FIRST opt-in's; with both off, both are cleared.
-    static func choosing(crash: Bool, usage: Bool, over was: TelemetryConsent, now: Date,
+    ///
+    /// A nil stream is LEFT AS `was` HAS IT. A Settings switch names only its
+    /// own stream, and `was` is read off the book inside the write: a switch
+    /// that passed the other stream's value as last drawn turned it back off
+    /// when the two were flicked faster than the book reloaded.
+    static func choosing(crash: Bool?, usage: Bool?, over was: TelemetryConsent, now: Date,
                          newId: () -> String = { UUID().uuidString.lowercased() }) -> TelemetryConsent {
+        let crash = crash ?? was.crash, usage = usage ?? was.usage
         guard crash || usage else { return TelemetryConsent() }
         return TelemetryConsent(crash: crash, usage: usage,
                                 installId: was.installId.isEmpty ? newId() : was.installId,
                                 consentAt: was.consentAt.isEmpty ? Telemetry.stamp(now) : was.consentAt)
     }
+
+    /// Only what both say yes to — the book in memory and the book on disk,
+    /// which another app (Electron, on the same book) may have changed.
+    func and(_ other: TelemetryConsent) -> TelemetryConsent {
+        TelemetryConsent(crash: crash && other.crash, usage: usage && other.usage,
+                         installId: installId, consentAt: consentAt)
+    }
+
+    /// Whether this consent lets an event of `kind` (`"crash"`/`"usage"`) stay.
+    func allows(_ kind: String) -> Bool { kind == "crash" ? crash : kind == "usage" ? usage : false }
 
     /// Written over whatever `settings.telemetry` held, keeping any key this
     /// build does not know — a newer app's field is not this one's to drop.
@@ -287,9 +303,16 @@ final class Telemetry {
 
     /// Scrub and queue one event — only with that stream's consent, only as
     /// the scrubber built it, and not at all if the scrubber throws.
+    ///
+    /// `live` is the consent as it is NOW, asked again after the awaits and
+    /// before the write: the queue is read, the scrubber is awaited, then the
+    /// file is written, and an opt-out that deleted the queue in between would
+    /// otherwise be undone by that write. A stream switched off meanwhile also
+    /// takes its events out of what is written.
     @discardableResult
     func enqueue(_ kind: Kind, _ raw: [String: JSONValue], consent: TelemetryConsent,
-                 engine: KhaytEngine, file: TelemetryQueueFile) async -> Bool {
+                 engine: KhaytEngine, file: TelemetryQueueFile,
+                 live: (() -> TelemetryConsent)? = nil) async -> Bool {
         guard kind == .crash ? consent.crash : consent.usage else { return false }
         var raw = raw
         raw["installId"] = .string(consent.installId)
@@ -311,8 +334,35 @@ final class Telemetry {
         queue.append(.object(["kind": .string(kind.rawValue), "payload": .object(payload),
                               "at": .string(Self.stamp(now()))]))
         guard let tidy = try? await engine.telemetryTidy(queue, keep: Self.keep) else { return false }
-        file.write(tidy)
+        // Asked again now, after every await: nothing suspends between here
+        // and the write, so an opt-out cannot land in between.
+        let current = live?() ?? consent
+        guard current.allows(kind.rawValue) else { return false }
+        file.write(tidy.filter(Self.kept(by: current)))
         return true
+    }
+
+    /// Whether a queued event survives `consent`.
+    nonisolated static func kept(by consent: TelemetryConsent) -> (JSONValue) -> Bool {
+        { e in
+            guard case .object(let o) = e, case .string(let k)? = o["kind"] else { return false }
+            return consent.allows(k)
+        }
+    }
+
+    /// The queue made to agree with `consent`: a stream that is off has no
+    /// events in it, and with both off there is no file. Run on every tick as
+    /// well as when the Mac's own switch moves, because the same book can be
+    /// opted out from the Electron app, which never touches this file.
+    func prune(consent: TelemetryConsent, file: TelemetryQueueFile) {
+        guard consent.any else {
+            if FileManager.default.fileExists(atPath: file.url.path) { file.delete() }
+            return
+        }
+        guard !consent.crash || !consent.usage else { return }
+        let queue = file.read()
+        let kept = queue.filter(Self.kept(by: consent))
+        if kept.count != queue.count { file.write(kept) }
     }
 
     private static func sameCounter(_ e: JSONValue, _ p: [String: JSONValue]) -> Bool {
@@ -404,13 +454,7 @@ final class Telemetry {
             backoffMs = 0; nextAttemptAtMs = 0
             return
         }
-        if !consent.crash || !consent.usage {
-            let kept = file.read().filter { e in
-                guard case .object(let o) = e, case .string(let k)? = o["kind"] else { return false }
-                return k == "crash" ? consent.crash : consent.usage
-            }
-            file.write(kept)
-        }
+        prune(consent: consent, file: file)
         if (consent.crash && !was.crash) || (consent.usage && !was.usage) {
             nextFlushAt = min(nextFlushAt, now().addingTimeInterval(Self.firstFlush))
         }
@@ -454,10 +498,46 @@ final class Telemetry {
     }
 
     private func tick(_ shop: Shop) async {
+        // The book on disk as well as the book in memory: an opt-out made in
+        // the Electron app on this same book is not in memory until the Mac
+        // next reloads, and it must still empty this Mac's queue and stop it
+        // sending. Only what both say yes to counts.
+        var consent = shop.telemetryConsent
+        if let build = shop.source.build, let stored = await consentOnDiskIfChanged(build.storeURL) {
+            consent = consent.and(stored)
+        }
+        if let file = Self.file(for: shop) { prune(consent: consent, file: file) }
         await collect(shop)
         guard now() >= nextFlushAt, let engine = shop.engine, let file = Self.file(for: shop) else { return }
         nextFlushAt = now().addingTimeInterval(Self.flushEvery)
-        await flush(consent: shop.telemetryConsent, engine: engine, file: file)
+        await flush(consent: consent, engine: engine, file: file)
+    }
+
+    /// `settings.telemetry` as the book on disk has it, nil when it cannot be
+    /// read. Parsed on a dispatch queue — a book is megabytes, and a
+    /// continuation holds no cooperative-pool thread while it waits — and
+    /// only when the file changed since the last look.
+    @ObservationIgnored private var diskConsent: (stamp: Date, consent: TelemetryConsent)?
+
+    func consentOnDiskIfChanged(_ url: URL) async -> TelemetryConsent? {
+        let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        if let stamp, let cached = diskConsent, cached.stamp == stamp { return cached.consent }
+        guard let read = await Self.consentOnDisk(url) else { return nil }
+        if let stamp { diskConsent = (stamp, read) }
+        return read
+    }
+
+    nonisolated static func consentOnDisk(_ url: URL) async -> TelemetryConsent? {
+        await withCheckedContinuation { done in
+            DispatchQueue.global(qos: .utility).async {
+                guard let data = try? Data(contentsOf: url),
+                      let root = try? JSONDecoder().decode([String: JSONValue].self, from: data),
+                      case .object(let settings)? = root["settings"] else {
+                    done.resume(returning: nil); return
+                }
+                done.resume(returning: TelemetryConsent(settings: settings))
+            }
+        }
     }
 
     /// One `app_launch`, with today's running count.
@@ -467,24 +547,30 @@ final class Telemetry {
         let raw = TelemetryRaw.usage(feature: "app_launch", count: tally("app_launch"),
                                      settings: shop.settingsDict, mode: shop.mode,
                                      context(language: shop.words.language))
-        await enqueue(.usage, raw, consent: consent, engine: engine, file: file)
+        await enqueue(.usage, raw, consent: consent, engine: engine, file: file,
+                      live: { [weak shop] in shop?.telemetryConsent ?? TelemetryConsent() })
     }
 
     /// The rules' failures since the last look, and the last run's crash note.
+    /// Consent is asked again for every event, not once for the batch: each
+    /// `enqueue` awaits, and the shop can opt out between two of them.
     func collect(_ shop: Shop) async {
-        let consent = shop.telemetryConsent
         let faults = EngineFaults.recent().filter { $0.at > faultCursor }
         faultCursor = faults.last?.at ?? faultCursor
-        guard consent.crash, let engine = shop.engine, let file = Self.file(for: shop) else { return }
+        guard shop.telemetryConsent.crash, let engine = shop.engine, let file = Self.file(for: shop) else { return }
+        let live: () -> TelemetryConsent = { [weak shop] in shop?.telemetryConsent ?? TelemetryConsent() }
         let c = context(language: shop.words.language)
         if let note = shop.lastCrash, defaults.string(forKey: Self.crashNoteKey) != Self.noteId(note) {
             defaults.set(Self.noteId(note), forKey: Self.crashNoteKey)
             if let raw = TelemetryRaw.crash(note: note, c) {
-                await enqueue(.crash, raw, consent: consent, engine: engine, file: file)
+                await enqueue(.crash, raw, consent: live(), engine: engine, file: file, live: live)
             }
         }
         for fault in faults.suffix(20) {
-            await enqueue(.crash, TelemetryRaw.crash(problem: fault.problem, call: fault.call, c), consent: consent, engine: engine, file: file)
+            let consent = live()
+            guard consent.crash else { break }
+            await enqueue(.crash, TelemetryRaw.crash(problem: fault.problem, call: fault.call, c),
+                          consent: consent, engine: engine, file: file, live: live)
         }
         // A fault the scrubbing itself raised is not news, and reporting it
         // would only raise another: the cursor moves past everything up to now.
@@ -513,19 +599,23 @@ extension Shop {
     var telemetryConsent: TelemetryConsent { TelemetryConsent(settings: settingsDict) }
 
     /// Choose the two consents — the card's buttons and the Settings toggles.
-    /// The staff lock decides, as for every other setting.
+    /// The staff lock decides, as for every other setting. A nil stream is
+    /// left as the BOOK has it, read inside the write — so a Settings switch
+    /// names only its own stream and cannot turn the other one back off with
+    /// a value drawn before the last change reloaded.
     @discardableResult
-    func setTelemetry(crash: Bool, usage: Bool) async -> Bool {
+    func setTelemetry(crash: Bool? = nil, usage: Bool? = nil) async -> Bool {
         writeProblem = nil
         guard source.isReal else { writeProblem = words.callIt("mac.move_sample"); return false }
         guard permitted("settings", "edit") else { return false }
         guard let build = source.build else { return false }
-        let was = telemetryConsent
+        var was = telemetryConsent
         var chosen = was
         do {
             try StoreWriter.update(build) { root in
                 var settings = Self.settings(root)
                 let stored = TelemetryConsent(settings: settings)
+                was = stored
                 chosen = TelemetryConsent.choosing(crash: crash, usage: usage, over: stored, now: Date())
                 settings["telemetry"] = chosen.written(over: settings["telemetry"])
                 root["settings"] = .object(settings)
