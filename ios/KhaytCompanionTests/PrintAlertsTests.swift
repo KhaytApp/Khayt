@@ -35,6 +35,20 @@ final class PrintAlertsTests: XCTestCase {
         XCTAssertEqual(d.observe(["M1": r("Cancelled")]).first?.outcome, .cancelled)
     }
 
+    /// The Mac's poll of a printer failed: `/api/live/printers` serves
+    /// `state: null` with the poll's error. The print is still running.
+    func testAMissedPollIsNotAFailedPrint() {
+        var d = FinishDetector()
+        let t0 = Date(timeIntervalSince1970: 0)
+        _ = d.observe(["M1": r("Printing")], now: t0)
+        XCTAssertTrue(d.observe(["M1": r(nil, error: "timed out")], now: t0.addingTimeInterval(60)).isEmpty,
+                      "not heard is not failed")
+        XCTAssertTrue(d.observe(["M1": r("Printing")], now: t0.addingTimeInterval(120)).isEmpty)
+        let ended = d.observe(["M1": r("Operational")], now: t0.addingTimeInterval(3_600))
+        XCTAssertEqual(ended.first?.outcome, .finished)
+        XCTAssertEqual(ended.first?.durationS, 3_600, "timed from the real start, not from after the missed poll")
+    }
+
     private func event(_ outcome: PrintFinished.Outcome, order: String? = "INV-1", advancedTo: String? = nil) -> PrintFinished {
         PrintFinished(at: "2026-09-26T10:00:00Z", machineId: "M1", machineName: "X1C", orderId: order,
                       project: "Bracket", client: nil, filename: nil, durationS: 11_520, outcome: outcome,

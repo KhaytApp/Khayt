@@ -26,6 +26,8 @@ enum PrintActivityPlan {
                       now: Date = Date()) -> [Step] {
         var steps: [Step] = []
         for (id, r) in readings.sorted(by: { $0.key < $1.key }) {
+            // A missed poll is the phone not hearing, like a machine that drops out.
+            if r.isUnheard { continue }
             let was = running[id]
             if r.isPrinting || r.isPaused {
                 let ends = r.timeRemaining.flatMap { $0 > 0 ? now.addingTimeInterval(TimeInterval($0)) : nil }

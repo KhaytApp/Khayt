@@ -16,6 +16,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   tries again. Links sent before this update are not tracked, so finish
   those in the Tabby or Tamara portal. Tamara collects at shipment by
   itself after 21 days; capturing it when you ship is not built yet.
+- **iOS: a missed printer poll no longer ends a print as failed.** When the
+  Mac's poll of a printer fails, `/api/live/printers` serves `state: null`
+  with the error. The phone read that as the print stopping: the Live Activity
+  ended as failed, a "Print failed" alert went out, and the next good poll
+  started a new activity. A reading with no state is now "not heard", like a
+  machine that drops out, in both the Live Activity rules and the
+  print-finished detector. Settings now says that pushes with the app closed
+  also need print progress turned on on the Mac.
 
 - **iOS: photos on the customer's tracking page.** A published order's page
   now has a Photos card: take or choose a photo of the finished part and it

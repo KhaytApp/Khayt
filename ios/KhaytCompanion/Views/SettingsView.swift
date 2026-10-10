@@ -27,6 +27,11 @@ struct SettingsView: View {
                     languagePicker
                     eyebrow(L10n.tr("settings.notifications"))
                     notificationsCard
+                    if settings.liveActivities {
+                        // The Mac sends print progress for a closed app only when
+                        // its owner opts in there, off by default (matches /privacy).
+                        foot(L10n.tr("settings.live_activities.mac"))
+                    }
                     eyebrow(L10n.tr("cloud.title"))
                     cloudCard
                     eyebrow(L10n.tr("settings.connection"))

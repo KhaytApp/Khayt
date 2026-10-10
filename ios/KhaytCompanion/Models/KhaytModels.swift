@@ -272,6 +272,12 @@ struct MachineLiveStatus: Codable, Identifiable, Sendable {
     /// "Print finished" alert while `isPrinting` was the only question asked.
     var isPaused: Bool { (state ?? "").lowercased().contains("pause") }
     var hasError: Bool { !(error ?? "").isEmpty }
+    /// No state at all: the Mac's last poll of this printer failed (an
+    /// unreachable printer comes back as `state: null` plus the poll's error).
+    /// That is NOT HEARD, not "stopped printing". Read it as a print ending
+    /// and one missed poll ends a Live Activity as failed, raises a false
+    /// "Print failed" alert, and the next good poll starts it all over again.
+    var isUnheard: Bool { state == nil }
     var isOnline: Bool { hasPrinterApi && (state != nil || hasError) }
 
     /// ETA formatted like the desktop: "2h 14m" / "45m".
