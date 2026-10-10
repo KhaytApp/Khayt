@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Maintainers) The Mac's road to beta is written down.** `mac/BETA.md` lists
+  what has to be true before `4.0.0-beta.1`: crash reports live and read, a
+  week on the shop's real book, the features shipped untried tried for real,
+  and the not-yet-built list settled. The Mac will not serve the desktop's
+  printer webhook, since it polls its printers itself. The one thing that
+  webhook did which the Mac does not, moving a job on when its print starts or
+  ends, is now the README's not-yet-built item.
+
 - **iOS: one Live Activity rule for the phone and the Mac.** The phone's Live
   Activities now decide what to start, update and end with KhaytCore's
   `LiveActivityPlan`, the rule the Mac's pushes use. The Lock Screen can't

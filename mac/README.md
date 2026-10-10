@@ -1101,11 +1101,10 @@ failed.
 
 ## Not yet built
 
-The LAN server's printer
-webhook — every other LAN route a phone or a customer uses is here, and the
-printer webhook matters least, because this app polls its printers itself.
-`KhaytCore` came first because the alternative, screens against a half-trusted
-engine, is how the two apps come to disagree about a shop's money.
+Moving a job on by itself when its print starts, finishes or is cancelled —
+what the desktop's printer webhook does. The Mac will not serve that webhook
+(decided October 2026), because it polls its printers itself; the move belongs
+at the finish seam in `Shop.printFinished`, from its own polling, opt-in.
 
 THE PARAGRAPH ABOVE IS THE LIST, and `NotYetBuiltTests` reads exactly it — the
 first paragraph of this section and nothing after it. That is the guard, and it
@@ -1113,6 +1112,8 @@ exists because this list had been wrong for months: it named gift cards, the
 portfolio, the colour studio and the converter long after all four shipped, and
 this is the section a person reads to decide what to build next. A list of work
 that is already done is worse than no list, because it is believed.
+
+What has to be true before the first beta is in [BETA.md](./BETA.md).
 
 **Analytics is no longer on the list.** Every chart and table
 `renderer/analytics.js` draws has a counterpart on the Mac, most of them lifted
