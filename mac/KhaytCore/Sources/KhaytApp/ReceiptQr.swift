@@ -37,7 +37,9 @@ enum ReceiptQr {
                 if let cg = picture.cgImage(forProposedRect: nil, context: nil, hints: nil) { images.append(cg) }
             }
         } else if let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                  let cg = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+                  // Upright, and never decoded absurdly large: a phone photo of
+                  // a receipt carries its turn as a tag (ProductPhotos.upright).
+                  let cg = ProductPhotos.upright(source) {
             images.append(cg)
         }
         var seen = Set<String>()
