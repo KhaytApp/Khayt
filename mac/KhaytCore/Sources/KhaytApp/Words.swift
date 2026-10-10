@@ -520,7 +520,7 @@ final class Words {
         "mac.sup_vat_invalid": ["en": "A Saudi VAT number is 15 digits, starting and ending with 3.",
                                 "ar": "الرقم الضريبي السعودي 15 رقمًا، يبدأ بالرقم 3 وينتهي به."],
         // Live Activities: this Mac's own opt-in (LiveActivityPush.optInKey).
-        "mac.la_section":    ["en": "iPhone", "ar": "iPhone"],
+        "mac.la_section":    ["en": "iPhone", "ar": "الآيفون"],
         "mac.la_toggle":     ["en": "Send print progress to my iPhone (Live Activities)",
                               "ar": "إرسال تقدّم الطباعة إلى iPhone (الأنشطة المباشرة)"],
         "mac.la_hint":       ["en": "Off unless you turn it on, and set on each Mac. When on, this Mac sends your printers' progress and job names through Khayt Cloud and Apple to your iPhone's Lock Screen.",

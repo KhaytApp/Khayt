@@ -220,7 +220,7 @@ struct SupplierSheet: View {
                 // either language.
                 GridRow {
                     Text(shop.words.callIt("mac.sup_vat")).foregroundStyle(.secondary)
-                    TextField("3XXXXXXXXXXXXX3", text: $draft.vat)
+                    TextField("300000000000003", text: $draft.vat)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.body, design: .monospaced))
                         .environment(\.layoutDirection, .leftToRight)
