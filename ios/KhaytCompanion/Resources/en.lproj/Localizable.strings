@@ -648,3 +648,12 @@
 "wa.photo.remove" = "Remove photo";
 "wa.share_photo" = "Share with photo…";
 "wa.share_photo.note" = "Pick WhatsApp in the share sheet, then the customer's chat. It is written to the customer's log once it goes to WhatsApp.";
+/* Focus filter (ShopFocusFilter) */
+"Khayt notifications" = "Khayt notifications";
+"Print finished or failed" = "Print finished or failed";
+"New order requests" = "New order requests";
+"Queue, late jobs, low filament" = "Queue, late jobs, low filament";
+"focus.none" = "No shop notifications";
+"focus.kind.print" = "Prints";
+"focus.kind.intake" = "Order requests";
+"focus.kind.shop" = "Shop";

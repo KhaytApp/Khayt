@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: choose which shop notifications reach you in each Focus.** Settings
+  › Focus › any Focus › Add Filter › Khayt: prints finished or failed, new
+  order requests, and the rest of the shop's news (queue, late jobs, low
+  filament) are each on or off. Apple's own filtering does the holding back —
+  every Khayt notification, local or pushed, now says which kind it is.
+
 - **iOS: send the customer a photo of the finished part.** The WhatsApp
   update can carry a photo — taken there or chosen from the library — and goes
   through the share sheet (a `wa.me` link carries text only); pick WhatsApp,

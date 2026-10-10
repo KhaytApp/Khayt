@@ -27,10 +27,14 @@ final class NotificationService: UNNotificationServiceExtension {
                              withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
         deliver = contentHandler
         let original = request.content.mutableCopy() as? UNMutableNotificationContent
+        original?.filterCriteria = NotificationKind.of(request.content.userInfo)
         fallback = original
         Task {
             let rewritten = await Self.rewrite(request.content.userInfo)
-            contentHandler(rewritten ?? original ?? request.content)
+            // Labelled for Focus filters whichever version is shown.
+            let shown = rewritten ?? original
+            shown?.filterCriteria = NotificationKind.of(request.content.userInfo)
+            contentHandler(shown ?? request.content)
             deliver = nil
         }
     }

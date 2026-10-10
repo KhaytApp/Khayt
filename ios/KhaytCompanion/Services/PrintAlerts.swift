@@ -98,6 +98,7 @@ final class PrintAlertCenter: NSObject, UNUserNotificationCenterDelegate {
         c.body = L10n.tr("PUSH_INTAKE")
         c.sound = .default
         c.threadIdentifier = "khayt.intake"
+        c.filterCriteria = NotificationKind.intake
         try? await UNUserNotificationCenter.current()
             .add(UNNotificationRequest(identifier: id, content: c, trigger: nil))
     }
