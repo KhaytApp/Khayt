@@ -3535,6 +3535,8 @@
   "bnpl.copy_link": "نسخ الرابط",
   "bnpl.share_wa": "مشاركة عبر واتساب",
   "bnpl.link_generated": "تم إنشاء رابط الدفع",
+  "bnpl.confirmed": "تم استلام دفعة {service} لـ «{project}» وتسجيلها.",
+  "bnpl.confirm_failed": "{service}: تعذّر إتمام دفعة «{project}»: {error}. سيحاول خيط مجددًا، ويمكنك إتمامها من بوابة {service}.",
   "bnpl.link_copied": "تم نسخ الرابط",
   "bnpl.payment_modal": "روابط الدفع",
   "bnpl.amount_label": "المبلغ",

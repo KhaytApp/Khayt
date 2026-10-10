@@ -353,6 +353,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   // BNPL Payment Links
   bnplTabby:  (opts) => ipcRenderer.invoke('hub:bnpl-tabby',  opts),
   bnplTamara: (opts) => ipcRenderer.invoke('hub:bnpl-tamara', opts),
+  bnplCheck:  (opts) => ipcRenderer.invoke('hub:bnpl-check', opts),
   bnplStripe: (opts) => ipcRenderer.invoke('hub:bnpl-stripe', opts),
 
   // Telegram notifications

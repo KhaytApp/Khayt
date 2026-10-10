@@ -514,6 +514,12 @@ async function openBnplModal(orderId) {
       if (btn) { btn.disabled = false; btn.textContent = t('bnpl.generate'); }
       if (!res_el) return;
       if (result?.ok && result.url) {
+        // Remember the link on its job, so the app can finish the payment once the
+        // customer has paid — Tamara's authorise, Tabby's capture (renderer/bnpl-watch.js).
+        if ((svc.id === 'tabby' || svc.id === 'tamara') && typeof KhaytBnplConfirm !== 'undefined') {
+          const link = KhaytBnplConfirm.linkRecord(svc.id, result, { amount, currency: cfg.currency || 'SAR' });
+          if (link) { KhaytBnplConfirm.addLink(order, link); saveAll(); }
+        }
         // Generate QR for the link
         let qrHtml = '';
         try { const svg = await window.hubAPI?.generateQR?.(result.url, { width: 120, margin: 1 }); if (svg) qrHtml = svg; } catch {}
