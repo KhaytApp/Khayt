@@ -680,3 +680,18 @@
 "quote.file.reason.no-numbers" = "The shop's prices aren't set up on the Mac yet.";
 "quote.file.reason.no-price" = "The Mac couldn't price this file.";
 "quote.file.reason.busy" = "The Mac is busy. Try again in a moment.";
+/* Order photos on the customer's tracking page (khayt-cloud #111) */
+"photos.title" = "Photos on the customer’s page";
+"photos.none" = "No photos yet. Add the finished part and the customer sees it on their tracking page.";
+"photos.note" = "Anyone with the order’s link can see these photos. Location data is removed before they are kept.";
+"photos.needs_cloud" = "Sign in to Khayt Cloud in Settings to add photos to this order’s tracking page.";
+"photos.one" = "Order photo";
+"photos.remove" = "Remove photo";
+"photos.remove.title" = "Remove this photo?";
+"photos.remove.message" = "It disappears from the customer’s tracking page.";
+"photos.err.full" = "This order already has %lld photos. Remove one to add another.";
+"photos.err.too_large" = "That photo is too large to send, even made smaller.";
+"photos.err.not_published" = "This order has no tracking page yet. Publish it from the Mac first.";
+"photos.err.viewer" = "Your Khayt Cloud sign-in can view but not change this shop.";
+"photos.err.not_an_image" = "That file isn’t a photo Khayt can use. Choose a JPEG or PNG.";
+"photos.err.http" = "Khayt Cloud didn’t take the photo (error %lld). Try again.";

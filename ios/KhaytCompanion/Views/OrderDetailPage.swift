@@ -24,6 +24,7 @@ struct OrderDetailPage: View {
     @State private var recordingPayment = false
     @State private var whatsApp: KhaytAPIClient.WhatsAppOffer?
     @State private var writingWhatsApp = false
+    @State private var photoAccess: KhaytAPIClient.PhotoAccess?
 
     init(order: QueueOrder, facts: OrderFacts?, onChanged: @escaping () async -> Void) {
         _order = State(initialValue: order)
@@ -46,6 +47,11 @@ struct OrderDetailPage: View {
             }
             if let whatsApp {
                 WhatsAppCard(offer: whatsApp) { writingWhatsApp = true }
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            }
+            // Only an order the Mac has published has a page to put a photo on.
+            if let photoAccess, photoAccess != .notPublished {
+                OrderPhotosCard(access: photoAccess)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
         }
@@ -82,6 +88,7 @@ struct OrderDetailPage: View {
             machines = (try? await api.fetchMachines()) ?? []
             await loadPayment()
             whatsApp = await api.whatsAppOffer(orderId: order.id)
+            photoAccess = api.photoAccess(orderId: order.id)
             #if DEBUG
             // `-KhaytWASheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
             if whatsApp != nil, UserDefaults.standard.bool(forKey: "KhaytWASheet") { writingWhatsApp = true }

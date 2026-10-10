@@ -680,3 +680,18 @@
 "quote.file.reason.no-numbers" = "أسعار الورشة غير مُعدّة على الماك بعد.";
 "quote.file.reason.no-price" = "لم يستطع الماك تسعير هذا الملف.";
 "quote.file.reason.busy" = "الماك مشغول. حاول بعد قليل.";
+/* Order photos on the customer's tracking page (khayt-cloud #111) */
+"photos.title" = "صور في صفحة العميل";
+"photos.none" = "لا صور بعد. أضف صورة القطعة الجاهزة ليراها العميل في صفحة تتبّع طلبه.";
+"photos.note" = "يرى هذه الصور كل من لديه رابط الطلب. تُحذف بيانات الموقع قبل حفظها.";
+"photos.needs_cloud" = "سجّل الدخول إلى Khayt Cloud من الإعدادات لإضافة صور إلى صفحة تتبّع هذا الطلب.";
+"photos.one" = "صورة الطلب";
+"photos.remove" = "إزالة الصورة";
+"photos.remove.title" = "إزالة هذه الصورة؟";
+"photos.remove.message" = "ستختفي من صفحة تتبّع العميل.";
+"photos.err.full" = "لهذا الطلب %lld صور بالفعل. أزل واحدة لإضافة أخرى.";
+"photos.err.too_large" = "الصورة أكبر من أن تُرسل حتى بعد تصغيرها.";
+"photos.err.not_published" = "ليس لهذا الطلب صفحة تتبّع بعد. انشره من الماك أولاً.";
+"photos.err.viewer" = "تسجيل دخولك إلى Khayt Cloud يسمح بالعرض فقط دون التعديل.";
+"photos.err.not_an_image" = "هذا الملف ليس صورة يستطيع خيط استخدامها. اختر JPEG أو PNG.";
+"photos.err.http" = "لم يقبل Khayt Cloud الصورة (خطأ %lld). حاول مرة أخرى.";
