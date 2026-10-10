@@ -6601,6 +6601,43 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.64] - 2026-10-10
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Crash reports if you agree to them, an AI assistant that can answer questions
+about your shop, and exports for Wafeq and Daftra.
+
+### New
+
+- **Crash reports and usage counts, only if you say yes.** A small card asks
+  once. Both are off until you turn them on in Settings ▸ Preferences, where
+  "View what's collected" shows exactly what is waiting to go. Emails, phone
+  numbers, long numbers and file paths are taken out, and your orders,
+  customers, prices and files are never sent. Turning a switch off deletes
+  what was queued, including when you turn it off in the Windows or Linux app.
+- **Ask an AI assistant about your shop.** `khayt-mcp`, the Mac's connection
+  for assistants such as Claude Desktop, can now answer questions about open
+  and late orders, who owes what, stock running low, profit and loss for a
+  quarter or month, and the price of a quote. It reads the shop's records and
+  never changes them. Customer names are **hidden by default**: the assistant
+  sees "Customer 1", "Customer 2", and Settings ▸ Assistant can share names.
+  Phone numbers, emails and addresses are never shared, including ones typed
+  into a title.
+- **Export for the Accountant: Wafeq and Daftra.** Wafeq gets invoices before
+  VAT and expenses, and Daftra gets sales as income entries, so an invoice
+  Khayt has already issued is not issued twice. Qoyod is not offered: its
+  import columns are not published.
+
+### Changed and fixed
+
+- **Accountant exports are safe to open in Excel.** A name or note starting
+  with `=`, `+`, `-` or `@` could run as a formula. It is now written as text.
+  Amounts are unchanged; a refund still reads -12.00.
+- The Mac's Xero and Zoho exports now use the sales account and tax name saved
+  in the accounting settings, as the Windows and Linux app's do.
+
 ## [4.0.0-alpha.63] - 2026-10-10
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
