@@ -34,6 +34,9 @@ struct DashboardView: View {
     @State private var showWaste = false
     @State private var showExpense = false
     @State private var showIntake = false
+    @State private var scanningLabel = false
+    @State private var scannedSpool: InventorySpool?
+    @State private var labelProblem: String?
     @State private var showSettings = false
     /// Settings is a sidebar-only tab (see `MainTabView`). Where there is no
     /// sidebar — compact width: an iPhone, iPhone Duo's outer display — it
@@ -78,6 +81,13 @@ struct DashboardView: View {
             .sheet(isPresented: $showWaste) { LogWasteSheet() }
             .sheet(isPresented: $showExpense) { ExpenseSheet() }
             .sheet(isPresented: $showIntake) { IntakeView() }
+            .sheet(isPresented: $scanningLabel) {
+                LabelScanner { code in Task { await follow(code) } }
+            }
+            .navigationDestination(item: $scannedSpool) { SpoolDetailPage(spool: $0) { await load() } }
+            .alert(labelProblem ?? "", isPresented: Binding(get: { labelProblem != nil }, set: { if !$0 { labelProblem = nil } })) {
+                Button(L10n.tr("common.close"), role: .cancel) {}
+            }
             .navigationDestination(item: $openOrder) { order in
                 OrderDetailPage(order: order, facts: facts[order.id]) { await load() }
             }
@@ -173,6 +183,7 @@ struct DashboardView: View {
                 Button { showWaste = true } label: { Label(L10n.tr("home.action.waste"), systemImage: "trash") }
                 Button { showExpense = true } label: { Label(L10n.tr("home.action.expense"), systemImage: "doc.text.viewfinder") }
                 Button { showAddSpool = true } label: { Label(L10n.tr("home.action.add_spool"), systemImage: "cylinder") }
+                Button { scanningLabel = true } label: { Label(L10n.tr("scan.label.title"), systemImage: "qrcode.viewfinder") }
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .medium))
@@ -453,6 +464,15 @@ struct DashboardView: View {
         }
         if let id = KhaytCompanionApp.ScreenshotOpen.take("order:") { openOrder = queue.first { $0.id == id } }
         #endif
+    }
+
+    /// A scanned label: open the job or the spool it names, or say why not.
+    private func follow(_ code: String) async {
+        switch await api.followLabel(code) {
+        case .order(let o): openOrder = o
+        case .spool(let s): scannedSpool = s
+        case .refused(let why): labelProblem = why
+        }
     }
 
     private func advance(_ order: QueueOrder) async {

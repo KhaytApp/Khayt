@@ -812,6 +812,46 @@ final class KhaytAPIClient: ObservableObject {
         return (v?.ok ?? false, v?.reason)
     }
 
+    /// What a scanned Khayt label names, found in this phone's book.
+    enum LabelTarget {
+        case order(QueueOrder)
+        case spool(InventorySpool)
+        /// Not a Khayt label, or one whose record this phone does not hold.
+        case refused(String)
+    }
+
+    /// Follow a scanned label to its record. The MEANING of the code is
+    /// `lib/scan.js` (`KhaytEngine.scanCode`) — the module that reads what
+    /// `lib/labels.js` writes — so the phone reads labels from either desktop.
+    /// A tracking link is matched by its token, which is what the parcel
+    /// carries: the link names an order without exposing its id.
+    func followLabel(_ text: String) async -> LabelTarget {
+        guard let reader, let engine = try? await reader.sharedEngine(),
+              let read = try? await engine.scanCode(text) else { return .refused(L10n.tr("scan.label.unknown")) }
+        switch read.type {
+        case "spool":
+            let spools = (try? await fetchInventory()) ?? []
+            if let id = read.id, let s = spools.first(where: { $0.id == id }) { return .spool(s) }
+        case "order", "track":
+            var id = read.id
+            if read.type == "track", let token = read.token, let book, case .array(let rows)? = try? book.read()["printLog"] {
+                id = rows.compactMap { row -> String? in
+                    guard case .object(let o) = row, o["trackingToken"] == .string(token),
+                          case .string(let oid)? = o["id"] else { return nil }
+                    return oid
+                }.first
+            }
+            guard let id else { break }
+            if let open = ((try? await fetchQueue()) ?? []).first(where: { $0.id == id }) { return .order(open) }
+            if let done = ((try? await fetchRecentOrders(limit: 500)) ?? []).first(where: { $0.id == id }) {
+                return .order(QueueOrder(entry: done))
+            }
+        default:
+            return .refused(L10n.tr("scan.label.unknown"))
+        }
+        return .refused(L10n.tr("scan.label.missing"))
+    }
+
     func updateOrderStatus(orderId: String, status: String) async throws {
         if try await writeLocally({ try $0.setOrderStatus(orderId: orderId, to: status) }) { return }
         let encodedId = try encodeOrderIdForPath(orderId)

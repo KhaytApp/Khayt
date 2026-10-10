@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: scan a Khayt label.** Home's + menu → "Scan a label" reads the QR
+  either desktop prints on a job's bag or a spool (`KHAYT-ORDER:`,
+  `KHAYT-SPOOL:`, or the job's tracking link) and opens that job or spool —
+  read by the shared `lib/scan.js`, so the reader and the label printer cannot
+  disagree. A code that is not Khayt's, or names a record this phone does not
+  hold, says so.
+
 - **iOS: Control Center and Lock Screen buttons.** "Log a failed print" and
   "Scan a spool" can be added to Control Center, the Lock Screen or the Action
   button; each opens Khayt on that sheet. The request now travels through the
