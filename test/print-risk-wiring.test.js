@@ -38,7 +38,14 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+// `Shop` is one Swift class written across `Shop.swift` and its
+// `Shop+<Area>.swift` extensions, so reading Shop.swift means reading them all.
+const SHOP_DIR = 'mac/KhaytCore/Sources/KhaytApp';
+const read = (p) => p !== `${SHOP_DIR}/Shop.swift`
+  ? fs.readFileSync(path.join(ROOT, p), 'utf8')
+  : ['Shop.swift', ...fs.readdirSync(path.join(ROOT, SHOP_DIR))
+    .filter((n) => n.startsWith('Shop+') && n.endsWith('.swift')).sort()]
+    .map((n) => fs.readFileSync(path.join(ROOT, SHOP_DIR, n), 'utf8')).join('\n');
 
 const IMPORT = 'mac/KhaytCore/Sources/KhaytApp/LibraryImport.swift';
 const SHOP = 'mac/KhaytCore/Sources/KhaytApp/Shop.swift';
