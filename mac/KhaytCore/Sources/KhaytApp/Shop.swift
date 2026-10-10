@@ -14512,6 +14512,13 @@ final class Shop {
     struct SiteIds { var orders = Set<String>(), machines = Set<String>(), spools = Set<String>() }
     var siteIds = SiteIds()
 
+    /// What this run has told the phones' Live Activities, per machine — see
+    /// `LiveActivityPush`. Not observed: no screen draws it.
+    @ObservationIgnored let liveActivities = LiveActivityPush.Memory()
+    /// How a Live Activity post reaches the cloud. A seam for tests, which
+    /// must never reach a real server.
+    @ObservationIgnored var liveActivityFetch: (URLRequest) async throws -> URLResponse = LiveActivityPush.liveFetch
+
     func count(_ stage: Stage) -> Int { orders.count { Stage.of($0) == stage && inSite($0) } }
 
     // MARK: - What the library shows

@@ -31,6 +31,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   fractional percent (rounded) instead of failing the pushed update, and
   the `LA_PRINT_STARTED` alert ships in English and Arabic.
 
+- **(Mac) The iPhone's print Live Activities keep moving with the phone
+  closed.** When a shop is connected to Khayt Cloud, the Mac now tells the
+  cloud when a print starts, moves on (a whole percent, a pause, a new finish
+  time) and ends, and the cloud pushes it to the phones. The Mac decides by the
+  phone's own rule, now shared: a printer that stops answering has not
+  finished; only one seen printing and then seen idle has. Nothing is sent for
+  a shop not on Khayt Cloud or with a view-only connection. These pushes are
+  readable by Khayt Cloud and Apple, as the privacy page says.
+
 - **(Mac) For the iPhone app.** The phone can quote a file a customer sent it:
   the shop's owner PIN now opens the model estimate on the Mac's shop network
   server, as it opens the phone's other routes. (Not the intake form: that
