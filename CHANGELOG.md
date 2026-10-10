@@ -6476,6 +6476,42 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.63] - 2026-10-10
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Add an expense from a supplier's receipt, and print progress on the iPhone's
+Lock Screen with the phone closed.
+
+### New
+
+- **Add an expense from a supplier's receipt.** Expenses ▸ *Add from
+  receipt…* (also in the File menu) reads the ZATCA QR on a Saudi tax invoice,
+  from a photo, a screenshot, a scanned PDF or the code's text pasted. It opens
+  the expense form filled in with the total, the VAT (only when the shop is
+  VAT-registered), the invoice's day and the seller. Nothing is saved until you
+  choose a category and press Add. A receipt already in your expenses is
+  flagged, and a seller whose VAT number matches a supplier is named as that
+  supplier. A seller who is not one yet can be added with **Add as supplier**.
+- **Suppliers have a VAT number field** (optional; 15 digits, a 3 at each end).
+- **Print progress on the iPhone with the phone closed.** Off until you turn it
+  on, on each Mac: Settings ▸ Integrations ▸ *Send print progress to my iPhone
+  (Live Activities)*. When on and the shop is on Khayt Cloud, the Mac tells the
+  cloud when a print starts, moves on and ends, and the cloud pushes it to the
+  phones' Lock Screens. When no phone is listening, the Mac stops sending.
+- **For the iPhone app:** the owner PIN opens the model estimate, so the phone
+  can quote a file a customer sent it, and the shop's WhatsApp templates reach
+  the phone.
+
+### Changed and fixed
+
+- A printer poll that failed is no longer read as a finished print, the same
+  rule as the phone's.
+- The shop network server answers a locked-out owner PIN with "too many
+  attempts", and a model over 1 MB is checked against the PIN before it is
+  read.
+
 ## [4.0.0-alpha.62] - 2026-10-10
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
