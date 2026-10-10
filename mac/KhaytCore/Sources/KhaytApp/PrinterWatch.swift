@@ -508,6 +508,10 @@ final class PrinterWatch {
             // ready on it. Only then: a recount on every poll would be every
             // few seconds for nothing.
             if (status.loaded ?? []) != loadedBefore { shop.loadedChanged() }
+            // The phones' Live Activities, which only a push can move while
+            // the phone is closed. Sends nothing for a shop not on Khayt Cloud,
+            // and never waits: the post runs on its own.
+            shop.liveActivityHeard(machine, status: status)
             // AFTER the reading is recorded, because a shop looking at the
             // screen should not wait on a store write to see its printer's
             // progress move. This is the only thing that notices a job ending.
