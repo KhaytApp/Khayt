@@ -435,6 +435,45 @@ import KhaytCore
         try render(MachineSheet(shop: shop, existing: shop.machines.first),
                    "29-machine-words", size: CGSize(width: MachineSheet.width, height: 560))
     }
+    /// Adding an expense from a receipt's QR: the reader with three codes read
+    /// (one matched to a supplier, one already filed, one not a tax invoice),
+    /// and the expense sheet it fills in.
+    @Test("the receipt reader and the filled-in expense sheet render")
+    func receiptSheets() async throws {
+        guard Self.outputDir != nil else { return }
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        func qr(_ seller: String, _ total: String, _ vat: String, _ vatNo: String = "310122393500003") async throws -> String {
+            try await engine.zatcaPayload(sellerName: seller, vatNumber: vatNo, timestamp: "2026-10-09T14:30:00Z",
+                                          total: total, vatAmount: vat)
+        }
+        let matched = try await qr("مؤسسة طويق لخيوط الطباعة", "1150.00", "150.00")
+        let filedQr = try await qr("Riyadh Hardware", "92.00", "12.00", "300000000000003")
+        let first = try #require(try await engine.receiptDraft(matched, suppliers: shop.supplierRows,
+                                                              expenses: shop.expenseRows, reclaimsTax: true))
+        let ref = try #require(try await engine.receiptDraft(filedQr, suppliers: [], expenses: [], reclaimsTax: true))
+        let dup = try #require(try await engine.receiptDraft(
+            filedQr, suppliers: [],
+            expenses: [.object(["id": .string("E1"), "receiptRef": .string(ref.draft.receiptRef)])],
+            reclaimsTax: true))
+        let found: [ReceiptReaderSheet.Found] = [
+            .init(text: matched, draft: first, reason: nil),
+            .init(text: filedQr, draft: dup, reason: nil),
+            .init(text: "https://pay.example/1", draft: nil, reason: "not_base64"),
+        ]
+        let size = CGSize(width: 460, height: 560)
+        try render(ReceiptReaderSheet(shop: shop), "receipt-reader-empty", size: CGSize(width: 460, height: 260))
+        try render(ReceiptReaderSheet(shop: shop, found: found), "receipt-reader-found", size: size)
+        try renderDark(ReceiptReaderSheet(shop: shop, found: found), "receipt-reader-found-dark", size: size)
+        shop.receiptPrefill = first
+        try render(ExpenseSheet(shop: shop), "receipt-expense-prefilled",
+                   size: CGSize(width: ExpenseSheet.width, height: 440))
+        shop.receiptPrefill = first
+        try renderDark(ExpenseSheet(shop: shop), "receipt-expense-prefilled-dark",
+                       size: CGSize(width: ExpenseSheet.width, height: 440))
+    }
+
     /// The supplier sheets, which no picture has ever been taken of.
     ///
     /// Three of them, and the last is the one worth looking at: a purchase log

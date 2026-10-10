@@ -23,9 +23,13 @@ struct Expenses: View {
             // that matches nothing still keeps the split: there IS a summary.
             if shop.expenses.isEmpty {
                 EmptyHere(title: shop.words.callIt("exp.empty"), mark: .expenses) {
-                    Button(shop.words.callIt("exp.add_title")) { shop.addingExpense = true }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!shop.canMoveJobs)
+                    HStack(spacing: 10) {
+                        Button(shop.words.callIt("exp.add_title")) { shop.addingExpense = true }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!shop.canMoveJobs)
+                        Button(shop.words.callIt("mac.receipt_add") + "\u{2026}") { shop.startReadingReceipt() }
+                            .disabled(!shop.canMoveJobs)
+                    }
                 }
             } else {
                 HSplitView {
@@ -38,7 +42,8 @@ struct Expenses: View {
         .background(Khayt.ground)
         .screenToolbar { SpendToolbar(shop: shop, add: { shop.addingExpense = true },
                                       addLabel: shop.words.callIt("exp.add_title")) }
-        .sheet(isPresented: $shop.addingExpense) { ExpenseSheet(shop: shop) }
+        .sheet(isPresented: $shop.addingExpense, onDismiss: { shop.receiptPrefill = nil }) { ExpenseSheet(shop: shop) }
+        .sheet(isPresented: $shop.readingReceipt) { ReceiptReaderSheet(shop: shop) }
     }
 
     private var table: some View {

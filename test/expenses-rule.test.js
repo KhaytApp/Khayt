@@ -103,7 +103,10 @@ test('the module and the original agree over 4000 generated expense forms', () =
     if (mine.expense) {
       assert.equal(mine.expense.vatAmount, 0,
                    `a form with no tax on it: ${JSON.stringify(form)}`);
-      const { vatAmount, ...rest } = mine.expense;
+      // `receiptRef` is new the same way: a typed form was read off no
+      // receipt, so it carries none (lib/zatca-qr.js `receiptRef`).
+      assert.equal(mine.expense.receiptRef, null, `a typed form: ${JSON.stringify(form)}`);
+      const { vatAmount, receiptRef, ...rest } = mine.expense;
       assert.deepEqual({ ...mine, expense: rest }, theirs, JSON.stringify(form));
     } else {
       assert.deepEqual(mine, theirs, JSON.stringify(form));

@@ -172,6 +172,7 @@ extension Shop {
         askingTheBook = false; checkingCloud = false; confirmingSignOut = false
         findingPrinters = false; importingSpoolman = false; issuingGiftCard = false
         loggingWaste = false; namingGroup = false; pausingProduction = false
+        readingReceipt = false; receiptPrefill = nil
         planningBatch = false; planningCampaign = false; reviewingDeposits = false
         reviewingSyncLosses = false; scanning = false; schedulingWork = false
         sendingFeedback = false; settingUpShop = false; showingOnlineOrders = false
