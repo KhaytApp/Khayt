@@ -66,6 +66,11 @@ Authorization: Bearer khayt_<random>
 - `GET /api/status`
 - `GET /order/:id` (customer portal)
 - Quote approval, intake (separate intake PIN/token), webhooks, static PWA assets
+- **Mac only (Oct 2026):** `POST /api/intake/estimate` and `POST /api/intake`
+  also accept the **owner PIN** (`x-khayt-pin`), so the shop's own phone can
+  quote a file a customer sent it and file it in Intake. Without a PIN they
+  are decided exactly as before (intake session or intake token); a wrong PIN
+  counts towards the owner-PIN lockout. The Node server does not do this yet.
 
 Companion apps should call `GET /api/status` first (reachability), then `GET /api/queue` with PIN to confirm pairing.
 
@@ -162,7 +167,7 @@ so the Mac and the phone cannot disagree about it):
 |---|---|
 | `settings` | always, in full — nothing can be priced without it |
 | `printLog` | every **unfinished** order whatever its age, plus the newest 200 finished |
-| `clients`, `inventory`, `machines`, `waitingList` | in full, up to a ceiling |
+| `clients`, `inventory`, `machines`, `waitingList`, `waTemplates` | in full, up to a ceiling |
 | everything else | stays on the Mac |
 
 An order is finished at `completed`, `shipped`, `delivered` or `cancelled`.

@@ -61,6 +61,11 @@ public enum BookScope {
         ("inventory", .whole(cap: 5_000)),
         ("machines", .whole(cap: 500)),
         ("waitingList", .whole(cap: 1_000)),
+        // The shop's own WhatsApp wording. The phone's job update reads it
+        // when present and falls back to Khayt's default words otherwise — so
+        // without this a shop's templates never reached the phone (iOS
+        // handoff, Oct 2026). Text only; nothing in it is a secret.
+        ("waTemplates", .whole(cap: 200)),
     ]
 
     /// What a pull actually contained.
