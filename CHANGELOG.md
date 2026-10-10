@@ -35,6 +35,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   same from both apps. Qoyod is not on the list: it only accepts the Excel
   template each account downloads, and its columns are not published.
 
+- **(Mac) An assistant can now answer questions about your books, read-only.**
+  `khayt-mcp`, the server that lets Claude Desktop, Cursor or Codex search
+  your model library, has five new questions it can answer. It can list your
+  open orders and which ones are late. It can say who owes you money and how
+  overdue they are. It can show what is running low, with the grams your open
+  jobs have already reserved. It can give your profit and loss for a quarter or
+  a month, with revenue net of VAT as on the Reports screen. And it can draft a
+  quote from grams and hours, which is never saved. Every figure comes from the
+  rules the app's own screens use, so the answers match. It cannot change
+  anything, and it never repeats a password, a PIN, a saved key or a
+  customer's phone, email or address. Khayt does not have to be running.
+  Customer names are not shared unless you choose to: by default the assistant
+  sees "Customer 1", "Customer 2" and so on, the same label for the same
+  customer every time, and a customer's name typed into a job or model title
+  is replaced the same way. To let it see names, turn on "Share customer names
+  with AI assistants (khayt-mcp)" in Settings ▸ Assistant.
+
 - **iOS: one Live Activity rule for the phone and the Mac.** The phone's Live
   Activities now decide what to start, update and end with KhaytCore's
   `LiveActivityPlan`, the rule the Mac's pushes use. The Lock Screen can't

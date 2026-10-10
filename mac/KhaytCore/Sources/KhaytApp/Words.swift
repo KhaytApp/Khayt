@@ -2161,6 +2161,12 @@ final class Words {
         "set.ai_feats": ["en": "What it may do", "ar": "ما يُسمح له بفعله"],
         "mac.ai_forget_key": ["en": "Forget the stored key",
                               "ar": "حذف المفتاح المحفوظ"],
+        // `settings.mcp.shareCustomerNames` — what the books tools in
+        // `khayt-mcp` may say about a customer. Off unless the shop turns it on.
+        "mac.mcp_share_names": ["en": "Share customer names with AI assistants (khayt-mcp)",
+                                "ar": "مشاركة أسماء العملاء مع مساعدي الذكاء الاصطناعي (khayt-mcp)"],
+        "mac.mcp_share_names_hint": ["en": "Off: assistants connected to khayt-mcp see “Customer 1”, “Customer 2” instead of names. On: they see your customers’ names. Phone numbers, emails and addresses are never shared.",
+                                     "ar": "عند الإيقاف: يرى المساعدون المتصلون بـ khayt-mcp ‏«Customer 1» و«Customer 2» بدلًا من الأسماء. عند التشغيل: يرون أسماء عملائك. أرقام الهواتف والبريد الإلكتروني والعناوين لا تُشارَك أبدًا."],
         "mac.ai_key_unsealed": ["en": "That key could not be encrypted, so it was not saved. The book syncs and is backed up, and a key in the clear would go with it.",
                                 "ar": "لم يتمكّن خيط من تشفير المفتاح، فلم يُحفظ. الدفتر يُزامن ويُنسخ احتياطيًا، والمفتاح غير المشفّر سينتقل معه."],
         // ── SETTING EMAIL UP, WHICH THIS APP COULD NOT DO ─────────────────

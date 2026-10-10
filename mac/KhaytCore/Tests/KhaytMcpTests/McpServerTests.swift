@@ -46,19 +46,19 @@ struct McpServerTests {
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
-    static func call(_ tool: String, _ args: [String: Any] = [:]) -> [String: Any]? {
-        payload(shop.answer(to: ["jsonrpc": "2.0", "id": 1, "method": "tools/call",
+    static func call(_ tool: String, _ args: [String: Any] = [:]) async -> [String: Any]? {
+        payload(await shop.answer(to: ["jsonrpc": "2.0", "id": 1, "method": "tools/call",
                                  "params": ["name": tool, "arguments": args]]))
     }
 
     // MARK: - Protocol
 
     @Test("it introduces itself with the version it speaks")
-    func handshake() {
-        let out = Self.shop.answer(to: ["jsonrpc": "2.0", "id": 1, "method": "initialize"])
+    func handshake() async {
+        let out = await Self.shop.answer(to: ["jsonrpc": "2.0", "id": 1, "method": "initialize"])
         let result = out?["result"] as? [String: Any]
         #expect(result?["protocolVersion"] as? String == Server.protocolVersion)
-        #expect((result?["serverInfo"] as? [String: Any])?["name"] as? String == "khayt-library")
+        #expect((result?["serverInfo"] as? [String: Any])?["name"] as? String == "khayt")
         #expect(out?["id"] as? Int == 1)
     }
 
@@ -66,22 +66,22 @@ struct McpServerTests {
     /// protocol error and hosts differ in how loudly they complain, so this is
     /// the kind of bug that works everywhere except the host somebody uses.
     @Test("a notification is not answered")
-    func notificationsAreSilent() {
-        #expect(Self.shop.answer(to: ["jsonrpc": "2.0", "method": "notifications/initialized"])
+    func notificationsAreSilent() async {
+        #expect(await Self.shop.answer(to: ["jsonrpc": "2.0", "method": "notifications/initialized"])
                 == nil)
-        #expect(Self.shop.answer(to: ["jsonrpc": "2.0", "method": "anything/at/all"]) == nil)
+        #expect(await Self.shop.answer(to: ["jsonrpc": "2.0", "method": "anything/at/all"]) == nil)
     }
 
     @Test("every tool it advertises is one it can be asked")
-    func toolsAreReal() {
-        let out = Self.shop.answer(to: ["jsonrpc": "2.0", "id": 2, "method": "tools/list"])
+    func toolsAreReal() async {
+        let out = await Self.shop.answer(to: ["jsonrpc": "2.0", "id": 2, "method": "tools/list"])
         let listed = (out?["result"] as? [String: Any])?["tools"] as? [[String: Any]] ?? []
-        #expect(listed.count == 3)
+        #expect(listed.count == 8)
         for tool in listed {
             let name = tool["name"] as? String ?? ""
             #expect(tool["description"] != nil, "\(name) has no description")
             #expect(tool["inputSchema"] != nil, "\(name) has no schema")
-            let out = Self.shop.answer(to: ["jsonrpc": "2.0", "id": 3, "method": "tools/call",
+            let out = await Self.shop.answer(to: ["jsonrpc": "2.0", "id": 3, "method": "tools/call",
                                             "params": ["name": name,
                                                        "arguments": ["id": "PF-1"]]])
             #expect(out?["error"] == nil, "\(name) is advertised and cannot be called")
@@ -89,10 +89,10 @@ struct McpServerTests {
     }
 
     @Test("an unknown method and an unknown tool are refused, not ignored")
-    func refusals() {
-        let m = Self.shop.answer(to: ["jsonrpc": "2.0", "id": 4, "method": "does/not/exist"])
+    func refusals() async {
+        let m = await Self.shop.answer(to: ["jsonrpc": "2.0", "id": 4, "method": "does/not/exist"])
         #expect((m?["error"] as? [String: Any])?["code"] as? Int == -32601)
-        let t = Self.shop.answer(to: ["jsonrpc": "2.0", "id": 5, "method": "tools/call",
+        let t = await Self.shop.answer(to: ["jsonrpc": "2.0", "id": 5, "method": "tools/call",
                                       "params": ["name": "delete_everything"]])
         #expect((t?["error"] as? [String: Any])?["code"] as? Int == -32602)
     }
@@ -100,10 +100,10 @@ struct McpServerTests {
     // MARK: - The answers
 
     @Test("search narrows on every word, not on any of them")
-    func searchIsAnAnd() {
-        let both = Self.call("search_models", ["query": "flexi dragon"])
+    func searchIsAnAnd() async {
+        let both = await Self.call("search_models", ["query": "flexi dragon"])
         #expect(both?["count"] as? Int == 1)
-        let neither = Self.call("search_models", ["query": "flexi bracket"])
+        let neither = await Self.call("search_models", ["query": "flexi bracket"])
         #expect(neither?["count"] as? Int == 0, """
             two words matched models holding either one — a shop searching two \
             words means both
@@ -111,8 +111,8 @@ struct McpServerTests {
     }
 
     @Test("it can find what the shop has never made")
-    func neverPrinted() {
-        let out = Self.call("search_models", ["never_printed": true])
+    func neverPrinted() async {
+        let out = await Self.call("search_models", ["never_printed": true])
         let titles = (out?["models"] as? [[String: Any]])?.compactMap { $0["title"] as? String }
         #expect(titles?.sorted() == ["Slide Shoes", "Turbine bracket"])
     }
@@ -121,10 +121,10 @@ struct McpServerTests {
     /// answer. Unknown is not a no, and a shop asking "what may I sell" must
     /// not be handed models on the strength of silence.
     @Test("a model with no licence is neither sellable nor unsellable")
-    func silenceIsNotAnAnswer() {
-        let yes = (Self.call("search_models", ["sellable": true])?["models"] as? [[String: Any]])?
+    func silenceIsNotAnAnswer() async {
+        let yes = (await Self.call("search_models", ["sellable": true])?["models"] as? [[String: Any]])?
             .compactMap { $0["title"] as? String } ?? []
-        let no = (Self.call("search_models", ["sellable": false])?["models"] as? [[String: Any]])?
+        let no = (await Self.call("search_models", ["sellable": false])?["models"] as? [[String: Any]])?
             .compactMap { $0["title"] as? String } ?? []
         #expect(yes == ["Flexi Dragon"])
         #expect(no == ["Slide Shoes"])
@@ -135,8 +135,8 @@ struct McpServerTests {
     }
 
     @Test("the summary counts what a shop can act on")
-    func summaryIsUseful() {
-        let out = Self.call("library_summary")
+    func summaryIsUseful() async {
+        let out = await Self.call("library_summary")
         #expect(out?["models"] as? Int == 4)
         #expect(out?["never_printed"] as? Int == 2)
         #expect(out?["no_licence_recorded"] as? Int == 2)
@@ -148,17 +148,17 @@ struct McpServerTests {
     }
 
     @Test("asking for a model that is not there says so rather than inventing one")
-    func missingModel() {
-        let out = Self.call("get_model", ["id": "PF-nope"])
+    func missingModel() async {
+        let out = await Self.call("get_model", ["id": "PF-nope"])
         #expect(out?["error"] != nil)
-        #expect(Self.call("get_model", ["id": "PF-3"])?["title"] as? String == "Falcon hood")
+        #expect(await Self.call("get_model", ["id": "PF-3"])?["title"] as? String == "Falcon hood")
     }
 
     /// A limit that is absurd must not be honoured. A host that asks for two
     /// million models should get a page, not the process's memory.
     @Test("the page size is bounded at both ends")
-    func limitsAreSane() {
-        #expect((Self.call("search_models", ["limit": 0])?["models"] as? [Any])?.count == 1)
-        #expect((Self.call("search_models", ["limit": 9_999_999])?["models"] as? [Any])?.count == 4)
+    func limitsAreSane() async {
+        #expect((await Self.call("search_models", ["limit": 0])?["models"] as? [Any])?.count == 1)
+        #expect((await Self.call("search_models", ["limit": 9_999_999])?["models"] as? [Any])?.count == 4)
     }
 }

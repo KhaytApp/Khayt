@@ -1679,12 +1679,13 @@ per-process: two processes on one `khayt-store.json` race exactly the way two
 shop-floor tablets did before #898. Either the Mac app replaces Electron on that
 machine, or the second one opens read-only behind a lock.
 
-## Asking an assistant about the library
+## Asking an assistant about the library and the books
 
-`khayt-mcp` is a Model Context Protocol server over the shop's model library.
-Claude Desktop, Cursor and Codex launch a command and speak JSON-RPC down a
-pipe, so it is a small executable beside the Quick Look extensions rather than
-anything in the app — **Khayt does not have to be running**.
+`khayt-mcp` is a Model Context Protocol server over the shop's model library
+and, read-only, its books. Claude Desktop, Cursor and Codex launch a command
+and speak JSON-RPC down a pipe, so it is a small executable beside the Quick
+Look extensions rather than anything in the app — **Khayt does not have to be
+running**.
 
 ```bash
 swift build --package-path mac/KhaytCore --product khayt-mcp
@@ -1697,22 +1698,62 @@ Then point the host at the binary. For Claude Desktop, in
 { "mcpServers": { "khayt": { "command": "/full/path/to/khayt-mcp" } } }
 ```
 
-Three tools: `search_models`, `get_model`, `library_summary`.
+The books tools run the shop's rules from `KhaytCore_KhaytCore.bundle`, which
+`swift build` writes next to the binary. Point the host at the binary where
+it was built, or copy the bundle along with it.
 
-**What it can see is the point.** The library, and nothing else — not a
-customer, not a price, not an invoice, not a payment, not the shop's contact
-details. Khayt keeps all of that in the same file, so a server that reads the
-file could just as easily answer "what is Nouf's phone number". What it can
-answer is decided in `Library` by never lifting anything else out of the book,
-and the protocol layer takes no path and no query language, so there is nothing
-to point somewhere new. It opens the book **read-only** and never writes it, so
-it does not care whether Khayt is running and holding the lock.
+Eight tools:
+
+| Tool | What it answers |
+|---|---|
+| `search_models`, `get_model`, `library_summary` | the model library |
+| `open_orders` | jobs not finished and not voided: status, customer (a label unless names are shared, below), due date, days late, price, due and owed in the job's currency. Late first. `include_quotes`, `late_only` |
+| `receivables` | who owes what, aged as Reports ages it (0-30 … 90+), with days past the due date where one was set. `overdue_only` |
+| `stock_runway` | filament and consumables that are low, will run out within `within_days` (default 14), or are promised beyond the shelf; grams reserved by open jobs; whether a purchase order is still needed |
+| `profit_and_loss` | the Reports P&L by quarter or month (`period: "2026-Q3"` or `"2026-09"`), revenue **net of VAT** |
+| `quote_draft` | cost and price for grams × hours on a spool, machine or preset, with the shop's margin and tax. **Never saved** |
+
+**Every figure is a shared rule's.** The books tools ask `KhaytEngine` the
+same `lib/` rules the screens use, with the same inputs: `receivables.js`,
+`pnl-report.js`, `reorder.js` and `consumable-reorder.js`, `order-money.js`,
+`attention.js`, `calculator-cost.js` with `pricing.js`, and `tax.js`.
+`McpBooksTests` checks each tool against the rule's own answer on the sample
+book. Swift only picks fields, sorts and caps. Every list takes a `limit`
+(default 25, at most 100) and says `truncated` when it was cut.
+
+**What it can see is decided, not incidental.** The library tools lift only
+the library (`Library`). The books tools lift money and, only if the shop says
+so, a customer's *name* — never a phone, an email or an address — and the book is passed through
+`KhaytCloudOutbox.forPhone` before any tool reads it, so every credential,
+every sealed `__enc__` value and the staff PIN hashes are masked first. The
+protocol layer takes no path and no query language, so there is nothing to
+point somewhere new. It opens the book **read-only**: nothing in the target
+writes, not even a temporary file beside the store, so it does not care
+whether Khayt is running and holding the lock. The books are re-read on every
+question, so an answer is about the book as it is now.
+
+**Customer names are off by default.** An assistant may be a cloud service,
+so a name it reads leaves the Mac. Unless `settings.mcp.shareCustomerNames` is
+`true` — the switch "Share customer names with AI assistants (khayt-mcp)" in
+Settings ▸ Assistant — every tool says `Customer 3` instead: the client's
+place in the book's `clients` list, counted from one, never anything read off
+the name. It is the same label for the same customer in every tool and every
+call, so "the same customer owes on two orders" can still be said. A job typed
+with a name and no client record gets a number after the last client's. A
+whole customer name typed into a job's project, a model's title, folder,
+category, tag or designer, or a stock label is replaced by the label too, and
+the library is searched after that, so searching for a name finds nothing.
+The setting is read on every question, so the switch holds from the next one.
+Supplier and operator names are not in any tool's answer. `CustomerNames` is
+the rule; `McpCustomerNamesTests` checks every client name in the sample book,
+in both languages, against everything every tool says.
 
 Drive it by hand to check it:
 
 ```bash
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"library_summary"}}' \
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"receivables","arguments":{"overdue_only":true,"limit":5}}}' \
   | ./khayt-mcp
 ```
 
