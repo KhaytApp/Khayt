@@ -985,8 +985,11 @@ final class LanServer {
         let engine = host.engine
         let now = host.now()
         let limits = try? await engine.lanIntakeLimits()
-        let owner = await ownerPinGranted(request)
-        guard owner || hasSession(request, now: now, sessionMs: limits?.SESSION_MS ?? 14_400_000) || hasIntakeToken(request) else {
+        // NOT the owner PIN, unlike the estimate: a submission records the
+        // CUSTOMER's own consent (PDPL) to the notice they were shown, and a
+        // shop filing from its phone cannot truthfully give it for them. The
+        // phone quotes through the estimate and its own order path instead.
+        guard hasSession(request, now: now, sessionMs: limits?.SESSION_MS ?? 14_400_000) || hasIntakeToken(request) else {
             return .open(401, #"{"error":"Unauthorized"}"#)
         }
         let allowed = await rateStep(\.submits, request, now: now, limit: Int(limits?.SUBMIT_LIMIT ?? 20))
@@ -1824,7 +1827,7 @@ final class LanServer {
     /// cookie back over it — the flag would only break the session.
     /// The shop's own phone, quoting a file a customer sent it: the owner PIN
     /// — the gate every other phone route uses — also opens the intake
-    /// estimate and the intake form. The phone holds no intake session and
+    /// ESTIMATE (never the intake form: see `intakeSubmit`). The phone holds no intake session and
     /// its copy of the intake token is masked (iOS handoff, Oct 2026). Only
     /// tried when a PIN is SENT, so a customer's session or token is decided
     /// exactly as before; a wrong one counts towards the PIN lockout like any

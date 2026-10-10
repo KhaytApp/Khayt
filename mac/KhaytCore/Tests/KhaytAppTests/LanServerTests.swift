@@ -1198,7 +1198,7 @@ struct LanServerTests {
         return book
     }
 
-    @Test("the shop's own phone quotes a file with the owner PIN, and nothing else opens it")
+    @Test("the shop's own phone estimates a file with the owner PIN; the consent form stays the customer's")
     func ownerPinQuotes() async throws {
         let bench = try await Bench()
         defer { bench.stop() }
@@ -1213,13 +1213,11 @@ struct LanServerTests {
         let owner = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
                                          headers: ["x-khayt-pin": "24682468"])
         #expect(owner.status == 200, Comment(rawValue: owner.text))
-        // And the form's submit, which a wrong PIN still cannot reach.
-        let submitWrong = try await bench.post("/api/intake", json: #"{"name":"A"}"#,
-                                               headers: ["x-khayt-pin": "11111111"])
-        #expect(submitWrong.status == 401 || submitWrong.status == 429, Comment(rawValue: submitWrong.text))
+        // The form's submit is NOT opened by the PIN: it records the
+        // customer's own consent, which the shop cannot give for them.
         let submitOwner = try await bench.post("/api/intake", json: #"{"name":"A"}"#,
                                                headers: ["x-khayt-pin": "24682468"])
-        #expect(submitOwner.status != 401, Comment(rawValue: submitOwner.text))
+        #expect(submitOwner.status == 401, Comment(rawValue: submitOwner.text))
     }
 
     @Test("a measured model comes back priced, and the form offers the upload")

@@ -66,11 +66,12 @@ Authorization: Bearer khayt_<random>
 - `GET /api/status`
 - `GET /order/:id` (customer portal)
 - Quote approval, intake (separate intake PIN/token), webhooks, static PWA assets
-- **Mac only (Oct 2026):** `POST /api/intake/estimate` and `POST /api/intake`
-  also accept the **owner PIN** (`x-khayt-pin`), so the shop's own phone can
-  quote a file a customer sent it and file it in Intake. Without a PIN they
-  are decided exactly as before (intake session or intake token); a wrong PIN
-  counts towards the owner-PIN lockout. The Node server does not do this yet.
+- **Mac only (Oct 2026):** `POST /api/intake/estimate` also accepts the
+  **owner PIN** (`x-khayt-pin`), so the shop's own phone can price a file a
+  customer sent it. Without a PIN it is decided exactly as before (intake
+  session or intake token); a wrong PIN counts towards the owner-PIN lockout.
+  `POST /api/intake` does NOT: a submission records the customer's own PDPL
+  consent, which the shop cannot give for them. The Node server does neither.
 
 Companion apps should call `GET /api/status` first (reachability), then `GET /api/queue` with PIN to confirm pairing.
 
