@@ -3529,6 +3529,8 @@
   "bnpl.copy_link": "Link kopieren",
   "bnpl.share_wa": "Über WhatsApp teilen",
   "bnpl.link_generated": "Zahlungslink generiert",
+  "bnpl.confirmed": "{service}-Zahlung für „{project}“ erhalten und erfasst.",
+  "bnpl.confirm_failed": "{service}: Die Zahlung für „{project}“ konnte nicht abgeschlossen werden: {error}. Khayt versucht es erneut; Sie können sie auch im {service}-Portal abschließen.",
   "bnpl.link_copied": "Link kopiert",
   "bnpl.payment_modal": "Zahlungslinks",
   "bnpl.amount_label": "Betrag",

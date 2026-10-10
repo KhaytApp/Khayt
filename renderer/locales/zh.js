@@ -3529,6 +3529,8 @@
   "bnpl.copy_link": "复制链接",
   "bnpl.share_wa": "通过WhatsApp分享",
   "bnpl.link_generated": "支付链接已生成",
+  "bnpl.confirmed": "已收到“{project}”的 {service} 付款并已记录。",
+  "bnpl.confirm_failed": "{service}：无法完成“{project}”的付款：{error}。Khayt 会重试；你也可以在 {service} 后台完成。",
   "bnpl.link_copied": "链接已复制",
   "bnpl.payment_modal": "支付链接",
   "bnpl.amount_label": "金额",

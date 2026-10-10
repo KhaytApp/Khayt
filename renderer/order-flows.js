@@ -3244,6 +3244,10 @@ async function captureFailurePhoto(orderId) {
     reprintSinglePart,
     openPaymentModal,
     clearPayment,
+    // The payment rule and its effects, for a payment recorded outside the dialog
+    // (renderer/bnpl-watch.js: a Tabby/Tamara link the customer paid).
+    PaymentRules,
+    runPaymentEffects,
     renderOeExtraLinesHtml,
     openOrderEditor,
     openBatchPlannerModal,

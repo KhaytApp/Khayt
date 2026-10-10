@@ -3529,6 +3529,8 @@
   "bnpl.copy_link": "Bağlantıyı Kopyala",
   "bnpl.share_wa": "WhatsApp ile Paylaş",
   "bnpl.link_generated": "Ödeme bağlantısı oluşturuldu",
+  "bnpl.confirmed": "“{project}” için {service} ödemesi alındı ve kaydedildi.",
+  "bnpl.confirm_failed": "{service}: “{project}” ödemesi tamamlanamadı: {error}. Khayt yeniden deneyecek; ödemeyi {service} portalından da tamamlayabilirsiniz.",
   "bnpl.link_copied": "Bağlantı kopyalandı",
   "bnpl.payment_modal": "Ödeme Bağlantıları",
   "bnpl.amount_label": "Tutar",

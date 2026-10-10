@@ -4,6 +4,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Tabby and Tamara payments are finished and recorded for you.** A payment
+  link from Khayt stopped at the link: Tamara cancels an order the shop does
+  not authorise within 72 hours of the customer paying, and Tabby does not
+  pay the shop until the payment is captured. Khayt did neither, and
+  Tamara's payment notices went to an address that could not receive them.
+  Now, while Khayt is open, it checks each link every ten minutes. Once the
+  customer has paid, it authorises the Tamara order or captures the Tabby
+  payment, and records the payment on the job as Record Payment does, with
+  the same receipt email and webhooks. If a step fails, Khayt says so and
+  tries again. Links sent before this update are not tracked, so finish
+  those in the Tabby or Tamara portal. Tamara collects at shipment by
+  itself after 21 days; capturing it when you ship is not built yet.
+
 - **iOS: photos on the customer's tracking page.** A published order's page
   now has a Photos card: take or choose a photo of the finished part and it
   appears on the customer's `/p/{token}` page (khayt-cloud #111), up to six,

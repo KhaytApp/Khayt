@@ -3529,6 +3529,8 @@
   "bnpl.copy_link": "リンクをコピー",
   "bnpl.share_wa": "WhatsAppで共有",
   "bnpl.link_generated": "支払いリンクを生成しました",
+  "bnpl.confirmed": "「{project}」の {service} 支払いを受け取り、記録しました。",
+  "bnpl.confirm_failed": "{service}: 「{project}」の支払いを完了できませんでした: {error}。Khayt が再試行します。{service} のポータルで完了することもできます。",
   "bnpl.link_copied": "リンクをコピーしました",
   "bnpl.payment_modal": "支払いリンク",
   "bnpl.amount_label": "金額",
