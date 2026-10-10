@@ -31,6 +31,8 @@ final class KhaytAPIClient: ObservableObject {
 
     /// This phone's own Khayt Cloud sign-in, when it has one — see `CloudSession`.
     @Published private(set) var cloud: CloudSession? = CloudSession.load()
+    /// Set by `PrintActivities`; its tokens are registered again after a sign-in.
+    weak var liveActivityPush: LiveActivityPush?
     /// Which way the book last went home, and when. Said on screen because a
     /// phone that synced through the cloud has reached the Mac only if the Mac
     /// has synced since.
@@ -530,6 +532,7 @@ final class KhaytAPIClient: ObservableObject {
         cloudNeedsSignIn = false
         cloudProblem = nil
         await registerForPush()
+        await liveActivityPush?.sendAll()
         await syncThroughCloud()
     }
 

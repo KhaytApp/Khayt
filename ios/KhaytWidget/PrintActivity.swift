@@ -24,6 +24,30 @@ struct PrintActivityAttributes: ActivityAttributes {
         var progress: Int
         var startedAt: Date?
         var endsAt: Date?
+
+        init(phase: Phase, job: String?, progress: Int, startedAt: Date?, endsAt: Date?) {
+            self.phase = phase; self.job = job; self.progress = progress
+            self.startedAt = startedAt; self.endsAt = endsAt
+        }
+
+        /// A PUSHED state is decoded by the system, with the default strategies,
+        /// from what Khayt Cloud relays. Printers report fractional percents, and
+        /// a `42.5` sent to a synthesised `Int` does not round. It fails the
+        /// whole decode, and the update is dropped without a word. So the
+        /// number is read either way and rounded. This changes the TYPE's own
+        /// decoding, not the decoder's strategy, which is what Apple forbids.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            phase = try c.decode(Phase.self, forKey: .phase)
+            job = try c.decodeIfPresent(String.self, forKey: .job)
+            if let whole = try? c.decode(Int.self, forKey: .progress) {
+                progress = whole
+            } else {
+                progress = Int(try c.decode(Double.self, forKey: .progress).rounded())
+            }
+            startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt)
+            endsAt = try c.decodeIfPresent(Date.self, forKey: .endsAt)
+        }
     }
 
     let machineId: String

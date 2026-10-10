@@ -662,3 +662,6 @@
 "scan.label.hint" = "وجّه الكاميرا إلى ملصق طلب أو بكرة من خيط.";
 "scan.label.unknown" = "هذا الرمز ليس ملصقًا من خيط.";
 "scan.label.missing" = "الطلب أو البكرة في هذا الملصق غير موجودة على هذا الهاتف.";
+
+/* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
+"LA_PRINT_STARTED" = "بدأت %@ الطباعة";

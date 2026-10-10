@@ -66,23 +66,30 @@ enum PrintActivityPlan {
 /// live readings the app already receives.
 ///
 /// Apple lets an app START a Live Activity only while it is in the
-/// foreground, which is also when readings arrive. Updating one while the
-/// app is closed needs ActivityKit pushes from Khayt Cloud; until then the
-/// self-running countdown carries it.
+/// foreground, which is also when readings arrive. While the app is closed,
+/// Khayt Cloud moves them by ActivityKit push (`LiveActivityPush`), when the
+/// phone is signed in to it. Otherwise the self-running countdown carries them.
 @MainActor
 final class PrintActivities {
     private var watching: AnyCancellable?
     private var switchedOff: AnyCancellable?
     private let settings: ConnectionSettings
+    let push: LiveActivityPush
 
-    init(printers: LivePrinters, settings: ConnectionSettings) {
+    init(printers: LivePrinters, settings: ConnectionSettings, api: KhaytAPIClient) {
         self.settings = settings
+        push = LiveActivityPush(api: api, enabled: { [weak settings] in settings?.liveActivities ?? false })
+        api.liveActivityPush = push
+        push.begin()
         watching = printers.$byMachine.dropFirst().sink { [weak self, weak printers] readings in
             guard let self, printers?.isLive == true else { return }
             Task { await self.apply(readings) }
         }
-        switchedOff = settings.$liveActivities.dropFirst().filter { !$0 }.sink { [weak self] _ in
-            Task { await self?.endAll() }
+        switchedOff = settings.$liveActivities.dropFirst().removeDuplicates().sink { [weak self] on in
+            guard let self else { return }
+            Task {
+                if on { await self.push.sendAll() } else { await self.push.withdrawStart(); await self.endAll() }
+            }
         }
     }
 
@@ -102,8 +109,12 @@ final class PrintActivities {
             case let .start(id, name, state):
                 // Refused when Live Activities are off for the app or the
                 // system's limit is reached; the print carries on regardless.
-                _ = try? Activity.request(attributes: PrintActivityAttributes(machineId: id, machineName: name),
-                                          content: ActivityContent(state: state, staleDate: state.endsAt))
+                // `.token`: the cloud can then move it with the app closed.
+                if let started = try? Activity.request(attributes: PrintActivityAttributes(machineId: id, machineName: name),
+                                                       content: ActivityContent(state: state, staleDate: state.endsAt),
+                                                       pushType: .token) {
+                    push.watch(started)
+                }
             case let .update(id, state):
                 await live[id]?.update(ActivityContent(state: state, staleDate: state.endsAt))
             case let .end(id, state):

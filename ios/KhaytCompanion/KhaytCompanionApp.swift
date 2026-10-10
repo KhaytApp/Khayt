@@ -52,7 +52,7 @@ struct KhaytCompanionApp: App {
         _channel = StateObject(wrappedValue: channel)
         let center = PrintAlertCenter(api: apiClient, settings: s, printers: printers)
         alerts = center
-        activities = PrintActivities(printers: printers, settings: s)
+        activities = PrintActivities(printers: printers, settings: s, api: apiClient)
         channel.onEvent = { kind, at, ciphertext, session in
             await center.receive(kind: kind, ciphertext: ciphertext, dek: session.dek, at: at)
         }
