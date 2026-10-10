@@ -987,6 +987,14 @@ public actor KhaytEngine {
         // store is told as the job moves. After `carriers`, whose tracking
         // links it reads, and `shelf-sale`, which reads the basket.
         "webstore-order",
+        // Opt-in crash reports and usage counts (#1789). The scrubber is the
+        // one place that decides what may leave a shop's Mac — rebuilt field by
+        // field from an allowlist — and the Mac runs the SAME file Electron
+        // does, so the two apps cannot come to disagree about what is personal
+        // data. The sender is its send policy: what a 422, a 429 and a 404 mean
+        // for the queue. Neither reads the other, so their order is free.
+        "telemetry-scrub",
+        "telemetry-sender",
     ]
 
     /// The languages whose strings are bundled.
@@ -1000,6 +1008,68 @@ public actor KhaytEngine {
 
     public init(bundle: Bundle? = nil) throws {
         runtime = try JSRuntime(modules: Self.modules, locales: Self.locales, bundle: bundle)
+    }
+
+    // MARK: - Telemetry (#1789)
+
+    /// A crash report as `lib/telemetry-scrub.js` rebuilds it: scrubbed and
+    /// cut down to its allowlist, whatever `raw` carried. Throws when the
+    /// scrubber does, and the caller DROPS the event — fail closed.
+    public func telemetryCrashReport(_ raw: [String: JSONValue]) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytTelemetryScrub.buildCrashReport(ARG0)", [.object(raw)],
+                          as: [String: JSONValue].self)
+    }
+
+    /// A usage event, counts and enums only. Nil when the scrubber refuses it
+    /// (a feature name that is not an identifier).
+    public func telemetryUsageEvent(_ raw: [String: JSONValue]) throws -> [String: JSONValue]? {
+        try runtime.call2("KhaytTelemetryScrub.buildUsageEvent(ARG0)", [.object(raw)],
+                          as: [String: JSONValue]?.self)
+    }
+
+    /// The local queue, bounded (newest kept) and with repeated crashes taken
+    /// out — `boundQueue` then `dedupeCrashes`, as Electron's enqueue does.
+    public func telemetryTidy(_ queue: [JSONValue], keep: Int) throws -> [JSONValue] {
+        try runtime.call2("KhaytTelemetryScrub.dedupeCrashes(KhaytTelemetryScrub.boundQueue(ARG0, ARG1))",
+                          [.array(queue), .number(Double(keep))], as: [JSONValue].self)
+    }
+
+    /// What to send now, if anything: `planFlush`, which re-checks each
+    /// stream's consent at send time, the backoff, and the batch cap.
+    public struct TelemetryPlan: Decodable, Sendable, Equatable {
+        public let send: Bool
+        public let reason: String?
+        public let batch: [JSONValue]?
+    }
+
+    public func telemetryPlan(queue: [JSONValue], crash: Bool, usage: Bool,
+                              nowMs: Double, nextAttemptAtMs: Double) throws -> TelemetryPlan {
+        try runtime.call2("""
+            KhaytTelemetrySender.planFlush({ queue: ARG0, consent: { crash: ARG1, usage: ARG2 },
+                                             now: ARG3, nextAttemptAt: ARG4 })
+            """, [.array(queue), .bool(crash), .bool(usage), .number(nowMs), .number(nextAttemptAtMs)],
+            as: TelemetryPlan.self)
+    }
+
+    /// What an answer means for the queue: `interpret`. A 422 drops the batch
+    /// (it would be refused again, forever, ahead of every good event); a 404
+    /// is the ingest switched off, kept and backed off a long way.
+    public struct TelemetryVerdict: Decodable, Sendable, Equatable {
+        public let drop: Bool
+        public let backoffMs: Double
+        public let reason: String
+    }
+
+    public func telemetryVerdict(status: Int, retryAfterSec: Double?, backoffMs: Double) throws -> TelemetryVerdict {
+        try runtime.call2("KhaytTelemetrySender.interpret(ARG0, { retryAfterSec: ARG1, backoffMs: ARG2 })",
+                          [.number(Double(status)), retryAfterSec.map(JSONValue.number) ?? .null,
+                           .number(backoffMs)], as: TelemetryVerdict.self)
+    }
+
+    /// Where it goes. Khayt's own ingest, NOT the shop's configured cloud —
+    /// the sender says why.
+    public func telemetryEndpoint() throws -> String {
+        try runtime.value("KhaytTelemetrySender", "DEFAULT_ENDPOINT", as: String.self)
     }
 
     // MARK: - Words

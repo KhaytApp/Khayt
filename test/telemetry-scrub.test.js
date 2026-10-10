@@ -177,3 +177,35 @@ test('a document filename cannot leak a customer name, but module names survive'
   assert.ok(frame.includes('store.js:412'), `module/line lost from stack frame: ${frame}`);
   assert.ok(!frame.includes('/Users/t'), 'home dir still stripped');
 });
+
+test('a deep stack fits the ingest, which refuses the whole event over 4,000 characters', () => {
+  // khayt-cloud src/telemetry-ingest.js CAPS.stack. Thirty frames of up to 201
+  // characters scrubbed to ~6,000, so a deep crash was queued, sent, refused (422)
+  // and dropped — the reports most worth having were the ones that never arrived.
+  const frame = (i) => `    at someVeryLongFunctionName_${i}_${'x'.repeat(110)} (renderer/app.js:${i}:1)`;
+  const stack = Array.from({ length: 30 }, (_, i) => frame(i)).join('\n');
+  const out = S.scrubStack(stack);
+  assert.ok(out.length <= 4000, `stack is ${out.length} characters`);
+  // Whole frames only: every line kept is a complete frame, not half of one.
+  const lines = out.split('\n');
+  assert.ok(lines.length > 10);
+  assert.ok(lines.every((l) => l.endsWith(':1)')), 'a frame was cut in half');
+  // A short stack is untouched by the cap.
+  assert.equal(S.scrubStack('Error: x\n    at f (a.js:1:1)'), 'Error: x\n    at f (a.js:1:1)');
+});
+
+test('both telemetry modules publish a global for JavaScriptCore and read no `global`', () => {
+  // The native Mac runs these files in JavaScriptCore, which has no `global` and
+  // no `module` (#1789). A bare `global.X` read throws there and nowhere else.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  for (const [file, name] of [['lib/telemetry-scrub.js', 'KhaytTelemetryScrub'],
+                              ['lib/telemetry-sender.js', 'KhaytTelemetrySender']]) {
+    const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    assert.ok(!/(^|[^.\w])global\./m.test(src), `${file} reads \`global.\``);
+    const ctx = vm.createContext({});
+    vm.runInContext(src, ctx);
+    assert.equal(typeof vm.runInContext(name, ctx), 'object', `${file} defined no ${name}`);
+  }
+});
