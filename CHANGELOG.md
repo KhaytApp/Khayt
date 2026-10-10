@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: send the customer a photo of the finished part.** The WhatsApp
+  update can carry a photo — taken there or chosen from the library — and goes
+  through the share sheet (a `wa.me` link carries text only); pick WhatsApp,
+  then the customer's chat. It is written to the customer's log once it goes
+  to WhatsApp.
+
 - **iOS: tell the customer on WhatsApp.** The order page offers the update a
   job is due — received, ready, shipped, delivered — and opens WhatsApp on the
   customer's number with the message typed, in the customer's language

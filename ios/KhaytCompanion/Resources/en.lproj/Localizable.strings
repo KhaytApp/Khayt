@@ -643,3 +643,8 @@
 "wa.reason.no_country_code" = "Add the country code to this number (for example +971…). Only Saudi numbers can be written without one.";
 "wa.reason.bad_saudi_number" = "This is not a Saudi mobile or landline number. 800 and 9200 numbers have no WhatsApp.";
 "wa.reason.no_milestone" = "A quote or a cancelled job has no update to send.";
+"wa.photo.take" = "Take a photo";
+"wa.photo.pick" = "Choose a photo";
+"wa.photo.remove" = "Remove photo";
+"wa.share_photo" = "Share with photo…";
+"wa.share_photo.note" = "Pick WhatsApp in the share sheet, then the customer's chat. It is written to the customer's log once it goes to WhatsApp.";
