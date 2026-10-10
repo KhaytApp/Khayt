@@ -33,6 +33,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   test's two loads straddled midnight, so "the same book" had changed — the
   required check failed at random, on main too.
 
+- **Docs:** competitive review, third reading (October 2026). Arabic is no
+  longer unique among competitors; Saudi e-invoicing (ZATCA) still is. A weekly
+  review now runs every Sunday and opens a PR to the roadmap.
+
 - **iOS: scan a Khayt label.** Home's + menu → "Scan a label" reads the QR
   either desktop prints on a job's bag or a spool (`KHAYT-ORDER:`,
   `KHAYT-SPOOL:`, or the job's tracking link) and opens that job or spool —

@@ -395,3 +395,227 @@ feature at a time.
 
 *Caveat, as §5: vendor marketing pages read once, not hands-on evaluations.
 Enough to place a product, not to trust a feature matrix.*
+
+## 7. Third reading — October 2026
+
+On 2026-10-10 every product in §0 and §6 was read again, and the field was searched for
+anything new since September. The method is unchanged:
+
+- facts come only from each product's own pages;
+- anything that could not be read is marked as unread;
+- every claim about Khayt was checked against the code in `lib/`, `renderer/`,
+  `mac/KhaytCore/Sources` and `ios/`.
+
+**Ten** apparent gaps turned out not to be gaps. One of them nearly got through for the
+same reason §6's did. The verifying grep ran under zsh, which does not word-split
+`$S`, so every search for a "missing" feature came back empty. That included searches
+for features that exist, such as `wearRate`. A search that finds nothing has still not
+proved absence. This time the shell, not the vocabulary, was why it found nothing.
+
+### What changed among products already on the list
+
+| Product | Change since July / September | Read? |
+|---|---|---|
+| [FoxTrack](https://foxtrack.studio/pricing) | **Prices rose about 33%.** Pro went from $9 to **$12/mo**, and Farm from $29 to **$39/mo**. The site now lists tax label and number on invoices ("GST, VAT or sales tax"), any currency, a **bring-your-own-key AI assistant**, and an open-source printer bridge. Its [roadmap](https://foxtrack.studio/roadmap) shows as done: multi-language invoices, Spoolman, API, emailing invoices, and Shopify/Etsy/Woo (in beta). Under consideration: RFID/NFC filament tracking. Mobile is a PWA only. | ✅ |
+| [CalcMyPrint](https://www.calcmyprint.com/) | **Read for the first time** (§0 had only its tagline), from its JS bundle. It is a costing and catalogue tool: depreciation, wattage, failure rate, a labour library, a "recipe builder", G-code import, and stock by weight. **No invoicing, tax, portal, app or languages.** Price is €0 / €4.99 / €9.99 per month, still in beta. | ⚠️ JS bundle, not the rendered page |
+| [Layers](https://layers.app/plans) | Paid prices are now confirmed: **$49 and $149 per month**, and the free tier allows 5 orders a month. Its UI has 11 languages, **including Arabic and Farsi**. [v1.13.1](https://layers.app/blog/layers-v1-13-1-release-note-more-control-better-workflows-easier-integrations) added an OpenAPI with orders and customers, Excel export, RFQs for CNC and moulding, and shareable part and order URLs. | ✅ (/pricing renders only in JS; /plans was read) |
+| [3DPBOSS](https://3dpboss.com/) | No visible change. /pricing returns 404, and prices are still on the home page. | ✅ |
+| [Printago](https://printago.io/changelog) | Shipping almost every week. Since September it has added Farm Reports including **Profit**, plus eBay, WooCommerce, **ShipStation** (Walmart/Amazon/BigCommerce), TikTok Shop, Wix and OneDrive. It also offers [**AI Agents**](https://printago.io/features/ai-agents): a CLI plus a **Claude Code skill**. Its [roadmap](https://printago.io/roadmap) lists **Part Estimation** ("so you can quote") as Up Next and a **Quote Portal** as Exploring. It still has nothing on invoicing or tax. | ✅ (docs.printago.io is an empty shell) |
+| [SimplyPrint](https://simplyprint.io/blog/simplyprint-client-flashforge-dremel-prusa-klipper/) | **"The Shop"** is a closed pilot. An order comes in, becomes work in the queue, and goes on to packing. The wider release was due "in the next couple of weeks" from 23/09. It also has 15 UI languages, **none of them Arabic**. Still no costing, invoicing or tax. | ⚠️ changelog returned 403 |
+| [Stimalo](https://stimalo.com/pricing) | v2.0.0, made by one person in Italy. It is **free for everyone until 31 Dec 2026**. It now has a [find-a-maker marketplace](https://stimalo.com/trova-maker) in Italy (230 makers), and its Italian page lists **AI that scans supplier invoices**. It still issues **no customer invoices**, and it is in IT/EN only. | ✅ (it has no public changelog) |
+| [3D Filament Profiles](https://3dfilamentprofiles.com/) | It has grown from about 24k to **34,506 filaments**, with 5,460 TD values. | ✅ through a browser (direct fetches got 429) |
+| [3D Print Manager](https://3dprintmanager.eu/) | **Read for the first time** (§6 listed it as category only). Of everything on the list, it is the **closest books-first match**. A LAN agent records actual usage from Bambu AMS, Prusa and Klipper. It costs each print with the real spool price and electricity, turns webshop orders into work orders, reserves filament, and issues **quotes and invoices through Minimax**, or a PDF with an EU payment QR code. Price is €0 / €3.99 / €19.99 / €39.99 per month. It is in HR/EN/DE, on web, Windows and Android. | ✅ |
+| [MeshVault](https://www.meshvault.app/) | **It is now free** (it was $19.99), and an Android app and an iOS TestFlight build have appeared. | ✅ |
+| [Meshory](https://meshory.com/) | The price goes from $34.99 to **$39.99 on 28 Oct**. It added "AI-powered visual search". | ✅ |
+| [PrintStash](https://github.com/xiao-villamor/PrintStash) | v0.13.0. Support for Bambu LAN, PrusaLink, OctoPrint and Elegoo is now in beta. | ✅ |
+| [Layova](https://layova.ca/) | **No longer 403** (it was in July). It is a production scheduler: import a 3MF, plan across printers by due date, and warn when a deadline is at risk. No public price. | ⚠️ JS bundle only |
+| [Bambu Farm Manager](https://wiki.bambulab.com/en/software/bambu-farm-release-notes/3-0-0) | v3.0.0 adds "Start All" auto-matching by filament and colour, printer groups, and RTSPS video. **No cost, order or customer features.** | ⚠️ wiki read; bambulab.com returned 403 |
+| [Print Farm Manager](https://printfarmmanager.com/) | $29 one-time and local. It reports profit per hour and "blocked revenue" from filament risk. No invoicing. | ✅ |
+| Quote3D, 3D Price Lab, MeshTune, STLMaid, Obloid, OctoPrint, Repetier, 3DQue | No change that matters to Khayt. Quote3D now has API v2; OctoPrint 2.0 is at rc6. | ✅ |
+| [OctoFarm](https://github.com/OctoFarm/OctoFarm) | **Dead.** The last release was in 2022, and octofarm.net now redirects to ad domains. | ✅ |
+| Prusa Connect, 3DPrinterOS | Prusa Connect now advertises a "farm mode". Neither has cost, order or invoice features. Prusa's paid tiers could not be read: that pricing page renders only in JS. | ⚠️ partial |
+| BuildBee, Print&Go, 3DiWell Farm Manager, Bambu Handy | — | ❌ JS-only, login wall or 403 |
+| RIGHTPrint | Still nothing anywhere under that name. | ❌ not findable |
+
+### New since September
+
+| Product | Category | Model | Read? |
+|---|---|---|---|
+| [PrintMate](https://apps.apple.com/us/app/3d-print-cost-sales-printmate/id6743996044) ([site](https://foggyapps.com/printmate/)) | **Native Apple shop app.** Runs on iPhone, iPad, **Mac** and visionOS, with **25 languages including Arabic** and a **VAT % field**. Its 2026.08.01 release replaced Sales with Orders, quotes, invoices and delivery tracking. 2026.09.01 added **Bambu Lab integration that pre-fills jobs from printer history**, multiple printers, and monthly expenses. | Freemium (5 of each). Subscriptions from $0.99/wk up to about $39.99 lifetime | ✅ App Store page |
+| [Printforge CRM](https://crm.printforge.com.au) | **Books-first, web.** STL/G-code cost breakdown, numbered PDF quotes, a **"Claude-powered" AI quote assistant**, a kanban, a Gantt calendar, and **GST/ABN tax invoices** with Stripe. Shareable customer upload links that can be revoked. Timesheets, shipments, Xero, Shopify, Etsy and Home Assistant. Built-in design generators (cookie cutter, stamp, mould). English only. | AUD 0 / 4 / 9 / 18 / 39 per month | ✅ |
+| [CalcuMake](https://github.com/cmbaldwin/calcumake) | Books-first, open source (MIT, Rails). Pricing calculator, jobs, invoicing, clients and filament stock. 7 languages **including Arabic**. No tax calculation. | Free, or ¥150 / ¥1,500 per month | ⚠️ README and [Product Hunt](https://www.producthunt.com/products/calcumake); calcumake.com did not load |
+| [FilaOps](https://github.com/Blb3D/filaops) | **Self-hosted "Print Farm ERP"** under BSL 1.1. Quotes, sales orders, invoices, payment terms and credit limits, multi-level BOM, MRP and purchasing, **double-entry GL and trial balance**, RBAC and 432 endpoints. | Free self-host; a "PRO" edition has been announced | ✅ |
+| [MakerQuote.IO](https://makerquote.digico.com.mt/features) | Quote to invoice in one click, **"VAT-ready" invoices**, stock that deducts itself, shareable quote links, and **AI pricing "based on market rates"**. | Free, or €7.99/mo | ✅ |
+| [3DPCC](https://3dpcc.com) | Costing, inventory, catalogue with SKUs, orders, stock reservation, quotes. Web plus an iOS app. No tax. | Free, or $12.50/mo | ✅ |
+| [PrintPulse](https://print-pulse.app), [Prinate](https://prinate.app) | Quote, BOM and margin tools. Prinate also has quotes and invoices. Web only, no tax. | €0–19/mo; $0–5.99/mo | ✅ |
+| [3dPrintOps](https://apps.apple.com/us/app/3dprintops/id6793183174), [3D Print Cost](https://apps.apple.com/app/id6758351451), [Spool cost calculator](https://apps.apple.com/us/app/spool-3d-print-cost-calculator/id6758672926) | Native Apple cost apps. 3dPrintOps runs on iPhone, iPad, Mac, **Watch** and Vision. The Spool app **imports history and spools from Bambu's cloud** and calculates drying cost and equipment ROI. | $1.99–$9.99, or a subscription | ✅ App Store pages (two of the release dates look wrong) |
+| [Daedalus](https://pkg.go.dev/github.com/philjestin/daedalus) | Open-source desktop app (Wails). Orders from Etsy and Squarespace, printer control, **expense receipt OCR**, and profit per hour. No invoicing. | MIT | ✅ |
+| [Bambuddy](https://github.com/Person2099/bambuddy), PrintOps | Self-hosted Bambu control. PrintOps is a fork of Bambuddy with costing and quotes. | AGPL | ⚠️ Bambuddy read through a third-party article |
+| Spool: Filament Tracker, SpoolPainter, FilaMan | Spool trackers with Bambu auto-logging or NFC. | — | ⚠️ store listings only |
+
+**No 3D-print shop software aimed at Arabic speakers or at Saudi Arabia was found.** The
+only ZATCA-compliant tools that turned up are general accounting packages: Zoho Books,
+Qoyod and Wafeq. Reddit threads from 2026 could not be reached through search.
+
+**Meshmill: no 3D-printing product by that name exists.** These were checked:
+
+- [jes/meshmill](https://github.com/jes/meshmill) is CNC CAM software from 2022.
+- [make-your-own-world/MeshMill](https://github.com/make-your-own-world/MeshMill) is a
+  GPL Windows tool for reducing scan meshes on a CUDA GPU. Its repo was **created on
+  2026-10-04**, which makes it the likeliest thing the user saw. It prepares meshes "for
+  downstream manufacturing tools", so it sits in the mesh-tools bucket, not with
+  shop software.
+- meshmill.com is a 2024 GoDaddy page about metaverse content, and meshmill.xyz
+  redirects to it.
+- meshmill .io, .app, .ai, .co, .net and .dev have no DNS record.
+- The App Store has no app by that name in either spelling.
+- GitHub search finds 6 repos with that name. None of them is about printing.
+
+### The finding: Arabic stopped being unique, and ZATCA did not
+
+§2 and §6 both counted Arabic and RTL as ground nobody else held. That is no longer true:
+
+- **Layers** has Arabic in its UI.
+- **PrintMate** has Arabic, on the Mac and the iPhone, with a VAT field.
+- **CalcuMake** has Arabic in its UI.
+
+What is still unique is **tax-compliant invoicing**: ZATCA Phase 1 and 2, VAT net of
+revenue, and credit notes. FoxTrack prints a tax label, MakerQuote calls itself
+"VAT-ready", Printforge issues GST tax invoices, and 3D Print Manager hands invoicing to
+Minimax. None of them does Saudi e-invoicing. A **native Mac app** is no longer unique
+either: PrintMate, 3dPrintOps and 3D Print Cost all run on the Mac. Khayt's distinct
+combination is now **native Apple app + local-first + ZATCA + printer actuals**. The
+copy on the website should lead with that. "We speak Arabic" is now one feature among
+several.
+
+The other movement is that **the automation bucket is moving towards books**, as §6
+predicted. Printago now has a Profit report, and Part Estimation and a Quote Portal are
+on its roadmap. SimplyPrint is building an order-to-queue Shop. Neither has invoicing or
+tax yet, and both would have to choose to build it.
+
+### Ten false alarms
+
+Each item below looked like a gap on a competitor's page, and the code shows Khayt
+already has it.
+
+| Looked missing | Competitor | Where it is in Khayt |
+|---|---|---|
+| RFID/NFC spool tags | FoxTrack (under consideration), FilaMan | `ios/KhaytCompanion/NFC/NFCReader.swift` and `NFCEncoder.swift`, `WriteNFCTagSheet.swift`; on the desktop, a hex-dump import in `renderer/inventory.js` |
+| AI with your own key | FoxTrack, Printforge | `lib/ai-providers.js` supports Anthropic, OpenAI, Gemini and Ollama. `lib/ai-tools.js` has `quote_extract`, `suggest_price`, `draft_customer_message` and `answer_shop_question` |
+| AI pricing | MakerQuote ("market rates") | `lib/ai-price.js` suggests prices from the shop's **own** completed jobs, which is a better basis than "market rates" |
+| Multi-language invoices | FoxTrack | `lib/invoice-language.js` |
+| Reserving filament for orders | 3D Print Manager, 3DPCC | `committedByItem` in `lib/reorder.js`, and the reserved grams in `renderer/inventory.js` |
+| Credit limits | FilaOps | `creditLimit` in `renderer/clients.js`, plus `lib/payment-plan.js` |
+| Profit and failure reports | Printago Farm Reports | `lib/pnl-report.js`, `machine-pl.js`, `failed-print-cost.js`, `failure-rate.js` |
+| Part Estimation and a Quote Portal | Printago (roadmap) | Shipped in July as R1 and R5 (`lib/public-quote.js`, plus Cloud `mobile/intake.html` and `portal.html`) |
+| Recipe/BOM products and platform fees | CalcMyPrint, 3DPPC | `lib/assembly.js`, `print-kits.js`, components in the job margin (#1752), and `lib/platform-fees.js`, which includes eBay |
+| Xero/QuickBooks and Home Assistant | Printforge, 3D Print Manager | `lib/accounting-export.js` covers QuickBooks, Xero and Zoho **as file exports, not a live sync**. `lib/smart-plug.js` talks to Home Assistant |
+
+R8 (derived wear rate, `lib/depreciation.js`, #1659) and R9 (the filament catalogue,
+`lib/filament-catalog.js`, #1194 and #1747) both shipped after §6 was written. R10, the
+written automation line, is **still unwritten**. No document in `docs/` states it.
+
+### Real gaps, verified
+
+- **Bambu jobs have no actual figures.** In `lib/printer-actuals.js`, the `bambu`
+  branch says "nothing is claimed here — the shop types these". PrintMate (pre-fill from
+  printer history), the Spool app (Bambu cloud import) and 3D Print Manager (AMS usage)
+  all fill them in. This is the one place where R3's differentiator does not reach the
+  most common printer brand.
+- **Scanning a supplier receipt.** Stimalo (AI invoice scanning) and Daedalus (receipt
+  OCR) both read supplier documents. In Khayt, `lib/expense-book.js` stores a
+  `receiptPath` and the receipt's VAT, but someone has to type it. iOS OCR exists only
+  for filament labels (`LabelPhotoOCR.swift`, `FilamentLabelParser.swift`).
+  `lib/zatca-qr.js` can *build* the TLV QR code but cannot *read* one.
+- **An agent interface to the books.** Printago ships a CLI and a Claude Code skill.
+  `KhaytMcp` exists (`mac/KhaytCore/Sources/KhaytMcp/`), but its tools cover only the
+  **library**: `search_models`, `get_model` and `library_summary`. There are no tools
+  for orders, receivables, stock or the P&L.
+- **No Saudi accounting export targets.** `accounting-export.js` exports to generic,
+  QuickBooks, Xero and Zoho formats. It has nothing for Qoyod, Wafeq or Daftra. Their
+  import formats were **not read** this round.
+- Smaller items, all real and all low value: an Apple Watch app (3dPrintOps), a count
+  of every consumable in one pass (FilaOps), a double-entry ledger (FilaOps), design
+  generators (Printforge), and a customer marketplace (Stimalo, Printforge).
+
+### Ranked ideas
+
+The buyer is a small Saudi shop with 2 printers, working in Arabic and English.
+
+1. **Scan the ZATCA QR on a supplier's receipt to file the expense.** Every Saudi
+   simplified tax invoice carries a TLV QR code with five fields: tag 1 seller, tag 2
+   VAT number, tag 3 timestamp, tag 4 total, and tag 5 VAT. That makes it an exact read,
+   with no OCR or AI guesswork, of the one figure a VAT-registered shop has to claim
+   back as input tax.
+   - *Why:* competitors use AI scanning to get this approximately. Khayt can get it
+     exactly, and only in the one market where nobody else is looking.
+   - *Exists:* the encoder in `lib/zatca-qr.js`, the barcode scanner on iOS
+     (`BarcodeScannerView.swift`), and the expense book's receipt-VAT field.
+   - *Effort:* small to medium. A pure `decodeTLV` in lib, plus a scan button on
+     iOS and Mac.
+   - *Lanes:* lib, then iOS first, then Mac.
+2. **Real figures for Bambu jobs.** Take the per-plate sliced grams from the 3MF the
+   printer actually ran. When Khayt itself sent the job, it already holds that file
+   locally, because `lib/bambu-ftp.js` uploads it. For a job started elsewhere, the
+   FTPS client would need a RETR added: today it can only STOR. Take duration from the
+   MQTT start and finish timestamps rather than from remaining ÷ percent.
+   - The result must be labelled "sliced figure for the plate printed", not
+     "measured". That is the same discipline as R1.
+   - *Why:* it is the most common printer brand in the market, and three competitors
+     fill these figures already.
+   - *Effort:* medium. *Lanes:* lib, then Mac, then Electron.
+   - **Blocked on hardware:** the only printer on the bench is the U1, so this cannot be
+     verified without a Bambu.
+3. **Books tools in `KhaytMcp`, read-only.** Add tools for open orders, receivables and
+   overdue payments, stock runway, a P&L for a period, and a quote draft.
+   - *Why:* Printago and Printforge show that "ask an agent about my shop" is now
+     something products ship. Khayt already has the server and the pure lib rules.
+   - *Keep it read-only* so the store's write chain is never bypassed.
+   - *Effort:* small to medium. *Lane:* Mac.
+4. **Reposition on the website.** Change the copy from "Arabic" to "**ZATCA invoicing +
+   native Mac/iPhone + local-first + measured cost**". Add a row comparing Khayt with
+   FoxTrack's new $12/$39 prices and PrintMate.
+   - *Why:* the Arabic claim can now be matched by three products; the ZATCA claim
+     cannot.
+   - *Effort:* tiny. *Lane:* the khaytapp.com website.
+5. **Export formats for Qoyod, Wafeq and Daftra** in `accounting-export.js`. This is
+   only worth doing after their import formats have been read. A Saudi shop's
+   accountant is more likely to use one of these than Xero.
+   - *Effort:* small, once the formats have been read. *Lanes:* lib, then both apps.
+6. **Write R10.** SimplyPrint's Shop and Printago's Quote Portal are both moving into
+   orders. The line Khayt will not cross (cloud slicing, lights-out production,
+   marketplace connectors) should be on paper before the next feature argues it again.
+
+### Deliberately not doing
+
+- **A connector for every marketplace** (ShipStation, TikTok Shop, eBay, Walmart, as in
+  Printago). A Saudi shop sells on Salla, Zid and WhatsApp, and Khayt already has those.
+  Racing Printago's weekly connector releases means losing.
+- **A maker marketplace** (Stimalo's find-a-maker, Printforge). It is a different
+  business, two-sided, and needs liquidity Khayt does not have.
+- **Design generators** (Printforge's cookie cutter, stamp and mould tools). Mesh tools,
+  as in §3: link out rather than build.
+- **A double-entry ledger** (FilaOps). Khayt exports to the shop's accountant; becoming
+  the accountant's software is a different product.
+- **Watch and visionOS apps** (3dPrintOps, PrintMate). Live Activities and Control Center
+  already put a print on the wrist and the lock screen.
+- **AI "market rate" pricing** (MakerQuote). A price taken from strangers' rates is a
+  number the shop never agreed to. `ai-price.js` prices from the shop's own history on
+  purpose.
+
+### On pricing, briefly
+
+The field's anchor moved upward:
+
+- FoxTrack: $12 / $39.
+- Layers: $49 / $149.
+- 3D Print Manager: €3.99–€39.99.
+- Printforge: AUD 4–39.
+
+At the free end, MeshVault went free and Stimalo is free until the end of 2026. Native
+Apple apps sell one-time for $2–$40. The pattern from §4 holds: plain order tracking is
+cheap or free, and nobody charges for tax compliance because nobody else offers it.
+
+*Caveat, as §5 and §6: these are vendor marketing pages read once, not hands-on
+evaluations. They are enough to place a product, not to trust a feature matrix. The
+App Store figures came through a summarising fetch.*
