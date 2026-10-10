@@ -697,4 +697,4 @@
 "photos.err.http" = "لم يقبل Khayt Cloud الصورة (خطأ %lld). حاول مرة أخرى.";
 
 /* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
-"settings.live_activities.mac" = "لتبقى الطباعة محدّثة على شاشة القفل والتطبيق مغلق، يجب أن يرسل الماك تقدّم الطباعة: فعّل ذلك في خيط على الماك، وسجّل دخول هذا الهاتف إلى Khayt Cloud.";
+"settings.live_activities.mac" = "لتبقى الطباعة محدّثة على شاشة القفل والتطبيق مغلق، فعّل «إرسال تقدّم الطباعة إلى iPhone (الأنشطة المباشرة)» في خيط على الـMac (الإعدادات ▸ التكاملات ▸ الآيفون)، وسجّل دخول هذا الهاتف إلى Khayt Cloud.";

@@ -1,18 +1,20 @@
 import ActivityKit
 import Combine
 import Foundation
+import KhaytCore
 
 /// What the Live Activities should do, given what the printers say now.
 ///
-/// Pure, so it can be tested without ActivityKit: the readings and the
-/// activities already running go in, a list of steps comes out.
+/// The RULE is KhaytCore's `LiveActivityPlan`, the one the Mac's pushes use
+/// too (`LiveActivityPush`, through Khayt Cloud). If the phone and the push
+/// decided apart, the Lock Screen would say one thing while the app is open
+/// and another once it closes. This is only the translation between the
+/// phone's types and the shared ones, so the tests here hold the shared rule.
 ///
-/// ── THE SAME RULES AS THE PRINT-FINISHED ALERT ──────────────────────────
-///
-/// A machine that drops out of the readings has NOT finished — the phone
-/// simply stopped hearing about it, so its activity is left alone. A paused
-/// print is still a print. Only a machine seen printing and then seen not
-/// printing has ended, with the outcome `FinishDetector` would give it.
+/// The rules themselves, briefly: a machine that drops out of the readings, or
+/// whose poll failed (no state), has not ended; a paused print is still a
+/// print; only one seen printing and then seen not printing has ended, with
+/// the outcome `FinishDetector` would give it.
 enum PrintActivityPlan {
     typealias State = PrintActivityAttributes.ContentState
 
@@ -24,43 +26,35 @@ enum PrintActivityPlan {
 
     static func steps(readings: [String: MachineLiveStatus], running: [String: State],
                       now: Date = Date()) -> [Step] {
-        var steps: [Step] = []
-        for (id, r) in readings.sorted(by: { $0.key < $1.key }) {
-            // A missed poll is the phone not hearing, like a machine that drops out.
-            if r.isUnheard { continue }
-            let was = running[id]
-            if r.isPrinting || r.isPaused {
-                let ends = r.timeRemaining.flatMap { $0 > 0 ? now.addingTimeInterval(TimeInterval($0)) : nil }
-                let state = State(phase: r.isPaused ? .paused : .printing, job: r.filename,
-                                  progress: min(100, max(0, r.progress ?? 0)),
-                                  startedAt: was?.startedAt ?? now, endsAt: ends)
-                guard let was else {
-                    if r.isPrinting { steps.append(.start(machineId: id, name: r.name ?? id, state)) }
-                    continue
+        LiveActivityPlan.steps(readings: readings.mapValues(shared), running: running.mapValues(shared), now: now)
+            .map { step in
+                switch step {
+                case let .start(id, name, s): return .start(machineId: id, name: name, phone(s))
+                case let .update(id, s): return .update(machineId: id, phone(s))
+                case let .end(id, s): return .end(machineId: id, phone(s))
                 }
-                if worthSending(from: was, to: state) { steps.append(.update(machineId: id, state)) }
-            } else if let was {
-                let st = (r.state ?? "").lowercased()
-                let phase: State.Phase = r.hasError || st.contains("error") || st.contains("fail") ? .failed
-                    : st.contains("cancel") ? .cancelled : .finished
-                steps.append(.end(machineId: id, State(phase: phase, job: was.job,
-                                                       progress: phase == .finished ? 100 : was.progress,
-                                                       startedAt: was.startedAt, endsAt: now)))
             }
-        }
-        return steps
     }
 
-    /// Updates are budgeted by the system, and the countdown runs itself, so
-    /// only a change a person would notice is sent: a new phase, a new job,
-    /// a whole percent, or the finish moving by more than a minute.
     static func worthSending(from a: State, to b: State) -> Bool {
-        if a.phase != b.phase || a.job != b.job || a.progress != b.progress { return true }
-        switch (a.endsAt, b.endsAt) {
-        case let (x?, y?): return abs(x.timeIntervalSince(y)) > 60
-        case (nil, nil): return false
-        default: return true
-        }
+        LiveActivityPlan.worthSending(from: shared(a), to: shared(b))
+    }
+
+    // MARK: - Translation
+
+    static func shared(_ r: MachineLiveStatus) -> LiveActivityPlan.Reading {
+        .init(name: r.name, state: r.state, progress: r.progress, filename: r.filename,
+              timeRemaining: r.timeRemaining, error: r.error)
+    }
+
+    static func shared(_ s: State) -> LiveActivityPlan.State {
+        .init(phase: LiveActivityPlan.Phase(rawValue: s.phase.rawValue) ?? .printing, job: s.job,
+              progress: s.progress, startedAt: s.startedAt, endsAt: s.endsAt)
+    }
+
+    static func phone(_ s: LiveActivityPlan.State) -> State {
+        State(phase: State.Phase(rawValue: s.phase.rawValue) ?? .printing, job: s.job,
+              progress: s.progress, startedAt: s.startedAt, endsAt: s.endsAt)
     }
 }
 
