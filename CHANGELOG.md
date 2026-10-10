@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Maintainers) The Mac's full test run no longer looks hung on a Mac with a
+  real print library.** The test that checks the Mac's 3MF reader against
+  Electron's, file by file over the shop's own vault, skipped archives by
+  their size on disk. A 23 MB file unpacks to 128 MB of mesh and took over an
+  hour in a debug build. It now skips by the unpacked model size, and runs in
+  about a minute. `KHAYT_PARITY_ALL=1` still runs everything. CI has no vault
+  and was never affected.
+
 - **(Maintainers) The Mac's road to beta is written down.** `mac/BETA.md` lists
   what has to be true before `4.0.0-beta.1`: crash reports live and read, a
   week on the shop's real book, the features shipped untried tried for real,
