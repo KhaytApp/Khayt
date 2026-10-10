@@ -9049,6 +9049,7 @@ final class Shop {
     static let accountingFormats: [(String, String)] = [
         ("generic", "CSV"), ("quickbooks", "QuickBooks"),
         ("xero", "Xero"), ("zoho", "Zoho Books"),
+        ("wafeq", "Wafeq"), ("daftra", "Daftra"),
     ]
 
     /// The two files an accountant actually wants.
@@ -9099,12 +9100,14 @@ final class Shop {
             let invoices = try await engine.invoiceCsv(
                 orderRows, settings: settingsDict, clients: clientRows, format: format,
                 language: words.language)
-            let expenses = try await engine.expenseCsv(expenseRows, format: format)
+            let expenses = try await engine.expenseCsv(expenseRows, format: format, settings: settingsDict)
             let a = dir.appending(path: "khayt-invoices-\(day).csv")
             let b = dir.appending(path: "khayt-expenses-\(day).csv")
             try Data(invoices.utf8).write(to: a, options: .atomic)
             try Data(expenses.utf8).write(to: b, options: .atomic)
             spendNote = words.callIt("mac.exported_to") + " " + dir.lastPathComponent
+            if format == "wafeq" { spendNote? += " — " + words.callIt("mac.export_wafeq_note") }
+            if format == "daftra" { spendNote? += " — " + words.callIt("mac.export_daftra_note") }
         } catch {
             spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
         }
