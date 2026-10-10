@@ -380,6 +380,13 @@ struct Mesh3MFTests {
         }
     }
 
+    /// The unpacked size of an archive's model parts — the bytes `measure3MF`
+    /// streams through. An unreadable archive counts as over any budget.
+    nonisolated static func unpackedModelBytes(_ url: URL) -> Int {
+        guard let entries = try? Zip.entries(of: url) else { return .max }
+        return entries.filter { $0.name.lowercased().hasSuffix(".model") }.reduce(0) { $0 + $1.size }
+    }
+
     @Test("the key this produces is the key Electron produces, file for file")
     func matchesElectron() async throws {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -459,8 +466,11 @@ struct Mesh3MFTests {
         for (relative, theirs) in electron {
             guard let theirs, !theirs.hasPrefix("error:") else { continue }
             let path = vault.appending(path: relative)
-            let bytes = (try? FileManager.default.attributesOfItem(atPath: path.path)[.size] as? Int) ?? 0
-            if bytes > budget { skipped += 1; continue }
+            // The budget is on what gets READ — the unpacked model parts — not
+            // the archive on disk. A 23 MB 3MF here unpacks to 128 MB of mesh
+            // and took over an hour in a debug build, which looked like a hang
+            // in a full run (Oct 2026) and slowed every timing-bound test.
+            if Self.unpackedModelBytes(path) > budget { skipped += 1; continue }
             let measured = await Self.offMain { try? Mesh.measure3MF(path) }
             guard let m = measured else {
                 Issue.record("\(relative): Electron measured it and this could not")
