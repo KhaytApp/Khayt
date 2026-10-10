@@ -2893,6 +2893,15 @@ final class Words {
         "mac.export_accounting_where": [
             "en": "Two files are written here: one of invoices and one of expenses.",
             "ar": "يُكتب هنا ملفان: ملف للفواتير وآخر للمصروفات."],
+        // Said after a Wafeq or Daftra export, because both importers ask the
+        // person to match columns and names, and neither file is right until
+        // they do. lib/accounting-export.js cites where each rule comes from.
+        "mac.export_wafeq_note": [
+            "en": "In Wafeq, match the columns on the import screen and pick the account each expense was paid through. Customer, account and tax names must be spelled as they are in Wafeq.",
+            "ar": "في وافِق، طابق الأعمدة في شاشة الاستيراد واختر الحساب الذي دُفع منه كل مصروف. يجب أن تُكتب أسماء العملاء والحسابات والضرائب كما هي في وافِق."],
+        "mac.export_daftra_note": [
+            "en": "Sales go to Daftra as incomes, dated DD/MM/YYYY — set the same date format in Daftra. Tax names must be spelled as they are in Daftra, and the tax must not be included in the price.",
+            "ar": "تُستورد المبيعات إلى دفترة كإيرادات بتاريخ يوم/شهر/سنة — اضبط صيغة التاريخ نفسها في دفترة. يجب أن تُكتب أسماء الضرائب كما هي في دفترة، وألا تكون الضريبة مشمولة في السعر."],
         "mac.export_failed": ["en": "Nothing was exported:", "ar": "لم يُصدَّر شيء:"],
         // Who the shop's money came from, and what it is asked for. Khayt has
         // its own words for the two lists; this is the name of the page that

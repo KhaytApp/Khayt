@@ -1819,7 +1819,8 @@ public actor KhaytEngine {
     /// The shop's invoices as a CSV, in the layout the accountant's software
     /// wants.
     ///
-    /// `format` is one of `generic`, `quickbooks`, `xero`, `zoho`; anything
+    /// `format` is one of `generic`, `quickbooks`, `xero`, `zoho`, `wafeq`,
+    /// `daftra`; anything
     /// else is treated as generic by the rule rather than refused, which is the
     /// right way round for a file somebody is trying to produce at the end of a
     /// quarter.
@@ -1883,21 +1884,46 @@ public actor KhaytEngine {
                 return nameById[JSSemantics.text(id)] ?? ""
             })
         // `buildInvoiceCsv` is a formatter and stays where it is: it lays out
-        // four accounting packages' column orders, which is a table, not a rule.
+        // the accounting packages' column orders, which is a table, not a rule.
         return try runtime.call2(
-            "KhaytAccountingExport.buildInvoiceCsv(ARG0,"
-            + " {format: ARG1, from: ARG2 || undefined, to: ARG3 || undefined})",
-            [.array(rows), .string(format), .string(from), .string(to)],
+            "KhaytAccountingExport.buildInvoiceCsv(ARG0, ARG1)",
+            [.array(rows), .object(Self.accountingOptions(settings, format: format, from: from, to: to))],
             as: String.self)
     }
 
     /// The shop's expenses as a CSV, in the same layouts.
+    ///
+    /// `settings` supplies the shop's currency, because an expense record
+    /// carries none and Wafeq refuses a row without one.
     public func expenseCsv(_ expenses: [JSONValue], format: String,
+                           settings: [String: JSONValue] = [:],
                            from: String = "", to: String = "") throws -> String {
         try runtime.call2(
-            "KhaytAccountingExport.buildExpenseCsv(ARG0, {format: ARG1, from: ARG2 || undefined, to: ARG3 || undefined})",
-            [.array(expenses), .string(format), .string(from), .string(to)],
+            "KhaytAccountingExport.buildExpenseCsv(ARG0, ARG1)",
+            [.array(expenses), .object(Self.accountingOptions(settings, format: format, from: from, to: to))],
             as: String.self)
+    }
+
+    /// The options the accountant's file is built with.
+    ///
+    /// The sales account and tax name are the ones the other app's export
+    /// dialogue saves under `accountingSync`, read from the same keys so the
+    /// same book exports the same file from either app. Before Wafeq and
+    /// Daftra this app passed neither, and Xero's TaxType got the bare rate
+    /// where the other app wrote the shop's code. The currency is the shop's,
+    /// for rows that carry none.
+    static func accountingOptions(_ settings: [String: JSONValue], format: String,
+                                  from: String, to: String) -> [String: JSONValue] {
+        var out: [String: JSONValue] = ["format": .string(format)]
+        if !from.isEmpty { out["from"] = .string(from) }
+        if !to.isEmpty { out["to"] = .string(to) }
+        if case .object(let sync)? = settings["accountingSync"] {
+            for key in ["salesAccount", "taxCode"] {
+                if case .string(let v)? = sync[key], !v.isEmpty { out[key] = .string(v) }
+            }
+        }
+        if case .string(let c)? = settings["currency"], !c.isEmpty { out["currency"] = .string(c) }
+        return out
     }
 
     // MARK: - The shelf

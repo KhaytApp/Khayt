@@ -253,3 +253,80 @@ test('invoice payload carries salesAccount + taxCode', () => {
   assert.equal(p.salesAccount, '200');
   assert.equal(p.taxCode, 'NONE');
 });
+
+/*
+ * Wafeq and Daftra (Saudi). The columns are cited in lib/accounting-export.js
+ * from each vendor's own help centre; these pin them, and pin the tax stance:
+ * revenue goes out NET, with the tax named, never folded into the amount.
+ */
+const { INVOICE_FORMATS, EXPENSE_FORMATS } = require('../lib/accounting-export');
+
+test('Wafeq invoices: Wafeq field names, ISO dates, net price flagged exc. tax', () => {
+  const inv = [{ id: 'INV-9', date: '2026-06-01', clientName: 'شركة الضياء', price: 115, vatRate: 15, currency: 'SAR' }];
+  const { header, rows } = parseCsv(buildInvoiceCsv(inv, { format: 'wafeq', salesAccount: 'Sales', taxCode: 'VAT on Sales' }));
+  assert.deepEqual(header, ['Invoice number', 'Customer name', 'Currency', 'Date', 'Due date',
+    'Line item description', 'Qty', 'Price', 'Account', 'Tax rate', 'Amount is inc. or exc. tax']);
+  const r = rows[0];
+  assert.equal(col(header, r, 'Invoice number'), 'INV-9');
+  assert.equal(col(header, r, 'Customer name'), 'شركة الضياء');
+  assert.equal(col(header, r, 'Date'), '2026-06-01');
+  assert.equal(col(header, r, 'Due date'), '2026-06-01');
+  assert.equal(col(header, r, 'Qty'), '1');
+  assert.equal(col(header, r, 'Price'), '100.00', 'the price is the NET figure');
+  assert.equal(col(header, r, 'Amount is inc. or exc. tax'), 'exc. tax');
+  assert.equal(col(header, r, 'Tax rate'), 'VAT on Sales');
+  assert.equal(col(header, r, 'Account'), 'Sales');
+});
+
+test('Wafeq/Daftra: an exclusive shop still exports the net price, and no tax means no tax name', () => {
+  const excl = [{ id: 'A', date: '2026-06-01', price: 100, vatRate: 15, taxMode: 'exclusive', currency: 'USD' }];
+  const w = parseCsv(buildInvoiceCsv(excl, { format: 'wafeq' }));
+  assert.equal(col(w.header, w.rows[0], 'Price'), '100.00');
+  // No tax name configured: the numeric rate, as Xero/Zoho fall back — a row
+  // Wafeq asks about, rather than VAT that silently vanishes.
+  assert.equal(col(w.header, w.rows[0], 'Tax rate'), '15');
+  const zero = [{ id: 'B', date: '2026-06-01', price: 50, vatRate: 0 }];
+  const d = parseCsv(buildInvoiceCsv(zero, { format: 'daftra', taxCode: 'VAT' }));
+  assert.equal(col(d.header, d.rows[0], 'Taxes'), '', 'a zero-rated sale names no tax');
+  assert.equal(col(d.header, d.rows[0], 'Amount'), '50.00');
+});
+
+test('Daftra income: Daftra column names, DD/MM/YYYY, net amount + tax name', () => {
+  const inv = [{ id: 'INV-3', date: '2026-07-15', clientName: 'Acme', price: 230, vatRate: 15 }];
+  const { header, rows } = parseCsv(buildInvoiceCsv(inv, { format: 'daftra', taxCode: 'VAT', salesAccount: '4100', currency: 'SAR' }));
+  assert.deepEqual(header, ['Date', 'Amount', 'Currency', 'Vendor', 'Description', 'Taxes', 'Sub-Account']);
+  assert.equal(col(header, rows[0], 'Date'), '15/07/2026');
+  assert.equal(col(header, rows[0], 'Amount'), '200.00');
+  assert.equal(col(header, rows[0], 'Currency'), 'SAR', 'a row with no currency takes the shop\'s');
+  assert.equal(col(header, rows[0], 'Vendor'), 'Acme');
+  assert.equal(col(header, rows[0], 'Description'), 'INV-3');
+  assert.equal(col(header, rows[0], 'Taxes'), 'VAT');
+  assert.equal(col(header, rows[0], 'Sub-Account'), '4100');
+});
+
+test('Wafeq/Daftra expenses: required columns, gross amount, shop currency, date range', () => {
+  const expenses = [
+    { date: '2026-01-10', category: 'filament', amount: 57.5, note: 'PLA' },
+    { date: '2026-02-10', category: 'rent', amount: 1000, note: '' },
+  ];
+  const w = parseCsv(buildExpenseCsv(expenses, { format: 'wafeq', currency: 'SAR', paymentAccount: 'Petty Cash', from: '2026-02-01' }));
+  assert.deepEqual(w.header, ['Date', 'Account', 'Paid through', 'Currency', 'Amount', 'Amount is inc. or exc. tax', 'Description']);
+  assert.equal(w.rows.length, 1);
+  assert.deepEqual(w.rows[0], ['2026-02-10', 'Rent', 'Petty Cash', 'SAR', '1000.00', 'inc. tax', '']);
+
+  const d = parseCsv(buildExpenseCsv(expenses, { format: 'daftra', currency: 'SAR' }));
+  assert.deepEqual(d.header, ['Date', 'Amount', 'Currency', 'Category', 'Description']);
+  assert.deepEqual(d.rows[0], ['10/01/2026', '57.50', 'SAR', 'Cost of Goods Sold', 'PLA']);
+});
+
+test('the format lists name the Saudi packages, and Qoyod is not guessed at', () => {
+  for (const f of ['wafeq', 'daftra']) {
+    assert.ok(INVOICE_FORMATS.includes(f));
+    assert.ok(EXPENSE_FORMATS.includes(f));
+  }
+  assert.ok(!INVOICE_FORMATS.includes('qoyod'));
+  // An unknown name still falls back to generic rather than refusing.
+  const inv = [{ id: 'X', date: '2026-01-01', price: 10 }];
+  assert.deepEqual(parseCsv(buildInvoiceCsv(inv, { format: 'qoyod' })).header,
+    parseCsv(buildInvoiceCsv(inv, { format: 'generic' })).header);
+});
