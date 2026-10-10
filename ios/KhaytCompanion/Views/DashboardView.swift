@@ -34,6 +34,8 @@ struct DashboardView: View {
     @State private var showWaste = false
     @State private var showExpense = false
     @State private var showIntake = false
+    @State private var pickingModel = false
+    @State private var quotingFile: QuotedFile?
     @State private var scanningLabel = false
     @State private var scannedSpool: InventorySpool?
     @State private var labelProblem: String?
@@ -81,6 +83,11 @@ struct DashboardView: View {
             .sheet(isPresented: $showWaste) { LogWasteSheet() }
             .sheet(isPresented: $showExpense) { ExpenseSheet() }
             .sheet(isPresented: $showIntake) { IntakeView() }
+            .fileImporter(isPresented: $pickingModel, allowedContentTypes: QuoteFileSheet.types) { result in
+                if case .success(let url) = result, let copy = QuotedFile.copy(url) { quotingFile = copy }
+            }
+            .sheet(item: $quotingFile) { QuoteFileSheet(file: $0.url) }
+            .onChange(of: ordersNav.quoteFileRequest) { _, f in if let f { quotingFile = f; ordersNav.quoteFileRequest = nil } }
             .sheet(isPresented: $scanningLabel) {
                 LabelScanner { code in Task { await follow(code) } }
             }
@@ -184,6 +191,7 @@ struct DashboardView: View {
                 Button { showExpense = true } label: { Label(L10n.tr("home.action.expense"), systemImage: "doc.text.viewfinder") }
                 Button { showAddSpool = true } label: { Label(L10n.tr("home.action.add_spool"), systemImage: "cylinder") }
                 Button { scanningLabel = true } label: { Label(L10n.tr("scan.label.title"), systemImage: "qrcode.viewfinder") }
+                Button { pickingModel = true } label: { Label(L10n.tr("quote.file.pick"), systemImage: "cube") }
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .medium))

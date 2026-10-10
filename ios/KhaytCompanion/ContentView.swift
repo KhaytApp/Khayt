@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var settings: ConnectionSettings
     @EnvironmentObject private var api: KhaytAPIClient
+    @EnvironmentObject private var ordersNav: OrdersNavigationState
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab = 0
 
@@ -24,6 +25,13 @@ struct ContentView: View {
             }
         }
         .onAppear { applyPendingTab() }
+        // "Open in Khayt" from WhatsApp, Mail or Files: a model to quote.
+        .onOpenURL { url in
+            guard url.isFileURL, KhaytAPIClient.modelExtensions.contains(url.pathExtension.lowercased()),
+                  let copy = QuotedFile.copy(url) else { return }
+            selectedTab = 0
+            ordersNav.quoteFileRequest = copy
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { applyPendingTab() }
         }

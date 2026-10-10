@@ -4,6 +4,8 @@ import SwiftUI
 struct NewOrderSheet: View {
     let machines: [MachineInfo]
     var onCreated: () -> Void = {}
+    /// Where the form starts — a quote priced from a model file, say.
+    var initial: NewOrderDraft? = nil
 
     @EnvironmentObject private var api: KhaytAPIClient
     @Environment(\.dismiss) private var dismiss
@@ -91,6 +93,7 @@ struct NewOrderSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(KhaytDesign.ground.ignoresSafeArea())
+            .onAppear { if let initial, draft.project.isEmpty { draft = initial } }
             .navigationTitle(L10n.tr(draft.isQuote ? "order.new.title_quote" : "order.new.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

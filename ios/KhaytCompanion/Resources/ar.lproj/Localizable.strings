@@ -665,3 +665,18 @@
 
 /* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
 "LA_PRINT_STARTED" = "بدأت %@ الطباعة";
+/* Quoting a model file (Mac /api/intake/estimate) */
+"quote.file.title" = "تسعير ملف";
+"quote.file.pick" = "تسعير ملف";
+"quote.file.file" = "الملف";
+"quote.file.hours" = "%@ س";
+"quote.file.exact" = "قاسه مُقطِّع الطباعة على الماك.";
+"quote.file.estimated" = "تقدير من شكل المجسّم.";
+"quote.file.make_quote" = "حوّله إلى عرض سعر";
+"quote.file.needs_mac" = "تسعير الملفات يحتاج تطبيق خيط للماك (alpha.63 أو أحدث) على شبكة الورشة.";
+"quote.file.reason.off" = "التسعير الفوري متوقف على الماك. فعّله لنموذج الطلبات في الإعدادات.";
+"quote.file.reason.unsupported" = "يسعّر خيط ملفات STL وOBJ و3MF وG-code.";
+"quote.file.reason.too-large" = "حجم الملف أكبر من 32 ميغابايت.";
+"quote.file.reason.no-numbers" = "أسعار الورشة غير مُعدّة على الماك بعد.";
+"quote.file.reason.no-price" = "لم يستطع الماك تسعير هذا الملف.";
+"quote.file.reason.busy" = "الماك مشغول. حاول بعد قليل.";
