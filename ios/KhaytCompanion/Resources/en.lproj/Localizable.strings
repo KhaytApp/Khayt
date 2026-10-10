@@ -662,3 +662,6 @@
 "scan.label.hint" = "Point at a Khayt job or spool label.";
 "scan.label.unknown" = "That code isn't a Khayt label.";
 "scan.label.missing" = "That label's job or spool isn't on this phone.";
+
+/* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
+"LA_PRINT_STARTED" = "%@ started printing";

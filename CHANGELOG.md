@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: Live Activities keep moving with the app closed.** The phone gives
+  Khayt Cloud its ActivityKit push tokens (khayt-cloud #112). Each running
+  activity's update token goes with its machine and is withdrawn when the
+  activity ends. The push-to-start token is registered only while Live
+  Activities are on in Settings, so the cloud can start one when a print
+  begins; switching them off withdraws it. An activity the cloud started is
+  followed like one the app started. The activity state now reads a
+  fractional percent (rounded) instead of failing the pushed update, and
+  the `LA_PRINT_STARTED` alert ships in English and Arabic.
+
 - **(Mac) For the iPhone app.** The phone can quote a file a customer sent it:
   the shop's owner PIN now opens the model estimate on the Mac's shop network
   server, as it opens the phone's other routes. (Not the intake form: that
