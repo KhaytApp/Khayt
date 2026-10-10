@@ -7,7 +7,8 @@ import KhaytCore
 ///
 /// Only a machine SEEN printing and then seen not printing counts. A machine
 /// that drops out of the readings, or that the phone first sees idle, is not
-/// a finished print — the phone was simply not looking when it ran.
+/// a finished print — the phone was simply not looking when it ran. Nor is
+/// one whose poll failed (`isUnheard`): the print is still on the bed.
 struct FinishDetector {
     private var printing: [String: (since: Date, filename: String?)] = [:]
 
@@ -16,6 +17,7 @@ struct FinishDetector {
         for (id, r) in readings {
             let isPrinting = r.isPrinting
             if r.isPaused { continue }      // still on the bed: neither started nor ended
+            if r.isUnheard { continue }     // a missed poll: not heard, not ended
             if isPrinting {
                 if printing[id] == nil { printing[id] = (now, r.filename) }
                 continue

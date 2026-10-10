@@ -695,3 +695,6 @@
 "photos.err.viewer" = "Your Khayt Cloud sign-in can view but not change this shop.";
 "photos.err.not_an_image" = "That file isn’t a photo Khayt can use. Choose a JPEG or PNG.";
 "photos.err.http" = "Khayt Cloud didn’t take the photo (error %lld). Try again.";
+
+/* Under the Live Activities toggle: the Mac's own opt-in for pushes. */
+"settings.live_activities.mac" = "To keep prints moving on the Lock Screen while this app is closed, the Mac has to send print progress: turn that on in Khayt on the Mac, and sign this phone in to Khayt Cloud.";

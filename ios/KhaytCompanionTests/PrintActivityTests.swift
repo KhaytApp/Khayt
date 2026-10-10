@@ -66,4 +66,13 @@ final class PrintActivityTests: XCTestCase {
         XCTAssertEqual(detector.observe(["M": reading("M", "idle")], now: now.addingTimeInterval(180)).count, 1,
                        "and the real ending still alerts")
     }
+
+    /// One missed Mac poll (`state: null` plus the poll's error) must not end
+    /// the activity as failed and start a fresh one on the next good poll.
+    func testAMissedPollLeavesTheActivityAlone() {
+        XCTAssertEqual(PrintActivityPlan.steps(readings: ["M": reading("M", nil, error: "timed out")],
+                                               running: ["M": printing()], now: now), [])
+        XCTAssertEqual(PrintActivityPlan.steps(readings: ["M": reading("M", nil, error: "timed out")],
+                                               running: [:], now: now), [], "and starts nothing either")
+    }
 }
