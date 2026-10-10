@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: one Live Activity rule for the phone and the Mac.** The phone's Live
+  Activities now decide what to start, update and end with KhaytCore's
+  `LiveActivityPlan`, the rule the Mac's pushes use. The Lock Screen can't
+  say one thing while the app is open and another once it's closed. The
+  phone's own copy of the rule is gone. Settings now names the Mac's toggle
+  exactly: "Send print progress to my iPhone (Live Activities)", under
+  Settings ▸ Integrations ▸ iPhone.
+
 - **Tabby and Tamara payments are finished and recorded for you.** A payment
   link from Khayt stopped at the link: Tamara cancels an order the shop does
   not authorise within 72 hours of the customer paying, and Tabby does not

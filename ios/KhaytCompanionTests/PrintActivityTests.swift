@@ -1,4 +1,5 @@
 import XCTest
+import KhaytCore
 @testable import KhaytCompanion
 
 /// The Live Activity's rules — pure, so ActivityKit is not needed to hold them.
@@ -74,5 +75,19 @@ final class PrintActivityTests: XCTestCase {
                                                running: ["M": printing()], now: now), [])
         XCTAssertEqual(PrintActivityPlan.steps(readings: ["M": reading("M", nil, error: "timed out")],
                                                running: [:], now: now), [], "and starts nothing either")
+    }
+
+    /// The phone's activity state and KhaytCore's shared plan name the same
+    /// phases. A phase only one side knows would be translated to "printing".
+    func testThePhoneAndTheSharedPlanNameTheSamePhases() {
+        let phone: [PrintActivityPlan.State.Phase] = [.printing, .paused, .finished, .failed, .cancelled]
+        for p in phone {
+            XCTAssertNotNil(LiveActivityPlan.Phase(rawValue: p.rawValue), "\(p) is unknown to KhaytCore")
+            let s = PrintActivityPlan.State(phase: p, job: "j", progress: 5, startedAt: now, endsAt: nil)
+            XCTAssertEqual(PrintActivityPlan.phone(PrintActivityPlan.shared(s)), s, "round trip of \(p)")
+        }
+        for p in [LiveActivityPlan.Phase.printing, .paused, .finished, .failed, .cancelled] {
+            XCTAssertNotNil(PrintActivityPlan.State.Phase(rawValue: p.rawValue), "\(p) is unknown to the phone")
+        }
     }
 }
