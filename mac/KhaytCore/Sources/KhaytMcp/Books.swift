@@ -22,7 +22,9 @@ import KhaytCore
 /// staff PIN hashes are masked before a tool sees the book. The tools then
 /// lift only the fields they name: a customer's NAME, never a phone, an email
 /// or an address — and the name only when the shop has said it may go
-/// (`CustomerNames`): by default an assistant reads "Customer 3".
+/// (`CustomerNames`): by default an assistant reads "Customer 3". Every free
+/// text they say — a project, a stock label — goes through `Outgoing` too, so
+/// a phone or an email TYPED into one is taken out as well.
 ///
 /// ── FRESH ON EVERY QUESTION ──────────────────────────────────────────────
 ///
@@ -42,6 +44,10 @@ struct Books: Sendable {
         self.engine = engine
         self.names = CustomerNames(book: book)
     }
+
+    /// Names, then every phone, email, IBAN and long number, out of the free
+    /// text a tool says (`Outgoing`).
+    var outgoing: Outgoing { Outgoing(names: names, engine: engine) }
 
     /// Read a store's bytes and mask them. Throws on a book that is not JSON.
     static func open(_ data: Data, engine: KhaytEngine) async throws -> Books {
@@ -100,15 +106,17 @@ struct Books: Sendable {
             }
         }
         let page = Page(shown, args)
+        let projects = await outgoing.clean(page.items.map(\.project))
+        let clients = await outgoing.clean(page.items.map { names.client(order: $0.id, named: $0.client) })
         return [
             "as_of": Calendar.book.dayString(now),
             "count": shown.count,
             "late": jobs.count { $0.daysLate != nil },
             "truncated": page.truncated,
-            "orders": page.items.map { o -> [String: Any] in
+            "orders": page.items.enumerated().map { i, o -> [String: Any] in
                 var row: [String: Any] = [
-                    "id": o.id, "project": names.scrub(o.project),
-                    "client": names.client(order: o.id, named: o.client), "status": o.status,
+                    "id": o.id, "project": projects[i],
+                    "client": clients[i], "status": o.status,
                     "currency": o.currency, "price": Self.money(o.price),
                     "due": Self.money(o.due), "owed": Self.money(o.owed),
                     "pay_status": o.payStatus,
@@ -145,6 +153,8 @@ struct Books: Sendable {
             shown = shown.filter { r in r.instalment ? r.days > 0 : (daysPast(r) ?? 0) > 0 }
         }
         let page = Page(shown, args)
+        let projects = await outgoing.clean(page.items.map(\.project))
+        let clients = await outgoing.clean(page.items.map { names.client(order: $0.id, named: $0.client) })
         return [
             "as_of": Calendar.book.dayString(now),
             "currency": await baseCurrency(),
@@ -155,10 +165,10 @@ struct Books: Sendable {
             "count": shown.count,
             "truncated": page.truncated,
             // The rule's order: oldest first, which is what a shop chases.
-            "rows": page.items.map { r -> [String: Any] in
+            "rows": page.items.enumerated().map { i, r -> [String: Any] in
                 var row: [String: Any] = [
-                    "id": r.id, "project": names.scrub(r.project),
-                    "client": names.client(order: r.id, named: r.client),
+                    "id": r.id, "project": projects[i],
+                    "client": clients[i],
                     "owed": Self.money(r.owed), "days_outstanding": r.days,
                     "bucket": r.bucket, "pay_status": r.payStatus, "instalment": r.instalment,
                 ]
@@ -185,20 +195,24 @@ struct Books: Sendable {
             return a.low && !b.low
         }
         let page = Page(items, args)
+        // The label, the material and the colour are all typed by the shop.
+        let labels = await outgoing.clean(page.items.map(\.label))
+        let materials = await outgoing.clean(page.items.map(\.material))
+        let colors = await outgoing.clean(page.items.map(\.color))
         return [
             "as_of": Calendar.book.dayString(now),
             "within_days": within,
             "count": items.count,
             "truncated": page.truncated,
-            "items": page.items.map { s -> [String: Any] in
+            "items": page.items.enumerated().map { i, s -> [String: Any] in
                 var row: [String: Any] = [
-                    "id": s.id, "kind": s.kind, "label": names.scrub(s.label), "unit": s.unit,
+                    "id": s.id, "kind": s.kind, "label": labels[i], "unit": s.unit,
                     "low": s.low, "on_hand": Self.money(s.stock),
                     "used_per_day": Self.money(s.perDay),
                     "suggest_order": Self.money(s.suggest), "needs_ordering": s.needsOrdering,
                 ]
-                if let v = s.material { row["material"] = v }
-                if let v = s.color { row["color"] = v }
+                if let v = materials[i] { row["material"] = v }
+                if let v = colors[i] { row["color"] = v }
                 if let v = s.committed { row["reserved"] = Self.money(v) }
                 if let v = s.available { row["available"] = Self.money(v) }
                 if let v = s.daysLeft { row["days_left"] = v }
@@ -335,7 +349,7 @@ struct Books: Sendable {
 
         var inputs: [String: Any] = ["grams": grams, "hours": hours, "qty": qty,
                                      "margin_pct": margin, "rush": rush]
-        if let v = spoolLabel { inputs["spool"] = names.scrub(v) }
+        if let v = spoolLabel { inputs["spool"] = await outgoing.clean(v) }
         if machine != nil { inputs["machine_id"] = args["machine_id"] }
         if preset != nil { inputs["preset_id"] = args["preset_id"] }
         return [

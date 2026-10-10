@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import KhaytCore
 @testable import KhaytMcp
 
 /// The protocol, and the one thing it must never answer.
@@ -31,7 +32,7 @@ struct McpServerTests {
         model(id: "PF-3", title: "Falcon hood", printed: 12, designer: "The3Dee",
               group: "Saudi Kings"),
         model(id: "PF-4", title: "Turbine bracket", group: "Saudi Kings"),
-    ]))
+    ]), engine: try? KhaytEngine())
 
     static func result(_ response: [String: Any]?) -> Any? {
         (response?["result"] as? [String: Any])
@@ -152,6 +153,24 @@ struct McpServerTests {
         let out = await Self.call("get_model", ["id": "PF-nope"])
         #expect(out?["error"] != nil)
         #expect(await Self.call("get_model", ["id": "PF-3"])?["title"] as? String == "Falcon hood")
+    }
+
+    /// FAIL CLOSED. With no rules to take phones and emails out of the
+    /// library's free text, the free text is not said at all — the ids and
+    /// counts still are.
+    @Test("with no rules to scrub with, the library says no free text")
+    func noRulesNoText() async {
+        let bare = Server(library: Self.shop.library)
+        let out = McpServerTests.payload(await bare.answer(to: [
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": ["name": "search_models", "arguments": ["limit": 10]]]))
+        let models = out?["models"] as? [[String: Any]] ?? []
+        #expect(models.count == 4)
+        for m in models {
+            #expect(m["title"] as? String == "<redacted>", "\(m)")
+            if let p = m["project"] { #expect(p as? String == "<redacted>") }
+            if let d = m["designer"] { #expect(d as? String == "<redacted>") }
+        }
     }
 
     /// A limit that is absurd must not be honoured. A host that asks for two

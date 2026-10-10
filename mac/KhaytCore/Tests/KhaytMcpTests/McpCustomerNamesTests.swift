@@ -198,6 +198,104 @@ struct McpCustomerNamesTests {
         #expect(names.client(order: "x", named: "Nobody We Know") == "Customer")
     }
 
+    // MARK: - Written the way people write names
+
+    static let nouf = CustomerNames(book: [
+        "clients": .array([.object(["id": .string("c1"), "nameEn": .string("Nouf Al-Dossari"),
+                                    "nameAr": .string("نوف الدوسري")])]),
+    ])
+
+    @Test("an Arabic proclitic, ى for ي, a double space or a missing hyphen still finds the name",
+          arguments: [
+              ("هدية لنوف الدوسري", "هدية لCustomer 1"),
+              ("ونوف الدوسري", "وCustomer 1"),
+              ("نوف الدوسرى", "Customer 1"),
+              ("نوف الدوسريّ تصل الخميس", "Customer 1 تصل الخميس"),
+              ("نـوف الدوسري", "Customer 1"),
+              ("Nouf  Al-Dossari", "Customer 1"),
+              ("Nouf Al Dossari", "Customer 1"),
+              ("gift for NOUF AL - DOSSARI!", "gift for Customer 1!"),
+              ("بنوف الدوسري، شكراً", "بCustomer 1، شكراً"),
+          ])
+    func foldedForms(_ text: String, _ said: String) {
+        #expect(Self.nouf.scrub(text) == said)
+    }
+
+    @Test("folding never matches a name inside a longer word")
+    func foldedStaysBounded() {
+        #expect(Self.nouf.scrub("Nouf Al-Dossarix") == "Nouf Al-Dossarix")
+        #expect(Self.nouf.scrub("xNouf Al-Dossari") == "xNouf Al-Dossari")
+        // Two letters before it is a word, not a proclitic.
+        #expect(Self.nouf.scrub("ولنوف الدوسري") == "ولنوف الدوسري")
+        #expect(Self.nouf.scrub("نوف الدوسريين") == "نوف الدوسريين")
+        // Text around a match is handed on exactly as it was typed.
+        #expect(Self.nouf.scrub("مَعَ  نوف الدوسري  -  ok") == "مَعَ  Customer 1  -  ok")
+    }
+
+    // MARK: - Phones, emails and IBANs typed into free text
+
+    /// What a shop types: a project naming a customer by phone, a model title
+    /// with an email, a tag holding an IBAN — and a client's own number, short
+    /// enough that only the record knows it is a phone.
+    static let planted = [
+        "0551234567", "+966551234568", "+966 55 123 4569", "055 123 4570",
+        "nouf.d@example.com", "SA0380000000608010167519", "SA44 2000 0001 2345 6789 1234",
+        "٠٥٥١٢٣٤٥٧٢", "800 1234",
+    ]
+
+    static func plantedBook(share: Bool) throws -> Book {
+        var book = try Self.book()
+        if share { book = McpBooksTests.sharingNames(book) }
+        var orders = McpBooksTests.rows(book, "printLog")
+        if let at = orders.firstIndex(where: { Self.id($0) == "ORD-01039" }),
+           case .object(var o) = orders[at] {
+            o["project"] = .string("Nouf 0551234567 – pickup Thu, or +966551234568 / +966 55 123 4569")
+            orders[at] = .object(o)
+        }
+        book["printLog"] = .array(orders)
+        var files = McpBooksTests.rows(book, "printFiles")
+        if case .object(var f)? = files.first {
+            f["name"] = .string("Box for nouf.d@example.com (055 123 4570)")
+            f["tags"] = .array([.string("SA0380000000608010167519"), .string("call ٠٥٥١٢٣٤٥٧٢"),
+                                .string("SA44 2000 0001 2345 6789 1234"), .string("ext 800 1234")])
+            f["folder"] = .string("Orders for 0551234567")
+            files[0] = .object(f)
+        }
+        book["printFiles"] = .array(files)
+        var clients = McpBooksTests.rows(book, "clients")
+        if case .object(var c)? = clients.first {
+            c["phone"] = .string("800 1234")
+            clients[0] = .object(c)
+        }
+        book["clients"] = .array(clients)
+        var stock = McpBooksTests.rows(book, "inventory")
+        if let at = stock.firstIndex(where: { Self.id($0) == "sp-1" }), case .object(var s) = stock[at] {
+            s["color"] = .string("Red for 0551234567")
+            stock[at] = .object(s)
+        }
+        book["inventory"] = .array(stock)
+        return book
+    }
+
+    @Test("no phone, email or IBAN typed into free text reaches the assistant, shared names or not",
+          arguments: [false, true])
+    func noContactInFreeText(_ share: Bool) async throws {
+        let engine = try KhaytEngine()
+        let said = try await Self.everything(try Self.plantedBook(share: share), engine: engine)
+        #expect(said.contains("<redacted>"), "nothing was redacted: the plants were not said at all")
+        #expect(said.contains("pickup Thu"), "the rest of the project was lost")
+        for plant in Self.planted {
+            #expect(!said.contains(plant), "\(share): \(plant) was said")
+            let digits = plant.filter(\.isWholeNumber)
+            if digits.count >= 7 {
+                let western = String(digits.map { c in c.wholeNumberValue.map { Character("\($0)") } ?? c })
+                #expect(!said.contains(western), "\(share): \(plant)'s digits were said")
+                #expect(!said.contains(String(western.suffix(7))), "\(share): \(plant)'s number was said")
+            }
+        }
+        #expect(!said.contains("@example.com"))
+    }
+
     // MARK: - On
 
     @Test("on: the tools say the names, as before")

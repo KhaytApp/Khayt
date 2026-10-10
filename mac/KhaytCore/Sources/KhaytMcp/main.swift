@@ -54,7 +54,7 @@ let server = Server(library: library, books: engine.map { engine in
     // switch in Settings ▸ Assistant holds from the next one. A book that
     // cannot be read shares nothing.
     CustomerNames.read(data: (try? Library.bookData(at: bookURL)) ?? Data())
-})
+}, engine: engine)
 
 // `await` at the top level: each request is answered in turn, in order. The
 // engine is an actor, so the awaits hop to it and back — nothing here blocks
