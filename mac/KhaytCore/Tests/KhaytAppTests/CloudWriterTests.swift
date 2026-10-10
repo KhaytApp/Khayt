@@ -405,10 +405,10 @@ struct CloudRefusalsTests {
 struct SendToCloudWiringTests {
 
     static func shopSource() throws -> String {
-        try String(contentsOf: URL(fileURLWithPath: #filePath)
+        try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
     }
 
     static func sendToCloud() throws -> Substring {

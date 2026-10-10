@@ -68,9 +68,9 @@ import KhaytCore
 
     @Test("the masthead is handed the time log when the book loads")
     func mastheadIsHandedIt() throws {
-        let src = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let src = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         #expect(src.contains("timeEntries: Self.rows(root, \"timeEntries\"), now: now)"))
     }
 

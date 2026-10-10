@@ -194,7 +194,7 @@ struct TelegramSettingsTests {
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp/Shop.swift")
-        let shop = try String(contentsOf: url, encoding: .utf8)
+        let shop = try ShopSources.read(url)
         #expect(!shop.isEmpty, "Shop.swift was not read — this would pass vacuously")
 
         #expect(shop.contains("func warnAboutLowStock("), "the sender is gone")

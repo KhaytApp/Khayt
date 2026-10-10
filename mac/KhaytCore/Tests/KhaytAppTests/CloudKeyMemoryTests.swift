@@ -33,9 +33,9 @@ struct CloudKeyMemoryTests {
 
     @Test("the key is kept at both unlocks, dropped on Lock, and restored when a book loads")
     func wired() throws {
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         // Both unlocks go through keepCloudKey, which remembers or forgets as
         // the shop chose ("Remember me on this Mac"); CloudSignOutTests pins that.
         let kept = shop.components(separatedBy: "await keepCloudKey(").count - 1

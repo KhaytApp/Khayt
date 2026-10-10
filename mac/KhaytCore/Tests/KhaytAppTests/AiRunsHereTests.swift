@@ -23,7 +23,7 @@ struct AiRunsHereTests {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytApp/\(name)")
-        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        return (try? ShopSources.read(url)) ?? ""
     }
 
     /// Feature id -> the `Shop` method a screen calls, and the `AiClient`
@@ -66,7 +66,7 @@ struct AiRunsHereTests {
         let files = (try? FileManager.default.contentsOfDirectory(at: dir,
                      includingPropertiesForKeys: nil)) ?? []
         let asked = files.filter {
-            $0.pathExtension == "swift" && $0.lastPathComponent != "Shop.swift"
+            $0.pathExtension == "swift" && !ShopSources.isShop($0.lastPathComponent)
                 && $0.lastPathComponent != "AiClient.swift"
         }.contains { url in
             guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }

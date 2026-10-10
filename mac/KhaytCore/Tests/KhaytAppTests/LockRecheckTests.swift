@@ -17,7 +17,7 @@ struct LockRecheckTests {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp/\(file)")
-        return try String(contentsOf: url, encoding: .utf8)
+        return try ShopSources.read(url)
     }
 
     // N1

@@ -139,9 +139,9 @@ struct LibraryFileSafetyTests {
 
     @Test("the window's import passes keep-original through and skips linked folders")
     func importWiring() throws {
-        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let source = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         let start = try #require(source.range(of: "func addModelsToLibrary(_ chosen: [URL]"))
         let body = String(source[start.lowerBound...].prefix(6000))
         #expect(body.contains("keepOriginal: keepOriginal,"))

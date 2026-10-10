@@ -340,7 +340,7 @@ struct PhotoOrientationTests {
         #expect(strip.contains("turn: { by in Task { await turn(picture.id, by: by) } }"))
         #expect(strip.contains(".overlay(alignment: .bottomTrailing) { turnButtons }"))
         #expect(strip.contains("Button(shop.words.callIt(\"mac.rotate_left\")) { turn(-1) }"))
-        let shop = try String(contentsOf: root.appending(path: "Shop.swift"), encoding: .utf8)
+        let shop = try ShopSources.read(root.appending(path: "Shop.swift"))
         #expect(shop.contains("ProductPhotos.target(existing: staged![i].path"),
                 "the save does not write a turned picture over its own file")
     }

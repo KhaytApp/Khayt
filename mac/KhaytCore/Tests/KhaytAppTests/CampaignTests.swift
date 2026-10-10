@@ -147,9 +147,9 @@ struct CampaignTests {
             "Hi {{name}}", recipient: recipient, spend: "1", settings: .object([:]))
         #expect(text == "Hi <img src=x onerror=alert(1)> & $&")
         // The send path asks for the escaped form.
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         #expect(shop.contains("campaignPreview(body, for: recipient, html: true)"),
                 "the campaign email is filled as plain text")
     }

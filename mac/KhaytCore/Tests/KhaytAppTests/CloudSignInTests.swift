@@ -48,12 +48,11 @@ struct CloudSignInTests {
     /// cloud, which reads as the server having lost it.
     @Test("the passphrase is proved before anything is written")
     func passphraseBeforeWrite() throws {
-        let source = try String(
-            contentsOf: URL(fileURLWithPath: #filePath)
+        let source = try ShopSources.read(
+            URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent().deletingLastPathComponent()
                 .deletingLastPathComponent()
-                .appending(path: "Sources/KhaytApp/Shop.swift"),
-            encoding: .utf8)
+                .appending(path: "Sources/KhaytApp/Shop.swift"))
         guard let fn = source.range(of: "func signInToCloud(") else {
             Issue.record("signInToCloud is gone"); return
         }
@@ -73,12 +72,11 @@ struct CloudSignInTests {
     /// written is `renderer/settings.js`'s, key for key.
     @Test("settings.cloud is written in the shape the other app writes")
     func theShapeMatches() throws {
-        let mac = try String(
-            contentsOf: URL(fileURLWithPath: #filePath)
+        let mac = try ShopSources.read(
+            URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent().deletingLastPathComponent()
                 .deletingLastPathComponent()
-                .appending(path: "Sources/KhaytApp/Shop.swift"),
-            encoding: .utf8)
+                .appending(path: "Sources/KhaytApp/Shop.swift"))
         guard let fn = mac.range(of: "func signInToCloud(") else {
             Issue.record("signInToCloud is gone"); return
         }

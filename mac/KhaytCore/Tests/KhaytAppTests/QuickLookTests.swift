@@ -116,7 +116,7 @@ struct QuickLookTests {
 
         for file in ["Shop.swift", "FileActions.swift", "LibraryGrid.swift",
                      "Menus.swift", "LibraryInspector.swift"] {
-            let text = (try? String(contentsOf: sources.appending(path: file), encoding: .utf8)) ?? ""
+            let text = (try? ShopSources.read(sources.appending(path: file))) ?? ""
             // ONE line list for both the search and the bounds. Swift's
             // `split(separator:)` drops empty subsequences unless told not to,
             // so numbering the offenders from one split and the function from

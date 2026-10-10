@@ -82,7 +82,7 @@ struct LibraryDeleteTests {
         // And the words are the Electron app's own, in both languages.
         for key in ["plib.delete_title", "plib.delete_confirm", "plib.deleted", "plib.delete_partial"] {
             #expect(window.contains(key) || actions.contains(key)
-                    || ((try? String(contentsOf: root.appending(path: "Shop.swift"), encoding: .utf8)) ?? "").contains(key),
+                    || ((try? ShopSources.read(root.appending(path: "Shop.swift"))) ?? "").contains(key),
                     "\(key) is not used — the two apps say this differently")
         }
     }

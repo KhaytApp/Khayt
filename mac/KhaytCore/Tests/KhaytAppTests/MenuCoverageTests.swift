@@ -31,7 +31,7 @@ struct MenuCoverageTests {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytApp/\(name)")
-        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        return (try? ShopSources.read(url)) ?? ""
     }
 
     /// Where a job can be sent, offered wherever a job is.

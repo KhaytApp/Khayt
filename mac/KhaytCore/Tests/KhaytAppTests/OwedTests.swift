@@ -91,10 +91,10 @@ struct OwedTests {
         // A source guard: `load` is one long async function and there is no
         // seam. It catches the regression that matters — dropping the call and
         // going back to a subtraction on every screen.
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         #expect(shop.contains("await resolveOwed(root)"))
         #expect(shop.contains("engine.owedByOrder("))
         // …and after the settings tables, because the rule resolves an order's
@@ -198,10 +198,10 @@ struct LateTests {
 
     @Test("the book resolves it on load")
     func theBookIsWired() throws {
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         #expect(shop.contains("await resolveLate(root)"))
         #expect(shop.contains("engine.lateOrders("))
     }

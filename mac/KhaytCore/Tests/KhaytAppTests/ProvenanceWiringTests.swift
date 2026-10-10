@@ -16,8 +16,7 @@ struct ProvenanceWiringTests {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-        return try String(contentsOf: root.appending(path: "Sources/KhaytApp/Shop.swift"),
-                          encoding: .utf8)
+        return try ShopSources.read(root.appending(path: "Sources/KhaytApp/Shop.swift"))
     }
 
     @Test("the provenance read is wired to the book opening")

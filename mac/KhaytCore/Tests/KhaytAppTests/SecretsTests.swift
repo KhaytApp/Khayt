@@ -137,10 +137,10 @@ struct SecretsTests {
         // injectable session and awaits a real request. What it is worth is
         // catching the exact regression: somebody passing `message.botToken`
         // straight to `send` again, which is what the code did until now.
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         guard let at = shop.range(of: "private func tell(_ message: TelegramMessage)") else {
             Issue.record("tell has been renamed"); return
         }

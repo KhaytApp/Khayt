@@ -47,9 +47,12 @@ struct MessagesAreShownTests {
         var shop = ""
         let files = (try? FileManager.default.contentsOfDirectory(at: dir,
                                                                   includingPropertiesForKeys: nil)) ?? []
-        for url in files where url.pathExtension == "swift" {
+        // Shop is `Shop.swift` plus its `Shop+<Area>.swift` extensions; all of
+        // them are Shop, and none of them is something that can draw.
+        for url in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
+        where url.pathExtension == "swift" {
             guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
-            if url.lastPathComponent == "Shop.swift" { shop = text } else { views[url.lastPathComponent] = text }
+            if ShopSources.isShop(url.lastPathComponent) { shop += text + "\n" } else { views[url.lastPathComponent] = text }
         }
         return (shop, views)
     }

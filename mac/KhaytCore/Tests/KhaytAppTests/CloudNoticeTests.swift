@@ -76,10 +76,10 @@ struct CloudNoticeTests {
     @Test("both windows carry it, and only when connected")
     func theWindowsSayIt() throws {
         func source(_ file: String) throws -> String {
-            try String(contentsOf: URL(fileURLWithPath: #filePath)
+            try ShopSources.read(URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent().deletingLastPathComponent()
                 .deletingLastPathComponent()
-                .appending(path: "Sources/KhaytApp/\(file)"), encoding: .utf8)
+                .appending(path: "Sources/KhaytApp/\(file)"))
         }
         // The window that ships.
         let shell = try source("Shell.swift")
