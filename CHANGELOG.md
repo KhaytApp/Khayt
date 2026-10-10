@@ -12,6 +12,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   webhook did which the Mac does not, moving a job on when its print starts or
   ends, is now the README's not-yet-built item.
 
+- **(Mac) Crash reports and usage counts, only if you say yes.** The Mac app
+  now asks once, in a small card at the top of the window, whether to share
+  crash reports, and usage counts as an extra. "Not now" means it doesn't ask
+  again. Both are off until you turn them on, and Settings ▸ Preferences has
+  the two switches for good, with "View what's collected" showing exactly
+  what's waiting to go. Reports are cleaned by the same rule the Electron
+  desktop app uses: no names, numbers, file paths, orders, customers, prices
+  or files. Turning a switch off deletes anything queued at once. (#1789)
+- **Crash reports with a long stack are no longer thrown away.** A report
+  whose stack ran past 4,000 characters was refused whole by Khayt Cloud. The
+  stack is now cut to fit, keeping complete lines.
+
 - **iOS: one Live Activity rule for the phone and the Mac.** The phone's Live
   Activities now decide what to start, update and end with KhaytCore's
   `LiveActivityPlan`, the rule the Mac's pushes use. The Lock Screen can't

@@ -343,6 +343,7 @@ final class Words {
     nonisolated static let own: [String: [String: String]] =
         base.merging(PrintFactLines.ownWords) { mine, _ in mine }
             .merging(ReviewWords.alpha58) { mine, _ in mine }
+            .merging(TelemetryWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
         // Shelves

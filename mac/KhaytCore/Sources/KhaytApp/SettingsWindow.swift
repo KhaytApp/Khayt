@@ -1190,6 +1190,9 @@ struct PreferencesPane: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                // Crash reports and usage counts (#1789): the book's consent,
+                // saved on the spot rather than with the bar below.
+                TelemetrySettings(shop: shop)
                 Section(shop.words.callIt("set.locale_section")) {
                     Toggle(shop.words.callIt("set.use_hijri"), isOn: $draft.useHijri)
                     Toggle(shop.words.callIt("set.use_arabic_nums"), isOn: $draft.useArabicNumerals)

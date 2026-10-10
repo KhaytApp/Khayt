@@ -126,6 +126,9 @@ struct KhaytApp: App {
                     // A new shop — an empty book, or no book on this Mac at
                     // all — is offered the setup, once. See `ShopSetup.offers`.
                     shop.offerSetupIfNew()
+                    // Opt-in crash reports and usage counts (#1789). Sends
+                    // nothing unless the book says so; see `Telemetry`.
+                    Telemetry.shared.start(shop: shop)
                     // EVERY MOVED MODEL, ASKED FOR: on launch and once a day
                     // while the app is open. After "Free up space" the cloud
                     // holds the only copy, and nothing else ever looks again —
