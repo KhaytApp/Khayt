@@ -6945,6 +6945,14 @@ public actor KhaytEngine {
     public struct ReceiptDraft: Decodable, Sendable, Equatable {
         public let draft: Draft
         public let supplier: Matched?
+        /// The seller, when no supplier matched: for the person to add, with
+        /// its VAT number, so the next receipt from them matches.
+        public let newSupplier: NewSupplier?
+        /// The receipt's own seller (control and bidi-override characters
+        /// removed, at most 200 characters) and VAT number — separately, so
+        /// the app builds its note in the shop's language.
+        public let sellerName: String
+        public let vatNumber: String
         /// An expense already filed from this same receipt.
         public let duplicateOf: String?
 
@@ -6958,6 +6966,10 @@ public actor KhaytEngine {
         public struct Matched: Decodable, Sendable, Equatable {
             public let id: String
             public let name: String
+        }
+        public struct NewSupplier: Decodable, Sendable, Equatable {
+            public let name: String
+            public let vatNumber: String
         }
     }
 

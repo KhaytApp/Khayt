@@ -29,6 +29,11 @@ struct Supplier: Identifiable, Hashable, Sendable {
     /// the shop has never said.
     var leadDays: Int?
     var website: String
+    /// The supplier's VAT registration number. Stored as `vat`, the key the
+    /// book already uses for a client's and for the shop's own number; a
+    /// `vatNumber` written by anything else is read too. A receipt's ZATCA QR
+    /// is matched to the supplier by it (`lib/zatca-qr.js`).
+    var vat: String
     var notes: String
     /// What this supplier quotes, per kilogram, per material.
     var priceList: [Quote]
@@ -112,10 +117,24 @@ struct Supplier: Identifiable, Hashable, Sendable {
     /// default there and is the default here.
     static let categories = ["filament", "hardware", "tools", "packaging", "services", "other"]
 
+    /// A VAT number as its digits: spaces dropped, Arabic-Indic and Persian
+    /// digits made 0-9 (the Arabic keyboard types them).
+    static func vatDigits(_ typed: String) -> String {
+        PinHash.normalize(typed).filter { !$0.isWhitespace }
+    }
+
+    /// A Saudi VAT registration number: fifteen digits, starting and ending in
+    /// 3 — the rule the receipt decoder holds a ZATCA QR to. Empty is allowed:
+    /// the number is optional.
+    static func vatIsValid(_ typed: String) -> Bool {
+        let digits = vatDigits(typed)
+        return digits.isEmpty || digits.wholeMatch(of: /3\d{13}3/) != nil
+    }
+
     /// A new one, before it has been saved.
     static func blank() -> Supplier {
         Supplier(id: "", name: "", category: "other", phone: "", leadDays: nil,
-                 website: "", notes: "", priceList: [], purchases: [])
+                 website: "", vat: "", notes: "", priceList: [], purchases: [])
     }
 
     @MainActor
@@ -131,6 +150,8 @@ struct Supplier: Identifiable, Hashable, Sendable {
         let lead = Shop.plainNumber(o["leadDays"]) ?? 0
         self.leadDays = lead > 0 ? Int(saturating: lead.rounded()) : nil
         self.website = Shop.plainString(o["website"]) ?? ""
+        let vat = Shop.plainString(o["vat"]) ?? ""
+        self.vat = vat.isEmpty ? (Shop.plainString(o["vatNumber"]) ?? "") : vat
         self.notes = Shop.plainString(o["notes"]) ?? ""
         if case .array(let quoted)? = o["priceList"] {
             self.priceList = quoted.compactMap { q in
@@ -150,8 +171,8 @@ struct Supplier: Identifiable, Hashable, Sendable {
         }
     }
 
-    private init(id: String, name: String, category: String, phone: String,
-                 leadDays: Int?, website: String, notes: String, priceList: [Quote],
+    init(id: String, name: String, category: String, phone: String,
+                 leadDays: Int?, website: String, vat: String = "", notes: String, priceList: [Quote],
                  purchases: [Purchase]) {
         self.id = id
         self.name = name
@@ -159,6 +180,7 @@ struct Supplier: Identifiable, Hashable, Sendable {
         self.phone = phone
         self.leadDays = leadDays
         self.website = website
+        self.vat = vat
         self.notes = notes
         self.priceList = priceList
         self.purchases = purchases
@@ -180,6 +202,7 @@ struct Supplier: Identifiable, Hashable, Sendable {
             "category": .string(category),
             "phone": .string(phone.trimmingCharacters(in: .whitespaces)),
             "website": .string(website.trimmingCharacters(in: .whitespaces)),
+            "vat": .string(Supplier.vatDigits(vat)),
             "notes": .string(notes.trimmingCharacters(in: .whitespacesAndNewlines)),
             "priceList": .array(priceList.compactMap { q in
                 let material = q.material.trimmingCharacters(in: .whitespaces)

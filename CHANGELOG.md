@@ -62,20 +62,42 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   says why. The reading rule is shared (`lib/zatca-qr.js` `decodeTLV`,
   `receiptToExpenseDraft`), and an expense now keeps which receipt it was read
   from (`receiptRef`).
+  - Each card shows the seller's VAT number, and a seller who is not yet one of
+    your suppliers can be added with **Add as supplier**, number included, so
+    the next receipt from them is matched. Suppliers have a **VAT number** field
+    (optional; 15 digits, a 3 at each end; stored as `vat`).
+  - The form opens with **no category chosen**, and Add stays off until you pick
+    one. The note is written in the shop's language, and the amounts are rounded
+    to the halala. A shop whose books are not in riyals is told the receipt is.
+  - A code that is not a receipt shows its first characters, so you can tell
+    which one it was. The list of codes scrolls on a small screen, so Cancel is
+    always in view. A seller name is cut at 200 characters, with control and
+    text-direction characters removed. A PDF page is drawn at most 4096 pixels
+    on a side and read one page at a time.
+  - Arabic: "Link to order (optional)" reads «مرجع الطلب (اختياري)».
 
 - **(Mac) The iPhone's print Live Activities keep moving with the phone
-  closed.** When a shop is connected to Khayt Cloud, the Mac now tells the
+  closed.** Off until you turn it on, on each Mac: Settings ▸ Integrations ▸
+  *Send print progress to my iPhone (Live Activities)*. When it is on and the
+  shop is connected to Khayt Cloud, the Mac tells the
   cloud when a print starts, moves on (a whole percent, a pause, a new finish
   time) and ends, and the cloud pushes it to the phones. The Mac decides by the
   phone's own rule, now shared: a printer that stops answering has not
   finished; only one seen printing and then seen idle has. Nothing is sent for
   a shop not on Khayt Cloud or with a view-only connection. These pushes are
-  readable by Khayt Cloud and Apple, as the privacy page says.
+  readable by Khayt Cloud and Apple, as the privacy page says. When the cloud
+  says no phone is listening, the Mac stops sending and asks again only when a
+  print starts, at most every ten minutes. A refused or failed send waits longer
+  each time before the next one. A printer whose poll failed (no state) has not
+  finished, the same rule as the phone.
 
 - **(Mac) For the iPhone app.** The phone can quote a file a customer sent it:
   the shop's owner PIN now opens the model estimate on the Mac's shop network
   server, as it opens the phone's other routes. (Not the intake form: that
-  records the customer's own consent, which the shop cannot give for them.) And the
+  records the customer's own consent, which the shop cannot give for them.) A
+  model over 1 MB is let in too, and the PIN is tried once per request. A
+  locked-out PIN answers "too many attempts" (429), not "wrong PIN". The
+  owner's own estimates do not use up the hourly limit set for customers. And the
   shop's own WhatsApp templates now reach the phone, so its job updates use
   the shop's wording instead of Khayt's defaults.
 - **Mac tests:** the web-store follow test loads the sample book on one fixed

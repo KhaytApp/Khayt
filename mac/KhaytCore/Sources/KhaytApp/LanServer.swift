@@ -326,7 +326,13 @@ final class LanServer {
 
     /// Why a request was not read: too big for its route, or every
     /// large-body slot is taken.
-    enum ReadRefusal: Error { case tooLarge, busy, off, unauthorised }
+    enum ReadRefusal: Error {
+        case tooLarge, busy, off
+        /// Not let in, judged from the head: no session, no token, or the
+        /// owner PIN's own answer (401 wrong, 429 locked out, 421 a name that
+        /// is not this network's).
+        case refused(Response)
+    }
 
     /// Whether this connection holds one of the `maxLargeBodies` slots.
     final class LargeBodySlot { var held = false }
@@ -592,8 +598,8 @@ final class LanServer {
             try? await write(.open(503, #"{"ok":false,"reason":"busy"}"#), method: "POST", to: connection)
         } catch ReadRefusal.off {
             try? await write(.open(403, #"{"ok":false,"reason":"off"}"#), method: "POST", to: connection)
-        } catch ReadRefusal.unauthorised {
-            try? await write(.open(401, #"{"error":"Unauthorized"}"#), method: "POST", to: connection)
+        } catch ReadRefusal.refused(let answer) {
+            try? await write(answer, method: "POST", to: connection)
         } catch {
             // A client that hung up mid-request, a read that ran out of time,
             // or a listener being stopped.
@@ -643,8 +649,8 @@ final class LanServer {
             // answered from it, and the slot and the body are only taken by a
             // request the route would actually measure. Oct 2026 review.
             // In the route's order: the session, then the switch.
-            guard await mayUploadLarge(headers: headers, remote: remote) else {
-                throw ReadRefusal.unauthorised
+            if let refused = await largeUploadRefusal(headers: headers, remote: remote) {
+                throw ReadRefusal.refused(refused)
             }
             guard Self.quotingIsOn(host.store()) else { throw ReadRefusal.off }
             guard largeBodies < Self.maxLargeBodies else { throw ReadRefusal.busy }
@@ -1031,15 +1037,40 @@ final class LanServer {
         return true
     }
 
-    /// Would the estimate route let this visitor in — an intake session from
-    /// this address, or the intake token — judged from the HEAD alone, so a
-    /// large body is refused before it is read. The route asks again.
+    /// Would the estimate route let this visitor in — the owner PIN, an
+    /// intake session from this address, or the intake token — judged from
+    /// the HEAD alone, so a large body is refused before it is read. The
+    /// route asks again.
     func mayUploadLarge(headers: [String: String], remote: String) async -> Bool {
+        await largeUploadRefusal(headers: headers, remote: remote) == nil
+    }
+
+    /// Nil when the head may send its large body; the answer otherwise.
+    ///
+    /// The owner PIN was never tried here, so the shop's own phone quoting a
+    /// model over a megabyte was refused 401 by the head while the same PIN
+    /// opened the route for a smaller one (alpha.63 review). It is tried
+    /// exactly when the route tries it — when a PIN is SENT — and a wrong one
+    /// is counted here, once: the request ends at the head and the route never
+    /// runs to count it again. A locked-out PIN answers 429, as `pinGate` does.
+    func largeUploadRefusal(headers: [String: String], remote: String) async -> Response? {
         let probe = Request(method: "POST", path: "/api/intake/estimate", query: [:],
                             headers: headers, body: Data(), remote: remote)
-        if hasIntakeToken(probe) { return true }
+        if probe.headers["x-khayt-pin"] != nil {
+            return await pinGate(probe).map(Self.openToAnyOrigin)
+        }
+        if hasIntakeToken(probe) { return nil }
         let limits = try? await host.engine.lanIntakeLimits()
         return hasSession(probe, now: host.now(), sessionMs: limits?.SESSION_MS ?? 14_400_000)
+            ? nil : .open(401, #"{"error":"Unauthorized"}"#)
+    }
+
+    /// An owner route's refusal, readable by the intake page's origin like
+    /// every other intake answer.
+    nonisolated static func openToAnyOrigin(_ response: Response) -> Response {
+        var out = response
+        out.headers["Access-Control-Allow-Origin"] = "*"
+        return out
     }
 
     private func hasIntakeToken(_ request: Request) -> Bool {
@@ -1286,7 +1317,14 @@ final class LanServer {
         let engine = host.engine
         let now = host.now()
         let limits = try? await engine.lanIntakeLimits()
-        let owner = await ownerPinGranted(request)
+        // A PIN that is sent is the PIN's answer, whatever else came with it:
+        // locked out is 429 and a wrong one 401, as on every owner route.
+        let owner: Bool
+        switch await ownerPinRefusal(request) {
+        case .some(.some(let refused)): return Self.openToAnyOrigin(refused)
+        case .some(.none): owner = true
+        case .none: owner = false
+        }
         guard owner || hasSession(request, now: now, sessionMs: limits?.SESSION_MS ?? 14_400_000) || hasIntakeToken(request) else {
             return .open(401, #"{"error":"Unauthorized"}"#)
         }
@@ -1299,7 +1337,10 @@ final class LanServer {
             // request anyone on the shop's Wi-Fi can make.
             perHour = typed.isFinite ? Int(min(10_000, typed)) : 10_000
         }
-        guard await rateStep(\.estimates, request, now: now, limit: perHour) else {
+        // The owner's own phone is not a visitor: its quotes do not spend a
+        // customer's hourly allowance. The PIN lockout and `maxMeasuring`
+        // still bound it.
+        if !owner, !(await rateStep(\.estimates, request, now: now, limit: perHour)) {
             return .open(429, #"{"error":"Too many estimates — try again later"}"#)
         }
         guard Self.quotingIsOn(host.store()) else {
@@ -1812,6 +1853,22 @@ final class LanServer {
 
     // MARK: - The PIN
 
+    /// The shop's own phone, quoting a file a customer sent it: the owner PIN
+    /// — the gate every other phone route uses — also opens the intake
+    /// ESTIMATE (never the intake form: see `intakeSubmit`). The phone holds
+    /// no intake session and its copy of the intake token is masked (iOS
+    /// handoff, Oct 2026). Only tried when a PIN is SENT, so a customer's
+    /// session or token is decided exactly as before; a wrong one counts
+    /// towards the PIN lockout like any other route's.
+    ///
+    /// Nil when no PIN was sent; `.some(nil)` when it opens; `.some(refusal)`
+    /// with `pinGate`'s answer when it does not — 429 when locked out, so the
+    /// phone can say "wait" rather than "wrong PIN".
+    private func ownerPinRefusal(_ request: Request) async -> Response?? {
+        guard request.headers["x-khayt-pin"] != nil else { return nil }
+        return .some(await pinGate(request))
+    }
+
     /// Nil when the caller may pass; the refusal to send otherwise. The same
     /// answers, in the same order, as the Node server's `checkPinForGet`.
     ///
@@ -1821,22 +1878,6 @@ final class LanServer {
     /// accepted, read or write: it was accepted on every GET, so the PIN sat
     /// in the address of every phone-made link, in clear over plain HTTP.
     /// The phone sends the header and always has. Oct 2026 review.
-    ///
-    /// The `Secure` cookie flag is NOT set on the session it buys: this
-    /// server speaks plain HTTP, and a browser would refuse to send a Secure
-    /// cookie back over it — the flag would only break the session.
-    /// The shop's own phone, quoting a file a customer sent it: the owner PIN
-    /// — the gate every other phone route uses — also opens the intake
-    /// ESTIMATE (never the intake form: see `intakeSubmit`). The phone holds no intake session and
-    /// its copy of the intake token is masked (iOS handoff, Oct 2026). Only
-    /// tried when a PIN is SENT, so a customer's session or token is decided
-    /// exactly as before; a wrong one counts towards the PIN lockout like any
-    /// other route's.
-    private func ownerPinGranted(_ request: Request) async -> Bool {
-        guard request.headers["x-khayt-pin"] != nil else { return false }
-        return await pinGate(request) == nil
-    }
-
     private func pinGate(_ request: Request, formPin: String? = nil) async -> Response? {
         // DNS REBINDING: a web page the owner visits can point its own name at
         // this Mac and read the book through the owner's browser, same-origin.
@@ -1934,6 +1975,10 @@ final class LanServer {
     nonisolated static let maxSessions = 200
 
     /// A fresh 256-bit session, set as a cookie, and the browser sent on.
+    ///
+    /// The `Secure` cookie flag is NOT set: this server speaks plain HTTP,
+    /// and a browser would refuse to send a Secure cookie back over it — the
+    /// flag would only break the session.
     private func sessionResponse(to location: String) -> Response {
         let now = host.now()
         queueSessions = queueSessions.filter { $0.value > now }
@@ -1957,6 +2002,7 @@ final class LanServer {
         return true
     }
 
+    /// One cookie's value out of a `Cookie:` header; nil when it is absent.
     nonisolated static func cookie(_ name: String, in header: String?) -> String? {
         for part in (header ?? "").split(separator: ";") {
             let kv = part.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1)

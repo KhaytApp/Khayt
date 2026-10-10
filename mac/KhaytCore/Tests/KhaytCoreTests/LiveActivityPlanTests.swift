@@ -35,6 +35,21 @@ struct LiveActivityPlanTests {
         #expect(Plan.steps(readings: [:], running: ["m1": Self.printing()], now: Self.now).isEmpty)
     }
 
+    /// The phone's `testAMissedPollLeavesTheActivityAlone` (#1811): one missed
+    /// poll (`state: nil` plus the poll's error) must not end the activity as
+    /// failed and start a fresh one on the next good poll.
+    @Test("a missed poll (no state, an error) is not heard: no end, no start; a real fault still fails")
+    func missedPollIsNotAnEnd() {
+        let missed = Self.r(nil, error: "timed out")
+        #expect(missed.isUnheard)
+        #expect(Plan.steps(readings: ["m1": missed], running: ["m1": Self.printing()], now: Self.now).isEmpty)
+        #expect(Plan.steps(readings: ["m1": missed], running: [:], now: Self.now).isEmpty, "and starts nothing either")
+        let fault = Plan.steps(readings: ["m1": Self.r("error", error: "Nozzle clog")],
+                               running: ["m1": Self.printing(70)], now: Self.now)
+        guard case let .end(_, f)? = fault.first else { Issue.record("a real fault did not end it"); return }
+        #expect(f.phase == .failed)
+    }
+
     @Test("seen printing, then seen not printing: finished at 100, failed or cancelled as it says")
     func ends() {
         let was = ["m1": Self.printing(70)]

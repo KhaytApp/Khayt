@@ -12,9 +12,13 @@ struct LiveActivityPushTests {
     final class Recorder: @unchecked Sendable {
         var requests: [URLRequest] = []
         var status = 200
-        func fetch(_ r: URLRequest) async throws -> URLResponse {
+        var reply = #"{"ok":true,"tokens":1,"sent":1,"dropped":0,"failed":0,"apns":true}"#
+        var offline = false
+        func fetch(_ r: URLRequest) async throws -> (Data, URLResponse) {
             requests.append(r)
-            return HTTPURLResponse(url: r.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+            if offline { throw URLError(.notConnectedToInternet) }
+            return (Data(reply.utf8),
+                    HTTPURLResponse(url: r.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
         }
     }
 
@@ -25,7 +29,7 @@ struct LiveActivityPushTests {
                                         from: JSONSerialization.data(withJSONObject: o))
     }
 
-    static func shop(cloud: [String: JSONValue]?) async -> (Shop, Recorder) {
+    static func shop(cloud: [String: JSONValue]?, optedIn: Bool = true) async -> (Shop, Recorder) {
         let shop = Shop()
         await shop.load(.sample)
         var settings = shop.settingsDict
@@ -33,6 +37,7 @@ struct LiveActivityPushTests {
         await shop.useLockFixture(operators: shop.operatorRows, settings: settings)
         let rec = Recorder()
         shop.liveActivityFetch = rec.fetch
+        shop.liveActivitiesOptedIn = { optedIn }
         return (shop, rec)
     }
 
@@ -148,5 +153,101 @@ struct LiveActivityPushTests {
         try await Task.sleep(for: .milliseconds(100))
         #expect(rec.requests.count == 1)
         #expect(shop.liveActivities.quietUntil == Self.now.addingTimeInterval(3600))
+    }
+
+    // MARK: alpha.63 review
+
+    @Test("not opted in on this Mac: nothing is sent, connected or not — and the opt-in is OFF by default")
+    func optIn() async throws {
+        let (shop, rec) = await Self.shop(cloud: Self.connected, optedIn: false)
+        let machine = try #require(shop.machines.first)
+        shop.liveActivityHeard(machine, status: try Self.status("printing"), now: Self.now)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(rec.requests.isEmpty)
+        // The real seam reads a key nobody has written as off.
+        let fresh = UserDefaults(suiteName: "khayt.la.\(UUID().uuidString)")!
+        #expect(fresh.bool(forKey: LiveActivityPush.optInKey) == false)
+        #expect(LiveActivityPush.optInKey == "mac.liveActivities")
+    }
+
+    @Test("a 200 with no phones goes quiet: updates and ends are not posted, a start asks again after ten minutes")
+    func noPhones() async throws {
+        let (shop, rec) = await Self.shop(cloud: Self.connected)
+        let machine = try #require(shop.machines.first)
+        rec.reply = #"{"ok":true,"tokens":0,"sent":0,"dropped":0,"failed":0,"apns":true}"#
+        shop.liveActivityHeard(machine, status: try Self.status("printing"), now: Self.now)
+        await Self.settle(rec, count: 1)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(shop.liveActivities.noPhonesSince == Self.now)
+        // The print moves and ends: nothing posted, but the plan keeps up.
+        shop.liveActivityHeard(machine, status: try Self.status("printing", progress: 60), now: Self.now.addingTimeInterval(60))
+        shop.liveActivityHeard(machine, status: try Self.status("standby", left: nil), now: Self.now.addingTimeInterval(120))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(rec.requests.count == 1)
+        #expect(shop.liveActivities.running[machine.id] == nil, "the ended print is still remembered as running")
+        // A new print inside ten minutes: still quiet.
+        shop.liveActivityHeard(machine, status: try Self.status("printing"), now: Self.now.addingTimeInterval(300))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(rec.requests.count == 1)
+        // A new print after them: asked again, and a phone is there now.
+        shop.liveActivityHeard(machine, status: try Self.status("standby", left: nil), now: Self.now.addingTimeInterval(400))
+        rec.reply = #"{"ok":true,"tokens":1}"#
+        shop.liveActivityHeard(machine, status: try Self.status("printing"), now: Self.now.addingTimeInterval(700))
+        await Self.settle(rec, count: 2)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(rec.requests.count == 2)
+        #expect(try Self.body(try #require(rec.requests.last))["event"] as? String == "start")
+        #expect(shop.liveActivities.noPhonesSince == nil)
+    }
+
+    @Test("401 is quiet for an hour; 400, 413, 5xx and no answer back off, growing, capped")
+    func backsOff() async throws {
+        #expect(LiveActivityPush.backoff(1) == 30)
+        #expect(LiveActivityPush.backoff(2) == 60)
+        #expect(LiveActivityPush.backoff(3) == 120)
+        #expect(LiveActivityPush.backoff(40) == 1800)
+
+        let (shop, rec) = await Self.shop(cloud: Self.connected)
+        let machine = try #require(shop.machines.first)
+        rec.status = 401
+        shop.liveActivityHeard(machine, status: try Self.status("printing"), now: Self.now)
+        await Self.settle(rec, count: 1)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(shop.liveActivities.quietUntil == Self.now.addingTimeInterval(3600))
+
+        let (other, rec2) = await Self.shop(cloud: Self.connected)
+        let m2 = try #require(other.machines.first)
+        for (i, code) in [500, 413, 400].enumerated() {
+            rec2.status = code
+            let at = Self.now.addingTimeInterval(Double(i) * 10_000)
+            other.liveActivityHeard(m2, status: try Self.status("printing"), now: at)
+            await Self.settle(rec2, count: i + 1)
+            try await Task.sleep(for: .milliseconds(50))
+            #expect(other.liveActivities.failures == i + 1)
+            #expect(other.liveActivities.quietUntil == at.addingTimeInterval(LiveActivityPush.backoff(i + 1)))
+            // Inside the wait: not asked.
+            other.liveActivityHeard(m2, status: try Self.status("printing"), now: at.addingTimeInterval(1))
+            try await Task.sleep(for: .milliseconds(50))
+            #expect(rec2.requests.count == i + 1, "posted inside the backoff after a \(code)")
+        }
+        rec2.offline = true
+        other.liveActivityHeard(m2, status: try Self.status("printing"), now: Self.now.addingTimeInterval(40_000))
+        await Self.settle(rec2, count: 4)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(other.liveActivities.failures == 4, "no answer is a failure too")
+        // Taken: the count starts again.
+        rec2.offline = false; rec2.status = 200
+        other.liveActivityHeard(m2, status: try Self.status("printing"), now: Self.now.addingTimeInterval(50_000))
+        await Self.settle(rec2, count: 5)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(other.liveActivities.failures == 0)
+    }
+
+    @Test("the 200's tokens: 0 is nobody, a count is sent, a reply without one is sent")
+    func tokensRead() {
+        #expect(LiveActivityPush.tokens(in: Data(#"{"ok":true,"tokens":0}"#.utf8)) == 0)
+        #expect(LiveActivityPush.tokens(in: Data(#"{"ok":true,"tokens":3}"#.utf8)) == 3)
+        #expect(LiveActivityPush.tokens(in: Data(#"{"ok":true}"#.utf8)) == nil)
+        #expect(LiveActivityPush.tokens(in: Data("not json".utf8)) == nil)
     }
 }

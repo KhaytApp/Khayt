@@ -16,6 +16,9 @@ struct ExpenseSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var amount: Double = 0
+    /// Empty when the sheet was filled in from a receipt: a receipt does not
+    /// say what the money was for, and a category picked for the person is
+    /// one they file without ever choosing (alpha.63 review).
     @State private var category = "filament"
     @State private var date = Date()
     @State private var vatAmount: Double = 0
@@ -37,13 +40,28 @@ struct ExpenseSheet: View {
     init(shop: Shop) {
         self.shop = shop
         if let read = shop.receiptPrefill {
-            _amount = State(initialValue: read.draft.amount)
-            _vatAmount = State(initialValue: read.draft.vatAmount)
+            // To the halala: a QR may write six decimals, and the field shows two.
+            _amount = State(initialValue: Self.halala(read.draft.amount))
+            _vatAmount = State(initialValue: Self.halala(read.draft.vatAmount))
             if let day = Order.day(read.draft.date) { _date = State(initialValue: min(day, Date())) }
-            _note = State(initialValue: read.draft.note)
+            _note = State(initialValue: Self.receiptNote(read, words: shop.words))
             _receiptRef = State(initialValue: read.draft.receiptRef)
+            _category = State(initialValue: "")
         }
     }
+
+    static func halala(_ x: Double) -> Double { (x * 100).rounded() / 100 }
+
+    /// The note a receipt files under, in the shop's language: the supplier as
+    /// the book names them (or the seller as the receipt does), and the VAT
+    /// number. Built here, not taken from the shared rule's English note.
+    static func receiptNote(_ read: KhaytEngine.ReceiptDraft, words: Words) -> String {
+        words.callIt("mac.receipt_note", ["seller": .string(read.supplier?.name ?? read.sellerName),
+                                          "vat": .string(read.vatNumber)])
+    }
+
+    /// Add is open once there is an amount and a category.
+    var canAdd: Bool { amount > 0 && !category.isEmpty }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -54,6 +72,13 @@ struct ExpenseSheet: View {
                 Text(shop.words.callIt("mac.receipt_from"))
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                // A ZATCA receipt is in riyals; a shop that keeps its books in
+                // another currency is told, not converted for.
+                if shop.currency != "SAR" {
+                    Text(shop.words.callIt("mac.receipt_sar", ["currency": .string(shop.currency)]))
+                        .font(.callout).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
@@ -97,6 +122,7 @@ struct ExpenseSheet: View {
                 GridRow {
                     Text(shop.words.callIt("exp.category")).foregroundStyle(.secondary)
                     Picker("", selection: $category) {
+                        if category.isEmpty { Text("—").tag("") }
                         ForEach(Shop.expenseCategories, id: \.self) { c in
                             Label(shop.words.callIt("exp.cat." + c), systemImage: Expenses.symbol(c)).tag(c)
                         }
@@ -163,7 +189,7 @@ struct ExpenseSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("exp.add_btn"), action: commit)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(amount <= 0)
+                    .disabled(!canAdd)
             }
         }
         .padding(18)
@@ -182,7 +208,7 @@ struct ExpenseSheet: View {
     }
 
     private func commit() {
-        guard amount > 0 else { return }
+        guard canAdd else { return }
         let input: [String: JSONValue] = [
             "amount": .number(amount),
             // Never more than what was paid, and never negative: the rule

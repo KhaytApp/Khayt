@@ -16,7 +16,9 @@ import Foundation
 ///
 /// The rules, as the phone has them:
 /// - A machine that drops out of the readings has NOT finished — nobody heard
-///   from it, so it is left alone.
+///   from it, so it is left alone. Nor has one whose poll failed (`state`
+///   nil, `isUnheard`); a real fault arrives WITH a state and still ends
+///   `failed`.
 /// - A paused print is still a print.
 /// - Only a machine seen printing and then seen not printing has ended:
 ///   `failed` on an error, `cancelled` when it says so, otherwise `finished`.
@@ -65,6 +67,12 @@ public enum LiveActivityPlan {
         public var isPrinting: Bool { (state ?? "").lowercased().contains("print") }
         public var isPaused: Bool { (state ?? "").lowercased().contains("pause") }
         public var hasError: Bool { !(error ?? "").isEmpty }
+        /// No state at all: the Mac's last poll of this printer failed (an
+        /// unreachable printer comes back as `state: null` plus the poll's error).
+        /// That is NOT HEARD, not "stopped printing". Read it as a print ending
+        /// and one missed poll ends a Live Activity as failed, raises a false
+        /// "Print failed" alert, and the next good poll starts it all over again.
+        public var isUnheard: Bool { state == nil }
     }
 
     public enum Step: Sendable, Equatable {
@@ -83,6 +91,8 @@ public enum LiveActivityPlan {
                              now: Date = Date()) -> [Step] {
         var steps: [Step] = []
         for (id, r) in readings.sorted(by: { $0.key < $1.key }) {
+            // A missed poll is the phone not hearing, like a machine that drops out.
+            if r.isUnheard { continue }
             let was = running[id]
             if r.isPrinting || r.isPaused {
                 let ends = r.timeRemaining.flatMap { $0 > 0 ? now.addingTimeInterval(TimeInterval($0)) : nil }

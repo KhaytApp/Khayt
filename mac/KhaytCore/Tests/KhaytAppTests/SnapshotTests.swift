@@ -457,21 +457,74 @@ import KhaytCore
             filedQr, suppliers: [],
             expenses: [.object(["id": .string("E1"), "receiptRef": .string(ref.draft.receiptRef)])],
             reclaimsTax: true))
+        // A seller the book does not know: offered as a supplier, with its number.
+        let strangerQr = try await qr("مؤسسة نجد للبراغي", "57.50", "7.50", "302345678900003")
+        let stranger = try #require(try await engine.receiptDraft(strangerQr, suppliers: shop.supplierRows,
+                                                                 expenses: shop.expenseRows, reclaimsTax: true))
         let found: [ReceiptReaderSheet.Found] = [
             .init(text: matched, draft: first, reason: nil),
+            .init(text: strangerQr, draft: stranger, reason: nil),
             .init(text: filedQr, draft: dup, reason: nil),
-            .init(text: "https://pay.example/1", draft: nil, reason: "not_base64"),
+            .init(text: "https://pay.example/invoice/2026/10/0042", draft: nil, reason: "not_base64"),
         ]
-        let size = CGSize(width: 460, height: 560)
         try render(ReceiptReaderSheet(shop: shop), "receipt-reader-empty", size: CGSize(width: 460, height: 260))
-        try render(ReceiptReaderSheet(shop: shop, found: found), "receipt-reader-found", size: size)
-        try renderDark(ReceiptReaderSheet(shop: shop, found: found), "receipt-reader-found-dark", size: size)
+        // The cards, laid flat: `ImageRenderer` draws nothing inside the
+        // sheet's ScrollView, so the words are photographed here and the sheet
+        // itself in a real window below.
+        let cards = VStack(alignment: .leading, spacing: 10) {
+            ForEach(found) { ReceiptFoundRow(shop: shop, item: $0, use: { _ in }) }
+        }.padding(18).frame(width: 460)
+        try render(cards.background(Khayt.surface), "receipt-reader-found", size: CGSize(width: 460, height: 560))
+        try renderDark(cards, "receipt-reader-found-dark", size: CGSize(width: 460, height: 560))
+        // The whole sheet in a window, ScrollView and all — and on a short
+        // screen (560 points, a 13-inch with the Dock up and a big text size):
+        // the codes scroll and Cancel stays in the picture.
+        let many = found + found.map { ReceiptReaderSheet.Found(text: $0.text, draft: $0.draft, reason: $0.reason) }
+        Self.hosted(ReceiptReaderSheet(shop: shop, found: found, screenHeight: 1000), "receipt-reader-window",
+                    CGSize(width: 460, height: 720))
+        Self.hosted(ReceiptReaderSheet(shop: shop, found: many, screenHeight: 560), "receipt-reader-short",
+                    CGSize(width: 460, height: 560))
+        Self.hosted(ReceiptReaderSheet(shop: shop, found: many, screenHeight: 560), "receipt-reader-short-dark",
+                    CGSize(width: 460, height: 560), dark: true)
         shop.receiptPrefill = first
         try render(ExpenseSheet(shop: shop), "receipt-expense-prefilled",
                    size: CGSize(width: ExpenseSheet.width, height: 440))
         shop.receiptPrefill = first
         try renderDark(ExpenseSheet(shop: shop), "receipt-expense-prefilled-dark",
                        size: CGSize(width: ExpenseSheet.width, height: 440))
+        // The supplier sheet with the VAT number a receipt is matched by.
+        var withVat = try #require(shop.suppliers.first { !$0.vat.isEmpty } ?? shop.suppliers.first)
+        if withVat.vat.isEmpty { withVat.vat = "310122393500003" }
+        let supplierSize = CGSize(width: SheetMetrics.outerWidth(SupplierSheet.width), height: 600)
+        // In a window, so the fields show what is in them.
+        Self.hosted(SupplierSheet(shop: shop, supplier: withVat), "supplier-vat", supplierSize)
+        Self.hosted(SupplierSheet(shop: shop, supplier: withVat), "supplier-vat-dark", supplierSize, dark: true)
+        shop.receiptPrefill = first
+        Self.hosted(ExpenseSheet(shop: shop), "receipt-expense-window", CGSize(width: ExpenseSheet.width, height: 480))
+        shop.receiptPrefill = first
+        Self.hosted(ExpenseSheet(shop: shop), "receipt-expense-window-dark", CGSize(width: ExpenseSheet.width, height: 480),
+                    dark: true)
+    }
+
+    /// A sheet photographed in a real window rather than by `ImageRenderer`,
+    /// which draws nothing inside a ScrollView (MoveIntoGroupTests.hosted).
+    static func hosted(_ view: some View, _ name: String, _ size: CGSize, dark: Bool = false) {
+        guard let dir = outputDir else { return }
+        let rtl = Direction.rtlLanguages.contains(Direction.shopLanguage())
+        let host = NSHostingView(rootView: view
+            .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+            .frame(width: size.width, height: size.height, alignment: .top)
+            .background(Khayt.surface))
+        host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = host
+        host.frame = NSRect(origin: .zero, size: size)
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
+        host.cacheDisplay(in: host.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: dir.appending(path: name + ".png"))
     }
 
     /// The supplier sheets, which no picture has ever been taken of.

@@ -14521,7 +14521,12 @@ final class Shop {
     @ObservationIgnored let liveActivities = LiveActivityPush.Memory()
     /// How a Live Activity post reaches the cloud. A seam for tests, which
     /// must never reach a real server.
-    @ObservationIgnored var liveActivityFetch: (URLRequest) async throws -> URLResponse = LiveActivityPush.liveFetch
+    @ObservationIgnored var liveActivityFetch: (URLRequest) async throws -> (Data, URLResponse) = LiveActivityPush.liveFetch
+    /// Whether this Mac may post at all: the opt-in in Settings → Integrations,
+    /// this Mac's own (UserDefaults, OFF when never set). A seam for tests.
+    @ObservationIgnored var liveActivitiesOptedIn: () -> Bool = {
+        UserDefaults.standard.bool(forKey: LiveActivityPush.optInKey)
+    }
 
     func count(_ stage: Stage) -> Int { orders.count { Stage.of($0) == stage && inSite($0) } }
 

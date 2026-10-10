@@ -148,3 +148,38 @@ test('a bare day stays that day; a stamp with a zone is read on the local calend
   assert.equal(Z.receiptDay('2026-10-09T23:30:00'), '2026-10-09', 'no zone: the day as written');
   assert.equal(Z.receiptDay('garbage'), '');
 });
+
+test('an unknown seller comes back as a new supplier, with its VAT number; a matched one does not', () => {
+  const r = Z.decodeTLV(Z.buildTLV(receipt())).receipt;
+  const fresh = Z.receiptToExpenseDraft(r, { suppliers: [] });
+  assert.deepEqual(fresh.newSupplier, { name: 'مؤسسة الخيط للطباعة', vatNumber: VAT });
+  assert.equal(fresh.sellerName, 'مؤسسة الخيط للطباعة');
+  assert.equal(fresh.vatNumber, VAT);
+  // Added with the number under `vat` (the key the Mac's supplier sheet
+  // writes), the next receipt matches — spaces in a typed number or all.
+  const added = Z.receiptToExpenseDraft(r, { suppliers: [{ id: 'S9', name: 'Other name', vat: '310 1223 9350 0003' }] });
+  assert.equal(added.supplier.id, 'S9');
+  assert.equal(added.newSupplier, null);
+  assert.equal(added.sellerName, 'مؤسسة الخيط للطباعة', 'the receipt\'s own seller, apart from the book\'s name');
+});
+
+test('a seller name is stripped of control and bidi-override characters and capped at 200', () => {
+  const hostile = 'Evil‮3.99‬ Co\u0000\u0007\n⁦x⁩';
+  const out = Z.decodeTLV(Z.buildTLV(receipt({ sellerName: hostile })));
+  assert.equal(out.ok, true, JSON.stringify(out));
+  assert.equal(out.receipt.sellerName, 'Evil 3.99 Co x');
+  assert.doesNotMatch(Z.receiptToExpenseDraft(out.receipt, {}).draft.note, /[‪-‮⁦-⁩\u0000-\u001F]/);
+  const long = Z.decodeTLV(Z.buildTLV(receipt({ sellerName: 'م'.repeat(600) })));
+  assert.equal(long.ok, true);
+  assert.equal(Array.from(long.receipt.sellerName).length, 200);
+  // Nothing but overrides is no seller at all.
+  assert.equal(Z.decodeTLV(Z.buildTLV(receipt({ sellerName: '‮‬' }))).reason, 'missing_tag');
+});
+
+test('the draft is to the halala, however many decimals the code writes', () => {
+  const r = Z.decodeTLV(Z.buildTLV(receipt({ total: '115.004999', vatAmount: '15.005001' }))).receipt;
+  const { draft } = Z.receiptToExpenseDraft(r, { reclaimsTax: true });
+  assert.equal(draft.amount, 115);
+  assert.equal(draft.vatAmount, 15.01);
+  assert.equal(draft.receiptRef, `zatca:${VAT}:2026-10-09T14:30:00Z:115.004999`, 'the reference is the code\'s own figure');
+});

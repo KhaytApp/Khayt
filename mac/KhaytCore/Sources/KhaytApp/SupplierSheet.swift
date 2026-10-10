@@ -214,6 +214,17 @@ struct SupplierSheet: View {
                     Text(shop.words.callIt("sup.website")).foregroundStyle(.secondary)
                     TextField("https://…", text: $draft.website).textFieldStyle(.roundedBorder)
                 }
+                // Optional. How a receipt read off its ZATCA QR finds this
+                // supplier (ReceiptQr.swift), so it is checked as the code is:
+                // fifteen digits, a 3 at each end. Digits run left to right in
+                // either language.
+                GridRow {
+                    Text(shop.words.callIt("mac.sup_vat")).foregroundStyle(.secondary)
+                    TextField("3XXXXXXXXXXXXX3", text: $draft.vat)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.body, design: .monospaced))
+                        .environment(\.layoutDirection, .leftToRight)
+                }
             }
 
             Divider()
@@ -322,6 +333,12 @@ struct SupplierSheet: View {
     }
 
     private func commit() {
+        // Checked when it is typed: a number another app stored in some
+        // other shape does not block saving the rest of the record.
+        let stored = shop.suppliers.first { $0.id == draft.id }?.vat ?? ""
+        guard draft.vat == stored || Supplier.vatIsValid(draft.vat) else {
+            problem = shop.words.callIt("mac.sup_vat_invalid"); return
+        }
         let wanted = Self.saving(draft, lead: lead)
         Task {
             await shop.saveSupplier(wanted)
