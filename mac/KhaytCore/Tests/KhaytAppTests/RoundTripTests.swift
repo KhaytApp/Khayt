@@ -265,6 +265,41 @@ struct RoundTripTests {
         #expect(Self.diff(saved, raw) == ["notes"])
     }
 
+    @Test("a supplier's VAT number: written as `vat` when typed, digits only; untouched, the stored one stays")
+    func supplierVat() throws {
+        var raw = Self.first("suppliers")
+        raw["vat"] = nil
+        var supplier = try #require(Supplier(row: .object(raw)))
+        #expect(supplier.vat.isEmpty)
+        supplier.vat = "٣١٠ ١٢٢٣ ٩٣٥٠ ٠٠٠٣"   // typed on the Arabic keyboard, spaced
+        let saved = Shop.supplierRecord(
+            saving: SupplierSheet.saving(supplier, lead: SupplierSheet.leadText(supplier)), over: raw)
+        #expect(Self.diff(saved, raw) == ["vat"])
+        #expect(saved["vat"] == .string("310122393500003"))
+
+        // Another app's number under `vatNumber`: read, and left exactly as it
+        // was by a save that did not touch it.
+        var other = Self.first("suppliers")
+        other["vat"] = nil
+        other["vatNumber"] = .string("300000000000003")
+        let read = try #require(Supplier(row: .object(other)))
+        #expect(read.vat == "300000000000003")
+        let kept = Shop.supplierRecord(saving: SupplierSheet.saving(read, lead: SupplierSheet.leadText(read)), over: other)
+        #expect(Self.diff(kept, other).isEmpty, "changed: \(Self.diff(kept, other))")
+    }
+
+    @Test("a VAT number is optional, and when given it is fifteen digits with a 3 at each end")
+    func supplierVatValid() {
+        #expect(Supplier.vatIsValid(""))
+        #expect(Supplier.vatIsValid("310122393500003"))
+        #expect(Supplier.vatIsValid(" 310 122393500003 "))
+        #expect(Supplier.vatIsValid("٣١٠١٢٢٣٩٣٥٠٠٠٠٣"))
+        #expect(!Supplier.vatIsValid("31012239350000"), "fourteen digits")
+        #expect(!Supplier.vatIsValid("210122393500003"), "not a 3 first")
+        #expect(!Supplier.vatIsValid("310122393500004"), "not a 3 last")
+        #expect(!Supplier.vatIsValid("3101223935000O3"), "a letter")
+    }
+
     // MARK: - Products
 
     static let keys = [

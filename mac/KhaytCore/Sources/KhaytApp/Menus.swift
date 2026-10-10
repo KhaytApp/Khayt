@@ -190,6 +190,10 @@ private struct BookMenu: View {
         .disabled(!shop.canMoveJobs || shop.importing)
         .keyboardShortcut("i", modifiers: [.command, .shift])
 
+        // A supplier's expense, read off the ZATCA QR on its receipt.
+        Button(Words.upfront("mac.receipt_add") + "\u{2026}") { shop.startReadingReceipt() }
+            .disabled(!shop.canMoveJobs)
+
         // The whole rack, from the menu; one spool from its own context menu on
         // the shelf. Not a write, so it does not wait on `canMoveJobs` — a
         // read-only book can still print labels for the rack it describes —

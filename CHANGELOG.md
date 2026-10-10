@@ -51,11 +51,53 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   followed like one the app started. The activity state now reads a
   fractional percent (rounded) instead of failing the pushed update, and
   the `LA_PRINT_STARTED` alert ships in English and Arabic.
+- **(Mac) Add an expense from a supplier's receipt.** Expenses ▸ *Add from
+  receipt…* (also in the File menu) reads the ZATCA QR on a Saudi tax invoice —
+  from a photo, a screenshot, a scanned PDF, or the code's text pasted — and
+  opens the expense form filled in with the total, the VAT (only when the shop
+  is VAT-registered), the invoice's day and the seller. Nothing is saved until
+  you choose the category and press Add. A receipt already in your expenses is
+  flagged and not offered again, a seller whose VAT number matches one of your
+  suppliers is named as that supplier, and a code that is not a tax invoice's
+  says why. The reading rule is shared (`lib/zatca-qr.js` `decodeTLV`,
+  `receiptToExpenseDraft`), and an expense now keeps which receipt it was read
+  from (`receiptRef`).
+  - Each card shows the seller's VAT number, and a seller who is not yet one of
+    your suppliers can be added with **Add as supplier**, number included, so
+    the next receipt from them is matched. Suppliers have a **VAT number** field
+    (optional; 15 digits, a 3 at each end; stored as `vat`).
+  - The form opens with **no category chosen**, and Add stays off until you pick
+    one. The note is written in the shop's language, and the amounts are rounded
+    to the halala. A shop whose books are not in riyals is told the receipt is.
+  - A code that is not a receipt shows its first characters, so you can tell
+    which one it was. The list of codes scrolls on a small screen, so Cancel is
+    always in view. A seller name is cut at 200 characters, with control and
+    text-direction characters removed. A PDF page is drawn at most 4096 pixels
+    on a side and read one page at a time.
+  - Arabic: "Link to order (optional)" reads «مرجع الطلب (اختياري)».
+
+- **(Mac) The iPhone's print Live Activities keep moving with the phone
+  closed.** Off until you turn it on, on each Mac: Settings ▸ Integrations ▸
+  *Send print progress to my iPhone (Live Activities)*. When it is on and the
+  shop is connected to Khayt Cloud, the Mac tells the
+  cloud when a print starts, moves on (a whole percent, a pause, a new finish
+  time) and ends, and the cloud pushes it to the phones. The Mac decides by the
+  phone's own rule, now shared: a printer that stops answering has not
+  finished; only one seen printing and then seen idle has. Nothing is sent for
+  a shop not on Khayt Cloud or with a view-only connection. These pushes are
+  readable by Khayt Cloud and Apple, as the privacy page says. When the cloud
+  says no phone is listening, the Mac stops sending and asks again only when a
+  print starts, at most every ten minutes. A refused or failed send waits longer
+  each time before the next one. A printer whose poll failed (no state) has not
+  finished, the same rule as the phone.
 
 - **(Mac) For the iPhone app.** The phone can quote a file a customer sent it:
   the shop's owner PIN now opens the model estimate on the Mac's shop network
   server, as it opens the phone's other routes. (Not the intake form: that
-  records the customer's own consent, which the shop cannot give for them.) And the
+  records the customer's own consent, which the shop cannot give for them.) A
+  model over 1 MB is let in too, and the PIN is tried once per request. A
+  locked-out PIN answers "too many attempts" (429), not "wrong PIN". The
+  owner's own estimates do not use up the hourly limit set for customers. And the
   shop's own WhatsApp templates now reach the phone, so its job updates use
   the shop's wording instead of Khayt's defaults.
 - **Mac tests:** the web-store follow test loads the sample book on one fixed
@@ -6433,6 +6475,42 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-alpha.63] - 2026-10-10
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Add an expense from a supplier's receipt, and print progress on the iPhone's
+Lock Screen with the phone closed.
+
+### New
+
+- **Add an expense from a supplier's receipt.** Expenses ▸ *Add from
+  receipt…* (also in the File menu) reads the ZATCA QR on a Saudi tax invoice,
+  from a photo, a screenshot, a scanned PDF or the code's text pasted. It opens
+  the expense form filled in with the total, the VAT (only when the shop is
+  VAT-registered), the invoice's day and the seller. Nothing is saved until you
+  choose a category and press Add. A receipt already in your expenses is
+  flagged, and a seller whose VAT number matches a supplier is named as that
+  supplier. A seller who is not one yet can be added with **Add as supplier**.
+- **Suppliers have a VAT number field** (optional; 15 digits, a 3 at each end).
+- **Print progress on the iPhone with the phone closed.** Off until you turn it
+  on, on each Mac: Settings ▸ Integrations ▸ *Send print progress to my iPhone
+  (Live Activities)*. When on and the shop is on Khayt Cloud, the Mac tells the
+  cloud when a print starts, moves on and ends, and the cloud pushes it to the
+  phones' Lock Screens. When no phone is listening, the Mac stops sending.
+- **For the iPhone app:** the owner PIN opens the model estimate, so the phone
+  can quote a file a customer sent it, and the shop's WhatsApp templates reach
+  the phone.
+
+### Changed and fixed
+
+- A printer poll that failed is no longer read as a finished print, the same
+  rule as the phone's.
+- The shop network server answers a locked-out owner PIN with "too many
+  attempts", and a model over 1 MB is checked against the PIN before it is
+  read.
 
 ## [4.0.0-alpha.62] - 2026-10-10
 

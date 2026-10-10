@@ -2648,7 +2648,7 @@
   "exp.recurring_annually": "سنوي",
   "exp.recurring_due": "تاريخ الاستحقاق",
   "exp.recurring_added": "تم إضافة المصروف المتكرر",
-  "exp.order_ref": "مرجع الطلب",
+  "exp.order_ref": "مرجع الطلب (اختياري)",
   "exp.linked_expenses": "المصروفات المرتبطة",
   "exp.no_linked": "لا توجد مصروفات مرتبطة",
   "exp.budget_title": "الميزانية",

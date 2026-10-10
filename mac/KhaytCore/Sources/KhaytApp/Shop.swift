@@ -12167,6 +12167,10 @@ final class Shop {
     /// carries the "+" and the strip is not inside the screen — see
     /// `ScreenActions`. The sheets stay where they were.
     var addingExpense = false
+    /// "Add from receipt…": the reader sheet, and what it read — handed to the
+    /// expense sheet to fill in, never saved by itself (ReceiptQr.swift).
+    var readingReceipt = false
+    var receiptPrefill: KhaytEngine.ReceiptDraft?
     var loggingWaste = false
     /// The printers Khayt knows, read once per launch — the catalogue is a
     /// constant, not something a book carries.
@@ -14511,6 +14515,18 @@ final class Shop {
     /// each ask made the board and the sidebar count quadratic in the jobs.
     struct SiteIds { var orders = Set<String>(), machines = Set<String>(), spools = Set<String>() }
     var siteIds = SiteIds()
+
+    /// What this run has told the phones' Live Activities, per machine — see
+    /// `LiveActivityPush`. Not observed: no screen draws it.
+    @ObservationIgnored let liveActivities = LiveActivityPush.Memory()
+    /// How a Live Activity post reaches the cloud. A seam for tests, which
+    /// must never reach a real server.
+    @ObservationIgnored var liveActivityFetch: (URLRequest) async throws -> (Data, URLResponse) = LiveActivityPush.liveFetch
+    /// Whether this Mac may post at all: the opt-in in Settings → Integrations,
+    /// this Mac's own (UserDefaults, OFF when never set). A seam for tests.
+    @ObservationIgnored var liveActivitiesOptedIn: () -> Bool = {
+        UserDefaults.standard.bool(forKey: LiveActivityPush.optInKey)
+    }
 
     func count(_ stage: Stage) -> Int { orders.count { Stage.of($0) == stage && inSite($0) } }
 

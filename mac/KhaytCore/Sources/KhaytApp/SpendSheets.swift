@@ -16,6 +16,9 @@ struct ExpenseSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var amount: Double = 0
+    /// Empty when the sheet was filled in from a receipt: a receipt does not
+    /// say what the money was for, and a category picked for the person is
+    /// one they file without ever choosing (alpha.63 review).
     @State private var category = "filament"
     @State private var date = Date()
     @State private var vatAmount: Double = 0
@@ -26,11 +29,57 @@ struct ExpenseSheet: View {
     /// say. Held in state because the engine is an actor and a view cannot ask
     /// it a question while it is drawing.
     @State private var suggestion: String?
+    /// Which supplier receipt this was read off, when it was — carried into
+    /// the record so the same receipt scanned again is caught (ReceiptQr.swift).
+    @State private var receiptRef = ""
     @FocusState private var focused: Bool
+
+    /// Filled in from a receipt read off its QR, when there is one waiting —
+    /// as the sheet's starting values, so the fields are right on the first
+    /// frame rather than a frame after it.
+    init(shop: Shop) {
+        self.shop = shop
+        if let read = shop.receiptPrefill {
+            // To the halala: a QR may write six decimals, and the field shows two.
+            _amount = State(initialValue: Self.halala(read.draft.amount))
+            _vatAmount = State(initialValue: Self.halala(read.draft.vatAmount))
+            if let day = Order.day(read.draft.date) { _date = State(initialValue: min(day, Date())) }
+            _note = State(initialValue: Self.receiptNote(read, words: shop.words))
+            _receiptRef = State(initialValue: read.draft.receiptRef)
+            _category = State(initialValue: "")
+        }
+    }
+
+    static func halala(_ x: Double) -> Double { (x * 100).rounded() / 100 }
+
+    /// The note a receipt files under, in the shop's language: the supplier as
+    /// the book names them (or the seller as the receipt does), and the VAT
+    /// number. Built here, not taken from the shared rule's English note.
+    static func receiptNote(_ read: KhaytEngine.ReceiptDraft, words: Words) -> String {
+        words.callIt("mac.receipt_note", ["seller": .string(read.supplier?.name ?? read.sellerName),
+                                          "vat": .string(read.vatNumber)])
+    }
+
+    /// Add is open once there is an amount and a category.
+    var canAdd: Bool { amount > 0 && !category.isEmpty }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(shop.words.callIt("exp.add_title")).font(.headline)
+            if !receiptRef.isEmpty {
+                // Filled in, not filed: the receipt says what was paid, not
+                // what for, so the category is still the person's to choose.
+                Text(shop.words.callIt("mac.receipt_from"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                // A ZATCA receipt is in riyals; a shop that keeps its books in
+                // another currency is told, not converted for.
+                if shop.currency != "SAR" {
+                    Text(shop.words.callIt("mac.receipt_sar", ["currency": .string(shop.currency)]))
+                        .font(.callout).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
@@ -73,6 +122,7 @@ struct ExpenseSheet: View {
                 GridRow {
                     Text(shop.words.callIt("exp.category")).foregroundStyle(.secondary)
                     Picker("", selection: $category) {
+                        if category.isEmpty { Text("—").tag("") }
                         ForEach(Shop.expenseCategories, id: \.self) { c in
                             Label(shop.words.callIt("exp.cat." + c), systemImage: Expenses.symbol(c)).tag(c)
                         }
@@ -139,12 +189,16 @@ struct ExpenseSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("exp.add_btn"), action: commit)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(amount <= 0)
+                    .disabled(!canAdd)
             }
         }
         .padding(18)
         .frame(width: Self.width)
-        .onAppear { focused = true }
+        .onAppear {
+            focused = true
+            // Taken: the next "Add expense" is a typed one.
+            shop.receiptPrefill = nil
+        }
         // Re-asked as the note is typed, which is when the answer can change.
         // `.task(id:)` cancels the one in flight, so a shop typing quickly asks
         // once rather than once per keystroke.
@@ -154,7 +208,7 @@ struct ExpenseSheet: View {
     }
 
     private func commit() {
-        guard amount > 0 else { return }
+        guard canAdd else { return }
         let input: [String: JSONValue] = [
             "amount": .number(amount),
             // Never more than what was paid, and never negative: the rule
@@ -166,6 +220,7 @@ struct ExpenseSheet: View {
             "note": .string(note),
             "orderId": .string(orderId),
             "recurring": .string(recurring),
+            "receiptRef": .string(receiptRef),
         ]
         dismiss()
         Task { await shop.addExpense(input) }

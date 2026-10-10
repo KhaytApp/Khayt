@@ -5677,6 +5677,7 @@
   {
    "id": "SUP-sample01",
    "name": "Tuwaiq Filament Supply",
+   "vat": "310122393500003",
    "category": "filament",
    "phone": "+966 55 402 1180",
    "leadDays": 5,

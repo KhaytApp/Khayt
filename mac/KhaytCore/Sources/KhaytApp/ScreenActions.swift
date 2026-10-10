@@ -171,6 +171,10 @@ struct ScreenActions: View {
                 plus("mac.new_spool", enabled: shop.canMoveJobs) { shop.addingSpool = true }
             } else if shop.showingExpenses {
                 period
+                // A supplier's receipt read off its QR, beside the typed one.
+                Button(shop.words.callIt("mac.receipt_add") + "\u{2026}") { shop.startReadingReceipt() }
+                    .disabled(!shop.canMoveJobs)
+                    .buttonStyle(WellButtonStyle(onNavy: true))
                 plus("exp.add_title", enabled: shop.canMoveJobs) { shop.addingExpense = true }
             } else if shop.showingWaste {
                 period

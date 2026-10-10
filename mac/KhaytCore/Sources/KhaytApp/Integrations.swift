@@ -22,6 +22,7 @@ import KhaytCore
 /// is exactly why saving must not switch the other one off.
 struct IntegrationsPane: View {
     let shop: Shop
+    @AppStorage(LiveActivityPush.optInKey) private var liveActivities = false
 
     /// The provider settings as the directory edits them.
     struct Draft: Equatable {
@@ -127,6 +128,16 @@ struct IntegrationsPane: View {
                     // Where the shop stands on the portal trial — only when
                     // there is one to show (`isTrialVisible`: started, or over).
                     PortalTrialLine(shop: shop)
+                }
+
+                // This Mac's own choice, OFF until the shop turns it on: the
+                // printers' progress posted to Khayt Cloud for the iPhone's
+                // Live Activities (LiveActivityPush). Not in the book.
+                Section(shop.words.callIt("mac.la_section")) {
+                    Toggle(shop.words.callIt("mac.la_toggle"), isOn: $liveActivities)
+                    Text(shop.words.callIt("mac.la_hint"))
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Section(shop.words.callIt("integ.payments")) {
