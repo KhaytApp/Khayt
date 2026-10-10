@@ -855,6 +855,56 @@ final class KhaytAPIClient: ObservableObject {
         return .refused(L10n.tr("scan.label.missing"))
     }
 
+    // MARK: - Quoting a model file
+
+    /// What the Mac's estimate route answers (`POST /api/intake/estimate`).
+    struct ModelEstimate: Decodable, Equatable {
+        let ok: Bool
+        let reason: String?
+        let price: Double?
+        let currency: String?
+        let qty: Int?
+        let grams: Double?
+        let hours: Double?
+        /// True when a slicer measured it; false for an estimate off the geometry.
+        let exact: Bool?
+    }
+
+    /// The Mac's 32 MB ceiling (`LanServer.maxUpload`), checked here so a big
+    /// file is refused on the phone instead of after the upload.
+    nonisolated static let maxModelBytes = 32 * 1024 * 1024
+    nonisolated static let modelExtensions: Set<String> = ["stl", "obj", "3mf", "gcode", "gco"]
+
+    /// Ask the Mac what a model would cost — the same estimate its intake form
+    /// gives a customer, opened to the owner PIN (Mac #1803). The model is
+    /// measured on the Mac and priced by the shop's own settings.
+    ///
+    /// Only the estimate: the intake SUBMISSION records the customer's own
+    /// privacy consent, which a shop filing from its phone cannot give for
+    /// them, so the price becomes a quote order instead.
+    func estimate(file url: URL, qty: Int) async throws -> ModelEstimate {
+        let ext = url.pathExtension.lowercased()
+        guard Self.modelExtensions.contains(ext) else {
+            return ModelEstimate(ok: false, reason: "unsupported", price: nil, currency: nil, qty: nil,
+                                 grams: nil, hours: nil, exact: nil)
+        }
+        let data = try Data(contentsOf: url)
+        guard data.count <= Self.maxModelBytes else {
+            return ModelEstimate(ok: false, reason: "too-large", price: nil, currency: nil, qty: nil,
+                                 grams: nil, hours: nil, exact: nil)
+        }
+        var q = URLComponents()
+        q.queryItems = [URLQueryItem(name: "name", value: "model." + ext),
+                        URLQueryItem(name: "qty", value: String(max(1, min(1000, qty))))]
+        let (body, response) = try await request(path: "/api/intake/estimate?" + (q.percentEncodedQuery ?? ""),
+                                                 method: "POST", body: data, requiresPin: true)
+        guard let http = response as? HTTPURLResponse else { throw KhaytAPIError.transport(URLError(.badServerResponse)) }
+        if http.statusCode == 401 || http.statusCode == 404 { throw KhaytAPIError.server(L10n.tr("quote.file.needs_mac")) }
+        // Refusals come back as { ok: false, reason } with a 4xx/5xx; read them.
+        if let answer = try? JSONDecoder().decode(ModelEstimate.self, from: body) { return answer }
+        throw try decodeAPIError(body, status: http.statusCode)
+    }
+
     func updateOrderStatus(orderId: String, status: String) async throws {
         if try await writeLocally({ try $0.setOrderStatus(orderId: orderId, to: status) }) { return }
         let encodedId = try encodeOrderIdForPath(orderId)

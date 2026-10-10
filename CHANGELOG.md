@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: quote a customer's model file.** A model sent over WhatsApp, Mail
+  or Files opens in Khayt (STL, OBJ, 3MF, G-code), or is picked from Home's +
+  menu → "Quote a file". The Mac prices it the way its intake form prices a
+  customer's upload — measured, at the shop's settings, slicer-exact where it
+  can — and "Make it a quote" opens a new quote with the price filled in. It
+  needs the Khayt Mac app (alpha.63, which opens the estimate to the owner's
+  PIN) and instant quotes switched on.
+
 - **iOS: Live Activities keep moving with the app closed.** The phone gives
   Khayt Cloud its ActivityKit push tokens (khayt-cloud #112). Each running
   activity's update token goes with its machine and is withdrawn when the

@@ -665,3 +665,18 @@
 
 /* A Live Activity started by Khayt Cloud's push (khayt-cloud #112). %@ is the machine's name. */
 "LA_PRINT_STARTED" = "%@ started printing";
+/* Quoting a model file (Mac /api/intake/estimate) */
+"quote.file.title" = "Quote a file";
+"quote.file.pick" = "Quote a file";
+"quote.file.file" = "File";
+"quote.file.hours" = "%@ h";
+"quote.file.exact" = "Measured by the Mac's slicer.";
+"quote.file.estimated" = "An estimate from the model's shape.";
+"quote.file.make_quote" = "Make it a quote";
+"quote.file.needs_mac" = "Quoting a file needs the Khayt Mac app (alpha.63 or later) on the shop's Wi-Fi.";
+"quote.file.reason.off" = "Instant quotes are off on the Mac. Turn them on for the intake form in Settings.";
+"quote.file.reason.unsupported" = "Khayt can price STL, OBJ, 3MF and G-code files.";
+"quote.file.reason.too-large" = "The file is over 32 MB.";
+"quote.file.reason.no-numbers" = "The shop's prices aren't set up on the Mac yet.";
+"quote.file.reason.no-price" = "The Mac couldn't price this file.";
+"quote.file.reason.busy" = "The Mac is busy. Try again in a moment.";
