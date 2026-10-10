@@ -29,3 +29,15 @@ struct ScanSpoolControl: ControlWidget {
         .description("Opens Khayt on booking in a spool.")
     }
 }
+
+struct CalculatorControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.khaytapp.companion.control.calculator") {
+            ControlWidgetButton(action: OpenCalculatorIntent()) {
+                Label("Price a part", systemImage: "function")
+            }
+        }
+        .displayName("Price a part")
+        .description("Opens Khayt on the calculator.")
+    }
+}

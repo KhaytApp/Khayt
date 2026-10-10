@@ -19,6 +19,10 @@ import Foundation
 /// print file, a product, an expense or an audit line, and a phone at the
 /// machines needs today's queue, not 2023's invoices.
 ///
+/// (October 2026: the phone's calculator and receipt scanner added the presets,
+/// the consumables shelf, the suppliers and the RECENT expenses — each named
+/// beside its entry in `workingSet` with the screen that reads it.)
+///
 /// So the phone takes a working set and leaves the rest on the Mac, where it
 /// already lives and is already backed up.
 ///
@@ -48,6 +52,11 @@ public enum BookScope {
         case whole(cap: Int)
         /// Every unfinished order, plus the newest `n` finished ones.
         case openPlusNewest(Int)
+        /// The newest `n` by the record's own day (`recency`), wherever in the
+        /// list they sit. Newest-first is only a convention: a row folded in
+        /// from a phone or an import can land anywhere, and a plain prefix
+        /// would then miss a recent one.
+        case newest(Int)
     }
 
     /// What a phone carries, and nothing else.
@@ -66,6 +75,18 @@ public enum BookScope {
         // without this a shop's templates never reached the phone (iOS
         // handoff, Oct 2026). Text only; nothing in it is a secret.
         ("waTemplates", .whole(cap: 200)),
+        // The phone's calculator (Oct 2026): the shop's saved presets — the
+        // seven figures a part is costed at — and the consumables shelf, so a
+        // price worked out on the phone is the one the Mac would give.
+        ("printers", .whole(cap: 200)),
+        ("consumables", .whole(cap: 2_000)),
+        // The phone's receipt scanner (`lib/zatca-qr.js`): suppliers to match
+        // a receipt's seller by VAT number, and recent expenses so the same
+        // receipt is not filed twice (`receiptRef`). Recent, not all: a
+        // duplicate is a receipt scanned again soon after, and three years of
+        // expenses is history no phone screen shows.
+        ("suppliers", .whole(cap: 1_000)),
+        ("expenses", .newest(1_000)),
     ]
 
     /// What a pull actually contained.
@@ -137,6 +158,8 @@ public enum BookScope {
                     .sorted { recency($0) > recency($1) }
                     .prefix(n)
                 kept = open + closed
+            case .newest(let n):
+                kept = Array(rows.sorted { recency($0) > recency($1) }.prefix(n))
             }
             held[collection] = .init(whole: kept.count == rows.count,
                                      sent: kept.count,

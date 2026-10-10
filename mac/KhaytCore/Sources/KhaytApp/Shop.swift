@@ -4381,18 +4381,7 @@ final class Shop {
     /// written over it. Static so a test can hold it to a record.
     static func costInput(spool: Spool?, grams: Double, hours: Double, qty: Int,
                           extra: [String: JSONValue] = [:]) -> JSONValue {
-        var part = extra
-        part["printWeight"] = .number(max(0, grams))
-        part["printTime"] = .number(max(0, hours))
-        part["qty"] = .number(Double(max(1, qty)))
-        if let spool {
-            part["filamentId"] = .string(spool.id)
-            part["material"] = .string(spool.material)
-            part["spoolCost"] = .number(spool.cost ?? 0)
-            // At least one gram: the cost model divides by this.
-            part["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
-        }
-        return .object(part)
+        CalculatorPart.single(spool: spool.map(\.costing), grams: grams, hours: hours, qty: qty, extra: extra)
     }
 
     /// What one part costs to make, through the shared cost model.
@@ -4717,24 +4706,14 @@ final class Shop {
                       agreedAmount: Double = 0, rule: PriceRule = PriceRule(),
                       extraLines: [ExtraLine] = []) async -> QuoteTotal? {
         guard let engine else { return nil }
-        var input: [String: JSONValue] = [
-            "baseCost": .number(baseCost), "qty": .number(1),
-            "margin": .number(margin), "discountPct": .number(discountPct),
-            "shippingCost": .number(shippingCost),
-            "rushEnabled": .bool(rush), "business": .bool(true),
-            "agreedAmount": .number(agreedAmount),
-        ]
+        var input = CalculatorPart.quoteInput(baseCost: baseCost, margin: margin, discountPct: discountPct,
+                                              shippingCost: shippingCost, rush: rush,
+                                              agreedAmount: agreedAmount, settings: settingsDict)
         // Half-written rows are dropped rather than sent as zeroes: a zero
         // amount is a line on the customer's invoice reading "Design fee 0.00".
         let charges = extraLines.filter(\.isWorthKeeping)
         if !charges.isEmpty { input["extraLines"] = .array(charges.map(\.row)) }
         for (key, value) in rule.fields { input[key] = value }
-        // The shop's own rush percentage, or Khayt's default of twenty-five.
-        if rush {
-            var pct = 25.0
-            if case .object(let all) = settingsValue, case .number(let own)? = all["rushFeePct"] { pct = own }
-            input["rushPct"] = .number(pct)
-        }
         return try? await engine.quoteTotal(input)
     }
 

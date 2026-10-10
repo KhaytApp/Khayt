@@ -4,6 +4,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: a calculator, and expenses read off a receipt's QR.** The iPhone's
+  quote sheet sent seven numbers to the Mac and showed the answer, so it
+  needed the Mac nearby, used Khayt's starting rates, and was hidden in
+  Home's + menu. The new Calculator (a row on Home, a tab on iPad and the
+  unfolded iPhone Duo, and "Price a part" in Siri, Shortcuts and Control
+  Center) works the price out on the phone from the shop's own spools,
+  printers, presets and consumables. It handles several colours with purge,
+  editable cost rates, margin, discount and rush. It can send the price to
+  the customer or start a quote. It uses the same rules as the Mac's
+  calculator: the part is now built by one shared function, `CalculatorPart`
+  in KhaytCore, which both apps use. On the expense sheet, "Scan the
+  receipt's QR" reads a Saudi tax invoice the way the Mac's "Add from
+  receipt" does (`lib/zatca-qr.js`). It fills in the total, the VAT you
+  reclaim, the date and the seller, catches a receipt that is already filed,
+  and also finds the code in a photo of the receipt. To make this work, the
+  phone's copy of the shop (`BookScope.workingSet`) now includes presets,
+  consumables, suppliers and the newest 1,000 expenses by date.
 - **(Maintainers) The Mac's full test run no longer looks hung on a Mac with a
   real print library.** The test that checks the Mac's 3MF reader against
   Electron's, file by file over the shop's own vault, skipped archives by

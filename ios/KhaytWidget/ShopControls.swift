@@ -31,6 +31,19 @@ struct ScanSpoolIntent: AppIntent {
     }
 }
 
+/// Open the app on the calculator.
+struct OpenCalculatorIntent: AppIntent {
+    static let title: LocalizedStringResource = "Price a part"
+    static let description = IntentDescription("Opens Khayt on the calculator.")
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        PendingAction.ask("calculator")
+        return .result()
+    }
+}
+
 /// A sheet an intent asked Home to open, taken once.
 ///
 /// In the App Group's defaults, not the app's own: an intent run from a

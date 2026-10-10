@@ -684,6 +684,12 @@ struct ExpenseDraft: Codable, Sendable {
     var category: String
     var note: String
     var receiptBase64: String?
+    /// From a receipt's QR (`ReceiptScan.swift`): the input VAT the shop
+    /// reclaims, the invoice's day, and the receipt's identity so the same
+    /// one is caught if it is scanned again. Nil when typed by hand.
+    var vatAmount: Double? = nil
+    var date: String? = nil
+    var receiptRef: String? = nil
 }
 
 /// What it says to a person is in `KhaytAPIError+Words.swift`, not here: this

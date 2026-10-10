@@ -13,6 +13,7 @@ struct ContentView: View {
         KhaytTabItem(id: 2, title: L10n.tr("tab.inventory"), icon: "cylinder.split.1x2.fill"),
         KhaytTabItem(id: 3, title: L10n.tr("tab.machines"), icon: "printer.fill"),
         KhaytTabItem(id: 4, title: L10n.tr("tab.clients"), icon: "person.2.fill"),
+        KhaytTabItem(id: MainTabView.calculatorTab, title: L10n.tr("tab.calculator"), icon: "function"),
         KhaytTabItem(id: 5, title: L10n.tr("tab.settings"), icon: "gearshape.fill")
     ]
 
@@ -55,6 +56,7 @@ struct ContentView: View {
         case "machines": selectedTab = 3
         case "clients": selectedTab = 4
         case "settings": selectedTab = 5
+        case "calculator": selectedTab = MainTabView.calculatorTab
         default: break
         }
     }
@@ -62,6 +64,9 @@ struct ContentView: View {
 
 struct MainTabView: View {
     static let settingsTab = 5
+    /// A tab where there is room for one (iPad, iPhone Duo unfolded); on a
+    /// compact iPhone the bar is full, and Home's header opens it instead.
+    static let calculatorTab = 6
     @Binding var selectedTab: Int
     let tabs: [KhaytTabItem]
     @EnvironmentObject private var health: ConnectionHealth
@@ -112,7 +117,7 @@ struct MainTabView: View {
     private var shownTabs: [KhaytTabItem] { Self.shown(tabs, regularWidth: widthClass == .regular) }
 
     static func shown(_ tabs: [KhaytTabItem], regularWidth: Bool) -> [KhaytTabItem] {
-        regularWidth ? tabs : tabs.filter { $0.id != settingsTab }
+        regularWidth ? tabs : tabs.filter { $0.id != settingsTab && $0.id != calculatorTab }
     }
 
     /// One tab's page: the screen background, the connection banner, the screen.
@@ -137,6 +142,7 @@ struct MainTabView: View {
         case 3: MachinesView()
         case 4: ClientsView()
         case 5: SettingsView()
+        case Self.calculatorTab: CalculatorScreen()
         default: DashboardView()
         }
     }

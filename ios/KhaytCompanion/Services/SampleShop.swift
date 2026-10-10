@@ -81,12 +81,26 @@ enum SampleShop {
                 order("S-1024", "completed", "Dice tower", "Tabletop Guild", "C-4", placed: -40, due: -33, price: 55, paid: 55, material: "PLA", qty: 1),
             ]),
             "inventory": .array([
-                spool("SP-201", "Bambu", "PLA", "#1B1B1F", left: 180, of: 1000),
-                spool("SP-202", "Polymaker", "PETG", "#2F6DB5", left: 640, of: 1000),
-                spool("SP-203", "Prusament", "PLA", "#E8662A", left: 910, of: 1000),
-                spool("SP-204", "eSun", "ABS", "#F2F2F0", left: 120, of: 1000),
-                spool("SP-205", "Elegoo", "Resin", "#9AA3AD", left: 480, of: 1000),
-                spool("SP-206", "Polymaker", "Nylon", "#C9B79C", left: 750, of: 750),
+                spool("SP-201", "Bambu", "PLA", "#1B1B1F", left: 180, of: 1000, cost: 19.99),
+                spool("SP-202", "Polymaker", "PETG", "#2F6DB5", left: 640, of: 1000, cost: 22.50),
+                spool("SP-203", "Prusament", "PLA", "#E8662A", left: 910, of: 1000, cost: 29.99),
+                spool("SP-204", "eSun", "ABS", "#F2F2F0", left: 120, of: 1000, cost: 18.00),
+                spool("SP-205", "Elegoo", "Resin", "#9AA3AD", left: 480, of: 1000, cost: 35.00),
+                spool("SP-206", "Polymaker", "Nylon", "#C9B79C", left: 750, of: 750, cost: 42.00),
+            ]),
+            // The calculator's saved presets and the consumables shelf, so the
+            // sample prices a part the way a real shop's book would.
+            "printers": .array([
+                .object(["id": .string("PR-1"), "name": .string("Everyday PLA"),
+                         "wearRate": .number(0.35), "powerDraw": .number(150), "elecRate": .number(0.18),
+                         "laborRate": .number(20), "failureRate": .number(8),
+                         "prepTime": .number(0.15), "postTime": .number(0.25), "rev": .number(1)]),
+            ]),
+            "consumables": .array([
+                .object(["id": .string("CN-1"), "name": .string("Magnet 6×2 mm"), "cost": .number(0.12),
+                         "stock": .number(240), "unit": .string("pcs"), "rev": .number(1)]),
+                .object(["id": .string("CN-2"), "name": .string("M3 heat-set insert"), "cost": .number(0.08),
+                         "stock": .number(500), "unit": .string("pcs"), "rev": .number(1)]),
             ]),
             "waitingList": .array([
                 .object(["id": .string("W-11"), "project": .string("Custom cosplay helmet"),
@@ -103,10 +117,10 @@ enum SampleShop {
     }
 
     private static func spool(_ id: String, _ brand: String, _ material: String, _ hex: String,
-                              left: Double, of total: Double) -> JSONValue {
+                              left: Double, of total: Double, cost: Double) -> JSONValue {
         .object(["id": .string(id), "brand": .string(brand), "material": .string(material),
                  "color": .string(hex), "weightRemaining": .number(left), "weightTotal": .number(total),
-                 "rev": .number(1)])
+                 "cost": .number(cost), "rev": .number(1)])
     }
 
     /// Every collection held whole — the sample is the entire shop.
