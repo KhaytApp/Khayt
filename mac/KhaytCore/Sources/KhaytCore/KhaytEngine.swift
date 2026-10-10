@@ -1027,6 +1027,32 @@ public actor KhaytEngine {
                           as: [String: JSONValue]?.self)
     }
 
+    /// Each text with the personal-data shapes taken out — emails, phone
+    /// numbers, IBANs and long digit runs become `<redacted>` — by the
+    /// telemetry scrubber's own `scrubPii`, so what counts as personal data
+    /// is one rule wherever Khayt hands text on. Arabic-Indic digits are read
+    /// as the Western digits they are first: the shared patterns match ASCII
+    /// digits only, and a phone typed "٠٥٥١٢٣٤٥٦٧" is the same phone. One
+    /// crossing for the whole list. Throws when the scrubber does; a caller
+    /// must then send nothing of the text (fail closed).
+    public func scrubPersonalData(_ texts: [String]) throws -> [String] {
+        if texts.isEmpty { return [] }
+        let western = texts.map { text -> String in
+            String(String.UnicodeScalarView(text.unicodeScalars.map { s -> Unicode.Scalar in
+                switch s.value {
+                case 0x0660...0x0669: return Unicode.Scalar(s.value - 0x0660 + 0x30)!
+                case 0x06F0...0x06F9: return Unicode.Scalar(s.value - 0x06F0 + 0x30)!
+                default: return s
+                }
+            }))
+        }
+        let out = try runtime.call2(
+            "ARG0.map(function (s) { return KhaytTelemetryScrub.scrubPii(s); })",
+            [.array(western.map { .string($0) })], as: [String].self)
+        guard out.count == texts.count else { throw KhaytJSError.unexpectedResult("scrubPii") }
+        return out
+    }
+
     /// The local queue, bounded (newest kept) and with repeated crashes taken
     /// out — `boundQueue` then `dedupeCrashes`, as Electron's enqueue does.
     public func telemetryTidy(_ queue: [JSONValue], keep: Int) throws -> [JSONValue] {

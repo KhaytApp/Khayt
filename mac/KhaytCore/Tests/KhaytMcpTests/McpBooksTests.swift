@@ -49,7 +49,7 @@ struct McpBooksTests {
         Server(library: (try? Library.read(data: data)) ?? Library(models: []),
                books: { try await Books.open(data, engine: engine) },
                now: { now },
-               names: { CustomerNames.read(data: data) })
+               names: { CustomerNames.read(data: data) }, engine: engine)
     }
 
     /// The book with `settings.mcp.shareCustomerNames` set — the shop having

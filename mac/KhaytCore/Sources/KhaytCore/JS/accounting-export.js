@@ -35,6 +35,25 @@ function csvEscape(value) {
   return s;
 }
 
+/**
+ * A TEXT cell made safe to open in a spreadsheet: a value that starts with
+ * `=`, `+`, `-`, `@`, a tab or a CR is read by Excel, Sheets and Numbers as a
+ * formula, so it gets a leading `'` — the same rule as lib/csv-bundle.js and
+ * lib/report-builder.js. A customer can type their own name through web-store
+ * and portal intake, so a name like `=HYPERLINK(...)` is a real input here.
+ *
+ * TEXT ONLY: names, notes, descriptions, ids, accounts, currencies, dates. A
+ * money or number cell is never passed through this, because a refund is
+ * "-12.00" and a quote mark in front of it would turn the figure into text in
+ * the bookkeeping package. Returns the value unescaped; csvEscape still runs.
+ * @param {*} value
+ * @returns {string}
+ */
+function neutralize(value) {
+  const s = value === null || value === undefined ? '' : String(value);
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+
 /** Round a number to 2 decimal places (half-up on positive magnitude). */
 function roundMoney(n) {
   const v = +n || 0;
@@ -256,17 +275,18 @@ const SAUDI_INVOICE_LAYOUTS = {
       'Amount is inc. or exc. tax'],
     // Khayt keeps no due date on an invoice; the work is paid for on receipt.
     row: (inv, s, rate, opts) => [
-      inv.id || '', inv.clientName || '', inv.currency || opts.currency || '',
-      dateKey(inv.date), dateKey(inv.date), inv.id || '', 1, money(s.subtotal),
-      opts.salesAccount || '', taxNameCell(rate, opts), 'exc. tax',
+      neutralize(inv.id), neutralize(inv.clientName), neutralize(inv.currency || opts.currency),
+      neutralize(dateKey(inv.date)), neutralize(dateKey(inv.date)), neutralize(inv.id), 1,
+      money(s.subtotal), neutralize(opts.salesAccount), neutralize(taxNameCell(rate, opts)), 'exc. tax',
     ],
   },
   daftra: {
     columns: ['Date', 'Amount', 'Currency', 'Vendor', 'Description', 'Taxes', 'Sub-Account'],
     // "Vendor" is Daftra's name for the party an income was received from.
     row: (inv, s, rate, opts) => [
-      dayMonthYear(inv.date), money(s.subtotal), inv.currency || opts.currency || '',
-      inv.clientName || '', inv.id || '', taxNameCell(rate, opts), opts.salesAccount || '',
+      neutralize(dayMonthYear(inv.date)), money(s.subtotal), neutralize(inv.currency || opts.currency),
+      neutralize(inv.clientName), neutralize(inv.id), neutralize(taxNameCell(rate, opts)),
+      neutralize(opts.salesAccount),
     ],
   },
 };
@@ -280,15 +300,16 @@ const SAUDI_EXPENSE_LAYOUTS = {
       'Amount is inc. or exc. tax', 'Description'],
     // The amount is what the receipt said was paid, tax and all.
     row: (exp, opts) => [
-      dateKey(exp.date), mapCategoryAccount(exp.category), opts.paymentAccount || '',
-      exp.currency || opts.currency || '', money(exp.amount), 'inc. tax', exp.note || '',
+      neutralize(dateKey(exp.date)), neutralize(mapCategoryAccount(exp.category)),
+      neutralize(opts.paymentAccount), neutralize(exp.currency || opts.currency),
+      money(exp.amount), 'inc. tax', neutralize(exp.note),
     ],
   },
   daftra: {
     columns: ['Date', 'Amount', 'Currency', 'Category', 'Description'],
     row: (exp, opts) => [
-      dayMonthYear(exp.date), money(exp.amount), exp.currency || opts.currency || '',
-      mapCategoryAccount(exp.category), exp.note || '',
+      neutralize(dayMonthYear(exp.date)), money(exp.amount), neutralize(exp.currency || opts.currency),
+      neutralize(mapCategoryAccount(exp.category)), neutralize(exp.note),
     ],
   },
 };
@@ -371,17 +392,18 @@ function buildInvoiceCsv(invoices, opts = {}) {
     // Providers that key tax by code (Xero TaxType / Zoho Tax Name) get the
     // configured tax code; everything else gets the numeric rate.
     const taxCell = (TAX_CODE_PROVIDERS.has(format) && opts.taxCode) ? opts.taxCode : rate;
+    // Text cells are neutralized; money and the numeric rate never are.
     const cells = {
-      Date: dateKey(inv.date),
-      InvoiceNo: inv.id || '',
-      Customer: inv.clientName || '',
-      Currency: inv.currency || '',
-      AccountCode: opts.salesAccount || '',
+      Date: neutralize(dateKey(inv.date)),
+      InvoiceNo: neutralize(inv.id),
+      Customer: neutralize(inv.clientName),
+      Currency: neutralize(inv.currency),
+      AccountCode: neutralize(opts.salesAccount),
       Subtotal: money(subtotal),
       VAT: money(vat),
-      VATRate: taxCell,
+      VATRate: typeof taxCell === 'string' ? neutralize(taxCell) : taxCell,
       Total: money(total),
-      BaseCurrency: baseCurrency,
+      BaseCurrency: neutralize(baseCurrency),
       BaseTotal: baseTotal,
     };
     rows.push(INVOICE_COLUMNS.map((c) => csvEscape(cells[c])).join(','));
@@ -417,11 +439,11 @@ function buildExpenseCsv(expenses, opts = {}) {
   for (const exp of Array.isArray(expenses) ? expenses : []) {
     if (!inRange(exp.date, opts.from, opts.to)) continue;
     const cells = {
-      Date: dateKey(exp.date),
-      Category: mapCategoryAccount(exp.category),
+      Date: neutralize(dateKey(exp.date)),
+      Category: neutralize(mapCategoryAccount(exp.category)),
       Amount: money(exp.amount),
-      Currency: exp.currency || '',
-      Note: exp.note || '',
+      Currency: neutralize(exp.currency),
+      Note: neutralize(exp.note),
     };
     rows.push(EXPENSE_COLUMNS.map((c) => csvEscape(cells[c])).join(','));
   }
@@ -476,6 +498,7 @@ function buildExpensePayload(exp, opts = {}) {
 const api = {
   BOM,
   csvEscape,
+  neutralize,
   vatSplit,
   roundMoney,
   mapCategoryAccount,

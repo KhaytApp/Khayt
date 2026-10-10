@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 
 /// Khayt's library and books, answerable by an assistant — the Model Context
 /// Protocol.
@@ -39,6 +40,10 @@ struct Server: Sendable {
     /// tools carry their own (`Books.names`), from the same book by the same
     /// rule, so a label is the same customer in both.
     var names: @Sendable () -> CustomerNames = { .none }
+    /// The shared rules, for taking phones, emails and IBANs out of what the
+    /// LIBRARY tools say (`Outgoing`). Nil — the rules could not start — and
+    /// every title, project and tag is said as `<redacted>`: fail closed.
+    var engine: KhaytEngine? = nil
 
     /// The protocol version this speaks. MCP negotiates: the host sends the
     /// version it wants and a server that knows a different one says so rather
@@ -244,9 +249,9 @@ struct Server: Sendable {
         let args = params["arguments"] as? [String: Any] ?? [:]
         if Self.bookTools.contains(name) { return ok(id, content(await fromBooks(name, args))) }
         switch name {
-        case "search_models":  return ok(id, content(search(args)))
-        case "get_model":      return ok(id, content(one(args)))
-        case "library_summary":return ok(id, content(summary()))
+        case "search_models":  return ok(id, content(search(args, await models())))
+        case "get_model":      return ok(id, content(one(args, await models())))
+        case "library_summary":return ok(id, content(summary(await models())))
         default:               return fail(id, -32602, "no tool \(name)")
         }
     }
@@ -278,14 +283,15 @@ struct Server: Sendable {
 
     /// The library as an assistant may read it: every customer name in a
     /// title, a project, a category, a tag or a designer replaced by its label
-    /// unless the shop shares names. Searched AFTER that, so a search for a
-    /// customer's name cannot pick out the models that carry it.
-    private var models: [Library.Model] {
-        let names = names()
-        return names.share ? library.models : library.models.map { $0.scrubbed(names) }
+    /// unless the shop shares names, and every phone, email, IBAN and long
+    /// number taken out whatever it is set to (`Outgoing`). Searched AFTER
+    /// that, so a search for a customer's name or number cannot pick out the
+    /// models that carry it.
+    private func models() async -> [Library.Model] {
+        await Library.Model.cleaned(library.models, Outgoing(names: names(), engine: engine))
     }
 
-    private func search(_ args: [String: Any]) -> Any {
+    private func search(_ args: [String: Any], _ models: [Library.Model]) -> Any {
         var found = models
         if let q = (args["query"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !q.isEmpty {
@@ -307,7 +313,7 @@ struct Server: Sendable {
         return ["count": found.count, "models": found.prefix(limit).map(Self.dictionary(of:))]
     }
 
-    private func one(_ args: [String: Any]) -> Any {
+    private func one(_ args: [String: Any], _ models: [Library.Model]) -> Any {
         let id = args["id"] as? String ?? ""
         guard let model = models.first(where: { $0.id == id }) else {
             return ["error": "no model with id \(id)"]
@@ -315,8 +321,7 @@ struct Server: Sendable {
         return Self.dictionary(of: model)
     }
 
-    private func summary() -> Any {
-        let models = models
+    private func summary(_ models: [Library.Model]) -> Any {
         var byGroup: [String: Int] = [:]
         for m in models { byGroup[m.group ?? "(unfiled)", default: 0] += 1 }
         return [

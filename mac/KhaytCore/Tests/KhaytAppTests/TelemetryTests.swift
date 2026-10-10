@@ -326,6 +326,95 @@ struct TelemetryTests {
         #expect(!FileManager.default.fileExists(atPath: electron.path))
     }
 
+    /// An opt-out made in Electron on the same book never calls
+    /// `consentChanged` here — so every tick makes the queue agree with the
+    /// consent it reads, the book on disk included.
+    @Test("a tick's prune empties a stream that is off, and deletes the queue with both off")
+    func tickPrunes() async {
+        let rig = Rig()
+        await rig.telemetry.enqueue(.crash, Self.fault("Error: x"),
+                                    consent: Self.both, engine: Self.engine, file: rig.file)
+        await rig.telemetry.enqueue(.usage, TelemetryRaw.usage(feature: "app_launch", count: 1, settings: [:],
+                                                               mode: "simple", Self.context),
+                                    consent: Self.both, engine: Self.engine, file: rig.file)
+        rig.telemetry.prune(consent: Self.both, file: rig.file)
+        #expect(rig.file.read().count == 2, "a consent that allows both took something out")
+        let usageOnly = TelemetryConsent(crash: false, usage: true, installId: Self.both.installId)
+        rig.telemetry.prune(consent: usageOnly, file: rig.file)
+        #expect(rig.file.read().count == 1)
+        rig.telemetry.prune(consent: TelemetryConsent(), file: rig.file)
+        #expect(!FileManager.default.fileExists(atPath: rig.file.url.path))
+    }
+
+    /// What a tick reads: Electron writing `crashOptIn: false` into the same
+    /// book is seen on disk, and only what both the memory and the disk allow
+    /// is kept.
+    @Test("the consent on disk is read, and only what memory and disk both allow counts")
+    func diskConsent() async throws {
+        let rig = Rig()
+        let store = rig.dir.appending(path: "khayt-store.json")
+        let book: JSONValue = .object(["settings": .object(["telemetry": .object([
+            "crashOptIn": .bool(false), "usageOptIn": .bool(true), "installId": .string("abc12345")])])])
+        try JSONEncoder().encode(book).write(to: store)
+        let disk = try #require(await Telemetry.consentOnDisk(store))
+        #expect(!disk.crash && disk.usage)
+        #expect(Self.both.and(disk) == TelemetryConsent(crash: false, usage: true,
+                                                        installId: Self.both.installId,
+                                                        consentAt: Self.both.consentAt))
+        #expect(await rig.telemetry.consentOnDiskIfChanged(store) == disk)
+        #expect(await Telemetry.consentOnDisk(rig.dir.appending(path: "nope.json")) == nil)
+    }
+
+    /// The write after the awaits cannot undo an opt-out made during them.
+    @Test("an opt-out during enqueue's await is not undone by its write")
+    func enqueueRechecksConsent() async {
+        let rig = Rig()
+        await rig.telemetry.enqueue(.crash, Self.fault("Error: first"),
+                                    consent: Self.both, engine: Self.engine, file: rig.file)
+        #expect(rig.file.read().count == 1)
+        // `live` is asked after the awaits: the opt-out has happened by then,
+        // and deleted the queue, exactly as `consentChanged` does.
+        let telemetry = rig.telemetry, file = rig.file
+        let queued = await telemetry.enqueue(.crash, Self.fault("Error: second"),
+                                             consent: Self.both, engine: Self.engine, file: file,
+                                             live: {
+            telemetry.consentChanged(to: TelemetryConsent(), from: Self.both, file: file)
+            return TelemetryConsent()
+        })
+        #expect(!queued)
+        #expect(!FileManager.default.fileExists(atPath: file.url.path), "the deleted queue was written back")
+
+        // One stream off meanwhile: its events do not come back with the write.
+        await rig.telemetry.enqueue(.usage, TelemetryRaw.usage(feature: "app_launch", count: 1, settings: [:],
+                                                               mode: "simple", Self.context),
+                                    consent: Self.both, engine: Self.engine, file: rig.file)
+        let crashOnly = TelemetryConsent(crash: true, usage: false, installId: Self.both.installId)
+        #expect(await rig.telemetry.enqueue(.crash, Self.fault("Error: third"),
+                                            consent: Self.both, engine: Self.engine, file: rig.file,
+                                            live: { crashOnly }))
+        let kinds = rig.file.read().compactMap { e -> String? in
+            if case .object(let o) = e, case .string(let k)? = o["kind"] { return k }
+            return nil
+        }
+        #expect(kinds == ["crash"])
+    }
+
+    /// Two switches flicked faster than the book reloads: each names only its
+    /// own stream, and the other is kept as the book has it.
+    @Test("a Settings switch leaves the other stream as the book has it")
+    func switchesKeepEachOther() {
+        let now = Date(timeIntervalSince1970: 1_791_000_000)
+        let crashOn = TelemetryConsent.choosing(crash: true, usage: nil, over: TelemetryConsent(), now: now,
+                                                newId: { "id-1" })
+        #expect(crashOn.crash && !crashOn.usage)
+        // The usage switch, drawn before crash went on, still says only usage.
+        let both = TelemetryConsent.choosing(crash: nil, usage: true, over: crashOn, now: now)
+        #expect(both.crash && both.usage, "turning usage on turned crash back off")
+        #expect(both.installId == "id-1")
+        let usageOnly = TelemetryConsent.choosing(crash: false, usage: nil, over: both, now: now)
+        #expect(!usageOnly.crash && usageOnly.usage)
+    }
+
     @Test("the sample book cannot be opted in, and nothing is written")
     func sampleRefuses() async {
         let shop = Shop()

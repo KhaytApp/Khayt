@@ -15,7 +15,9 @@ import KhaytCore
 /// chosen fields: money and customer NAMES, read through the shared rules, and
 /// still never a phone, an email, an address or a secret. A customer's name
 /// typed into a model's title, project or tags is replaced the same way the
-/// books tools replace it, unless the shop shares names (`CustomerNames`).
+/// books tools replace it, unless the shop shares names (`CustomerNames`), and
+/// a phone, email or IBAN typed there is taken out whatever the setting
+/// (`Outgoing`).
 ///
 /// READ-ONLY, and it never opens the store for writing. Khayt may be running
 /// and holding the lock; nothing here cares, because nothing here changes
@@ -111,15 +113,34 @@ struct Library: Sendable {
 }
 
 extension Library.Model {
-    /// This model with every customer name in its typed text replaced
-    /// (`CustomerNames.scrub`). The licence is an SPDX-like id, not a person.
-    func scrubbed(_ names: CustomerNames) -> Library.Model {
-        Library.Model(
-            id: id, title: names.scrub(title), group: group.map { names.scrub($0) },
-            category: category.map { names.scrub($0) }, tags: tags.map { names.scrub($0) },
-            material: material, designer: designer.map { names.scrub($0) }, licence: licence,
-            sellable: sellable, timesPrinted: timesPrinted, lastPrinted: lastPrinted,
-            sizeBytes: sizeBytes, fileKind: fileKind)
+    /// These models as an assistant may read them: every free text in them —
+    /// title, project, category, tags, material, designer — through
+    /// `Outgoing`, so a customer's name becomes its label (unless the shop
+    /// shares names) and a phone, an email, an IBAN or a long number typed
+    /// into any of them is taken out whatever the setting. One crossing into
+    /// the rules for the whole library. The licence is an SPDX-like id, not a
+    /// person.
+    static func cleaned(_ models: [Library.Model], _ out: Outgoing) async -> [Library.Model] {
+        var texts: [String] = []
+        for m in models {
+            texts.append(m.title)
+            texts.append(contentsOf: [m.group, m.category, m.material, m.designer].map { $0 ?? "" })
+            texts.append(contentsOf: m.tags)
+        }
+        var clean = await out.clean(texts).makeIterator()
+        func next() -> String { clean.next() ?? CustomerNames.redacted }
+        func optional(_ v: String?) -> String? { let c = next(); return v == nil ? nil : c }
+        return models.map { m in
+            let title = next()
+            let group = optional(m.group), category = optional(m.category)
+            let material = optional(m.material), designer = optional(m.designer)
+            let tags = m.tags.map { _ in next() }
+            return Library.Model(
+                id: m.id, title: title, group: group, category: category, tags: tags,
+                material: material, designer: designer, licence: m.licence,
+                sellable: m.sellable, timesPrinted: m.timesPrinted, lastPrinted: m.lastPrinted,
+                sizeBytes: m.sizeBytes, fileKind: m.fileKind)
+        }
     }
 
     /// Everything about this model a search should look at, folded once.

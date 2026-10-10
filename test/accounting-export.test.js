@@ -330,3 +330,47 @@ test('the format lists name the Saudi packages, and Qoyod is not guessed at', ()
   assert.deepEqual(parseCsv(buildInvoiceCsv(inv, { format: 'qoyod' })).header,
     parseCsv(buildInvoiceCsv(inv, { format: 'generic' })).header);
 });
+
+test('formula injection: a text cell starting =, +, -, @, tab or CR is neutralized in every format', () => {
+  const evil = ['=HYPERLINK("http://x","y")', '+1+1', '-2+3', '@SUM(A1)', '\tcmd', '\r=1'];
+  for (const format of INVOICE_FORMATS) {
+    for (const bad of evil) {
+      const inv = [{ id: bad, date: '2026-07-15', clientName: bad, price: 115, vatRate: 15 }];
+      const { rows } = parseCsv(buildInvoiceCsv(inv, { format, salesAccount: bad, taxCode: bad, currency: 'SAR' }));
+      for (const cell of rows[0]) {
+        assert.ok(!/^[=+\-@\t\r]/.test(cell), `${format}: "${cell}" would run as a formula`);
+      }
+      assert.ok(rows[0].includes("'" + bad), `${format}: the name was not kept, quoted`);
+    }
+  }
+  for (const format of EXPENSE_FORMATS) {
+    for (const bad of evil) {
+      const exp = [{ date: '2026-01-10', category: bad, amount: 5, note: bad, currency: 'SAR' }];
+      const { rows } = parseCsv(buildExpenseCsv(exp, { format, paymentAccount: bad }));
+      for (const cell of rows[0]) {
+        assert.ok(!/^[=+\-@\t\r]/.test(cell), `${format}: "${cell}" would run as a formula`);
+      }
+      assert.ok(rows[0].includes("'" + bad), `${format}: the note was not kept, quoted`);
+    }
+  }
+});
+
+test('formula injection: money and number cells are never quoted, so a refund stays -12.00', () => {
+  for (const format of INVOICE_FORMATS) {
+    const doc = buildInvoiceCsv([{ id: 'R-1', date: '2026-07-15', clientName: 'Acme', price: -11.5, vatRate: 15 }],
+      { format });
+    assert.ok(!doc.includes("'-"), `${format}: a negative amount was turned into text`);
+    assert.ok(doc.includes('-10.00'), `${format}: the refund's net amount is missing`);
+  }
+  for (const format of EXPENSE_FORMATS) {
+    const doc = buildExpenseCsv([{ date: '2026-01-10', category: 'rent', amount: -12, note: 'refund' }], { format });
+    assert.ok(doc.includes('-12.00') && !doc.includes("'-12.00"), `${format}: ${doc}`);
+  }
+});
+
+test('formula injection: ordinary values are byte-for-byte as before', () => {
+  const inv = [{ id: 'INV-1', date: '2026-07-15', clientName: 'Nouf, Al-Dossari', price: 115, vatRate: 15, currency: 'SAR' }];
+  assert.equal(buildInvoiceCsv(inv, { format: 'generic' }),
+    BOM + 'Date,InvoiceNo,Customer,Currency,AccountCode,Subtotal,VAT,VATRate,Total,BaseCurrency,BaseTotal\r\n'
+    + '2026-07-15,INV-1,"Nouf, Al-Dossari",SAR,,100.00,15.00,15,115.00,,');
+});

@@ -87,13 +87,16 @@ struct TelemetrySettings: View {
             Text(shop.words.callIt("tel.hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Toggle(isOn: Binding(get: { consent.crash }, set: { on in
-                Task { await shop.setTelemetry(crash: on, usage: consent.usage) }
+            // Each switch says only its own stream. The other is read off the
+            // book inside the write, never from this draw's `consent`, which
+            // a quick second flick would otherwise turn back off.
+            Toggle(isOn: Binding(get: { shop.telemetryConsent.crash }, set: { on in
+                Task { await shop.setTelemetry(crash: on) }
             })) {
                 labelled("tel.crash", "tel.crash_hint")
             }
-            Toggle(isOn: Binding(get: { consent.usage }, set: { on in
-                Task { await shop.setTelemetry(crash: consent.crash, usage: on) }
+            Toggle(isOn: Binding(get: { shop.telemetryConsent.usage }, set: { on in
+                Task { await shop.setTelemetry(usage: on) }
             })) {
                 labelled("tel.usage", "tel.usage_hint")
             }
@@ -144,8 +147,11 @@ enum TelemetryWords {
     nonisolated static let table: [String: [String: String]] = [
         "mac.tel_card_title": ["en": "Help make Khayt better?",
                                "ar": "هل تساعدنا في تحسين خيط؟"],
-        "mac.tel_card_body": ["en": "Khayt sends nothing unless you allow it. A crash report tells us what went wrong, with names, numbers and file paths taken out. Never your orders, customers, prices or files.",
-                              "ar": "لا يرسل خيط شيئًا ما لم تسمح بذلك. يخبرنا تقرير العطل بما حدث بعد حذف الأسماء والأرقام ومسارات الملفات، ولا يتضمن أبدًا طلباتك أو عملاءك أو أسعارك أو ملفاتك."],
+        // What `lib/telemetry-scrub.js` takes out, as the privacy page says
+        // it: emails, phone numbers, long numbers (IBANs among them) and file
+        // paths. NOT person names — the scrubber has no way to know one.
+        "mac.tel_card_body": ["en": "Khayt sends nothing unless you allow it. A crash report tells us what went wrong, with emails, phone numbers, long numbers and file paths taken out. Never your orders, customers, prices or files.",
+                              "ar": "لا يرسل خيط شيئًا ما لم تسمح بذلك. يخبرنا تقرير العطل بما حدث بعد حذف عناوين البريد الإلكتروني وأرقام الهواتف والأرقام الطويلة ومسارات الملفات، ولا يتضمن أبدًا طلباتك أو عملاءك أو أسعارك أو ملفاتك."],
         "mac.tel_card_usage": ["en": "Also share usage counts",
                                "ar": "مشاركة أعداد الاستخدام أيضًا"],
         "mac.tel_card_share": ["en": "Share Crash Reports",
