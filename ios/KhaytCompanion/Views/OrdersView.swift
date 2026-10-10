@@ -277,10 +277,10 @@ struct OrdersView: View {
     /// The design's window line: a count, then where the rest of it is.
     private func windowLine(_ window: HeldWindow) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(L10n.format("orders.window.count", window.sent.formatted(), window.available.formatted()))
+            Text(L10n.format("orders.window.count", window.sent.formatted(.number.locale(L10n.locale)), window.available.formatted(.number.locale(L10n.locale))))
                 .font(.khayt(12.5, .semibold, relativeTo: .footnote).monospacedDigit())
                 .foregroundStyle(KhaytDesign.ink)
-            Text(L10n.format("orders.window.body", window.sent.formatted()))
+            Text(L10n.format("orders.window.body", window.sent.formatted(.number.locale(L10n.locale))))
                 .font(.khayt(12, relativeTo: .caption))
                 .foregroundStyle(KhaytDesign.note)
                 .fixedSize(horizontal: false, vertical: true)

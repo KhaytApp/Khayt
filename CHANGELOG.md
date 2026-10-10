@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iOS: Arabic screens write Western digits.** Arabic words, numbers 0–9 —
+  the Saudi convention and the desktop's guarded rule
+  (`test/arabic-numerals.test.js`), which the phone's `Money` already followed.
+  An earlier UI pass made counts, grams and due dates Arabic-Indic (٥١٥,
+  ٧ أكتوبر) by mistake; one Latin-digit locale now formats every number and
+  date, and a test fails on ٠–٩ in Arabic.
+
 - **iOS: choose which shop notifications reach you in each Focus.** Settings
   › Focus › any Focus › Add Filter › Khayt: prints finished or failed, new
   order requests, and the rest of the shop's news (queue, late jobs, low

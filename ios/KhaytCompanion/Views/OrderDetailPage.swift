@@ -248,7 +248,7 @@ struct OrderDetailContent: View {
                 .animation(.easeOut(duration: 0.45), value: progress)
             if let eta = live.etaLocalized, let done = live.finishesAt() {
                 Text(L10n.format("machines.left_until", eta,
-                            done.formatted(date: .omitted, time: .shortened)))
+                            done.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale))))
                     .font(.khayt(12.5, relativeTo: .footnote).monospacedDigit())
                     .foregroundStyle(KhaytDesign.note)
             } else {

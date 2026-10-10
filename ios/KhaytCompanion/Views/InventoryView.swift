@@ -187,7 +187,7 @@ struct InventoryView: View {
 
     private var wholeLine: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(L10n.format("inventory.whole.count", spools.count.formatted()))
+            Text(L10n.format("inventory.whole.count", spools.count.formatted(.number.locale(L10n.locale))))
                 .font(.khayt(12.5, .semibold, relativeTo: .footnote).monospacedDigit())
                 .foregroundStyle(KhaytDesign.ink)
             Text(L10n.tr("inventory.whole.body"))

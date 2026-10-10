@@ -7,7 +7,7 @@ extension QueueOrder {
 
     var formattedDueDate: String? {
         guard let dueDate, !dueDate.isEmpty else { return nil }
-        // "8 Oct" / "٨ أكتوبر" in the app's language, the year only when it is
+        // "8 Oct" / "8 أكتوبر" in the app's language (Western digits), the year only when it is
         // not this one — rather than the book's "2026-10-08", which read as a
         // stray Western number on an Arabic screen. Unparseable: as written.
         guard let date = DueDateParser.parse(dueDate) else { return dueDate }
