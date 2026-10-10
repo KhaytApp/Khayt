@@ -323,7 +323,9 @@ function renderAccountingSyncSettings() {
       <span id="acctTestResult" style="font-size:12px;color:var(--text-muted);"></span>
     </div>`;
 
-  const collect = () => ({
+  // Keep what this form does not edit: the export dialog stores the sales
+  // account and tax code here too, and a webhook save must not wipe them.
+  const collect = () => Object.assign({}, settings.accountingSync, {
     enabled: el.querySelector('#acctEnabled').checked,
     format: el.querySelector('#acctFormat').value,
     webhookUrl: el.querySelector('#acctUrl').value.trim(),

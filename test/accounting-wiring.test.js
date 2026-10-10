@@ -71,3 +71,43 @@ test('a row with no taxMode reads as inclusive — every row written before this
   assert.equal(r.total, 115);
   assert.equal(r.subtotal, 100);
 });
+
+// The export dialog is the only way the desktop reaches a CSV format, so a
+// format the module knows and the menu leaves out is a format the desktop
+// does not have (Wafeq and Daftra landed in the module first, #1815).
+test('export dialog offers every format the module builds, and passes the shop currency', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const acct = require('../lib/accounting-export.js');
+  const src = fs.readFileSync(path.join(__dirname, '../renderer/expenses.js'), 'utf8');
+  const menu = src.slice(src.indexOf('<select id="acctFormat">'), src.indexOf('</select>', src.indexOf('<select id="acctFormat">')));
+  const offered = [...menu.matchAll(/<option value="([a-z]+)"/g)].map((m) => m[1]);
+  for (const f of new Set(acct.INVOICE_FORMATS.concat(acct.EXPENSE_FORMATS))) {
+    assert.ok(offered.includes(f), `format ${f} is missing from the export dialog`);
+  }
+  // Expenses carry no currency; without the shop's, Wafeq's Currency column is blank.
+  assert.match(src, /buildExpenseCsv\(expenses, \{[^}]*currency: settings\.currency/);
+  assert.match(src, /buildInvoiceCsv\(ordersToInvoiceRows\(\), \{[^}]*currency: settings\.currency/);
+  const csv = acct.buildExpenseCsv([{ date: '2026-06-01', category: 'Filament', amount: 57.5 }], { format: 'wafeq', currency: 'SAR' });
+  assert.ok(csv.split('\n')[1].includes('SAR'), 'the expense row carries the shop currency');
+});
+
+// Settings › Accounting sync and the export dialog share settings.accountingSync.
+// Saving the webhook form used to replace the object and drop the sales
+// account and tax code the export dialog had remembered.
+test('saving the webhook form keeps the export mapping', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '../renderer/settings.js'), 'utf8');
+  assert.match(src, /const collect = \(\) => Object\.assign\(\{\}, settings\.accountingSync, \{/);
+});
+
+test('Wafeq and Daftra notes exist in every locale', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const dir = path.join(__dirname, '../renderer/locales');
+  for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.js'))) {
+    const s = fs.readFileSync(path.join(dir, f), 'utf8');
+    for (const k of ['acct.wafeq_note', 'acct.daftra_note']) assert.ok(s.includes(`"${k}":`), `${k} missing in ${f}`);
+  }
+});
