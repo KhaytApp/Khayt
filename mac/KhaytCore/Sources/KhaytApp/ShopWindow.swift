@@ -116,6 +116,9 @@ struct ShopWindow: View {
     /// which is what stops this being a fork of the app.
     @ViewBuilder private var screen: some View {
         lockedOr {
+            // The one-time ask about crash reports (#1789), over every screen,
+            // the home one included, until it is answered. Never a sheet.
+            TelemetryCard(shop: shop)
             if shop.showingDashboard {
                 Triage(shop: shop)
             } else {
@@ -300,6 +303,7 @@ struct ShopWindow: View {
                 // the whole book (alpha.62 re-check). `lockedOr` is the one
                 // gate both shells draw through.
                 lockedOr {
+                    TelemetryCard(shop: shop)
                     EngineBanner(shop: shop)
                     MoveBanners(shop: shop)
                     SpendBanner(shop: shop)
