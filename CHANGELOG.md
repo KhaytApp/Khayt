@@ -21,6 +21,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and also finds the code in a photo of the receipt. To make this work, the
   phone's copy of the shop (`BookScope.workingSet`) now includes presets,
   consumables, suppliers and the newest 1,000 expenses by date.
+
+- **Accounting export now offers Wafeq and Daftra.** Choose either one under
+  Expenses › Accounting CSV. Both files carry the shop's currency, which Wafeq
+  needs on every row. The dialog says what to match on the package's import
+  screen: Wafeq asks for the account each expense was paid through, and Daftra
+  takes dates as DD/MM/YYYY and needs a tax that is not included in the price,
+  because sales are written net. Qoyod is not offered: its import template is
+  made per account and its columns are not published.
+- **Saving the accounting webhook no longer forgets the export's account
+  codes.** Settings › Accounting sync replaced the whole setting on save, which
+  wiped the sales account and tax code the export dialog had remembered.
+
 - **(Maintainers) The Mac's full test run no longer looks hung on a Mac with a
   real print library.** The test that checks the Mac's 3MF reader against
   Electron's, file by file over the shop's own vault, skipped archives by

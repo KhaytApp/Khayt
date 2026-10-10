@@ -543,6 +543,8 @@ function exportAccounting() {
         <option value="quickbooks">QuickBooks</option>
         <option value="xero">Xero</option>
         <option value="zoho">Zoho Books</option>
+        <option value="wafeq">Wafeq</option>
+        <option value="daftra">Daftra</option>
       </select>
       <div id="acctMapping" style="margin-top:10px;">
         <div class="inline-pair">
@@ -556,7 +558,21 @@ function exportAccounting() {
           </div>
         </div>
         <p style="font-size:11px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('acct.mapping_hint') || 'Xero/Zoho require an account code and a tax code on imported invoices.')}</p>
+        <p id="acctFormatNote" style="font-size:11px;color:var(--text-muted);margin:4px 0 0;" hidden></p>
       </div>`,
+    onMount(modal) {
+      // Wafeq and Daftra both ask the person to match columns and names on
+      // their import screen; say what has to match before the file is made.
+      const sel = modal.querySelector('#acctFormat');
+      const note = modal.querySelector('#acctFormatNote');
+      const show = () => {
+        const key = sel.value === 'wafeq' ? 'acct.wafeq_note' : sel.value === 'daftra' ? 'acct.daftra_note' : '';
+        note.hidden = !key;
+        note.textContent = key ? t(key) : '';
+      };
+      sel.addEventListener('change', show);
+      show();
+    },
     onSave(modal) {
       const dataset = modal.querySelector('#acctDataset').value;
       const format = modal.querySelector('#acctFormat').value;
@@ -568,10 +584,11 @@ function exportAccounting() {
       const stamp = localDateStr();
       let csv, name;
       if (dataset === 'expenses') {
-        csv = KhaytAccountingExport.buildExpenseCsv(expenses, { format });
+        // Expenses carry no currency of their own; Wafeq refuses a row without one.
+        csv = KhaytAccountingExport.buildExpenseCsv(expenses, { format, currency: settings.currency || 'SAR' });
         name = `expenses-${format}-${stamp}.csv`;
       } else {
-        csv = KhaytAccountingExport.buildInvoiceCsv(ordersToInvoiceRows(), { format, salesAccount, taxCode });
+        csv = KhaytAccountingExport.buildInvoiceCsv(ordersToInvoiceRows(), { format, salesAccount, taxCode, currency: settings.currency || 'SAR' });
         name = `invoices-${format}-${stamp}.csv`;
       }
       downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), name);
