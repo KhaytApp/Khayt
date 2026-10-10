@@ -333,6 +333,7 @@ struct LanServerTests {
         // sample having it: what is being tested is that this is left behind,
         // and a fixture that never had it would pass by accident.
         bench.book.value["printFiles"] = .array([.object(["id": .string("f1")])])
+        bench.book.value["waTemplates"] = .array([.object(["id": .string("wa1"), "text": .string("Ready, {name}")])])
         bench.book.value["auditLog"] = .array([.object(["id": .string("a1")])])
 
         let none = try await bench.get("/api/store")
@@ -362,6 +363,8 @@ struct LanServerTests {
         #expect(sent.store["settings"] != nil)
         #expect(sent.store["printLog"] != nil)
         #expect(sent.store["inventory"] != nil)
+        // The shop's WhatsApp wording, which the phone's job update uses.
+        #expect(sent.store["waTemplates"] != nil, "the phone was not sent the shop's WhatsApp templates")
 
         // Said as a fact rather than a comparison, because a comparison against
         // `forCloud` would still pass if `forCloud` stopped masking.
@@ -1193,6 +1196,28 @@ struct LanServerTests {
             "prepTime": .number(0.1), "postTime": .number(0.1),
         ])])
         return book
+    }
+
+    @Test("the shop's own phone estimates a file with the owner PIN; the consent form stays the customer's")
+    func ownerPinQuotes() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        bench.book.value = Self.quotingBook(bench.book.value)
+        // No session, no intake token: a stranger is refused, as before.
+        let none = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes)
+        #expect(none.status == 401, Comment(rawValue: none.text))
+        let wrong = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                         headers: ["x-khayt-pin": "00000000"])
+        #expect(wrong.status == 401, Comment(rawValue: wrong.text))
+        // The owner PIN — what the phone's other routes send — opens it.
+        let owner = try await bench.post("/api/intake/estimate?name=cube.stl", json: Self.stlBytes,
+                                         headers: ["x-khayt-pin": "24682468"])
+        #expect(owner.status == 200, Comment(rawValue: owner.text))
+        // The form's submit is NOT opened by the PIN: it records the
+        // customer's own consent, which the shop cannot give for them.
+        let submitOwner = try await bench.post("/api/intake", json: #"{"name":"A"}"#,
+                                               headers: ["x-khayt-pin": "24682468"])
+        #expect(submitOwner.status == 401, Comment(rawValue: submitOwner.text))
     }
 
     @Test("a measured model comes back priced, and the form offers the upload")

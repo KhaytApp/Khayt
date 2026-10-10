@@ -23,13 +23,21 @@ struct WebStoreFollowTests {
     /// task that should have been cancelled race the next change.
     static let delay: Duration = .milliseconds(20)
 
+    /// Every load in this suite on ONE day. The sample book is rebased to the
+    /// day it is read on, and a test that loads it twice straddled midnight
+    /// on a starved CI runner (the two loads 15+ minutes apart): the second
+    /// book's dates had moved, so "the same book" was a changed one and a
+    /// republish was scheduled. All three failing runs began 23:29–23:42 UTC
+    /// and ran past 00:00 (Oct 2026). Locally the suite takes a second.
+    static let day = Date(timeIntervalSince1970: 1_788_000_000)
+
     final class Count { var fired = 0; var sent = 0 }
 
     /// The sample book, read once, its store live, publishes counted.
     static func liveShop(_ count: Count,
                          publish: (@MainActor (Shop) async -> Void)? = nil) async -> Shop {
         let shop = Shop()
-        await shop.load(.sample)
+        await shop.load(.sample, asOf: Self.day)
         shop.webStoreFollowDelay = delay
         shop.webStoreAutoPublish = publish ?? { _ in count.fired += 1 }
         shop.webStoreLive = true
@@ -51,7 +59,7 @@ struct WebStoreFollowTests {
         let shop = await Self.liveShop(count)
         shop.webStoreSeen = Self.before
         // The book as changed: re-read, as the app does after any write.
-        await shop.load(.sample)
+        await shop.load(.sample, asOf: Self.day)
         #expect(shop.webStoreLive == true, "the reload forgot the store was live")
         let follow = try #require(shop.webStoreRepublish, "the reload scheduled no follow")
         #expect(!follow.isCancelled, "the reload cancelled the follow it had scheduled")
@@ -83,7 +91,7 @@ struct WebStoreFollowTests {
     func reloadAlone() async {
         let count = Count()
         let shop = await Self.liveShop(count)
-        await shop.load(.sample)
+        await shop.load(.sample, asOf: Self.day)
         #expect(shop.webStoreLive == true)
         // Nothing was scheduled at all — not merely nothing fired yet.
         #expect(shop.webStoreRepublish == nil, "a re-read of the same book scheduled a republish")
@@ -91,10 +99,20 @@ struct WebStoreFollowTests {
         #expect(count.fired == 0)
     }
 
+    @Test("the cause of the CI flake, pinned: the sample read a day later IS a changed catalogue")
+    func sampleAcrossMidnight() async {
+        let count = Count()
+        let shop = await Self.liveShop(count)
+        await shop.load(.sample, asOf: Self.day.addingTimeInterval(86_400))
+        #expect(shop.webStoreRepublish != nil,
+                "if this stops scheduling, the day pin above is no longer what keeps reloadAlone steady")
+        shop.webStoreRepublish?.cancel()
+    }
+
     @Test("a different book forgets the last store, and is not compared with it")
     func anotherBook() async {
         let shop = Shop()
-        await shop.load(.sample)
+        await shop.load(.sample, asOf: Self.day)
         shop.webStoreLive = true
         #expect(!shop.webStoreBookRead(nil), "the same book read again is not another")
         #expect(shop.webStoreLive == true)
@@ -108,7 +126,7 @@ struct WebStoreFollowTests {
         let engine = try KhaytEngine()
         let count = Count()
         let shop = Shop()
-        await shop.load(.sample)
+        await shop.load(.sample, asOf: Self.day)
         let catalog = try await engine.storefrontCatalog(products: shop.productRows, settings: shop.settingsValue,
                                                          lang: "en", withPhotos: false, heroes: [:])
         let published = CatalogPublisher.prices(of: catalog)
@@ -136,7 +154,7 @@ struct WebStoreFollowTests {
         }
         let notices = shop.moveNotices.count
         shop.webStoreSeen = Self.before
-        await shop.load(.sample)
+        await shop.load(.sample, asOf: Self.day)
         try #require(shop.webStoreRepublish != nil, "the change scheduled no follow")
         await Self.settle(shop)
         #expect(count.fired == 1)
@@ -183,7 +201,7 @@ struct WebStoreFollowTests {
     func gate() async throws {
         let engine = try KhaytEngine()
         let shop = Shop()
-        await shop.load(.sample)
+        await shop.load(.sample, asOf: Self.day)
         let catalog = try await engine.storefrontCatalog(products: shop.productRows, settings: shop.settingsValue,
                                                          lang: "en", withPhotos: false, heroes: [:])
         let published = CatalogPublisher.prices(of: catalog)
@@ -202,7 +220,7 @@ struct WebStoreFollowTests {
     @Test("an automatic publish that finds nothing to list keeps the store up and tells the shop")
     func emptyIsHeldNotUnpublished() async throws {
         let shop = Shop()
-        await shop.load(.sample)
+        await shop.load(.sample, asOf: Self.day)
         shop.webStoreLive = true
         shop.holdEmptyStore()
         #expect(shop.webStoreLive == true, "an automatic publish took the store offline")

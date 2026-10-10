@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Mac) For the iPhone app.** The phone can quote a file a customer sent it:
+  the shop's owner PIN now opens the model estimate on the Mac's shop network
+  server, as it opens the phone's other routes. (Not the intake form: that
+  records the customer's own consent, which the shop cannot give for them.) And the
+  shop's own WhatsApp templates now reach the phone, so its job updates use
+  the shop's wording instead of Khayt's defaults.
+- **Mac tests:** the web-store follow test loads the sample book on one fixed
+  day. The sample is rebased to the day it is read, and on a slow CI run the
+  test's two loads straddled midnight, so "the same book" had changed — the
+  required check failed at random, on main too.
+
 - **iOS: scan a Khayt label.** Home's + menu → "Scan a label" reads the QR
   either desktop prints on a job's bag or a spool (`KHAYT-ORDER:`,
   `KHAYT-SPOOL:`, or the job's tracking link) and opens that job or spool —
