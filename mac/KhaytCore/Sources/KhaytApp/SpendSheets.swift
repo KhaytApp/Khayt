@@ -26,11 +26,35 @@ struct ExpenseSheet: View {
     /// say. Held in state because the engine is an actor and a view cannot ask
     /// it a question while it is drawing.
     @State private var suggestion: String?
+    /// Which supplier receipt this was read off, when it was — carried into
+    /// the record so the same receipt scanned again is caught (ReceiptQr.swift).
+    @State private var receiptRef = ""
     @FocusState private var focused: Bool
+
+    /// Filled in from a receipt read off its QR, when there is one waiting —
+    /// as the sheet's starting values, so the fields are right on the first
+    /// frame rather than a frame after it.
+    init(shop: Shop) {
+        self.shop = shop
+        if let read = shop.receiptPrefill {
+            _amount = State(initialValue: read.draft.amount)
+            _vatAmount = State(initialValue: read.draft.vatAmount)
+            if let day = Order.day(read.draft.date) { _date = State(initialValue: min(day, Date())) }
+            _note = State(initialValue: read.draft.note)
+            _receiptRef = State(initialValue: read.draft.receiptRef)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(shop.words.callIt("exp.add_title")).font(.headline)
+            if !receiptRef.isEmpty {
+                // Filled in, not filed: the receipt says what was paid, not
+                // what for, so the category is still the person's to choose.
+                Text(shop.words.callIt("mac.receipt_from"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
@@ -144,7 +168,11 @@ struct ExpenseSheet: View {
         }
         .padding(18)
         .frame(width: Self.width)
-        .onAppear { focused = true }
+        .onAppear {
+            focused = true
+            // Taken: the next "Add expense" is a typed one.
+            shop.receiptPrefill = nil
+        }
         // Re-asked as the note is typed, which is when the answer can change.
         // `.task(id:)` cancels the one in flight, so a shop typing quickly asks
         // once rather than once per keystroke.
@@ -166,6 +194,7 @@ struct ExpenseSheet: View {
             "note": .string(note),
             "orderId": .string(orderId),
             "recurring": .string(recurring),
+            "receiptRef": .string(receiptRef),
         ]
         dismiss()
         Task { await shop.addExpense(input) }

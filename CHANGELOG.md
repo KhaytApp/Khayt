@@ -21,6 +21,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   followed like one the app started. The activity state now reads a
   fractional percent (rounded) instead of failing the pushed update, and
   the `LA_PRINT_STARTED` alert ships in English and Arabic.
+- **(Mac) Add an expense from a supplier's receipt.** Expenses ▸ *Add from
+  receipt…* (also in the File menu) reads the ZATCA QR on a Saudi tax invoice —
+  from a photo, a screenshot, a scanned PDF, or the code's text pasted — and
+  opens the expense form filled in with the total, the VAT (only when the shop
+  is VAT-registered), the invoice's day and the seller. Nothing is saved until
+  you choose the category and press Add. A receipt already in your expenses is
+  flagged and not offered again, a seller whose VAT number matches one of your
+  suppliers is named as that supplier, and a code that is not a tax invoice's
+  says why. The reading rule is shared (`lib/zatca-qr.js` `decodeTLV`,
+  `receiptToExpenseDraft`), and an expense now keeps which receipt it was read
+  from (`receiptRef`).
 
 - **(Mac) For the iPhone app.** The phone can quote a file a customer sent it:
   the shop's owner PIN now opens the model estimate on the Mac's shop network

@@ -6917,6 +6917,63 @@ public actor KhaytEngine {
              .string(total), .string(vatAmount)], as: String.self)
     }
 
+    // MARK: - A supplier's receipt, read off its QR
+
+    /// What a supplier receipt's ZATCA QR says — `KhaytZatcaQr.decodeTLV`.
+    public struct ReceiptRead: Decodable, Sendable, Equatable {
+        public let ok: Bool
+        /// Why it could not be read: `not_base64`, `truncated`, `bad_vat_number`, …
+        public let reason: String?
+        public let receipt: Receipt?
+
+        public struct Receipt: Decodable, Sendable, Equatable {
+            public let sellerName: String
+            public let vatNumber: String
+            public let timestamp: String
+            public let total: Double
+            public let vatAmount: Double
+            public let phase2: Bool
+        }
+    }
+
+    public func readReceiptQr(_ text: String) throws -> ReceiptRead {
+        try runtime.call2("KhaytZatcaQr.decodeTLV(ARG0)", [.string(text)], as: ReceiptRead.self)
+    }
+
+    /// The expense a read receipt proposes, for a person to review —
+    /// `KhaytZatcaQr.receiptToExpenseDraft`.
+    public struct ReceiptDraft: Decodable, Sendable, Equatable {
+        public let draft: Draft
+        public let supplier: Matched?
+        /// An expense already filed from this same receipt.
+        public let duplicateOf: String?
+
+        public struct Draft: Decodable, Sendable, Equatable {
+            public let amount: Double
+            public let vatAmount: Double
+            public let date: String
+            public let note: String
+            public let receiptRef: String
+        }
+        public struct Matched: Decodable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+        }
+    }
+
+    public func receiptDraft(_ text: String, suppliers: [JSONValue], expenses: [JSONValue],
+                             reclaimsTax: Bool) throws -> ReceiptDraft? {
+        try runtime.call2("""
+            (function (t, s, e, r) {
+              var read = KhaytZatcaQr.decodeTLV(t);
+              if (!read.ok) return null;
+              return KhaytZatcaQr.receiptToExpenseDraft(read.receipt, { suppliers: s, expenses: e, reclaimsTax: r });
+            })(ARG0, ARG1, ARG2, ARG3)
+            """,
+            [.string(text), .array(suppliers), .array(expenses), .bool(reclaimsTax)],
+            as: ReceiptDraft?.self)
+    }
+
     /// The money lines under an invoice's table — `KhaytInvoiceDocument.invoiceSummary`.
     public struct InvoiceSummary: Decodable, Sendable, Equatable {
         /// The items, before rush, shipping and the discount.

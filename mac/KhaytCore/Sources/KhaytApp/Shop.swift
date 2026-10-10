@@ -12167,6 +12167,10 @@ final class Shop {
     /// carries the "+" and the strip is not inside the screen — see
     /// `ScreenActions`. The sheets stay where they were.
     var addingExpense = false
+    /// "Add from receipt…": the reader sheet, and what it read — handed to the
+    /// expense sheet to fill in, never saved by itself (ReceiptQr.swift).
+    var readingReceipt = false
+    var receiptPrefill: KhaytEngine.ReceiptDraft?
     var loggingWaste = false
     /// The printers Khayt knows, read once per launch — the catalogue is a
     /// constant, not something a book carries.
