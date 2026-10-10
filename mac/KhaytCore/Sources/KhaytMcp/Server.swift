@@ -33,6 +33,12 @@ struct Server: Sendable {
     /// Today, for every "how late" and "which quarter". Injected so a test can
     /// hold the sample book at a fixed day.
     var now: @Sendable () -> Date = { Date() }
+    /// Whose names the LIBRARY tools may say — read from the book per
+    /// question, like the books, so turning the setting on or off in Khayt
+    /// holds from the next question without restarting the host. The books
+    /// tools carry their own (`Books.names`), from the same book by the same
+    /// rule, so a label is the same customer in both.
+    var names: @Sendable () -> CustomerNames = { .none }
 
     /// The protocol version this speaks. MCP negotiates: the host sends the
     /// version it wants and a server that knows a different one says so rather
@@ -96,7 +102,9 @@ struct Server: Sendable {
             "description": """
                 The shop's open jobs — not finished, not voided: status, \
                 customer, due date, days late, and what each is worth and still \
-                owes, in the job's own currency. Late jobs first. Read-only.
+                owes, in the job's own currency. Late jobs first. Read-only. \
+                Unless the shop shares customer names, a customer is a label \
+                such as "Customer 3", the same customer in every answer.
                 """,
             "inputSchema": [
                 "type": "object",
@@ -117,7 +125,8 @@ struct Server: Sendable {
                 Who owes the shop money and for how long, aged as the Reports \
                 screen ages it: each unpaid job or instalment, days outstanding, \
                 the 0-30/31-60/61-90/90+ buckets, and days past the due date \
-                where one was set. In the shop's own currency. Read-only.
+                where one was set. In the shop's own currency. Read-only. \
+                Customers are labelled as in open_orders.
                 """,
             "inputSchema": [
                 "type": "object",
@@ -267,8 +276,17 @@ struct Server: Sendable {
 
     // MARK: - The library
 
+    /// The library as an assistant may read it: every customer name in a
+    /// title, a project, a category, a tag or a designer replaced by its label
+    /// unless the shop shares names. Searched AFTER that, so a search for a
+    /// customer's name cannot pick out the models that carry it.
+    private var models: [Library.Model] {
+        let names = names()
+        return names.share ? library.models : library.models.map { $0.scrubbed(names) }
+    }
+
     private func search(_ args: [String: Any]) -> Any {
-        var found = library.models
+        var found = models
         if let q = (args["query"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !q.isEmpty {
             // Every word has to appear somewhere, so "dragon flexi" narrows
@@ -291,14 +309,14 @@ struct Server: Sendable {
 
     private func one(_ args: [String: Any]) -> Any {
         let id = args["id"] as? String ?? ""
-        guard let model = library.models.first(where: { $0.id == id }) else {
+        guard let model = models.first(where: { $0.id == id }) else {
             return ["error": "no model with id \(id)"]
         }
         return Self.dictionary(of: model)
     }
 
     private func summary() -> Any {
-        let models = library.models
+        let models = models
         var byGroup: [String: Int] = [:]
         for m in models { byGroup[m.group ?? "(unfiled)", default: 0] += 1 }
         return [

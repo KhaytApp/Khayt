@@ -21,7 +21,8 @@ import KhaytCore
 /// hands a phone — so every credential, every sealed `__enc__` value and the
 /// staff PIN hashes are masked before a tool sees the book. The tools then
 /// lift only the fields they name: a customer's NAME, never a phone, an email
-/// or an address.
+/// or an address — and the name only when the shop has said it may go
+/// (`CustomerNames`): by default an assistant reads "Customer 3".
 ///
 /// ── FRESH ON EVERY QUESTION ──────────────────────────────────────────────
 ///
@@ -32,6 +33,15 @@ struct Books: Sendable {
     /// The whole store, masked.
     let book: [String: JSONValue]
     let engine: KhaytEngine
+    /// Whose names may be said, and what to say instead — from this same
+    /// book, so a label means the same customer in every tool.
+    let names: CustomerNames
+
+    init(book: [String: JSONValue], engine: KhaytEngine) {
+        self.book = book
+        self.engine = engine
+        self.names = CustomerNames(book: book)
+    }
 
     /// Read a store's bytes and mask them. Throws on a book that is not JSON.
     static func open(_ data: Data, engine: KhaytEngine) async throws -> Books {
@@ -97,7 +107,8 @@ struct Books: Sendable {
             "truncated": page.truncated,
             "orders": page.items.map { o -> [String: Any] in
                 var row: [String: Any] = [
-                    "id": o.id, "project": o.project, "client": o.client, "status": o.status,
+                    "id": o.id, "project": names.scrub(o.project),
+                    "client": names.client(order: o.id, named: o.client), "status": o.status,
                     "currency": o.currency, "price": Self.money(o.price),
                     "due": Self.money(o.due), "owed": Self.money(o.owed),
                     "pay_status": o.payStatus,
@@ -146,7 +157,8 @@ struct Books: Sendable {
             // The rule's order: oldest first, which is what a shop chases.
             "rows": page.items.map { r -> [String: Any] in
                 var row: [String: Any] = [
-                    "id": r.id, "project": r.project, "client": r.client,
+                    "id": r.id, "project": names.scrub(r.project),
+                    "client": names.client(order: r.id, named: r.client),
                     "owed": Self.money(r.owed), "days_outstanding": r.days,
                     "bucket": r.bucket, "pay_status": r.payStatus, "instalment": r.instalment,
                 ]
@@ -180,7 +192,7 @@ struct Books: Sendable {
             "truncated": page.truncated,
             "items": page.items.map { s -> [String: Any] in
                 var row: [String: Any] = [
-                    "id": s.id, "kind": s.kind, "label": s.label, "unit": s.unit,
+                    "id": s.id, "kind": s.kind, "label": names.scrub(s.label), "unit": s.unit,
                     "low": s.low, "on_hand": Self.money(s.stock),
                     "used_per_day": Self.money(s.perDay),
                     "suggest_order": Self.money(s.suggest), "needs_ordering": s.needsOrdering,
@@ -323,7 +335,7 @@ struct Books: Sendable {
 
         var inputs: [String: Any] = ["grams": grams, "hours": hours, "qty": qty,
                                      "margin_pct": margin, "rush": rush]
-        if let v = spoolLabel { inputs["spool"] = v }
+        if let v = spoolLabel { inputs["spool"] = names.scrub(v) }
         if machine != nil { inputs["machine_id"] = args["machine_id"] }
         if preset != nil { inputs["preset_id"] = args["preset_id"] }
         return [

@@ -1405,6 +1405,26 @@ struct AssistantPane: View {
                             .frame(width: 240)
                     }
                 }
+
+                // ── THE ASSISTANTS THAT ASK THE BOOK, NOT THE ONE ABOVE ───
+                //
+                // `khayt-mcp` answers whatever assistant the shop connects to
+                // it, and that may be a cloud service. Saved the moment it
+                // changes, like the telemetry consents: a choice about what
+                // leaves the Mac is not part of the provider draft, and the
+                // master switch above does not govern it.
+                Section {
+                    Toggle(isOn: Binding(get: { shop.sharesCustomerNamesWithMcp },
+                                         set: { on in Task { await shop.shareCustomerNamesWithMcp(on) } })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(shop.words.callIt("mac.mcp_share_names"))
+                            Text(shop.words.callIt("mac.mcp_share_names_hint"))
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .disabled(!shop.canWrite || !shop.source.isReal)
+                }
             }
             .formStyle(.grouped)
             SaveBar(shop: shop, dirty: draft != original && addressProblem == nil,
@@ -1505,6 +1525,49 @@ struct AssistantPane: View {
         draft.key = ""
         draft.clearKey = false
         await reload()
+    }
+}
+
+// MARK: - Customer names, to an assistant over khayt-mcp
+
+extension Shop {
+    /// `settings.mcp.shareCustomerNames` — true only when the book says so.
+    /// `khayt-mcp` reads the same key (`CustomerNames.sharing`).
+    var sharesCustomerNamesWithMcp: Bool {
+        guard case .object(let mcp)? = settingsDict["mcp"],
+              case .bool(let on)? = mcp["shareCustomerNames"] else { return false }
+        return on
+    }
+
+    /// The settings with the choice written in, every other key of the `mcp`
+    /// block kept as the book has it.
+    nonisolated static func sharingCustomerNames(_ on: Bool, over settings: [String: JSONValue]) -> [String: JSONValue] {
+        var settings = settings
+        var mcp: [String: JSONValue] = [:]
+        if case .object(let o)? = settings["mcp"] { mcp = o }
+        mcp["shareCustomerNames"] = .bool(on)
+        settings["mcp"] = .object(mcp)
+        return settings
+    }
+
+    /// Choose whether assistants connected to `khayt-mcp` read customers'
+    /// names. Straight onto the settings, not through the settings form:
+    /// `settings-edit.js` takes no `mcp` block from a form. The staff lock
+    /// decides, as for every other setting.
+    func shareCustomerNamesWithMcp(_ on: Bool) async {
+        writeProblem = nil
+        guard source.isReal else { writeProblem = words.callIt("mac.move_sample"); return }
+        guard permitted(LockGate.person("settings", "edit")) else { return }
+        guard let build = source.build else { return }
+        do {
+            try StoreWriter.update(build) { root in
+                root["settings"] = .object(Self.sharingCustomerNames(on, over: Self.settings(root)))
+            }
+        } catch {
+            writeProblem = String(describing: error)
+            return
+        }
+        await load(source)
     }
 }
 

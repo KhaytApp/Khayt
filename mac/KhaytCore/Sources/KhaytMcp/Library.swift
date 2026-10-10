@@ -13,7 +13,9 @@ import KhaytCore
 ///
 /// The books tools are `Books`, a separate reader with its own, deliberately
 /// chosen fields: money and customer NAMES, read through the shared rules, and
-/// still never a phone, an email, an address or a secret.
+/// still never a phone, an email, an address or a secret. A customer's name
+/// typed into a model's title, project or tags is replaced the same way the
+/// books tools replace it, unless the shop shares names (`CustomerNames`).
 ///
 /// READ-ONLY, and it never opens the store for writing. Khayt may be running
 /// and holding the lock; nothing here cares, because nothing here changes
@@ -109,6 +111,17 @@ struct Library: Sendable {
 }
 
 extension Library.Model {
+    /// This model with every customer name in its typed text replaced
+    /// (`CustomerNames.scrub`). The licence is an SPDX-like id, not a person.
+    func scrubbed(_ names: CustomerNames) -> Library.Model {
+        Library.Model(
+            id: id, title: names.scrub(title), group: group.map { names.scrub($0) },
+            category: category.map { names.scrub($0) }, tags: tags.map { names.scrub($0) },
+            material: material, designer: designer.map { names.scrub($0) }, licence: licence,
+            sellable: sellable, timesPrinted: timesPrinted, lastPrinted: lastPrinted,
+            sizeBytes: sizeBytes, fileKind: fileKind)
+    }
+
     /// Everything about this model a search should look at, folded once.
     var haystack: String {
         ([title, group, category, material, designer, licence] + tags)

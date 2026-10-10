@@ -49,6 +49,11 @@ let server = Server(library: library, books: engine.map { engine in
     // conversation, and "who owes me" is a question about now. Read-only —
     // `Library.bookData` never writes, and `Books.open` masks before reading.
     { @Sendable [bookURL] in try await Books.open(Library.bookData(at: bookURL), engine: engine) }
+}, names: { [bookURL] in
+    // Whether the shop shares customer names, asked per question too, so the
+    // switch in Settings ▸ Assistant holds from the next one. A book that
+    // cannot be read shares nothing.
+    CustomerNames.read(data: (try? Library.bookData(at: bookURL)) ?? Data())
 })
 
 // `await` at the top level: each request is answered in turn, in order. The

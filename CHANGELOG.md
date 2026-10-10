@@ -46,6 +46,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rules the app's own screens use, so the answers match. It cannot change
   anything, and it never repeats a password, a PIN, a saved key or a
   customer's phone, email or address. Khayt does not have to be running.
+  Customer names are not shared unless you choose to: by default the assistant
+  sees "Customer 1", "Customer 2" and so on, the same label for the same
+  customer every time, and a customer's name typed into a job or model title
+  is replaced the same way. To let it see names, turn on "Share customer names
+  with AI assistants (khayt-mcp)" in Settings ▸ Assistant.
 
 - **iOS: one Live Activity rule for the phone and the Mac.** The phone's Live
   Activities now decide what to start, update and end with KhaytCore's

@@ -48,7 +48,18 @@ struct McpBooksTests {
     static func server(_ data: Data, engine: KhaytEngine, now: Date = anchor) -> Server {
         Server(library: (try? Library.read(data: data)) ?? Library(models: []),
                books: { try await Books.open(data, engine: engine) },
-               now: { now })
+               now: { now },
+               names: { CustomerNames.read(data: data) })
+    }
+
+    /// The book with `settings.mcp.shareCustomerNames` set — the shop having
+    /// chosen to let an assistant read its customers' names.
+    static func sharingNames(_ book: [String: JSONValue], _ on: JSONValue = .bool(true)) -> [String: JSONValue] {
+        var book = book
+        var settings = Self.settings(book)
+        settings["mcp"] = .object(["shareCustomerNames": on])
+        book["settings"] = .object(settings)
+        return book
     }
 
     static func call(_ server: Server, _ tool: String,
@@ -106,7 +117,9 @@ struct McpBooksTests {
 
     @Test("receivables are the Reports screen's aged figures, row for row")
     func receivablesMatchTheRule() async throws {
-        let book = try Self.sample()
+        // Shared, so the names can be held to the rule's own; what is said
+        // when they are not is `McpCustomerNamesTests`.
+        let book = Self.sharingNames(try Self.sample())
         let engine = try KhaytEngine()
         let server = Self.server(try JSONEncoder().encode(book), engine: engine)
         let out = await Self.call(server, "receivables", ["limit": 100])
