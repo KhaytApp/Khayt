@@ -250,11 +250,16 @@ final class Telemetry {
 
     // MARK: Small facts
 
-    /// The channel the ingest knows: `stable` or `beta`. Every 4.0 alpha is a
-    /// pre-release, so the Mac's lane reports as `beta` — the ingest accepts
-    /// no third value — and `byVersion` still tells a Mac from Electron.
+    /// The channel the ingest knows: `stable`, `beta` or `alpha` (khayt-cloud
+    /// #114 added `alpha`; anything else is a 422 and the batch is dropped).
+    /// A version naming `alpha` is the 4.0 alpha lane; any other pre-release,
+    /// or a development build with no version, is `beta`.
     nonisolated static func channel(forVersion v: String) -> String {
-        v.contains("-") || v.isEmpty || !(v.first?.isNumber ?? false) ? "beta" : "stable"
+        if v.isEmpty || !(v.first?.isNumber ?? false) { return "beta" }
+        if let dash = v.firstIndex(of: "-") {
+            return v[dash...].lowercased().contains("alpha") ? "alpha" : "beta"
+        }
+        return "stable"
     }
 
     /// A UTC timestamp, Gregorian whatever the Mac's own calendar is.

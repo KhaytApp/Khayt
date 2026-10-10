@@ -121,7 +121,7 @@ struct TelemetryTests {
         }
         #expect(report["name"] == .string("TypeError"))
         #expect(report["osFamily"] == .string("macOS"))
-        #expect(report["channel"] == .string("beta"))
+        #expect(report["channel"] == .string("alpha"))
         #expect(report["locale"] == .string("ar"))
         #expect(Set(report.keys) == Set(["type", "name", "message", "stack", "process", "appVersion",
                                          "electronVersion", "osFamily", "osMajor", "locale", "channel",
@@ -340,7 +340,8 @@ struct TelemetryTests {
 
     @Test("the Mac's alpha lane reports as beta; a release as stable")
     func channels() {
-        #expect(Telemetry.channel(forVersion: "4.0.0-alpha.63") == "beta")
+        #expect(Telemetry.channel(forVersion: "4.0.0-alpha.63") == "alpha")
+        #expect(Telemetry.channel(forVersion: "4.0.0-beta.1") == "beta")
         #expect(Telemetry.channel(forVersion: "4.0.0") == "stable")
         #expect(Telemetry.channel(forVersion: "development build") == "beta")
     }

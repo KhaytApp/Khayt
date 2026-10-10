@@ -209,3 +209,10 @@ test('both telemetry modules publish a global for JavaScriptCore and read no `gl
     assert.equal(typeof vm.runInContext(name, ctx), 'object', `${file} defined no ${name}`);
   }
 });
+
+test('the Mac 4.0 alpha lane keeps its channel (khayt-cloud #114 accepts alpha)', () => {
+  // An enum miss falls back to `stable`, so before `alpha` was listed every
+  // Mac alpha would have been counted as a stable install.
+  assert.equal(S.buildCrashReport({ channel: 'alpha' }).channel, 'alpha');
+  assert.equal(S.buildUsageEvent({ feature: 'app_launch', channel: 'alpha' }).channel, 'alpha');
+});

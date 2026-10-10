@@ -165,7 +165,7 @@
   const USAGE_ENUMS = {
     mode: ['simple', 'professional', 'enthusiast'],
     businessType: ['solo', 'shop', 'farm', 'b2b'],
-    channel: ['stable', 'beta'],
+    channel: ['stable', 'beta', 'alpha'],
     locale: ['en', 'ar', 'de', 'es', 'fr', 'tr', 'ja', 'zh'],
   };
 
