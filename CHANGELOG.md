@@ -12,6 +12,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   webhook did which the Mac does not, moving a job on when its print starts or
   ends, is now the README's not-yet-built item.
 
+- **(Mac) Export for the Accountant now offers Wafeq and Daftra.** These are two
+  Saudi accounting products, and their import formats were taken from their own
+  help centres. Wafeq gets invoices with the price before VAT, marked "exc. tax",
+  and expenses with the shop's currency. Daftra gets sales as income vouchers
+  dated DD/MM/YYYY, so an invoice Khayt has already sent to ZATCA is not issued
+  a second time, and expenses in the same format. After the export, the Mac says
+  what to match on each product's import screen. Both files use the sales account
+  and tax name saved in the other app's export dialogue, so they come out the
+  same from both apps. Qoyod is not on the list: it only accepts the Excel
+  template each account downloads, and its columns are not published.
+
 - **iOS: one Live Activity rule for the phone and the Mac.** The phone's Live
   Activities now decide what to start, update and end with KhaytCore's
   `LiveActivityPlan`, the rule the Mac's pushes use. The Lock Screen can't
