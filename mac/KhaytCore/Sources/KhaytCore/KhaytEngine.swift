@@ -12095,6 +12095,220 @@ public actor KhaytEngine {
                           [order], as: PaymentRecorded.self)
     }
 
+    // MARK: - The books, as an assistant may ask about them (`khayt-mcp`)
+    //
+    // Read-only questions about the book, for the MCP server. Every figure is a
+    // shared rule's: these only gather what the rules already say into rows an
+    // assistant can read. Nothing here writes, and nothing here is arithmetic
+    // of its own.
+
+    /// The currency the shop's books are kept in — `KhaytOrderMoney`'s answer
+    /// for an order with no customer, so it falls back exactly where the money
+    /// rules do.
+    public func baseCurrency(settings: [String: JSONValue]) throws -> String {
+        try runtime.call2("KhaytOrderMoney.clientCurrency(null, {settings: ARG0})",
+                          [.object(settings)], as: String.self)
+    }
+
+    /// One job still on the floor.
+    public struct OpenOrder: Decodable, Sendable, Equatable {
+        public let id: String
+        public let project: String
+        public let status: String
+        /// `KhaytOrderStatus.stageOf` — the same as `status` for open work.
+        public let stage: String?
+        /// The customer's name in the shop's language, else the name typed on
+        /// the job. Never a phone, an email or an address.
+        public let client: String
+        public let date: String?
+        public let dueDate: String?
+        /// Days past the promised date, from `lib/attention.js` — nil when the
+        /// job is not late (or promised no date).
+        public let daysLate: Int?
+        /// The job's own currency (`orderCurrency`); the three figures below
+        /// are in it.
+        public let currency: String
+        /// The price as recorded on the job.
+        public let price: Double
+        /// What is due on it (`orderDueRaw`): price + tax for an exclusive shop.
+        public let due: Double
+        /// What is still owed (`orderOwedRaw`), after payments, gift cards and
+        /// credit notes.
+        public let owed: Double
+        /// `KhaytOrderPayment.statusOf`.
+        public let payStatus: String
+    }
+
+    /// The jobs a shop has not finished: the dashboard's ACTIVE statuses
+    /// (`lib/dashboard-facts.js`), never a voided one, and quotes too when
+    /// asked. Lateness is `lib/attention.js`'s; money is `lib/order-money.js`'s.
+    public func openOrders(orders: [JSONValue], clients: [JSONValue],
+                           settings: [String: JSONValue], currencies: [String: JSONValue],
+                           language: String, now: Date,
+                           includeQuotes: Bool = false) throws -> [OpenOrder] {
+        try runtime.call2("""
+            (function (orders, ctx, known, lang, now, quotes) {
+              var active = KhaytDashboardFacts.ACTIVE_STATUSES;
+              var late = {};
+              var attn = KhaytAttention.selectAttention({ orders: orders, now: now });
+              (attn.items || []).forEach(function (a) {
+                if (a && a.kind === 'order' && a.id != null) late[a.id] = a.daysLate;
+              });
+              // An EMPTY catalogue is no catalogue — it would distrust every code.
+              var cat = (known && Object.keys(known).length) ? known : null;
+              var byId = {};
+              (ctx.clients || []).forEach(function (c) { if (c && c.id) byId[c.id] = c; });
+              var text = function (v) { return typeof v === 'string' && v ? v : null; };
+              var out = [];
+              for (var i = 0; i < orders.length; i++) {
+                var o = orders[i];
+                if (!o || o.id == null || o.voidedAt) continue;
+                if (active.indexOf(o.status) === -1 && !(quotes && o.status === 'quote')) continue;
+                var c = o.clientId ? byId[o.clientId] : null;
+                var name = (c && KhaytContentLanguages.read(c, 'name', lang, ctx.settings)) || o.client || '';
+                out.push({
+                  id: String(o.id), project: String(o.project || ''), status: String(o.status),
+                  stage: KhaytOrderStatus.stageOf(o), client: String(name),
+                  date: text(o.date), dueDate: text(o.dueDate),
+                  daysLate: Object.prototype.hasOwnProperty.call(late, o.id) ? late[o.id] : null,
+                  currency: String(KhaytOrderMoney.orderCurrency(o, ctx, cat)),
+                  price: Number(o.price) || 0,
+                  due: KhaytOrderMoney.orderDueRaw(o, ctx),
+                  owed: KhaytOrderMoney.orderOwedRaw(o, ctx),
+                  payStatus: String(KhaytOrderPayment.statusOf(o, ctx)),
+                });
+              }
+              return out;
+            })(ARG0, {settings: ARG2, clients: ARG1}, ARG3, ARG4, ARG5, ARG6)
+            """,
+            [.array(orders), .array(clients), .object(settings), .object(currencies),
+             .string(language), .number(now.timeIntervalSince1970 * 1000), .bool(includeQuotes)],
+            as: [OpenOrder].self)
+    }
+
+    /// Whole days each job is past its due date, by id —
+    /// `KhaytPaymentReminder.daysOverdue`, the figure the payment reminder
+    /// selects on. A job with no due date is absent; 0 is due today and a
+    /// negative figure is not yet due.
+    public func daysPastDue(orders: [JSONValue], now: Date) throws -> [String: Int] {
+        try runtime.call2("""
+            (function (orders, now) {
+              var out = {};
+              for (var i = 0; i < orders.length; i++) {
+                var o = orders[i];
+                if (!o || o.id == null) continue;
+                var d = KhaytPaymentReminder.daysOverdue(o, now);
+                if (d !== null) out[String(o.id)] = d;
+              }
+              return out;
+            })(ARG0, ARG1)
+            """, [.array(orders), .number(now.timeIntervalSince1970 * 1000)],
+            as: [String: Int].self)
+    }
+
+    /// One shelf item that is low, running out, or already promised beyond
+    /// what is on it.
+    public struct StockRow: Decodable, Sendable, Equatable {
+        public let id: String
+        /// `filament` or `consumable`.
+        public let kind: String
+        public let label: String
+        public let material: String?
+        public let color: String?
+        /// What it is counted in: grams for filament unless the shop said
+        /// otherwise (`lib/inventory-units.js`), the shop's own unit for a
+        /// consumable.
+        public let unit: String
+        public let low: Bool
+        /// On the shelf now.
+        public let stock: Double
+        /// Reserved by open jobs (filament only — `committedByItem`).
+        public let committed: Double?
+        /// On the shelf less what is reserved (filament only).
+        public let available: Double?
+        /// Recent use per day, over the trailing 30 days.
+        public let perDay: Double
+        /// Nil when nothing was used in the window: an unknown future.
+        public let daysLeft: Double?
+        /// What the reorder rule would ask for.
+        public let suggest: Double
+        /// True when the rule would draft a purchase order — false when it is
+        /// already on one, or nothing needs ordering.
+        public let needsOrdering: Bool
+    }
+
+    /// What is low or running out, filament and consumables, with the grams
+    /// open jobs have reserved. `lib/reorder.js reorderSuggestions` and
+    /// `lib/consumable-reorder.js consumableSuggestions`, asked with the
+    /// options `needsOrdering` uses, so the list matches the shelf's.
+    public func stockRunway(spools: [JSONValue], consumables: [JSONValue],
+                            orders: [JSONValue], purchaseOrders: [JSONValue],
+                            settings: [String: JSONValue], now: Date,
+                            leadDays: Int = 14) throws -> [StockRow] {
+        try runtime.call2("""
+            (function (a) {
+              var str = function (v) { return typeof v === 'string' && v ? v : null; };
+              var filament = KhaytReorder.reorderSuggestions(a.spools, a.orders, {
+                now: a.now, windowDays: 30, leadDays: a.leadDays, targetDays: 45,
+                partGrams: KhaytOrderDeduction.partGramsConsumed,
+                isLow: function (item) { return KhaytOrderDeduction.isLowStock(item, a.settings); },
+              });
+              var draft = {};
+              KhaytReorder.itemsNeedingDraftPo(filament, a.purchaseOrders)
+                .forEach(function (s) { draft[s.id] = true; });
+              var bits = KhaytConsumableReorder.consumableSuggestions(a.consumables, a.orders, {
+                now: a.now, windowDays: 30, leadDays: a.leadDays,
+              });
+              var draftBits = {};
+              KhaytConsumableReorder.consumablesNeedingDraftPo(bits, a.purchaseOrders)
+                .forEach(function (s) { draftBits[s.id] = true; });
+              return filament.map(function (s) {
+                return {
+                  id: String(s.id), kind: 'filament', label: String(s.label == null ? '' : s.label),
+                  material: str(s.item && s.item.material), color: str(s.item && s.item.color),
+                  unit: KhaytInventoryUnits.unitOf(s.item), low: !!s.low,
+                  stock: Number(s.weight) || 0, committed: Number(s.committedG) || 0,
+                  available: Number(s.available) || 0, perDay: Number(s.gramsPerDay) || 0,
+                  daysLeft: s.daysLeft == null ? null : s.daysLeft,
+                  suggest: Number(s.suggestG) || 0, needsOrdering: !!draft[s.id],
+                };
+              }).concat(bits.map(function (s) {
+                return {
+                  id: String(s.id), kind: 'consumable', label: String(s.label == null ? '' : s.label),
+                  material: null, color: null, unit: String(s.unit || ''), low: !!s.low,
+                  stock: Number(s.stock) || 0, committed: null, available: null,
+                  perDay: Number(s.perDay) || 0,
+                  daysLeft: s.daysLeft == null ? null : s.daysLeft,
+                  suggest: Number(s.suggestQty) || 0, needsOrdering: !!draftBits[s.id],
+                };
+              }));
+            })(ARG0)
+            """,
+            [.object([
+                "spools": .array(spools), "consumables": .array(consumables),
+                "orders": .array(orders), "purchaseOrders": .array(purchaseOrders),
+                "settings": .object(settings),
+                "now": .number(now.timeIntervalSince1970 * 1000),
+                "leadDays": .number(Double(leadDays)),
+            ])],
+            as: [StockRow].self)
+    }
+
+    /// A price split into net and tax by the shop's own profile, with the total
+    /// the invoice would print — `KhaytTax.computeTax`, whose guarantee is
+    /// that `subtotal + taxTotal === total` at 2dp in both modes.
+    public struct TaxedAmount: Decodable, Sendable, Equatable {
+        public let subtotal: Double
+        public let taxTotal: Double
+        public let total: Double
+        public let mode: String
+    }
+
+    public func taxed(_ amount: Double, settings: [String: JSONValue]) throws -> TaxedAmount {
+        try runtime.call2("KhaytTax.computeTax(ARG0, KhaytTax.profileFromSettings(ARG1))",
+                          [.number(amount), .object(settings)], as: TaxedAmount.self)
+    }
+
     public func raw<T: Decodable>(_ script: String, as type: T.Type) throws -> T {
         let value = try runtime.evaluate("JSON.stringify(\(script))")
         guard let json = value.toString(), let data = json.data(using: .utf8) else {

@@ -8,13 +8,12 @@ import KhaytCore
 /// The library, and nothing else. Not a customer, not a price, not an invoice,
 /// not a payment, not the shop's own contact details. Khayt's book holds all
 /// of that in one file, and a server that reads the file could just as easily
-/// answer "what is Nouf's phone number" — so what it can answer is decided
-/// HERE, once, by never lifting anything else out of the book.
+/// answer "what is Nouf's phone number" — so what the LIBRARY tools can answer
+/// is decided HERE, once, by never lifting anything else out of the book.
 ///
-/// That is a narrower thing than the book, and the narrowness is the feature:
-/// an assistant asking about models is a shop organising its library, and an
-/// assistant able to read its takings is a different product with a different
-/// conversation attached to it.
+/// The books tools are `Books`, a separate reader with its own, deliberately
+/// chosen fields: money and customer NAMES, read through the shared rules, and
+/// still never a phone, an email, an address or a secret.
 ///
 /// READ-ONLY, and it never opens the store for writing. Khayt may be running
 /// and holding the lock; nothing here cares, because nothing here changes
@@ -50,8 +49,23 @@ struct Library: Sendable {
             .appending(path: "Library/Application Support/khayt/khayt-store.json")
     }
 
-    static func read(from url: URL = storeURL()) throws -> Library {
+    /// The book's bytes, READ ONLY. A primary that will not parse beside a
+    /// `.prev` that does — what an interrupted save leaves — is answered from
+    /// the `.prev`, as the app opens it, but nothing is copied or repaired
+    /// here: putting the file back is the app's job, under its lock.
+    static func bookData(at url: URL = storeURL()) throws -> Data {
         let data = try Data(contentsOf: url)
+        if (try? JSONSerialization.jsonObject(with: data)) != nil { return data }
+        if let older = try? Data(contentsOf: url.appendingPathExtension("prev")),
+           (try? JSONSerialization.jsonObject(with: older)) != nil { return older }
+        return data
+    }
+
+    static func read(from url: URL = storeURL()) throws -> Library {
+        try read(data: bookData(at: url))
+    }
+
+    static func read(data: Data) throws -> Library {
         let root = try JSONSerialization.jsonObject(with: data)
         guard let book = root as? [String: Any],
               let rows = book["printFiles"] as? [[String: Any]] else {

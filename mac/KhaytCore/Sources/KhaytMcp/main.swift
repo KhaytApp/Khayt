@@ -1,4 +1,5 @@
 import Foundation
+import KhaytCore
 
 /// The pipe, and nothing else.
 ///
@@ -34,8 +35,25 @@ do {
     note("no book at \(storeURL.path) — \(error.localizedDescription)")
     library = Library(models: [])
 }
-let server = Server(library: library)
+// The shared rules, started once — the books tools ask them every figure. A
+// rules bundle that will not load leaves the library answering and the books
+// tools saying why they cannot.
+let engine: KhaytEngine?
+do { engine = try KhaytEngine() } catch {
+    note("the rules could not start — \(error)")
+    engine = nil
+}
+let bookURL = storeURL
+let server = Server(library: library, books: engine.map { engine in
+    // Re-read per question: a host keeps this process for a whole
+    // conversation, and "who owes me" is a question about now. Read-only —
+    // `Library.bookData` never writes, and `Books.open` masks before reading.
+    { @Sendable [bookURL] in try await Books.open(Library.bookData(at: bookURL), engine: engine) }
+})
 
+// `await` at the top level: each request is answered in turn, in order. The
+// engine is an actor, so the awaits hop to it and back — nothing here blocks
+// inside a detached task.
 while let line = readLine(strippingNewline: true) {
     let tidy = line.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !tidy.isEmpty else { continue }
@@ -44,7 +62,7 @@ while let line = readLine(strippingNewline: true) {
         note("could not read a line as JSON")
         continue
     }
-    guard let response = server.answer(to: request) else { continue }
+    guard let response = await server.answer(to: request) else { continue }
     guard let out = try? JSONSerialization.data(withJSONObject: response) else { continue }
     FileHandle.standardOutput.write(out)
     FileHandle.standardOutput.write(Data("\n".utf8))

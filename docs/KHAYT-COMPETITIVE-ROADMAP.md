@@ -530,7 +530,9 @@ written automation line, is **still unwritten**. No document in `docs/` states i
 - **An agent interface to the books.** Printago ships a CLI and a Claude Code skill.
   `KhaytMcp` exists (`mac/KhaytCore/Sources/KhaytMcp/`), but its tools cover only the
   **library**: `search_models`, `get_model` and `library_summary`. There are no tools
-  for orders, receivables, stock or the P&L.
+  for orders, receivables, stock or the P&L. *(Ranked idea 3 adds them, read-only:
+  `open_orders`, `receivables`, `stock_runway`, `profit_and_loss` and `quote_draft`.
+  See `mac/README.md`.)*
 - **No Saudi accounting export targets.** `accounting-export.js` exports to generic,
   QuickBooks, Xero and Zoho formats. It has nothing for Qoyod, Wafeq or Daftra. Their
   import formats were **not read** this round.

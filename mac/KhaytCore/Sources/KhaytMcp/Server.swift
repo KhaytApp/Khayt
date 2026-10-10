@@ -1,6 +1,7 @@
 import Foundation
 
-/// Khayt's library, answerable by an assistant — the Model Context Protocol.
+/// Khayt's library and books, answerable by an assistant — the Model Context
+/// Protocol.
 ///
 /// ── WHY THIS IS A SEPARATE BINARY AND NOT A WINDOW ────────────────────────
 ///
@@ -10,20 +11,28 @@ import Foundation
 /// this is an executable beside `KhaytThumbnail` and `KhaytPreview`, which are
 /// already small programs on `KhaytCore` for the same reason.
 ///
-/// ── AND WHY IT ANSWERS ONLY ABOUT THE LIBRARY ─────────────────────────────
+/// ── WHAT IT ANSWERS ───────────────────────────────────────────────────────
 ///
-/// `Library` says what it can see and what it refuses to. This file is the
-/// protocol and nothing else: every question it can be asked is one of the
-/// three tools below, and none of them takes a path, a query language or
-/// anything else that could be pointed somewhere new.
+/// The library (`Library`), and five READ-ONLY questions about the books
+/// (`Books`): open orders, who owes what, what is running out, the P&L, and a
+/// quote worked out and never saved. This file is the protocol and nothing
+/// else: every question it can be asked is one of the tools below, none of
+/// them takes a path, a query language or anything else that could be pointed
+/// somewhere new, and none of them writes.
 ///
 /// ── PURE, SO IT CAN BE TESTED WITHOUT A PIPE ──────────────────────────────
 ///
 /// `answer(to:)` takes a request and returns a response. Nothing here reads
 /// stdin or writes stdout — `main.swift` does that — so the protocol is
 /// exercised by handing it bytes, which is what `McpServerTests` does.
-struct Server {
+struct Server: Sendable {
     let library: Library
+    /// The books, read fresh for each question — nil when the rules could not
+    /// start, and the books tools then say so.
+    var books: (@Sendable () async throws -> Books)? = nil
+    /// Today, for every "how late" and "which quarter". Injected so a test can
+    /// hold the sample book at a fixed day.
+    var now: @Sendable () -> Date = { Date() }
 
     /// The protocol version this speaks. MCP negotiates: the host sends the
     /// version it wants and a server that knows a different one says so rather
@@ -82,11 +91,121 @@ struct Server {
             "inputSchema": ["type": "object", "properties": [:] as [String: Any],
                             "required": [] as [String]],
         ],
+        [
+            "name": "open_orders",
+            "description": """
+                The shop's open jobs — not finished, not voided: status, \
+                customer, due date, days late, and what each is worth and still \
+                owes, in the job's own currency. Late jobs first. Read-only.
+                """,
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "include_quotes": ["type": "boolean",
+                                       "description": "Also list quotes not yet accepted."],
+                    "late_only": ["type": "boolean",
+                                  "description": "Only jobs past the date promised."],
+                    "limit": ["type": "integer",
+                              "description": "At most this many. Default 25, at most 100."],
+                ],
+                "required": [] as [String],
+            ],
+        ],
+        [
+            "name": "receivables",
+            "description": """
+                Who owes the shop money and for how long, aged as the Reports \
+                screen ages it: each unpaid job or instalment, days outstanding, \
+                the 0-30/31-60/61-90/90+ buckets, and days past the due date \
+                where one was set. In the shop's own currency. Read-only.
+                """,
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "overdue_only": ["type": "boolean",
+                                     "description": "Only amounts past a due date that was set."],
+                    "limit": ["type": "integer",
+                              "description": "At most this many rows. Default 25, at most 100."],
+                ],
+                "required": [] as [String],
+            ],
+        ],
+        [
+            "name": "stock_runway",
+            "description": """
+                Filament and consumables that are low, will run out within the \
+                window at the recent rate of use, or are promised to open jobs \
+                beyond what is on the shelf — with the grams those jobs have \
+                reserved and whether a purchase order is still needed. Read-only.
+                """,
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "within_days": ["type": "integer",
+                                    "description": "Running out within this many days. Default 14."],
+                    "limit": ["type": "integer",
+                              "description": "At most this many. Default 25, at most 100."],
+                ],
+                "required": [] as [String],
+            ],
+        ],
+        [
+            "name": "profit_and_loss",
+            "description": """
+                The shop's P&L by quarter or month, as the Reports screen shows \
+                it: revenue net of VAT, cost of goods, expenses, fixed overhead, \
+                waste, depreciation, labour, VAT collected and due, net and \
+                margin. Newest first. Read-only.
+                """,
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "period": ["type": "string",
+                               "description": "One period, \"2026-Q3\" or \"2026-09\". Omit for the latest."],
+                    "granularity": ["type": "string", "enum": ["quarter", "month"],
+                                    "description": "Default quarter."],
+                    "limit": ["type": "integer",
+                              "description": "How many periods. Default 4, at most 24."],
+                ],
+                "required": [] as [String],
+            ],
+        ],
+        [
+            "name": "quote_draft",
+            "description": """
+                Work out what a print would cost the shop and what to charge, \
+                with the shop's own calculator rules, rates, margin and tax. A \
+                DRAFT: nothing is saved — no job, no quote, no customer.
+                """,
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "grams": ["type": "number", "description": "Filament per piece, in grams."],
+                    "hours": ["type": "number", "description": "Print time per piece, in hours."],
+                    "qty": ["type": "integer", "description": "Pieces. Default 1, at most 1000."],
+                    "spool_id": ["type": "string",
+                                 "description": "The spool it prints from, for the material's price."],
+                    "machine_id": ["type": "string",
+                                   "description": "The machine, for its wear and power."],
+                    "preset_id": ["type": "string", "description": "A saved printer preset."],
+                    "margin_pct": ["type": "number",
+                                   "description": "Markup on cost. Default the shop's own."],
+                    "discount_pct": ["type": "number"],
+                    "rush": ["type": "boolean"],
+                    "shipping_cost": ["type": "number"],
+                ],
+                "required": ["grams", "hours"],
+            ],
+        ],
     ]
+
+    /// The tools that read the books rather than the library.
+    static let bookTools: Set<String> = ["open_orders", "receivables", "stock_runway",
+                                         "profit_and_loss", "quote_draft"]
 
     // MARK: - One request in, one response out
 
-    func answer(to request: [String: Any]) -> [String: Any]? {
+    func answer(to request: [String: Any]) async -> [String: Any]? {
         let method = request["method"] as? String ?? ""
         let id = request["id"]
         // A NOTIFICATION HAS NO ID AND TAKES NO ANSWER. Replying to one is a
@@ -98,12 +217,12 @@ struct Server {
             return ok(id, [
                 "protocolVersion": Self.protocolVersion,
                 "capabilities": ["tools": ["listChanged": false]],
-                "serverInfo": ["name": "khayt-library", "version": "1"],
+                "serverInfo": ["name": "khayt", "version": "2"],
             ])
         case "tools/list":
             return ok(id, ["tools": Self.tools])
         case "tools/call":
-            return call(id, request["params"] as? [String: Any] ?? [:])
+            return await call(id, request["params"] as? [String: Any] ?? [:])
         case "ping":
             return ok(id, [:])
         default:
@@ -111,9 +230,10 @@ struct Server {
         }
     }
 
-    private func call(_ id: Any?, _ params: [String: Any]) -> [String: Any] {
+    private func call(_ id: Any?, _ params: [String: Any]) async -> [String: Any] {
         let name = params["name"] as? String ?? ""
         let args = params["arguments"] as? [String: Any] ?? [:]
+        if Self.bookTools.contains(name) { return ok(id, content(await fromBooks(name, args))) }
         switch name {
         case "search_models":  return ok(id, content(search(args)))
         case "get_model":      return ok(id, content(one(args)))
@@ -122,7 +242,30 @@ struct Server {
         }
     }
 
-    // MARK: - The three answers
+    // MARK: - The books
+
+    /// A books question, answered — or why it could not be. Said in the
+    /// result rather than as a protocol error: the question was a fair one,
+    /// and the assistant should be told why there is no answer.
+    private func fromBooks(_ name: String, _ args: [String: Any]) async -> Any {
+        guard let books else { return ["error": "Khayt's rules could not start, so the books cannot be read."] }
+        let at = now()
+        do {
+            let book = try await books()
+            switch name {
+            case "open_orders":     return try await book.openOrders(args, now: at)
+            case "receivables":     return try await book.receivables(args, now: at)
+            case "stock_runway":    return try await book.stockRunway(args, now: at)
+            case "profit_and_loss": return try await book.profitAndLoss(args, now: at)
+            case "quote_draft":     return try await book.quoteDraft(args)
+            default:                return ["error": "no tool \(name)"]
+            }
+        } catch {
+            return ["error": "could not answer from the book: \(error)"]
+        }
+    }
+
+    // MARK: - The library
 
     private func search(_ args: [String: Any]) -> Any {
         var found = library.models
