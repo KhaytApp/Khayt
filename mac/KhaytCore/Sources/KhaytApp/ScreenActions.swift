@@ -122,6 +122,16 @@ struct ScreenActions: View {
                            enabled: shop.canMoveJobs && !shop.importing, titled: true) {
                     Task { await shop.addModelToLibrary() }
                 }
+                // WHAT IS ALREADY IN THE FOLDER. A model dropped into the
+                // library's folder from the Finder, another Mac or a phone is
+                // adopted where it sits — see `LibraryStorage`. Runs on load
+                // too; this is the "look now".
+                NavyAction(label: shop.words.callIt("mac.storage_rescan"),
+                           symbol: "arrow.triangle.2.circlepath",
+                           enabled: shop.canMoveJobs && !shop.importing && !shop.libraryMoveBusy
+                               && shop.libraryRoots != nil) {
+                    Task { await shop.rescanStorage() }
+                }
             } else if shop.showingCatalogue {
                 layoutSwitch
                 // THE CLOUD'S TWO WAYS IN. They were declared as toolbar items

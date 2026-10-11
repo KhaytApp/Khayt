@@ -4,6 +4,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the library picks up models already in its folder, and their photos.**
+  A model file dropped into the library's own folder (from the Finder, another
+  Mac or iCloud Drive) now joins the library where it is, the same way a
+  linked folder's models do. Nothing is copied, moved, renamed or deleted, and
+  a copy of a model the library already has counts as a duplicate. This runs
+  once each time a book opens, and from a new **Rescan Storage** button on the
+  library, which says how many models were added, how many were duplicates and
+  how many came with a photo. It never takes files the app wrote itself: a
+  model's own folder (versions, converted copies, `.cloud` sidecars, thumbs),
+  a `PF-…` folder whose record was deleted, group pictures, hidden files,
+  `.Trash` or symlinks. A model you delete from the library after it was
+  picked up this way is not added again. Only the folder the library uses now
+  is read, not the mirror and not past locations. Imports and linked-folder
+  rescans now also bring the model's photo: a picture with the same name
+  (`dragon.stl` + `dragon.jpg`), or, for a folder holding one model, the
+  pictures in it or in its `images/`, `photos/` or `renders/` folder, which is
+  how Printables, MakerWorld and Thingiverse downloads are laid out. The photo
+  becomes the model's picture, a 3MF keeps its slicer preview as well, and a
+  picture that cannot be read never stops the import.
+
 - **iOS: a calculator, and expenses read off a receipt's QR.** The iPhone's
   quote sheet sent seven numbers to the Mac and showed the answer, so it
   needed the Mac nearby, used Khayt's starting rates, and was hidden in
