@@ -170,7 +170,14 @@ test('every reason is a key the interface can translate', () => {
 // nobody asks is a feature that does not exist.
 const fs = require('node:fs');
 const path = require('node:path');
-const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+// `Shop` is one Swift class written across `Shop.swift` and its
+// `Shop+<Area>.swift` extensions, so reading Shop.swift means reading them all.
+const SHOP_DIR = 'mac/KhaytCore/Sources/KhaytApp';
+const read = (p) => p !== `${SHOP_DIR}/Shop.swift`
+  ? fs.readFileSync(path.join(__dirname, '..', p), 'utf8')
+  : ['Shop.swift', ...fs.readdirSync(path.join(__dirname, '..', SHOP_DIR))
+    .filter((n) => n.startsWith('Shop+') && n.endsWith('.swift')).sort()]
+    .map((n) => fs.readFileSync(path.join(__dirname, '..', SHOP_DIR, n), 'utf8')).join('\n');
 
 test('the Mac app bundles the rule and asks it', () => {
   const engine = read('mac/KhaytCore/Sources/KhaytCore/KhaytEngine.swift');

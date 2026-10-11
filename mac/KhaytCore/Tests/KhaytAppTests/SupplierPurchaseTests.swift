@@ -148,9 +148,9 @@ struct SupplierPurchaseTests {
     }
 
     static func source(_ name: String) throws -> String {
-        try String(contentsOf: URL(fileURLWithPath: #filePath)
+        try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/\(name)"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/\(name)"))
     }
 }

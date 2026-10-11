@@ -33,7 +33,7 @@ struct NothingLivesOnlyInTheOldShellTests {
         .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
 
     static func text(_ file: String) -> String {
-        (try? String(contentsOf: sources.appending(path: file), encoding: .utf8)) ?? ""
+        (try? ShopSources.read(sources.appending(path: file))) ?? ""
     }
 
     /// Properties the retired shell may read alone, with the reason.

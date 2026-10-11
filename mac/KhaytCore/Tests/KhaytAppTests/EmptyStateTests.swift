@@ -23,7 +23,7 @@ struct EmptyStateTests {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytApp/\(name)")
-        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        return (try? ShopSources.read(url)) ?? ""
     }
 
     /// Every screen a search can empty, and the mark each one draws.

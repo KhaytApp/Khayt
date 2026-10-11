@@ -344,7 +344,7 @@ struct ProductPictureWiringTests {
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp")
-        return try String(contentsOf: dir.appending(path: file), encoding: .utf8)
+        return try ShopSources.read(dir.appending(path: file))
     }
 
     @Test("the product sheet shows the strip, loads through the rule, and saves what it holds")

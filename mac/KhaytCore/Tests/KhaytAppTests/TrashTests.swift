@@ -41,10 +41,10 @@ struct TrashTests {
         // will not take stays where it is, the record goes, and the shop is
         // told the delete was partial. The Finder can still delete it by hand;
         // nothing the app does removes a model for good.
-        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let source = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         guard let at = source.range(of: "static func trash(") else {
             Issue.record("trash is gone"); return
         }
@@ -56,10 +56,10 @@ struct TrashTests {
 
     @Test("the library's delete goes through it")
     func libraryUsesIt() throws {
-        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let source = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         guard let at = source.range(of: "func deleteLibraryFiles(") else {
             Issue.record("deleteLibraryFiles is gone"); return
         }

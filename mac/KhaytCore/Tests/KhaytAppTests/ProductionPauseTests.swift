@@ -85,10 +85,10 @@ struct ProductionPauseTests {
         // `pausedAt` is written as NULL rather than removed: a field taken out
         // entirely is one a merge can resurrect from an older copy on another
         // machine, and this book syncs.
-        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let source = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         guard let resume = source.range(of: "func resumeProduction()") else {
             Issue.record("resumeProduction has moved"); return
         }

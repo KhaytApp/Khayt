@@ -159,7 +159,7 @@ struct ProductDocsTests {
                                encoding: .utf8)
         #expect(!sheet.contains("ProductDocs.delete("),
                 "the sheet deletes the file itself, so cancelling loses it anyway")
-        let shop = try String(contentsOf: dir.appending(path: "Shop.swift"), encoding: .utf8)
+        let shop = try ShopSources.read(dir.appending(path: "Shop.swift"))
         #expect(shop.contains("ProductDocs.delete(name, in: build)"),
                 "nothing ever unlinks a removed document")
     }

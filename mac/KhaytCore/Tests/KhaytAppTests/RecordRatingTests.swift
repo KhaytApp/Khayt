@@ -78,10 +78,10 @@ struct RecordRatingTests {
         // The portal writes `submittedAt`; this writes `recordedAt`. A book
         // that cannot tell them apart has lost the difference between what a
         // customer said and what the shop wrote down for them.
-        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let source = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         guard let at = source.range(of: "func recordRating(") else {
             Issue.record("recordRating has moved"); return
         }

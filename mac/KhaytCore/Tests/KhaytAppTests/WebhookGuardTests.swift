@@ -308,7 +308,7 @@ struct WebhookWiringTests {
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp")
-        return try String(contentsOf: dir.appending(path: file), encoding: .utf8)
+        return try ShopSources.read(dir.appending(path: file))
     }
 
     /// The same file with its COMMENTS REMOVED.

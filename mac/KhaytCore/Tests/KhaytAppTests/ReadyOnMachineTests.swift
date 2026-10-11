@@ -121,9 +121,9 @@ struct LoadedByHandTests {
 
     @Test("the library falls back to typed spools only when the printer says nothing")
     func fallbackIsWired() throws {
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         #expect(shop.contains("if !reported.isEmpty { return reported }"), "the printer's own reading no longer wins")
         #expect(shop.contains("?.loadedByHand ?? []"), "typed spools are no longer read")
         let sheet = try String(contentsOf: URL(fileURLWithPath: #filePath)

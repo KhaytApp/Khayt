@@ -324,7 +324,7 @@ struct PrintKitWiringTests {
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp")
-        return try String(contentsOf: dir.appending(path: file), encoding: .utf8)
+        return try ShopSources.read(dir.appending(path: file))
     }
 
     @Test("the book reads its kits when it loads")

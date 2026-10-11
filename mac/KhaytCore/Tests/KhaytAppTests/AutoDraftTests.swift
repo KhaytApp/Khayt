@@ -23,10 +23,10 @@ struct AutoDraftTests {
 
     static var shopSource: String {
         get throws {
-            try String(contentsOf: URL(fileURLWithPath: #filePath)
+            try ShopSources.read(URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent().deletingLastPathComponent()
                 .deletingLastPathComponent()
-                .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+                .appending(path: "Sources/KhaytApp/Shop.swift"))
         }
     }
 

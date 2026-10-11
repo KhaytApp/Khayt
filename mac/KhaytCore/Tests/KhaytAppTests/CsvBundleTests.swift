@@ -115,7 +115,7 @@ struct CsvBundleTests {
         let menus = try String(contentsOf: sources.appending(path: "Menus.swift"), encoding: .utf8)
         #expect(menus.contains("shop.exportEverythingAsCsv()"), "the export is on no menu")
 
-        let shop = try String(contentsOf: sources.appending(path: "Shop.swift"), encoding: .utf8)
+        let shop = try ShopSources.read(sources.appending(path: "Shop.swift"))
         guard let from = shop.range(of: "func exportEverythingAsCsv("),
               let to = shop.range(of: "\n    /// The accounting packages",
                                   range: from.upperBound..<shop.endIndex) else {

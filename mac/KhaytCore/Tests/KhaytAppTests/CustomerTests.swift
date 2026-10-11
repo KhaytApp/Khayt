@@ -210,10 +210,10 @@ struct CustomerNameTests {
         // A source guard: `customers` is a computed property on an @Observable
         // model and there is no seam. What it catches is the exact regression —
         // dropping the argument and going back to spelling names in Swift.
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         #expect(shop.contains("Customer.from(orders, clients: clients, names: clientNames)"))
         #expect(shop.contains("engine?.customerNames("),
                 "the names must be resolved when the book loads")

@@ -91,10 +91,10 @@ struct AccountingNameTests {
 
     @Test("the export asks for the reader's language rather than assuming one")
     func theCallSitePassesIt() throws {
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         #expect(shop.contains("language: words.language"),
                 "the accounting export picks a language of its own")
     }

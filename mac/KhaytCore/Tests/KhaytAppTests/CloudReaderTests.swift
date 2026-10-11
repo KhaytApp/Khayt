@@ -618,9 +618,9 @@ struct CloudRollbackTests {
         #expect(memory.highest(Self.connection) == 1)
         let ok = try await CloudReader.pull(Self.connection, token: "t", memory: memory, fetch: Self.reply(1))
         #expect(ok.rev == 1)
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         // Every pull and push of the shop's store goes through the memory.
         #expect(shop.components(separatedBy: "memory: cloudRevisions").count - 1 >= 5,
                 "a store pull or push skips the rollback check")

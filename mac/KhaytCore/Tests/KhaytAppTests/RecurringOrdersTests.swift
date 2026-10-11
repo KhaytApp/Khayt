@@ -123,9 +123,9 @@ struct RecurringOrdersTests {
     /// that line goes.
     @Test("the runner is wired to the book opening")
     func wired() throws {
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         #expect(shop.contains("            remeasureIfDue()\n            createRecurringIfDue()\n"),
                 "createRecurringIfDue() is not called where the book finishes loading")
         #expect(shop.contains("RecurringOrders.run(&root, engine: engine)"),

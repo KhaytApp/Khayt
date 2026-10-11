@@ -53,10 +53,10 @@ struct MarkDriedTests {
 
     @Test("it goes through the spool rule rather than writing the field itself")
     func throughTheRule() throws {
-        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Sources/KhaytApp/Shop.swift"), encoding: .utf8)
+            .appending(path: "Sources/KhaytApp/Shop.swift"))
         guard let at = shop.range(of: "func markDried(") else {
             Issue.record("markDried is gone"); return
         }

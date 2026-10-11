@@ -159,12 +159,11 @@ struct NeedsTheOtherAppTests {
         // there while its Gap stayed behind is exactly the stale sentence this
         // file exists to catch — and it would be caught nowhere else, because
         // the app would be working and only the words would be wrong.
-        let shop = try String(
-            contentsOf: URL(fileURLWithPath: #filePath)
+        let shop = try ShopSources.read(
+            URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent().deletingLastPathComponent()
                 .deletingLastPathComponent()
-                .appending(path: "Sources/KhaytApp/Shop.swift"),
-            encoding: .utf8)
+                .appending(path: "Sources/KhaytApp/Shop.swift"))
         guard let line = shop.range(of: "let canSend: Set<String> = ["),
               let close = shop[line.upperBound...].firstIndex(of: "]") else {
             Issue.record("applyMove no longer says which channels it can send")

@@ -125,7 +125,7 @@ struct RemeasureTests {
         let sources = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp")
-        let shop = try String(contentsOf: sources.appending(path: "Shop.swift"), encoding: .utf8)
+        let shop = try ShopSources.read(sources.appending(path: "Shop.swift"))
         let command = try String(contentsOf: sources.appending(path: "ImportCommand.swift"), encoding: .utf8)
         // In `load`, after the book's own reads, not before them.
         // The signature without its parameter list: what this is looking for
