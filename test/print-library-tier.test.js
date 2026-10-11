@@ -198,3 +198,51 @@ test('formatBytes says the thing the decision actually turns on', () => {
   assert.equal(T.formatBytes(36 * 1024 ** 3), '36 GB');
   assert.equal(T.formatBytes(1.5 * 1024 ** 3), '1.5 GB');
 });
+
+/* ── Only records' own folders (Mac #1832; found by the Mac's review) ──── */
+
+// The Mac adopts models IN PLACE under the library's primary folder
+// (`<primary>/Dragon/dragon.stl`, recorded by `externalPath`). A sweep that
+// walked every folder uploaded such a file and then deleted it from the shop's
+// own folder.
+test('a sweep sees only files in a record\'s own folder, and never an in-place model', () => {
+  const { itemDirName } = require('../lib/print-library-location.js');
+  const book = { printFiles: [
+    { id: 'PF-1' },
+    { id: 'PF 2' },                                          // folder PF_2
+    { id: 'PF-3', externalPath: '/lib/PF-3/linked.stl' },   // in place, even inside a record folder
+    { id: 'PF-4', externalPath: '/lib/Dragon/dragon.stl' },
+  ] };
+  const files = [
+    { id: 'PF-1', filename: 'a.3mf', fullPath: '/lib/PF-1/a.3mf' },
+    { id: 'PF_2', filename: 'b.stl', fullPath: '/lib/PF_2/b.stl' },
+    { id: 'PF-3', filename: 'linked.stl', fullPath: '/lib/PF-3/linked.stl' },
+    { id: 'Dragon', filename: 'dragon.stl', fullPath: '/lib/Dragon/dragon.stl' },
+    { id: 'Shop stuff', filename: 'big.stl', fullPath: '/lib/Shop stuff/big.stl' },
+  ];
+  const own = T.ownFilesOnly(files, book, { itemDirName });
+  assert.deepEqual(own.map((f) => f.fullPath), ['/lib/PF-1/a.3mf', '/lib/PF_2/b.stl']);
+  // Case-insensitive disks: the caller's normaliser decides.
+  const fold = (p) => p.toLowerCase();
+  const upper = [{ id: 'PF-3', filename: 'LINKED.STL', fullPath: '/LIB/PF-3/LINKED.STL' }];
+  assert.equal(T.ownFilesOnly(upper, book, { itemDirName, samePath: fold }).length, 0);
+});
+
+test('with no book, nothing is swept', () => {
+  const files = [{ id: 'PF-1', filename: 'a.3mf', fullPath: '/lib/PF-1/a.3mf' }];
+  assert.deepEqual(T.ownFilesOnly(files, null), []);
+  assert.deepEqual(T.ownFilesOnly(files, {}), []);
+  assert.deepEqual(T.ownFilesOnly(files, { printFiles: [] }), []);
+});
+
+test('the desktop sweep filters through ownFilesOnly and fails closed without a book', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'main.js'), 'utf8');
+  const at = src.indexOf('async function printLibFilesWithUsage');
+  const body = src.slice(at, at + 1600);
+  assert.match(body, /if \(!book\) return \[\];/);
+  assert.match(body, /PLT\.ownFilesOnly\(files, book, \{ itemDirName, samePath \}\)/);
+  assert.match(body, /PLT\.annotate\(own, usage\)/);
+  // Both the preview and the run go through it.
+  assert.match(src, /'hub:printlib-tier-scan'[\s\S]{0,300}printLibFilesWithUsage\(\)/);
+  assert.match(src, /'hub:printlib-tier-run'[\s\S]{0,700}PLT\.plan\(await printLibFilesWithUsage\(\)/);
+});

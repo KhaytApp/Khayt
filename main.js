@@ -2797,10 +2797,19 @@ async function printLibFilesWithUsage() {
   const files = await printLibAllFiles();
   let book = null;
   try { book = readStoreDecryptedFromDisk(); } catch (_) { book = null; }
-  if (!book) return files;
+  // No book, no sweep: without it a record's folder and a folder of the shop's
+  // own (one the Mac adopted in place) look the same, and the sweep deletes
+  // what it uploads. This used to return every file unfiltered.
+  if (!book) return [];
   const { itemDirName } = require('./lib/print-library-location');
+  // Only records' own folders, never a file a record holds in place
+  // (lib/print-library-tier.js ownFilesOnly). The disk on a Mac or Windows
+  // machine ignores case, so the comparison does too.
+  const fold = process.platform === 'darwin' || process.platform === 'win32';
+  const samePath = (p) => { const r = path.resolve(String(p || '')); return fold ? r.toLowerCase() : r; };
+  const own = PLT.ownFilesOnly(files, book, { itemDirName, samePath });
   const usage = PLT.usageFromBook({ printFiles: book.printFiles, orders: book.printLog, itemDirName });
-  return PLT.annotate(files, usage);
+  return PLT.annotate(own, usage);
 }
 
 ipcMain.handle('hub:printlib-tier-scan', async () => {
