@@ -6747,6 +6747,51 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.65] - 2026-10-11
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The library finds the models already in its storage, with their photos, and
+deleting a model now asks whether to remove it from this Mac or everywhere.
+
+### New
+
+- **The library picks up models already in its storage.** A model file in the
+  library folder that the library does not know is added where it is —
+  nothing is copied, moved or renamed. Models in the folders the library used
+  before are copied in, and the originals are left alone. Files you put in the
+  library's bucket by hand appear as **online** models: nothing is downloaded
+  until you press Download. This happens when the book opens, and
+  **Rescan Storage** in the library does it on demand. A model you deleted,
+  in this app or the Windows and Linux one, does not come back.
+- **A model's photo comes with it.** A picture with the model's name beside
+  it, or in an `images/`, `photos/` or `renders/` folder (how Printables,
+  MakerWorld and Thingiverse downloads arrive), becomes its photo. Models
+  that have no photo yet are looked at once; a photo you remove stays
+  removed.
+- **Deleting asks what you mean.** *Remove from This Mac* is the default: a
+  model with an online copy stays in the library as an online model you can
+  download again, after the online copy is checked once more. Models that are
+  only on this Mac need their own button, which says how many. *Delete
+  Completely from Library* also deletes the online copies. A model in a
+  folder of your own only ever loses its library entry, never your file.
+- **Usage counts say which features are used**, only if "Share usage counts"
+  is on: a fixed list of 25, such as quote created, invoice exported and
+  model imported, each a name and a number for the day — never the order,
+  the customer, the file or the amount.
+
+### Changed and fixed
+
+- **Free Up Space and Back Up Whole Library never take your own files.**
+  They now touch only Khayt's own model folders.
+- The delete question's wording is right in English and Arabic for one, two
+  and many models.
+- Photos are read in the background, so a large library no longer freezes the
+  window while it gets them.
+- (Maintainers) `Shop.swift` is split into twelve files by area. Nothing
+  changes for the shop.
+
 ## [4.0.0-alpha.64] - 2026-10-10
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
