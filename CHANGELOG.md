@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Moving old models to the bucket never touches a model the Mac adopted
+  from the bucket.** The Mac marks a model that is in the bucket but not yet
+  downloaded with a small `.online` file in its library folder. The desktop's
+  "move unused models to the bucket" sweep looked at every file in a model's
+  folder and was kept off that marker only by its 1 MB minimum size. Had the
+  minimum been set to 0, it could have replaced the marker with a pointer to
+  itself, and the Mac would have lost track of the model. The marker is now
+  refused by name. The Mac uses the same rule (`lib/print-library-tier.js`).
+
 - **Mac: deleting a model removes it from this Mac by default, and "Delete
   Completely" removes it everywhere.**
   - **Remove from This Mac** is the default. A model with an online copy

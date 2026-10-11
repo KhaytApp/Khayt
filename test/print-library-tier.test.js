@@ -71,6 +71,18 @@ test('an already-tiered file is not tiered twice', () => {
   assert.equal(T.evictable(file('m.3mf.cloud', 300, 500), POLICY, NOW).reason, 'already-tiered');
 });
 
+// The Mac writes `<model>.online` for a bucket object it adopted without
+// downloading (#1828). Tiering it would replace the only pointer to the object.
+test('the Mac\'s .online marker is never tiered, whatever minBytes says', () => {
+  const anyMin = T.normalisePolicy({ enabled: true, keepDays: 0, minBytes: 0 });
+  assert.equal(anyMin.minBytes, 0, 'the policy accepts 0, so the size floor cannot be what protects it');
+  assert.equal(T.evictable(file('m.3mf.online', 50e6, 900), anyMin, NOW).reason, 'online-marker');
+  assert.equal(T.isOnlineMarker('Part.STL.ONLINE'), true);
+  assert.equal(T.isOnlineMarker('m.3mf'), false);
+  const p = T.plan([file('m.3mf.online', 50e6, 900), file('cold.3mf', 80e6, 900)], anyMin, NOW);
+  assert.deepEqual(p.candidates.map((f) => f.filename), ['cold.3mf']);
+});
+
 test('plan reports why nothing happened, not just that nothing happened', () => {
   // A sweep that frees nothing and says nothing looks like a broken button.
   const p = T.plan([
