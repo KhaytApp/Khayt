@@ -4,6 +4,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: Rescan Storage also covers past library folders, the bucket and old
+  models' photos.**
+  - **A deleted model stays deleted.** Every file the library takes in is
+    recorded in the book, so a model deleted in either app is not taken in
+    again. A loose copy of a model the library already has is recorded too,
+    so it is not read again on every launch.
+  - **Old library folders are copied, not linked.** A model in a folder the
+    library used to live in is copied into the current one, and the original
+    is left alone. The mirror is never read, because it is a copy of the
+    library.
+  - **Bucket files show as online models.** A model file you put in the
+    library's bucket yourself appears as an online model, and nothing is
+    downloaded. Download (Bring Back) fetches it and checks it against the
+    size and checksum the bucket listed. It is then measured and pictured
+    like an import, and a matching picture beside it in the bucket becomes
+    its photo. Deleted models' backups and the app's own copies are skipped.
+  - **Google Drive is not scanned.** Khayt's Drive access lets the app see
+    only files it created, so a file added to Drive by hand is invisible to
+    it.
+  - **Models already in the library get one photo check.** A model with no
+    photo is checked once for a picture beside it. A photo you later remove
+    does not come back.
+
 - **Mac: the library picks up models already in its folder, and their photos.**
   A model file dropped into the library's own folder (from the Finder, another
   Mac or iCloud Drive) now joins the library where it is, the same way a
