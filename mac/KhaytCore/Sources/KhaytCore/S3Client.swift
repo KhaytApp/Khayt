@@ -209,8 +209,11 @@ public enum S3 {
         public let key: String
         public let size: Int
         public let modified: Date?
-        public init(key: String, size: Int, modified: Date?) {
-            self.key = key; self.size = size; self.modified = modified
+        /// The ETag the listing gave, quotes and all — a plain MD5 for a
+        /// single-part upload, `…-N` for a multipart one. Nil when absent.
+        public let etag: String?
+        public init(key: String, size: Int, modified: Date?, etag: String? = nil) {
+            self.key = key; self.size = size; self.modified = modified; self.etag = etag
         }
     }
 
@@ -242,7 +245,7 @@ public enum S3 {
         var truncated = false
         var next: String?
         private var text = ""
-        private var key = "", size = 0, modified: Date?
+        private var key = "", size = 0, modified: Date?, etag: String?
         private var inContents = false
 
         static func parse(_ data: Data) -> (items: [Listed], truncated: Bool, next: String?) {
@@ -264,7 +267,7 @@ public enum S3 {
         func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?,
                     qualifiedName: String?, attributes: [String: String] = [:]) {
             text = ""
-            if name == "Contents" { inContents = true; key = ""; size = 0; modified = nil }
+            if name == "Contents" { inContents = true; key = ""; size = 0; modified = nil; etag = nil }
         }
         func parser(_ parser: XMLParser, foundCharacters string: String) { text += string }
         func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?,
@@ -274,9 +277,10 @@ public enum S3 {
             case "Key" where inContents: key = value
             case "Size" where inContents: size = Int(value) ?? 0
             case "LastModified" where inContents: modified = Self.date(value)
+            case "ETag" where inContents: etag = value.isEmpty ? nil : value
             case "Contents":
                 inContents = false
-                if !key.isEmpty { items.append(Listed(key: key, size: size, modified: modified)) }
+                if !key.isEmpty { items.append(Listed(key: key, size: size, modified: modified, etag: etag)) }
             case "IsTruncated": truncated = value == "true"
             case "NextContinuationToken": next = value
             default: break

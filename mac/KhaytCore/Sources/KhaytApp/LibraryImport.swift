@@ -299,6 +299,103 @@ enum LibraryImport {
             try? FileManager.default.copyItem(at: paper, to: into)
         }
 
+        let a = await analyse(destination, ext: ext, dir: dir, engine: engine, analyseRisk: analyseRisk)
+        let size = a.size, said = a.provenance, geometry = a.geometry, riskAnalysis = a.riskAnalysis
+        let key = a.key, colours = a.colours, swapCount = a.swapCount, thumbFile = a.thumbFile
+
+        // The folder's name when the folder named it (a model alone in
+        // `King Abdulaziz/` is "King Abdulaziz", not "crown"); the file's name
+        // otherwise. The file's own name is kept either way, as originalName.
+        let name = title.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+            ?? originalName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
+        var record = self.record(id: id, name: name, originalName: originalName,
+                                 filename: filename, ext: ext, size: size,
+                                 hash: hash, key: key,
+                                 reader: a.reader, colours: colours,
+                                 swapCount: swapCount, thumbFile: thumbFile, group: group,
+                                 provenance: said, riskAnalysis: riskAnalysis,
+                                 parsed: a.parsed,
+                                 externalPath: inPlace ? source.standardizedFileURL.path : nil)
+        // THE PHOTO THAT CAME WITH IT, when there was one — see `ModelPhoto`.
+        // The record is new, so there is no photo of the shop's to keep; and a
+        // picture that will not decode is passed over, never a failed import.
+        // Read before the original goes to the Trash below, though only the
+        // model is ever taken: the picture stays where it was.
+        let photo = firstPhoto(photos)
+        if let photo { record["userPhoto"] = .string(photo) }
+        do {
+            // lock: callers — convertModel, addModelToLibrary, addModelsToLibrary
+            try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
+                var rows: [JSONValue] = []
+                if case .array(let existing)? = root["printFiles"] { rows = existing }
+                // Newest first, as the other app does — a shop that has just
+                // added something looks for it at the top.
+                rows.insert(.object(record), at: 0)
+                root["printFiles"] = .array(rows)
+            }
+        } catch {
+            // The book refused it, so the copy has no record to belong to.
+            try? FileManager.default.removeItem(at: dir)
+            throw Failure.failed(String(describing: error))
+        }
+
+        // THE LAST THING, AFTER EVERYTHING ELSE HAS SUCCEEDED.
+        //
+        // The original is removed here and nowhere else, and only once all
+        // three things are true: the bytes are at the destination, they have
+        // been read back and match, and the book has a record pointing at them.
+        // Every failure above returns with the source exactly as it was, which
+        // is why none of them needs a way to put it back.
+        //
+        // `keepOriginal` is for a source that is not the shop's to consume — a
+        // USB stick, a customer's share, a read-only volume. A failure to
+        // remove is NOT a failed import: the file is in the library and in the
+        // book, and the worst case is one duplicate left in a downloads folder,
+        // which is the recoverable half of the rule above.
+        var movedIn = false
+        // To the TRASH, not deleted. The copy is verified and recorded by now,
+        // but the original may be in iCloud Drive or Dropbox, where deleting
+        // it deletes it on every device; the Trash is the Finder's own undo.
+        // A source the Trash will not take is simply left where it was.
+        // NEVER for a linked model: its file is the shop's, where it put it.
+        if !keepOriginal && !inPlace {
+            do { try FileManager.default.trashItem(at: source, resultingItemURL: nil); movedIn = true }
+            catch { movedIn = false }
+        }
+
+        return Added(id: id, name: name, triangleCount: geometry?.triangleCount,
+                     colours: colours.count, contentHash: hash, movedIn: movedIn,
+                     photo: photo != nil)
+    }
+
+    /// The first of these pictures that decodes, as a `userPhoto` data URI.
+    static func firstPhoto(_ candidates: [URL]) -> String? {
+        for url in candidates {
+            if let uri = try? LibraryPhoto.dataURI(of: url) { return uri }
+        }
+        return nil
+    }
+
+    /// What reading a model's bytes tells the record: its size, who made it,
+    /// its measurements and identity, its colours, its picture and the
+    /// slicer's own figures. Shared by an import and by a cloud-only model
+    /// brought down for the first time (`LibraryStorage`), so a file that came
+    /// in either way is described the same way.
+    struct Analysis {
+        var size: Int
+        var provenance: Mesh.Provenance?
+        var geometry: Mesh.Measurement?
+        var riskAnalysis: [String: JSONValue]?
+        var key: String?
+        var reader: Int?
+        var colours: [JSONValue]
+        var swapCount: Int
+        var thumbFile: String?
+        var parsed: [String: JSONValue]
+    }
+
+    static func analyse(_ destination: URL, ext: String, dir: URL, engine: KhaytEngine,
+                        analyseRisk: Bool) async -> Analysis {
         let size = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size]
                     as? Int) ?? 0
 
@@ -374,78 +471,10 @@ enum LibraryImport {
            (try? drawn.write(to: dir.appending(path: "thumb.png"))) != nil {
             thumbFile = "thumb.png"
         }
-
-        // The folder's name when the folder named it (a model alone in
-        // `King Abdulaziz/` is "King Abdulaziz", not "crown"); the file's name
-        // otherwise. The file's own name is kept either way, as originalName.
-        let name = title.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
-            ?? originalName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
-        var record = self.record(id: id, name: name, originalName: originalName,
-                                 filename: filename, ext: ext, size: size,
-                                 hash: hash, key: key,
-                                 reader: try? await engine.geometryReader(), colours: colours,
-                                 swapCount: swapCount, thumbFile: thumbFile, group: group,
-                                 provenance: said, riskAnalysis: riskAnalysis,
-                                 parsed: await SlicerFigures.read(destination, engine: engine) ?? [:],
-                                 externalPath: inPlace ? source.standardizedFileURL.path : nil)
-        // THE PHOTO THAT CAME WITH IT, when there was one — see `ModelPhoto`.
-        // The record is new, so there is no photo of the shop's to keep; and a
-        // picture that will not decode is passed over, never a failed import.
-        // Read before the original goes to the Trash below, though only the
-        // model is ever taken: the picture stays where it was.
-        let photo = firstPhoto(photos)
-        if let photo { record["userPhoto"] = .string(photo) }
-        do {
-            // lock: callers — convertModel, addModelToLibrary, addModelsToLibrary
-            try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
-                var rows: [JSONValue] = []
-                if case .array(let existing)? = root["printFiles"] { rows = existing }
-                // Newest first, as the other app does — a shop that has just
-                // added something looks for it at the top.
-                rows.insert(.object(record), at: 0)
-                root["printFiles"] = .array(rows)
-            }
-        } catch {
-            // The book refused it, so the copy has no record to belong to.
-            try? FileManager.default.removeItem(at: dir)
-            throw Failure.failed(String(describing: error))
-        }
-
-        // THE LAST THING, AFTER EVERYTHING ELSE HAS SUCCEEDED.
-        //
-        // The original is removed here and nowhere else, and only once all
-        // three things are true: the bytes are at the destination, they have
-        // been read back and match, and the book has a record pointing at them.
-        // Every failure above returns with the source exactly as it was, which
-        // is why none of them needs a way to put it back.
-        //
-        // `keepOriginal` is for a source that is not the shop's to consume — a
-        // USB stick, a customer's share, a read-only volume. A failure to
-        // remove is NOT a failed import: the file is in the library and in the
-        // book, and the worst case is one duplicate left in a downloads folder,
-        // which is the recoverable half of the rule above.
-        var movedIn = false
-        // To the TRASH, not deleted. The copy is verified and recorded by now,
-        // but the original may be in iCloud Drive or Dropbox, where deleting
-        // it deletes it on every device; the Trash is the Finder's own undo.
-        // A source the Trash will not take is simply left where it was.
-        // NEVER for a linked model: its file is the shop's, where it put it.
-        if !keepOriginal && !inPlace {
-            do { try FileManager.default.trashItem(at: source, resultingItemURL: nil); movedIn = true }
-            catch { movedIn = false }
-        }
-
-        return Added(id: id, name: name, triangleCount: geometry?.triangleCount,
-                     colours: colours.count, contentHash: hash, movedIn: movedIn,
-                     photo: photo != nil)
-    }
-
-    /// The first of these pictures that decodes, as a `userPhoto` data URI.
-    static func firstPhoto(_ candidates: [URL]) -> String? {
-        for url in candidates {
-            if let uri = try? LibraryPhoto.dataURI(of: url) { return uri }
-        }
-        return nil
+        return Analysis(size: size, provenance: said, geometry: geometry, riskAnalysis: riskAnalysis,
+                        key: key, reader: try? await engine.geometryReader(), colours: colours,
+                        swapCount: swapCount, thumbFile: thumbFile,
+                        parsed: await SlicerFigures.read(destination, engine: engine) ?? [:])
     }
 
     // MARK: - Many at once
@@ -455,6 +484,10 @@ enum LibraryImport {
         var moved = 0
         /// The ids of the models that came in, for backing them up.
         var addedIds: [String] = []
+        /// Which sources came in, and which were duplicates — so a caller
+        /// keeping a ledger of what it has looked at knows each file's fate.
+        var addedURLs: [URL] = []
+        var duplicateURLs: [URL] = []
         var duplicates = 0
         /// How many of the models that came in brought a photo with them.
         var photos = 0
@@ -550,11 +583,13 @@ enum LibraryImport {
                                           owns: owns, whoHasIt: whoHasIt)
                 report.moved += 1
                 report.addedIds.append(added.id)
+                report.addedURLs.append(file.url)
                 if added.photo { report.photos += 1 }
                 if added.movedIn { report.trashed.append(file.url) }
                 if let hash = added.contentHash { known.insert(hash) }
             } catch Failure.alreadyHere {
                 report.duplicates += 1
+                report.duplicateURLs.append(file.url)
             } catch {
                 report.failures.append("\(file.url.lastPathComponent): \(error)")
             }

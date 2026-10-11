@@ -340,6 +340,11 @@ enum CloudLibrary {
         return (hex(sha.finalize()), hex(md5.finalize()), size)
     }
 
+    /// MD5 of bytes in hand, hex — what a plain ETag is.
+    nonisolated static func md5(_ data: Data) -> String {
+        Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
     /// What went wrong, said in the shop's language by `Shop.cloudSay`.
     enum Failure: Error, Equatable {
         case notThere
@@ -359,6 +364,13 @@ enum CloudLibrary {
     @discardableResult
     static func ensureInBucket(_ c: LibraryRemote, key: String, file: URL,
                                engine: KhaytEngine) async throws -> (sha256: String, size: Int) {
+        try await ensureInBucket(c, key: key, file: file, engine: engine, fetch: fetch)
+    }
+
+    /// The same, through a given transport — so a caller (and its test) need
+    /// not swap the shared one.
+    static func ensureInBucket(_ c: LibraryRemote, key: String, file: URL,
+                               engine: KhaytEngine, fetch: @escaping S3.Fetch) async throws -> (sha256: String, size: Int) {
         let local = try await Task.detached { try Self.digests(of: file) }.value
         if let there = try await c.head(key, fetch: fetch), there.size == local.size,
            try await engine.etagVerdict(etag: there.etag, md5: local.md5) == "match" {
@@ -521,6 +533,14 @@ enum CloudLibrary {
     /// as the other app scans it — sidecars, pictures and notes left out by the
     /// shared rule, not here.
     nonisolated static func libraryFiles(root: String) -> [KhaytEngine.TierFile] {
+        libraryFiles(root: root, includingMarkers: false)
+    }
+
+    /// The same, with the `.online` markers of cloud-only models
+    /// (`Shop.onlineExt`) when asked. Left out otherwise, and that is a
+    /// safety rule rather than tidiness: every caller of the plain listing
+    /// uploads, tiers or frees what it lists — and a marker is not a model.
+    nonisolated static func libraryFiles(root: String, includingMarkers: Bool) -> [KhaytEngine.TierFile] {
         let fm = FileManager.default
         let rootURL = URL(fileURLWithPath: root)
         let rootReal = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
@@ -541,6 +561,7 @@ enum CloudLibrary {
                 guard values?.isRegularFile == true, values?.isSymbolicLink != true,
                       file.resolvingSymlinksInPath().standardizedFileURL.path
                         .hasPrefix(rootReal.hasSuffix("/") ? rootReal : rootReal + "/") else { continue }
+                if !includingMarkers, file.lastPathComponent.hasSuffix(Shop.onlineExt) { continue }
                 // When the file landed in its folder — the import, for a copy
                 // whose mtime is still the download's. See `annotated`.
                 let added = values?.addedToDirectoryDate.map { $0.timeIntervalSince1970 * 1000 }
@@ -567,7 +588,9 @@ extension Shop {
     func isInCloudOnly(_ file: LibraryFile) -> Bool {
         guard modelFile(for: file) == nil, let dir = directory(for: file) else { return false }
         let contents = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
-        return contents.contains { $0.hasSuffix(".cloud") }
+        // A `.cloud` sidecar (moved off this Mac) or an `.online` marker (put
+        // in the bucket by the shop, never here — `LibraryStorage`).
+        return contents.contains { $0.hasSuffix(".cloud") || $0.hasSuffix(Shop.onlineExt) }
     }
 
     /// Put a test file in the bucket, read it back, and take it away again —
@@ -763,7 +786,36 @@ extension Shop {
             do { try await CloudLibrary.bringBack(model, remotes: { await self.cloudRemotes(for: $0) }, engine: engine) }
             catch { cloudLibraryProblem = words.callIt("mac.cloudlib_bring_back_failed") + " " + cloudSay(error) }
         }
+        let markers = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
+            .filter { $0.hasSuffix(Shop.onlineExt) }
+        for name in markers {
+            if let problem = await bringDownOnline(file.id, marker: dir.appending(path: name), engine: engine) {
+                cloudLibraryProblem = problem
+            }
+        }
         await load(source)
+    }
+
+    /// A model the shop put in the bucket by hand, brought down for the first
+    /// time — then measured, hashed and pictured as an import would have.
+    /// Returns what to say when it did not work, or found a duplicate.
+    func bringDownOnline(_ id: String, marker: URL, engine: KhaytEngine) async -> String? {
+        // lock: system — bringing down a model the library already lists, as Bring Back does; it adds nothing and removes only its marker.
+        guard let build = source.build,
+              let c = await CloudLibrary.libraryBucket(settings: settingsDict, build: build) else {
+            return words.callIt("mac.cloudlib_not_set_up")
+        }
+        do {
+            let model = try await Shop.bringDown(marker, config: c, engine: engine, fetch: CloudLibrary.fetch)
+            if let same = try await Shop.fillDownloaded(id: id, file: model, storeURL: build.storeURL, engine: engine,
+                                                        owns: { StoreLock.weOwnIt(build) },
+                                                        whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) {
+                return words.callIt("mac.storage_downloaded_duplicate", ["name": .string(same)])
+            }
+            return nil
+        } catch {
+            return words.callIt("mac.cloudlib_bring_back_failed") + " " + cloudSay(error)
+        }
     }
 
     /// Every model that was moved to the cloud, back onto this Mac.
@@ -784,6 +836,18 @@ extension Shop {
                 try await CloudLibrary.bringBack(model, remotes: { await self.cloudRemotes(for: $0) }, engine: engine)
                 back += 1
             } catch { failures.append(model.lastPathComponent + ": " + cloudSay(error)) }
+        }
+        // And the models the shop put in the bucket by hand: everything is
+        // everything.
+        let markers = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary, includingMarkers: true) }.value
+            .filter { $0.filename.hasSuffix(Shop.onlineExt) }
+        let idOf = Dictionary(files.map { (LibraryLocation.itemDirName($0.id), $0.id) }, uniquingKeysWith: { a, _ in a })
+        for (i, m) in markers.enumerated() {
+            cloudProgress = (done: sidecars.count + i, total: sidecars.count + markers.count, name: m.filename)
+            guard let id = idOf[m.id ?? ""] else { continue }
+            if let problem = await bringDownOnline(id, marker: URL(fileURLWithPath: m.fullPath), engine: engine) {
+                failures.append(m.filename + ": " + problem)
+            } else { back += 1 }
         }
         cloudLibraryNote = words.callIt("mac.cloudlib_brought_back", ["n": .number(Double(back))])
         if !failures.isEmpty { cloudLibraryProblem = failures.prefix(3).joined(separator: "\n") }

@@ -580,6 +580,47 @@ private struct OwedSummary: View {
 struct WindowSheets: ViewModifier {
     @Bindable var shop: Shop
 
+    /// What the delete question says under the names, once the plan is in.
+    private var planLines: [String] {
+        guard let plan = shop.deletePlan else { return [shop.words.callIt("mac.delete_checking")] }
+        return Shop.deletePlanLines(plan, words: shop.words)
+    }
+
+    /// The delete question's choices, from the plan.
+    ///
+    /// * Remove from This Mac — the default, and not destructive-styled:
+    ///   nothing it does loses the only copy of anything.
+    /// * Delete the ones only on this Mac too — destructive, and only offered
+    ///   when there are some, with the count on the button. When EVERY model
+    ///   is only here it is the delete there always was (`fullDelete`).
+    /// * Delete Completely — destructive, only when there is an online copy.
+    @ViewBuilder
+    private func deleteChoices(fullDelete: @escaping () -> Void) -> some View {
+        if let plan = shop.deletePlan {
+            let elsewhere = plan.keptOnline.count + plan.cloudOnly.count + plan.inPlace.count
+            if elsewhere > 0 {
+                Button(shop.words.callIt("mac.delete_from_mac")) {
+                    Task { await shop.removeFromThisMac(plan, includingOnlyHere: false) }
+                }
+                if !plan.onlyHere.isEmpty {
+                    Button(shop.words.callIt("mac.delete_only_here_too",
+                                             ["n": .number(Double(plan.onlyHere.count))]), role: .destructive) {
+                        Task { await shop.removeFromThisMac(plan, includingOnlyHere: true) }
+                    }
+                }
+            } else {
+                Button(shop.words.callIt("common.delete"), role: .destructive, action: fullDelete)
+            }
+            // These buttons are only ever drawn as the actions of the two
+            // delete `confirmationDialog(`s below — the question IS the ask.
+            if plan.onlineCount > 0 {
+                Button(shop.words.callIt("mac.delete_completely"), role: .destructive) {
+                    Task { await shop.deleteCompletely(plan) }
+                }
+            }
+        }
+    }
+
     func body(content: Content) -> some View {
         content
             // On the split view, not inside `detail`. Inside it, the detail content
@@ -671,7 +712,9 @@ struct WindowSheets: ViewModifier {
                                      set: { if !$0 { shop.pendingLibraryDelete = nil } }),
                 titleVisibility: .visible
             ) {
-                Button(shop.words.callIt("common.delete"), role: .destructive) {
+                // FROM THIS MAC by default, COMPLETELY when asked — see
+                // `LibraryDelete`. The plan is worked out as the question opens.
+                deleteChoices {
                     guard let file = shop.pendingLibraryDelete else { return }
                     Task { await shop.deleteLibraryFile(file) }
                 }
@@ -679,8 +722,12 @@ struct WindowSheets: ViewModifier {
                     shop.pendingLibraryDelete = nil
                 }
             } message: {
-                Text(shop.words.callIt("plib.delete_confirm",
-                                       ["name": .string(shop.pendingLibraryDelete?.title ?? "")]))
+                Text(verbatim: ([shop.words.callIt("plib.delete_confirm",
+                                                   ["name": .string(shop.pendingLibraryDelete?.title ?? "")])]
+                                + planLines).joined(separator: "\n\n"))
+            }
+            .task(id: shop.pendingLibraryDelete?.id) {
+                if let file = shop.pendingLibraryDelete { await shop.planDeletes([file]) }
             }
             // Several at once: one question naming how many, and which.
             .confirmationDialog(
@@ -691,17 +738,20 @@ struct WindowSheets: ViewModifier {
                                      set: { if !$0 { shop.pendingLibraryDeletes = [] } }),
                 titleVisibility: .visible
             ) {
-                Button(shop.words.callIt("mac.delete_n_models",
-                                         ["n": .number(Double(shop.pendingLibraryDeletes.count))]),
-                       role: .destructive) {
+                deleteChoices {
                     Task { await shop.confirmLibraryDeletes() }
                 }
                 Button(shop.words.callIt("common.cancel"), role: .cancel) {
                     shop.pendingLibraryDeletes = []
                 }
             } message: {
-                // WHICH models, not just how many — see `libraryDeleteMessage`.
-                Text(verbatim: shop.libraryDeleteMessage(shop.pendingLibraryDeletes))
+                // WHICH models, not just how many — see `libraryDeleteMessage`
+                // — and what each choice does to them.
+                Text(verbatim: ([shop.libraryDeleteMessage(shop.pendingLibraryDeletes)] + planLines)
+                    .joined(separator: "\n\n"))
+            }
+            .task(id: shop.pendingLibraryDeletes.map(\.id)) {
+                if !shop.pendingLibraryDeletes.isEmpty { await shop.planDeletes(shop.pendingLibraryDeletes) }
             }
             .sheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
