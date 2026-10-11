@@ -24,24 +24,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   becomes the model's picture, a 3MF keeps its slicer preview as well, and a
   picture that cannot be read never stops the import.
 
-- **Add an expense from a receipt's QR code.** Expenses › Add from receipt
-  opens a photo, screenshot or PDF of a Saudi tax invoice (PDF on macOS and
-  Windows) and reads the QR code on it, or reads the code's text pasted in.
-  It shows the seller, their VAT number, the date, the total and the VAT, and
-  fills the Add Expense form with them. The receipt does not say what the money
-  was for, so you still choose the category and press Add. The picture is
-  attached as the receipt, and a seller who is not yet a supplier can be added
-  with their VAT number. A receipt that is already in your expenses is not
-  offered again. This is the same reading the Mac and iPhone do
-  (`lib/zatca-qr.js`). The code is found with jsQR (Apache-2.0).
-- **An attached receipt is saved with its expense again, and the Expenses
-  date filter works.** Since the expense page moved into its own file in May,
-  it kept a second, private copy of the selected range and of the attached
-  receipt. The controls set one copy and the page read the other. So choosing
-  a range did not narrow the list, the totals or the chart, and a receipt
-  attached with 📎 was dropped when the expense was added. Receipts attached
-  before this fix were not kept, and the app cannot recover them.
-
 - **iOS: a calculator, and expenses read off a receipt's QR.** The iPhone's
   quote sheet sent seven numbers to the Mac and showed the answer, so it
   needed the Mac nearby, used Khayt's starting rates, and was hidden in
@@ -59,17 +41,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and also finds the code in a photo of the receipt. To make this work, the
   phone's copy of the shop (`BookScope.workingSet`) now includes presets,
   consumables, suppliers and the newest 1,000 expenses by date.
-
-- **Accounting export now offers Wafeq and Daftra.** Choose either one under
-  Expenses › Accounting CSV. Both files carry the shop's currency, which Wafeq
-  needs on every row. The dialog says what to match on the package's import
-  screen: Wafeq asks for the account each expense was paid through, and Daftra
-  takes dates as DD/MM/YYYY and needs a tax that is not included in the price,
-  because sales are written net. Qoyod is not offered: its import template is
-  made per account and its columns are not published.
-- **Saving the accounting webhook no longer forgets the export's account
-  codes.** Settings › Accounting sync replaced the whole setting on save, which
-  wiped the sales account and tax code the export dialog had remembered.
 
 - **(Maintainers) The Mac's full test run no longer looks hung on a Mac with a
   real print library.** The test that checks the Mac's 3MF reader against
@@ -127,10 +98,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   what's waiting to go. Reports are cleaned by the same rule the Electron
   desktop app uses: emails, phone numbers, long numbers and file paths are
   taken out, and orders, customers, prices and files are never sent. Turning a switch off deletes anything queued at once. (#1789)
-- **Crash reports with a long stack are no longer thrown away.** A report
-  whose stack ran past 4,000 characters was refused whole by Khayt Cloud. The
-  stack is now cut to fit, keeping complete lines.
-
 - **(Mac) Export for the Accountant now offers Wafeq and Daftra.** These are two
   Saudi accounting products, and their import formats were taken from their own
   help centres. Wafeq gets invoices with the price before VAT, marked "exc. tax",
@@ -167,18 +134,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   exactly: "Send print progress to my iPhone (Live Activities)", under
   Settings ▸ Integrations ▸ iPhone.
 
-- **Tabby and Tamara payments are finished and recorded for you.** A payment
-  link from Khayt stopped at the link: Tamara cancels an order the shop does
-  not authorise within 72 hours of the customer paying, and Tabby does not
-  pay the shop until the payment is captured. Khayt did neither, and
-  Tamara's payment notices went to an address that could not receive them.
-  Now, while Khayt is open, it checks each link every ten minutes. Once the
-  customer has paid, it authorises the Tamara order or captures the Tabby
-  payment, and records the payment on the job as Record Payment does, with
-  the same receipt email and webhooks. If a step fails, Khayt says so and
-  tries again. Links sent before this update are not tracked, so finish
-  those in the Tabby or Tamara portal. Tamara collects at shipment by
-  itself after 21 days; capturing it when you ship is not built yet.
 - **iOS: a missed printer poll no longer ends a print as failed.** When the
   Mac's poll of a printer fails, `/api/live/printers` serves `state: null`
   with the error. The phone read that as the print stopping: the Live Activity
@@ -416,16 +371,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - The quote sheet's hours unit is "س" in Arabic, and a literal unit in a
     field now fails a test.
 
-
-
-- **A customer's rating is kept, and they are told it was received.** When a
-  customer rated a finished job from its status page, the rating was saved,
-  but the page then said "Could not submit", and Khayt's window was never
-  told. The window's next save could write over the rating. Now the customer
-  sees "Thank you", and the window takes in that one job without disturbing
-  an edit you have open. An edit made a moment before a printer or a survey
-  updates a job is no longer overwritten either.
-
 - **alpha.61 review fixes (Mac + shared).**
   - Reports: the P&L table's Net Income column is back on screen. alpha.60
     widened Expenses for its captions and pushed the last column off the
@@ -454,19 +399,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   view-only cloud member sees the link and the messages but not the buttons that
   would change them. The portal trial's days left show in Settings →
   Integrations.
-- **Customer link fixes (both apps).** A deposit that is not a positive number,
-  or a pay link that is not an https address, is refused instead of being put
-  on the customer's page (a typed "abc" asked the customer for "NaN"). The link
-  is built cleanly from a server address typed with a trailing slash.
-
 - **(Mac) A customer's bare STL slices with OrcaSlicer or Bambu Studio.** A mesh
   carries no printer settings, and these slicers' built-in defaults fail their
   own checks, so no upload could be sliced with them. The Mac now hands the
   slicer the printer you last used in it, with a print and a filament profile
   that printer accepts — the same choice the desktop makes (3.11.7). Snapmaker
   Orca's command line crashes on such a slice (its bug); Khayt says it crashed.
-
-
 
 - **(Mac) Staff sign-in.** Settings → Operations → Staff sign-in. When it is
   on, the Mac asks who is using it — each person picks their name and types
@@ -482,17 +420,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   same access levels and PINs as the desktop app, so a shop that already
   uses its operator lock keeps its staff and PINs. It keeps staff to their
   part of the app; it is not encryption of the book.
-
-- **"Slice for exact quote" works on a plain STL with OrcaSlicer and Bambu
-  Studio.** A model with no print settings of its own, such as an STL or a
-  3MF that holds only the shape, could not be sliced by these slicers. Their
-  built-in defaults are not a printer, so OrcaSlicer refused it and Bambu
-  Studio weighed it at 0 g. Khayt now slices it on the printer you last used
-  in that slicer, with a print profile and filament that printer accepts, and
-  the calculator's note names them. A project file that carries its own
-  settings is sliced exactly as before. If the slicer itself crashes,
-  Khayt now says so. Snapmaker Orca's command line currently crashes on its
-  U1 presets, so use OrcaSlicer or Bambu Studio for quotes from an STL.
 
 - **(Mac) Reports → Best: top clients count delivered jobs.** A job that had
   reached its customer was left out of the top clients list, so the shop's
@@ -5146,6 +5073,82 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.9] - 2026-10-11
+
+Receipts and accounting, since 3.11.8.
+Individual entries are kept below; this is what changed for you.
+
+**Add an expense from a receipt's QR code.** Open a photo, screenshot or
+PDF of a Saudi tax invoice and the expense form fills itself in; you choose
+the category. **Accounting export offers Wafeq and Daftra**, and no export
+can carry a spreadsheet formula. **Tabby and Tamara payments are confirmed
+and recorded by the app.** The Expenses date filter works again, and an
+attached receipt is saved with its expense.
+
+- **Add an expense from a receipt's QR code.** Expenses › Add from receipt
+  opens a photo, screenshot or PDF of a Saudi tax invoice (PDF on macOS and
+  Windows) and reads the QR code on it, or reads the code's text pasted in.
+  It shows the seller, their VAT number, the date, the total and the VAT, and
+  fills the Add Expense form with them. The receipt does not say what the money
+  was for, so you still choose the category and press Add. The picture is
+  attached as the receipt, and a seller who is not yet a supplier can be added
+  with their VAT number. A receipt that is already in your expenses is not
+  offered again. This is the same reading the Mac and iPhone do
+  (`lib/zatca-qr.js`). The code is found with jsQR (Apache-2.0).
+- **An attached receipt is saved with its expense again, and the Expenses
+  date filter works.** Since the expense page moved into its own file in May,
+  it kept a second, private copy of the selected range and of the attached
+  receipt. The controls set one copy and the page read the other. So choosing
+  a range did not narrow the list, the totals or the chart, and a receipt
+  attached with 📎 was dropped when the expense was added. Receipts attached
+  before this fix were not kept, and the app cannot recover them.
+- **Accounting export now offers Wafeq and Daftra.** Choose either one under
+  Expenses › Accounting CSV. Both files carry the shop's currency, which Wafeq
+  needs on every row. The dialog says what to match on the package's import
+  screen: Wafeq asks for the account each expense was paid through, and Daftra
+  takes dates as DD/MM/YYYY and needs a tax that is not included in the price,
+  because sales are written net. Qoyod is not offered: its import template is
+  made per account and its columns are not published.
+- **Saving the accounting webhook no longer forgets the export's account
+  codes.** Settings › Accounting sync replaced the whole setting on save, which
+  wiped the sales account and tax code the export dialog had remembered.
+- **Accounting exports can no longer carry a spreadsheet formula.** A
+  customer name or note starting with `=`, `+`, `-` or `@` (which customers can
+  type through the web store and the portal) now gets a leading `'` in every
+  export format, so a spreadsheet will not run it. Amounts are never touched,
+  so a refund still reads `-12.00`.
+- **An exported copy of the book no longer carries staff PIN hashes** or the
+  PIN-reset code's hash; both are masked. A four-digit PIN behind its hash is
+  quick to guess for whoever holds the file.
+- **A staff PIN typed in Arabic digits (٠–٩) is the same PIN as 0–9.** The
+  same PIN typed on an Arabic keyboard used to be refused when set, and counted
+  as wrong at sign-in. A PIN set in Arabic digits before this still opens.
+- **A deposit typed with a decimal comma ("12,50") on the customer's link is
+  refused** rather than read as 1250.
+- **Slicing a plain STL reads the slicer's preset folders more carefully.** A
+  preset reached through a link is used only when it stays inside the
+  slicer's folders, a file there that is not a regular file is skipped, and
+  choosing presets makes about a tenth of the file-system calls it did.
+- **Crash reports with a long stack are no longer thrown away.** A report
+  whose stack ran past 4,000 characters was refused whole by Khayt Cloud. The
+  stack is now cut to fit, keeping complete lines.
+- **Tabby and Tamara payments are finished and recorded for you.** A payment
+  link from Khayt stopped at the link: Tamara cancels an order the shop does
+  not authorise within 72 hours of the customer paying, and Tabby does not
+  pay the shop until the payment is captured. Khayt did neither, and
+  Tamara's payment notices went to an address that could not receive them.
+  Now, while Khayt is open, it checks each link every ten minutes. Once the
+  customer has paid, it authorises the Tamara order or captures the Tabby
+  payment, and records the payment on the job as Record Payment does, with
+  the same receipt email and webhooks. If a step fails, Khayt says so and
+  tries again. Links sent before this update are not tracked, so finish
+  those in the Tabby or Tamara portal. Tamara collects at shipment by
+  itself after 21 days; capturing it when you ship is not built yet.
+- **Customer link fixes (both apps).** A deposit that is not a positive number,
+  or a pay link that is not an https address, is refused instead of being put
+  on the customer's page (a typed "abc" asked the customer for "NaN"). The link
+  is built cleanly from a server address typed with a trailing slash.
 
 ## [3.11.8] - 2026-10-08
 
