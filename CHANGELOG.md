@@ -13,6 +13,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   itself, and the Mac would have lost track of the model. The marker is now
   refused by name. The Mac uses the same rule (`lib/print-library-tier.js`).
 
+- **Mac: usage counts now say which features a shop uses, not only that the
+  app was opened.** Only with "Share usage counts" switched on.
+  - **25 fixed counters**, such as quote created, invoice exported, model
+    imported, payment recorded, print sent, report opened, backup run and
+    update installed. Each one is counted once when the action succeeds. A
+    batch counts as one, and an action that fails counts as nothing.
+  - **A counter is a name and a number for the day.** It never includes the
+    order, the customer, the file or the amount. It goes through the same
+    scrubber as before, and Settings ▸ Preferences ▸ "View what's collected"
+    shows exactly what will be sent.
+  - With usage counts off, nothing is counted and nothing is kept.
+
 - **Mac: deleting a model removes it from this Mac by default, and "Delete
   Completely" removes it everywhere.**
   - **Remove from This Mac** is the default. A model with an online copy

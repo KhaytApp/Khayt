@@ -832,6 +832,8 @@ extension Shop {
             // Out of the selection too, or the inspector keeps describing a
             // model that is gone.
             fileSelection.subtract(ids)
+            // One delete, however many models it took.
+            Telemetry.feature(.libraryDelete, in: self)
             await load(source)
             if !allGone {
                 importProblem = words.callIt("plib.delete_partial")

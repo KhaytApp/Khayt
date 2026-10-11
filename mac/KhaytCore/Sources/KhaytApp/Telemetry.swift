@@ -24,8 +24,9 @@ import KhaytCore
 ///
 /// The crash feed is `EngineFaults` — the shared rules' failures, which the app
 /// otherwise swallows with `try?` — and the note `LastWords` leaves when AppKit
-/// kills the app. Usage is one counter, `app_launch`, with the shop's coarse
-/// switches (mode, VAT, ZATCA, online, LAN) — counts and enums, never content.
+/// kills the app. Usage is `app_launch` plus the `TelemetryFeature` counters
+/// (`Telemetry.feature(_:in:)`), each with the shop's coarse switches (mode,
+/// VAT, ZATCA, online, LAN) — counts and enums, never content.
 struct TelemetryConsent: Equatable, Sendable {
     var crash = false
     var usage = false
@@ -220,6 +221,56 @@ enum TelemetryRaw {
     }
 }
 
+/// The features a usage counter can name — spec §1B's "feature reached",
+/// and the ONLY names a call site can pass: there is no `String` overload,
+/// so a counter cannot carry anything a person typed.
+///
+/// Each is counted where the action SUCCEEDS (after the book's write, never
+/// on a refusal), once per action: a batch is one, a retry that fails is
+/// none. The count is a number and nothing else — never the order, the
+/// customer, the file or the amount. `TelemetryFeatureTests` holds every raw
+/// value to the shared scrubber's `^[a-z0-9_]+$` and 40 characters, and holds
+/// every case to at least one call site.
+///
+/// Names are the desktop's where the same action exists there
+/// (`quote_created`, `invoice_exported`, `ai_extract_used`, `backup_run`,
+/// `update_installed` are the spec's own examples), so one feature means one
+/// thing in the cloud's report whichever app counted it.
+enum TelemetryFeature: String, CaseIterable, Sendable {
+    // Orders and money
+    case quoteCreated = "quote_created"
+    case orderCreated = "order_created"
+    case orderMoved = "order_moved"
+    case invoiceExported = "invoice_exported"
+    case paymentRecorded = "payment_recorded"
+    case expenseAdded = "expense_added"
+    case receiptScanned = "receipt_scanned"
+    case accountingExport = "accounting_export"
+    // People and things
+    case customerAdded = "customer_added"
+    case supplierAdded = "supplier_added"
+    case productSaved = "product_saved"
+    case spoolAdded = "spool_added"
+    // The library
+    case libraryImport = "library_import"
+    case libraryDelete = "library_delete"
+    // Printers
+    case printerLinked = "printer_linked"
+    case printSent = "print_sent"
+    // Looking and keeping
+    case reportOpened = "report_opened"
+    case backupRun = "backup_run"
+    // Reaching out
+    case cloudSignedIn = "cloud_sync_signed_in"
+    case liveActivitySent = "live_activity_sent"
+    case aiExtractUsed = "ai_extract_used"
+    case aiReplyDrafted = "ai_reply_drafted"
+    case aiMarginSuggested = "ai_margin_suggested"
+    case askTheBookUsed = "ask_the_book_used"
+    // The app itself
+    case updateInstalled = "update_installed"
+}
+
 /// The sender, and the one-time ask's memory.
 @MainActor @Observable
 final class Telemetry {
@@ -309,10 +360,30 @@ final class Telemetry {
     /// file is written, and an opt-out that deleted the queue in between would
     /// otherwise be undone by that write. A stream switched off meanwhile also
     /// takes its events out of what is written.
+    ///
+    /// ONE AT A TIME. Each enqueue reads the queue, awaits the scrubber, then
+    /// writes the file — and with feature counters fired from anywhere in the
+    /// app, two can now overlap. Two overlapping read-modify-writes keep only
+    /// the later one's view of the queue, so the earlier event was lost. Each
+    /// call waits for the one before it to finish first.
     @discardableResult
     func enqueue(_ kind: Kind, _ raw: [String: JSONValue], consent: TelemetryConsent,
                  engine: KhaytEngine, file: TelemetryQueueFile,
                  live: (() -> TelemetryConsent)? = nil) async -> Bool {
+        let before = lane
+        let mine = Task { @MainActor in
+            await before?.value
+            return await self.enqueueNow(kind, raw, consent: consent, engine: engine, file: file, live: live)
+        }
+        lane = Task { @MainActor in _ = await mine.value }
+        return await mine.value
+    }
+
+    @ObservationIgnored private var lane: Task<Void, Never>?
+
+    private func enqueueNow(_ kind: Kind, _ raw: [String: JSONValue], consent: TelemetryConsent,
+                            engine: KhaytEngine, file: TelemetryQueueFile,
+                            live: (() -> TelemetryConsent)?) async -> Bool {
         guard kind == .crash ? consent.crash : consent.usage else { return false }
         var raw = raw
         raw["installId"] = .string(consent.installId)
@@ -540,7 +611,8 @@ final class Telemetry {
         }
     }
 
-    /// One `app_launch`, with today's running count.
+    /// One `app_launch`, with today's running count — and `update_installed`
+    /// when this launch is the first of a new version.
     func recordLaunch(_ shop: Shop) async {
         let consent = shop.telemetryConsent
         guard consent.usage, let engine = shop.engine, let file = Self.file(for: shop) else { return }
@@ -549,6 +621,57 @@ final class Telemetry {
                                      context(language: shop.words.language))
         await enqueue(.usage, raw, consent: consent, engine: engine, file: file,
                       live: { [weak shop] in shop?.telemetryConsent ?? TelemetryConsent() })
+        if versionChanged() { await Self.feature(.updateInstalled, in: shop)?.value }
+    }
+
+    static let lastVersionKey = "telemetry.lastVersion"
+
+    /// Whether this launch runs a different version from the last one this
+    /// Mac counted. Not Sparkle's "will install" — that fires before the
+    /// install and on a failure too; a new version actually running is the
+    /// install that happened. The first launch ever (no version kept) is not
+    /// an update, and neither is a development build with no version.
+    func versionChanged() -> Bool {
+        guard !appVersion.isEmpty, appVersion.first?.isNumber == true else { return false }
+        let was = defaults.string(forKey: Self.lastVersionKey)
+        defaults.set(appVersion, forKey: Self.lastVersionKey)
+        return was != nil && was != appVersion
+    }
+
+    // MARK: Feature counters
+
+    /// Count one use of `feature` in `shop`'s book — THE entry point every
+    /// call site uses.
+    ///
+    /// Without usage consent this is a few dictionary reads and nothing else:
+    /// no tally, nothing queued, no task. It never reads or writes the book
+    /// (the consent is the settings already in memory) and never blocks: the
+    /// tally is a `UserDefaults` dictionary, and the scrub and the queue file
+    /// happen in a task after the caller has moved on. The sample book has no
+    /// queue file, so it counts nothing either.
+    ///
+    /// Returns the task, for a test to await; call sites ignore it.
+    @discardableResult
+    static func feature(_ feature: TelemetryFeature, in shop: Shop?) -> Task<Bool, Never>? {
+        guard let shop else { return nil }
+        let consent = shop.telemetryConsent
+        guard consent.usage else { return nil }
+        return shared.feature(feature, consent: consent, engine: shop.engine, file: file(for: shop),
+                              settings: shop.settingsDict, mode: shop.mode, language: shop.words.language,
+                              live: { [weak shop] in shop?.telemetryConsent ?? TelemetryConsent() })
+    }
+
+    /// The same, with everything handed in — the seam a test drives.
+    @discardableResult
+    func feature(_ feature: TelemetryFeature, consent: TelemetryConsent, engine: KhaytEngine?,
+                 file: TelemetryQueueFile?, settings: [String: JSONValue], mode: String, language: String,
+                 live: (() -> TelemetryConsent)? = nil) -> Task<Bool, Never>? {
+        guard consent.usage, let engine, let file else { return nil }
+        let raw = TelemetryRaw.usage(feature: feature.rawValue, count: tally(feature.rawValue),
+                                     settings: settings, mode: mode, context(language: language))
+        return Task { @MainActor in
+            await self.enqueue(.usage, raw, consent: consent, engine: engine, file: file, live: live)
+        }
     }
 
     /// The rules' failures since the last look, and the last run's crash note.

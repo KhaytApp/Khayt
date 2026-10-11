@@ -407,6 +407,7 @@ extension Shop {
             // Kept on this Mac, so the next launch does not ask again.
             await keepCloudKey(dek, keyset: keyset, shopId: session.shopId)
             if case .locked = syncStatus { syncStatus = .idle }
+            Telemetry.feature(.cloudSignedIn, in: self)
             await load(source)
             // ── A KEY ONLY THIS BOOK HOLDS GOES TO THE CLOUD ──────────────
             //

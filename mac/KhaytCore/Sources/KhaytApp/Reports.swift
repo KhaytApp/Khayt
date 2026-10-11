@@ -232,6 +232,9 @@ struct Reports: View {
                 }
             }
         }
+        // Once per time the page is opened — no id, so a recompute or a
+        // redraw does not count again.
+        .task { Telemetry.feature(.reportOpened, in: shop) }
         // The time log too, and the rows rather than a count: logged labour is
         // a line of the P&L, and logging an hour, changing one or ⌘Z on one
         // moves no count above — the net stayed stale until the page reopened.

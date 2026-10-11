@@ -239,6 +239,8 @@ extension Shop {
                 memory.lastSent[step.machineId] = now
                 memory.failures = 0
                 memory.noPhonesSince = nil
+                // One per print: the start, not every update after it.
+                if case .start = step { Telemetry.feature(.liveActivitySent, in: self) }
             }
             moved()
         case .noPhones:

@@ -573,6 +573,7 @@ extension Shop {
         }
 
         var created: String?
+        var quoted = false
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
@@ -600,8 +601,10 @@ extension Shop {
                                     action: Self.plainString(record["status"]) == "quote"
                                             ? "quote_created" : "order_created")
                 created = id
+                quoted = Self.plainString(record["status"]) == "quote"
             }
             lastCreated = created
+            if created != nil { Telemetry.feature(quoted ? .quoteCreated : .orderCreated, in: self) }
             await load(source)
             // Put the person on the job they just took.
             if let created {
@@ -737,6 +740,7 @@ extension Shop {
         // After the write, like a move's: a delivery that went out for a
         // payment the book then refused to keep would be a lie told outward.
         guard wrote else { return }
+        Telemetry.feature(.paymentRecorded, in: self)
         if let mail { await post(mail) }
         if !owed.isEmpty { await fire(owed) }
         // The customer's page shows the balance. A payment is counted as one
@@ -1462,6 +1466,7 @@ extension Shop {
         defer { importing = false }
         do {
             let added = try await LibraryImport.add(url, shop: self)
+            Telemetry.feature(.libraryImport, in: self)
             let key = added.movedIn ? "mac.model_moved" : "mac.model_added"
             importNote = added.measured
                 ? words.callIt(key,

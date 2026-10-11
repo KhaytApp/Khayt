@@ -275,6 +275,8 @@ extension Shop {
                 Self.sealUndo(&undo, in: root)
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("mac.edit_customer")) }
+            // No undo means no record was there before: a new customer.
+            else { Telemetry.feature(.customerAdded, in: self) }
             editingCustomer = nil
             await load(source)
         } catch {
@@ -1170,6 +1172,7 @@ extension Shop {
             lastBackup = Backups.lastBackupDay(in: Backups.directory(for: build))
             spendNote = words.callIt("mac.backed_up") + " " + file.lastPathComponent
             backupProblem = nil
+            Telemetry.feature(.backupRun, in: self)
         } catch {
             backupProblem = String(describing: error)
             spendProblem = words.callIt("mac.backup_failed") + " " + String(describing: error)
@@ -1404,6 +1407,7 @@ extension Shop {
             let b = dir.appending(path: "khayt-expenses-\(day).csv")
             try Data(invoices.utf8).write(to: a, options: .atomic)
             try Data(expenses.utf8).write(to: b, options: .atomic)
+            Telemetry.feature(.accountingExport, in: self)
             spendNote = words.callIt("mac.exported_to") + " " + dir.lastPathComponent
             if format == "wafeq" { spendNote? += " — " + words.callIt("mac.export_wafeq_note") }
             if format == "daftra" { spendNote? += " — " + words.callIt("mac.export_daftra_note") }
@@ -1855,6 +1859,7 @@ extension Shop {
             // refused would be worse than being told nothing.
             moveNotices = said
             registerMoveUndo(undoSnapshot, named: words.callIt("mac.move_action"))
+            Telemetry.feature(.orderMoved, in: self)
             await load(source)
             // AFTER the write, and only if it succeeded. A message about a job
             // that was not saved is worse than no message. A send that fails is

@@ -100,6 +100,7 @@ extension Shop {
     /// Hand a read receipt to the expense sheet, filled in for review.
     func fileFromReceipt(_ draft: KhaytEngine.ReceiptDraft) {
         guard permitted("invoicing", "create") else { return }
+        Telemetry.feature(.receiptScanned, in: self)
         receiptPrefill = draft
         readingReceipt = false
         addingExpense = true
