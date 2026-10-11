@@ -57,16 +57,26 @@ function checkRecurringExpenses() {
 /* ============================================================
    Expense tracker
    ============================================================ */
-let expRangeFilter = 'all';
-
-const EXP_CATEGORIES = ['filament','electricity','maintenance','tools','shipping','other'];
+// expRangeFilter, _expReceiptPath and EXP_CATEGORIES are the top-level ones
+// above. A second `let` of each used to stand here, inside this function, and
+// shadowed them: wire-events.js set the window's copy and this file read its
+// own, so the range filter never narrowed the page and an attached receipt
+// was never saved with its expense.
 
 function expCatLabel(cat) {
   return t('exp.cat.' + cat) || cat;
 }
 
-// Module-level variable for the current expense receipt path
-let _expReceiptPath = null;
+/** The receipt file the next expense is filed with, and its name beside the button. */
+function setExpenseReceipt(filePath) {
+  _expReceiptPath = filePath || null;
+  const nameEl = $('#expReceiptName');
+  if (nameEl) nameEl.textContent = filePath ? String(filePath).split(/[\\/]/).pop() : '';
+}
+
+// The receipt the form was filled from (lib/zatca-qr.js `receiptRef`), so the
+// same receipt read twice is caught instead of filed twice.
+let _expReceiptRef = null;
 
 function addExpense() {
   // The record is lib/expense-book.js's, so the Mac writes the same one. It
@@ -80,9 +90,14 @@ function addExpense() {
     orderId:     $('#expOrderRef')?.value,
     recurring:   $('#expRecurring')?.value,
     receiptPath: _expReceiptPath,
+    receiptRef:  _expReceiptRef,
     locationId:  $('#exp_locationId')?.value,
   }, { id: uid('EXP'), today: localDateStr() });
   if (made.refused) { toast(t('exp.amount_required'), 'error'); return; }
+  if (made.expense.receiptRef && expenses.some((e) => e && e.receiptRef === made.expense.receiptRef)) {
+    toast(t('exp.receipt_duplicate'), 'error');
+    return;
+  }
   expenses.unshift(made.expense);
   saveAll();
   // Budget overspend check, AFTER the expense is in, against the shop's own
@@ -97,11 +112,147 @@ function addExpense() {
   $('#expNote').value   = '';
   if ($('#expOrderRef')) $('#expOrderRef').value = '';
   if ($('#expRecurring')) $('#expRecurring').value = '';
-  _expReceiptPath = null;
-  const nameEl = $('#expReceiptName');
-  if (nameEl) nameEl.textContent = '';
+  setExpenseReceipt(null);
+  _expReceiptRef = null;
   renderExpenses();
   toast(t('exp.added'), 'success');
+}
+
+/* ── Add from receipt ─────────────────────────────────────────────────────
+ * The QR on a Saudi tax invoice names the seller, their VAT number, the
+ * moment, the total and the VAT (lib/zatca-qr.js). Reading it FILLS THE FORM;
+ * it files nothing. The receipt does not say what the money was for, so the
+ * category stays the person's to choose, and Add Expense is still theirs to
+ * press. The Mac's "Add from receipt" and the iPhone's "Scan the receipt's
+ * QR" read the same code through the same module.
+ */
+const RECEIPT_REASON_KEY = {
+  not_base64: 'exp.receipt_not_invoice',
+  bad_vat_number: 'exp.receipt_bad_vat_number',
+};
+
+function receiptReclaimsTax() {
+  const profile = (typeof KhaytTax !== 'undefined' && settings) ? KhaytTax.profileFromSettings(settings) : null;
+  return !!(profile && profile.rates && profile.rates.length);
+}
+
+/** What one code proposes, or the sentence that says why it cannot. */
+function readReceiptCode(text) {
+  const Qr = globalThis.KhaytZatcaQr;
+  const read = Qr.decodeTLV(text);
+  if (!read.ok) {
+    return { ok: false, problem: t(read.reason === 'empty' ? 'exp.receipt_none_found'
+      : (RECEIPT_REASON_KEY[read.reason] || 'exp.receipt_damaged')) };
+  }
+  const proposed = Qr.receiptToExpenseDraft(read.receipt, {
+    suppliers: typeof suppliers !== 'undefined' ? suppliers : [],
+    expenses, reclaimsTax: receiptReclaimsTax(),
+  });
+  return { ok: true, read: proposed };
+}
+
+/** Put a read receipt into the Add Expense form. */
+function fillExpenseFromReceipt(read, filePath) {
+  const d = read.draft;
+  const today = localDateStr();
+  $('#expAmount').value = d.amount.toFixed(2);
+  if ($('#expVatAmount')) $('#expVatAmount').value = d.vatAmount ? d.vatAmount.toFixed(2) : '';
+  // A receipt dated ahead of the shop's clock is filed today; the form refuses a future day.
+  if (d.date) $('#expDate').value = d.date > today ? today : d.date;
+  $('#expNote').value = t('exp.receipt_note', { seller: read.supplier ? read.supplier.name : read.sellerName, vat: read.vatNumber });
+  _expReceiptRef = d.receiptRef;
+  if (filePath) setExpenseReceipt(filePath);
+  toast(t('exp.receipt_from'), 'info', 5000);
+  $('#expCategory')?.focus();
+}
+
+function openReceiptQr() {
+  let current = null;   // { draft, path }
+  openFormModal({
+    title: t('exp.receipt_title'),
+    sizeLg: false,
+    saveLabel: t('exp.receipt_use'),
+    bodyHtml: `
+      <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 10px;">${escapeHtml(t('exp.receipt_hint'))}</p>
+      <button type="button" class="btn small" id="rqOpen">${escapeHtml(t('exp.receipt_open'))}</button>
+      <label style="margin-top:12px;" for="rqText">${escapeHtml(t('exp.receipt_paste'))}</label>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="rqText" dir="ltr" spellcheck="false" autocomplete="off" style="font-family:var(--mono, monospace);flex:1;">
+        <button type="button" class="btn small" id="rqRead">${escapeHtml(t('exp.receipt_read'))}</button>
+      </div>
+      <p id="rqProblem" role="alert" style="font-size:12.5px;color:var(--danger);margin:10px 0 0;" hidden></p>
+      <div id="rqCard" style="margin-top:12px;" hidden></div>`,
+    onMount(modal) {
+      const save = modal.querySelector('[data-act="save"]');
+      const problem = modal.querySelector('#rqProblem');
+      const card = modal.querySelector('#rqCard');
+      const show = (said) => {
+        problem.hidden = !said;
+        problem.textContent = said || '';
+      };
+      const draw = () => {
+        const r = current && current.read;
+        if (save) save.disabled = !r || !!r.duplicateOf;
+        card.hidden = !r;
+        if (!r) { card.innerHTML = ''; return; }
+        const who = r.supplier ? r.supplier.name : r.sellerName;
+        const cur = (settings && settings.currency) || 'SAR';
+        card.innerHTML = `
+          <div class="card" style="padding:10px 12px;margin:0;">
+            <div style="font-weight:600;">${escapeHtml(who)}</div>
+            <div style="font-size:12px;color:var(--text-muted);" dir="auto">${escapeHtml(t('exp.receipt_vat_number', { vat: r.vatNumber }))}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${escapeHtml(r.supplier ? t('exp.receipt_supplier') : t('exp.receipt_new_supplier'))}
+              ${r.supplier ? '' : `<button type="button" class="btn small ghost" id="rqAddSupplier" style="margin-inline-start:6px;">${escapeHtml(t('exp.receipt_add_supplier'))}</button>`}</div>
+            <div style="display:flex;gap:16px;margin-top:8px;font-variant-numeric:tabular-nums;">
+              <span>${escapeHtml(t('common.date'))}: ${escapeHtml(r.draft.date || '—')}</span>
+              <span>${escapeHtml(t('exp.amount'))}: ${escapeHtml(r.draft.amount.toFixed(2))}</span>
+              ${r.draft.vatAmount ? `<span>${escapeHtml(t('exp.vat_paid'))}: ${escapeHtml(r.draft.vatAmount.toFixed(2))}</span>` : ''}
+            </div>
+            ${cur !== 'SAR' ? `<p style="font-size:12px;color:var(--warning, var(--text-muted));margin:8px 0 0;">${escapeHtml(t('exp.receipt_sar', { currency: cur }))}</p>` : ''}
+            ${r.duplicateOf ? `<p style="font-size:12px;color:var(--danger);margin:8px 0 0;">${escapeHtml(t('exp.receipt_duplicate'))}</p>` : ''}
+          </div>`;
+        card.querySelector('#rqAddSupplier')?.addEventListener('click', () => {
+          // Stored with its number as `vat`, the field the Mac writes, so the
+          // next receipt from this seller matches by number.
+          suppliers.push({ id: uid('sup'), purchases: [], name: r.newSupplier.name, vat: r.newSupplier.vatNumber,
+            category: 'other', phone: '', leadDays: null, website: '', notes: '', priceList: [] });
+          saveAll();
+          if (typeof renderSuppliers === 'function') renderSuppliers();
+          toast(t('sup.saved'), 'success');
+          read(current.text, current.path);
+        });
+      };
+      const read = (text, path) => {
+        const got = readReceiptCode(text);
+        if (!got.ok) { current = null; show(got.problem); draw(); return; }
+        current = { text, path: path || null, read: got.read };
+        show('');
+        draw();
+      };
+      if (save) save.disabled = true;
+      modal.querySelector('#rqRead').addEventListener('click', () => read(modal.querySelector('#rqText').value, null));
+      modal.querySelector('#rqText').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); read(e.target.value, null); }
+      });
+      modal.querySelector('#rqOpen').addEventListener('click', async () => {
+        if (!window.hubAPI?.readReceiptQr) return;
+        const btn = modal.querySelector('#rqOpen');
+        btn.disabled = true;
+        try {
+          const r = await window.hubAPI.readReceiptQr();
+          if (!r) return;
+          if (!r.ok) { current = null; draw(); show(t('exp.receipt_none_found')); return; }
+          read(r.code, r.path);
+        } finally { btn.disabled = false; }
+      });
+    },
+    onSave() {
+      const r = current && current.read;
+      if (!r || r.duplicateOf) return false;
+      fillExpenseFromReceipt(r, current.path);
+      return true;
+    },
+  });
 }
 
 function showLinkedExpenses(orderId) {
@@ -770,6 +921,10 @@ function _doExportTaxSummary(periodLabel, fromDate, toDate) {
     checkRecurringExpenses,
     expCatLabel,
     addExpense,
+    setExpenseReceipt,
+    openReceiptQr,
+    readReceiptCode,
+    fillExpenseFromReceipt,
     showLinkedExpenses,
     emailOrderToClient,
     populateExpOrderDatalist,

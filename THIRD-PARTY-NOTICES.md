@@ -17,6 +17,16 @@ is provided for attribution; the full license texts ship with each package under
 The MIT License permits use, copying, modification, and redistribution provided
 the copyright notice and permission notice are preserved.
 
+## Runtime libraries (Apache License 2.0)
+
+| Component | License | Used for |
+|-----------|---------|----------|
+| [jsQR](https://github.com/cozmo/jsQR) — Copyright 2017 Cosmo Wolfe | Apache-2.0 | finding the QR code in a picture of a receipt ("Add from receipt") |
+
+jsQR ships no NOTICE file. Its licence text is installed with it at
+`node_modules/jsqr/LICENSE` and is at
+<https://www.apache.org/licenses/LICENSE-2.0>. Khayt uses it unmodified.
+
 ## Fonts (SIL Open Font License 1.1)
 
 The following typefaces are bundled via `@fontsource/*` and are licensed under the
