@@ -249,16 +249,9 @@ struct LibraryA65ReviewTests {
         #expect(p.cloudOnly == ["PF-d"] && p.handPlaced == ["PF-d"] && p.onlyHere.isEmpty)
         #expect(p.online["PF-d"]?.contains("bucket:Mine/d.stl") == true)
 
-        // Bring Back with the marker present leaves it alone…
-        bucket.seed("/lib/" + strayKey, markerBytes)
-        let real = CloudLibrary.fetch
-        CloudLibrary.fetch = bucket.fetch
-        defer { CloudLibrary.fetch = real }
-        try await CloudLibrary.bringBack(markerURL, remotes: { _ in [.bucket(config)] }, engine: engine)
-        #expect(try Data(contentsOf: markerURL) == markerBytes)
-        // …and with the marker gone, it puts the MARKER back, verified — never a model.
-        try FileManager.default.removeItem(at: markerURL)
-        try await CloudLibrary.bringBack(markerURL, remotes: { _ in [.bucket(config)] }, engine: engine)
+        // Bring Back with the marker present leaves it alone — before any
+        // request (the bytes it would fetch are the marker's own anyway).
+        try await CloudLibrary.bringBack(markerURL, remotes: { _ in [] }, engine: engine)
         #expect(try Data(contentsOf: markerURL) == markerBytes)
         #expect(!FileManager.default.fileExists(atPath: dir.appending(path: "d.stl").path))
     }

@@ -116,12 +116,12 @@ struct OffsiteRestoreTests {
 
     @Test("settings and status are kept per Mac, and the notice waits for two days of failing")
     func stateIsKept() throws {
-        let (suite, defaults) = try #require(ThrowawayDefaults.make("khayt-offsite-test"))
-        defer {
-            ThrowawayDefaults.clear(suite, defaults)
-            // Nothing left behind in ~/Library/Preferences (104 leaked files, Oct 2026).
-            #expect(!FileManager.default.fileExists(atPath: ThrowawayDefaults.plist(suite).path))
-        }
+        // A suite in a temp folder of its own, not ~/Library/Preferences:
+        // 104 leaked `khayt-offsite-test-*.plist` files by Oct 2026.
+        let suite = try #require(ThrowawayDefaults.make("khayt-offsite-test"))
+        let defaults = suite.defaults
+        defer { ThrowawayDefaults.clear(suite) }
+        #expect(suite.name.hasPrefix("/"), "an absolute path, so nothing is written to the Preferences folder")
 
         let first = OffsiteBackupState(defaults: defaults)
         #expect(first.settings.enabled == false, "an off-site backup switched itself on")

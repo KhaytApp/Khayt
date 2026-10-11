@@ -202,6 +202,14 @@ extension Shop {
         return (config?.remote, bucket, tag, config?.prefix ?? "", config?.provider ?? "")
     }
 
+    /// ── THE QUESTION OPENS ONLY ONCE THIS IS DONE ────────────────────────
+    ///
+    /// A macOS confirmation dialog is drawn once, when it opens, and never
+    /// redrawn: opened before the plan, it said "Checking…" over a lone Cancel
+    /// for good and no model could be deleted at all (alpha.65 review,
+    /// measured in the snapshot run). `WindowSheets` presents it only when
+    /// `deletePlan` is set; this runs from a `.task` on the window.
+    ///
     /// Work out what deleting these would do, for the question. Kept until
     /// the question closes; `nil` while the remote is being asked.
     func planDeletes(_ chosen: [LibraryFile]) async {
@@ -289,14 +297,15 @@ extension Shop {
         return lines
     }
 
-    /// A counted sentence: `key_one` for one, Arabic's dual `key_two` for two,
+    /// A counted sentence: `key_n1` for one, Arabic's dual `key_n2` for two,
     /// else `key` — each placing its own `{n}` (or saying the number in words).
     /// Not `Words.counting`, which puts a numeral in FRONT of a `_one` that has
-    /// no `{n}` of its own: "1 One has an online copy".
+    /// no `{n}` of its own: "1 One has an online copy" — hence its own
+    /// suffixes, which `counting` (and `CountedOneTests`) leave alone.
     static func say(_ words: Words, _ key: String, _ n: Int, _ more: [String: JSONValue] = [:]) -> String {
         var pick = key
-        if n == 1, words.callIt(key + "_one") != key + "_one" { pick = key + "_one" }
-        if n == 2, words.language == "ar", words.callIt(key + "_two") != key + "_two" { pick = key + "_two" }
+        if n == 1, words.callIt(key + "_n1") != key + "_n1" { pick = key + "_n1" }
+        if n == 2, words.language == "ar", words.callIt(key + "_n2") != key + "_n2" { pick = key + "_n2" }
         var params = more
         params["n"] = .number(Double(n))
         return words.callIt(pick, params)

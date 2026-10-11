@@ -736,12 +736,7 @@ struct WindowSheets: ViewModifier {
             // app asks in, and the destructive button says what it does.
             .confirmationDialog(
                 shop.words.callIt("plib.delete_title"),
-                // ONLY ONCE THE PLAN IS IN. A macOS confirmation dialog is
-                // drawn once, when it opens, and never redrawn: opened before
-                // the plan it said "Checking…" over a lone Cancel for good, and
-                // no model could be deleted at all (alpha.65 review, measured
-                // in the snapshot run). `planDeletes` runs from the `.task`
-                // below, which is on the window, not in the dialog.
+                // Once the plan is in: a macOS dialog is never redrawn (see `planDeletes`).
                 isPresented: Binding(get: { shop.pendingLibraryDelete != nil && shop.deletePlan != nil },
                                      set: { if !$0 { shop.pendingLibraryDelete = nil; shop.deletePlan = nil } }),
                 titleVisibility: .visible
