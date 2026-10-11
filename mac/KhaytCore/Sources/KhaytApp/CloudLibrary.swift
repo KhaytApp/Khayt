@@ -364,6 +364,13 @@ enum CloudLibrary {
     @discardableResult
     static func ensureInBucket(_ c: LibraryRemote, key: String, file: URL,
                                engine: KhaytEngine) async throws -> (sha256: String, size: Int) {
+        try await ensureInBucket(c, key: key, file: file, engine: engine, fetch: fetch)
+    }
+
+    /// The same, through a given transport — so a caller (and its test) need
+    /// not swap the shared one.
+    static func ensureInBucket(_ c: LibraryRemote, key: String, file: URL,
+                               engine: KhaytEngine, fetch: @escaping S3.Fetch) async throws -> (sha256: String, size: Int) {
         let local = try await Task.detached { try Self.digests(of: file) }.value
         if let there = try await c.head(key, fetch: fetch), there.size == local.size,
            try await engine.etagVerdict(etag: there.etag, md5: local.md5) == "match" {

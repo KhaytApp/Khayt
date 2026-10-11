@@ -331,6 +331,9 @@ final class Shop {
     var pendingLibraryDelete: LibraryFile?
     /// Several models chosen for deletion at once; asked about in one go.
     var pendingLibraryDeletes: [LibraryFile] = []
+    /// What deleting the models in the open question would do — what stays
+    /// online, what goes for good (`LibraryDelete`). Nil while it is worked out.
+    var deletePlan: LibraryDeletePlan?
     var customerSelection: Customer.ID?
     /// Which screen, and for the library which folder.
     ///

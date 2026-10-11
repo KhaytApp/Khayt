@@ -4,6 +4,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: deleting a model removes it from this Mac by default, and "Delete
+  Completely" removes it everywhere.**
+  - **Remove from This Mac** is the default. A model with an online copy
+    keeps its place in the library as an online model that you can download
+    again. The online copy is checked again before the file here goes, and
+    the file goes to the Trash. A model in a folder of your own (linked, or
+    picked up from the library folder) loses only its library entry, never
+    your file.
+  - **Models with no online copy need their own confirmation.** The question
+    says how many of the chosen models are only on this Mac, and deleting
+    those takes a separate button that names the count.
+  - **Delete Completely from Library** also deletes the online copies: the
+    backup, the copy a model was moved to, and a file you put in the bucket
+    yourself. The question says so. If an online copy cannot be deleted, that
+    model is kept in the library and online, and the message names it.
+
 - **Mac: Rescan Storage also covers past library folders, the bucket and old
   models' photos.**
   - **A deleted model stays deleted.** Every file the library takes in is
