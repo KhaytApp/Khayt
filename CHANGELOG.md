@@ -229,6 +229,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   becomes the model's picture, a 3MF keeps its slicer preview as well, and a
   picture that cannot be read never stops the import.
 
+- **Docs:** weekly competitive review, 2026-10-11.
+
 - **iOS: a calculator, and expenses read off a receipt's QR.** The iPhone's
   quote sheet sent seven numbers to the Mac and showed the answer, so it
   needed the Mac nearby, used Khayt's starting rates, and was hidden in
