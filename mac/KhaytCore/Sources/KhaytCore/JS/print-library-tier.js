@@ -233,6 +233,43 @@ function usageFromBook(book) {
   return out;
 }
 
+/**
+ * Only the files a sweep may touch: those in a library RECORD'S OWN folder,
+ * and never a file some record points at in place.
+ *
+ * The library's primary folder is not Khayt's alone. Since the Mac adopts
+ * models IN PLACE (#1824, #1828), `<primary>/Dragon/dragon.stl` is the shop's
+ * own file, recorded by `externalPath`, in a folder no record id names. A sweep
+ * that walked every folder under the primary uploaded such a file and then
+ * DELETED it from the shop's folder (found by the Mac's review; fixed there in
+ * #1832 as `CloudLibrary.ownFoldersOnly`). So: a folder counts only when it is
+ * `itemDirName(record.id)` of a record in the book, and a path any record
+ * holds as its `externalPath` is left alone even inside one.
+ *
+ * FAILS CLOSED. With no book there is no way to tell the shop's folders from
+ * Khayt's, so nothing is returned and nothing is swept.
+ *
+ * `opts.itemDirName` is the folder rule (lib/print-library-location.js);
+ * `opts.samePath` normalises a path for comparison (case-folding on a
+ * case-insensitive disk is the caller's to decide).
+ */
+function ownFilesOnly(files, book, opts) {
+  const o = opts || {};
+  const b = book && typeof book === 'object' ? book : null;
+  if (!b || !Array.isArray(b.printFiles)) return [];
+  const dirOf = typeof o.itemDirName === 'function' ? o.itemDirName : (id) => str(id);
+  const norm = typeof o.samePath === 'function' ? o.samePath : (p) => str(p);
+  const own = new Set();
+  const external = new Set();
+  for (const r of b.printFiles) {
+    if (!r || typeof r !== 'object') continue;
+    if (str(r.id)) own.add(dirOf(r.id));
+    if (str(r.externalPath)) external.add(norm(r.externalPath));
+  }
+  return (Array.isArray(files) ? files : []).filter((f) =>
+    f && own.has(str(f.id)) && !(str(f.fullPath) && external.has(norm(f.fullPath))));
+}
+
 /** The listing with what the book knows folded in, for `plan`. A new array. */
 function annotate(files, usage) {
   const u = usage || {};
@@ -376,6 +413,7 @@ const api = {
   isSidecar,
   ONLINE_MARKER_EXT,
   isOnlineMarker,
+  ownFilesOnly,
   sidecarName,
   baseName,
   normalisePolicy,

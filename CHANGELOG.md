@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Moving unused models to the bucket only touches Khayt's own model
+  folders.** Since the Mac began adding model files in place (a folder of
+  your own inside the library folder, such as `Dragon/dragon.stl`), the
+  desktop's "move unused models to the bucket" could have uploaded one of
+  your files and then deleted it from your folder. The sweep looked at every
+  folder in the library folder. It now looks only in the folder of each model
+  in your library, never at a file a model points to where it already was,
+  and does nothing if it cannot read the book. The Mac has the same rule
+  (`lib/print-library-tier.js` `ownFilesOnly`).
+
 - **Moving old models to the bucket never touches a model the Mac adopted
   from the bucket.** The Mac marks a model that is in the bucket but not yet
   downloaded with a small `.online` file in its library folder. The desktop's
