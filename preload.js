@@ -137,6 +137,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   printLibTierRun:    ()                  => ipcRenderer.invoke('hub:printlib-tier-run'),
   printLibTierRestoreAll: ()              => ipcRenderer.invoke('hub:printlib-tier-restore-all'),
   onPrintLibTierProgress: (() => { let _cb=null; ipcRenderer.on('hub:printlib-tier-progress', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
+  onPrintLibBroughtDown: (() => { let _cb=null; ipcRenderer.on('hub:printlib-brought-down', (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
   storageProviders:   ()                  => ipcRenderer.invoke('hub:storage-providers'),
   storageResolveEndpoint: (provider, vars) => ipcRenderer.invoke('hub:storage-resolve-endpoint', { provider, vars }),
   // Google Drive. connect() opens the consent screen in the real browser and

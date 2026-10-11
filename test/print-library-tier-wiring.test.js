@@ -117,8 +117,9 @@ test('deleting a model also removes its sidecar', () => {
   // Otherwise the library keeps listing a file the shop deleted, and offers to
   // download it.
   const at = mainJs.indexOf("ipcMain.handle('hub:printlib-delete'");
-  const body = mainJs.slice(at, at + 1400);
-  assert.match(body, /\[safe \+ PLT\.SIDECAR_EXT, safe\]/, 'a tiered file cannot be deleted at all');
+  const body = mainJs.slice(at, at + 1800);
+  // The Mac's `.online` marker joined the list (it is trashed with its model too).
+  assert.match(body, /\[safe \+ PLT\.SIDECAR_EXT, (?:safe \+ PLT\.ONLINE_MARKER_EXT, )?safe\]/, 'a tiered file cannot be deleted at all');
 });
 
 test('a sweep refuses to run without a bucket, or while switched off', () => {
