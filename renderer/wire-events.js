@@ -1043,16 +1043,12 @@ function wireEvents() {
         filters: [{ name: 'Images/PDF', extensions: ['jpg','jpeg','png','pdf'] }]
       });
       if (filePath) {
-        _expReceiptPath = filePath;
-        const nameEl = $('#expReceiptName');
-        if (nameEl) {
-          const parts = filePath.split('/');
-          nameEl.textContent = parts[parts.length - 1];
-        }
+        setExpenseReceipt(filePath);
         toast(t('exp.receipt_attached'), 'success', 2000);
       }
     });
   }
+  $('#btnExpFromReceipt')?.addEventListener('click', () => openReceiptQr());
   // Inject locationId select into expense form
   (() => {
     const addBtn = $('#btnAddExpense');

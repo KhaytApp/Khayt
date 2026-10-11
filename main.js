@@ -1056,6 +1056,56 @@ ipcMain.handle('hub:pick-file', async (event, opts = {}) => {
   return result.filePaths[0];
 });
 
+// --- Add from receipt: the QR code on a photo, screenshot or PDF of a Saudi
+//     tax invoice. Finding the code is lib/receipt-qr-image.js; what it says is
+//     lib/zatca-qr.js, in the renderer, where the person checks it. Returns
+//     { ok, path, code } or { ok:false, path, reason } — 'none_found' or
+//     'unreadable'. The path comes back either way: the picture is the
+//     receipt, and the form attaches it. ---
+ipcMain.handle('hub:read-receipt-qr', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  // A PDF is drawn through the system's thumbnailer, which Linux does not have.
+  const pdf = process.platform === 'darwin' || process.platform === 'win32';
+  const result = await dialog.showOpenDialog(win, {
+    filters: [{ name: 'Receipt', extensions: ['jpg', 'jpeg', 'png'].concat(pdf ? ['pdf'] : []) }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  const filePath = result.filePaths[0];
+  try {
+    const Find = require('./lib/receipt-qr-image.js');
+    const jsQR = require('jsqr');
+    const { nativeImage } = require('electron');
+    let img;
+    if (/\.pdf$/i.test(filePath)) {
+      if (!pdf) return { ok: false, path: filePath, reason: 'unreadable' };
+      // The first page, large enough for a receipt's code to have modules
+      // several pixels wide.
+      img = await nativeImage.createThumbnailFromPath(filePath, { width: 2400, height: 2400 });
+    } else {
+      const st = await fs.promises.stat(filePath);
+      if (!st.isFile() || st.size > 64 * 1024 * 1024) return { ok: false, path: filePath, reason: 'unreadable' };
+      img = nativeImage.createFromBuffer(await fs.promises.readFile(filePath));
+    }
+    if (!img || img.isEmpty()) return { ok: false, path: filePath, reason: 'unreadable' };
+    const size = img.getSize();
+    const edges = Find.edgesToTry(size.width, size.height);
+    if (!edges.length) return { ok: false, path: filePath, reason: 'unreadable' };
+    for (const edge of edges) {
+      const scaled = edge
+        ? img.resize(size.width >= size.height ? { width: edge, quality: 'best' } : { height: edge, quality: 'best' })
+        : img;
+      const s = scaled.getSize();
+      const code = Find.findCode(Find.bgraToRgba(scaled.toBitmap()), s.width, s.height, jsQR);
+      if (code) return { ok: true, path: filePath, code };
+    }
+    return { ok: false, path: filePath, reason: 'none_found' };
+  } catch (e) {
+    console.error('hub:read-receipt-qr:', e);
+    return { ok: false, path: filePath, reason: 'unreadable' };
+  }
+});
+
 // --- Slice a model with the user's INSTALLED slicer and return its own time +
 //     filament estimate (accurate quoting). We never bundle a slicer engine
 //     (keeps the license clean); we shell out to one the user installed and parse

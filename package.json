@@ -107,6 +107,7 @@
   "dependencies": {
     "@sentry/electron": "^7.16.0",
     "electron-updater": "^6.8.9",
+    "jsqr": "^1.4.0",
     "localtunnel": "^2.0.2",
     "qrcode": "^1.5.3"
   },

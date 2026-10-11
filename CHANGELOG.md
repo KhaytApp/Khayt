@@ -24,6 +24,24 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   becomes the model's picture, a 3MF keeps its slicer preview as well, and a
   picture that cannot be read never stops the import.
 
+- **Add an expense from a receipt's QR code.** Expenses › Add from receipt
+  opens a photo, screenshot or PDF of a Saudi tax invoice (PDF on macOS and
+  Windows) and reads the QR code on it, or reads the code's text pasted in.
+  It shows the seller, their VAT number, the date, the total and the VAT, and
+  fills the Add Expense form with them. The receipt does not say what the money
+  was for, so you still choose the category and press Add. The picture is
+  attached as the receipt, and a seller who is not yet a supplier can be added
+  with their VAT number. A receipt that is already in your expenses is not
+  offered again. This is the same reading the Mac and iPhone do
+  (`lib/zatca-qr.js`). The code is found with jsQR (Apache-2.0).
+- **An attached receipt is saved with its expense again, and the Expenses
+  date filter works.** Since the expense page moved into its own file in May,
+  it kept a second, private copy of the selected range and of the attached
+  receipt. The controls set one copy and the page read the other. So choosing
+  a range did not narrow the list, the totals or the chart, and a receipt
+  attached with 📎 was dropped when the expense was added. Receipts attached
+  before this fix were not kept, and the app cannot recover them.
+
 - **iOS: a calculator, and expenses read off a receipt's QR.** The iPhone's
   quote sheet sent seven numbers to the Mac and showed the answer, so it
   needed the Mac nearby, used Khayt's starting rates, and was hidden in
