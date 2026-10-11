@@ -74,6 +74,9 @@ enum LibraryImport {
         /// `keepOriginal`, and false when the removal did not work — a file on
         /// a read-only volume is still imported, it just also stays put.
         let movedIn: Bool
+        /// True when a photo found beside the file became its `userPhoto` —
+        /// see `ModelPhoto`.
+        var photo: Bool = false
         /// True when the model was measured. A gcode has no mesh and is not a
         /// failure — it simply has no geometry to key on.
         var measured: Bool { triangleCount != nil }
@@ -207,6 +210,7 @@ enum LibraryImport {
                     group: String? = nil,
                     documents: [URL] = [],
                     title: String? = nil,
+                    photos: [URL] = [],
                     analyseRisk: Bool = false,
                     owns: @escaping () -> Bool,
                     whoHasIt: @escaping () -> String?) async throws -> Added {
@@ -376,7 +380,7 @@ enum LibraryImport {
         // otherwise. The file's own name is kept either way, as originalName.
         let name = title.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
             ?? originalName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
-        let record = self.record(id: id, name: name, originalName: originalName,
+        var record = self.record(id: id, name: name, originalName: originalName,
                                  filename: filename, ext: ext, size: size,
                                  hash: hash, key: key,
                                  reader: try? await engine.geometryReader(), colours: colours,
@@ -384,6 +388,13 @@ enum LibraryImport {
                                  provenance: said, riskAnalysis: riskAnalysis,
                                  parsed: await SlicerFigures.read(destination, engine: engine) ?? [:],
                                  externalPath: inPlace ? source.standardizedFileURL.path : nil)
+        // THE PHOTO THAT CAME WITH IT, when there was one — see `ModelPhoto`.
+        // The record is new, so there is no photo of the shop's to keep; and a
+        // picture that will not decode is passed over, never a failed import.
+        // Read before the original goes to the Trash below, though only the
+        // model is ever taken: the picture stays where it was.
+        let photo = firstPhoto(photos)
+        if let photo { record["userPhoto"] = .string(photo) }
         do {
             // lock: callers — convertModel, addModelToLibrary, addModelsToLibrary
             try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
@@ -425,7 +436,16 @@ enum LibraryImport {
         }
 
         return Added(id: id, name: name, triangleCount: geometry?.triangleCount,
-                     colours: colours.count, contentHash: hash, movedIn: movedIn)
+                     colours: colours.count, contentHash: hash, movedIn: movedIn,
+                     photo: photo != nil)
+    }
+
+    /// The first of these pictures that decodes, as a `userPhoto` data URI.
+    static func firstPhoto(_ candidates: [URL]) -> String? {
+        for url in candidates {
+            if let uri = try? LibraryPhoto.dataURI(of: url) { return uri }
+        }
+        return nil
     }
 
     // MARK: - Many at once
@@ -436,6 +456,8 @@ enum LibraryImport {
         /// The ids of the models that came in, for backing them up.
         var addedIds: [String] = []
         var duplicates = 0
+        /// How many of the models that came in brought a photo with them.
+        var photos = 0
         var failures: [String] = []
         /// The sources that went to the Trash once their copy was checked —
         /// so the window can say so, rather than leave a shop to find out.
@@ -488,6 +510,9 @@ enum LibraryImport {
         /// than its file does — see `ImportGrouping.placements`. Nil: the
         /// file's name, as always.
         var title: String? = nil
+        /// Pictures found beside it, best first — see `ModelPhoto`. The first
+        /// that decodes becomes the new record's `userPhoto`.
+        var photos: [URL] = []
 
         /// Files with no grouping — what `--import` of a bare list means, and
         /// what most tests want. Spelled out at the call site so a caller that
@@ -520,10 +545,12 @@ enum LibraryImport {
                                           engine: engine, keepOriginal: keepOriginal, inPlace: inPlace,
                                           group: file.group, documents: file.documents,
                                           title: file.title,
+                                          photos: file.photos,
                                           analyseRisk: analyseRisk,
                                           owns: owns, whoHasIt: whoHasIt)
                 report.moved += 1
                 report.addedIds.append(added.id)
+                if added.photo { report.photos += 1 }
                 if added.movedIn { report.trashed.append(file.url) }
                 if let hash = added.contentHash { known.insert(hash) }
             } catch Failure.alreadyHere {

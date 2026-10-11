@@ -925,6 +925,7 @@ final class Shop {
             readProvenanceIfDue()
             readSlicerFiguresIfDue()
             rescanLinkedIfDue()
+            rescanStorageIfDue()
             // Beside the standing orders, which is the same kind of thing: a
             // write the shop asked to have made for it. After the book has
             // loaded, because it reads what is already on order to decide.
@@ -1190,6 +1191,10 @@ final class Shop {
 
     /// The books whose linked folders this launch has already rescanned.
     var linkedScannedBooks: Set<String> = []
+    /// That pass in flight, so the storage pass can wait its turn.
+    var linkedScan: Task<Void, Never>?
+    /// The books whose own library folder this launch has already looked through.
+    var storageScannedBooks: Set<String> = []
 
     /// The books whose slicer figures this launch has already read.
     var slicerFiguresReadBooks: Set<String> = []

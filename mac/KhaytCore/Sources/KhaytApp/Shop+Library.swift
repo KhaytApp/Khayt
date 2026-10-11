@@ -144,7 +144,7 @@ extension Shop {
         guard case .store(let build) = source, !linkedScannedBooks.contains(build.rawValue),
               !linkedFolders.isEmpty else { return }
         linkedScannedBooks.insert(build.rawValue)
-        Task { [weak self] in await self?.rescanLinkedFolders(byPerson: false) }
+        linkedScan = Task { [weak self] in await self?.rescanLinkedFolders(byPerson: false) }
     }
 
     /// Read the slicer's own time, weight and material off every sliced file
@@ -912,10 +912,20 @@ extension Shop {
                 // the WHOLE folder at once: a folder of several models is a
                 // project, a folder of one names its model — see
                 // `ImportGrouping.placements`.
-                found += ImportGrouping.incoming(here, chosen: url)
+                // And the photo that came with each — see `ModelPhoto`.
+                let photos = ModelPhoto.candidates(for: here, everyModel: here, boundary: url)
+                found += ImportGrouping.incoming(here, chosen: url).map {
+                    var file = $0
+                    file.photos = photos[$0.url] ?? []
+                    return file
+                }
             } else if LibraryImport.kinds.contains(url.pathExtension.lowercased()) {
                 // Picked on its own: no group. The shop chose one file, not a set.
-                found.append(LibraryImport.Incoming(url: url, group: nil))
+                // Its photo only by its own name: the folder it sits in is not
+                // a project the shop chose.
+                var file = LibraryImport.Incoming(url: url, group: nil)
+                file.photos = ModelPhoto.candidates(for: [url], everyModel: [url], boundary: nil)[url] ?? []
+                found.append(file)
             }
         }
         // Sorted so a run is repeatable and a person watching can follow it.

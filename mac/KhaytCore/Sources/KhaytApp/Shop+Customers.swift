@@ -808,11 +808,26 @@ extension Shop {
             if thisGone { try? Self.trash(dir) } else { allGone = false }
         }
         let ids = Set(files.map(\.id))
+        let roots = libraryRoots?.roots ?? []
         do {
             try StoreWriter.update(build) { root in
                 var rows = Self.rows(root, "printFiles")
                 rows.removeAll { Self.recordId($0).map(ids.contains) ?? false }
                 root["printFiles"] = .array(rows)
+                // A model ADOPTED from the library's own folder keeps its file
+                // where the shop put it — so remember not to adopt it again,
+                // or the delete is undone on the next launch (`LibraryStorage`).
+                var settings = Self.settings(root)
+                var library: [String: JSONValue] = [:]
+                if case .object(let l)? = settings["printLibrary"] { library = l }
+                var already: [JSONValue] = []
+                if case .array(let a)? = library["notAdopted"] { already = a }
+                let next = Self.notAdoptedAfterDeleting(files, roots: roots, already: already)
+                if next.count != already.count || next != already {
+                    library["notAdopted"] = .array(next)
+                    settings["printLibrary"] = .object(library)
+                    root["settings"] = .object(settings)
+                }
             }
             // Out of the selection too, or the inspector keeps describing a
             // model that is gone.
