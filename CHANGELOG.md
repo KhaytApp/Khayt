@@ -35,6 +35,41 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     shows exactly what will be sent.
   - With usage counts off, nothing is counted and nothing is kept.
 
+- **Mac: fixes from the alpha.65 review of the library storage and delete
+  choices.**
+  - **The delete question works.** It opened before it knew which models had
+    an online copy and was never redrawn, so it showed "Checking…" and only a
+    Cancel button, and no model could be deleted. It now opens once the check
+    is done, with a short limit on how long the check waits for online
+    storage. While it checks, the library says so.
+  - **Free Up Space never takes your own files.** Folders you keep inside the
+    library folder are left alone by Free Up Space and by Back Up Whole
+    Library. Before this fix, an old file in such a folder could be uploaded
+    and removed from your folder.
+  - **Rescan Storage leaves Khayt's own copies alone, at any depth.** It
+    skips a model's folder copied inside one of yours, the mirror, and linked
+    folders that sit inside the library folder. Before this fix, saved
+    versions in those places could come back as new models.
+  - **Delete Completely is more careful.**
+    - It deletes a file you put in the bucket only from the bucket that file
+      came from.
+    - It keeps an online file that another model in the library still uses.
+    - It refuses a bucket key with an empty segment (`a//b.stl`), which would
+      have reached a different file. Rescan Storage no longer takes such keys
+      in at all.
+  - **Clearer wording, in English and Arabic.**
+    - The question no longer says "1 have an online copy".
+    - It no longer starts "…and its files? This cannot be undone" when the
+      default choice keeps the model online or keeps your file.
+    - A model that is only online is explained, and the question no longer
+      offers a button that would do nothing to it.
+  - **The model panel no longer ticks "On this Mac"** for a model that is
+    only online.
+  - **Photos found during a rescan are read in the background**, so the
+    window no longer freezes while a large library gets its photos.
+  - **Two Macs rescanning at the same time** no longer lose each other's
+    record of what has already been taken in.
+
 - **Mac: deleting a model removes it from this Mac by default, and "Delete
   Completely" removes it everywhere.**
   - **Remove from This Mac** is the default. A model with an online copy

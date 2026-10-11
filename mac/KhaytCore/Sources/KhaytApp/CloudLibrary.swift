@@ -523,6 +523,27 @@ enum CloudLibrary {
         return out
     }
 
+    /// Only the files in a RECORD's folder — never a folder the shop keeps
+    /// in the library's own folder.
+    ///
+    /// ── THE PRIMARY FOLDER HOLDS THE SHOP'S OWN FOLDERS NOW ──────────────
+    ///
+    /// `libraryFiles` lists `<root>/<any folder>/<file>`, which was the same
+    /// thing as "the record folders" until the storage pass (#1824) started
+    /// adopting models IN PLACE from that same root. Then `<root>/Dragon/
+    /// dragon.stl` — the shop's own file, a record's `externalPath` — was
+    /// listed too, nothing in the book named a folder called `Dragon`, so it
+    /// had no recorded use, and once old enough Free Up Space uploaded it and
+    /// REMOVED it from the shop's folder (Oct 2026 review). Backing up the
+    /// whole library uploaded it under a key no record owns. What uploads,
+    /// tiers or frees is therefore limited to the folders a record or a job
+    /// names (`dirNames`).
+    nonisolated static func ownFoldersOnly(_ listed: [KhaytEngine.TierFile], printFiles: [JSONValue],
+                                           orders: [JSONValue]) -> [KhaytEngine.TierFile] {
+        let mine = Set(dirNames(printFiles: printFiles, orders: orders).values)
+        return listed.filter { mine.contains($0.id ?? "") }
+    }
+
     /// "a, b, c and 4 more" — the first few names in a confirmation.
     nonisolated static func firstNames(_ names: [String], shown: Int = 5, more: (Int) -> String) -> String {
         let head = names.prefix(shown).joined(separator: ", ")
@@ -589,7 +610,12 @@ extension Shop {
         guard modelFile(for: file) == nil, let dir = directory(for: file) else { return false }
         let contents = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
         // A `.cloud` sidecar (moved off this Mac) or an `.online` marker (put
-        // in the bucket by the shop, never here — `LibraryStorage`).
+        // in the bucket by the shop, never here — `LibraryStorage`). A stray
+        // `<model>.online.cloud` — the desktop's tier sweep moving a MARKER
+        // off when its size floor is 0 — is the marker's sidecar: never a
+        // model (`soleModel`), never tiered again (the shared rule skips
+        // sidecars), and Bring Back puts the marker back from it, verified.
+        // `LibraryA65ReviewTests.strayOnlineCloud` holds all of that.
         return contents.contains { $0.hasSuffix(".cloud") || $0.hasSuffix(Shop.onlineExt) }
     }
 
@@ -643,7 +669,9 @@ extension Shop {
         }
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false; cloudProgress = nil }
-        let all = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
+        let all = CloudLibrary.ownFoldersOnly(
+            await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value,
+            printFiles: fileRows, orders: orderRows)
             .filter { !$0.filename.hasSuffix(".cloud") }
         var done = 0, failed = 0
         for file in all {
@@ -665,7 +693,9 @@ extension Shop {
     /// still needs.
     private func tierPlan(engine: KhaytEngine, config: CloudLibrary.Config,
                           roots: LibraryLocation.Roots) async -> KhaytEngine.TierPlan? {
-        let listed = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
+        let listed = CloudLibrary.ownFoldersOnly(
+            await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value,
+            printFiles: fileRows, orders: orderRows)
         guard let all = try? await CloudLibrary.annotated(listed, engine: engine,
                                                           printFiles: fileRows, orders: orderRows) else { return nil }
         return try? await engine.tierPlan(all, policy: config.tier, now: Date())

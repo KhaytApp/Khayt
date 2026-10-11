@@ -29,8 +29,8 @@ import KhaytCore
 enum LibraryPhoto {
 
     /// `resizeImage(file, 480, 0.82)` in `renderer/printfiles.js`. Not choices.
-    static let maxDim = 480
-    static let quality = 0.82
+    nonisolated static let maxDim = 480
+    nonisolated static let quality = 0.82
 
     /// Read a picked file and return what goes in the record, or throw.
     ///
@@ -38,7 +38,13 @@ enum LibraryPhoto {
     /// on the source, the same refusal to enlarge a small picture, the same
     /// flattening onto white because JPEG carries no alpha and a transparent
     /// PNG encoded straight to JPEG comes out on black.
-    static func dataURI(of url: URL) throws -> String {
+    ///
+    /// NONISOLATED, and called off the main actor by everything that decodes
+    /// more than the one picture a person chose (Oct 2026 review): the storage
+    /// pass's photo backfill decoded up to 2000 pictures on load, each an
+    /// 8 MB-capped CGImageSource decode, on the main actor — the window froze
+    /// while a library of downloads got its photos. Nothing here touches UI.
+    nonisolated static func dataURI(of url: URL) throws -> String {
         let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int
         if let size, size > ProductPhotos.maxSourceBytes { throw ProductPhotos.Failure.tooBig(size) }
         // `CGImageSource` rather than `NSImage`, for the reason `ProductPhotos`
