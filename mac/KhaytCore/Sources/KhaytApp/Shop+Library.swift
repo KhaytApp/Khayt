@@ -1028,6 +1028,8 @@ extension Shop {
         // Into the bucket too, when the shop backs its library up there. In
         // the background: an import is not made to wait on the network.
         if !report.addedIds.isEmpty {
+            // One import, however many models it brought in.
+            Telemetry.feature(.libraryImport, in: self)
             let ids = report.addedIds
             Task { [weak self] in await self?.backUpToCloud(ids: ids) }
         }

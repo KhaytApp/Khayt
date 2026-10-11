@@ -97,6 +97,7 @@ struct InvoiceSheet: View {
         Task {
             do {
                 try await paper.pdf().write(to: url, options: .atomic)
+                Telemetry.feature(.invoiceExported, in: shop)
                 saved = shop.words.callIt("mac.saved_to") + " " + url.lastPathComponent
             } catch {
                 saved = error.localizedDescription

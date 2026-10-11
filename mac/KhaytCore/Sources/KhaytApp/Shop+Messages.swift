@@ -54,6 +54,7 @@ extension Shop {
             // the shop's to send on that person's behalf.
             let text = try await AiClient.draftReply(
                 order: row, clientName: job.client, intent: intent, note: note, shop: self)
+            Telemetry.feature(.aiReplyDrafted, in: self)
             return .drafted(text)
         } catch AiClient.Failure.notConsented {
             return .refused(words.callIt("mac.ai_reply_not_consented"))
@@ -113,6 +114,7 @@ extension Shop {
         }
         do {
             asked[at].answer = try await AiClient.ask(said, history: history, shop: self)
+            Telemetry.feature(.askTheBookUsed, in: self)
         } catch AiClient.Failure.notConsented {
             asked[at].problem = words.callIt("mac.ai_assistant_not_consented")
         } catch AiClient.Failure.noKey {
@@ -208,6 +210,7 @@ extension Shop {
             if case .array(let list)? = o["assumptions"] {
                 notes = list.compactMap(Self.plainString)
             }
+            Telemetry.feature(.aiExtractUsed, in: self)
             return .filled(DraftedPart(
                 qty: max(1, min(9999, Int(saturating: Self.plainNumber(part["qty"]) ?? 1))),
                 grams: Self.plainNumber(part["printWeight"]) ?? 0,
@@ -534,6 +537,7 @@ extension Shop {
                 ProductDocs.delete(name, in: build)
             }
             editingProduct = nil
+            Telemetry.feature(.productSaved, in: self)
             await load(source)
             // A price the shop just saved in the product sheet: a live web
             // store may follow it (see `CatalogPublisher.heldPrices`).

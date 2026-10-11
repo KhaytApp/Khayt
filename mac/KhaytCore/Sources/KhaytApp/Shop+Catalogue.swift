@@ -663,6 +663,7 @@ extension Shop {
             guard out.ok, let margin = out.suggestedMargin else {
                 return .refused(out.problem ?? words.callIt("mac.ai_no_draft"))
             }
+            Telemetry.feature(.aiMarginSuggested, in: self)
             return .advised(PriceAdvice(margin: margin,
                                         rationale: out.rationale ?? ""))
         } catch AiClient.Failure.notConsented {

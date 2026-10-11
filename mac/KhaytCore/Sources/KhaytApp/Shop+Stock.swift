@@ -641,6 +641,8 @@ extension Shop {
                 Self.sealUndo(&undo, in: root)
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("sup.edit")) }
+            // No undo means no record was there before: a new supplier.
+            else { Telemetry.feature(.supplierAdded, in: self) }
             editingSupplier = nil
             await load(source)
             moveNotices = [words.callIt("sup.saved")]
@@ -1073,6 +1075,7 @@ extension Shop {
                     overspend = (category, over)
                 }
             }
+            Telemetry.feature(.expenseAdded, in: self)
             await load(source)
             if let overspend {
                 spendNote = words.callIt("exp.budget_exceeded", [
@@ -1370,6 +1373,7 @@ extension Shop {
             addingSpool = false
             await load(source)
             spendNote = words.callIt(id == nil ? "inv.added" : "inv.updated")
+            if id == nil { Telemetry.feature(.spoolAdded, in: self) }
         } catch let refusal as MoveRefused {
             spendProblem = refusal.sentence
         } catch {

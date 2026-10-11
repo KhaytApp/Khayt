@@ -165,6 +165,7 @@ extension Shop {
             moveProblem = words.callIt("mac.move_sample"); return
         }
         let id = Self.uid("MCH")
+        var added = false
         do {
             var record: [String: JSONValue] = [
                 "id": .string(id),
@@ -198,7 +199,9 @@ extension Shop {
                 StoreWriter.stamp(&record)
                 fleet.append(.object(record))
                 root["machines"] = .array(fleet)
+                added = true
             }
+            if added, Self.linksPrinter(record, over: nil) { Telemetry.feature(.printerLinked, in: self) }
             await load(source)
         } catch {
             moveProblem = String(describing: error)
@@ -263,6 +266,7 @@ extension Shop {
             let sent = try await PrinterSend.send(file, to: machine, key: key, startPrint: startPrint, engine: engine)
             sendNote = words.callIt(sent.started ? "mac.send_started" : "mac.send_uploaded",
                                     ["name": .string(machine.name)])
+            Telemetry.feature(.printSent, in: self)
             await printers.refresh(machine, shop: self)
         } catch {
             let said = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
@@ -750,6 +754,7 @@ extension Shop {
                 }
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("mach.edit")) }
+            if Self.linksPrinter(input, over: opened) { Telemetry.feature(.printerLinked, in: self) }
             editingMachine = nil
             addingMachine = false
             await load(source)
@@ -763,6 +768,18 @@ extension Shop {
 
     /// Why a machine write was refused, before it has words.
     enum MachineRefused: Error { case gone, needName }
+
+    /// Whether a machine save connects a printer that was not connected —
+    /// a connection type now, where the record as opened had none. Saving an
+    /// already-linked machine again is not another link.
+    static func linksPrinter(_ input: [String: JSONValue], over opened: [String: JSONValue]?) -> Bool {
+        func type(_ record: [String: JSONValue]?) -> String {
+            guard case .object(let api)? = record?["printerApi"],
+                  case .string(let t)? = api["type"] else { return "" }
+            return t == "none" ? "" : t
+        }
+        return !type(input).isEmpty && type(opened).isEmpty
+    }
 
     /// The machine write itself, against the book as it is ON DISK — the one
     /// path a machine reaches the book by, whether the Machine sheet sent it or
