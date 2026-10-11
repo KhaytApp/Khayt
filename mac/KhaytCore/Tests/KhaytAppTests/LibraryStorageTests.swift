@@ -40,8 +40,8 @@ struct LibraryStorageTests {
         try LibraryImportEndToEndTests.printFiles(in: bench)
     }
 
-    static func adopt(_ bench: Bench, ignored: Set<String> = []) async throws -> Shop.StorageReport {
-        await Shop.adoptFromStorage(root: bench.library, rows: try rows(bench), ignored: ignored,
+    static func adopt(_ bench: Bench, past: [URL] = []) async throws -> Shop.StorageReport {
+        await Shop.adoptFromStorage(root: bench.library, past: past,
                                     storeURL: bench.store, engine: try KhaytEngine(),
                                     owns: { true }, whoHasIt: { nil }, progress: { _, _, _ in })
     }

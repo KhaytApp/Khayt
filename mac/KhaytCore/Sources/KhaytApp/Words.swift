@@ -2342,6 +2342,7 @@ final class Words {
         "mac.storage_rescan": ["en": "Rescan Storage", "ar": "أعد فحص التخزين"],
         "mac.storage_scanned": ["en": "Library folder checked: {n} models added where they are, {same} already in the library, {photos} with a photo.", "ar": "فُحص مجلد المكتبة: أُضيف {n} من المجسّمات في مكانها، و{same} موجودة في المكتبة من قبل، و{photos} معها صورة."],
         "mac.storage_nothing_new": ["en": "The library folder has no models the library does not already know.", "ar": "لا مجسّمات في مجلد المكتبة إلا وهي في المكتبة."],
+        "mac.storage_downloaded_duplicate": ["en": "Downloaded — and it is the same file as “{name}”, already in the library.", "ar": "نُزّل — وهو الملف نفسه الموجود في المكتبة باسم “{name}”."],
         "mac.storage_capped": ["en": "The folder is very large, so this stopped part way — rescan to look further.", "ar": "المجلد كبير جدًا فتوقف الفحص في منتصفه — أعد الفحص للمتابعة."],
         "mac.linked_where": ["en": "Linked — in {path}", "ar": "مرتبط — في {path}"],
         "mac.print_next": ["en": "Print next", "ar": "للطباعة لاحقًا"],

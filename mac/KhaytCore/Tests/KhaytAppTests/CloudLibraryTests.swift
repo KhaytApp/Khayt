@@ -14,6 +14,11 @@ final class FakeBucket: @unchecked Sendable {
     private(set) var puts = 0
 
     func object(_ path: String) -> Data? { lock.withLock { objects[path] } }
+    /// Put an object in by hand, as a shop dragging a file into the bucket's
+    /// web console would — `path` is `/<bucket>/<key>`.
+    func seed(_ path: String, _ data: Data) { lock.withLock { objects[path] = data } }
+    /// Every GET of an object, by path — to prove what was and was not fetched.
+    private(set) var gets: [String] = []
     func remove(_ path: String) { _ = lock.withLock { objects.removeValue(forKey: path) } }
 
     var fetch: S3.Fetch {
@@ -41,7 +46,24 @@ final class FakeBucket: @unchecked Sendable {
                     default: h["ETag"] = "\"\(md5)\""
                     }
                     return answer(200, Data(), h)
+                case "GET" where (url.query ?? "").contains("list-type=2"):
+                    // ListObjectsV2, one page: every object under the bucket
+                    // whose key starts with the prefix asked for.
+                    let bucket = path.split(separator: "/").first.map(String.init) ?? ""
+                    let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+                    let prefix = items.first { $0.name == "prefix" }?.value ?? ""
+                    var xml = "<ListBucketResult><IsTruncated>false</IsTruncated>"
+                    for (p, d) in objects.sorted(by: { $0.key < $1.key }) where p.hasPrefix("/\(bucket)/") {
+                        let key = String(p.dropFirst(bucket.count + 2))
+                        guard key.hasPrefix(prefix) else { continue }
+                        let md5 = Insecure.MD5.hash(data: d).map { String(format: "%02x", $0) }.joined()
+                        let esc = key.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+                        xml += "<Contents><Key>\(esc)</Key><Size>\(d.count)</Size><ETag>&quot;\(md5)&quot;</ETag></Contents>"
+                    }
+                    xml += "</ListBucketResult>"
+                    return answer(200, Data(xml.utf8))
                 case "GET":
+                    gets.append(path)
                     guard var d = objects[path] else { return answer(404) }
                     if lie == .noEtagWrongBody, !d.isEmpty { d[0] ^= 0xFF }
                     return answer(200, d)
