@@ -321,7 +321,7 @@ enum LibraryImport {
         // picture that will not decode is passed over, never a failed import.
         // Read before the original goes to the Trash below, though only the
         // model is ever taken: the picture stays where it was.
-        let photo = firstPhoto(photos)
+        let photo = await PinWork.run { firstPhoto(photos) }
         if let photo { record["userPhoto"] = .string(photo) }
         do {
             // lock: callers — convertModel, addModelToLibrary, addModelsToLibrary
@@ -369,7 +369,9 @@ enum LibraryImport {
     }
 
     /// The first of these pictures that decodes, as a `userPhoto` data URI.
-    static func firstPhoto(_ candidates: [URL]) -> String? {
+    /// Blocking work: call it through `PinWork.run`, never on the main actor
+    /// and never inside a `Task.detached` (the cooperative pool).
+    nonisolated static func firstPhoto(_ candidates: [URL]) -> String? {
         for url in candidates {
             if let uri = try? LibraryPhoto.dataURI(of: url) { return uri }
         }

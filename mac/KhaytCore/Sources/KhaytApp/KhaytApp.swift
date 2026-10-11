@@ -678,6 +678,11 @@ final class Activator: NSObject, NSApplicationDelegate {
             // shelf of the real book and photographs it, and does nothing
             // else: navigation only, no sheets, no gestures. Writes are gated
             // on owning the book, and a running Khayt holds it.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DELETE"] == "1", let shop = subject {
+                await captureLibraryStorage(shop, into: dir)
+                NSApp.terminate(nil)
+                return
+            }
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_REAL"] == "1", let shop = subject {
                 if let real = Shop.available.first(where: \.isReal) { await shop.load(real) }
                 // Long enough for the printers to answer, which the dashboard
@@ -1532,6 +1537,72 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// no picture: it looks like the change did nothing.
     private static func settle() async {
         try? await Task.sleep(for: .milliseconds(700))
+    }
+
+    /// `KHAYT_SNAPSHOT_DELETE=1`: the library's storage surfaces — Rescan
+    /// Storage, its progress banner, an online-only model's inspector, and
+    /// every variant of the delete question — on whatever book is open (a
+    /// throwaway one under `CFFIXED_USER_HOME`; it never presses a button).
+    ///
+    /// The question's plans are SET rather than worked out, so each variant
+    /// is drawn whatever the book holds; the first shot is the real plan as
+    /// the book's own files make it. Nothing is confirmed: every question is
+    /// closed with its Cancel state, by clearing it.
+    static func captureLibraryStorage(_ shop: Shop, into dir: URL) async {
+        shop.shelf = .library(nil)
+        await settle()
+        capture(named: "40-library-rescan", into: dir)
+        shop.libraryMoveProgress = (done: 3, total: 12, name: "dragon-head.3mf")
+        await settle()
+        capture(named: "41-rescan-progress", into: dir)
+        shop.libraryMoveProgress = nil
+        if let online = shop.files.first(where: { shop.isInCloudOnly($0) }) {
+            shop.fileSelection = [online.id]
+            await settle()
+            capture(named: "42-online-model", into: dir)
+            capturePanes(named: "42-online-model", into: dir)
+        } else {
+            FileHandle.standardError.write(Data("no online-only model in this book for 42\n".utf8))
+        }
+        shop.fileSelection = []
+        let some = Array(shop.visibleFiles.prefix(4))
+        guard let first = some.first, some.count == 4 else {
+            FileHandle.standardError.write(Data("the delete question needs four models on screen\n".utf8))
+            return
+        }
+        let ids = some.map(\.id)
+        func plan(_ edit: (inout LibraryDeletePlan) -> Void) -> LibraryDeletePlan {
+            var p = LibraryDeletePlan(); edit(&p); return p
+        }
+        let variants: [(String, Bool, LibraryDeletePlan?)] = [
+            ("43a-delete-one-as-planned", true, nil),
+            ("43b-delete-one-online", true, plan {
+                $0.ids = [first.id]; $0.keptOnline = [first.id]; $0.online = [first.id: ["bucket:k"]] }),
+            ("43c-delete-one-only-here", true, plan { $0.ids = [first.id]; $0.onlyHere = [first.id] }),
+            ("43d-delete-one-cloud-only", true, plan {
+                $0.ids = [first.id]; $0.cloudOnly = [first.id]; $0.handPlaced = [first.id]
+                $0.online = [first.id: ["bucket:k"]] }),
+            ("43e-delete-one-in-place", true, plan { $0.ids = [first.id]; $0.inPlace = [first.id] }),
+            ("44a-delete-many-mixed", false, plan {
+                $0.ids = ids; $0.keptOnline = [ids[0]]; $0.onlyHere = [ids[1], ids[2]]; $0.cloudOnly = [ids[3]]
+                $0.handPlaced = [ids[3]]; $0.online = [ids[0]: ["bucket:a"], ids[3]: ["bucket:d"]] }),
+            ("44b-delete-many-only-here", false, plan { $0.ids = ids; $0.onlyHere = ids }),
+            ("44c-delete-many-online", false, plan {
+                $0.ids = ids; $0.keptOnline = ids; $0.inPlace = []
+                $0.online = Dictionary(uniqueKeysWithValues: ids.map { ($0, ["bucket:" + $0]) }) }),
+        ]
+        for (name, single, p) in variants {
+            // The plan FIRST: the question is drawn once, when it opens.
+            if let p { shop.deletePlan = p }
+            if single { shop.pendingLibraryDelete = first } else { shop.pendingLibraryDeletes = some }
+            await settle()
+            await settle()
+            captureSheet(named: name, into: dir)
+            shop.pendingLibraryDelete = nil
+            shop.pendingLibraryDeletes = []
+            shop.deletePlan = nil
+            await settle()
+        }
     }
 
     // ── A HANG SHOULD BE LOUD ────────────────────────────────

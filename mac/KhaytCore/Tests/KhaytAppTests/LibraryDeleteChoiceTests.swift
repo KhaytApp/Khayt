@@ -77,7 +77,7 @@ struct LibraryDeleteChoiceTests {
         #expect(p.local["PF-c"] == nil, "the shop's own file is never a local copy to remove")
         let en = Words(); await en.load("en", engine: try KhaytEngine())
         let lines = Shop.deletePlanLines(p, words: en)
-        #expect(lines.contains { $0.contains("1 of these 4 are only on this Mac") }, "\(lines)")
+        #expect(lines.contains { $0.contains("One of these 4 is only on this Mac") }, "\(lines)")
     }
 
     @Test("Remove from This Mac: the file goes only once the online copy is proved, and the copy stays")

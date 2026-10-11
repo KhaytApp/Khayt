@@ -246,7 +246,13 @@ struct LibraryInspector: View {
             // Where the bytes are is worth stating plainly. "On this Mac" and
             // "in the records but not here" look identical in a grid, and only
             // one of them can be put on a printer this afternoon.
-            if shop.fileIsPresent(file) {
+            // The FILE, not its folder: a model online only (moved off, or put
+            // in the bucket by hand) has a folder holding just its sidecar or
+            // marker, and was ticked "On this Mac" right above "In the cloud"
+            // (alpha.65 review, snapshot 42).
+            if shop.isInCloudOnly(file) {
+                DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.cloudlib_in_cloud"), dim: true)
+            } else if shop.fileIsPresent(file) {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), "✓", dim: true)
             } else {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.not_found"), warn: true)

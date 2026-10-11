@@ -154,6 +154,21 @@ extension Shop {
         return next
     }
 
+    /// A pass's ledger, written over the one ON DISK NOW rather than the one
+    /// the pass started from: whatever another writer (the other app, a sync,
+    /// the other pass) added since `read` is kept. Run inside the write
+    /// chain. A pass that wrote `next` whole put back the ledger it had read,
+    /// minus anything added during a bucket listing (Oct 2026 review).
+    nonisolated static func ledgerMerged(_ next: StorageLedger, over read: StorageLedger,
+                                         into current: StorageLedger) -> StorageLedger {
+        var out = current
+        let wasAdopted = Set(read.adopted), wasSeen = Set(read.seenDuplicates)
+        out.adopted = StorageLedger.merged(next.adopted, adding: current.adopted.filter { !wasAdopted.contains($0) })
+        out.seenDuplicates = StorageLedger.merged(next.seenDuplicates,
+                                                  adding: current.seenDuplicates.filter { !wasSeen.contains($0) })
+        return out
+    }
+
     /// Files the shop deleted from the library after they were adopted
     /// (the older list — see `StorageLedger`).
     var notAdopted: Set<String> { Set(StorageLedger.read(settingsDict).notAdopted) }
@@ -175,8 +190,12 @@ extension Shop {
     ///     decode still owns its folder.
     ///   - ignored: paths never to adopt (the ledger's, `notAdopted`).
     ///   - seen: signatures of files already found to be duplicates.
+    ///   - excluding: folders never walked into wherever they sit — the
+    ///     mirror, the linked folders and the other roots, when one is nested
+    ///     inside this root.
     nonisolated static func untrackedInStorage(_ root: URL, rows: [JSONValue], ignored: Set<String>,
                                                seen: Set<String> = [],
+                                               excluding: [String] = [],
                                                visitCap: Int = storageVisitCap,
                                                adoptCap: Int = storageAdoptCap)
         -> (files: [LibraryImport.Incoming], capped: Bool) {
@@ -201,6 +220,13 @@ extension Shop {
         func isModel(_ url: URL) -> Bool {
             LibraryImport.kinds.contains(url.pathExtension.lowercased()) && LibraryImport.isRegularFile(url)
         }
+        let fences = Set(excluding.flatMap { p -> [String] in
+            let u = URL(fileURLWithPath: p)
+            return [u.standardizedFileURL.path, canonical(u)]
+        })
+        func fenced(_ dir: URL) -> Bool {
+            !fences.isEmpty && (fences.contains(dir.standardizedFileURL.path) || fences.contains(canonical(dir)))
+        }
 
         // The root as it really is, so a root reached through a symlink is
         // walked, and every path found is spelled one way.
@@ -218,16 +244,29 @@ extension Shop {
             guard let v = try? entry.resourceValues(forKeys: Set(keys)), v.isSymbolicLink != true else { continue }
             if v.isDirectory == true {
                 let name = entry.lastPathComponent
-                guard !isKhaytFolder(name, recordDirs: recordDirs), name != ".Trash" else { continue }
+                guard !isKhaytFolder(name, recordDirs: recordDirs), name != ".Trash",
+                      !fenced(entry) else { continue }
                 // Every model under it, known ones too: "a folder of one model"
                 // and its grouping are judged over the whole folder, so a second
                 // file dropped beside an adopted one is grouped the same way.
                 var all: [URL] = []
-                let walker = fm.enumerator(at: entry, includingPropertiesForKeys: LibraryImport.fileKeys,
+                let walker = fm.enumerator(at: entry,
+                                           includingPropertiesForKeys: LibraryImport.fileKeys + [.isDirectoryKey],
                                            options: [.skipsHiddenFiles, .skipsPackageDescendants])
                 while let next = walker?.nextObject() as? URL {
                     visited += 1
                     if visited > visitCap { capped = true; break }
+                    // KHAYT'S OWN FOLDERS AT ANY DEPTH, not only at the top: a
+                    // record folder copied into a shop folder (or the mirror,
+                    // nested here) holds versions and converted copies whose
+                    // bytes no record has — each would be adopted as a new
+                    // model (Oct 2026 review).
+                    if (try? next.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                        if isKhaytFolder(next.lastPathComponent, recordDirs: recordDirs) || fenced(next) {
+                            walker?.skipDescendants()
+                        }
+                        continue
+                    }
                     if isModel(next) { all.append(next) }
                 }
                 let fresh = Set(all.filter { !isKnown($0) })
@@ -278,7 +317,7 @@ extension Shop {
     /// The seam the tests drive against a temp directory and a temp book, as
     /// `LibraryImport.add` is. The walks run on a dispatch queue (`PinWork`),
     /// never blocking a cooperative-pool thread.
-    static func adoptFromStorage(root: URL, past: [URL] = [],
+    static func adoptFromStorage(root: URL, past: [URL] = [], excluding: [String] = [],
                                  storeURL: URL, engine: KhaytEngine,
                                  owns: @escaping () -> Bool,
                                  whoHasIt: @escaping () -> String?,
@@ -301,8 +340,12 @@ extension Shop {
         // The primary in place; each past location by copy.
         for (where_, inPlace) in [(root, true)] + past.map({ ($0, false) }) {
             guard FileManager.default.fileExists(atPath: where_.path) else { continue }
+            // Every other root is a fence for this one's walk: the primary is
+            // never walked again from a past location around it, and nothing
+            // nested here (the mirror, a linked folder) is walked as part of it.
+            let fence = excluding + ([root] + past).filter { $0 != where_ }.map(\.path)
             let found = await PinWork.run {
-                Shop.untrackedInStorage(where_, rows: rows, ignored: skipped, seen: seen)
+                Shop.untrackedInStorage(where_, rows: rows, ignored: skipped, seen: seen, excluding: fence)
             }
             report.capped = report.capped || found.capped
             guard !found.files.isEmpty else { continue }
@@ -331,10 +374,7 @@ extension Shop {
             // lock: callers — rescanStorage
             try? StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
                 var settings = Self.settings(book)
-                var current = StorageLedger.read(settings)
-                current.adopted = StorageLedger.merged(next.adopted, adding: current.adopted.filter { !ledger.adopted.contains($0) })
-                current.seenDuplicates = next.seenDuplicates
-                current.write(into: &settings)
+                Self.ledgerMerged(next, over: ledger, into: StorageLedger.read(settings)).write(into: &settings)
                 book["settings"] = .object(settings)
             }
         }
@@ -369,9 +409,15 @@ extension Shop {
     /// The object keys a book already knows: those its sidecars and markers
     /// name, under the library's own folder.
     nonisolated static func keysNamedOnDisk(_ root: URL) -> Set<String> {
+        keysNamedOnDisk(roots: [root.path], except: [])
+    }
+
+    /// The same over every root, leaving out the record folders in `except`
+    /// — what the models NOT being deleted still name.
+    nonisolated static func keysNamedOnDisk(roots: [String], except: Set<String>) -> Set<String> {
         var out: Set<String> = []
-        for f in CloudLibrary.libraryFiles(root: root.path, includingMarkers: true)
-        where f.filename.hasSuffix(".cloud") || f.filename.hasSuffix(onlineExt) {
+        for f in roots.flatMap({ CloudLibrary.libraryFiles(root: $0, includingMarkers: true) })
+        where (f.filename.hasSuffix(".cloud") || f.filename.hasSuffix(onlineExt)) && !except.contains(f.id ?? "") {
             guard let data = FileManager.default.contents(atPath: f.fullPath),
                   let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let key = o["key"] as? String else { continue }
@@ -475,7 +521,11 @@ extension Shop {
         for item in listed {
             let rel = String(item.key.dropFirst(listPrefix.count))
             let parts = rel.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-            if parts.contains(where: { $0.hasPrefix(".") }) { continue }
+            // A hidden segment, or an EMPTY one (`a//b.stl`, a leading `/`):
+            // `S3.request` drops empty segments, so Bring Back would fetch —
+            // and Delete Completely would delete — `a/b.stl`, a different
+            // object (Oct 2026 review).
+            if parts.contains(where: { $0.hasPrefix(".") || $0.isEmpty }) { continue }
             if parts.first == "print-files", parts.count >= 3 {
                 let dir = parts[1]
                 if recordDirs.contains(dir) { owned.append(item) }
@@ -558,11 +608,15 @@ extension Shop {
                       size <= ProductPhotos.maxSourceBytes,
                       let data = try? await S3.get(c, key: photoKey, fetch: fetch) else { continue }
                 photosFetched += 1
-                let tmp = fm.temporaryDirectory.appending(path: "khayt-photo-\(UUID().uuidString)")
-                    .appendingPathExtension((photoKey as NSString).pathExtension)
-                defer { try? fm.removeItem(at: tmp) }   // scratch
-                guard (try? data.write(to: tmp)) != nil,
-                      let uri = try? LibraryPhoto.dataURI(of: tmp) else { continue }
+                let ext = (photoKey as NSString).pathExtension
+                // Decoded off the main actor, as every batch decode is.
+                guard let uri = await PinWork.run({ () -> String? in
+                    let tmp = FileManager.default.temporaryDirectory
+                        .appending(path: "khayt-photo-\(UUID().uuidString)").appendingPathExtension(ext)
+                    defer { try? FileManager.default.removeItem(at: tmp) }   // scratch
+                    guard (try? data.write(to: tmp)) != nil else { return nil }
+                    return try? LibraryPhoto.dataURI(of: tmp)
+                }) else { continue }
                 record["userPhoto"] = .string(uri)
                 report.photos += 1
                 break
@@ -594,7 +648,7 @@ extension Shop {
                 rows.insert(contentsOf: records.map(JSONValue.object), at: 0)
                 book["printFiles"] = .array(rows)
                 var settings = Self.settings(book)
-                next.write(into: &settings)
+                Self.ledgerMerged(next, over: ledger, into: StorageLedger.read(settings)).write(into: &settings)
                 book["settings"] = .object(settings)
             }
         } catch {
@@ -774,8 +828,11 @@ extension Shop {
         }
         guard !due.isEmpty else { return 0 }
         let looked = due
-        let candidates: [String: [URL]] = await PinWork.run {
-            var out: [String: [URL]] = [:]
+        // The walk AND the decoding, on a dispatch queue: up to `cap`
+        // pictures decoded here once ran on the main actor and froze the
+        // window on load (Oct 2026 review).
+        let photos: [String: String] = await PinWork.run {
+            var out: [String: String] = [:]
             var under: [String: [URL]] = [:]
             for item in looked {
                 var every = [item.model]
@@ -793,13 +850,9 @@ extension Shop {
                         return !n.hasPrefix("thumb") && n != (item.thumb ?? "").lowercased()
                     }
                 }
-                out[item.id] = found
+                if let uri = LibraryImport.firstPhoto(found) { out[item.id] = uri }
             }
             return out
-        }
-        var photos: [String: String] = [:]
-        for (id, urls) in candidates {
-            if let uri = LibraryImport.firstPhoto(urls) { photos[id] = uri }
         }
         let ids = Set(looked.map(\.id))
         let mark = JSONValue.string(StoreWriter.iso(Date()))
@@ -850,7 +903,8 @@ extension Shop {
         let past = Self.pastLocations(roots, builtIn: LibraryLocation.defaultRoot(for: build))
             .map { URL(fileURLWithPath: $0) }
         var report = await Self.adoptFromStorage(
-            root: root, past: past, storeURL: build.storeURL, engine: engine,
+            root: root, past: past, excluding: roots.roots.filter { $0 != roots.primary } + [roots.mirror].compactMap { $0 } + linkedFolders,
+            storeURL: build.storeURL, engine: engine,
             owns: owns, whoHasIt: who,
             progress: { [weak self] done, total, url in
                 self?.libraryMoveProgress = (done, total, url.lastPathComponent)

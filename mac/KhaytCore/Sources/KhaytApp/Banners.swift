@@ -143,7 +143,7 @@ struct MoveBanners: View {
             // The library's own housekeeping — a rescan of the storage or the
             // linked folders, a move — said where it has got to, as an import
             // is. Nothing to stop: each file is adopted whole or not at all.
-            Banner(text: shop.words.callIt("mac.import_progress", [
+            Banner(text: shop.words.callIt("mac.storage_progress", [
                         "done": .number(Double(p.done)),
                         "total": .number(Double(p.total)),
                         "name": .string(p.name)]),
