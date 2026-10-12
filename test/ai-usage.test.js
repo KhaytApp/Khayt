@@ -153,3 +153,28 @@ test('the panel discloses that the figure is device-local', () => {
   const en = fs.readFileSync(path.join(__dirname, '../renderer/locales/en.js'), 'utf8');
   assert.match(en, /"set\.ai_spend_device"/, 'the caveat needs an English string');
 });
+
+test('the desktop\'s normalised usage is counted, not recorded as 0 tokens and $0', () => {
+  // renderer/ai-call.js records `res.usage`, which main.js takes from
+  // lib/ai-providers.js usageOf: {inputTokens, outputTokens}. The ledger read
+  // only the provider's own spelling, so every desktop call cost "$0".
+  const { usageOf } = require('../lib/ai-providers.js');
+  const now = new Date(2026, 9, 12).getTime();
+  const replies = {
+    anthropic: { usage: { input_tokens: 1000, output_tokens: 200 } },
+    openai: { usage: { prompt_tokens: 1000, completion_tokens: 200 } },
+    google: { usageMetadata: { promptTokenCount: 1000, candidatesTokenCount: 200 } },
+  };
+  for (const [provider, data] of Object.entries(replies)) {
+    const led = U.record({}, { task: 'quote', model: 'claude-sonnet-5-5', usage: usageOf(provider, data), now });
+    const row = led['2026-10'].quote;
+    assert.equal(row.input, 1000, provider);
+    assert.equal(row.output, 200, provider);
+    assert.ok(row.cost > 0, `${provider} cost`);
+  }
+  // The Mac spells it the provider's way before recording; same figures.
+  const mac = U.record({}, { task: 'library', model: 'claude-sonnet-5-5', usage: { input_tokens: 1000, output_tokens: 200 }, now });
+  const desk = U.record({}, { task: 'library', model: 'claude-sonnet-5-5', usage: { inputTokens: 1000, outputTokens: 200 }, now });
+  assert.deepEqual(mac, desk);
+  assert.equal(U.costOf({ inputTokens: 1000, outputTokens: 200 }, 'x'), U.costOf({ input_tokens: 1000, output_tokens: 200 }, 'x'));
+});
