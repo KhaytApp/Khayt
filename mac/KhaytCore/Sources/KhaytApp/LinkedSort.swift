@@ -157,22 +157,34 @@ enum SortCache {
         return out
     }
 
-    /// The cached answers for one linked folder: every unit whose signature
-    /// still matches what is on disk.
+    /// The cached answers for one linked folder, for the folders still there.
+    ///
+    /// ── A STALE ANSWER STILL STANDS UNTIL A NEW ONE COMES (alpha.67 review) ──
+    ///
+    /// A unit whose tree changed (a model added under it) is ASKED again —
+    /// `isCached` holds it to its signature — but until that answer arrives
+    /// its last one is used for every folder it named that is still there.
+    /// Dropping it the moment the signature moved put the heuristic back for
+    /// the whole unit: the new model was filed under the heuristic's name for
+    /// its print while its siblings sat under the assistant's, and with the
+    /// assistant off or unreachable "Regroup from folders" moved every record
+    /// of the unit back — the library flipping between two sorts of the same
+    /// folders. A folder renamed or gone is a path no longer in the unit, and
+    /// its answer is not used.
     nonisolated static func answers(_ settings: [String: JSONValue], for units: [Unit]) -> PrintSort.Answers {
         guard case .object(let library)? = settings["printLibrary"],
               case .object(let map)? = library[settingsKey] else { return PrintSort.Answers() }
         var out = PrintSort.Answers()
         for unit in units {
-            guard case .object(let entry)? = map[unit.key], case .string(let sig)? = entry["sig"],
-                  sig == unit.signature else { continue }
+            guard case .object(let entry)? = map[unit.key] else { continue }
+            let here = Set(unit.entries.map(\.path))
             if case .object(let roles)? = entry["roles"] {
-                for (path, role) in roles {
+                for (path, role) in roles where here.contains(path) {
                     if case .string(let r) = role, let parsed = PrintSort.Role(rawValue: r) { out.roles[path] = parsed }
                 }
             }
             if case .object(let names)? = entry["names"] {
-                for (path, name) in names {
+                for (path, name) in names where here.contains(path) {
                     if case .string(let n) = name, !n.isEmpty { out.names[path] = n }
                 }
             }

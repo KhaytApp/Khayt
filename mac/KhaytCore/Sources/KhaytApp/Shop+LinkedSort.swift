@@ -80,6 +80,12 @@ extension Shop {
                     ledger = next
                     spent = true
                 }
+            } catch AiClient.Failure.notConsented {
+                break                       // switched off meanwhile: the heuristic stands, nothing to say
+            } catch AiClient.Failure.noKey {
+                // In the shop's words, not "No API key" in an Arabic sentence.
+                result.problem = words.callIt("mac.ai_no_key")
+                break
             } catch {
                 result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
                 break

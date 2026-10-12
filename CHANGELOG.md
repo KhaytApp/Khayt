@@ -9,6 +9,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   none, but skips a model whose photo you took off. Removing a photo on the
   desktop did not say so, so the Mac could put a found picture back on it.
   It now does; adding a photo again clears that.
+- **Mac: fixes from the 4.0.0-alpha.67 review of sorting linked folders.**
+  - **A print keeps the kind and picture you gave it.** When the automatic
+    sort took a collection out of a print's path ("Aug26 Giga Tier/Life
+    Size Gambit" becoming "Life Size Gambit"), a kind or picture you had set
+    on the print's old group was lost if its models sat in part groups
+    below it, or were split between two parts. It now moves to the print's
+    new group. A group you already set up at the new place keeps yours.
+  - **Tags you typed are kept.** Adding the collection tag no longer
+    replaces tags stored in the older comma-separated form, and it uses the
+    spelling you already use for that tag elsewhere in the library.
+  - **No more flip-flopping groups.** When a folder your assistant already
+    sorted gets a new model, its earlier answer is kept until the
+    assistant answers again, so the new model joins its print instead of
+    landing in a group of its own, and "Regroup from folders" with the
+    assistant off no longer undoes its sorting.
+  - **An assistant's print name can only ever be one group.** A name such
+    as ".." or one with a slash is cleaned or ignored, including one read
+    back from another device's settings.
+  - **Clearer words.** The note when the assistant is off names the right
+    settings pane ("AI assist"); a missing API key is said in your language;
+    and in Arabic a collection is a "حزمة", no longer the word the library
+    uses for a group.
+
 - **Mac: linked folders are sorted into prints, with their pictures.** After
   a linked Google Drive was scanned, models were filed under Patreon tiers
   and month folders ("Oct26 Giga Tier/Guilmon Card/Mini Poster"), and no
@@ -31,7 +54,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     before you press Apply. Groups you made yourself are never moved.
     Books regrouped by alpha.66 are sorted again once, automatically.
   - **Optional: your assistant can check the sorting.** Turn on "Sort
-    linked folders" in Settings ▸ Assistant (off by default, never turned
+    linked folders" in Settings ▸ AI assist (off by default, never turned
     on by the old AI switch). Only the NAMES of folders and files, and how
     many models each folder holds, are sent — never a file or a picture.
     Answers are checked, remembered so the same folders are never sent

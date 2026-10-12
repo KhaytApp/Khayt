@@ -321,10 +321,17 @@ struct PrintSortTests {
         let back = SortCache.answers(settings, for: units)
         #expect(back.roles == [Self.buzz: .print], "only the unit's own folders are kept")
         #expect(back.names[Self.buzz] == "Buzz Lightyear (life size)")
-        // A new folder under it: a new signature, asked again, old answer not used.
+        // A new folder under it: a new signature, asked again — and until the
+        // new answer comes, the old one stands for the folders still there,
+        // so nothing flips back to the heuristic in between (alpha.67 review).
         let grown = SortCache.units(Self.plan(Self.buzzModels + [Self.buzz + "/STLs/New Size/x.stl"], images: Self.buzzImages))
         #expect(!SortCache.isCached(grown[0], in: settings))
-        #expect(SortCache.answers(settings, for: grown) == PrintSort.Answers())
+        #expect(SortCache.answers(settings, for: grown).roles == [Self.buzz: .print])
+        #expect(SortCache.answers(settings, for: grown).names[Self.buzz] == "Buzz Lightyear (life size)")
+        // A folder renamed away is not in the unit, and its answer is not used.
+        let renamed = SortCache.units(Self.plan(Self.buzzModels.map {
+            $0.replacingOccurrences(of: "Life Size Buzz Lightyear", with: "Buzz LS") }))
+        #expect(SortCache.answers(settings, for: renamed) == PrintSort.Answers())
         // And the sorted plan of a walk reads it back.
         let sorted = Shop.sortedPlan(root: Self.drive, models: Self.buzzModels.map { Self.drive.appending(path: $0) },
                                      images: Self.buzzImages.map { Self.drive.appending(path: $0) }, settings: settings)
@@ -421,7 +428,8 @@ struct PrintSortTests {
         let changes = LinkedRegroup.changes(rows: rows, plan: p)
         let by = Dictionary(uniqueKeysWithValues: changes.map { ($0.id, $0) })
         #expect(by["a"]?.group == "Life Size Buzz Lightyear/4 feet Size")
-        #expect(by["a"]?.tag == "Aug26 Giga Tier")
+        // In the spelling the book already uses for it (row c): one tag, not two chips.
+        #expect(by["a"]?.tag == "aug26 giga tier")
         #expect(by["b"] == nil, "the shop's own group")
         #expect(by["c"]?.tag == nil, "the tag is there already, in the shop's spelling")
         #expect(by["d"]?.group == "Life Size Gambit/Large Cuts" && by["d"]?.name == nil, "the shop's name stays")
@@ -430,7 +438,7 @@ struct PrintSortTests {
         if case .array(let r)? = root["printFiles"] { rows = r }
         #expect(LinkedRegroup.changes(rows: rows, plan: p).isEmpty, "a second refile finds nothing to do")
         guard case .object(let a)? = rows.first else { Issue.record("no row"); return }
-        #expect(a["tags"] == .array([.string("Aug26 Giga Tier")]))
+        #expect(a["tags"] == .array([.string("aug26 giga tier")]))
         #expect(a["autoGroup"] == .string("Life Size Buzz Lightyear/4 feet Size"))
     }
 

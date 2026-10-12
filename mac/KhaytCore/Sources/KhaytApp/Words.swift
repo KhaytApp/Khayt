@@ -2392,22 +2392,29 @@ final class Words {
         "mac.linked_regroup_help": ["en": "File the linked models by their folders again, with the current rules. Groups you set yourself are left alone.", "ar": "يعيد ترتيب المجسّمات المرتبطة حسب مجلداتها بالقواعد الحالية. المجموعات التي اخترتها بنفسك تبقى كما هي."],
         "mac.linked_regrouped": ["en": "Regrouped from their folders: {n}. Groups you set yourself were left alone.", "ar": "أُعيد تجميعها حسب مجلداتها: {n}. المجموعات التي اخترتها بنفسك بقيت كما هي."],
         "mac.linked_sort": ["en": "Sort linked folders…", "ar": "فرز المجلدات المرتبطة…"],
-        "mac.linked_sort_help": ["en": "Find the prints in your linked folders and make each one a group, with its picture. Shows what would change before anything moves.", "ar": "يجد المطبوعات في مجلداتك المرتبطة ويجعل كل مطبوعة مجموعة بصورتها. يعرض ما سيتغير قبل نقل أي شيء."],
+        "mac.linked_sort_help": ["en": "Find the prints in your linked folders and make each one a group, with its picture. Shows what would change before anything moves.", "ar": "يجد الطباعات في مجلداتك المرتبطة ويجعل كل طباعة مجموعة بصورتها. يعرض ما سيتغير قبل نقل أي شيء."],
         "mac.ai_feat_library": ["en": "Sort linked folders", "ar": "فرز المجلدات المرتبطة"],
-        "mac.ai_data_library": ["en": "the NAMES of the folders and files in your linked folders, and how many models each folder holds. Never the files themselves, and never a picture.", "ar": "أسماء المجلدات والملفات في مجلداتك المرتبطة، وعدد المجسّمات في كل مجلد. لا تُرسل الملفات نفسها أبدًا، ولا أي صورة."],
+        "mac.ai_data_library": ["en": "the names of the folders in your linked folders, a few file names from each, and how many models each folder holds. Never the files themselves, and never a picture.", "ar": "أسماء المجلدات في مجلداتك المرتبطة، وبضعة أسماء ملفات من كل مجلد، وعدد المجسّمات في كل مجلد. لا تُرسل الملفات نفسها أبدًا، ولا أي صورة."],
         "mac.sort_title": ["en": "Sort linked folders", "ar": "فرز المجلدات المرتبطة"],
-        "mac.sort_summary": ["en": "Prints found: {prints}, in collections: {collections}.", "ar": "المطبوعات التي وُجدت: {prints}، في مجموعات: {collections}."],
-        "mac.sort_moved": ["en": "Models that move into their print’s group: {n}.", "ar": "مجسّمات ستنتقل إلى مجموعة مطبوعتها: {n}."],
-        "mac.sort_renamed": ["en": "Models named after their print or part: {n}.", "ar": "مجسّمات ستأخذ اسم مطبوعتها أو جزئها: {n}."],
-        "mac.sort_tagged": ["en": "Models tagged with the collection they came from: {n}.", "ar": "مجسّمات ستُوسم باسم المجموعة التي جاءت منها: {n}."],
+        // "Collection" is where files came from (a Patreon tier, a pack, a
+        // month's release) and becomes a TAG. Not مجموعة in Arabic: that is
+        // the library's word for a GROUP, the very thing a collection stops
+        // being here. A print is طباعة, as everywhere else in the library.
+        "mac.sort_summary": ["en": "Prints found: {prints}. Collections they came from: {collections}.", "ar": "الطباعات التي وُجدت: {prints}. الحزم التي جاءت منها: {collections}."],
+        "mac.sort_moved": ["en": "Models that move into their print’s group: {n}.", "ar": "مجسّمات ستنتقل إلى مجموعة طباعتها: {n}."],
+        "mac.sort_renamed": ["en": "Models named after their print or part: {n}.", "ar": "مجسّمات ستأخذ اسم طباعتها أو جزئها: {n}."],
+        "mac.sort_tagged": ["en": "Models tagged with the collection they came from: {n}.", "ar": "مجسّمات سيُضاف إليها وسم الحزمة التي جاءت منها: {n}."],
         "mac.sort_kept": ["en": "Models you grouped yourself stay where they are: {n}.", "ar": "المجسّمات التي جمّعتها بنفسك تبقى مكانها: {n}."],
         "mac.sort_models": ["en": "Models: {n}", "ar": "المجسّمات: {n}"],
         "mac.sort_from": ["en": "From {name}", "ar": "من {name}"],
         "mac.sort_apply": ["en": "Apply", "ar": "تطبيق"],
         "mac.sort_asking": ["en": "Asking your assistant to sort the folders by their names…", "ar": "جارٍ سؤال مساعدك عن فرز المجلدات حسب أسمائها…"],
         "mac.sort_ai_used": ["en": "Your assistant sorted folders: {n}.", "ar": "مجلدات فرزها مساعدك: {n}."],
-        "mac.sort_ai_failed": ["en": "Your assistant could not sort the folders ({why}). Their names were used instead.", "ar": "تعذّر على مساعدك فرز المجلدات ({why}). استُخدمت أسماؤها بدلًا من ذلك."],
-        "mac.sort_ai_off": ["en": "Sorted by the folders’ names on this Mac. To let your assistant check it, turn on “Sort linked folders” in Settings ▸ Assistant — only folder and file names are sent.", "ar": "فُرزت حسب أسماء المجلدات على هذا الماك. لتسمح لمساعدك بمراجعتها، فعّل «فرز المجلدات المرتبطة» في الإعدادات ◂ المساعد — تُرسل أسماء المجلدات والملفات فقط."],
+        // {why} is a whole sentence (`mac.ai_no_key`) or the provider's own
+        // words, so it follows the sentence rather than sitting in brackets.
+        "mac.sort_ai_failed": ["en": "Your assistant could not sort the folders, so this Mac sorted them by their names. {why}", "ar": "تعذّر على مساعدك فرز المجلدات، ففرزها هذا الماك حسب أسمائها. {why}"],
+        // The pane is "AI assist" (`set.ai_master`), as `mac.ai_no_key` says it.
+        "mac.sort_ai_off": ["en": "Sorted by the folders’ names on this Mac. To let your assistant check it, turn on “Sort linked folders” in Settings → AI assist — only folder and file names are sent.", "ar": "فُرزت حسب أسماء المجلدات على هذا الماك. لتسمح لمساعدك بمراجعتها، فعّل «فرز المجلدات المرتبطة» في الإعدادات ← مساعدة الذكاء الاصطناعي — تُرسل أسماء المجلدات والملفات فقط."],
         "mac.sort_pictures_added": ["en": "Pictures added: {n}.", "ar": "صور أُضيفت: {n}."],
         "mac.print_next": ["en": "Print next", "ar": "للطباعة لاحقًا"],
         "mac.print_next_add": ["en": "Add to Print next", "ar": "أضف إلى قائمة الطباعة"],
