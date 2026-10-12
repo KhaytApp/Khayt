@@ -6817,6 +6817,43 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.66] - 2026-10-12
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+A folder you link from Google Drive, iCloud Drive or Dropbox is no longer
+downloaded just to be listed, its models land in sensible groups, and a scan
+can be stopped.
+
+### New
+
+- **Stop a library scan.** While the library looks through your folders and
+  storage, a **Stop** button shows in the library and in Settings ▸ Library
+  location. What was added before you pressed it stays, and the scan does not
+  start again by itself until the app is next opened.
+- **Online-only files stay online.** In a linked folder on Google Drive,
+  iCloud Drive or Dropbox, a model the drive has not downloaded is listed from
+  its name and size, and shows as **In the cloud**. Nothing is downloaded to
+  list it, to show its picture, to back it up or when you arrow past it.
+  **Download to this Mac** fetches it, and its details fill in then.
+- **Regroup from folders**, in Settings ▸ Library location, files the models
+  of your linked folders again by the folders they are in. It also runs once
+  by itself. A model you moved to a group by hand stays where you put it.
+
+### Changed and fixed
+
+- **Smarter groups from folders.** A linked folder's own name is no longer a
+  group, packaging folders (`STLs`, `Single STLs`, `Pictures`, `model_files`)
+  are not groups, a folder that repeats its parent (`Mumm-Ra/Mumm Ra -
+  Patreon`) is one group, and a long path keeps the project's name and drops
+  the pack or tier folders first. Download-site names read normally:
+  `snapmaker+U1+drawer_stls` is "snapmaker U1 drawer".
+- A model whose download fails is no longer marked as downloaded.
+- Regrouping keeps a group's kind and picture, waits for a linked folder that
+  is not there yet, and no longer moves a model inside two linked folders
+  back and forth.
+
 ## [4.0.0-alpha.65] - 2026-10-11
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
