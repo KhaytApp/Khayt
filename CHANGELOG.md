@@ -6885,6 +6885,51 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.67] - 2026-10-13
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Linked folders are sorted into the prints they hold, with their pictures, and
+your AI assistant can check the sorting if you turn it on.
+
+### New
+
+- **Each independent print is a main group.** Khayt tells collections (a
+  Patreon tier, a month, a pack) apart from prints (one thing to print), the
+  parts and sizes of a print, file formats and pictures. A model's group is
+  its print, plus one part or size level when the print is split that way,
+  such as "Life Size Gambit/Large Cuts". The same print from two collections
+  is one group, and the collection it came from is added to its tags.
+- **Pictures come in.** Each print's group gets its best picture: one named
+  after the print, then a front or cover shot, then its renders. A print of
+  one model gives that picture to the model. Pictures are fetched even when
+  the drive keeps them online only (never models), at most 8 MB each and 40
+  a scan. A picture you removed is not put back.
+- **Sort linked folders…** in Settings ▸ Library location shows how many
+  prints were found, in how many collections, and what would change, before
+  you press Apply. Groups you made yourself are never moved. A library
+  regrouped by alpha.66 is sorted again once, by itself.
+- **Optional: your assistant checks the sorting.** Turn on "Sort linked
+  folders" in Settings ▸ AI assist; it is off by default. Only the names of
+  folders and files, and how many models each folder holds, are sent — never
+  a file or a picture. Answers are checked and remembered, and Khayt's own
+  sorting fills in anything the assistant misses or fails on. A request that
+  keeps failing is not sent again the same day, and after three failures not
+  again until those folders change.
+
+### Changed and fixed
+
+- A print keeps the kind and picture you gave its group when the collection
+  is taken out of its path.
+- Adding a collection tag keeps the tags you already have, and uses the
+  spelling you already use for it.
+- A folder the assistant sorted keeps its answer when a new model arrives, so
+  groups no longer flip back and forth.
+- A print name from the assistant can only ever be one group: ".." or a name
+  with a slash is cleaned or ignored.
+- In Arabic a collection is "حزمة", no longer the word used for a group.
+
 ## [4.0.0-alpha.66] - 2026-10-12
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
