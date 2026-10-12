@@ -33,6 +33,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     twice, and the app's own sorting is used for anything missing or if
     the assistant fails. Its cost appears in the AI usage figures.
 
+- **The AI spend panel counts what the desktop's AI calls cost again.** Since
+  Khayt learned to use other AI providers, every call made from the desktop
+  was recorded as 0 tokens and $0: the provider's counts arrived under one
+  spelling and the ledger read another. Calls were still counted. New calls
+  now record their tokens and estimated cost; past months stay at $0, because
+  the counts were never kept.
 - **Mac: fixes from the 4.0.0-alpha.66 review of linked and online-only
   models.**
   - **A group's kind and picture move with it.** When "Regroup from folders"
