@@ -137,7 +137,9 @@ struct Alpha67ReviewTests {
         answers.names["2026 World Cup"] = "../../etc"
         var p = PrintSortTests.plan(models, answers: answers)
         let g = p.placed[models[0]]?.group ?? ""
-        #expect(!g.split(separator: "/").contains(where: { $0 == ".." || $0 == "." }), "\(g)")
+        let parts: [String] = g.split(separator: "/").map(String.init)
+        let climbs = parts.contains("..") || parts.contains(".")
+        #expect(!climbs, "\(g)")
         #expect(g.hasPrefix(".. - .. - etc/"))
         answers.names["2026 World Cup"] = ".."
         p = PrintSortTests.plan(models, answers: answers)
