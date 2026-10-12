@@ -104,7 +104,7 @@ struct LibraryInspector: View {
                 Label(shop.words.callIt("mac.cloudlib_in_cloud"), systemImage: "icloud")
                     .foregroundStyle(.secondary)
                 Button { Task { await shop.bringBack(file) } } label: {
-                    Label(shop.words.callIt("mac.cloudlib_bring_back"), systemImage: "icloud.and.arrow.down")
+                    Label(shop.words.callIt(file.isLinked ? "mac.linked_download" : "mac.cloudlib_bring_back"), systemImage: "icloud.and.arrow.down")
                 }
                 .disabled(shop.cloudLibraryBusy)
                 if shop.cloudLibraryBusy { ProgressView().controlSize(.small) }

@@ -130,9 +130,29 @@ enum LinkedRegroup {
     /// The changes, written onto the book's records. Both group fields, as
     /// every group write does (`moveRecord`), and `autoGroup`, so a later
     /// refile can tell this group from one the shop chooses afterwards.
+    ///
+    /// ── THE GROUP'S KIND AND PICTURE GO WITH IT ───────────────────────────
+    ///
+    /// A shop that marked `Auto_Copied_Shared (1)/Mumm-Ra` as one print's
+    /// parts, or gave it a picture, set that on the group — an entry in
+    /// `settings.libraryGroups` keyed by its path. Refiling moved the records
+    /// and left the entry behind on a path no file sat under, and the next
+    /// write of the map pruned it: the kind and the picture the shop chose
+    /// were gone (alpha.66 review). So when EVERY record of a group goes to
+    /// one new group, its entry goes with it — unless the new group already
+    /// has one of its own, which is the shop's and stays.
     nonisolated static func apply(_ changes: [Change], to root: inout [String: JSONValue]) {
         let byId = Dictionary(changes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         guard case .array(var rows)? = root["printFiles"] else { return }
+        // Where each group's records went, read before they move.
+        var went: [String: Set<String>] = [:]
+        for case .object(let o) in rows {
+            guard case .string(let id)? = o["id"], let c = byId[id] else { continue }
+            func text(_ k: String) -> String? { if case .string(let s)? = o[k] { s } else { nil } }
+            if let from = LibraryFile.groupName(folder: text("folder"), group: text("group")) {
+                went[from, default: []].insert(LibraryFile.normalise(c.group))
+            }
+        }
         for (i, row) in rows.enumerated() {
             guard case .object(var o) = row, case .string(let id)? = o["id"], let c = byId[id] else { continue }
             o["group"] = .string(c.group)
@@ -142,6 +162,58 @@ enum LinkedRegroup {
             rows[i] = .object(o)
         }
         root["printFiles"] = .array(rows)
+        carryEntries(went, rows: rows, into: &root)
+    }
+
+    /// The `settings.libraryGroups` entries of groups that moved whole.
+    nonisolated static func carryEntries(_ went: [String: Set<String>], rows: [JSONValue],
+                                         into root: inout [String: JSONValue]) {
+        guard case .object(var settings)? = root["settings"],
+              case .object(var map)? = settings[GroupKinds.settingsKey] else { return }
+        // Every group path still in use, and every level above one.
+        var inUse: Set<String> = []
+        for case .object(let o) in rows {
+            func text(_ k: String) -> String? { if case .string(let s)? = o[k] { s } else { nil } }
+            guard let g = LibraryFile.groupName(folder: text("folder"), group: text("group")) else { continue }
+            inUse.insert(g)
+        }
+        var changed = false
+        for (from, destinations) in went {
+            guard destinations.count == 1, let to = destinations.first, !to.isEmpty, to != from,
+                  let entry = map[from], map[to] == nil,
+                  // Something still filed at or below it keeps the group — and its entry.
+                  !inUse.contains(where: { Shop.isUnder($0, from) }) else { continue }
+            map[to] = entry
+            map[from] = nil
+            changed = true
+        }
+        guard changed else { return }
+        settings[GroupKinds.settingsKey] = .object(map)
+        root["settings"] = .object(settings)
+    }
+
+    /// Whether this walk may mark the book refiled: every linked folder was
+    /// there and walked whole. A Drive not mounted yet at launch, or a folder
+    /// that listed nothing while records point into it (a File Provider still
+    /// starting up), is refiled later — never marked done unseen, which would
+    /// leave its records under the old groups for good.
+    nonisolated static func complete(linked: [String], walked: [(root: URL, models: [URL])],
+                                     rows: [JSONValue]) -> Bool {
+        let seen = Set(walked.map { $0.root.standardizedFileURL.path })
+        for path in linked where !seen.contains(URL(fileURLWithPath: path).standardizedFileURL.path) {
+            return false
+        }
+        // Each record belongs to the innermost linked folder around it, as
+        // the walk files it (`Shop.linkedWalk`).
+        let empty = Set(walked.filter { $0.models.isEmpty }.map { $0.root.standardizedFileURL.path })
+        guard !empty.isEmpty else { return true }
+        let roots = Array(seen)
+        for case .object(let o) in rows {
+            guard case .string(let p)? = o["externalPath"], !p.isEmpty else { continue }
+            let owner = roots.filter { LibraryMove.under(p, $0) }.max { $0.count < $1.count }
+            if let owner, empty.contains(owner) { return false }
+        }
+        return true
     }
 
     /// The version this book was last refiled at.

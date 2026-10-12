@@ -134,7 +134,8 @@ extension Shop {
         // THE RECORDS ALREADY HERE, filed again once per book.
         var regrouped = 0
         if LinkedRegroup.doneVersion(settingsDict) < LinkedRegroup.version {
-            regrouped = (try? Self.regroupLinked(walked.map { ($0.root, $0.models) }, storeURL: build.storeURL,
+            regrouped = (try? Self.regroupLinked(walked.map { ($0.root, $0.models) }, linked: linkedFolders,
+                                                 storeURL: build.storeURL,
                                                  owns: owns, whoHasIt: who)) ?? 0
         }
         // THE ONES THAT WERE ONLINE AND ARE HERE NOW, filled in.
@@ -178,8 +179,12 @@ extension Shop {
     /// done. The load-time passes do not start again by themselves on this
     /// book this launch — see `rescanStorageIfDue`.
     func stopLibraryScan() {
-        libraryScanStop?.stop()
-        libraryScanStopping = libraryScanStop != nil
+        // Nothing running, nothing stopped: a Stop pressed as a scan ends (the
+        // button is drawn a frame late) must not mark the book stopped and so
+        // keep its load-time storage pass from running at all.
+        guard let running = libraryScanStop else { return }
+        running.stop()
+        libraryScanStopping = true
         linkedScan?.cancel()
         storageScan?.cancel()
         if case .store(let build) = source { libraryScanStoppedBooks.insert(build.rawValue) }
@@ -204,7 +209,8 @@ extension Shop {
         }
         if stop.isStopped || Task.isCancelled { return }
         do {
-            let n = try Self.regroupLinked(walked.map { ($0.root, $0.models) }, storeURL: build.storeURL,
+            let n = try Self.regroupLinked(walked.map { ($0.root, $0.models) }, linked: linkedFolders,
+                                           storeURL: build.storeURL,
                                            owns: { StoreLock.weOwnIt(build) },
                                            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
             await load(source)
@@ -233,9 +239,18 @@ extension Shop {
         func isInVault(_ path: String) -> Bool {
             vaults.contains { path == $0 || path.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }
         }
+        // NESTED LINKED FOLDERS: a model is the INNERMOST linked folder's,
+        // and only that one walks it. Walked by both, it was filed by the outer
+        // one at index time and judged by both at refile time — and each
+        // "Regroup from folders" moved it from one's group to the other's and
+        // back (alpha.66 review).
+        let linkedPaths = folders.map { $0.standardizedFileURL.path }
         var out: [LinkedFound] = []
         for root in folders where !isInVault(root.standardizedFileURL.path) {
             if stop?.isStopped == true { break }
+            let mine = root.standardizedFileURL.path
+            let inner = linkedPaths.filter { $0 != mine && LibraryMove.under($0, mine) }
+            func isInner(_ path: String) -> Bool { inner.contains { LibraryMove.under(path, $0) } }
             let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: LibraryImport.fileKeys,
                                                         options: [.skipsHiddenFiles, .skipsPackageDescendants])
             var models: [URL] = []
@@ -246,7 +261,8 @@ extension Shop {
                 // Regular files only, as the import walk: a symlink named
                 // `x.stl` is a pointer elsewhere, not a model kept here.
                 if LibraryImport.kinds.contains(next.pathExtension.lowercased()),
-                   LibraryImport.isRegularFile(next), !isInVault(next.standardizedFileURL.path) {
+                   LibraryImport.isRegularFile(next), !isInVault(next.standardizedFileURL.path),
+                   !isInner(next.standardizedFileURL.path) {
                     models.append(next)
                 }
             }
@@ -269,7 +285,11 @@ extension Shop {
     /// File the linked records again by their folders and mark the book as
     /// refiled, in ONE write through the store's chain. Returns how many
     /// records moved.
-    nonisolated static func regroupLinked(_ walked: [(root: URL, models: [URL])], storeURL: URL,
+    ///
+    /// `linked` is every folder linked on the book, here or not: the book is
+    /// marked refiled only when all of them were walked (`LinkedRegroup.complete`).
+    nonisolated static func regroupLinked(_ walked: [(root: URL, models: [URL])], linked: [String] = [],
+                                          storeURL: URL,
                                           owns: @escaping () -> Bool,
                                           whoHasIt: @escaping () -> String?) throws -> Int {
         var moved = 0
@@ -284,7 +304,10 @@ extension Shop {
                 changes += LinkedRegroup.changes(rows: rows, root: folder.root, models: folder.models)
             }
             LinkedRegroup.apply(changes, to: &root)
-            LinkedRegroup.markDone(&root)
+            if LinkedRegroup.complete(linked: linked.isEmpty ? walked.map(\.root.path) : linked,
+                                      walked: walked, rows: rows) {
+                LinkedRegroup.markDone(&root)
+            }
             moved = changes.count
         }
         return moved
@@ -299,9 +322,15 @@ extension Shop {
                       whoHasIt: @escaping () -> String?, stop: ScanStop?) async {
         // lock: system — fills in models the library already lists, from files now on this Mac; part of the linked pass, adds and removes nothing.
         guard let roots = libraryRoots else { return }
+        // Only a file in a folder this book links, or in its own library
+        // folder (`addOnline` from the storage pass): `externalPath` arrives
+        // by sync from the shop's other devices, and this pass reads what it
+        // names unasked — a path anywhere else on this Mac is not read.
+        let places = linkedFolders + roots.roots + [roots.primary]
         let waiting: [(id: String, path: String)] = fileRows.compactMap { row in
             guard case .object(let o) = row, let mark = o["indexedOnline"], mark != .null,
-                  case .string(let id)? = o["id"], case .string(let p)? = o["externalPath"], !p.isEmpty else { return nil }
+                  case .string(let id)? = o["id"], case .string(let p)? = o["externalPath"], !p.isEmpty,
+                  places.contains(where: { !$0.isEmpty && LibraryMove.under(p, $0) }) else { return nil }
             return (id, p)
         }
         guard !waiting.isEmpty else { return }
@@ -311,11 +340,20 @@ extension Shop {
         }
         for item in here {
             if stop?.isStopped == true || Task.isCancelled { break }
-            let pictures = URL(fileURLWithPath: roots.primary).appending(path: LibraryLocation.itemDirName(item.id))
+            let pictures = Self.vaultFolder(item.id, roots: roots)
             try? FileManager.default.createDirectory(at: pictures, withIntermediateDirectories: true)
             _ = try? await Self.fillDownloaded(id: item.id, file: URL(fileURLWithPath: item.path), pictures: pictures,
                                                storeURL: storeURL, engine: engine, owns: owns, whoHasIt: whoHasIt)
         }
+    }
+
+    /// A record's vault folder — the one it already has, in whichever of the
+    /// library's folders that is (it moves with the library), or a new one in
+    /// the primary. Where a linked model's picture goes; never the shop's own
+    /// folder the model sits in.
+    static func vaultFolder(_ id: String, roots: LibraryLocation.Roots) -> URL {
+        LibraryLocation.directory(for: id, roots: roots.roots)
+            ?? URL(fileURLWithPath: roots.primary).appending(path: LibraryLocation.itemDirName(id))
     }
 
     /// A linked model the cloud has not downloaded, brought down by reading
@@ -323,8 +361,7 @@ extension Shop {
     /// in. Bring Back's answer for a linked model (`bringBack`).
     func bringDownLinked(_ file: LibraryFile) async {
         guard let path = file.externalPath, let build = source.build, let engine, let roots = libraryRoots else { return }
-        let pictures = LibraryLocation.directory(for: file.id, roots: roots.roots)
-            ?? URL(fileURLWithPath: roots.primary).appending(path: LibraryLocation.itemDirName(file.id))
+        let pictures = Self.vaultFolder(file.id, roots: roots)
         try? FileManager.default.createDirectory(at: pictures, withIntermediateDirectories: true)
         do {
             // lock: system — reads a model the library already lists, as Bring Back does.

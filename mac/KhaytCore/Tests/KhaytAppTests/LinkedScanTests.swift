@@ -229,4 +229,119 @@ struct LinkedScanTests {
         if case .object(let s)? = book["settings"] { #expect(LinkedRegroup.doneVersion(s) == LinkedRegroup.version) }
         #expect(try Shop.regroupLinked([(root, models)], storeURL: bench.store, owns: { true }, whoHasIt: { nil }) == 0)
     }
+
+    // MARK: - alpha.66 review
+
+    @Test("a group's kind and picture go with it when every record moves; a group still in use keeps its own")
+    func regroupCarriesKinds() {
+        var root: [String: JSONValue] = [
+            "printFiles": .array([
+                .object(["id": .string("a"), "group": .string("Old/Dragon"), "folder": .string("Old/Dragon")]),
+                .object(["id": .string("b"), "group": .string("Old/Dragon"), "folder": .string("Old/Dragon")]),
+                .object(["id": .string("c"), "group": .string("Old/Kept"), "folder": .string("Old/Kept")]),
+                .object(["id": .string("d"), "group": .string("Old/Kept"), "folder": .string("Old/Kept")]),
+            ]),
+            "settings": .object(["libraryGroups": .object([
+                "Old/Dragon": .object(["kind": .string("parts"), "cover": .object(["model": .string("a")])]),
+                "Old/Kept": .object(["kind": .string("parts")]),
+            ])]),
+        ]
+        LinkedRegroup.apply([.init(id: "a", group: "Dragon", name: nil), .init(id: "b", group: "Dragon", name: nil),
+                             .init(id: "c", group: "Kept", name: nil)], to: &root)
+        guard case .object(let s)? = root["settings"], case .object(let map)? = s["libraryGroups"] else {
+            Issue.record("no libraryGroups"); return
+        }
+        #expect(map["Dragon"] == .object(["kind": .string("parts"), "cover": .object(["model": .string("a")])]))
+        #expect(map["Old/Dragon"] == nil)
+        #expect(map["Old/Kept"] != nil && map["Kept"] == nil, "d is still in Old/Kept, so the group and its kind stay")
+    }
+
+    @Test("a linked folder not walked, or walked empty with records in it, does not mark the book refiled")
+    func regroupWaitsForEveryFolder() throws {
+        let bench = try LibraryImportEndToEndTests.bench()
+        defer { try? FileManager.default.removeItem(at: bench.dir) }
+        let root = bench.dir.appending(path: "Shared")
+        let asleep = bench.dir.appending(path: "NAS").path
+        let rows: [JSONValue] = [.object(["id": .string("PF-0"), "name": .string("a"),
+                                          "externalPath": .string(root.appending(path: "Dragon/a.stl").path),
+                                          "group": .string("Shared/Dragon"), "folder": .string("Shared/Dragon")])]
+        try LibraryStorageTests.write(rows, to: bench)
+        func done() throws -> Double {
+            guard case .object(let s)? = try #require(Shop.readBook(bench.store))["settings"] else { return 0 }
+            return LinkedRegroup.doneVersion(s)
+        }
+        _ = try Shop.regroupLinked([(root, [root.appending(path: "Dragon/a.stl")])], linked: [root.path, asleep],
+                                   storeURL: bench.store, owns: { true }, whoHasIt: { nil })
+        #expect(try done() == 0, "the NAS was not there; its records are refiled when it is")
+        _ = try Shop.regroupLinked([(root, [])], linked: [root.path],
+                                   storeURL: bench.store, owns: { true }, whoHasIt: { nil })
+        #expect(try done() == 0, "a Drive that listed nothing while records point into it was not looked at")
+        _ = try Shop.regroupLinked([(root, [root.appending(path: "Dragon/a.stl")])], linked: [root.path],
+                                   storeURL: bench.store, owns: { true }, whoHasIt: { nil })
+        #expect(try done() == LinkedRegroup.version)
+    }
+
+    @Test("nested linked folders: a model is walked by the innermost only, so refiling settles")
+    func nestedLinkedFolders() throws {
+        let outer = FileManager.default.temporaryDirectory.appending(path: "nest-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: outer) }
+        let inner = outer.appending(path: "Prints/Monsters")
+        for rel in ["Prints/Monsters/Dragon/a.stl", "Prints/Monsters/Dragon/b.stl", "Toys/car.stl", "Toys/bus.stl"] {
+            let u = outer.appending(path: rel)
+            try FileManager.default.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data([1]).write(to: u)
+        }
+        let walked = Shop.linkedWalk([outer, inner], skippingAll: [], known: [], stop: nil)
+        #expect(walked.count == 2)
+        #expect(walked[0].models.map(\.lastPathComponent).sorted() == ["bus.stl", "car.stl"])
+        #expect(walked[1].models.map(\.lastPathComponent).sorted() == ["a.stl", "b.stl"])
+        // Twice over the same records: the second finds nothing to move.
+        var rows: [JSONValue] = walked.flatMap(\.fresh).enumerated().map { i, f in
+            .object(["id": .string("PF-\(i)"), "name": .string(LinkedRegroup.stem(f.url)),
+                     "externalPath": .string(f.url.standardizedFileURL.path),
+                     "group": .string(f.group ?? ""), "folder": .string(f.group ?? ""),
+                     "autoGroup": .string(f.group ?? "")])
+        }
+        for _ in 0..<2 {
+            var changes: [LinkedRegroup.Change] = []
+            for folder in walked { changes += LinkedRegroup.changes(rows: rows, root: folder.root, models: folder.models) }
+            #expect(changes.isEmpty, Comment(rawValue: "\(changes)"))
+            var root: [String: JSONValue] = ["printFiles": .array(rows)]
+            LinkedRegroup.apply(changes, to: &root)
+            if case .array(let r)? = root["printFiles"] { rows = r }
+        }
+    }
+
+    @Test("a file that cannot be read is not filled: the record stays online and is tried again")
+    func unreadableIsNotFilled() async throws {
+        let bench = try LibraryImportEndToEndTests.bench()
+        defer { try? FileManager.default.removeItem(at: bench.dir) }
+        let file = bench.dir.appending(path: "Drive/cube/cube.stl")
+        try Self.model(file)
+        _ = await LibraryImport.addMany(
+            LibraryImport.Incoming.ungrouped([file]),
+            storeURL: bench.store, libraryRoot: bench.library, knownHashes: [], nameOfExisting: { _ in nil },
+            engine: try KhaytEngine(), keepOriginal: true, inPlace: true, isOnline: { _ in true },
+            owns: { true }, whoHasIt: { nil })
+        let before = try #require(try Self.objects(bench).first)
+        let id = try #require({ if case .string(let s)? = before["id"] { s } else { nil } }())
+        let gone = bench.dir.appending(path: "Drive/cube/not-there.stl")      // the drive refused it
+        await #expect(throws: (any Error).self) {
+            try await Shop.fillDownloaded(id: id, file: gone, pictures: bench.library, storeURL: bench.store,
+                                          engine: try KhaytEngine(), owns: { true }, whoHasIt: { nil })
+        }
+        let after = try #require(try Self.objects(bench).first)
+        #expect(after["indexedOnline"] != nil && after["indexedOnline"] != .null)
+        #expect(after["sourceFile"] == before["sourceFile"])
+    }
+
+    @Test("selecting, backing up and planning a delete never read a linked file its drive has not downloaded")
+    func onlineNotReadByTheRest() throws {
+        let library = try LockRound3Tests.source("Shop+Library.swift")
+        #expect(library.contains("if file.isLinked, LinkedCloud.isOnlineOnly(url) { return }"))
+        let cloud = try LockRound3Tests.source("CloudLibrary.swift")
+        #expect(cloud.contains("if file.isLinked, LinkedCloud.isOnlineOnly(url) { continue }"))
+        let delete = try LockRound3Tests.source("LibraryDelete.swift")
+        #expect(delete.contains("if !file.isLinked,\n                       let local = await PinWork.run({ try? CloudLibrary.digests(of: model) })"))
+    }
 }

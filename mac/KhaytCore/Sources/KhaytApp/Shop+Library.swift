@@ -2816,6 +2816,12 @@ extension Shop {
             factsByFile[file.id] = .some(nil)
             return
         }
+        // Not by SELECTING a linked model its drive has not downloaded:
+        // reading the zip is downloading the model, and arrowing down a
+        // linked Drive's list fetched every model passed over (alpha.66
+        // review). Not remembered either, so the facts are read once the
+        // shop opens or brings it down.
+        if file.isLinked, LinkedCloud.isOnlineOnly(url) { return }
         factsInFlight.insert(file.id)
         let id = file.id
         Task { [weak self] in
