@@ -212,6 +212,7 @@ enum LibraryImport {
                     title: String? = nil,
                     photos: [URL] = [],
                     analyseRisk: Bool = false,
+                    online: Bool = false,
                     owns: @escaping () -> Bool,
                     whoHasIt: @escaping () -> String?) async throws -> Added {
         let ext = source.pathExtension.lowercased()
@@ -229,6 +230,13 @@ enum LibraryImport {
         // Oct 2026 review.
         guard isRegularFile(source) else {
             throw Failure.failed("\(originalName) is not a file")
+        }
+        // A LINKED file the cloud has not downloaded: named, sized and filed
+        // from what the drive lists, and never read — see `LinkedCloud`.
+        if inPlace && online {
+            return try await addOnline(source, storeURL: storeURL, libraryRoot: libraryRoot,
+                                       group: group, title: title, photos: photos,
+                                       owns: owns, whoHasIt: whoHasIt)
         }
 
         // THE SOURCE IS HASHED FIRST, and that is the whole shape of this.
@@ -316,6 +324,9 @@ enum LibraryImport {
                                  provenance: said, riskAnalysis: riskAnalysis,
                                  parsed: a.parsed,
                                  externalPath: inPlace ? source.standardizedFileURL.path : nil)
+        // The group the APP gave a linked model, so refiling it later can
+        // tell it from one the shop chose (`LinkedRegroup`).
+        if inPlace { record["autoGroup"] = .string(group ?? "") }
         // THE PHOTO THAT CAME WITH IT, when there was one — see `ModelPhoto`.
         // The record is new, so there is no photo of the shop's to keep; and a
         // picture that will not decode is passed over, never a failed import.
@@ -366,6 +377,70 @@ enum LibraryImport {
         return Added(id: id, name: name, triangleCount: geometry?.triangleCount,
                      colours: colours.count, contentHash: hash, movedIn: movedIn,
                      photo: photo != nil)
+    }
+
+    /// A linked model that is online only, indexed without a byte of it read.
+    ///
+    /// What the record carries is what the drive LISTS: the name, the size,
+    /// the folder it is in. No hash, no measurements, no colours, no picture
+    /// drawn from its triangles — each of those is a read, and a read is a
+    /// download. `indexedOnline` says so, and is what `Shop.fillNowLocal`
+    /// looks for once the file is on this Mac (the shop opened it, or set it
+    /// to "available offline"); `fillDownloaded` then writes the rest, as it
+    /// does for a bucket model brought down. A photo only from a picture
+    /// that is itself here — the caller has already left the others out.
+    static func addOnline(_ source: URL, storeURL: URL, libraryRoot: URL,
+                          group: String?, title: String?, photos: [URL],
+                          owns: @escaping () -> Bool,
+                          whoHasIt: @escaping () -> String?) async throws -> Added {
+        let originalName = source.lastPathComponent
+        let ext = source.pathExtension.lowercased()
+        let id = Shop.uid("PF")
+        // The record's vault folder, as for any linked model: where its
+        // picture goes once it has one, and what "on this Mac" is read from.
+        let dir = libraryRoot.appending(path: LibraryLocation.itemDirName(id))
+        do { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
+        catch { throw Failure.failed(error.localizedDescription) }
+        let name = title.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+            ?? originalName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
+        var record = self.record(id: id, name: name, originalName: originalName, filename: originalName,
+                                 ext: ext, size: LinkedCloud.listedSize(source), hash: nil, key: nil,
+                                 colours: [], swapCount: 0, thumbFile: nil, group: group,
+                                 externalPath: source.standardizedFileURL.path)
+        record["autoGroup"] = .string(group ?? "")
+        record["indexedOnline"] = .string(StoreWriter.iso(Date()))
+        let photo = await PinWork.run { firstPhoto(photos) }
+        if let photo { record["userPhoto"] = .string(photo) }
+        do {
+            // lock: callers — add
+            try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
+                var rows: [JSONValue] = []
+                if case .array(let existing)? = root["printFiles"] { rows = existing }
+                rows.insert(.object(record), at: 0)
+                root["printFiles"] = .array(rows)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: dir)
+            throw Failure.failed(String(describing: error))
+        }
+        return Added(id: id, name: name, triangleCount: nil, colours: 0, contentHash: nil,
+                     movedIn: false, photo: photo != nil)
+    }
+
+    /// `size|name` — how a file the cloud has not downloaded is recognised
+    /// as one the library already holds, since its bytes cannot be hashed
+    /// without fetching them. Lowercased: a drive may change a name's case.
+    nonisolated static func nameSize(_ size: Int, _ name: String) -> String {
+        "\(size)|\(name.lowercased())"
+    }
+
+    /// The `nameSize` of every record that says both.
+    nonisolated static func nameSizes(of files: [LibraryFile]) -> Set<String> {
+        Set(files.compactMap { f in
+            guard let size = f.size, size > 0,
+                  let name = f.originalName ?? f.sourceFile?.originalName, !name.isEmpty else { return nil }
+            return nameSize(Int(size), name)
+        })
     }
 
     /// The first of these pictures that decodes, as a `userPhoto` data URI.
@@ -499,6 +574,8 @@ enum LibraryImport {
         var trashed: [URL] = []
         /// True when the caller asked it to stop and it did.
         var stopped = false
+        /// Of `moved`, the linked files indexed online only — see `LinkedCloud`.
+        var online = 0
         var total: Int { moved + duplicates + failures.count }
     }
 
@@ -565,24 +642,50 @@ enum LibraryImport {
                         keepOriginal: Bool = false,
                         inPlace: Bool = false,
                         analyseRisk: Bool = false,
+                        knownNameSizes: Set<String> = [],
+                        isOnline: ((URL) -> Bool)? = nil,
                         owns: @escaping () -> Bool,
                         whoHasIt: @escaping () -> String?,
                         shouldStop: () -> Bool = { false },
                         progress: (Int, Int, URL) -> Void = { _, _, _ in }) async -> Report {
         var report = Report()
         var known = knownHashes
+        // Online-only files are recognised by name and size (`nameSize`);
+        // every file indexed here joins the set, so a placeholder of a model
+        // just indexed from a local copy is a duplicate too.
+        var knownNames = knownNameSizes
+        // Optional rather than defaulted to a closure: a `{ … }` in a
+        // parameter list reads as the body to `WritersAreGatedTests`.
+        let isOnline: (URL) -> Bool = isOnline ?? { _ in false }
         for (i, file) in files.enumerated() {
+            // Between files, never inside one: a file is indexed whole or not
+            // at all, and everything before the Stop stays indexed.
             if shouldStop() { report.stopped = true; break }
             progress(i, files.count, file.url)
+            // Only a LINKED file is ever left online: an import or a past
+            // location is copied, and a copy is a read.
+            let online = inPlace && isOnline(file.url)
+            let sig = nameSize(online ? LinkedCloud.listedSize(file.url)
+                                      : ((try? file.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0),
+                               file.url.lastPathComponent)
+            if online, knownNames.contains(sig) {
+                report.duplicates += 1
+                report.duplicateURLs.append(file.url)
+                continue
+            }
             do {
                 let added = try await add(file.url, storeURL: storeURL, libraryRoot: libraryRoot,
                                           knownHashes: known, nameOfExisting: nameOfExisting,
                                           engine: engine, keepOriginal: keepOriginal, inPlace: inPlace,
                                           group: file.group, documents: file.documents,
                                           title: file.title,
-                                          photos: file.photos,
+                                          // Never a picture the cloud would have to download.
+                                          photos: inPlace ? file.photos.filter { !isOnline($0) } : file.photos,
                                           analyseRisk: analyseRisk,
+                                          online: online,
                                           owns: owns, whoHasIt: whoHasIt)
+                knownNames.insert(sig)
+                if online { report.online += 1 }
                 report.moved += 1
                 report.addedIds.append(added.id)
                 report.addedURLs.append(file.url)

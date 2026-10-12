@@ -142,7 +142,11 @@ struct MoveBanners: View {
         } else if let p = shop.libraryMoveProgress {
             // The library's own housekeeping — a rescan of the storage or the
             // linked folders, a move — said where it has got to, as an import
-            // is. Nothing to stop: each file is adopted whole or not at all.
+            // is. A SCAN has a Stop (Oct 2026: "no way to stop the online
+            // folder scan" over a ten-thousand-model Drive): each file is
+            // indexed whole or not at all, so stopping between them leaves
+            // nothing half-done. A move has none — half a move is a library
+            // in two places.
             Banner(text: shop.words.callIt("mac.storage_progress", [
                         "done": .number(Double(p.done)),
                         "total": .number(Double(p.total)),
@@ -152,6 +156,18 @@ struct MoveBanners: View {
                 ProgressView(value: Double(p.done), total: Double(max(p.total, 1)))
                     .progressViewStyle(.linear)
                     .frame(width: 120)
+                if shop.libraryScanStop != nil {
+                    Button(shop.words.callIt("mac.stop")) { shop.stopLibraryScan() }
+                        .disabled(shop.libraryScanStopping)
+                }
+            }
+        } else if shop.libraryScanStop != nil {
+            // Still walking the folders, before there is a count to show.
+            Banner(text: shop.words.callIt("mac.library_looking"),
+                   symbol: "gearshape.arrow.trianglehead.2.clockwise.rotate.90",
+                   tint: Khayt.brand) {
+                Button(shop.words.callIt("mac.stop")) { shop.stopLibraryScan() }
+                    .disabled(shop.libraryScanStopping)
             }
         }
         // A conversion: what it saved, or why it would not. Beside the slicer

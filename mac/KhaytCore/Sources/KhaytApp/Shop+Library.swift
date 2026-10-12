@@ -166,6 +166,9 @@ extension Shop {
         slicerFiguresReadBooks.insert(build.rawValue)
         let due: [(id: String, url: URL, ext: String)] = files.compactMap { file in
             guard case .object(let rec)? = row(for: file.id), let url = modelFile(for: file) else { return nil }
+            // Not a file the cloud would have to download to be read: a
+            // linked Drive's online models are read when they are here.
+            if file.isLinked, LinkedCloud.isOnlineOnly(url) { return nil }
             let ext = url.pathExtension.lowercased()
             guard ["3mf", "gcode", "gco"].contains(ext) else { return nil }
             // Empty, or a 3MF read before plates were read one by one (its
@@ -1344,7 +1347,10 @@ extension Shop {
         // up to a few hundred model zips, and doing that on the MainActor
         // froze the window just after launch.
         let jobs: [(id: LibraryFile.ID, url: URL)] = candidates.compactMap { file in
-            modelFile(for: file).map { (file.id, $0) }
+            guard let url = modelFile(for: file) else { return nil }
+            // Never a linked file the cloud would have to download first.
+            if file.isLinked, LinkedCloud.isOnlineOnly(url) { return nil }
+            return (file.id, url)
         }
         let read: [LibraryFile.ID: (designer: String, licence: String)] = await Task.detached {
             var out: [LibraryFile.ID: (designer: String, licence: String)] = [:]

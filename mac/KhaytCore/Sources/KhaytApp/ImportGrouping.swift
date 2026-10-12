@@ -102,23 +102,67 @@ enum ImportGrouping {
     /// — the chosen folder first — with `STL`, `presupported` and the like
     /// dropped, so `Kings/King Abdulaziz/STL/head.stl` is
     /// `["Kings", "King Abdulaziz"]`. Empty for a file picked directly.
-    static func levels(for file: URL, chosen: URL) -> [String] {
+    ///
+    /// `includeChosen: false` is a LINKED folder: its own name is where the
+    /// shop keeps things (`Auto_Copied_Shared (1)`, `My Drive`, `NAS`) — a
+    /// source, not a project — so the groups start below it. A folder the
+    /// shop IMPORTS keeps its name, as it always has: that one it chose.
+    static func levels(for file: URL, chosen: URL, includeChosen: Bool = true) -> [String] {
+        guard let raw = rawLevels(for: file, chosen: chosen, includeChosen: includeChosen) else { return [] }
+        return folded(raw)
+    }
+
+    /// The folders between `chosen` and the file as written (the chosen one
+    /// first when `includeChosen`), or nil when the file is not inside it.
+    static func rawLevels(for file: URL, chosen: URL, includeChosen: Bool) -> [String]? {
         let chosenPath = chosen.standardizedFileURL.resolvingSymlinksInPath().path
         let filePath = file.standardizedFileURL.resolvingSymlinksInPath().path
         // Picked directly, not found inside a folder.
-        guard filePath != chosenPath else { return [] }
+        guard filePath != chosenPath else { return nil }
 
         let chosenParts = chosenPath.split(separator: "/").map(String.init)
         let fileParts = filePath.split(separator: "/").map(String.init)
         guard fileParts.count > chosenParts.count,
-              Array(fileParts.prefix(chosenParts.count)) == chosenParts else { return [] }
+              Array(fileParts.prefix(chosenParts.count)) == chosenParts else { return nil }
 
         // Folders BELOW what was chosen, with the filename dropped.
         let below = Array(fileParts.dropFirst(chosenParts.count).dropLast())
-        var levels: [String] = []
-        if let root = meaningful(chosen.lastPathComponent) { levels.append(root) }
-        levels += below.compactMap(meaningful)
-        return levels
+        return (includeChosen ? [chosen.lastPathComponent] : []) + below
+    }
+
+    /// ── WHAT A REAL DRIVE LOOKS LIKE (Oct 2026) ──────────────────────────
+    ///
+    /// The shop linked a Google Drive folder of ~10,000 models and reported
+    /// the grouping "not smart enough". Its folders are shaped like
+    ///
+    ///     Mumm-Ra/Mumm Ra - Patreon/Single STLs/…
+    ///     GridCube File Delivery/Gridcube STL Files/…
+    ///     Aug26 Giga Tier/Aug26 Collectibles Tier/Call of Duty 4 /Mini Poster/STLs/…
+    ///
+    /// and each shape went wrong a different way. So, level by level:
+    ///
+    ///   1. a folder made of nothing but packaging words (`Single Part STLs`,
+    ///      `Instructions and Gearlist`, `model_files`) is walked through, as
+    ///      `STL` always was — see `isContainer`;
+    ///   2. a download site's spelling is undone for the name (`display`);
+    ///   3. a level that only REPEATS the one above it (`Mumm Ra - Patreon`
+    ///      under `Mumm-Ra`, `Gridcube STL Files` under `GridCube File
+    ///      Delivery`) is the same project said twice and folds into it. The
+    ///      PARENT's spelling is kept, never the child's: the parent is the
+    ///      name all of its sub-folders share, and taking the child's would
+    ///      split one project into two top-level groups the moment it had a
+    ///      second sub-folder.
+    static func folded(_ raw: [String]) -> [String] {
+        var out: [String] = []
+        for folder in raw {
+            guard let named = meaningful(folder) else { continue }
+            let shown = display(named)
+            let mine = core(shown)
+            guard !mine.isEmpty else { continue }               // all wrapping: `STL Pack`
+            if let above = out.last, mine.isSubset(of: core(above)) { continue }
+            out.append(shown)
+        }
+        return out
     }
 
     /// Where one imported file goes: its group, and a title when the folder
@@ -149,8 +193,16 @@ enum ImportGrouping {
     ///
     /// Counts only fall as the path goes deeper, so the folders that collapse
     /// are always the last ones in a file's path.
-    static func placements(for files: [URL], chosen: URL) -> [URL: Placement] {
-        let levelsOf = Dictionary(files.map { ($0, levels(for: $0, chosen: chosen)) },
+    static func placements(for files: [URL], chosen: URL, includeChosen: Bool = true) -> [URL: Placement] {
+        placements(for: files, levels: { levels(for: $0, chosen: chosen, includeChosen: includeChosen) },
+                   fit: fitting)
+    }
+
+    /// The counting itself, over whichever rule names the levels — the
+    /// current one, or `V1` (what the records already on disk were filed by).
+    static func placements(for files: [URL], levels: (URL) -> [String],
+                           fit: ([String]) -> String) -> [URL: Placement] {
+        let levelsOf = Dictionary(files.map { ($0, levels($0)) },
                                   uniquingKeysWith: { a, _ in a })
         // How many of the files sit at or below each folder, keyed by the path
         // to it (levels joined with a separator no folder name can hold).
@@ -168,15 +220,15 @@ enum ImportGrouping {
                 let key = levels[...depth].joined(separator: "\u{1}")
                 if (count[key] ?? 0) >= 2 { kept.append(levels[depth]) } else { collapsed.append(levels[depth]) }
             }
-            out[file] = Placement(group: kept.isEmpty ? nil : fitting(kept),
+            out[file] = Placement(group: kept.isEmpty ? nil : fit(kept),
                                   title: collapsed.isEmpty ? nil : collapsed.joined(separator: " – "))
         }
         return out
     }
 
     /// The files found under one chosen folder, placed by the rule above.
-    static func incoming(_ files: [URL], chosen: URL) -> [LibraryImport.Incoming] {
-        let placed = placements(for: files, chosen: chosen)
+    static func incoming(_ files: [URL], chosen: URL, includeChosen: Bool = true) -> [LibraryImport.Incoming] {
+        let placed = placements(for: files, chosen: chosen, includeChosen: includeChosen)
         return files.map { url in
             let p = placed[url]
             return LibraryImport.Incoming(url: url, group: p?.group, title: p?.title)
@@ -204,10 +256,32 @@ enum ImportGrouping {
     /// shop never made.
     ///
     /// So the levels that survive are the ones that say the most: the project
-    /// it belongs to, and the folder it actually sat in. The levels between
-    /// them go first, then the root, and a single level too long to fit is
-    /// handed over anyway to be cut by the rule that owns the limit.
+    /// it belongs to, and the folder it actually sat in.
+    ///
+    /// WRAPPERS GO FIRST (Oct 2026). A pack's own folders — `Aug26 Giga Tier`,
+    /// `Organizers STL Pack`, `Yosh Free Files` — say how a model was
+    /// DELIVERED, and the old trim (the level just above the leaf) dropped
+    /// the PROJECT instead: `…/Call of Duty 4 /Mini Poster` was filed under
+    /// `…/Aug26 Giga Tier/Mini Poster`, and "Call of Duty 4" was nowhere. So a
+    /// wrapper goes before anything else, the INNERMOST first: the outermost
+    /// is the top level every file from that pack shares, and keeping it
+    /// keeps the library's top level the same as the Drive's.
+    ///
+    /// Then, with no wrapper left, the old trim: the levels between go, then
+    /// the root, and a single level too long to fit is handed over anyway to
+    /// be cut by the rule that owns the limit.
     static func fitting(_ levels: [String]) -> String {
+        var kept = levels
+        while tooLong(kept), kept.count > 1,
+              let i = kept.indices.dropLast().last(where: { isWrapper(kept[$0]) }) {
+            kept.remove(at: i)
+        }
+        return fittingV1(kept)
+    }
+
+    /// The trim without the wrapper rule — what every path was cut by before
+    /// Oct 2026, and still the last resort above.
+    static func fittingV1(_ levels: [String]) -> String {
         var kept = levels
         while kept.count > 2, tooLong(kept) {
             kept.remove(at: kept.count - 2)          // the level just above the leaf
@@ -227,6 +301,14 @@ enum ImportGrouping {
     /// wrote it, because it is the shop's name and this is not the place to
     /// tidy somebody's folders.
     static func meaningful(_ folder: String) -> String? {
+        guard let named = meaningfulV1(folder), !isContainer(named) else { return nil }
+        return named
+    }
+
+    /// `meaningful` by the list alone, before packaging made of several words
+    /// was recognised. Kept for `V1`, which reproduces the groups already
+    /// written.
+    static func meaningfulV1(_ folder: String) -> String? {
         let trimmed = folder.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
         let bare = strip(trimmed)
@@ -252,5 +334,119 @@ enum ImportGrouping {
         text = text.replacingOccurrences(of: #"^\s*\d+(?:\s+|\s*[-._)]+\s*)"#,
                                           with: "", options: .regularExpression)
         return text.trimmingCharacters(in: CharacterSet(charactersIn: " -_."))
+    }
+
+    // MARK: - Packaging made of several words
+
+    /// Words a folder made ENTIRELY of is packaging: `Single STLs`, `Single
+    /// Part STLs`, `Non Modified STLs`, `Colored 3mf for Bambu`, `Instructions
+    /// and Gearlist`, `model_files`. One of them inside a real name (`Head
+    /// and Shoulders`, `Multi Tool`) changes nothing — EVERY word has to be
+    /// one of these. Words that are a model somewhere (`gear`, `piece`,
+    /// `original`, `tool`) are deliberately left out, for the same reason
+    /// `notAName` is a list and not a cleverness.
+    static let containerWords: Set<String> = [
+        "stl", "stls", "3mf", "3mfs", "obj", "objs", "step", "stp", "gcode", "gcodes",
+        "ply", "amf", "ctb", "lys", "files", "file", "folder", "folders",
+        "single", "singles", "part", "parts", "non", "modified", "unmodified",
+        "colored", "coloured", "uncolored", "uncoloured", "color", "colour",
+        "multicolor", "multicolour", "multi", "mono",
+        "pictures", "picture", "pics", "pic", "media", "images", "image",
+        "photos", "photo", "renders", "render", "previews", "preview",
+        "documentation", "docs", "doc", "instructions", "instruction", "gearlist",
+        "model", "models", "print", "prints", "printable", "ready", "for", "and", "only",
+        "supported", "presupported", "unsupported", "supports", "pre",
+        "bambu", "prusa", "cura", "orca", "elegoo", "anycubic", "creality", "chitubox", "lychee",
+    ]
+
+    /// Words that WRAP a name without being it — how a pack was sold. Taken
+    /// away before two levels are compared (`core`).
+    static let decorationWords: Set<String> = [
+        "patreon", "tier", "tiers", "pack", "packs", "bundle", "bundles",
+        "release", "releases", "free",
+    ]
+
+    /// The lowercased words of a folder name, decoration (`strip`) gone first.
+    static func words(_ name: String) -> [String] {
+        strip(name).split(whereSeparator: { !($0.isLetter || $0.isNumber) }).map(String.init)
+    }
+
+    /// Every word packaging (numbers aside), and at least one word.
+    static func isContainer(_ name: String) -> Bool {
+        let w = words(name).filter { Double($0) == nil }
+        return !w.isEmpty && w.allSatisfy { containerWords.contains($0) || notAName.contains($0) }
+    }
+
+    /// What a level names once its wrapping is gone: `Mumm Ra - Patreon` and
+    /// `Mumm-Ra` are both {mumm, ra}; `Gridcube STL Files` is {gridcube}.
+    static func core(_ name: String) -> Set<String> {
+        Set(words(name).filter { !containerWords.contains($0) && !decorationWords.contains($0) })
+    }
+
+    /// A pack's own folder: a tier, a pack, a bundle, a Patreon drop, a "file
+    /// delivery", a folder of "… Files", or a month's release (`Aug26`).
+    static func isWrapper(_ name: String) -> Bool {
+        let w = words(name)
+        let marks: Set<String> = ["tier", "tiers", "pack", "packs", "bundle", "bundles", "patreon",
+                                  "release", "releases", "delivery", "files", "file"]
+        if w.contains(where: marks.contains) { return true }
+        return w.contains {
+            $0.range(of: #"^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\d{2,4}$"#,
+                     options: .regularExpression) != nil
+        }
+    }
+
+    /// A folder name as a group shows it, with a download site's spelling
+    /// undone: `snapmaker+U1+drawer+stand_stls` is "snapmaker U1 drawer
+    /// stand", `prusa-core-one-drybox-model_files` is "prusa core one
+    /// drybox", and a marketing tail after ` | ` goes. A name with none of
+    /// that comes back exactly as the shop wrote it — this undoes a web
+    /// server's spelling, it does not tidy somebody's folders.
+    static func display(_ folder: String) -> String {
+        var s = folder.replacingOccurrences(of: "+", with: " ")
+        s = s.replacingOccurrences(of: #"(?i)[-_](?:model[-_])?files$|[-_]stls?$"#, with: "",
+                                   options: .regularExpression)
+        if !s.contains(" ") {
+            s = s.replacingOccurrences(of: "_", with: " ")
+            // A slug — three hyphens or more and still no space — is words.
+            if !s.contains(" "), s.filter({ $0 == "-" }).count >= 3 {
+                s = s.replacingOccurrences(of: "-", with: " ")
+            }
+        } else {
+            // `World Cup_Key Chain`: an underscore before a Capitalised word
+            // is a space the site could not spell. `Dragon_v2` is left alone.
+            s = s.replacingOccurrences(of: #"(?<=\p{L})_(?=\p{Lu})"#, with: " ", options: .regularExpression)
+        }
+        if let bar = s.range(of: " | ") {
+            let head = String(s[..<bar.lowerBound])
+            if !head.trimmingCharacters(in: .whitespaces).isEmpty { s = head }
+        }
+        s = s.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+        return s.isEmpty ? folder.trimmingCharacters(in: .whitespaces) : s
+    }
+}
+
+// MARK: - The rule the records already on disk were filed by
+
+extension ImportGrouping {
+
+    /// Grouping as it was before Oct 2026: the chosen (or linked) folder's
+    /// name first, every level `meaningfulV1` kept, the old trim. Files
+    /// nothing new. It answers one question for `LinkedRegroup`: is this
+    /// record's group still the one the app gave it? Nothing marks a group
+    /// the shop chose by hand, so a group equal to what this rule produced
+    /// is the app's, and anything else is the shop's and is left alone.
+    enum V1 {
+        static func levels(for file: URL, chosen: URL) -> [String] {
+            guard let raw = ImportGrouping.rawLevels(for: file, chosen: chosen, includeChosen: true)
+            else { return [] }
+            return raw.compactMap(meaningfulV1)
+        }
+
+        static func placements(for files: [URL], chosen: URL) -> [URL: Placement] {
+            ImportGrouping.placements(for: files, levels: { levels(for: $0, chosen: chosen) },
+                                      fit: fittingV1)
+        }
     }
 }
