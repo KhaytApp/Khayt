@@ -13,6 +13,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   in your library, never at a file a model points to where it already was,
   and does nothing if it cannot read the book. The Mac has the same rule
   (`lib/print-library-tier.js` `ownFilesOnly`).
+- **Models the Mac added from your storage bucket open on the desktop too.**
+  When the Mac finds models you put in the bucket yourself, it adds them to
+  the library without downloading them. The desktop listed those as missing
+  files. It now treats them as in cloud storage: opening one, in the slicer or
+  in the 3D view, downloads it first and says so. The download is checked
+  against the size the bucket gave (and its checksum, where the bucket gives a
+  plain one). It is then read the way an import is, for its picture,
+  measurements, colours and fingerprint. If it turns out to be a copy of a
+  model already in the library, Khayt says which one. Deleting such a model
+  moves its local marker to the Trash and leaves the object in the bucket, as
+  deleting a tiered model always has. If the model is in a different bucket
+  from the one connected in Settings, Khayt names both instead of reporting
+  the model lost.
 
 - **Moving old models to the bucket never touches a model the Mac adopted
   from the bucket.** The Mac marks a model that is in the bucket but not yet

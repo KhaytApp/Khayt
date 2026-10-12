@@ -2413,6 +2413,25 @@ async function printLibSidecarMap(dir) {
 }
 
 /**
+ * The Mac's `.online` markers in one item folder, keyed by the model each
+ * stands in for. An unreadable marker is left out, as an unreadable sidecar is:
+ * the model then reads as absent rather than as safely in the bucket.
+ */
+async function printLibOnlineMap(dir) {
+  const out = new Map();
+  let names;
+  try { names = await fs.promises.readdir(dir); } catch (_) { return out; }
+  for (const n of names) {
+    if (!PLT.isOnlineMarker(n)) continue;
+    try {
+      const m = PLT.parseOnlineMarker(await fs.promises.readFile(path.join(dir, n), 'utf8'));
+      if (m) out.set(PLT.onlineBaseName(n), { ...m, fullPath: path.join(dir, PLT.onlineBaseName(n)) });
+    } catch (_) { /* reads as missing rather than as safe */ }
+  }
+  return out;
+}
+
+/**
  * Put a file in the bucket and prove it arrived.
  *
  * Returns the digests as well, because the caller needs the SHA-256 for the
@@ -2478,7 +2497,11 @@ async function printLibRehydrate(fullPath) {
   if (fs.existsSync(p)) return { ok: true, restored: false };
 
   const sidePath = p + PLT.SIDECAR_EXT;
-  if (!fs.existsSync(sidePath)) return { ok: true, restored: false };  // simply not a library file we tiered
+  if (!fs.existsSync(sidePath)) {
+    // Not tiered by us — but the Mac may have adopted it from the bucket.
+    if (fs.existsSync(p + PLT.ONLINE_MARKER_EXT)) return printLibBringDown(p);
+    return { ok: true, restored: false };  // simply not a library file in the cloud
+  }
 
   if (printLibRehydrating.has(p)) return printLibRehydrating.get(p);
   const job = (async () => {
@@ -2526,6 +2549,68 @@ async function printLibRehydrate(fullPath) {
     return { ok: true, restored: true };
   })();
 
+  printLibRehydrating.set(p, job);
+  try { return await job; } finally { printLibRehydrating.delete(p); }
+}
+
+/**
+ * Fetch a model the Mac adopted from the bucket without downloading
+ * (`<model>.online`, lib/print-library-tier.js `parseOnlineMarker`).
+ *
+ * The same shape as the sidecar path above — one download per file, written
+ * beside and renamed, the marker removed only once the model is whole — with
+ * the Mac's check: the listed size, and the ETag where it is a plain MD5.
+ * Bucket only: the Mac writes no marker for Drive.
+ *
+ * Then the window is told, so it reads the model the way an import does
+ * (hash, measurements, colours, picture). The Mac does the same after its
+ * `bringDown`. The object stays in the bucket.
+ */
+async function printLibBringDown(p) {
+  if (printLibRehydrating.has(p)) return printLibRehydrating.get(p);
+  const markerPath = p + PLT.ONLINE_MARKER_EXT;
+  const job = (async () => {
+    let m;
+    try { m = PLT.parseOnlineMarker(await fs.promises.readFile(markerPath, 'utf8')); }
+    catch (_) { m = null; }
+    if (!m) return { ok: false, error: 'The record of this file in the bucket is unreadable.' };
+
+    const cfg = printLibS3Settings();
+    const s3 = printLibS3({ evenIfOff: true });
+    if (!s3) return { ok: false, error: 'This model is in a storage bucket, but no bucket is connected. Add the bucket in Settings.' };
+    // A different bucket would answer "not there" for a key it never held,
+    // which reads as the model being lost. Say which bucket it is in instead.
+    if (m.bucket && cfg.bucket && m.bucket !== cfg.bucket) {
+      return { ok: false, error: `This model is in the bucket "${m.bucket}", but the connected bucket is "${cfg.bucket}".` };
+    }
+
+    let buf = null;
+    try { buf = await s3.client.get(m.key); }
+    catch (e) { return { ok: false, error: `Could not download the file: ${e.message}` }; }
+    if (!buf) return { ok: false, error: 'The file is no longer in the bucket.' };
+
+    const v = PLT.verifyOnlineDownload(m, buf.length, crypto.createHash('md5').update(buf).digest('hex'));
+    if (!v.ok) return { ok: false, error: v.error };
+
+    const tmp = `${p}.part-${process.pid}`;
+    try {
+      await fs.promises.mkdir(path.dirname(p), { recursive: true });
+      await fs.promises.writeFile(tmp, buf);
+      await fs.promises.rename(tmp, p);
+    } catch (e) {
+      try { await fs.promises.unlink(tmp); } catch (_) { /* nothing to clean up */ }
+      return { ok: false, error: `Could not save the downloaded file: ${e.message}` };
+    }
+    try { await fs.promises.unlink(markerPath); } catch (_) { /* listed as present anyway */ }
+
+    let contentHash = null;
+    try { contentHash = modelContentHash(buf); } catch (_) { contentHash = null; }
+    const payload = { dirName: path.basename(path.dirname(p)), filename: path.basename(p), fullPath: p, size: buf.length, contentHash };
+    for (const w of BrowserWindow.getAllWindows()) {
+      try { w.webContents.send('hub:printlib-brought-down', payload); } catch (_) { /* window closing */ }
+    }
+    return { ok: true, restored: true, online: true };
+  })();
   printLibRehydrating.set(p, job);
   try { return await job; } finally { printLibRehydrating.delete(p); }
 }
@@ -3275,7 +3360,7 @@ ipcMain.handle('hub:printlib-list', async (_e, id) => {
   const files = await fs.promises.readdir(dir);
   const entries = [];
   for (const f of files) {
-    if (PLT.isSidecar(f)) continue;                  // folded in below, under the name it stands for
+    if (PLT.isSidecar(f) || PLT.isOnlineMarker(f)) continue;   // folded in below, under the name each stands for
     const fullPath = path.join(dir, f);
     try {
       const stat = await fs.promises.stat(fullPath);
@@ -3287,7 +3372,7 @@ ipcMain.handle('hub:printlib-list', async (_e, id) => {
   // identical to the person staring at the screen — and this listing has to keep
   // working with the bucket unreachable, which is why it reads sidecars off the
   // disk rather than asking the bucket what it holds.
-  return PLT.mergeListing(entries, await printLibSidecarMap(dir));
+  return PLT.mergeListing(entries, await printLibSidecarMap(dir), await printLibOnlineMap(dir));
 });
 
 ipcMain.handle('hub:printlib-delete', async (_e, fullPath) => {
@@ -3311,7 +3396,9 @@ ipcMain.handle('hub:printlib-delete', async (_e, fullPath) => {
   // renderer already reports as "some files could not be deleted from disk".
   // Never a silent fallback to a permanent delete.
   let ok = true;
-  for (const p of [safe + PLT.SIDECAR_EXT, safe]) {
+  // The Mac's `.online` marker likewise: the model is gone from the library,
+  // and the object it named stays in the bucket for the same reason.
+  for (const p of [safe + PLT.SIDECAR_EXT, safe + PLT.ONLINE_MARKER_EXT, safe]) {
     try { await fs.promises.lstat(p); } catch (e) {
       if (e && e.code === 'ENOENT') continue;  // the ordinary case: no sidecar, or already gone
       ok = false; continue;

@@ -2183,7 +2183,13 @@
      * out of an async handler: no dialog, no toast, nothing happened. */
     const named = rec.sourceFile && files.find((f) => f.filename === rec.sourceFile.filename);
     const openable = named || files.find((f) => MODEL_EXT.test(String(f.filename || '')));
+    if (openable) noteDownload([openable]);
     return openable ? openable.fullPath : null;
+  }
+
+  /** A model in cloud storage opens by downloading first, which takes a moment: say so. */
+  function noteDownload(entries) {
+    if ((entries || []).some((f) => f && f.tiered)) toast(t('plib.downloading'), 'info', 4000);
   }
 
   async function view3d(id) {
@@ -2211,9 +2217,9 @@
     let files = [];
     try { files = await hub.printLibList(rec.id); } catch (_) { files = []; }
     if (!Array.isArray(files) || !files.length) return [];
-    const byName = new Map(files.map((f) => [String(f.filename), f.fullPath]));
-    const paths = partsOf(rec).map((p) => byName.get(String(p.filename))).filter(Boolean);
-    if (paths.length) return paths;
+    const byName = new Map(files.map((f) => [String(f.filename), f]));
+    const chosen = partsOf(rec).map((p) => byName.get(String(p.filename))).filter(Boolean);
+    if (chosen.length) { noteDownload(chosen); return chosen.map((f) => f.fullPath); }
     /* A record whose parts name nothing on disk still opens what IS there —
      * the pre-`files[]` shape, where the old code took files[0].
      *
@@ -2222,6 +2228,7 @@
      * files[0] blind meant the fallback could hand the slicer a JPEG. Only a
      * model or a G-code is a thing to open. */
     const openable = files.find((f) => MODEL_EXT.test(String(f.filename || '')));
+    if (openable) noteDownload([openable]);
     return openable ? [openable.fullPath] : [];
   }
 
@@ -2585,7 +2592,51 @@
     if (moved) { saveAll(); renderPrintFiles(); }
   }
 
-  const pub = { renderPrintFiles, migrateThumbsToDisk, addPrintFile, openInSlicer, editPrintFile, deletePrintFile, attachConverted, importConvertedAsNew, warnIfAlreadyHave, identifyPrintFile };
+  /* ── A model brought down from the bucket ──────────────────────────────────
+   *
+   * The Mac adopts models the shop put in its storage bucket by hand without
+   * downloading them: a record with no hash, no measurements and no picture,
+   * and a `.online` marker in its folder. Opening one here downloads it (main.js
+   * `printLibBringDown`), and main says so. This reads it the way an import
+   * does, as the Mac does after its own download (LibraryStorage.fillDownloaded).
+   */
+
+  /** The folder main.js keeps a record's files in (lib/print-library-location.js `itemDirName`). */
+  function itemDirNameOf(id) {
+    const base = String(id == null ? '' : id).trim().split(/[\\/]/).pop() || '';
+    return base.replace(/[^a-zA-Z0-9_-]/g, '_') || 'unsorted';
+  }
+
+  async function onBroughtDown(d) {
+    if (!d || !d.dirName || !d.filename) return;
+    const rec = (printFiles || []).find((r) => r && itemDirNameOf(r.id) === d.dirName);
+    if (!rec) return;
+    const name = rec.name || rec.originalName || d.filename;
+    // The record's own file: its size and hash are now known. A part of a
+    // multi-file print is read for its picture and numbers the same way.
+    if (rec.sourceFile && rec.sourceFile.filename === d.filename) {
+      if (Number(d.size) > 0) rec.sourceFile.size = Number(d.size);
+      if (d.contentHash) rec.contentHash = d.contentHash;
+    }
+    // The duplicate the bucket listing could not catch, caught now that the
+    // bytes are here. Said, not acted on: which copy to keep is the shop's call.
+    const twin = d.contentHash
+      ? (printFiles || []).find((r) => r && r !== rec && r.contentHash === d.contentHash)
+      : null;
+    if (twin) {
+      toast(t('plib.brought_down_dup', { name, other: twin.name || twin.originalName || '' }), 'warning', 7000);
+    } else {
+      toast(t('plib.brought_down', { name }), 'success', 4000);
+    }
+    await enrichPrintFile(rec, d.fullPath);   // saves and redraws
+  }
+
+  {
+    const hub = api();
+    if (hub && typeof hub.onPrintLibBroughtDown === 'function') hub.onPrintLibBroughtDown((d) => { onBroughtDown(d).catch(() => {}); });
+  }
+
+  const pub = { renderPrintFiles, migrateThumbsToDisk, addPrintFile, openInSlicer, editPrintFile, deletePrintFile, attachConverted, importConvertedAsNew, warnIfAlreadyHave, identifyPrintFile, onBroughtDown };
   Object.assign(global, pub);
   global.KhaytPrintFiles = pub;
   if (typeof module !== 'undefined' && module.exports) module.exports = pub;
