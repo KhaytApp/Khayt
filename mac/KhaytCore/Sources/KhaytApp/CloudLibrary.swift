@@ -607,6 +607,10 @@ extension Shop {
 
     /// Is this model's file in the cloud rather than on this Mac?
     func isInCloudOnly(_ file: LibraryFile) -> Bool {
+        // A LINKED model in a cloud drive's folder that the drive has not
+        // downloaded (`LinkedCloud`): listed, there, and in the cloud. Shown
+        // as one moved to the bucket is, with Bring Back to fetch it.
+        if file.isLinked, let url = modelFile(for: file) { return LinkedCloud.isOnlineOnly(url) }
         guard modelFile(for: file) == nil, let dir = directory(for: file) else { return false }
         let contents = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
         // A `.cloud` sidecar (moved off this Mac) or an `.online` marker (put
@@ -806,6 +810,14 @@ extension Shop {
     /// Bring one model back from the cloud, for a shop about to use it.
     func bringBack(_ file: LibraryFile) async {
         cloudLibraryProblem = nil
+        if file.isLinked {
+            // Its drive fetches it when it is read; reading it is filling it in.
+            cloudLibraryBusy = true
+            defer { cloudLibraryBusy = false }
+            await bringDownLinked(file)
+            await load(source)
+            return
+        }
         guard let engine, let dir = directory(for: file) else { return }
         let sidecars = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
             .filter { $0.hasSuffix(".cloud") }

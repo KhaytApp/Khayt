@@ -4,6 +4,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: linked folders on Google Drive, Dropbox or iCloud Drive can be
+  stopped, are not downloaded, and are grouped by their real projects.**
+  - **Stop.** Looking through linked folders, or through the library's own
+    storage, now has a Stop button in Settings ▸ Library location and in the
+    library's progress banner. Models added before you stop stay in the
+    library, and the note says how many were added. A stopped scan does not
+    start again by itself until the app is opened again.
+  - **Online-only files stay online.** A file the drive has not downloaded is
+    added from its name, size and folder only. Khayt does not read it, so the
+    drive does not download it. The library shows it as in the cloud. When
+    you open it or use Bring Back, the drive downloads it, and its
+    measurements, colours and picture are filled in then. Before this fix,
+    indexing a linked Drive downloaded every file in it.
+  - **Better groups.** The linked folder's own name (for example
+    `Auto_Copied_Shared (1)`) is no longer the top group. Folders that only
+    hold files, such as `Single STLs`, `Non Modified STLs`, `Pictures` or
+    `Instructions and Gearlist`, are skipped. A folder that repeats the one
+    above it (`Mumm-Ra/Mumm Ra - Patreon`) counts as one folder. When a path
+    is too long, pack and tier folders are dropped before the project, so
+    `Call of Duty 4` is kept. Names from download sites are cleaned up:
+    `holder+stand_stls` becomes "holder stand".
+  - **Models already in the library are regrouped once** by the same rules,
+    and Settings has a **Regroup from folders** button. Groups you chose
+    yourself are not changed.
+
 - **Mac: usage counts now say which features a shop uses, not only that the
   app was opened.** Only with "Share usage counts" switched on.
   - **25 fixed counters**, such as quote created, invoice exported, model

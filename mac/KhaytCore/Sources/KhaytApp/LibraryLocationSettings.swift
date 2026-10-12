@@ -79,6 +79,8 @@ struct LibraryLocationSettings: View {
                         Button(shop.words.callIt("mac.linked_link") + "\u{2026}") { chooseLinked() }
                         if !shop.linkedFolders.isEmpty {
                             Button(shop.words.callIt("mac.linked_rescan")) { Task { await shop.rescanLinkedFolders() } }
+                            Button(shop.words.callIt("mac.linked_regroup")) { Task { await shop.regroupLinkedFolders() } }
+                                .help(shop.words.callIt("mac.linked_regroup_help"))
                         }
                     }
                     .disabled(shop.libraryMoveBusy || !shop.canMoveJobs)
@@ -87,14 +89,26 @@ struct LibraryLocationSettings: View {
             Text(shop.words.callIt("mac.linked_hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if let p = shop.libraryMoveProgress {
-                ProgressView(value: Double(p.done), total: Double(max(p.total, 1))) {
-                    Text(shop.words.callIt("mac.cloudlib_progress", ["name": .string(p.name), "done": .number(Double(p.done)),
-                                                                     "total": .number(Double(p.total))]))
-                        .font(.caption).lineLimit(1).truncationMode(.middle)
+            HStack(spacing: 8) {
+                if let p = shop.libraryMoveProgress {
+                    ProgressView(value: Double(p.done), total: Double(max(p.total, 1))) {
+                        Text(shop.words.callIt("mac.cloudlib_progress", ["name": .string(p.name), "done": .number(Double(p.done)),
+                                                                         "total": .number(Double(p.total))]))
+                            .font(.caption).lineLimit(1).truncationMode(.middle)
+                    }
+                } else if shop.libraryMoveBusy {
+                    ProgressView().controlSize(.small)
+                    if shop.libraryScanStop != nil {
+                        Text(shop.words.callIt("mac.library_looking")).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
                 }
-            } else if shop.libraryMoveBusy {
-                ProgressView().controlSize(.small)
+                // A scan — never a move — can be stopped, and keeps what it did.
+                if shop.libraryScanStop != nil {
+                    Button(shop.words.callIt("mac.stop")) { shop.stopLibraryScan() }
+                        .controlSize(.small)
+                        .disabled(shop.libraryScanStopping)
+                }
             }
             if let note = shop.libraryMoveNote {
                 Label(note, systemImage: "checkmark.circle").font(.caption).foregroundStyle(Khayt.done)

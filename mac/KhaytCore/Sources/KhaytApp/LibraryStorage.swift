@@ -55,10 +55,13 @@ extension Shop {
         /// True when the walk stopped at its cap — there may be more.
         var capped = false
         var addedIds: [String] = []
+        /// True when the shop pressed Stop — see `ScanStop`.
+        var stopped = false
 
         mutating func fold(_ other: StorageReport) {
             added += other.added; duplicates += other.duplicates; photos += other.photos
             failures += other.failures; capped = capped || other.capped; addedIds += other.addedIds
+            stopped = stopped || other.stopped
         }
     }
 
@@ -197,7 +200,8 @@ extension Shop {
                                                seen: Set<String> = [],
                                                excluding: [String] = [],
                                                visitCap: Int = storageVisitCap,
-                                               adoptCap: Int = storageAdoptCap)
+                                               adoptCap: Int = storageAdoptCap,
+                                               stop: ScanStop? = nil)
         -> (files: [LibraryImport.Incoming], capped: Bool) {
         let fm = FileManager.default
         var recordDirs: Set<String> = []
@@ -240,7 +244,7 @@ extension Shop {
         var visited = 0
         var capped = false
         for entry in top {
-            if capped { break }
+            if capped || stop?.isStopped == true { break }
             guard let v = try? entry.resourceValues(forKeys: Set(keys)), v.isSymbolicLink != true else { continue }
             if v.isDirectory == true {
                 let name = entry.lastPathComponent
@@ -256,6 +260,7 @@ extension Shop {
                 while let next = walker?.nextObject() as? URL {
                     visited += 1
                     if visited > visitCap { capped = true; break }
+                    if visited % 256 == 0, stop?.isStopped == true { break }
                     // KHAYT'S OWN FOLDERS AT ANY DEPTH, not only at the top: a
                     // record folder copied into a shop folder (or the mirror,
                     // nested here) holds versions and converted copies whose
@@ -321,6 +326,8 @@ extension Shop {
                                  storeURL: URL, engine: KhaytEngine,
                                  owns: @escaping () -> Bool,
                                  whoHasIt: @escaping () -> String?,
+                                 stop: ScanStop? = nil,
+                                 isOnline: (@Sendable (URL) -> Bool)? = nil,
                                  progress: @escaping (Int, Int, URL) -> Void) async -> StorageReport {
         // lock: callers — rescanStorage
         guard let book = readBook(storeURL) else { return StorageReport() }
@@ -338,14 +345,23 @@ extension Shop {
             if names[h] == nil, case .string(let n)? = o["name"] { names[h] = n }
         }
         // The primary in place; each past location by copy.
+        // Online-only files in the primary (an iCloud Drive library with
+        // Optimise Storage on) are known by name and size — see `LinkedCloud`.
+        var nameSizes: Set<String> = []
+        for case .object(let o) in rows {
+            guard case .object(let sf)? = o["sourceFile"], case .number(let size)? = sf["size"], size > 0,
+                  case .string(let name)? = o["originalName"] ?? sf["originalName"] else { continue }
+            nameSizes.insert(LibraryImport.nameSize(Int(size), name))
+        }
         for (where_, inPlace) in [(root, true)] + past.map({ ($0, false) }) {
+            if stop?.isStopped == true || Task.isCancelled { report.stopped = true; break }
             guard FileManager.default.fileExists(atPath: where_.path) else { continue }
             // Every other root is a fence for this one's walk: the primary is
             // never walked again from a past location around it, and nothing
             // nested here (the mirror, a linked folder) is walked as part of it.
             let fence = excluding + ([root] + past).filter { $0 != where_ }.map(\.path)
             let found = await PinWork.run {
-                Shop.untrackedInStorage(where_, rows: rows, ignored: skipped, seen: seen, excluding: fence)
+                Shop.untrackedInStorage(where_, rows: rows, ignored: skipped, seen: seen, excluding: fence, stop: stop)
             }
             report.capped = report.capped || found.capped
             guard !found.files.isEmpty else { continue }
@@ -353,7 +369,11 @@ extension Shop {
                 found.files, storeURL: storeURL, libraryRoot: root,
                 knownHashes: hashes, nameOfExisting: { names[$0] },
                 engine: engine, keepOriginal: true, inPlace: inPlace,
-                owns: owns, whoHasIt: whoHasIt, progress: progress)
+                knownNameSizes: nameSizes, isOnline: isOnline,
+                owns: owns, whoHasIt: whoHasIt,
+                shouldStop: { stop?.isStopped == true || Task.isCancelled },
+                progress: progress)
+            report.stopped = report.stopped || done.stopped
             report.added += done.moved
             report.duplicates += done.duplicates
             report.photos += done.photos
@@ -498,6 +518,7 @@ extension Shop {
                                 storeURL: URL, fetch: @escaping S3.Fetch,
                                 owns: @escaping () -> Bool,
                                 whoHasIt: @escaping () -> String?,
+                                stop: ScanStop? = nil,
                                 progress: (Int, Int, String) -> Void) async throws -> StorageReport {
         // lock: callers — rescanStorage
         guard let book = readBook(storeURL) else { return StorageReport() }
@@ -555,6 +576,8 @@ extension Shop {
         let fm = FileManager.default
         let fresh = models.filter { !skipped.contains(tag($0.key)) && $0.size > 0 }
         for (i, item) in fresh.enumerated() {
+            // What was found before a Stop is written below, ledger and all.
+            if stop?.isStopped == true || Task.isCancelled { report.stopped = true; break }
             if records.count >= bucketAdoptCap { report.capped = true; break }
             progress(i, fresh.count, (item.key as NSString).lastPathComponent)
             let signature = "\(tag(item.key))|\(item.size)|\(item.etag ?? "")"
@@ -694,14 +717,20 @@ extension Shop {
     ///
     /// Returns the title of a record that already holds these bytes, when one
     /// does: the duplicate the listing could not catch, caught now.
+    ///
+    /// `pictures` is where a drawn or embedded preview is written: the
+    /// model's own folder for a bucket model, and the record's VAULT folder
+    /// for a linked one — a linked model's folder is the shop's, and nothing
+    /// of this app's is ever written into it. Also used for a linked model
+    /// indexed online only, once it is on this Mac (`Shop.fillNowLocal`).
     @discardableResult
-    static func fillDownloaded(id: String, file: URL, storeURL: URL, engine: KhaytEngine,
+    static func fillDownloaded(id: String, file: URL, pictures: URL? = nil, storeURL: URL, engine: KhaytEngine,
                                owns: @escaping () -> Bool,
                                whoHasIt: @escaping () -> String?) async throws -> String? {
-        // lock: callers — bringDownOnline
+        // lock: callers — bringDownOnline, fillNowLocal, bringDownLinked
         let ext = file.pathExtension.lowercased()
         let hash = await LibraryImport.offMain { try? LibraryImport.contentHash(of: file) } ?? nil
-        let a = await LibraryImport.analyse(file, ext: ext, dir: file.deletingLastPathComponent(),
+        let a = await LibraryImport.analyse(file, ext: ext, dir: pictures ?? file.deletingLastPathComponent(),
                                             engine: engine, analyseRisk: false)
         var duplicateOf: String?
         try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
@@ -727,6 +756,8 @@ extension Shop {
                     o["licence"] = .string(l)
                 }
                 if case .object(var sf)? = o["sourceFile"] { sf["size"] = .number(Double(a.size)); o["sourceFile"] = .object(sf) }
+                // Read now: no longer a record of what the drive listed.
+                o.removeValue(forKey: "indexedOnline")
                 rows[i] = .object(o)
             }
             book["printFiles"] = .array(rows)
@@ -822,6 +853,9 @@ extension Shop {
             guard case .string(let id)? = o["id"] else { continue }
             if due.count >= cap { break }
             guard let place = photoPlace(o, roots: roots, linked: linked) else { continue }
+            // A model the cloud has not downloaded is looked at once it is
+            // here, as one on an unplugged drive is — left unmarked.
+            if LinkedCloud.isOnlineOnly(place.model) { continue }
             var thumb: String?
             if case .string(let t)? = o["thumbFile"] { thumb = t }
             due.append((id, place.model, place.boundary, place.vault, thumb))
@@ -850,6 +884,8 @@ extension Shop {
                         return !n.hasPrefix("thumb") && n != (item.thumb ?? "").lowercased()
                     }
                 }
+                // Never a picture the cloud would have to download to decode.
+                found = found.filter { !LinkedCloud.isOnlineOnly($0) }
                 if let uri = LibraryImport.firstPhoto(found) { out[item.id] = uri }
             }
             return out
@@ -897,7 +933,9 @@ extension Shop {
         guard FileManager.default.fileExists(atPath: root.path) else { return }
         if byPerson { clearLastOutcome() }
         libraryMoveBusy = true
-        defer { libraryMoveBusy = false; libraryMoveProgress = nil }
+        let stop = ScanStop()
+        libraryScanStop = stop
+        defer { libraryMoveBusy = false; libraryMoveProgress = nil; libraryScanStop = nil }
         let owns = { StoreLock.weOwnIt(build) }
         let who = { StoreLock.describe(StoreLock.verdict(for: build)) }
         let past = Self.pastLocations(roots, builtIn: LibraryLocation.defaultRoot(for: build))
@@ -905,17 +943,17 @@ extension Shop {
         var report = await Self.adoptFromStorage(
             root: root, past: past, excluding: roots.roots.filter { $0 != roots.primary } + [roots.mirror].compactMap { $0 } + linkedFolders,
             storeURL: build.storeURL, engine: engine,
-            owns: owns, whoHasIt: who,
+            owns: owns, whoHasIt: who, stop: stop, isOnline: LinkedCloud.isOnlineOnly,
             progress: { [weak self] done, total, url in
                 self?.libraryMoveProgress = (done, total, url.lastPathComponent)
             })
         // The bucket, when the library's remote is one. Drive: see
         // `adoptFromBucket` for why there is nothing there to find.
-        if let config = await cloudConfig(), case .bucket(let c) = config.remote {
+        if !report.stopped, let config = await cloudConfig(), case .bucket(let c) = config.remote {
             do {
                 report.fold(try await Self.adoptFromBucket(
                     c, provider: config.provider, root: root, storeURL: build.storeURL,
-                    fetch: CloudLibrary.fetch, owns: owns, whoHasIt: who,
+                    fetch: CloudLibrary.fetch, owns: owns, whoHasIt: who, stop: stop,
                     progress: { [weak self] done, total, name in
                         self?.libraryMoveProgress = (done, total, name)
                     }))
@@ -923,12 +961,20 @@ extension Shop {
                 report.failures.append(cloudSay(error))
             }
         }
-        report.photos += await Self.backfillPhotos(storeURL: build.storeURL, roots: roots.roots,
-                                                   linked: linkedFolders, owns: owns, whoHasIt: who)
+        if !report.stopped, !stop.isStopped {
+            report.photos += await Self.backfillPhotos(storeURL: build.storeURL, roots: roots.roots,
+                                                       linked: linkedFolders, owns: owns, whoHasIt: who)
+        }
         await load(source)
         if !report.addedIds.isEmpty {
             let ids = report.addedIds
             Task { [weak self] in await self?.backUpToCloud(ids: ids) }
+        }
+        // Stopped: said either way, with what got in before it — whoever
+        // pressed Stop is waiting to hear that it did.
+        if report.stopped || stop.isStopped {
+            importNote = words.callIt("mac.scan_stopped", ["n": .number(Double(report.added))])
+            return
         }
         // The load-time pass speaks only when it found something; a person
         // who pressed the button is always answered.
@@ -947,13 +993,18 @@ extension Shop {
 
     /// The storage pass, once per book per launch — after the linked folders'
     /// pass, which holds the same busy flag.
+    ///
+    /// A shop that pressed Stop on the linked pass stopped the LOOKING, not
+    /// one folder of it: this pass does not then start by itself behind it.
+    /// Rescan in Settings still runs it whenever the shop asks.
     func rescanStorageIfDue() {
         guard case .store(let build) = source, !storageScannedBooks.contains(build.rawValue) else { return }
         storageScannedBooks.insert(build.rawValue)
         let linked = linkedScan
-        Task { [weak self] in
+        storageScan = Task { [weak self] in
             await linked?.value
-            await self?.rescanStorage(byPerson: false)
+            guard let self, !Task.isCancelled, !self.libraryScanStoppedBooks.contains(build.rawValue) else { return }
+            await self.rescanStorage(byPerson: false)
         }
     }
 

@@ -1198,6 +1198,18 @@ final class Shop {
     var linkedScan: Task<Void, Never>?
     /// The books whose own library folder this launch has already looked through.
     var storageScannedBooks: Set<String> = []
+    /// That pass in flight, so Stop can cancel it.
+    var storageScan: Task<Void, Never>?
+    /// The Stop of the linked or storage scan running now; nil when none is.
+    /// What the Stop buttons show on — a library MOVE has no Stop, because a
+    /// move half-done is a library in two places. See `ScanStop`.
+    var libraryScanStop: ScanStop? { didSet { libraryScanStopping = false } }
+    /// Stop has been pressed and the scan is finishing the file it is on —
+    /// observed, so the button greys at once (the flag itself is not).
+    var libraryScanStopping = false
+    /// Books whose scan the shop stopped this launch: the load-time passes
+    /// do not start again by themselves on them.
+    var libraryScanStoppedBooks: Set<String> = []
 
     /// The books whose slicer figures this launch has already read.
     var slicerFiguresReadBooks: Set<String> = []

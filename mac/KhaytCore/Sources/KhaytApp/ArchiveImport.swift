@@ -346,9 +346,12 @@ enum ArchiveImport {
             $0.path.localizedStandardCompare($1.path) == .orderedAscending
         }, scratch: scratch,
            // The archive's own name, decorations stripped — and its bare name
-           // if the rule finds nothing in it worth calling a group.
-           group: ImportGrouping.meaningful((name as NSString).deletingPathExtension)
-               ?? (name as NSString).deletingPathExtension)
+           // if the rule finds nothing in it worth calling a group. Spelled
+           // as a person would (`ImportGrouping.display`): a zip is how a
+           // site hands a model over, and `drybox-model_files` or
+           // `holder+stand_stls` is the site's spelling, not the shop's.
+           group: ImportGrouping.display(ImportGrouping.meaningful((name as NSString).deletingPathExtension)
+               ?? (name as NSString).deletingPathExtension))
     }
 
     /// How long `bsdtar` may take. Ten minutes is far past anything the
