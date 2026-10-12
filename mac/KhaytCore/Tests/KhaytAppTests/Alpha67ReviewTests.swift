@@ -144,6 +144,62 @@ struct Alpha67ReviewTests {
         #expect(p.placed[models[0]]?.group == "2026 World Cup/Can Opener", "nothing to read: the folder's own name")
     }
 
+    // MARK: - A request that keeps failing
+
+    @Test("a failing request is not re-sent the same day, and stops after three until its folders change")
+    func failuresAreHeld() {
+        var marks: [String: SortFailures.Mark] = [:]
+        // Day 1: fails. Held for the rest of the day.
+        marks = SortFailures.after(marks, asked: ["s"], failed: ["s"], pending: ["s"], today: "2026-10-12")
+        #expect(marks["s"] == SortFailures.Mark(count: 1, last: "2026-10-12"))
+        #expect(SortFailures.held("s", in: marks, today: "2026-10-12"))
+        #expect(!SortFailures.held("s", in: marks, today: "2026-10-13"), "tried again the next day")
+        // Days 2 and 3: fails again. Three: held on any day after.
+        marks = SortFailures.after(marks, asked: ["s"], failed: ["s"], pending: ["s"], today: "2026-10-13")
+        marks = SortFailures.after(marks, asked: ["s"], failed: ["s"], pending: ["s"], today: "2026-10-14")
+        #expect(marks["s"]?.count == 3)
+        #expect(SortFailures.held("s", in: marks, today: "2026-11-30"))
+        // A held request not asked keeps its mark; one the pass no longer
+        // makes (its folders changed: a new signature) is forgotten.
+        #expect(SortFailures.after(marks, asked: [], failed: [], pending: ["s"], today: "2026-10-15") == marks)
+        let changed = SortFailures.after(marks, asked: ["t"], failed: [], pending: ["t"], today: "2026-10-15")
+        #expect(changed.isEmpty)
+        #expect(!SortFailures.held("t", in: changed, today: "2026-10-15"))
+        // Pressed by hand and it worked: forgotten.
+        #expect(SortFailures.after(marks, asked: ["s"], failed: [], pending: ["s"], today: "2026-10-15").isEmpty)
+        // Round trip through the book.
+        var root: [String: JSONValue] = ["settings": .object([:])]
+        SortFailures.write(marks, into: &root)
+        guard case .object(let s)? = root["settings"] else { Issue.record("no settings"); return }
+        #expect(SortFailures.read(s) == marks)
+        SortFailures.write([:], into: &root)
+        guard case .object(let s2)? = root["settings"] else { Issue.record("no settings"); return }
+        #expect(SortFailures.read(s2).isEmpty)
+    }
+
+    @Test("the launch pass skips held requests; only Sort linked folders… by hand tries them")
+    func onlyByHandTriesAHeldRequest() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/Shop+LinkedSort.swift"), encoding: .utf8)
+        #expect(source.contains("if !byHand, SortFailures.held(sig, in: marks, today: today)"))
+        #expect(source.contains("askAssistantToSort(sorted, stop: stop, byHand: true)"), "the preview is by hand")
+        let rescan = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/LinkedFolders.swift"), encoding: .utf8)
+        #expect(rescan.contains("askAssistantToSort(plans, stop: stop)"), "the launch pass is not")
+    }
+
+    @Test("the note says how many folders the assistant could not sort")
+    @MainActor func heldIsSaid() async {
+        let shop = Shop()
+        await shop.load(.sample)
+        let line = SortAsk(sorted: 12, problem: nil, held: 40).line(shop.words) ?? ""
+        #expect(line.contains("12") && line.contains("40"))
+        #expect(SortAsk(held: 5).line(shop.words)?.contains("5") == true)
+        #expect(SortAsk().line(shop.words) == nil)
+    }
+
     // MARK: - What leaves this Mac
 
     /// The prompt the request carries, wherever the provider puts it.
@@ -281,7 +337,7 @@ struct Alpha67SnapshotTests {
         for dark in [false, true] {
             await hosted(LinkedSortSheet(shop: shop, preview: Self.preview(nil, off: true)), "a67-sort-sheet-assistant-off",
                    sheet, dark: dark)
-            await hosted(LinkedSortSheet(shop: shop, preview: Self.preview(SortAsk(sorted: 37, problem: nil), off: false)),
+            await hosted(LinkedSortSheet(shop: shop, preview: Self.preview(SortAsk(sorted: 37, problem: nil, held: 12), off: false)),
                    "a67-sort-sheet-assistant-used", sheet, dark: dark)
             await hosted(LinkedSortSheet(shop: shop, preview: Self.preview(SortAsk(sorted: 0, problem: "The provider is busy (HTTP 529). Try again in a minute."), off: false)),
                    "a67-sort-sheet-assistant-failed", sheet, dark: dark)

@@ -2413,6 +2413,7 @@ final class Words {
         // {why} is a whole sentence (`mac.ai_no_key`) or the provider's own
         // words, so it follows the sentence rather than sitting in brackets.
         "mac.sort_ai_failed": ["en": "Your assistant could not sort the folders, so this Mac sorted them by their names. {why}", "ar": "تعذّر على مساعدك فرز المجلدات، ففرزها هذا الماك حسب أسمائها. {why}"],
+        "mac.sort_ai_held": ["en": "Folders your assistant could not sort, sorted on this Mac instead: {n}. Press “Sort linked folders…” to ask again.", "ar": "مجلدات تعذّر على مساعدك فرزها ففُرزت على هذا الماك: {n}. اضغط «فرز المجلدات المرتبطة…» لتسأله مجددًا."],
         // The pane is "AI assist" (`set.ai_master`), as `mac.ai_no_key` says it.
         "mac.sort_ai_off": ["en": "Sorted by the folders’ names on this Mac. To let your assistant check it, turn on “Sort linked folders” in Settings → AI assist — only folder and file names are sent.", "ar": "فُرزت حسب أسماء المجلدات على هذا الماك. لتسمح لمساعدك بمراجعتها، فعّل «فرز المجلدات المرتبطة» في الإعدادات ← مساعدة الذكاء الاصطناعي — تُرسل أسماء المجلدات والملفات فقط."],
         "mac.sort_pictures_added": ["en": "Pictures added: {n}.", "ar": "صور أُضيفت: {n}."],

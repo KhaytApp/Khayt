@@ -24,6 +24,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     assistant answers again, so the new model joins its print instead of
     landing in a group of its own, and "Regroup from folders" with the
     assistant off no longer undoes its sorting.
+  - **A request that keeps failing is not paid for on every launch.** If
+    your assistant fails on some folders, they are not sent again the same
+    day, and after three failures not again until those folders change.
+    Pressing "Sort linked folders…" always tries, and the note says how
+    many folders the assistant could not sort.
   - **An assistant's print name can only ever be one group.** A name such
     as ".." or one with a slash is cleaned or ignored, including one read
     back from another device's settings.

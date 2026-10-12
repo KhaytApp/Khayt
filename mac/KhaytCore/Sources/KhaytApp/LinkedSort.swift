@@ -225,6 +225,70 @@ enum SortCache {
     }
 }
 
+// MARK: - Requests that keep failing
+
+/// Requests the assistant failed on, so a failing one is not paid for on
+/// every launch: `settings.printLibrary.folderSortFailed`, keyed by the
+/// request's signature (`SortCache.signature` of its folders), holding how
+/// many times it failed and the last day (`YYYY-MM-DD`, the book's calendar).
+///
+/// The launch pass skips a request that failed today, and one that failed
+/// `giveUpAfter` times until its folders change (a new signature). "Sort
+/// linked folders…" pressed by hand always tries. A request that succeeds is
+/// forgotten.
+enum SortFailures {
+
+    nonisolated static let settingsKey = "folderSortFailed"
+    nonisolated static let giveUpAfter = 3
+
+    struct Mark: Sendable, Equatable {
+        var count: Int
+        var last: String
+    }
+
+    nonisolated static func today(_ now: Date = Date()) -> String { Calendar.book.dayString(now) }
+
+    nonisolated static func read(_ settings: [String: JSONValue]) -> [String: Mark] {
+        guard case .object(let library)? = settings["printLibrary"],
+              case .object(let map)? = library[settingsKey] else { return [:] }
+        var out: [String: Mark] = [:]
+        for (sig, v) in map {
+            guard case .object(let o) = v, case .number(let n)? = o["count"], case .string(let d)? = o["last"] else { continue }
+            out[sig] = Mark(count: Int(n), last: d)
+        }
+        return out
+    }
+
+    /// Whether the launch pass leaves this request alone.
+    nonisolated static func held(_ signature: String, in marks: [String: Mark], today: String) -> Bool {
+        guard let m = marks[signature] else { return false }
+        return m.count >= giveUpAfter || m.last == today
+    }
+
+    /// The marks after a pass: one more for each that failed, none for each
+    /// that came back, and none for a request this pass no longer makes (its
+    /// folders changed, or were answered) — so the map never outgrows the
+    /// folders still waiting.
+    nonisolated static func after(_ marks: [String: Mark], asked: Set<String>, failed: Set<String>,
+                                  pending: Set<String>, today: String) -> [String: Mark] {
+        var out = marks.filter { pending.contains($0.key) }
+        for sig in asked where !failed.contains(sig) { out[sig] = nil }
+        for sig in failed { out[sig] = Mark(count: (marks[sig]?.count ?? 0) + 1, last: today) }
+        return out
+    }
+
+    nonisolated static func write(_ marks: [String: Mark], into root: inout [String: JSONValue]) {
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = root["settings"] { settings = s }
+        var library: [String: JSONValue] = [:]
+        if case .object(let l)? = settings["printLibrary"] { library = l }
+        library[settingsKey] = marks.isEmpty ? nil
+            : .object(marks.mapValues { .object(["count": .number(Double($0.count)), "last": .string($0.last)]) })
+        settings["printLibrary"] = .object(library)
+        root["settings"] = .object(settings)
+    }
+}
+
 // MARK: - The prints' pictures
 
 /// Which prints have been looked at for a picture, so the drive is not asked
