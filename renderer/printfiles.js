@@ -2516,7 +2516,14 @@
         rec.source = modal.querySelector('#pfSource').value.trim();
         rec.licence = modal.querySelector('#pfLicence').value;
         const ph = modal._getPhoto ? modal._getPhoto() : null;
-        if (ph) { if (ph.cleared) rec.userPhoto = null; else if (ph.stagedPhoto) rec.userPhoto = ph.stagedPhoto; }
+        // `userPhotoRemoved` tells the Mac not to put a picture it found in a
+        // linked folder back on a model the shop cleared (Shop+LinkedSort.swift
+        // reads `true` only). false, not deleted: an absent field is one a sync
+        // merge can bring back from an older copy.
+        if (ph) {
+          if (ph.cleared) { rec.userPhoto = null; rec.userPhotoRemoved = true; }
+          else if (ph.stagedPhoto) { rec.userPhoto = ph.stagedPhoto; if (rec.userPhotoRemoved) rec.userPhotoRemoved = false; }
+        }
         rec.updatedAt = Date.now();
         saveAll(); renderPrintFiles();
         toast(t('plib.saved') || 'Saved', 'success');

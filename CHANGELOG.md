@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A photo you remove from a model on the desktop stays removed on the Mac.**
+  The Mac puts pictures it finds in your linked folders on models that have
+  none, but skips a model whose photo you took off. Removing a photo on the
+  desktop did not say so, so the Mac could put a found picture back on it.
+  It now does; adding a photo again clears that.
 - **Mac: linked folders are sorted into prints, with their pictures.** After
   a linked Google Drive was scanned, models were filed under Patreon tiers
   and month folders ("Oct26 Giga Tier/Guilmon Card/Mini Poster"), and no
