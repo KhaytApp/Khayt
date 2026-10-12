@@ -78,7 +78,7 @@ test('the old global toggle does not carry consent for customer data', () => {
 
 test('an owner who never enabled AI gets everything off and no re-consent notice', () => {
   const { features, reconsentRequired } = P.migrateConsent({ enabled: false });
-  assert.deepEqual(Object.values(features), [false, false, false, false]);
+  assert.deepEqual(Object.values(features), Object.keys(P.AI_FEATURES).map(() => false));
   // Nothing broke for them, so there is nothing to explain.
   assert.deepEqual(reconsentRequired, []);
 });
@@ -137,12 +137,41 @@ test('every disclosure locale key exists in every shipped bundle', () => {
     // provider; the live one takes {provider} and both apps render it.
     'set.ai_master', 'set.ai_sends_to', 'set.ai_pii_badge', 'set.ai_reconsent',
     'priv.ai_active', 'priv.ai_review',
-    ...Object.values(P.AI_FEATURES).flatMap((f) => [f.labelKey, f.sendsKey]),
+    // Only the rows the desktop draws: a row another app performs alone
+    // (`hosts`) is that app's to word — checked below.
+    ...Object.values(P.AI_FEATURES).filter((f) => !f.hosts || f.hosts.includes('desktop'))
+      .flatMap((f) => [f.labelKey, f.sendsKey]),
   ];
   for (const code of ['en', 'ar', 'de', 'es', 'fr', 'ja', 'tr', 'zh']) {
     const missing = needed.filter((k) => !L[code] || !L[code][k]);
     assert.deepEqual(missing, [], `${code} missing disclosure keys: ${missing.join(', ')}`);
   }
+});
+
+test('a row only the Mac performs is worded, in both languages, in the Mac\'s own dictionary', () => {
+  const words = fs.readFileSync(path.join(ROOT, 'mac/KhaytCore/Sources/KhaytApp/Words.swift'), 'utf8');
+  const macOnly = Object.values(P.AI_FEATURES).filter((f) => f.hosts && !f.hosts.includes('desktop'));
+  assert.ok(macOnly.length >= 1, 'expected the Mac-only library row');
+  for (const f of macOnly) {
+    assert.deepEqual(f.hosts, ['mac']);
+    for (const key of [f.labelKey, f.sendsKey]) {
+      const line = words.split('\n').find((l) => l.includes(`"${key}":`));
+      assert.ok(line && /"en":/.test(line) && /"ar":/.test(line), `${key} missing from Words.swift (en + ar)`);
+    }
+  }
+});
+
+test('sorting linked folders is opt-in — never inherited from the old toggle', () => {
+  // The owner who ticked "AI quote" agreed to send a description, not the
+  // names of every folder on their drive.
+  const { features, reconsentRequired } = P.migrateConsent({ enabled: true, apiKey: 'k' });
+  assert.equal(features.library, false);
+  assert.equal(reconsentRequired.includes('library'), false, 'nothing ran before, so nothing to re-consent');
+  assert.equal(P.isFeatureEnabled({ enabled: true, features: { quote: true } }, 'library'), false);
+  assert.equal(P.isFeatureEnabled({ enabled: true, features: { library: true } }, 'library'), true);
+  assert.equal(P.isFeatureEnabled({ enabled: false, features: { library: true } }, 'library'), false);
+  assert.equal(P.AI_FEATURES.library.dataClass, P.DATA_CLASS.OWN);
+  assert.match(P.AI_FEATURES.library.sends.join(' '), /never the files/);
 });
 
 test('the main process enforces consent, not just the renderer', () => {

@@ -33,6 +33,7 @@ struct AiRunsHereTests {
         "price":     ("recommendMargin",          "AiClient.recommendMargin"),
         "reply":     ("draftMessage",             "AiClient.draftReply"),
         "assistant": ("ask",                      "AiClient.ask"),
+        "library":   ("previewLinkedSort",        "AiClient.sortFolders"),
     ]
 
     /// Looped INSIDE the test rather than as `@Test(arguments:)`: the sets are

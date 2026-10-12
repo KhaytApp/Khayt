@@ -17,7 +17,7 @@ const ROOT = path.join(__dirname, '..');
 
 test('every AI task frames itself distinctly to the model', () => {
   const ids = Object.keys(ai.AI_TASKS);
-  assert.deepEqual(ids.sort(), ['assistant', 'price', 'quote', 'reply']);
+  assert.deepEqual(ids.sort(), ['assistant', 'library', 'price', 'quote', 'reply']);
 
   const names = new Set(), descs = new Set();
   for (const [id, spec] of Object.entries(ai.AI_TASKS)) {

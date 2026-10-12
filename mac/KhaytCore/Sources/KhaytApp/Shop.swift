@@ -860,6 +860,7 @@ final class Shop {
             aiAssistantAllowed = aiFeatures.first { $0.id == "assistant" }?.enabled ?? false
             aiReplyAllowed = aiFeatures.first { $0.id == "reply" }?.enabled ?? false
             aiPriceAllowed = aiFeatures.first { $0.id == "price" }?.enabled ?? false
+            aiLibraryAllowed = aiFeatures.first { $0.id == "library" }?.enabled ?? false
             taxSummary = await describeTax(root["settings"])
             await readSettingsTables(root)
             // What each job still owes is `order-money`'s answer, not a
@@ -1379,6 +1380,15 @@ final class Shop {
     // Stored for "Selling a piece off the shelf" (Shop+Catalogue.swift).
     /// Whether the shop has agreed to price advice, on this book.
     private(set) var aiPriceAllowed = false
+
+    // Stored for "Sort linked folders" (Shop+LinkedSort.swift).
+    /// Whether the shop has agreed to its assistant sorting linked folders
+    /// by their names, on this book.
+    private(set) var aiLibraryAllowed = false
+    /// The assistant is being asked about the linked folders right now.
+    var librarySortAsking = false
+    /// What sorting the linked folders would do, while the sheet is open.
+    var sortPreview: SortPreview?
 
     // Stored for "Drafting a message to a customer" (Shop+Messages.swift).
     /// Whether the shop has agreed to message drafting, on this book.

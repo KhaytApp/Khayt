@@ -675,6 +675,14 @@ public actor KhaytEngine {
         // travels, and a test holds the payload to that list rather than to a
         // promise.
         "ai-reply",
+        // Sorting linked folders: what a folder IS (collection, print, part,
+        // format, pictures), read from NAMES only. The Mac's own heuristic
+        // (`PrintSort`) runs first and always; this is the optional second
+        // opinion, validated against the paths that were sent.
+        "ai-library",
+        // What the shop's own key has spent, per feature per month — the
+        // ledger the desktop keeps in `settings.aiUsage`, now kept here too.
+        "ai-usage",
         // What to charge, grounded in what this shop has ACTUALLY made.
         //
         // `buildComparables` needs no model at all: it is the shop's own
@@ -11702,6 +11710,82 @@ public actor KhaytEngine {
             [.object(["settings": .object(settings), "data": response,
                       "fallback": fallbackMargin.map { JSONValue.number($0) } ?? .null])],
             as: PriceSuggestion.self)
+    }
+
+    // MARK: - Sorting linked folders
+
+    /// Ask the assistant what each folder of a linked folder is
+    /// (`lib/ai-library.js`). Only folder paths, model counts, sub-folder
+    /// names and a few file names go — the disclosure says exactly that.
+    /// Consent is checked here, where the data leaves.
+    public func aiLibraryRequest(settings: [String: JSONValue], entries: [JSONValue],
+                                 apiKey: String) throws -> AiRequest {
+        try runtime.call2("""
+            (function (a) {
+              if (!KhaytAiPrivacy.isFeatureEnabled((a.settings || {}).ai, 'library')) {
+                throw new Error('AI_FEATURE_NOT_CONSENTED');
+              }
+              var t = KhaytAiTools.resolveTool('library', KhaytAiLibrary.LIBRARY_SCHEMA);
+              var settings = { ai: Object.assign({}, (a.settings || {}).ai, { apiKey: a.apiKey }) };
+              return KhaytAiProviders.buildRequest(settings, {
+                apiKey: a.apiKey,
+                system: KhaytAiLibrary.buildLibrarySystem(),
+                prompt: KhaytAiLibrary.buildLibraryRequest(a.entries),
+                tool: t.tool,
+                maxTokens: t.maxTokens,
+              });
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "entries": .array(entries), "apiKey": .string(apiKey)])],
+            as: AiRequest.self)
+    }
+
+    /// The assistant's sorting, kept only where it can be believed: a path
+    /// that was sent, a role that exists (`readLibraryAnswer`).
+    public struct AiLibraryAnswer: Decodable, Sendable {
+        public let ok: Bool
+        public let roles: [String: String]
+        public let names: [String: String]
+        public let dropped: Int
+        public let problem: String?
+        /// The provider's token counts, for `aiUsageRecord`.
+        public let usage: JSONValue?
+    }
+
+    public func aiLibraryRead(settings: [String: JSONValue], response: JSONValue,
+                              sentPaths: [String]) throws -> AiLibraryAnswer {
+        try runtime.call2("""
+            (function (a) {
+              var out = KhaytAiProviders.readResponse(a.settings, a.data);
+              // `usageOf` normalises every provider to {inputTokens,
+              // outputTokens}; the ledger (`KhaytAiUsage.record`) counts the
+              // provider's own spelling. Spelled for it here.
+              var u = out.usage
+                ? { input_tokens: out.usage.inputTokens, output_tokens: out.usage.outputTokens } : null;
+              if (!out.ok) {
+                return { ok: false, roles: {}, names: {}, dropped: 0,
+                         problem: KhaytAiTools.describeStop(out.stop), usage: u };
+              }
+              var r = KhaytAiLibrary.readLibraryAnswer(out.draft, a.paths);
+              return { ok: true, roles: r.roles, names: r.names, dropped: r.dropped,
+                       problem: null, usage: u };
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "data": response,
+                      "paths": .array(sentPaths.map(JSONValue.string))])],
+            as: AiLibraryAnswer.self)
+    }
+
+    /// One call folded into the book's AI spend ledger (`settings.aiUsage`,
+    /// `lib/ai-usage.js record`) — the same ledger the desktop keeps.
+    public func aiUsageRecord(ledger: JSONValue, task: String, model: String,
+                              usage: JSONValue, now: Date) throws -> JSONValue {
+        try runtime.call2("""
+            KhaytAiUsage.record(ARG0 && typeof ARG0 === 'object' ? ARG0 : {},
+                                { task: ARG1, model: ARG2, usage: ARG3, now: ARG4 })
+            """,
+            [ledger, .string(task), .string(model), usage, .number(now.timeIntervalSince1970 * 1000)],
+            as: JSONValue.self)
     }
 
     // MARK: - What a product costs, and what it is worth

@@ -79,13 +79,18 @@ enum LinkedCloud {
 enum LinkedRegroup {
 
     /// Bumped when the rule changes enough that the book should be refiled.
-    nonisolated static let version = 2.0
+    ///
+    /// 3 (Oct 2026): prints are the groups (`PrintSort`) — the collections a
+    /// file came from leave the group and become a tag.
+    nonisolated static let version = 3.0
 
     struct Change: Equatable, Sendable {
         let id: String
         let group: String
         /// A new name, when the record still had the one the old rule gave.
         let name: String?
+        /// The collection it came from, added to its tags when missing.
+        var tag: String? = nil
     }
 
     /// The name a file gets when its folder does not name it.
@@ -93,17 +98,32 @@ enum LinkedRegroup {
         url.lastPathComponent.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
     }
 
+    /// The changes one linked folder needs, by the heuristic alone — what a
+    /// test that has no pictures to list wants.
+    nonisolated static func changes(rows: [JSONValue], root: URL, models: [URL]) -> [Change] {
+        changes(rows: rows, plan: PrintSort.plan(root: root, models: models, images: []))
+    }
+
     /// The changes one linked folder needs.
     ///
     /// - Parameters:
     ///   - rows: the book's `printFiles`.
-    ///   - root: the linked folder.
-    ///   - models: every model under it, as the scan's walk found them —
-    ///     a folder of one model and a folder of several are judged over all
-    ///     of them, indexed or not, exactly as the scan files them.
-    nonisolated static func changes(rows: [JSONValue], root: URL, models: [URL]) -> [Change] {
-        let old = ImportGrouping.V1.placements(for: models, chosen: root)
-        let new = ImportGrouping.placements(for: models, chosen: root, includeChosen: false)
+    ///   - plan: the linked folder sorted — every model under it, as the
+    ///     scan's walk found them, indexed or not, so a print of one model and
+    ///     a print of several are judged over all of them.
+    ///
+    /// ── EVERY RULE THE APP HAS FILED BY IS THE APP'S ──────────────────────
+    ///
+    /// A record moves when its group is still one the app gave it: what the
+    /// first rule produced (`ImportGrouping.V1`), what the alpha.66 rule
+    /// produced (`ImportGrouping.placements` without the linked folder's
+    /// name), or the `autoGroup` this app last wrote. Anything else the shop
+    /// chose, and it stays. The same for its name.
+    nonisolated static func changes(rows: [JSONValue], plan: PrintSort.Plan) -> [Change] {
+        let root = plan.root
+        let models = plan.models
+        let v1 = ImportGrouping.V1.placements(for: models, chosen: root)
+        let v2 = ImportGrouping.placements(for: models, chosen: root, includeChosen: false)
         func key(_ u: URL) -> String { u.standardizedFileURL.path }
         let byPath = Dictionary(models.map { (key($0), $0) }, uniquingKeysWith: { a, _ in a })
         var out: [Change] = []
@@ -111,18 +131,27 @@ enum LinkedRegroup {
             guard case .string(let id)? = o["id"], case .string(let path)? = o["externalPath"], !path.isEmpty,
                   LibraryMove.under(path, root.path),
                   let url = byPath[key(URL(fileURLWithPath: path))],
-                  let was = old[url], let now = new[url] else { continue }
+                  let now = plan.placement(of: url) else { continue }
             func text(_ k: String) -> String? { if case .string(let s)? = o[k] { s } else { nil } }
             let current = LibraryFile.groupName(folder: text("folder"), group: text("group")) ?? ""
-            let fromOldRule = LibraryFile.normalise(was.group) == current
+            let older = [v1[url]?.group, v2[url]?.group].map { LibraryFile.normalise($0) }
+            let fromOldRule = older.contains(current)
             let fromThisApp = text("autoGroup").map { LibraryFile.normalise($0) == current } ?? false
             guard fromOldRule || fromThisApp else { continue }          // the shop's own
-            let group = now.group ?? ""
+            let group = LibraryFile.normalise(now.group)
             var name: String?
-            let oldName = was.title ?? stem(url), newName = now.title ?? stem(url)
-            if text("name") == oldName, newName != oldName { name = newName }
-            guard LibraryFile.normalise(group) != current || name != nil else { continue }
-            out.append(Change(id: id, group: group, name: name))
+            let oldNames = Set([v1[url]?.title, v2[url]?.title, nil].map { $0 ?? stem(url) })
+            let newName = now.title ?? stem(url)
+            if let had = text("name"), had != newName,
+               oldNames.contains(had) || text("autoName") == had { name = newName }
+            var tag: String?
+            if let collection = now.collection, !collection.isEmpty {
+                var tags: [String] = []
+                if case .array(let t)? = o["tags"] { tags = t.compactMap { if case .string(let s) = $0 { s } else { nil } } }
+                if !tags.contains(where: { Tags.key($0) == Tags.key(collection) }) { tag = collection }
+            }
+            guard group != current || name != nil || tag != nil else { continue }
+            out.append(Change(id: id, group: group, name: name, tag: tag))
         }
         return out
     }
@@ -158,7 +187,17 @@ enum LinkedRegroup {
             o["group"] = .string(c.group)
             o["folder"] = .string(c.group)
             o["autoGroup"] = .string(c.group)
-            if let name = c.name { o["name"] = .string(name) }
+            if let name = c.name {
+                o["name"] = .string(name)
+                // So a later refile can tell this name from one the shop types.
+                o["autoName"] = .string(name)
+            }
+            if let tag = c.tag {
+                var tags: [JSONValue] = []
+                if case .array(let t)? = o["tags"] { tags = t }
+                tags.append(.string(tag))
+                o["tags"] = .array(tags)
+            }
             rows[i] = .object(o)
         }
         root["printFiles"] = .array(rows)

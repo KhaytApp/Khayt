@@ -126,15 +126,17 @@ extension Shop {
 
         // THE WALK, metadata only, on a dispatch queue (`PinWork`) — not a
         // detached Task holding a cooperative thread for a whole Drive.
+        let settings = settingsDict
         let walked = await PinWork.run {
-            Shop.linkedWalk(folders.map { URL(fileURLWithPath: $0) }, skippingAll: vaults, known: known, stop: stop)
+            Shop.linkedWalk(folders.map { URL(fileURLWithPath: $0) }, skippingAll: vaults, known: known,
+                            settings: settings, stop: stop)
         }
         if stopped() { libraryMoveNote = words.callIt("mac.scan_stopped", ["n": .number(0)]); return }
 
         // THE RECORDS ALREADY HERE, filed again once per book.
         var regrouped = 0
         if LinkedRegroup.doneVersion(settingsDict) < LinkedRegroup.version {
-            regrouped = (try? Self.regroupLinked(walked.map { ($0.root, $0.models) }, linked: linkedFolders,
+            regrouped = (try? Self.regroupLinked(walked.map(\.plan), linked: linkedFolders,
                                                  storeURL: build.storeURL,
                                                  owns: owns, whoHasIt: who)) ?? 0
         }
@@ -158,6 +160,26 @@ extension Shop {
                 })
         }
         await load(source)
+
+        // INDEXED FIRST, REFINED AFTER: the library is already filed by the
+        // heuristic and on screen; the assistant (when the shop turned it on)
+        // and the prints' pictures only improve on that, and Stop ends both.
+        var plans = walked.map(\.plan)
+        var assistant: SortAsk?
+        if !stopped(), aiLibraryAllowed {
+            let asked = await askAssistantToSort(plans, stop: stop)
+            assistant = asked
+            if asked.sorted > 0, !stopped() {
+                plans = await PinWork.run { [settingsDict] in
+                    walked.map { Shop.sortedPlan(root: $0.root, models: $0.models, images: $0.images, settings: settingsDict) }
+                }
+                regrouped += (try? Self.regroupLinked(plans, linked: linkedFolders, storeURL: build.storeURL,
+                                                      owns: owns, whoHasIt: who)) ?? 0
+            }
+        }
+        let pictures = stopped() ? 0 : await fetchPrintPictures(plans, stop: stop)
+        if regrouped > 0 || pictures > 0 || assistant != nil { await load(source) }
+
         var lines: [String] = []
         if report.stopped || stopped() {
             lines.append(words.callIt("mac.scan_stopped", ["n": .number(Double(report.moved))]))
@@ -169,6 +191,8 @@ extension Shop {
         }
         if report.online > 0 { lines.append(words.callIt("mac.linked_online", ["online": .number(Double(report.online))])) }
         if regrouped > 0 { lines.append(words.callIt("mac.linked_regrouped", ["n": .number(Double(regrouped))])) }
+        if pictures > 0 { lines.append(words.callIt("mac.sort_pictures_added", ["n": .number(Double(pictures))])) }
+        if let line = assistant?.line(words) { lines.append(line) }
         libraryMoveNote = lines.joined(separator: " ")
         if !report.failures.isEmpty {
             libraryMoveProblem = report.failures.prefix(3).joined(separator: "\n")
@@ -204,12 +228,14 @@ extension Shop {
         libraryScanStop = stop
         defer { libraryMoveBusy = false; libraryMoveProgress = nil; libraryScanStop = nil }
         let vaults = roots.roots + [roots.primary]
+        let settings = settingsDict
         let walked = await PinWork.run {
-            Shop.linkedWalk(folders.map { URL(fileURLWithPath: $0) }, skippingAll: vaults, known: [], stop: stop)
+            Shop.linkedWalk(folders.map { URL(fileURLWithPath: $0) }, skippingAll: vaults, known: [],
+                            settings: settings, stop: stop)
         }
         if stop.isStopped || Task.isCancelled { return }
         do {
-            let n = try Self.regroupLinked(walked.map { ($0.root, $0.models) }, linked: linkedFolders,
+            let n = try Self.regroupLinked(walked.map(\.plan), linked: linkedFolders,
                                            storeURL: build.storeURL,
                                            owns: { StoreLock.weOwnIt(build) },
                                            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
@@ -225,15 +251,22 @@ extension Shop {
         let root: URL
         /// Every model under it, indexed or not.
         let models: [URL]
+        /// Every picture under it — names only, nothing read.
+        var images: [URL] = []
+        /// The folder sorted into prints (`PrintSort`), with whatever the
+        /// shop's assistant already said laid over the heuristic.
+        let plan: PrintSort.Plan
         /// The ones not indexed yet, grouped and with their photos.
         let fresh: [LibraryImport.Incoming]
     }
 
-    /// Every model under each linked folder, and the new ones placed by the
-    /// grouping rule with the linked folder's own name left out. Reads names
-    /// and listings only — no file's bytes, so nothing online is fetched —
-    /// and looks at `stop` every few hundred entries.
+    /// Every model and picture under each linked folder, the folder sorted
+    /// into prints (`PrintSort`, with the assistant's cached answers from
+    /// `settings` laid over it), and the new models placed by that sort. Reads
+    /// names and listings only — no file's bytes, so nothing online is
+    /// fetched — and looks at `stop` every few hundred entries.
     nonisolated static func linkedWalk(_ folders: [URL], skippingAll roots: [String], known: Set<String>,
+                                       settings: [String: JSONValue] = [:],
                                        stop: ScanStop?) -> [LinkedFound] {
         let vaults = roots.filter { !$0.isEmpty }.map { URL(fileURLWithPath: $0).standardizedFileURL.path }
         func isInVault(_ path: String) -> Bool {
@@ -254,32 +287,46 @@ extension Shop {
             let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: LibraryImport.fileKeys,
                                                         options: [.skipsHiddenFiles, .skipsPackageDescendants])
             var models: [URL] = []
+            var images: [URL] = []
             var seen = 0
             while let next = walker?.nextObject() as? URL {
                 seen += 1
                 if seen % 256 == 0, stop?.isStopped == true { break }
                 // Regular files only, as the import walk: a symlink named
                 // `x.stl` is a pointer elsewhere, not a model kept here.
-                if LibraryImport.kinds.contains(next.pathExtension.lowercased()),
-                   LibraryImport.isRegularFile(next), !isInVault(next.standardizedFileURL.path),
-                   !isInner(next.standardizedFileURL.path) {
-                    models.append(next)
-                }
+                let ext = next.pathExtension.lowercased()
+                let isModel = LibraryImport.kinds.contains(ext)
+                guard isModel || ModelPhoto.kinds.contains(ext) else { continue }
+                let path = next.standardizedFileURL.path
+                guard LibraryImport.isRegularFile(next), !isInVault(path), !isInner(path) else { continue }
+                if isModel { models.append(next) } else { images.append(next) }
             }
             models.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+            images.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+            let plan = sortedPlan(root: root, models: models, images: images, settings: settings)
             let new = models.filter { !known.contains($0.standardizedFileURL.path) }
             let photos = ModelPhoto.candidates(for: new, everyModel: models, boundary: root)
-            let newSet = Set(new)
-            let fresh = ImportGrouping.incoming(models, chosen: root, includeChosen: false)
-                .filter { newSet.contains($0.url) }
-                .map { incoming -> LibraryImport.Incoming in
-                    var file = incoming
-                    file.photos = photos[incoming.url] ?? []
-                    return file
-                }
-            out.append(LinkedFound(root: root, models: models, fresh: fresh))
+            let fresh = new.map { url -> LibraryImport.Incoming in
+                let p = plan.placement(of: url)
+                var file = LibraryImport.Incoming(url: url, group: p?.group, title: p?.title)
+                file.tags = p?.collection.map { [$0] } ?? []
+                file.photos = photos[url] ?? []
+                return file
+            }
+            out.append(LinkedFound(root: root, models: models, images: images, plan: plan, fresh: fresh))
         }
         return out
+    }
+
+    /// One linked folder sorted: the heuristic, then — when the book holds
+    /// answers from the shop's assistant for any of its top-level folders,
+    /// still matching what is on disk — again with those laid over it.
+    nonisolated static func sortedPlan(root: URL, models: [URL], images: [URL],
+                                       settings: [String: JSONValue]) -> PrintSort.Plan {
+        let first = PrintSort.plan(root: root, models: models, images: images)
+        let answers = SortCache.answers(settings, for: SortCache.units(first))
+        guard answers != PrintSort.Answers() else { return first }
+        return PrintSort.plan(root: root, models: models, images: images, answers: answers)
     }
 
     /// File the linked records again by their folders and mark the book as
@@ -292,16 +339,26 @@ extension Shop {
                                           storeURL: URL,
                                           owns: @escaping () -> Bool,
                                           whoHasIt: @escaping () -> String?) throws -> Int {
+        try regroupLinked(walked.map { PrintSort.plan(root: $0.root, models: $0.models, images: []) },
+                          linked: linked, storeURL: storeURL, owns: owns, whoHasIt: whoHasIt)
+    }
+
+    /// The refile itself, over linked folders already sorted.
+    nonisolated static func regroupLinked(_ plans: [PrintSort.Plan], linked: [String] = [],
+                                          storeURL: URL,
+                                          owns: @escaping () -> Bool,
+                                          whoHasIt: @escaping () -> String?) throws -> Int {
         var moved = 0
-        // lock: callers — rescanLinkedFolders, regroupLinkedFolders
+        let walked = plans.map { (root: $0.root, models: $0.models) }
+        // lock: callers — rescanLinkedFolders, regroupLinkedFolders, applyLinkedSort
         try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
             // Judged against the rows ON DISK NOW, inside the chain, so a
             // group the shop changed a moment ago is seen as the shop's.
             var rows: [JSONValue] = []
             if case .array(let r)? = root["printFiles"] { rows = r }
             var changes: [LinkedRegroup.Change] = []
-            for folder in walked {
-                changes += LinkedRegroup.changes(rows: rows, root: folder.root, models: folder.models)
+            for plan in plans {
+                changes += LinkedRegroup.changes(rows: rows, plan: plan)
             }
             LinkedRegroup.apply(changes, to: &root)
             if LinkedRegroup.complete(linked: linked.isEmpty ? walked.map(\.root.path) : linked,

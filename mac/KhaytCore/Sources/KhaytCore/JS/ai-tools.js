@@ -58,6 +58,13 @@ const AI_TASKS = {
     description: 'Answer the shop owner\'s question using only the supplied summary of their own shop data.',
     maxTokens: 16000,
   },
+  // One entry per folder, up to 150 folders a request (lib/ai-library.js):
+  // the answer is long by nature, and thinking shares the cap.
+  library: {
+    name: 'sort_library_folders',
+    description: 'Say what each folder of a 3D-print shop\'s model library is — a collection, a print, a part of a print, a file-format folder or pictures — and give each print a clean name.',
+    maxTokens: 32000,
+  },
 };
 
 /** Fallback when a caller sends no task id (older call site, or a bad payload). */

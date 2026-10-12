@@ -217,6 +217,48 @@ enum AiClient {
                                             fallbackMargin: fallback)
     }
 
+    /// Ask what each folder of a linked folder is (`lib/ai-library.js`).
+    ///
+    /// ── NAMES, AND NOTHING ELSE ───────────────────────────────────────────
+    ///
+    /// `entries` are folder paths, model counts, sub-folder names and up to
+    /// five file names a folder — the disclosure in Settings ▸ Assistant
+    /// says so. No file is opened to build them and no picture is sent.
+    ///
+    /// Returns the validated answer (paths that were not sent and roles that
+    /// do not exist are already gone) and what the call cost, for the ledger.
+    static func sortFolders(_ entries: [SortCache.Entry], shop: Shop) async throws
+        -> (answers: PrintSort.Answers, usage: JSONValue?, model: String) {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiLibraryRequest(settings: settings, entries: entries.map(\.json), apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+        // A long answer — one line per folder, up to 150 — after thinking:
+        // twice the usual ceiling.
+        let data = try await send(request, engine: engine, timeout: timeout * 2)
+        let read = try await engine.aiLibraryRead(settings: settings, response: data,
+                                                  sentPaths: entries.map(\.path))
+        guard read.ok else { throw Failure.refused(read.problem ?? "no answer") }
+        var answers = PrintSort.Answers()
+        for (path, role) in read.roles {
+            if let r = PrintSort.Role(rawValue: role) { answers.roles[path] = r }
+        }
+        answers.names = read.names
+        return (answers, read.usage, request.model)
+    }
+
     /// The session every AI request goes through. Ephemeral, and a redirect
     /// is followed only to the same scheme, host and port: the provider's API
     /// key is in a header, and `URLSession.shared` would carry it along a 30x
@@ -226,7 +268,8 @@ enum AiClient {
 
     /// POST it, retrying only what the shared policy says is transient.
     private static func send(_ shaped: KhaytEngine.AiRequest,
-                             engine: KhaytEngine) async throws -> JSONValue {
+                             engine: KhaytEngine,
+                             timeout: TimeInterval = AiClient.timeout) async throws -> JSONValue {
         guard let url = URL(string: shaped.url) else { throw Failure.refused("bad address") }
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
