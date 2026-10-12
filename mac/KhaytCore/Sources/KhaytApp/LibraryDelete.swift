@@ -98,7 +98,11 @@ extension Shop {
                 if let head = try? await remote.head(key, fetch: fetch) {
                     backupKey = key
                     keys.append(remoteTag + key)
-                    if let local = await PinWork.run({ try? CloudLibrary.digests(of: model) }),
+                    // A linked model's file is the shop's and is never removed,
+                    // so there is nothing to prove — and digesting one its drive
+                    // has not downloaded would download it to ask a question.
+                    if !file.isLinked,
+                       let local = await PinWork.run({ try? CloudLibrary.digests(of: model) }),
                        head.size == local.size,
                        (try? await engine.etagVerdict(etag: head.etag, md5: local.md5)) == "match" {
                         proved = true

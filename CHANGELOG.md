@@ -4,6 +4,32 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: fixes from the 4.0.0-alpha.66 review of linked and online-only
+  models.**
+  - **A group's kind and picture move with it.** When "Regroup from folders"
+    moves every model of a group to a new group, the group's kind (one
+    print's parts, say) and its picture go too. Before, they were left on the
+    old name and then lost.
+  - **A drive that is not mounted yet is regrouped later.** If a linked
+    folder was missing, or listed nothing, when the library was regrouped,
+    the book is no longer marked as done. Its models are regrouped the next
+    time the folder is there.
+  - **Linked folders inside other linked folders.** A model belongs to the
+    innermost linked folder only. Before, each "Regroup from folders" could
+    move it back and forth between two groups.
+  - **Online-only files are not downloaded by accident.** Selecting a linked
+    model that is online only no longer reads it for "How it prints". Backing
+    up new models skips files the drive has not downloaded. Asking to delete
+    a linked model does not read its file.
+  - **A failed download changes nothing.** If the drive is offline or refuses
+    the file, the model stays marked as online only and is tried again later.
+    Before, it lost that mark and was never filled in.
+  - **Plainer wording.** The button on a linked online-only model now says
+    "Download to this Mac" instead of "Bring back from the cloud".
+  - Background filling reads only files inside a linked folder or the
+    library's own folders, and puts pictures in the model's existing library
+    folder.
+
 - **Mac: linked folders on Google Drive, Dropbox or iCloud Drive can be
   stopped, are not downloaded, and are grouped by their real projects.**
   - **Stop.** Looking through linked folders, or through the library's own

@@ -1552,10 +1552,24 @@ final class Activator: NSObject, NSApplicationDelegate {
         shop.shelf = .library(nil)
         await settle()
         capture(named: "40-library-rescan", into: dir)
+        // A scan running: its count, and the Stop a scan (never a move) has.
+        shop.libraryScanStop = ScanStop()
         shop.libraryMoveProgress = (done: 3, total: 12, name: "dragon-head.3mf")
         await settle()
         capture(named: "41-rescan-progress", into: dir)
+        // Still walking the folders, before there is a count.
         shop.libraryMoveProgress = nil
+        await settle()
+        capture(named: "41b-rescan-looking", into: dir)
+        // Stop pressed: greyed while the file it is on finishes, then said.
+        shop.libraryScanStopping = true
+        await settle()
+        capture(named: "41c-rescan-stopping", into: dir)
+        shop.libraryScanStop = nil
+        shop.importNote = shop.words.callIt("mac.scan_stopped", ["n": .number(3)])
+        await settle()
+        capture(named: "41d-rescan-stopped", into: dir)
+        shop.importNote = nil
         if let online = shop.files.first(where: { shop.isInCloudOnly($0) }) {
             shop.fileSelection = [online.id]
             await settle()

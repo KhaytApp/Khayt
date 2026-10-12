@@ -730,6 +730,14 @@ extension Shop {
         // lock: callers — bringDownOnline, fillNowLocal, bringDownLinked
         let ext = file.pathExtension.lowercased()
         let hash = await LibraryImport.offMain { try? LibraryImport.contentHash(of: file) } ?? nil
+        // NOT READ, NOTHING WRITTEN. A drive that is offline, or refuses the
+        // download, fails the read — and writing anyway took `indexedOnline`
+        // off a record whose bytes were never seen, so `fillNowLocal` never
+        // looked at it again and it stayed unmeasured and unhashed for good
+        // (alpha.66 review). Said instead, and tried again next time.
+        guard let hash else {
+            throw LibraryImport.Failure.failed("could not read \(file.lastPathComponent)")
+        }
         let a = await LibraryImport.analyse(file, ext: ext, dir: pictures ?? file.deletingLastPathComponent(),
                                             engine: engine, analyseRisk: false)
         var duplicateOf: String?
@@ -738,14 +746,14 @@ extension Shop {
             for (i, row) in rows.enumerated() {
                 guard case .object(var o) = row else { continue }
                 if Self.recordId(row) != id {
-                    if let hash, case .string(hash)? = o["contentHash"], case .string(let n)? = o["name"] { duplicateOf = n }
+                    if case .string(hash)? = o["contentHash"], case .string(let n)? = o["name"] { duplicateOf = n }
                     continue
                 }
                 func empty(_ k: String) -> Bool {
                     switch o[k] { case nil, .null?: true; case .string(let s)?: s.isEmpty
                                   case .array(let x)?: x.isEmpty; case .object(let x)?: x.isEmpty; default: false }
                 }
-                if let hash { o["contentHash"] = .string(hash) }
+                o["contentHash"] = .string(hash)
                 if let key = a.key { o["geometryKey"] = .string(key) }
                 if let r = a.reader { o["geometryReader"] = .number(Double(r)) }
                 if empty("colors") { o["colors"] = .array(a.colours); o["swapCount"] = .number(Double(a.swapCount)) }

@@ -655,6 +655,12 @@ extension Shop {
         var failed = 0
         for file in files where ids.contains(file.id) {
             guard let url = modelFile(for: file) else { continue }
+            // Never a file its drive has not downloaded: uploading it reads
+            // it, and reading it downloads it. The storage pass indexes an
+            // iCloud Drive library's online files without a read and hands
+            // their ids here — every one would have come down (alpha.66
+            // review). Its drive already keeps it in the cloud.
+            if file.isLinked, LinkedCloud.isOnlineOnly(url) { continue }
             let key = S3.objectKey(prefix: config.prefix, id: LibraryLocation.itemDirName(file.id),
                                    filename: url.lastPathComponent)
             do { try await CloudLibrary.ensureInBucket(config.remote, key: key, file: url, engine: engine) }
