@@ -488,6 +488,26 @@ enum PrintSort {
         return out.isEmpty ? String(name.prefix(60)) : out
     }
 
+    /// A name the assistant gave a print, as a group may be called — or nil,
+    /// and the folder's own name is used.
+    ///
+    /// `lib/ai-library.js cleanName` already did this to the reply, but the
+    /// name is read back from the book's settings (`SortCache`), which sync
+    /// from every device, so it is held to the rule again where it becomes a
+    /// group path: one line, no `/` (a group path's separator — a name
+    /// `a/b` would file the print two levels deep), and something to read —
+    /// `..` or `-` names no print.
+    nonisolated static func assistantName(_ raw: String) -> String? {
+        let flat = String(String.UnicodeScalarView(raw.unicodeScalars.map {
+            CharacterSet.controlCharacters.contains($0) ? " " : $0
+        }))
+        let s = flat.replacingOccurrences(of: "/", with: " - ")
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+        guard s.contains(where: { $0.isLetter || $0.isNumber }) else { return nil }
+        return s
+    }
+
     // MARK: - A print's picture
 
     /// Words that name a print's hero shot.
@@ -630,8 +650,7 @@ enum PrintSort {
         // one group, spelled as the first path met spells it.
         var spelling: [String: String] = [:]
         func display(_ key: String) -> String {
-            let raw = names[key].map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 }
-                ?? cleanName(tree[key]?.name ?? key)
+            let raw = names[key].flatMap(assistantName) ?? cleanName(tree[key]?.name ?? key)
             let shown = fit(raw)
             let canon = core(shown).sorted().joined(separator: " ")
             let id = canon.isEmpty ? shown.lowercased() : canon

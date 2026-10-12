@@ -72,6 +72,9 @@ test('a print name is one line a group can hold: no slash, no control characters
   const long = L.cleanName('Word '.repeat(30));
   assert.ok(long.length <= 60 && !long.endsWith(' '));
   assert.equal(L.cleanName('   '), '');
+  // A group path segment of dots names nothing (alpha.67 review).
+  for (const dots of ['..', '.', ' - ', '../..', '***']) assert.equal(L.cleanName(dots), '', dots);
+  assert.equal(L.cleanName('درع'), 'درع', 'any script is a name');
   const r = L.readLibraryAnswer({ folders: [{ path: 'a', role: 'print', name: 'x/y' },
     { path: 'b', role: 'part', name: 'ignored for a part' }] }, ['a', 'b']);
   assert.deepEqual(r.names, { a: 'x - y' });

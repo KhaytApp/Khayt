@@ -126,6 +126,13 @@ enum LinkedRegroup {
         let v2 = ImportGrouping.placements(for: models, chosen: root, includeChosen: false)
         func key(_ u: URL) -> String { u.standardizedFileURL.path }
         let byPath = Dictionary(models.map { (key($0), $0) }, uniquingKeysWith: { a, _ in a })
+        // Every tag the book already uses, first spelling first (`Tags`' rule):
+        // a collection the shop has tagged "aug26 giga tier" elsewhere is that
+        // tag, not a second chip beside it.
+        var spelled: [String: String] = [:]
+        for case .object(let o) in rows {
+            for t in Tags.normalise(o["tags"]) where spelled[Tags.key(t)] == nil { spelled[Tags.key(t)] = t }
+        }
         var out: [Change] = []
         for case .object(let o) in rows {
             guard case .string(let id)? = o["id"], case .string(let path)? = o["externalPath"], !path.isEmpty,
@@ -146,9 +153,14 @@ enum LinkedRegroup {
                oldNames.contains(had) || text("autoName") == had { name = newName }
             var tag: String?
             if let collection = now.collection, !collection.isEmpty {
-                var tags: [String] = []
-                if case .array(let t)? = o["tags"] { tags = t.compactMap { if case .string(let s) = $0 { s } else { nil } } }
-                if !tags.contains(where: { Tags.key($0) == Tags.key(collection) }) { tag = collection }
+                // Read the way every tag box reads them (`Tags.normalise`), so
+                // a record whose tags are still one comma-separated string is
+                // judged by the tags in it, not as having none.
+                let tags = Tags.normalise(o["tags"])
+                if !tags.contains(where: { Tags.key($0) == Tags.key(collection) }) {
+                    // In the spelling the shop already uses for it, when it does.
+                    tag = spelled[Tags.key(collection)] ?? collection
+                }
             }
             guard group != current || name != nil || tag != nil else { continue }
             out.append(Change(id: id, group: group, name: name, tag: tag))
@@ -193,9 +205,13 @@ enum LinkedRegroup {
                 o["autoName"] = .string(name)
             }
             if let tag = c.tag {
+                // ADDED to what is there, never instead of it: a list keeps
+                // every entry as spelled, and the older comma-separated string
+                // is read into its tags first rather than written over.
                 var tags: [JSONValue] = []
                 if case .array(let t)? = o["tags"] { tags = t }
-                tags.append(.string(tag))
+                else { tags = Tags.normalise(o["tags"]).map(JSONValue.string) }
+                if !tags.contains(where: { Tags.key($0) == Tags.key(tag) }) { tags.append(.string(tag)) }
                 o["tags"] = .array(tags)
             }
             rows[i] = .object(o)
@@ -204,31 +220,85 @@ enum LinkedRegroup {
         carryEntries(went, rows: rows, into: &root)
     }
 
-    /// The `settings.libraryGroups` entries of groups that moved whole.
+    /// The `settings.libraryGroups` entries of groups the refile emptied.
+    ///
+    /// ── NOT ONLY A GROUP THAT MOVED WHOLE (alpha.67 review) ───────────────
+    ///
+    /// Version 3 takes the collections OUT of the path, so alpha.66's
+    /// `Aug26 Giga Tier/Life Size Gambit/{Large Cuts, Small Cuts}` becomes
+    /// `Life Size Gambit/{Large Cuts, Small Cuts}`. A kind or picture the shop
+    /// set on `Aug26 Giga Tier/Life Size Gambit` sat on a group no record is
+    /// filed in DIRECTLY, so it was in no record's `from` and never carried;
+    /// one set on a group whose records went to two parts had two
+    /// destinations and was skipped. Either way the entry stayed on a dead
+    /// path, and the next write of the map — the prints' pictures, moments
+    /// later in the same pass — pruned it. The shop's choice was gone.
+    ///
+    /// So every entry the refile empties goes to the deepest group ALL of its
+    /// records now share: the print, for a print's old path; the same group as
+    /// before, for one that moved whole. A collection's entry has nowhere to
+    /// go — its prints went their separate ways and it is a tag now — and is
+    /// left where it was. A destination with an entry of its own keeps it (that
+    /// is the shop's). Two old groups arriving at one new one: the deeper
+    /// one's entry, with the other's picture if it has none (`joining`).
     nonisolated static func carryEntries(_ went: [String: Set<String>], rows: [JSONValue],
                                          into root: inout [String: JSONValue]) {
         guard case .object(var settings)? = root["settings"],
               case .object(var map)? = settings[GroupKinds.settingsKey] else { return }
-        // Every group path still in use, and every level above one.
+        // Every group path still in use.
         var inUse: Set<String> = []
         for case .object(let o) in rows {
             func text(_ k: String) -> String? { if case .string(let s)? = o[k] { s } else { nil } }
             guard let g = LibraryFile.groupName(folder: text("folder"), group: text("group")) else { continue }
             inUse.insert(g)
         }
+        let original = map
+        var arrived: Set<String> = []
+        // Deepest first: when a wrapper and the group inside it arrive at the
+        // same print (`Tier/Buzz` and `Tier/Buzz/Buzz STLs`, or a tier that
+        // held one print), the entry set on the nearer group is the print's.
+        let keys = original.keys.sorted {
+            let a = $0.split(separator: "/").count, b = $1.split(separator: "/").count
+            return a != b ? a > b : $0 < $1
+        }
         var changed = false
-        for (from, destinations) in went {
-            guard destinations.count == 1, let to = destinations.first, !to.isEmpty, to != from,
-                  let entry = map[from], map[to] == nil,
+        for from in keys {
+            guard let entry = original[from],
                   // Something still filed at or below it keeps the group — and its entry.
                   !inUse.contains(where: { Shop.isUnder($0, from) }) else { continue }
-            map[to] = entry
+            var destinations = Set<String>()
+            for (was, to) in went where Shop.isUnder(was, from) { destinations.formUnion(to) }
+            guard let to = sharedGroup(destinations), to != from else { continue }
+            if arrived.contains(to) {
+                map[to] = GroupKinds.joining(map[to], picture: entry)
+            } else if original[to] != nil {
+                continue                                                   // the shop's own
+            } else {
+                map[to] = entry
+                arrived.insert(to)
+            }
             map[from] = nil
             changed = true
         }
         guard changed else { return }
         settings[GroupKinds.settingsKey] = .object(map)
         root["settings"] = .object(settings)
+    }
+
+    /// The deepest group every one of `paths` is at or under — nil when they
+    /// share none, or there are none, or one of them is no group at all.
+    nonisolated static func sharedGroup(_ paths: Set<String>) -> String? {
+        guard let first = paths.first, !paths.contains("") else { return nil }
+        var common = first.components(separatedBy: ImportGrouping.separator)
+        for p in paths.dropFirst() {
+            let parts = p.components(separatedBy: ImportGrouping.separator)
+            var n = 0
+            while n < min(common.count, parts.count), common[n] == parts[n] { n += 1 }
+            common = Array(common.prefix(n))
+            if common.isEmpty { return nil }
+        }
+        let out = common.joined(separator: ImportGrouping.separator)
+        return out.isEmpty ? nil : out
     }
 
     /// Whether this walk may mark the book refiled: every linked folder was

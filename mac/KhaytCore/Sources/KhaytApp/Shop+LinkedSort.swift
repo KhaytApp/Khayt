@@ -8,11 +8,16 @@ struct SortAsk: Sendable, Equatable {
     var sorted = 0
     /// Why it stopped, when it did. The heuristic stands for the rest.
     var problem: String?
+    /// Folders not asked about this time because their request kept failing
+    /// (`SortFailures`) — sorted on this Mac instead.
+    var held = 0
 
     @MainActor func line(_ words: Words) -> String? {
-        if let problem { return words.callIt("mac.sort_ai_failed", ["why": .string(problem)]) }
-        guard sorted > 0 else { return nil }
-        return words.callIt("mac.sort_ai_used", ["n": .number(Double(sorted))])
+        var parts: [String] = []
+        if let problem { parts.append(words.callIt("mac.sort_ai_failed", ["why": .string(problem)])) }
+        else if sorted > 0 { parts.append(words.callIt("mac.sort_ai_used", ["n": .number(Double(sorted))])) }
+        if held > 0 { parts.append(words.callIt("mac.sort_ai_held", ["n": .number(Double(held))])) }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 }
 
@@ -54,7 +59,14 @@ extension Shop {
     /// the heuristic when this runs, and anything it does not answer, or any
     /// fault on the way, leaves the heuristic standing. Stop ends it between
     /// requests.
-    func askAssistantToSort(_ plans: [PrintSort.Plan], stop: ScanStop?) async -> SortAsk {
+    ///
+    /// ── A REQUEST THAT KEEPS FAILING IS NOT PAID FOR ON EVERY LAUNCH ──────
+    ///
+    /// The launch pass (`byHand: false`) skips a request that failed today,
+    /// and one that failed three times until its folders change
+    /// (`SortFailures`); the note says how many folders that left unsorted.
+    /// "Sort linked folders…" (`byHand: true`) always tries.
+    func askAssistantToSort(_ plans: [PrintSort.Plan], stop: ScanStop?, byHand: Bool = false) async -> SortAsk {
         guard aiLibraryAllowed, let build = source.build, let engine else { return SortAsk() }
         let settings = settingsDict
         let units = plans.flatMap(SortCache.units).filter { !SortCache.isCached($0, in: settings) }
@@ -67,8 +79,19 @@ extension Shop {
         var ledger: JSONValue = settings["aiUsage"] ?? .object([:])
         var spent = false
         var result = SortAsk()
-        for batch in SortCache.batches(units) {
+        let today = SortFailures.today()
+        let marks = SortFailures.read(settings)
+        let batches = SortCache.batches(units)
+        let pending = Set(batches.map(SortCache.signature))
+        var asked = Set<String>(), failed = Set<String>()
+        for batch in batches {
             if stop?.isStopped == true || Task.isCancelled { break }
+            let sig = SortCache.signature(batch)
+            if !byHand, SortFailures.held(sig, in: marks, today: today) {
+                result.held += batch.count
+                continue
+            }
+            asked.insert(sig)
             do {
                 let reply = try await AiClient.sortFolders(batch, shop: self)
                 got.roles.merge(reply.answers.roles) { a, _ in a }
@@ -80,9 +103,20 @@ extension Shop {
                     ledger = next
                     spent = true
                 }
-            } catch {
-                result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            } catch AiClient.Failure.notConsented {
+                asked.remove(sig)
+                break                       // switched off meanwhile: the heuristic stands, nothing to say
+            } catch AiClient.Failure.noKey {
+                // Nothing was sent, so nothing to hold against the request.
+                // In the shop's words, not "No API key" in an Arabic sentence.
+                asked.remove(sig)
+                result.problem = words.callIt("mac.ai_no_key")
                 break
+            } catch {
+                // This request failed; the next may not (one too long for
+                // the provider says nothing about the others).
+                failed.insert(sig)
+                result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
             }
         }
         // A unit is remembered only when every one of its folders came back:
@@ -90,12 +124,14 @@ extension Shop {
         let answered = units.filter { $0.entries.allSatisfy { answeredPaths.contains($0.path) } }
             .map { (unit: $0, answers: got) }
         result.sorted = answered.reduce(0) { $0 + $1.unit.entries.count }
-        guard !answered.isEmpty || spent else { return result }
+        let nextMarks = SortFailures.after(marks, asked: asked, failed: failed, pending: pending, today: today)
+        guard !answered.isEmpty || spent || nextMarks != marks else { return result }
         do {
             // lock: system — the shop turned this on; it writes only the
-            // assistant's answers and their cost into settings.
+            // assistant's answers, their cost and which requests failed.
             try StoreWriter.update(build) { root in
                 SortCache.store(answered, into: &root)
+                if nextMarks != marks { SortFailures.write(nextMarks, into: &root) }
                 if spent {
                     var s = Self.settings(root)
                     s["aiUsage"] = ledger
@@ -233,7 +269,8 @@ extension Shop {
         var sorted = walked.map(\.plan)
         var asked: SortAsk?
         if aiLibraryAllowed {
-            let a = await askAssistantToSort(sorted, stop: stop)
+            // Pressed by hand: always tries, even a request that kept failing.
+            let a = await askAssistantToSort(sorted, stop: stop, byHand: true)
             asked = a
             if a.sorted > 0 {
                 await load(source)
