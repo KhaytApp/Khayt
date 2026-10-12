@@ -545,7 +545,21 @@ test('consent is recorded for known features only', () => {
   const out = apply(heldAi(), { ai: { features: { quote: true, invented: true } } });
   assert.equal(out.ai.features.invented, undefined);
   assert.deepEqual(Object.keys(out.ai.features).sort(),
-    ['assistant', 'price', 'quote', 'reply']);
+    ['assistant', 'library', 'price', 'quote', 'reply']);
+  assert.equal(out.ai.features.library, false, 'opt-in: never granted by a form that did not ask');
+});
+
+test('a form without a host-only switch keeps the answer the other app saved', () => {
+  // The desktop draws no "Sort linked folders" row (it has no linked
+  // folders); saving its assistant settings must not turn off what the shop
+  // turned on in the Mac app.
+  const held = heldAi();
+  held.ai.features = { ...(held.ai.features || {}), library: true };
+  const out = apply(held, { ai: { features: { quote: true, price: false, reply: false, assistant: false } } });
+  assert.equal(out.ai.features.library, true);
+  // …and the Mac's form, which does carry it, can turn it off.
+  const off = apply(held, { ai: { features: { quote: true, library: false } } });
+  assert.equal(off.ai.features.library, false);
 });
 
 test('saving the assistant does not silently change the provider', () => {

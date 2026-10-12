@@ -199,12 +199,15 @@ struct LinkedScanTests {
         ]
         let changes = LinkedRegroup.changes(rows: rows, root: Self.drive, models: rels.map(Self.f))
         let by = Dictionary(uniqueKeysWithValues: changes.map { ($0.id, $0) })
-        #expect(by["PF-a"]?.group == "Aug26 Giga Tier/Call of Duty 4/Mini Poster")
+        // Prints are the groups now (`PrintSort`): the tiers are where it came from.
+        #expect(by["PF-a"]?.group == "Call of Duty 4")
+        #expect(by["PF-a"]?.tag == "Aug26 Giga Tier")
         #expect(by["PF-b"] == nil, "a group the shop chose is the shop's")
-        #expect(by["PF-c"]?.group == "2026 World Cup/2026 FIFA World Cup Key Chain")
-        #expect(by["PF-d"]?.group == "2026 World Cup/2026 FIFA World Cup Key Chain")
+        // One key chain folder alone under the World Cup: one print, the outer name.
+        #expect(by["PF-c"]?.group == "2026 World Cup")
+        #expect(by["PF-d"]?.group == "2026 World Cup")
         #expect(by["PF-e"]?.group == "" && by["PF-e"]?.name == "Mumm-Ra",
-                "a folder of one is the model's name, without the Patreon and packaging folders")
+                "a print of one model is the model's name, without the Patreon and packaging folders")
     }
 
     @Test("the refile is one write through the chain, marks the book, and runs again to nothing")
@@ -223,8 +226,10 @@ struct LinkedScanTests {
         let n = try Shop.regroupLinked([(root, models)], storeURL: bench.store, owns: { true }, whoHasIt: { nil })
         #expect(n == 2)
         let after = try Self.objects(bench)
-        #expect(after.allSatisfy { $0["group"] == .string("Monsters/Dragon") && $0["folder"] == .string("Monsters/Dragon")
-                                   && $0["autoGroup"] == .string("Monsters/Dragon") })
+        // `Dragon` is the print; `Monsters`, the collection it sits in, is a tag.
+        #expect(after.allSatisfy { $0["group"] == .string("Dragon") && $0["folder"] == .string("Dragon")
+                                   && $0["autoGroup"] == .string("Dragon")
+                                   && $0["tags"] == .array([.string("Monsters")]) })
         let book = try #require(Shop.readBook(bench.store))
         if case .object(let s)? = book["settings"] { #expect(LinkedRegroup.doneVersion(s) == LinkedRegroup.version) }
         #expect(try Shop.regroupLinked([(root, models)], storeURL: bench.store, owns: { true }, whoHasIt: { nil }) == 0)

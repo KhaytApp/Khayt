@@ -275,6 +275,9 @@ extension Shop {
         // from the older copy on another machine.
         editFiles([fileId], named: words.callIt("mac.lp_removed")) { record in
             record["userPhoto"] = .null
+            // So the linked pass never puts a found picture back on it
+            // (`Shop.fetchPrintPictures`).
+            record["userPhotoRemoved"] = .bool(true)
         }
     }
 }

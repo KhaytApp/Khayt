@@ -81,6 +81,8 @@ struct LibraryLocationSettings: View {
                             Button(shop.words.callIt("mac.linked_rescan")) { Task { await shop.rescanLinkedFolders() } }
                             Button(shop.words.callIt("mac.linked_regroup")) { Task { await shop.regroupLinkedFolders() } }
                                 .help(shop.words.callIt("mac.linked_regroup_help"))
+                            Button(shop.words.callIt("mac.linked_sort")) { Task { await shop.previewLinkedSort() } }
+                                .help(shop.words.callIt("mac.linked_sort_help"))
                         }
                     }
                     .disabled(shop.libraryMoveBusy || !shop.canMoveJobs)
@@ -99,7 +101,8 @@ struct LibraryLocationSettings: View {
                 } else if shop.libraryMoveBusy {
                     ProgressView().controlSize(.small)
                     if shop.libraryScanStop != nil {
-                        Text(shop.words.callIt("mac.library_looking")).font(.caption).foregroundStyle(.secondary)
+                        Text(shop.words.callIt(shop.librarySortAsking ? "mac.sort_asking" : "mac.library_looking"))
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                 }
@@ -119,6 +122,11 @@ struct LibraryLocationSettings: View {
                     .font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+        // "Sort linked folders": nothing moves until the shop has seen what
+        // would, and pressed Apply.
+        .sheet(item: Binding(get: { shop.sortPreview }, set: { shop.sortPreview = $0 })) { preview in
+            LinkedSortSheet(shop: shop, preview: preview)
         }
         .confirmationDialog(shop.words.callIt("mac.libmove_confirm_title"),
                             isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } })) {

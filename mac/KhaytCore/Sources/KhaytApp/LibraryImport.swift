@@ -210,6 +210,7 @@ enum LibraryImport {
                     group: String? = nil,
                     documents: [URL] = [],
                     title: String? = nil,
+                    tags: [String] = [],
                     photos: [URL] = [],
                     analyseRisk: Bool = false,
                     online: Bool = false,
@@ -235,7 +236,7 @@ enum LibraryImport {
         // from what the drive lists, and never read — see `LinkedCloud`.
         if inPlace && online {
             return try await addOnline(source, storeURL: storeURL, libraryRoot: libraryRoot,
-                                       group: group, title: title, photos: photos,
+                                       group: group, title: title, tags: tags, photos: photos,
                                        owns: owns, whoHasIt: whoHasIt)
         }
 
@@ -325,8 +326,12 @@ enum LibraryImport {
                                  parsed: a.parsed,
                                  externalPath: inPlace ? source.standardizedFileURL.path : nil)
         // The group the APP gave a linked model, so refiling it later can
-        // tell it from one the shop chose (`LinkedRegroup`).
-        if inPlace { record["autoGroup"] = .string(group ?? "") }
+        // tell it from one the shop chose (`LinkedRegroup`) — and the name.
+        if inPlace {
+            record["autoGroup"] = .string(group ?? "")
+            record["autoName"] = .string(name)
+        }
+        if !tags.isEmpty { record["tags"] = .array(tags.map(JSONValue.string)) }
         // THE PHOTO THAT CAME WITH IT, when there was one — see `ModelPhoto`.
         // The record is new, so there is no photo of the shop's to keep; and a
         // picture that will not decode is passed over, never a failed import.
@@ -390,7 +395,7 @@ enum LibraryImport {
     /// does for a bucket model brought down. A photo only from a picture
     /// that is itself here — the caller has already left the others out.
     static func addOnline(_ source: URL, storeURL: URL, libraryRoot: URL,
-                          group: String?, title: String?, photos: [URL],
+                          group: String?, title: String?, tags: [String] = [], photos: [URL],
                           owns: @escaping () -> Bool,
                           whoHasIt: @escaping () -> String?) async throws -> Added {
         let originalName = source.lastPathComponent
@@ -408,6 +413,8 @@ enum LibraryImport {
                                  colours: [], swapCount: 0, thumbFile: nil, group: group,
                                  externalPath: source.standardizedFileURL.path)
         record["autoGroup"] = .string(group ?? "")
+        record["autoName"] = .string(name)
+        if !tags.isEmpty { record["tags"] = .array(tags.map(JSONValue.string)) }
         record["indexedOnline"] = .string(StoreWriter.iso(Date()))
         let photo = await PinWork.run { firstPhoto(photos) }
         if let photo { record["userPhoto"] = .string(photo) }
@@ -625,6 +632,9 @@ enum LibraryImport {
         /// Pictures found beside it, best first — see `ModelPhoto`. The first
         /// that decodes becomes the new record's `userPhoto`.
         var photos: [URL] = []
+        /// Tags the new record starts with — a linked model's collection
+        /// (`PrintSort.Placement.collection`): where it came from.
+        var tags: [String] = []
 
         /// Files with no grouping — what `--import` of a bare list means, and
         /// what most tests want. Spelled out at the call site so a caller that
@@ -679,6 +689,7 @@ enum LibraryImport {
                                           engine: engine, keepOriginal: keepOriginal, inPlace: inPlace,
                                           group: file.group, documents: file.documents,
                                           title: file.title,
+                                          tags: file.tags,
                                           // Never a picture the cloud would have to download.
                                           photos: inPlace ? file.photos.filter { !isOnline($0) } : file.photos,
                                           analyseRisk: analyseRisk,

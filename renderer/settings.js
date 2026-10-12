@@ -618,7 +618,11 @@ function renderAiSettings() {
   const providerOptions = all.map((p) => `
     <option value="${escapeHtml(p.id)}" ${p.id === chosen.id ? 'selected' : ''}>${escapeHtml(p.label)}</option>`).join('');
 
-  const featureRows = Object.values(P.AI_FEATURES).map((f) => {
+  // A feature only another app performs (`hosts`, e.g. the Mac's linked-
+  // folder sorting) is not offered here: a switch that does nothing where
+  // it is switched is the question "why does it never run?".
+  const featureRows = Object.values(P.AI_FEATURES)
+    .filter((f) => !f.hosts || f.hosts.includes('desktop')).map((f) => {
     const pii = f.dataClass === P.DATA_CLASS.CUSTOMER;
     const needsConsent = reconsentRequired.includes(f.id);
     return `

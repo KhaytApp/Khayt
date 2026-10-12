@@ -4,6 +4,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: linked folders are sorted into prints, with their pictures.** After
+  a linked Google Drive was scanned, models were filed under Patreon tiers
+  and month folders ("Oct26 Giga Tier/Guilmon Card/Mini Poster"), and no
+  pictures came in even when the folder had them.
+  - **Each independent print is a main group.** The app now tells apart
+    collections (a tier, a month, a pack), prints (one thing to print),
+    parts and sizes of a print, file formats (STLs, Colored 3MFs) and
+    pictures. A model's group is its print — plus one part or size level
+    when the print is split that way, such as "Life Size Gambit/Large
+    Cuts". The same print from two collections is one group.
+  - **Where it came from is a tag.** The collection a model came from
+    ("Aug26 Giga Tier") is added to its tags instead of its group.
+  - **Pictures come in.** Each print's group gets its best picture: one
+    named after the print, then a front or cover shot, then its Renders.
+    A print of one model gives that picture to the model. Pictures are
+    fetched even when the drive keeps them online only — never models —
+    at most 8 MB each and 40 a scan. A picture you removed is not put back.
+  - **"Sort linked folders…" in Settings ▸ Library location** shows how
+    many prints were found, in how many collections, and what would change,
+    before you press Apply. Groups you made yourself are never moved.
+    Books regrouped by alpha.66 are sorted again once, automatically.
+  - **Optional: your assistant can check the sorting.** Turn on "Sort
+    linked folders" in Settings ▸ Assistant (off by default, never turned
+    on by the old AI switch). Only the NAMES of folders and files, and how
+    many models each folder holds, are sent — never a file or a picture.
+    Answers are checked, remembered so the same folders are never sent
+    twice, and the app's own sorting is used for anything missing or if
+    the assistant fails. Its cost appears in the AI usage figures.
+
 - **Mac: fixes from the 4.0.0-alpha.66 review of linked and online-only
   models.**
   - **A group's kind and picture move with it.** When "Regroup from folders"

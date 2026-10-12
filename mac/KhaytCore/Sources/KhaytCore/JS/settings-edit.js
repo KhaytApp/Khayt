@@ -370,8 +370,14 @@
       const features = {};
       if (privacy) {
         for (const id of Object.keys(privacy.AI_FEATURES)) {
-          features[id] = has(a, 'features') ? !!(a.features || {})[id]
-                                            : !!((held.features || {})[id]);
+          // A feature only some apps perform (`hosts`, e.g. the Mac's
+          // linked-folder sorting) has no switch on the others' screens, so
+          // a form without it says nothing about it: the held answer stands.
+          // Otherwise saving the desktop's assistant settings would turn off
+          // what the shop turned on in the Mac app.
+          const hostOnly = Array.isArray(privacy.AI_FEATURES[id].hosts);
+          const said = has(a, 'features') && (!hostOnly || has(a.features || {}, id));
+          features[id] = said ? !!(a.features || {})[id] : !!((held.features || {})[id]);
         }
       }
       out.ai = {
