@@ -4,38 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Moving unused models to the bucket only touches Khayt's own model
-  folders.** Since the Mac began adding model files in place (a folder of
-  your own inside the library folder, such as `Dragon/dragon.stl`), the
-  desktop's "move unused models to the bucket" could have uploaded one of
-  your files and then deleted it from your folder. The sweep looked at every
-  folder in the library folder. It now looks only in the folder of each model
-  in your library, never at a file a model points to where it already was,
-  and does nothing if it cannot read the book. The Mac has the same rule
-  (`lib/print-library-tier.js` `ownFilesOnly`).
-- **Models the Mac added from your storage bucket open on the desktop too.**
-  When the Mac finds models you put in the bucket yourself, it adds them to
-  the library without downloading them. The desktop listed those as missing
-  files. It now treats them as in cloud storage: opening one, in the slicer or
-  in the 3D view, downloads it first and says so. The download is checked
-  against the size the bucket gave (and its checksum, where the bucket gives a
-  plain one). It is then read the way an import is, for its picture,
-  measurements, colours and fingerprint. If it turns out to be a copy of a
-  model already in the library, Khayt says which one. Deleting such a model
-  moves its local marker to the Trash and leaves the object in the bucket, as
-  deleting a tiered model always has. If the model is in a different bucket
-  from the one connected in Settings, Khayt names both instead of reporting
-  the model lost.
-
-- **Moving old models to the bucket never touches a model the Mac adopted
-  from the bucket.** The Mac marks a model that is in the bucket but not yet
-  downloaded with a small `.online` file in its library folder. The desktop's
-  "move unused models to the bucket" sweep looked at every file in a model's
-  folder and was kept off that marker only by its 1 MB minimum size. Had the
-  minimum been set to 0, it could have replaced the marker with a pointer to
-  itself, and the Mac would have lost track of the model. The marker is now
-  refused by name. The Mac uses the same rule (`lib/print-library-tier.js`).
-
 - **Mac: usage counts now say which features a shop uses, not only that the
   app was opened.** Only with "Share usage counts" switched on.
   - **25 fixed counters**, such as quote created, invoice exported, model
@@ -5191,6 +5159,44 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.10] - 2026-10-12
+
+Models the Mac adopted from your storage bucket, since 3.11.9.
+Individual entries are kept below; this is what changed for you.
+
+Models the Mac added from your storage bucket without downloading them now open on the desktop: opening one downloads it, checks it, and reads it like an import. Moving unused models to the bucket no longer touches a model file you keep in a folder of your own, or the Mac's marker for a model still in the bucket.
+
+- **Moving unused models to the bucket only touches Khayt's own model
+  folders.** Since the Mac began adding model files in place (a folder of
+  your own inside the library folder, such as `Dragon/dragon.stl`), the
+  desktop's "move unused models to the bucket" could have uploaded one of
+  your files and then deleted it from your folder. The sweep looked at every
+  folder in the library folder. It now looks only in the folder of each model
+  in your library, never at a file a model points to where it already was,
+  and does nothing if it cannot read the book. The Mac has the same rule
+  (`lib/print-library-tier.js` `ownFilesOnly`).
+- **Models the Mac added from your storage bucket open on the desktop too.**
+  When the Mac finds models you put in the bucket yourself, it adds them to
+  the library without downloading them. The desktop listed those as missing
+  files. It now treats them as in cloud storage: opening one, in the slicer or
+  in the 3D view, downloads it first and says so. The download is checked
+  against the size the bucket gave (and its checksum, where the bucket gives a
+  plain one). It is then read the way an import is, for its picture,
+  measurements, colours and fingerprint. If it turns out to be a copy of a
+  model already in the library, Khayt says which one. Deleting such a model
+  moves its local marker to the Trash and leaves the object in the bucket, as
+  deleting a tiered model always has. If the model is in a different bucket
+  from the one connected in Settings, Khayt names both instead of reporting
+  the model lost.
+- **Moving old models to the bucket never touches a model the Mac adopted
+  from the bucket.** The Mac marks a model that is in the bucket but not yet
+  downloaded with a small `.online` file in its library folder. The desktop's
+  "move unused models to the bucket" sweep looked at every file in a model's
+  folder and was kept off that marker only by its 1 MB minimum size. Had the
+  minimum been set to 0, it could have replaced the marker with a pointer to
+  itself, and the Mac would have lost track of the model. The marker is now
+  refused by name. The Mac uses the same rule (`lib/print-library-tier.js`).
 
 ## [3.11.9] - 2026-10-11
 
