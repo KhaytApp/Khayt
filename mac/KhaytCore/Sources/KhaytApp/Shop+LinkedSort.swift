@@ -56,6 +56,10 @@ struct SortPreview: Identifiable {
     /// Models loose at the top of the linked folders, how many of them the
     /// sort put in a print, and in how many prints (`LooseSort`).
     var loose = (total: 0, grouped: 0, prints: 0)
+    /// Pictures the sort is not sure of, for the shop to tick or untick.
+    var pictures: [PictureRow] = []
+    /// What "Check pictures" did, when it is on.
+    var pictureAsk: PictureAsk?
 
     /// The loose figures of some sorted linked folders.
     nonisolated static func looseCounts(_ plans: [PrintSort.Plan]) -> (total: Int, grouped: Int, prints: Int) {
@@ -415,6 +419,22 @@ extension Shop {
                                   moved: counted.moved, renamed: counted.renamed, tagged: counted.tagged,
                                   kept: counted.kept, assistant: asked, assistantOff: !aiLibraryAllowed)
         preview.loose = SortPreview.looseCounts(plans)
+        // The pictures to check — looked at by the assistant first when the
+        // shop turned "Check pictures" on (its own switch).
+        if aiPicturesAllowed, !stop.isStopped {
+            preview.pictureAsk = await checkPictures(plans, stop: stop, byHand: true)
+        }
+        var outcomes: [String: String] = [:]
+        if let engine {
+            for v in ["yes", "no", "unsure"] {
+                for ref in [true, false] {
+                    outcomes[v + "|\(ref)"] = try? await engine.aiPictureOutcome(verdict: v, hasReference: ref)
+                }
+            }
+        }
+        preview.pictures = PictureRow.rows(plans, settings: settingsDict,
+                                           hasPicture: { self.hasPicture($0, $1) },
+                                           outcome: { outcomes[$0.verdict + "|\($0.reference)"] })
         sortPreview = preview
     }
 
@@ -457,7 +477,7 @@ extension Shop {
     /// Apply the sort the sheet showed: the records refiled through the same
     /// protections as every refile (judged again on the book as it is now),
     /// then the prints' pictures.
-    func applyLinkedSort(_ preview: SortPreview) async {
+    func applyLinkedSort(_ preview: SortPreview, ticked: Set<String> = []) async {
         guard permitted("inventory", "edit") else { return }
         guard let build = source.build, StoreLock.weOwnIt(build), !libraryMoveBusy else { return }
         sortPreview = nil
@@ -471,8 +491,23 @@ extension Shop {
                                            owns: { StoreLock.weOwnIt(build) },
                                            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
             await load(source)
-            let pictures = stop.isStopped ? 0 : await fetchPrintPictures(preview.plans, stop: stop)
+            var pictures = stop.isStopped ? 0 : await fetchPrintPictures(preview.plans, stop: stop)
             if pictures > 0 { await load(source) }
+            // The pictures to check: ticked ones go on, unticked ones are
+            // remembered as turned down and never offered again.
+            if !preview.pictures.isEmpty, !stop.isStopped {
+                var put: [(plan: PrintSort.Plan, suggestion: LooseSort.Suggestion)] = []
+                var turned: [String] = []
+                for row in preview.pictures {
+                    if ticked.contains(row.id) {
+                        if let plan = preview.plans.first(where: { $0.root == row.root }) { put.append((plan, row.suggestion)) }
+                    } else {
+                        turned.append(row.id)
+                    }
+                }
+                rejectPictures(turned)
+                pictures += await putPictures(put, stop: stop)
+            }
             var lines = [words.callIt("mac.linked_regrouped", ["n": .number(Double(n))])]
             if pictures > 0 { lines.append(words.callIt("mac.sort_pictures_added", ["n": .number(Double(pictures))])) }
             libraryMoveNote = lines.joined(separator: " ")
@@ -488,6 +523,14 @@ struct LinkedSortSheet: View {
     let shop: Shop
     let preview: SortPreview
     @Environment(\.dismiss) private var dismiss
+    /// The pictures to check the shop has ticked (`PictureRow.ticked` to start).
+    @State private var ticks: Set<String>
+
+    init(shop: Shop, preview: SortPreview) {
+        self.shop = shop
+        self.preview = preview
+        _ticks = State(initialValue: Set(preview.pictures.filter(\.ticked).map(\.id)))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -540,6 +583,37 @@ struct LinkedSortSheet: View {
                 }
             }
             .frame(minHeight: 260)
+            if !preview.pictures.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(shop.words.callIt("mac.sort_pictures_check")).font(.headline)
+                    Text(shop.words.callIt("mac.sort_pictures_check_help"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    if preview.pictureAsk?.unsupported == true {
+                        Label(shop.words.callIt("mac.sort_pictures_ai_off"), systemImage: "sparkles")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else if let n = preview.pictureAsk?.checked, n > 0 {
+                        Label(shop.words.callIt("mac.sort_pictures_checked", ["n": .number(Double(n))]),
+                              systemImage: "sparkles")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                List(preview.pictures) { row in
+                    Toggle(isOn: Binding(get: { ticks.contains(row.id) },
+                                         set: { on in if on { ticks.insert(row.id) } else { ticks.remove(row.id) } })) {
+                        HStack(spacing: 10) {
+                            Thumbnail(source: row.picture.map { ThumbnailSource.file($0) })
+                                .frame(width: 40, height: 40)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(verbatim: row.name).lineLimit(1)
+                                Text(verbatim: row.image.lastPathComponent)
+                                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                    }
+                }
+                .frame(minHeight: 140)
+            }
             HStack {
                 Spacer()
                 Button(shop.words.callIt("common.cancel"), role: .cancel) {
@@ -549,11 +623,13 @@ struct LinkedSortSheet: View {
                 .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("mac.sort_apply")) {
                     let chosen = preview
+                    let picked = ticks
                     dismiss()
-                    Task { await shop.applyLinkedSort(chosen) }
+                    Task { await shop.applyLinkedSort(chosen, ticked: picked) }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!shop.canWrite || preview.moved + preview.renamed + preview.tagged == 0)
+                .disabled(!shop.canWrite
+                          || (preview.moved + preview.renamed + preview.tagged == 0 && preview.pictures.isEmpty))
             }
         }
         .padding(20)

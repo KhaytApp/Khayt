@@ -861,6 +861,7 @@ final class Shop {
             aiReplyAllowed = aiFeatures.first { $0.id == "reply" }?.enabled ?? false
             aiPriceAllowed = aiFeatures.first { $0.id == "price" }?.enabled ?? false
             aiLibraryAllowed = aiFeatures.first { $0.id == "library" }?.enabled ?? false
+            aiPicturesAllowed = aiFeatures.first { $0.id == "pictures" }?.enabled ?? false
             taxSummary = await describeTax(root["settings"])
             await readSettingsTables(root)
             // What each job still owes is `order-money`'s answer, not a
@@ -1385,6 +1386,9 @@ final class Shop {
     /// Whether the shop has agreed to its assistant sorting linked folders
     /// by their names, on this book.
     private(set) var aiLibraryAllowed = false
+    /// Whether the shop has agreed to "Check pictures" — its OWN switch,
+    /// apart from sorting linked folders.
+    private(set) var aiPicturesAllowed = false
     /// The assistant is being asked about the linked folders right now.
     var librarySortAsking = false
     /// What sorting the linked folders would do, while the sheet is open.
