@@ -203,7 +203,9 @@ extension Shop {
             try StoreWriter.update(build) { root in
                 SortCache.store(answered, into: &root)
                 LooseCache.store(looseAnswered, present: present, into: &root)
-                if nextMarks != marks { SortFailures.write(nextMarks, into: &root) }
+                if nextMarks != marks {
+                    SortFailures.write(SortFailures.keepingPictures(nextMarks, from: Self.settings(root)), into: &root)
+                }
                 if spent {
                     var s = Self.settings(root)
                     s["aiUsage"] = ledger
@@ -235,7 +237,11 @@ extension Shop {
     func fetchPrintPictures(_ plans: [PrintSort.Plan], stop: ScanStop?) async -> Int {
         guard let build = source.build, let roots = libraryRoots else { return 0 }
         let settings = settingsDict
-        let jobs = PrintPhotos.jobs(plans, looked: PrintPhotos.looked(settings), limit: PrintPhotos.perPass * 4)
+        // Every print still waiting, not the first 160: a print that cannot
+        // be settled yet (its group not filed, its pictures too big) costs no
+        // download, and with a short list enough of them hid every other
+        // print for good (review of #1844).
+        let jobs = PrintPhotos.jobs(plans, looked: PrintPhotos.looked(settings), limit: Int.max)
         guard !jobs.isEmpty else { return 0 }
         let covers = GroupKinds.covers(settings)
         // Linked records with no photo, by the file they point at.
@@ -250,9 +256,14 @@ extension Shop {
             if !hasPhoto, !removed { photoless.insert(path) }
         }
         let primary = roots.primary
+        // The groups records sit in now: a picture for a group nobody is
+        // filed in would be thrown away at the write — and the print marked
+        // looked with no picture, never tried again.
+        let liveNow = Set(GroupKinds.groupPaths(["printFiles": .array(fileRows)]))
         var groupPictures: [(group: String, rel: String)] = []
         var modelPhotos: [String: String] = [:]
         var looked: [String] = []
+        var printOfGroup: [String: String] = [:]
         var fetched = 0
         for job in jobs {
             if stop?.isStopped == true || Task.isCancelled || fetched >= PrintPhotos.perPass { break }
@@ -265,10 +276,15 @@ extension Shop {
             // one, so a picture the shop took off is never put back.
             var settled = true
             if let group = job.group, covers[group] == nil {
-                if let pick = await PinWork.run({ PrintPhotos.pick(job.candidates) }) {
+                if !liveNow.contains(where: { Self.isUnder($0, group) }) {
+                    settled = false                      // nobody filed there yet
+                } else if let pick = await PinWork.run({ PrintPhotos.pick(job.candidates) }) {
                     fetched += 1
                     if let rel = await PinWork.run({ try? GroupPictures.write(GroupPictures.encode(pick), for: group, under: primary) }) {
                         groupPictures.append((group, rel))
+                        printOfGroup[group] = job.print
+                    } else {
+                        settled = false
                     }
                 } else {
                     settled = false
@@ -319,12 +335,20 @@ extension Shop {
                 if changed { root["printFiles"] = .array(rows) }
                 let now = GroupKinds.covers(Self.settings(root))
                 let live = Set(GroupKinds.groupPaths(root))
+                var notWorn = Set<String>()
                 for (group, rel) in groupPictures {
-                    guard now[group] == nil, live.contains(where: { Self.isUnder($0, group) }) else { unused.append(rel); continue }
+                    guard now[group] == nil, live.contains(where: { Self.isUnder($0, group) }) else {
+                        unused.append(rel)
+                        // Not filed there after all: no picture went on, so
+                        // the print is not settled. (One that got a cover of
+                        // its own meanwhile is.)
+                        if now[group] == nil, let p = printOfGroup[group] { notWorn.insert(p) }
+                        continue
+                    }
                     GroupKinds.setCover(.image(rel), for: group, into: &root)
                     put += 1
                 }
-                PrintPhotos.markLooked(looked, into: &root)
+                PrintPhotos.markLooked(looked.filter { !notWorn.contains($0) }, into: &root)
             }
         } catch {
             unused = groupPictures.map(\.rel)
@@ -422,7 +446,7 @@ extension Shop {
         // The pictures to check — looked at by the assistant first when the
         // shop turned "Check pictures" on (its own switch).
         if aiPicturesAllowed, !stop.isStopped {
-            preview.pictureAsk = await checkPictures(plans, stop: stop, byHand: true)
+            preview.pictureAsk = await checkPictures(plans, stop: stop, byHand: true, put: false)
         }
         var outcomes: [String: String] = [:]
         if let engine {

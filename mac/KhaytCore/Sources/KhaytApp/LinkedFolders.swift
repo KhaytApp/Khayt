@@ -170,6 +170,11 @@ extension Shop {
             let asked = await askAssistantToSort(plans, stop: stop)
             assistant = asked
             if asked.sorted > 0 || asked.loose > 0, !stopped() {
+                // The answers were just written to the book, not to this
+                // Shop's copy of its settings: read them back first, or the
+                // plan is the one before them and nothing is regrouped until
+                // the next scan (review of #1844; the preview already did).
+                await load(source)
                 plans = await PinWork.run { [settingsDict] in
                     walked.map { Shop.sortedPlan(root: $0.root, models: $0.models, images: $0.images,
                                                  settings: settingsDict, births: $0.plan.births) }

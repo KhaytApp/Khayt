@@ -28,6 +28,12 @@ extension Shop {
     func hasPicture(_ plan: PrintSort.Plan, _ target: LooseSort.Suggestion.Target) -> Bool {
         switch target {
         case .print(let key):
+            // Settled once with a picture (`PrintPhotos.markLooked`): one the
+            // shop took off a GROUP leaves no marker of its own, so without
+            // this the sheet offered it again, ticked (review of #1844).
+            if PrintPhotos.looked(settingsDict).contains(plan.root.appending(path: key).standardizedFileURL.path) {
+                return true
+            }
             if let group = plan.group(ofPrint: key) { return GroupKinds.covers(settingsDict)[group] != nil }
             guard let only = plan.models(ofPrint: key).first else { return true }
             return hasPicture(plan, .model(only))
@@ -79,7 +85,11 @@ extension Shop {
     ///
     /// Independent of "Sort linked folders": it checks any picture the sort
     /// offered, the Mac's own finds included.
-    func checkPictures(_ plans: [PrintSort.Plan], stop: ScanStop?, byHand: Bool = false) async -> PictureAsk {
+    ///
+    /// `put`: false from the "Sort linked folders…" preview, which changes
+    /// nothing in the library until Apply — a "yes" there is offered ticked.
+    func checkPictures(_ plans: [PrintSort.Plan], stop: ScanStop?, byHand: Bool = false,
+                       put: Bool = true) async -> PictureAsk {
         var result = PictureAsk()
         guard aiPicturesAllowed, let build = source.build, let engine else { return result }
         let settings = settingsDict
@@ -89,8 +99,12 @@ extension Shop {
         }
         let rejected = PictureRejects.read(settings)
         let verdicts = PictureVerdicts.read(settings)
+        let knownHashes = PictureVerdicts.hashes(settings)
         let today = SortFailures.today()
         var marks = SortFailures.read(settings)
+        /// The failure marks this pass changed — merged into the book's
+        /// marks inside the write, never written over the folder sort's.
+        var touched = Set<String>()
         var ledger: JSONValue = settings["aiUsage"] ?? .object([:])
         var spent = false
         var newVerdicts: [String: PictureVerdicts.Verdict] = [:]
@@ -104,6 +118,11 @@ extension Shop {
                 guard !rejected.contains(PictureRejects.id(root: plan.root, image: s.image, target: s.target)),
                       !hasPicture(plan, s.target) else { continue }
                 let url = plan.root.appending(path: s.image)
+                // Already judged (by the bytes it had then): not read again —
+                // reading is the download — and not counted against the 40,
+                // or 40 unsure pairs would hold the budget for good.
+                if let h = knownHashes[plan.root.standardizedFileURL.path + "|" + s.image],
+                   verdicts[PictureVerdicts.key(hash: h, root: plan.root, target: s.target)] != nil { continue }
                 let listed = LinkedCloud.listedSize(url)
                 guard listed > 0, listed <= PictureSend.maxSourceBytes else { continue }
                 budget -= 1
@@ -128,12 +147,18 @@ extension Shop {
                 do {
                     let reply = try await AiClient.checkPicture(printName: name, photo: photo, reference: refData, shop: self)
                     result.checked += 1
-                    marks[sig] = nil
+                    touched.insert(sig)
                     if reply.answer.ok {
+                        marks[sig] = nil
                         newVerdicts[key] = PictureVerdicts.Verdict(verdict: reply.answer.verdict, reference: refData != nil)
+                    } else {
+                        // No verdict came back: held like a failure, or the
+                        // same pair was sent again on every scan.
+                        marks[sig] = SortFailures.Mark(count: (marks[sig]?.count ?? 0) + 1, last: today)
+                        result.problem = reply.answer.problem
                     }
                     switch reply.answer.outcome {
-                    case "attach": attach.append((plan, s))
+                    case "attach" where reply.answer.ok: attach.append((plan, s))
                     case "rejected": rejects.append(PictureRejects.id(root: plan.root, image: s.image, target: s.target))
                     default: break
                     }
@@ -152,20 +177,26 @@ extension Shop {
                     result.problem = words.callIt("mac.ai_no_key")
                     break outer
                 } catch {
+                    touched.insert(sig)
                     marks[sig] = SortFailures.Mark(count: (marks[sig]?.count ?? 0) + 1, last: today)
                     result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
                 }
             }
         }
         let marksNow = marks
-        if !newVerdicts.isEmpty || !hashes.isEmpty || !rejects.isEmpty || spent || marksNow != SortFailures.read(settings) {
+        let changedSigs = touched
+        if !newVerdicts.isEmpty || !hashes.isEmpty || !rejects.isEmpty || spent || !changedSigs.isEmpty {
             // lock: system — the shop turned "Check pictures" on; this writes
             // only the verdicts, which pairings were turned down, their cost
             // and which checks failed.
             try? StoreWriter.update(build) { root in
                 PictureVerdicts.write(newVerdicts, hashes: hashes, into: &root)
                 PictureRejects.add(rejects, into: &root)
-                SortFailures.write(marksNow, into: &root)
+                if !changedSigs.isEmpty {
+                    var current = SortFailures.read(Self.settings(root))
+                    for sig in changedSigs { current[sig] = marksNow[sig] }
+                    SortFailures.write(current, into: &root)
+                }
                 if spent {
                     var s = Self.settings(root)
                     s["aiUsage"] = ledger
@@ -174,7 +205,7 @@ extension Shop {
             }
             await load(source)
         }
-        if !attach.isEmpty { result.attached = await putPictures(attach, stop: stop) }
+        if put, !attach.isEmpty { result.attached = await putPictures(attach, stop: stop) }
         return result
     }
 
