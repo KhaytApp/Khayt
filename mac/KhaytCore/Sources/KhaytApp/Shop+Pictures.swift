@@ -99,7 +99,7 @@ extension Shop {
         }
         let rejected = PictureRejects.read(settings)
         let verdicts = PictureVerdicts.read(settings)
-        let knownHashes = PictureVerdicts.hashes(settings)
+        let known = PictureVerdicts.seen(settings)
         let today = SortFailures.today()
         var marks = SortFailures.read(settings)
         /// The failure marks this pass changed — merged into the book's
@@ -108,7 +108,7 @@ extension Shop {
         var ledger: JSONValue = settings["aiUsage"] ?? .object([:])
         var spent = false
         var newVerdicts: [String: PictureVerdicts.Verdict] = [:]
-        var hashes: [String: String] = [:]
+        var hashes: [String: PictureVerdicts.Seen] = [:]
         var rejects: [String] = []
         var attach: [(plan: PrintSort.Plan, suggestion: LooseSort.Suggestion)] = []
         var budget = PictureSend.checksPerScan
@@ -118,19 +118,23 @@ extension Shop {
                 guard !rejected.contains(PictureRejects.id(root: plan.root, image: s.image, target: s.target)),
                       !hasPicture(plan, s.target) else { continue }
                 let url = plan.root.appending(path: s.image)
-                // Already judged (by the bytes it had then): not read again —
-                // reading is the download — and not counted against the 40,
-                // or 40 unsure pairs would hold the budget for good.
-                if PictureVerdicts.judged(verdicts, hashes: knownHashes, root: plan.root,
-                                          image: s.image, target: s.target) { continue }
                 let listed = LinkedCloud.listedSize(url)
                 guard listed > 0, listed <= PictureSend.maxSourceBytes else { continue }
+                // Judged, or held after a failure, by the hash it had when its
+                // listing was the same: skipped WITHOUT reading (reading is the
+                // download) and without spending one of the 40 — or enough
+                // such pairs would hold the budget for good.
+                let modified = PictureVerdicts.modified(url)
+                let spot = plan.root.standardizedFileURL.path + "|" + s.image
+                if PictureVerdicts.skipWithoutReading(known[spot], size: listed, modified: modified,
+                                                      verdicts: verdicts, marks: marks, today: today,
+                                                      byHand: byHand, root: plan.root, target: s.target) { continue }
                 budget -= 1
                 // Reading it is what fetches a picture kept online — within
                 // the 8 MB cap and this scan's budget.
                 guard let data = await PinWork.run({ try? Data(contentsOf: url) }) else { continue }
                 let hash = PictureSend.hash(data)
-                hashes[plan.root.standardizedFileURL.path + "|" + s.image] = hash
+                hashes[spot] = PictureVerdicts.Seen(hash: hash, size: listed, modified: modified)
                 let key = PictureVerdicts.key(hash: hash, root: plan.root, target: s.target)
                 if verdicts[key] != nil || newVerdicts[key] != nil { continue }      // never sent twice
                 let sig = "picture:" + key
@@ -190,7 +194,7 @@ extension Shop {
             // only the verdicts, which pairings were turned down, their cost
             // and which checks failed.
             try? StoreWriter.update(build) { root in
-                PictureVerdicts.write(newVerdicts, hashes: hashes, into: &root)
+                PictureVerdicts.write(newVerdicts, seen: hashes, into: &root)
                 PictureRejects.add(rejects, into: &root)
                 if !changedSigs.isEmpty {
                     var current = SortFailures.read(Self.settings(root))
@@ -287,6 +291,24 @@ extension Shop {
         }
         if put > 0 { await load(source) }
         return put
+    }
+
+    /// "Show": bring one picture kept online down because the shop asked to
+    /// see it in the sheet (at most `PictureSend.maxSourceBytes`).
+    func bringDownPicture(_ url: URL) async -> Bool {
+        await PinWork.run { PictureSend.bringDown(url) }
+    }
+
+    /// Keep the remembered pictures and folder answers bounded
+    /// (`PictureMaps`): run on each scan, written only when something goes.
+    func prunePictureMaps(_ plans: [PrintSort.Plan]) async {
+        guard let build = source.build, !plans.isEmpty else { return }
+        var probe: [String: JSONValue] = ["settings": .object(settingsDict)]
+        guard PictureMaps.prune(&probe, plans: plans) else { return }
+        // lock: system — pruning the app's own caches of files no longer in
+        // the linked folders it just walked.
+        try? StoreWriter.update(build) { root in PictureMaps.prune(&root, plans: plans) }
+        await load(source)
     }
 
     /// Remember pairings the shop turned down, so they are never offered again.

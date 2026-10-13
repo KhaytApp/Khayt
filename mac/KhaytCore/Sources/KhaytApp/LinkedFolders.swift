@@ -189,6 +189,8 @@ extension Shop {
         if !stopped(), aiPicturesAllowed {
             pictures += await checkPictures(plans, stop: stop).attached
         }
+        // What is remembered about pictures and folders that are gone, let go.
+        if !stopped() { await prunePictureMaps(plans) }
         if regrouped > 0 || pictures > 0 || assistant != nil { await load(source) }
 
         var lines: [String] = []

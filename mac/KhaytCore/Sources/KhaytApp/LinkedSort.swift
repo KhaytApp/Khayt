@@ -658,4 +658,83 @@ enum PrintPhotos {
     nonisolated static func pick(_ candidates: [URL], size: (URL) -> Int = LinkedCloud.listedSize) -> URL? {
         candidates.first { let s = size($0); return s > 0 && s <= maxBytes }
     }
+
+    /// One print's share of a pass: what to fetch for it, and whether it is
+    /// settled — remembered as looked at — once those pictures are on.
+    struct Step: Sendable, Equatable {
+        let print: String
+        /// The group that wears the picture, and the picture it gets.
+        var group: String?
+        var groupPick: URL?
+        /// A print of one model: that model's path, and its picture.
+        var only: String?
+        var onlyPick: URL?
+        /// Pictures named exactly for one model, by the model's path.
+        var models: [String: URL] = [:]
+        var settled = true
+    }
+
+    /// ── LOOKED AT ONLY ONCE SETTLED (Oct 2026, review of #1844) ──────────
+    ///
+    /// What one pass fetches, decided before a byte is read: at most `limit`
+    /// pictures, over EVERY print still waiting (a print that cannot be
+    /// settled yet costs nothing, so it cannot hold the pass up). A print is
+    /// settled when its picture goes on, or it already wears one; it is NOT
+    /// when its group has nobody filed in it yet (the picture would be thrown
+    /// away), its pictures are all too big, or its model is not in the book
+    /// yet — those are tried again next pass, without a download now.
+    nonisolated static func pass(_ jobs: [Job], covered: Set<String>, live: Set<String>,
+                                 photoless: Set<String>, indexed: Set<String>, limit: Int = perPass,
+                                 pick: ([URL]) -> URL? = { PrintPhotos.pick($0) }) -> [Step] {
+        var out: [Step] = []
+        var fetched = 0
+        var planned = Set<String>()
+        for job in jobs {
+            if fetched >= limit { break }
+            var step = Step(print: job.print)
+            if let group = job.group, !covered.contains(group) {
+                if !live.contains(where: { Shop.isUnder($0, group) }) {
+                    step.settled = false                         // nobody filed there yet
+                } else if let p = pick(job.candidates) {
+                    step.group = group
+                    step.groupPick = p
+                    fetched += 1
+                } else {
+                    step.settled = false                         // every picture too big
+                }
+            }
+            if let only = job.only {
+                if photoless.contains(only) {
+                    if fetched < limit, let p = pick(job.candidates) {
+                        step.only = only
+                        step.onlyPick = p
+                        planned.insert(only)
+                        fetched += 1
+                    } else {
+                        step.settled = false
+                    }
+                } else if !indexed.contains(only) {
+                    step.settled = false                         // not in the book yet
+                }
+            }
+            for (model, image) in job.modelPictures.sorted(by: { $0.key < $1.key })
+            where photoless.contains(model) && !planned.contains(model) && fetched < limit {
+                guard let p = pick([image]) else { continue }
+                step.models[model] = p
+                planned.insert(model)
+                fetched += 1
+            }
+            if step.settled || step.groupPick != nil || step.onlyPick != nil || !step.models.isEmpty {
+                out.append(step)
+            }
+        }
+        return out
+    }
+
+    /// The prints a pass may remember as looked at, once the write said which
+    /// group pictures went on: one whose group turned out to have nobody in
+    /// it (no picture went on) is not settled.
+    nonisolated static func settled(_ steps: [Step], notWorn: Set<String>) -> [String] {
+        steps.filter { $0.settled && !($0.group.map(notWorn.contains) ?? false) }.map(\.print)
+    }
 }
