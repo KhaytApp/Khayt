@@ -137,6 +137,11 @@ jobs:
     # supported for two more years; moving to 26 is its own PR, with this job
     # watched.
     runs-on: ubuntu-24.04
+    # The whole job takes 4-5 minutes. Without a limit, a hung Electron step
+    # holds this REQUIRED check for GitHub's default six hours and blocks every
+    # lane's merges (the 3MF worker step hung for an hour on 12 Oct 2026; a
+    # rerun passed in 4.5 minutes).
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
@@ -218,6 +223,7 @@ jobs:
         run: xvfb-run -a npm run test:e2e:dedupe
 
       - name: E2E smoke (3MF work stays off the main thread)
+        timeout-minutes: 5
         run: xvfb-run -a npm run test:e2e:3mfworker
 
       - name: E2E smoke (order to print file link)
