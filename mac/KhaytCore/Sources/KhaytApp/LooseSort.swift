@@ -613,7 +613,9 @@ enum LooseSort {
         /// with only part words and numbers after it.
         func isPart(_ m: String, of words: [String]) -> Bool {
             guard let s = stems[m], s.starts(with: words) else { return false }
-            return s.dropFirst(words.count).allSatisfy { partWords.contains($0) || isNumber($0) || isMeasure($0) }
+            return s.dropFirst(words.count).allSatisfy {
+                partWords.contains($0) || isNumber($0) || isMeasure($0) || isVersion($0)
+            }
         }
         /// (b): something else the picture could equally mean.
         func competing(_ words: [String], target: Set<String>) -> Bool {
@@ -622,7 +624,11 @@ enum LooseSort {
                 if target.contains(m), isPart(m, of: words) { continue }
                 return true
             }
-            for n in names where related(n, words) { return true }
+            for (i, n) in names.enumerated() where related(n, words) {
+                // The target print's own name is no rival.
+                if target.contains(where: { clusterOf[$0] == i }) { continue }
+                return true
+            }
             return false
         }
         /// (c): no unrelated named model between the picture and the target.

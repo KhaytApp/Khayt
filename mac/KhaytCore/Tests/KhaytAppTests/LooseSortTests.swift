@@ -121,14 +121,168 @@ struct LooseSortTests {
         #expect(LooseSort.read("Bone White Body.stl") == nil, "a kit part named for its colour")
     }
 
-    @Test("a picture named for the print is its picture; a number or a camera's name is nobody's")
-    func pictures() {
-        let clusters = LooseSort.clusters(models: Self.copyOrder, images: Self.pictures, births: Self.births)
-        let mochi = clusters.first { $0.name == "mochi" }
-        #expect(mochi?.pictures == ["mochi.jpg"])
-        let all = clusters.flatMap(\.pictures)
-        #expect(!all.contains("189.jpg"))
-        #expect(!all.contains("IMG_2041.jpg"))
+    @Test("a picture is never put on by a likely name: mochi.jpg beside mochiA and mochi-medium is offered, unticked")
+    func prefixAmbiguity() {
+        let r = LooseSort.sort(models: Self.copyOrder, images: Self.pictures, births: Self.births)
+        let mochi = r.clusters.first { $0.name == "mochi" }
+        #expect(mochi?.pictures.isEmpty == true)
+        let offer = r.suggestions.first { $0.image == "mochi.jpg" }
+        #expect(offer?.target == .print("mochi"))
+        #expect(offer?.reason == .unsure)
+        #expect(offer?.ticked == false)
+        // A camera's name says nothing: at most an offer by its place in
+        // the copy order, never put on.
+        #expect(!r.clusters.flatMap(\.pictures).contains("IMG_2041.jpg"))
+        let img = r.suggestions.first { $0.image == "IMG_2041.jpg" }
+        #expect(img == nil || img?.reason == .numbered)
+    }
+
+    // MARK: - Pictures: certain, or offered
+
+    /// Models and pictures in one copy order.
+    static let shoot = [
+        "v9-QQ - holder.stl", "v9-QQ - cover.stl", "189.jpg", "v9-QQ - connector.stl", "v9-QQ.jpg",
+        "v9-QQQ - holder.stl", "v9-QQQ - cover.stl",
+        "teacup_holder_single.u1.3mf", "teacup_holder_single.3mf", "teacup_holder_single.jpg",
+        "Fig_Space Ranger Zed_Head_01_White.stl", "Fig_Space Ranger Zed_ArmLeft_01_Red.stl",
+        "Space Ranger Zed.jpg", "Space Ranger Zed Bust.stl", "Zed poster.jpg",
+        "Gnome Mailbox.stl", "Gnome Mailbox.jpg",
+        "Owl Lamp.stl", "Kettle Stand.stl", "Owl Lamp.jpg",
+        "190.jpg",
+        "KING-Omar-GRAY-120mm-U1.3mf", "KING-Omar-COLOR-120mm-U1.3mf",
+    ]
+    static var shootBirths: [String: Double] {
+        var out: [String: Double] = [:]
+        for (i, n) in shoot.enumerated() { out[n] = 1_800_000_000 + Double(i) }
+        return out
+    }
+    static func shot() -> LooseSort.Result {
+        let images = shoot.filter { $0.hasSuffix(".jpg") }
+        return LooseSort.sort(models: shoot.filter { !$0.hasSuffix(".jpg") }, images: images, births: shootBirths)
+    }
+
+    @Test("named exactly for one print, nothing else it could mean, in its run: put on")
+    func exactUniqueInRun() {
+        let r = Self.shot()
+        let qq = r.clusters.first { $0.name == "v9-QQ" }
+        #expect(qq?.pictures == ["v9-QQ.jpg"], "v9-QQQ is another print, but not a name v9-QQ runs into")
+        let teacup = r.clusters.first { $0.name == "teacup holder" }
+        #expect(teacup?.pictures == ["teacup_holder_single.jpg"])
+    }
+
+    @Test("a model in no print, with a picture of exactly its name: its own photo")
+    func singleModelPhoto() {
+        #expect(Self.shot().singles["Gnome Mailbox.stl"] == ["Gnome Mailbox.jpg"])
+    }
+
+    @Test("two prints of one subject — a figure and a bust: the figure's name is offered, not put on")
+    func twoPrintsOfOneSubject() {
+        let r = Self.shot()
+        let zed = r.clusters.first { $0.name == "Space Ranger Zed" }
+        #expect(zed?.pictures.isEmpty == true)
+        let offer = r.suggestions.first { $0.image == "Space Ranger Zed.jpg" }
+        #expect(offer?.reason == .unsure)
+        #expect(offer?.ticked == false)
+        // One shared word is only ever an offer.
+        let poster = r.suggestions.filter { $0.image == "Zed poster.jpg" }
+        #expect(!poster.isEmpty)
+        #expect(poster.allSatisfy { !$0.ticked })
+    }
+
+    @Test("an unrelated named model between the picture and its model: offered")
+    func runBroken() {
+        let r = Self.shot()
+        #expect(r.singles["Owl Lamp.stl"] == nil)
+        let offer = r.suggestions.first { $0.image == "Owl Lamp.jpg" }
+        #expect(offer?.target == .model("Owl Lamp.stl"))
+    }
+
+    @Test("a numbered picture inside a print's run is offered unticked; between two prints it is nobody's")
+    func numbered() {
+        let r = Self.shot()
+        let n189 = r.suggestions.first { $0.image == "189.jpg" }
+        #expect(n189?.reason == .numbered)
+        #expect(n189?.ticked == false)
+        #expect(r.unattached.contains("190.jpg"))
+        let attached = r.clusters.flatMap(\.pictures)
+        #expect(!attached.contains("189.jpg"))
+    }
+
+    @Test("the assistant's pairing is only ever an offer")
+    func assistantPictureIsOffered() {
+        let images = Self.shoot.filter { $0.hasSuffix(".jpg") }
+        let r = LooseSort.sort(models: Self.shoot.filter { !$0.hasSuffix(".jpg") }, images: images,
+                               births: Self.shootBirths, assistant: ["190.jpg": "KING-Omar"])
+        let offer = r.suggestions.first { $0.image == "190.jpg" }
+        #expect(offer?.reason == .assistant)
+        #expect(offer?.ticked == false)
+        #expect(!r.clusters.flatMap(\.pictures).contains("190.jpg"))
+    }
+
+    @Test("a turned-down pairing is never offered again")
+    @MainActor func rejectedNotReoffered() {
+        let images = Self.shoot.filter { $0.hasSuffix(".jpg") }
+        let p = PrintSort.plan(root: Self.drive, models: Self.shoot.filter { !$0.hasSuffix(".jpg") }.map { Self.drive.appending(path: $0) },
+                               images: images.map { Self.drive.appending(path: $0) }, births: Self.shootBirths)
+        let first = PictureRow.rows([p], settings: [:], hasPicture: { _, _ in false }, outcome: { _ in nil })
+        let owl = first.first { $0.image.lastPathComponent == "Owl Lamp.jpg" }
+        let id = try? #require(owl?.id)
+        var root: [String: JSONValue] = [:]
+        PictureRejects.add([id ?? ""], into: &root)
+        guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
+        let again = PictureRow.rows([p], settings: settings, hasPicture: { _, _ in false }, outcome: { _ in nil })
+        #expect(again.count == first.count - 1)
+        #expect(!again.contains { $0.id == id })
+        // And a print that already wears a picture is not offered one.
+        let worn = PictureRow.rows([p], settings: [:], hasPicture: { _, _ in true }, outcome: { _ in nil })
+        #expect(worn.isEmpty)
+    }
+
+    // MARK: - Folder prints (#1839)
+
+    @Test("a folder holding ONE print: any picture in it or its Renders is its picture")
+    func onePrintFolder() {
+        let models = ["Dragon/body.stl", "Dragon/wing.stl"]
+        let p = PrintSort.plan(root: Self.drive, models: models.map { Self.drive.appending(path: $0) },
+                               images: [Self.drive.appending(path: "Dragon/Renders/anything.jpg")])
+        #expect(p.pictures(ofPrint: "Dragon") == ["Dragon/Renders/anything.jpg"])
+    }
+
+    @Test("a pack's media folder holds SEVERAL prints: only an exact, unique name is put on; a near one is offered")
+    func multiPrintFolder() {
+        let models = ["Kit Delivery/Drawers/a.stl", "Kit Delivery/Drawers/b.stl",
+                      "Kit Delivery/Hooks/a.stl", "Kit Delivery/Hooks/b.stl",
+                      "Kit Delivery/Shelf/a.stl", "Kit Delivery/Shelf/b.stl"]
+        let images = ["Kit Delivery/Media/Drawers/d.jpg", "Kit Delivery/Media/Hooks/h.jpg",
+                      "Kit Delivery/Media/Shelf Big/s.jpg"]
+        let p = PrintSort.plan(root: Self.drive, models: models.map { Self.drive.appending(path: $0) },
+                               images: images.map { Self.drive.appending(path: $0) })
+        #expect(p.pictures(ofPrint: "Kit Delivery/Drawers") == ["Kit Delivery/Media/Drawers/d.jpg"])
+        #expect(p.pictures(ofPrint: "Kit Delivery/Shelf").isEmpty)
+        let offer = p.suggestions.first { $0.image == "Kit Delivery/Media/Shelf Big/s.jpg" }
+        #expect(offer?.target == .print("Kit Delivery/Shelf"))
+        #expect(offer?.ticked == true, "one near candidate, nothing else it could mean")
+    }
+
+    @Test("a print with no picture is not looked at for good: a picture that turns up later is found")
+    func notLookedWithoutPicture() {
+        let models = ["Dragon/body.stl", "Dragon/wing.stl"]
+        let bare = PrintSort.plan(root: Self.drive, models: models.map { Self.drive.appending(path: $0) }, images: [])
+        #expect(PrintPhotos.jobs([bare], looked: []).isEmpty)
+        let later = PrintSort.plan(root: Self.drive, models: models.map { Self.drive.appending(path: $0) },
+                                   images: [Self.drive.appending(path: "Dragon/front.jpg")])
+        #expect(PrintPhotos.jobs([later], looked: []).count == 1)
+    }
+
+    @Test("a single loose model's own picture is a job of its own")
+    func singleJob() {
+        let images = Self.shoot.filter { $0.hasSuffix(".jpg") }
+        let p = PrintSort.plan(root: Self.drive, models: Self.shoot.filter { !$0.hasSuffix(".jpg") }.map { Self.drive.appending(path: $0) },
+                               images: images.map { Self.drive.appending(path: $0) }, births: Self.shootBirths)
+        let jobs = PrintPhotos.jobs([p], looked: [])
+        let gnome = jobs.first { $0.only?.hasSuffix("Gnome Mailbox.stl") == true }
+        #expect(gnome?.candidates.map(\.lastPathComponent) == ["Gnome Mailbox.jpg"])
+        #expect(gnome?.group == nil)
     }
 
     @Test("copy order is birth order; with no births, the names' own order")
@@ -156,7 +310,7 @@ struct LooseSortTests {
         let mochiKey = PrintSort.looseKey("mochi")
         #expect(p.prints.contains(mochiKey))
         #expect(p.group(ofPrint: mochiKey) == "mochi")
-        #expect(p.pictures(ofPrint: mochiKey) == ["mochi.jpg"])
+        #expect(p.pictures(ofPrint: mochiKey).isEmpty, "mochi.jpg is offered, not put on")
         let counts = SortPreview.looseCounts([p])
         #expect(counts.total == Self.copyOrder.count)
         #expect(counts.prints == p.loose.count)
@@ -164,12 +318,15 @@ struct LooseSortTests {
 
     @Test("the print's picture is fetched under the same rules as a folder print's")
     func pictureJob() {
-        let jobs = PrintPhotos.jobs([Self.plan()], looked: [])
-        let mochi = jobs.first { $0.group == "mochi" }
-        #expect(mochi?.candidates.map(\.lastPathComponent) == ["mochi.jpg"])
-        #expect(mochi?.only == nil)
+        let images = Self.shoot.filter { $0.hasSuffix(".jpg") }
+        let plan = PrintSort.plan(root: Self.drive, models: Self.shoot.filter { !$0.hasSuffix(".jpg") }.map { Self.drive.appending(path: $0) },
+                                  images: images.map { Self.drive.appending(path: $0) }, births: Self.shootBirths)
+        let jobs = PrintPhotos.jobs([plan], looked: [])
+        let qq = jobs.first { $0.group == "v9-QQ" }
+        #expect(qq?.candidates.map(\.lastPathComponent) == ["v9-QQ.jpg"])
+        #expect(qq?.only == nil)
         let looked = Set(jobs.map(\.print))
-        #expect(PrintPhotos.jobs([Self.plan()], looked: looked).isEmpty, "looked at once, never again")
+        #expect(PrintPhotos.jobs([plan], looked: looked).isEmpty, "settled once, never again")
     }
 
     @Test("a record the shop placed, or took out of its group, is not moved; the app's own is")
@@ -299,11 +456,11 @@ struct LooseSortTests {
     func cacheAndApply() {
         let first = Self.plan()
         let sent = LooseCache.pending(first, settings: [:])
-        #expect(sent.count == Self.copyOrder.count)
+        #expect(sent.count == Self.copyOrder.count + Self.pictures.count, "pictures' names go too")
         let kart = ["Kart Racer 3MF For Bambu Printers.3mf", "Plate 2 - Red.stl", "Plate 1 - Yellow (1).stl"]
         let answered = LooseCache.Answered(root: Self.drive, sent: sent, prints: ["Kart Racer": kart])
         var root: [String: JSONValue] = [:]
-        let present = [Self.drive.standardizedFileURL.path: Set(first.looseModels)]
+        let present = [Self.drive.standardizedFileURL.path: LooseCache.present(first)]
         LooseCache.store([answered], present: present, into: &root)
         guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
         #expect(LooseCache.pending(first, settings: settings).isEmpty, "nothing is sent twice")

@@ -196,7 +196,7 @@ extension Shop {
         let nextMarks = SortFailures.after(marks, asked: asked, failed: failed, pending: pending, today: today)
         guard !answered.isEmpty || !looseAnswered.isEmpty || spent || nextMarks != marks else { return result }
         var present: [String: Set<String>] = [:]
-        for plan in plans { present[plan.root.standardizedFileURL.path] = Set(plan.looseModels) }
+        for plan in plans { present[plan.root.standardizedFileURL.path] = LooseCache.present(plan) }
         do {
             // lock: system — the shop turned this on; it writes only the
             // assistant's answers, their cost and which requests failed.

@@ -461,7 +461,7 @@ struct PrintSortTests {
 
     @Test("the once-per-book refile is a new version, so alpha.66 books are sorted into prints")
     func versionBumped() {
-        #expect(LinkedRegroup.version == 3)
+        #expect(LinkedRegroup.version >= 3, "4 since loose models are sorted too")
     }
 
     @Test("the preview counts what Apply would do, and what stays the shop's")
