@@ -334,7 +334,7 @@ extension Shop {
                                        births: [String: Double] = [:]) -> PrintSort.Plan {
         let first = PrintSort.plan(root: root, models: models, images: images, births: births)
         var answers = SortCache.answers(settings, for: SortCache.units(first))
-        answers.loose = LooseCache.answers(settings, root: root, present: Set(first.looseModels))
+        answers.loose = LooseCache.answers(settings, root: root, present: LooseCache.present(first))
         guard answers != PrintSort.Answers() else { return first }
         return PrintSort.plan(root: root, models: models, images: images, answers: answers, births: births)
     }

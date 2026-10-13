@@ -374,10 +374,18 @@ enum LooseCache {
         return out
     }
 
-    /// The loose names still to ask about, in copy order, at most `perScan`.
+    /// The loose names still to ask about — models and pictures, so the
+    /// assistant can say which print a picture shows (only ever an offer) —
+    /// in copy order, at most `perScan`.
     nonisolated static func pending(_ plan: PrintSort.Plan, settings: [String: JSONValue]) -> [String] {
         let done = asked(settings, root: plan.root)
-        return Array(plan.looseModels.filter { !done.contains($0) }.prefix(perScan))
+        let all = LooseSort.order(plan.looseModels + plan.looseImages, births: plan.births)
+        return Array(all.filter { !done.contains($0) }.prefix(perScan))
+    }
+
+    /// Every loose name of a plan, for `store`'s `present`.
+    nonisolated static func present(_ plan: PrintSort.Plan) -> Set<String> {
+        Set(plan.looseModels).union(plan.looseImages)
     }
 
     /// The requests a list of names makes: at most `perRequest` each, and a
