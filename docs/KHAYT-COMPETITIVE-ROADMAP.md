@@ -621,3 +621,44 @@ cheap or free, and nobody charges for tax compliance because nobody else offers 
 *Caveat, as §5 and §6: these are vendor marketing pages read once, not hands-on
 evaluations. They are enough to place a product, not to trust a feature matrix. The
 App Store figures came through a summarising fetch.*
+
+## Weekly reading — 2026-10-11
+
+The last full reading (§7) was one day earlier, on 2026-10-10. This run **could not read any
+product's own pages**: every direct fetch (printago.io, foxtrack.studio, layers.app,
+stimalo.com) failed with a DNS error (`ENOTFOUND`) from this environment. Only web search
+worked. So the products in §0, §6 and §7 are marked **❌ not re-read** this week, and nothing
+about them is claimed. No prices, features or shutdowns are reported as changed.
+
+### What search turned up
+
+| Product | What search showed | Read? |
+|---|---|---|
+| [PrintTrack](https://hunted.space/product/printtrack) | Free business manager: orders, profit per print, filament cost, PDF invoices. Maker-posted listing. No tax or ZATCA mentioned. | ⚠️ listing snippet only |
+| [SpoolDeck](https://appnavigator.io/app/spooldeck/) | Shopify app that turns store orders into print jobs and assigns them to printers. | ⚠️ listing snippet only |
+| [Quot3d](https://www.indiehackers.com/post/building-quot3d-6-weeks-from-idea-to-working-product-3d-printing-quote-automation-4cc57160b9) | Quote automation for print shops. Planned tiers $0 / $29 / $79 per month. The post is from December 2025. | ⚠️ build-log post only |
+| [PrintQuote](https://apps.shopify.com/3d-print-quote), [3D Print Quote Calculator](https://apps.shopify.com/3d-print-quote-calculator?locale=ja) | Shopify upload-a-file quote apps. | ⚠️ listing snippet only |
+| [Craftybase](https://craftybase.com/3d-printing-inventory-software), [Inventora](https://www.inventora.com/3d-printing-inventory-software/) | General maker inventory and COGS tools with a 3D-printing page. They sync with Etsy and Shopify. | ⚠️ snippet only |
+| Printago | Search result lists a Maintenance Tracker add-on and Maintenance Mode, P2S support and multi-store Etsy. The entries carry no dates, so none can be tied to this week. | ⚠️ snippet only |
+
+All of these are the same categories as §7 (order-to-job, quote calculators, maker
+inventory). None showed invoicing with tax.
+
+### Saudi / Arabic
+
+Search again found **no 3D-print shop software aimed at Saudi Arabia or Arabic speakers**.
+ZATCA results were only general e-invoicing products (GoAgile, TallyPrime, Refrens). The
+search could not reach any Reddit thread from r/3dprintingbusiness, r/PrintFarm or
+r/3Dprinting.
+
+### Verified gaps, false alarms, ranked ideas
+
+No new feature claim about Khayt was made this week, so nothing needed checking against the
+code. §7's gaps and ranked ideas stand unchanged. Nothing here changes their order.
+
+### Next reading
+
+Re-read the §0/§6/§7 products from an environment where the fetches resolve, and confirm
+the Meshory price change on 28 Oct and the Stimalo free period ending 31 Dec.
+
+*Caveat, as §5–§7: marketing pages and listing snippets, not hands-on evaluations.*
