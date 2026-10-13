@@ -32,6 +32,20 @@ extension PrintSort {
         var births: [String: Double] = [:]
         /// The prints found among the loose top-level models, by print key.
         var loose: [String: LooseSort.Cluster] = [:]
+        /// Loose models in no print with pictures of their own name, by path.
+        var looseSingles: [String: [String]] = [:]
+        /// A loose print's member with a picture of exactly its name, by path.
+        var looseOwn: [String: String] = [:]
+        /// Loose pictures nothing claimed.
+        var looseUnattached: [String] = []
+        /// Pictures to check: offered in "Sort linked folders…", never put on
+        /// by themselves. A print target is a print KEY.
+        var suggestions: [LooseSort.Suggestion] = []
+
+        /// The pictures at the top of the linked folder, in copy order.
+        var looseImages: [String] {
+            LooseSort.order(images.compactMap(rel).filter { !$0.contains("/") }, births: births)
+        }
 
         /// The models at the top of the linked folder, in no sub-folder, in
         /// copy order.
@@ -94,9 +108,10 @@ extension PrintSort {
         let tree = Tree(models: modelRels, images: imageRels)
         let roles = classify(tree, answers: answers.roles)
         // THE LOOSE ONES, sorted by their names in the order they arrived.
-        let clusters = LooseSort.clusters(models: modelRels.filter { !$0.contains("/") },
-                                          images: imageRels.filter { !$0.contains("/") },
-                                          births: births, assistant: answers.loose)
+        let sorted = LooseSort.sort(models: modelRels.filter { !$0.contains("/") },
+                                    images: imageRels.filter { !$0.contains("/") },
+                                    births: births, assistant: answers.loose)
+        let clusters = sorted.clusters
         var loose: [String: LooseSort.Cluster] = [:]
         var printOf: [String: String] = [:]
         var names = answers.names
@@ -114,13 +129,35 @@ extension PrintSort {
         }
         let placed = placements(tree, roles: roles, models: modelRels, names: names, loose: printOf)
         return Plan(root: root, models: models, images: images, tree: tree, roles: roles,
-                    names: answers.names, placed: placed, births: births, loose: loose)
+                    names: answers.names, placed: placed, births: births, loose: loose,
+                    looseSingles: sorted.singles, looseOwn: sorted.own, looseUnattached: sorted.unattached,
+                    suggestions: sorted.suggestions.map { s in
+                        guard case .print(let name) = s.target else { return s }
+                        return LooseSort.Suggestion(image: s.image, target: .print(looseKey(name)),
+                                                    reason: s.reason, ticked: s.ticked)
+                    } + folderSuggestions(tree, roles: roles, names: answers.names))
     }
 
     /// The key a print found among the loose models goes by. Never a
     /// folder's: a folder key is a path below the linked folder, and no
     /// model sits in a folder called `#loose` at the top of one.
     nonisolated static func looseKey(_ name: String) -> String { "#loose/" + LooseSort.identity(name) }
+
+    /// The folder prints' pictures to check: a pack media folder's picture
+    /// that names a print with a word more, or names two prints equally
+    /// (`mediaPictures`), for a print with no picture of its own.
+    static func folderSuggestions(_ tree: Tree, roles: [String: Role],
+                                  names: [String: String]) -> [LooseSort.Suggestion] {
+        var out: [LooseSort.Suggestion] = []
+        for (key, role) in roles where role == .print {
+            let name = names[key] ?? cleanName(tree[key]?.name ?? key)
+            guard pictures(of: key, in: tree, roles: roles, name: name).isEmpty else { continue }
+            for o in mediaPictures(of: key, in: tree, roles: roles, name: name).offered {
+                out.append(LooseSort.Suggestion(image: o.rel, target: .print(key), reason: .named, ticked: o.ticked))
+            }
+        }
+        return out.sorted { $0.image < $1.image }
+    }
 }
 
 // MARK: - What the assistant is sent, and what it said, remembered
@@ -567,8 +604,13 @@ enum PrintPhotos {
                 guard !looked.contains(abs) else { continue }
                 let pics = plan.pictures(ofPrint: key)
                 let models = plan.models(ofPrint: key)
-                let own = plan.loose[key] != nil ? [:]
+                let own: [String: String] = plan.loose[key] != nil
+                    ? plan.looseOwn.filter { models.contains($0.key) }
                     : PrintSort.modelPictures(of: key, in: plan.tree, models: models)
+                // Nothing to put on: not a job, and not looked at — a picture
+                // that turns up later is still found (alpha.67: a print looked
+                // at once with nothing was never looked at again).
+                guard !pics.isEmpty || !own.isEmpty else { continue }
                 let group = plan.group(ofPrint: key)
                 var ownPictures: [String: URL] = [:]
                 for (model, image) in own {
@@ -578,6 +620,15 @@ enum PrintPhotos {
                 out.append(Job(print: abs, group: group,
                                candidates: pics.map { plan.root.appending(path: $0) },
                                modelPictures: ownPictures, only: only))
+                if out.count >= limit { return out }
+            }
+            // A loose model in no print, with a picture certainly its own.
+            for (model, pics) in plan.looseSingles.sorted(by: { $0.key < $1.key }) {
+                let path = plan.root.appending(path: model).standardizedFileURL.path
+                let abs = path + "#photo"
+                guard !looked.contains(abs), !pics.isEmpty else { continue }
+                out.append(Job(print: abs, group: nil, candidates: pics.map { plan.root.appending(path: $0) },
+                               modelPictures: [:], only: path))
                 if out.count >= limit { return out }
             }
         }

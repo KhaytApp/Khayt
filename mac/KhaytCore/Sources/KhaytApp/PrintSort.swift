@@ -540,24 +540,13 @@ enum PrintSort {
         }
         walk(print, depth: 0, inGallery: false)
         // 6. A pack's own media folder, sorted by print: `GridCube File
-        //    Delivery/Media/Renders/Drawers/…` is the picture of `Drawers`.
-        var above = (print as NSString).deletingLastPathComponent
-        var hops = 0
-        while all.isEmpty, hops < 3 {
-            for child in tree[above]?.children ?? [] where isAssetName(tree[child]?.name ?? "") {
-                func find(_ key: String) {
-                    guard let n = tree[key] else { return }
-                    let c = core(n.name)
-                    if !c.isEmpty, !printCore.isEmpty, c == printCore || (c.isSuperset(of: printCore) && c.count <= printCore.count + 1) {
-                        for image in n.images { all.append((key + "/" + image, true, false)) }
-                    }
-                    n.children.forEach(find)
-                }
-                find(child)
+        //    Delivery/Media/Renders/Drawers/…` is the picture of `Drawers` —
+        //    but that folder holds SEVERAL prints' pictures, so only one named
+        //    exactly for this print and for no other counts (`mediaPictures`).
+        if all.isEmpty {
+            for rel in mediaPictures(of: print, in: tree, roles: roles, name: name).sure {
+                all.append((rel, true, false))
             }
-            if above.isEmpty { break }
-            above = (above as NSString).deletingLastPathComponent
-            hops += 1
         }
         func stemCore(_ rel: String) -> Set<String> {
             core((rel as NSString).lastPathComponent.replacingOccurrences(of: #"\.[^.]+$"#, with: "",
@@ -579,6 +568,55 @@ enum PrintSort {
                 return ra != rb ? ra < rb : a.offset < b.offset
             }
             .map(\.element.rel)
+    }
+
+    /// A pack's media folder above a print, holding pictures of SEVERAL
+    /// prints (`GridCube File Delivery/Media/Renders/Drawers/…`).
+    ///
+    /// ── ONE PRINT'S FOLDER, OR AN EXACT AND UNIQUE NAME (Oct 2026) ─────────
+    ///
+    /// A picture inside a print's own folder (or its Renders) is that print's:
+    /// the folder holds one print. A media folder shared by a pack's prints
+    /// is not, so a sub-folder there counts as this print's only when its
+    /// name says EXACTLY this print and could mean no other print in the
+    /// linked folder (`sure`). A sub-folder that names it with a word more
+    /// (`Drawers Large` for `Drawers`), or names two prints equally, is only
+    /// OFFERED (`offered`, ticked when it is the one strong candidate).
+    static func mediaPictures(of print: String, in tree: Tree, roles: [String: Role], name: String)
+        -> (sure: [String], offered: [(rel: String, ticked: Bool)]) {
+        guard let node = tree[print] else { return ([], []) }
+        let printCore = core(name).union(core(node.name))
+        guard !printCore.isEmpty else { return ([], []) }
+        let otherCores = roles.filter { $0.value == .print && $0.key != print }
+            .compactMap { tree[$0.key].map { core($0.name) } }
+        var sure: [String] = [], loose: [String] = []
+        var contested = false
+        var above = (print as NSString).deletingLastPathComponent
+        var hops = 0
+        while sure.isEmpty, loose.isEmpty, hops < 3 {
+            for child in tree[above]?.children ?? [] where isAssetName(tree[child]?.name ?? "") {
+                func find(_ key: String) {
+                    guard let n = tree[key] else { return }
+                    let c = core(n.name)
+                    if !c.isEmpty {
+                        let exact = c == printCore
+                        let near = c.isSuperset(of: printCore) && c.count <= printCore.count + 1
+                        let rivals = otherCores.contains { !$0.isEmpty && ($0 == c || $0.isSubset(of: c) || c.isSubset(of: $0)) }
+                        for image in n.images {
+                            if exact && !rivals { sure.append(key + "/" + image) }
+                            else if exact || near { loose.append(key + "/" + image); if rivals { contested = true } }
+                        }
+                    }
+                    n.children.forEach(find)
+                }
+                find(child)
+            }
+            if above.isEmpty { break }
+            above = (above as NSString).deletingLastPathComponent
+            hops += 1
+        }
+        let one = !contested && Set(loose.map { ($0 as NSString).deletingLastPathComponent }).count == 1
+        return (sure, sure.isEmpty ? loose.map { ($0, one) } : [])
     }
 
     /// A picture inside the print named EXACTLY as one model is

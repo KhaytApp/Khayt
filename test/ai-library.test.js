@@ -134,9 +134,9 @@ test('loose prints are believed only where they can be', () => {
 });
 
 test('the loose task frames itself as grouping files', () => {
-  const t = tools.resolveTool('loose', L.LOOSE_SCHEMA);
-  assert.equal(t.task, 'loose');
+  const t = L.looseTool();
   assert.equal(t.tool.name, 'group_loose_model_files');
+  assert.equal(t.tool.input_schema, L.LOOSE_SCHEMA);
   assert.ok(t.maxTokens >= 8000);
   assert.match(L.buildLooseSystem(), /file NAMES only/);
 });

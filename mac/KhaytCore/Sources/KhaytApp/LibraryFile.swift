@@ -80,6 +80,14 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// own path. Absent for a model that lives in the vault.
     let externalPath: String?
     var isLinked: Bool { !(externalPath ?? "").isEmpty }
+
+    /// A 3MF with the preview its slicer embedded, read off a file that was
+    /// on this Mac (`ThreeMF.preview`, `LibraryImport`).
+    var hasEmbeddedPreview: Bool {
+        guard thumbFile?.isEmpty == false else { return false }
+        let name = sourceFile?.filename ?? externalPath ?? self.name
+        return (name as NSString).pathExtension.lowercased() == "3mf"
+    }
     /// What its licence lets a shop do. `lib/model-licence.js` reads it; this
     /// only carries it.
     let licence: String?

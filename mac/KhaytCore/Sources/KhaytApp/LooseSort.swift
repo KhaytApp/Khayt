@@ -373,6 +373,12 @@ enum LooseSort {
     nonisolated static func clusters(models: [String], images: [String] = [],
                                      births: [String: Double] = [:],
                                      assistant: [String: String] = [:]) -> [Cluster] {
+        sort(models: models, images: images, births: births, assistant: assistant).clusters
+    }
+
+    /// The prints alone, from the models' names (and the assistant's word).
+    private nonisolated static func prints(models: [String], births: [String: Double],
+                                           assistant: [String: String]) -> [Cluster] {
         let ordered = order(models, births: births)
         var out: [Cluster] = []
         var taken = Set<String>()
@@ -440,10 +446,9 @@ enum LooseSort {
             out.append(Cluster(name: c.name, members: c.members))
         }
 
-        // 4. Pictures named for a print.
-        attachPictures(&out, images: order(images, births: births))
         return out
     }
+
 
     /// Paths in copy order: by birth, then by name.
     nonisolated static func order(_ rels: [String], births: [String: Double]) -> [String] {
@@ -499,22 +504,237 @@ enum LooseSort {
         return [(canon(words), name(run[0].read, words: words.count), run.map(\.rel))]
     }
 
-    /// A picture whose own name starts with a print's name is that print's
-    /// (`totoro.jpg`, `Totoro front.png`). A number names nothing.
-    private nonisolated static func attachPictures(_ clusters: inout [Cluster], images: [String]) {
-        guard !images.isEmpty, !clusters.isEmpty else { return }
-        let names = clusters.map { c -> [String] in
-            core(tokenize(stripped(c.name + ".x")).map(\.0)).filter { !isNoise($0) }
+    // MARK: - Pictures: attached only when CERTAIN, otherwise offered
+
+    /// A picture the sort is not sure of, offered in "Sort linked folders…"
+    /// under "Pictures to check" — never put on by itself.
+    struct Suggestion: Sendable, Equatable, Hashable {
+        enum Target: Sendable, Equatable, Hashable {
+            /// A print, by its name (a loose print) or its key.
+            case print(String)
+            /// One model, by its path below the linked folder.
+            case model(String)
         }
-        for image in images {
-            let file = (image as NSString).lastPathComponent
-            guard !isAnonymousPicture(file) else { continue }
-            let words = tokenize(stripped(file)).map(\.0)
-            var best: Int?
-            for (i, n) in names.enumerated() where !n.isEmpty && words.starts(with: n) && isDistinctive(n) {
-                if best == nil || n.count > names[best!].count { best = i }
+        enum Reason: String, Sendable, Equatable, Hashable {
+            /// Named exactly for it, but another print could be meant, or a
+            /// named model lies between them in the copy order.
+            case unsure
+            /// Shares the print's name with more after it (`mochi front.jpg`).
+            case named
+            /// Shares only a word of the print's name.
+            case subject
+            /// Named by a number, beside the print in the copy order.
+            case numbered
+            /// The shop's assistant put it with the print.
+            case assistant
+        }
+        let image: String
+        let target: Target
+        let reason: Reason
+        /// Ticked to start with: one strong candidate. Anything ambiguous
+        /// waits for the shop.
+        let ticked: Bool
+    }
+
+    /// The loose files sorted: the prints, and the pictures.
+    struct Result: Sendable, Equatable {
+        var clusters: [Cluster] = []
+        /// A model in no print with a picture CERTAINLY its own (`totoro.stl`
+        /// + `totoro.jpg`, nothing else called totoro-anything), by path.
+        var singles: [String: [String]] = [:]
+        /// A print's member with a picture certainly its own, by model path.
+        var own: [String: String] = [:]
+        /// Pictures to check.
+        var suggestions: [Suggestion] = []
+        /// Pictures that went to nobody, not even as a suggestion.
+        var unattached: [String] = []
+    }
+
+    /// The loose models AND pictures of one linked folder: the prints, then
+    /// the pictures (`attach`).
+    ///
+    /// `assistant` holds what the shop's assistant said for models and
+    /// pictures alike; a picture it placed is only ever a suggestion.
+    nonisolated static func sort(models: [String], images: [String] = [], births: [String: Double] = [:],
+                                 assistant: [String: String] = [:]) -> Result {
+        let modelSet = Set(models)
+        let forModels = assistant.filter { modelSet.contains($0.key) }
+        var result = Result(clusters: prints(models: models, births: births, assistant: forModels))
+        attach(&result, models: models, images: images, births: births,
+               assistant: assistant.filter { !modelSet.contains($0.key) })
+        return result
+    }
+
+    /// What a file's name says, for matching a picture to a model: the words
+    /// `read` keeps, or — for a name of only part words — all of them.
+    nonisolated static func stem(_ fileName: String) -> [String] {
+        if let r = read(fileName) { return r.tokens }
+        return tokenize(stripped(fileName)).map(\.0).filter { !isNoise($0) }
+    }
+
+    /// Whether one name runs on from the other (`totoro` and `totoroA`).
+    nonisolated static func related(_ a: [String], _ b: [String]) -> Bool {
+        a != b && (a.starts(with: b) || b.starts(with: a))
+    }
+
+    /// ── CERTAIN, OR OFFERED (Oct 2026) ────────────────────────────────────
+    ///
+    /// The shop asked for the RIGHT picture, not a likely one: the Drive
+    /// holds several Luffy prints, `totoroA` and `totoroB_smile`, a bust and
+    /// a figure of one man. A picture goes on by itself only when ALL hold:
+    ///
+    ///   (a) its name, read the way a model's is, EQUALS the print's (or the
+    ///       one model's) — a shared word is not enough;
+    ///   (b) nothing else at the top of the folder could equally be meant: no
+    ///       other print or model whose name runs on from it or into it
+    ///       (`totoro.jpg` beside `totoroA` and `totoro-medium` is unsure). A
+    ///       print's own parts (`Charmander_tooth3`) do not count against it;
+    ///   (c) no unrelated named model lies between it and the print in the
+    ///       copy order.
+    ///
+    /// Everything weaker — unsure, a name with more after it, a shared word, a
+    /// number beside the print, the assistant's word — is a `Suggestion`.
+    private nonisolated static func attach(_ result: inout Result, models: [String], images: [String],
+                                           births: [String: Double], assistant: [String: String]) {
+        guard !images.isEmpty else { return }
+        let clusters = result.clusters
+        let names = clusters.map { trimmed(tokenize($0.name).map(\.0)).filter { !isNoise($0) } }
+        var clusterOf: [String: Int] = [:]
+        for (i, c) in clusters.enumerated() { for m in c.members { clusterOf[m] = i } }
+        var stems: [String: [String]] = [:]
+        for m in models { stems[m] = stem((m as NSString).lastPathComponent) }
+        let named = Set(models.filter { read(($0 as NSString).lastPathComponent) != nil })
+        let all = order(models + images, births: births)
+        let isModel = Set(models)
+        var position: [String: Int] = [:]
+        for (i, r) in all.enumerated() { position[r] = i }
+
+        /// A member that is the print's own part: its name is the print's
+        /// with only part words and numbers after it.
+        func isPart(_ m: String, of words: [String]) -> Bool {
+            guard let s = stems[m], s.starts(with: words) else { return false }
+            return s.dropFirst(words.count).allSatisfy { partWords.contains($0) || isNumber($0) || isMeasure($0) }
+        }
+        /// (b): something else the picture could equally mean.
+        func competing(_ words: [String], target: Set<String>) -> Bool {
+            for m in models where !target.contains(m) || !isPart(m, of: words) {
+                guard let s = stems[m], related(s, words) else { continue }
+                if target.contains(m), isPart(m, of: words) { continue }
+                return true
             }
-            if let b = best { clusters[b].pictures.append(image) }
+            for n in names where related(n, words) { return true }
+            return false
         }
+        /// (c): no unrelated named model between the picture and the target.
+        func inRun(_ image: String, _ target: Set<String>) -> Bool {
+            guard let at = position[image] else { return false }
+            let spots = target.compactMap { position[$0] }
+            guard let nearest = spots.min(by: { abs($0 - at) < abs($1 - at) }) else { return false }
+            let range = nearest < at ? (nearest + 1)..<at : (at + 1)..<nearest
+            return !range.contains { i in
+                let r = all[i]
+                return isModel.contains(r) && named.contains(r) && !target.contains(r)
+            }
+        }
+        func suggest(_ image: String, _ target: Suggestion.Target, _ reason: Suggestion.Reason, ticked: Bool) {
+            result.suggestions.append(Suggestion(image: image, target: target, reason: reason, ticked: ticked))
+        }
+
+        var placed = Set<String>()
+        for image in order(images, births: births) {
+            let file = (image as NSString).lastPathComponent
+            if isAnonymousPicture(file) {
+                // A number, where the copy order ties it to ONE print: inside
+                // its run, or at its edge with no model on the far side.
+                guard let at = position[image] else { continue }
+                var before: String?, after: String?
+                var i = at - 1
+                while i >= 0 { if isModel.contains(all[i]) { before = all[i]; break }; i -= 1 }
+                i = at + 1
+                while i < all.count { if isModel.contains(all[i]) { after = all[i]; break }; i += 1 }
+                let b = before.flatMap { clusterOf[$0] }, a = after.flatMap { clusterOf[$0] }
+                let tied: Int? = {
+                    if let b, let a { return a == b ? b : nil }
+                    if let b, after == nil { return b }
+                    if let a, before == nil { return a }
+                    return nil
+                }()
+                if let c = tied {
+                    suggest(image, .print(clusters[c].name), .numbered, ticked: false)
+                    placed.insert(image)
+                }
+                continue
+            }
+            let words = stem(file)
+            guard !words.isEmpty else { continue }
+            // (a) Named exactly for a print, or for one model.
+            let exactPrints = names.indices.filter { names[$0] == words }
+            let exactModels = Set(models.filter { stems[$0] == words })
+            var target: (kind: Suggestion.Target, members: Set<String>)?
+            if exactPrints.count == 1 {
+                let c = exactPrints[0]
+                target = (.print(clusters[c].name), Set(clusters[c].members))
+            } else if exactPrints.isEmpty, !exactModels.isEmpty {
+                let owners = Set(exactModels.map { clusterOf[$0] })
+                if owners.count == 1, let c = owners.first! {
+                    // All the print's members are this name: the print's.
+                    target = exactModels.count == clusters[c].members.count
+                        ? (.print(clusters[c].name), Set(clusters[c].members))
+                        : (.model(exactModels.sorted().first!), exactModels)
+                } else if owners == [nil], exactModels.count == 1 {
+                    target = (.model(exactModels.first!), exactModels)
+                }
+            }
+            if let t = target {
+                let sure = !competing(words, target: t.members) && inRun(image, t.members)
+                if sure {
+                    switch t.kind {
+                    case .print(let name):
+                        if let c = clusters.firstIndex(where: { $0.name == name }) {
+                            result.clusters[c].pictures.append(image)
+                        }
+                    case .model(let m):
+                        if clusterOf[m] != nil {
+                            for each in t.members where result.own[each] == nil { result.own[each] = image }
+                        } else {
+                            result.singles[m, default: []].append(image)
+                        }
+                    }
+                } else {
+                    suggest(image, t.kind, .unsure, ticked: false)
+                }
+                placed.insert(image)
+                continue
+            }
+            // Weaker: a print's name with more after it, or one shared word.
+            var offers: [(Suggestion.Target, Suggestion.Reason)] = []
+            for (c, n) in names.enumerated() where !n.isEmpty {
+                if words.starts(with: n), isDistinctive(core(n)) {
+                    offers.append((.print(clusters[c].name), .named))
+                } else if words.contains(where: { isStrong($0) && n.contains($0) }) {
+                    offers.append((.print(clusters[c].name), .subject))
+                }
+            }
+            if offers.isEmpty {
+                // One model in no print sharing a strong word.
+                let lone = models.filter { clusterOf[$0] == nil && named.contains($0)
+                    && (stems[$0] ?? []).contains { w in isStrong(w) && words.contains(w) } }
+                if lone.count == 1 { offers.append((.model(lone[0]), .subject)) }
+                else { for m in lone.prefix(3) { offers.append((.model(m), .subject)) } }
+            }
+            let one = offers.count == 1 && offers[0].1 == .named
+            for (t, r) in offers.prefix(3) { suggest(image, t, r, ticked: one) }
+            if !offers.isEmpty { placed.insert(image) }
+        }
+        // The shop's assistant: only ever an offer.
+        for image in order(images, births: births) where !placed.contains(image) {
+            guard let raw = assistant[image], let said = PrintSort.assistantName(raw) else { continue }
+            let key = identity(shown(said))
+            if let c = clusters.firstIndex(where: { identity($0.name) == key }) {
+                suggest(image, .print(clusters[c].name), .assistant, ticked: false)
+                placed.insert(image)
+            }
+        }
+        result.unattached = images.filter { !placed.contains($0) }
     }
 }

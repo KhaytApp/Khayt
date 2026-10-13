@@ -87,6 +87,22 @@ const AI_FEATURES = {
     hosts: ['mac'],
     optIn: true,
   },
+  // Checking pictures (lib/ai-library.js buildPictureRequest). Its OWN switch:
+  // a photo is more than a name, so agreeing to send names is not agreeing to
+  // this, and neither is the old single toggle. Independent of `library`: it
+  // checks any candidate photo, including those the Mac found by itself.
+  pictures: {
+    id: 'pictures',
+    labelKey: 'mac.ai_feat_pictures',
+    sendsKey: 'mac.ai_data_pictures',
+    dataClass: DATA_CLASS.OWN,
+    sends: ['the print\'s name',
+      'the candidate photo, redrawn as a new JPEG of at most 512 pixels on its long side, which carries none of the original file\'s metadata (EXIF, GPS, IPTC, XMP)',
+      'when there is one, the print\'s own preview: the picture inside a 3MF file on this Mac, or the one this app drew of a model on this Mac',
+      'at most 2 images a request and 40 checks a scan; never a model file, and a model kept only in the cloud is never downloaded for a preview'],
+    hosts: ['mac'],
+    optIn: true,
+  },
 };
 
 /** Feature ids whose payload contains another person's personal data. */
