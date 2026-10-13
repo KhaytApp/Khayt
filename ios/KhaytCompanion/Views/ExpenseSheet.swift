@@ -31,6 +31,9 @@ struct ExpenseSheet: View {
     @State private var receiptSays: String?
     @State private var scanningQR = false
     @State private var reclaimsTax = false
+    /// The code that filled the form, read again once its seller is a supplier.
+    @State private var readCode: String?
+    @State private var addingSupplier = false
 
     // The desktop's own categories, so the phone cannot invent one that never
     // appears in a report.
@@ -131,6 +134,16 @@ struct ExpenseSheet: View {
                 Text(L10n.tr(draft.supplier != nil ? "exp.qr.supplier" : "exp.qr.new_supplier"))
                     .font(.khayt(13, relativeTo: .footnote))
                     .foregroundStyle(KhaytDesign.note)
+                if draft.supplier == nil, let seller = draft.newSupplier {
+                    Button { Task { await addSupplier(seller) } } label: {
+                        Label(L10n.tr("exp.qr.add_supplier"), systemImage: "person.crop.circle.badge.plus")
+                            .font(.khayt(14, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(KhaytDesign.brand)
+                            .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(addingSupplier)
+                }
                 V2Note(text: L10n.tr("exp.qr.filled"))
                 if receipt != nil { V2Note(text: L10n.tr("exp.qr.photo_stays"), tone: KhaytDesign.attention) }
             }
@@ -165,6 +178,7 @@ struct ExpenseSheet: View {
             switch try? await reader.readReceipt(code) {
             case .draft(let d)?:
                 if d.duplicateOf != nil { duplicate = true; continue }
+                readCode = code
                 apply(d)
                 return
             case .refused(let why)?:
@@ -177,6 +191,25 @@ struct ExpenseSheet: View {
             receiptSays = L10n.tr("exp.qr.duplicate")
         } else if !quietIfNone {
             receiptSays = L10n.tr("exp.qr.reason.\(reason ?? "not_base64")")
+        }
+    }
+
+    /// The seller becomes a supplier, in the book, and the code is read again
+    /// so the card names it as the book now does. The form keeps what the
+    /// person has already changed: only the card is redrawn.
+    private func addSupplier(_ seller: KhaytEngine.ReceiptDraft.NewSupplier) async {
+        addingSupplier = true
+        defer { addingSupplier = false }
+        do {
+            try await api.addSupplier(name: seller.name, vatNumber: seller.vatNumber)
+        } catch {
+            self.error = error.localizedDescription
+            return
+        }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        if let code = readCode, let reader = api.reader,
+           case .draft(let d)? = try? await reader.readReceipt(code) {
+            fromReceipt = d
         }
     }
 

@@ -750,7 +750,8 @@
 "exp.qr.hint" = "Point at the QR on the tax invoice";
 "exp.qr.vat_number" = "VAT no. %@";
 "exp.qr.supplier" = "One of your suppliers";
-"exp.qr.new_supplier" = "Not one of your suppliers yet — add them on the Mac so the next receipt matches.";
+"exp.qr.new_supplier" = "Not one of your suppliers yet.";
+"exp.qr.add_supplier" = "Add as supplier";
 "exp.qr.filled" = "Filled in from a receipt — check it, then choose the category.";
 "exp.qr.photo_stays" = "The figures come from the QR, so this expense is saved on the phone and the photo is not sent.";
 "exp.qr.duplicate" = "This receipt is already in your expenses, so it is not offered again.";
