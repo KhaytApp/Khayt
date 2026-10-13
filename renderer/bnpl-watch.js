@@ -29,7 +29,7 @@ async function checkBnplLinks() {
     const due = KhaytBnplConfirm.linksToCheck(typeof printLog !== 'undefined' ? printLog : []);
     for (const { orderId, link } of due) {
       let r;
-      try { r = await window.hubAPI.bnplCheck({ provider: link.provider, id: link.id }); }
+      try { r = await window.hubAPI.bnplCheck({ provider: link.provider, id: link.id, currency: link.currency }); }
       catch (e) { r = { ok: false, error: String((e && e.message) || e) }; }
       // The job may have changed while we waited on the network: work on what is there now.
       const order = printLog.find((o) => o && o.id === orderId);
@@ -47,6 +47,7 @@ async function checkBnplLinks() {
       }
       if (r.state === 'paid') {
         KhaytBnplConfirm.settle(live, 'paid', r.remoteStatus);
+        if (r.step === 'authorised') live.authorisedAt = live.checkedAt;   // Tamara's 21 days run from here
         const out = PaymentRules().recordPayment(order,
           KhaytBnplConfirm.paymentFor(order, live, localDateStr()),
           { today: localDateStr(), settings });
@@ -61,8 +62,44 @@ async function checkBnplLinks() {
         saveAll();
       }
     }
+    await captureShippedTamara();
   } finally {
     _bnplChecking = false;
+  }
+}
+
+/**
+ * Tamara: capture each authorised order whose job has gone out (shipped, or
+ * handed over). Until then Tamara holds the money, and only captures by itself
+ * 21 days after authorisation. Rule: KhaytBnplConfirm.linksToCapture.
+ */
+async function captureShippedTamara() {
+  if (!window.hubAPI?.bnplCapture || !(settings.bnpl && settings.bnpl.tamara && settings.bnpl.tamara.enabled)) return;
+  const due = KhaytBnplConfirm.linksToCapture(typeof printLog !== 'undefined' ? printLog : []);
+  for (const { orderId, link } of due) {
+    const order = printLog.find((o) => o && o.id === orderId);
+    if (!order) continue;
+    let r;
+    try { r = await window.hubAPI.bnplCapture({ provider: 'tamara', id: link.id, shipping: KhaytBnplConfirm.captureShipping(order) }); }
+    catch (e) { r = { ok: false, error: String((e && e.message) || e) }; }
+    const live = (order.bnplLinks || []).find((l) => l && l.provider === 'tamara' && l.id === link.id);
+    if (!live) continue;
+    if (r && r.ok) {
+      if (r.captured) live.capturedAt = new Date().toISOString();
+      else live.captureDone = true;                  // refunded, cancelled…: never ask again
+      if (r.remoteStatus) live.remoteStatus = String(r.remoteStatus);
+      delete live.captureError;
+      saveAll();
+      continue;
+    }
+    // Say so once per failure, not every ten minutes: the next run retries quietly.
+    const err = (r && r.error) || '';
+    if (r && r.remoteStatus && live.captureError !== err) {
+      live.captureError = err;
+      saveAll();
+      toast(t('bnpl.capture_failed', { project: order.project || order.id, error: err }), 'warning', 8000);
+    }
+    console.warn('[bnpl] capture failed', link.id, err);
   }
 }
 
@@ -76,4 +113,4 @@ function startBnplWatch() {
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => startBnplWatch());
 }
-if (typeof module !== 'undefined' && module.exports) module.exports = { checkBnplLinks, bnplWatchEnabled };
+if (typeof module !== 'undefined' && module.exports) module.exports = { checkBnplLinks, bnplWatchEnabled, captureShippedTamara };

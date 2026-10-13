@@ -3556,6 +3556,7 @@
   "bnpl.link_generated": "Link de pagamento gerado",
   "bnpl.confirmed": "Pagamento {service} recebido para “{project}” e registrado.",
   "bnpl.confirm_failed": "{service}: não foi possível concluir o pagamento de “{project}”: {error}. O Khayt tentará novamente; você também pode concluí-lo no portal {service}.",
+  "bnpl.capture_failed": "Tamara: não foi possível confirmar o envio de “{project}”: {error}. O Khayt tentará novamente; a Tamara também o confirma sozinha 21 dias após o pagamento.",
   "bnpl.link_copied": "Link copiado",
   "bnpl.payment_modal": "Links de pagamento",
   "bnpl.amount_label": "Valor",
