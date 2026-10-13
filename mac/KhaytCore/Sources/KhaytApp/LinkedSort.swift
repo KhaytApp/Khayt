@@ -540,6 +540,16 @@ enum SortFailures {
         return out
     }
 
+    /// The folder sort's marks, with the "Check pictures" ones (`picture:…`)
+    /// as the book holds them now. The two passes share this map: the sort's
+    /// `after` keeps only its own pending requests, and wrote the pictures'
+    /// failures away (review of #1844).
+    nonisolated static func keepingPictures(_ marks: [String: Mark], from settings: [String: JSONValue]) -> [String: Mark] {
+        var out = marks.filter { !$0.key.hasPrefix("picture:") }
+        for (k, v) in read(settings) where k.hasPrefix("picture:") { out[k] = v }
+        return out
+    }
+
     nonisolated static func write(_ marks: [String: Mark], into root: inout [String: JSONValue]) {
         var settings: [String: JSONValue] = [:]
         if case .object(let s)? = root["settings"] { settings = s }

@@ -485,7 +485,16 @@ enum PrintSort {
             if next.utf16.count > 60 { break }
             out = next
         }
-        return out.isEmpty ? String(name.prefix(60)) : out
+        guard out.isEmpty else { return out }
+        // One word longer than the limit: whole characters while they fit.
+        // `prefix(60)` counted CHARACTERS, so an emoji or an accented word
+        // came out over sixty UTF-16 units (review of #1844).
+        var cut = ""
+        for c in name {
+            if cut.utf16.count + String(c).utf16.count > 60 { break }
+            cut.append(c)
+        }
+        return cut
     }
 
     /// A name the assistant gave a print, as a group may be called — or nil,
