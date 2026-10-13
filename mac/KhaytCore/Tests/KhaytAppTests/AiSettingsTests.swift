@@ -32,7 +32,8 @@ struct AiSettingsTests {
         // what this should notice.
         // A fifth arrived on purpose (Oct 2026): `library`, sorting linked
         // folders by their names — opt-in, so off here.
-        #expect(Set(features.map(\.id)) == ["quote", "price", "reply", "assistant", "library"],
+        // A sixth (Oct 2026): `pictures`, "Check pictures" — opt-in, its own switch.
+        #expect(Set(features.map(\.id)) == ["quote", "price", "reply", "assistant", "library", "pictures"],
                 Comment(rawValue: "got \(features.map(\.id))"))
         for f in features {
             #expect(!f.labelKey.isEmpty, "\(f.id) has no name to show")
@@ -108,7 +109,7 @@ struct AiSettingsTests {
                     "enabled": .bool(master),
                     "features": .object(["quote": .bool(wanted), "price": .bool(wanted),
                                          "reply": .bool(wanted), "assistant": .bool(wanted),
-                                         "library": .bool(wanted)]),
+                                         "library": .bool(wanted), "pictures": .bool(wanted)]),
                 ])
                 let features = try await engine.aiFeatures(settings: s)
                 for f in features {

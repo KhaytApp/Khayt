@@ -194,7 +194,7 @@ enum LooseSort {
         s = s.replacingOccurrences(of: #"(?i)\.(stl|step|stp|obj|3mf)(?=$|[^A-Za-z0-9])"#, with: "",
                                    options: .regularExpression)
         s = s.replacingOccurrences(of: #"(?i)\.u1(?=$|[^A-Za-z0-9])"#, with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: #"\s*\(\d+\)"#, with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"\s*[(][0-9]+[)]"#, with: "", options: .regularExpression)
         s = s.replacingOccurrences(of: #"(?i)^obj_\d+_"#, with: "", options: .regularExpression)
         s = s.replacingOccurrences(of: #"(?i)^fig_"#, with: "", options: .regularExpression)
         // A web address's spaces (`Universal20Filament20Clip`) and a UUID.

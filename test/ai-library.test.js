@@ -133,6 +133,33 @@ test('loose prints are believed only where they can be', () => {
   }
 });
 
+test('Check pictures: published limits, at most two images, verdicts read strictly', () => {
+  assert.equal(L.LIMITS.pictureImages, 2);
+  assert.equal(L.LIMITS.pictureChecksPerScan, 40);
+  assert.equal(L.LIMITS.picturePixels, 512);
+  assert.equal(L.LIMITS.pictureSourceBytes, 8 * 1024 * 1024);
+  assert.equal(L.pictureImages('a', 'b').length, 2);
+  assert.deepEqual(L.pictureImages('a', null).map((i) => i.mediaType), ['image/jpeg']);
+  assert.equal(L.readPictureAnswer({ verdict: 'YES' }), 'yes');
+  assert.equal(L.readPictureAnswer({ verdict: 'maybe' }), 'unsure');
+  assert.equal(L.readPictureAnswer(null), 'unsure');
+  assert.equal(L.pictureOutcome('yes', true), 'attach');
+  assert.equal(L.pictureOutcome('yes', false), 'ticked');
+  assert.equal(L.pictureOutcome('no', true), 'rejected');
+  assert.equal(L.pictureOutcome('unsure', true), 'unticked');
+  assert.match(L.buildPictureRequest('Kart\nRacer', true), /Print: Kart Racer\nImage 1/);
+  const P = require('../lib/ai-providers.js');
+  const req = P.buildRequest({ ai: { provider: 'anthropic', apiKey: 'k' } }, {
+    system: 's', prompt: 'p', images: L.pictureImages('QQ', 'RR'),
+    tool: { name: 't', description: 'd', input_schema: {} }, maxTokens: 10,
+  });
+  const imgs = req.body.messages[0].content.filter((c) => c.type === 'image');
+  assert.equal(imgs.length, 2);
+  assert.equal(imgs[0].source.media_type, 'image/jpeg');
+  assert.equal(P.takesImages({ ai: { provider: 'compatible' } }), false);
+  assert.equal(P.takesImages({ ai: { provider: 'google' } }), true);
+});
+
 test('the loose task frames itself as grouping files', () => {
   const t = L.looseTool();
   assert.equal(t.tool.name, 'group_loose_model_files');
