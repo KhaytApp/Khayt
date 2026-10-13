@@ -42,11 +42,14 @@ enum AiClient {
         /// softened into "try again".
         case notConsented
         case noKey
+        /// The provider cannot take images ("Check pictures").
+        case noVision
         case refused(String)
         var errorDescription: String? {
             switch self {
             case .notConsented: return "AI_FEATURE_NOT_CONSENTED"
             case .noKey: return "No API key"
+            case .noVision: return "AI_NO_VISION"
             case .refused(let why): return why
             }
         }
@@ -286,6 +289,34 @@ enum AiClient {
         let read = try await engine.aiLooseRead(settings: settings, response: data, count: names.count)
         guard read.ok else { throw Failure.refused(read.problem ?? "no answer") }
         return (read.prints, read.usage, request.model)
+    }
+
+    /// "Check pictures": does this photo show this print? `photo` and
+    /// `reference` are already redrawn (`PictureSend.jpeg`) — no metadata.
+    static func checkPicture(printName: String, photo: Data, reference: Data?, shop: Shop) async throws
+        -> (answer: KhaytEngine.AiPictureAnswer, model: String) {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiPictureRequest(settings: settings, printName: printName,
+                                                        photo: photo.base64EncodedString(),
+                                                        reference: reference?.base64EncodedString(), apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("AI_NO_VISION") { throw Failure.noVision }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+        let data = try await send(request, engine: engine)
+        let read = try await engine.aiPictureRead(settings: settings, response: data, hasReference: reference != nil)
+        return (read, request.model)
     }
 
     /// The session every AI request goes through. Ephemeral, and a redirect

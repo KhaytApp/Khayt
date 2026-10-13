@@ -178,7 +178,12 @@ extension Shop {
                                                       owns: owns, whoHasIt: who)) ?? 0
             }
         }
-        let pictures = stopped() ? 0 : await fetchPrintPictures(plans, stop: stop)
+        var pictures = stopped() ? 0 : await fetchPrintPictures(plans, stop: stop)
+        // "Check pictures" (its own switch): the ones the assistant confirms
+        // against a print's own preview go on; the rest wait in the sheet.
+        if !stopped(), aiPicturesAllowed {
+            pictures += await checkPictures(plans, stop: stop).attached
+        }
         if regrouped > 0 || pictures > 0 || assistant != nil { await load(source) }
 
         var lines: [String] = []
