@@ -14,6 +14,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Settings window, so its Cancel and Apply buttons were cut off below it, and
   only Escape closed it. The title and buttons now stay in place and the
   list scrolls between them.
+- **Mac: Shortcuts, Siri and Spotlight see Khayt's actions again.** Every
+  release from 4.0.0-alpha.40 shipped without its App Intents metadata, so
+  "What is printing" and "What is waiting to print" were missing from Shortcuts and
+  Siri. Newer Xcode builds put the compiler's App Intents data in a different
+  place under a different name, and the build only printed a warning when it
+  could not find it. It finds the data again, and a build that cannot now
+  stops with an error instead of shipping without the actions.
 
 - **Mac: loose models in a linked folder are sorted into prints, and only
   the right picture goes on a print.**
