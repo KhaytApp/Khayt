@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Maintainers) A hung desktop smoke test no longer blocks every merge.**
+  The required "E2E smoke (Electron)" check had no time limit, so a step that
+  hung (the 3MF worker step, for an hour on 12 Oct) held every lane's merges
+  until someone cancelled it. The job now stops after 20 minutes (it takes 4-5)
+  and the 3MF worker step after 5.
 - **Mac: a model sent to the shop's Mac over Wi-Fi is no longer cut off
   when the app is busy.** The Mac counted its own delay in reading an
   upload against the phone, so a large model sent while the window was
