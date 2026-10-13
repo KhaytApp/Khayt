@@ -37,6 +37,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     each pair once. A "yes" with a preview puts the picture on; a "no" is
     not offered again; anything else waits for you to tick it.
 
+- **Mac: a WhatsApp update sent from the iPhone over Wi-Fi is logged on the
+  customer again.** The phone adds a line to the customer's messages when it
+  sends an update, but the Mac took changes to customers only through Khayt
+  Cloud. Over the shop's Wi-Fi it dropped the line while telling the phone it
+  had arrived, so it never reached the book. The Mac now takes a phone's changes
+  to customers and suppliers, which also lets the iPhone add a supplier from a
+  receipt. Staff accounts still cannot be changed from a phone.
+
 - **A photo you remove from a model on the desktop stays removed on the Mac.**
   The Mac puts pictures it finds in your linked folders on models that have
   none, but skips a model whose photo you took off. Removing a photo on the
