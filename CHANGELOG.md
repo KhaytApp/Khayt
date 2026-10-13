@@ -4,6 +4,39 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: loose models in a linked folder are sorted into prints, and only
+  the right picture goes on a print.**
+  - **Models with no folder of their own are grouped.** Files dropped
+    straight into the top of a linked folder used to stay ungrouped. They
+    are now grouped by their names, in the order they were copied in:
+    `v4-AA - holder` and `v4-AA - cover` become the print "v4-AA", next to
+    "v4-AAA"; `totoroA.stl` and `totoro-medium.3mf` become "totoro"; a `.u1`
+    copy joins its model. Names made only of parts, colours or numbers
+    (`Plate 3 - Yellow`, `Peg`) and single files stay as they are. Nothing
+    is downloaded; groups you set yourself are left alone, and a model you
+    took out of a group stays out. "Sort linked folders…" shows how many
+    loose models it would group, into how many prints.
+  - **Your assistant can place the rest.** With "Sort linked folders" on in
+    Settings → AI assist, the loose files' names (only names, at most 300 a
+    request and 3,000 a scan, each name sent once) go to your assistant,
+    which can put a kit's plainly named parts with their kit.
+  - **A picture goes on by itself only when it is certainly the print's.**
+    Its name must match the print exactly, mean no other print, and sit with
+    it. Anything less (a shared word, a number, a name two prints could
+    share) is listed under "Pictures to check" in "Sort linked folders…" to
+    tick or untick; one you untick is not offered again. A print with no
+    such picture shows its 3MF's own preview first.
+  - **Pictures keep coming in.** A print the 40-a-pass limit skipped, or
+    whose picture appeared later, gets it on a later pass. A picture you set
+    or removed is never replaced.
+  - **New: "Check pictures"** (Settings → AI assist, off by default, its own
+    switch). Your assistant compares a candidate photo with the print's own
+    preview. It sends the print's name, the photo redrawn as a new JPEG of
+    at most 512 pixels with none of its metadata, and the preview when a
+    model is on this Mac: at most 2 images a request and 40 checks a scan,
+    each pair once. A "yes" with a preview puts the picture on; a "no" is
+    not offered again; anything else waits for you to tick it.
+
 - **A photo you remove from a model on the desktop stays removed on the Mac.**
   The Mac puts pictures it finds in your linked folders on models that have
   none, but skips a model whose photo you took off. Removing a photo on the

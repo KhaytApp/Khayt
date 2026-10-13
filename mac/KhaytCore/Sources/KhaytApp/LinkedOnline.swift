@@ -82,7 +82,10 @@ enum LinkedRegroup {
     ///
     /// 3 (Oct 2026): prints are the groups (`PrintSort`) — the collections a
     /// file came from leave the group and become a tag.
-    nonisolated static let version = 3.0
+    ///
+    /// 4 (Oct 2026): the models loose at the top of a linked folder are
+    /// sorted into prints by their names (`LooseSort`).
+    nonisolated static let version = 4.0
 
     struct Change: Equatable, Sendable {
         let id: String
@@ -145,6 +148,10 @@ enum LinkedRegroup {
             let fromOldRule = older.contains(current)
             let fromThisApp = text("autoGroup").map { LibraryFile.normalise($0) == current } ?? false
             guard fromOldRule || fromThisApp else { continue }          // the shop's own
+            // Taken OUT of the group this app gave it: ungrouped by hand. A
+            // loose model's old rule is "no group", so without this the next
+            // refile put it straight back (version 4, loose models).
+            if current.isEmpty, let auto = text("autoGroup"), !LibraryFile.normalise(auto).isEmpty { continue }
             let group = LibraryFile.normalise(now.group)
             var name: String?
             let oldNames = Set([v1[url]?.title, v2[url]?.title, nil].map { $0 ?? stem(url) })

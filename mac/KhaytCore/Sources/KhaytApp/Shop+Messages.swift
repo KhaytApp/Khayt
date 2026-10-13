@@ -157,7 +157,8 @@ extension Shop {
     /// The comment above already said leaving the note on a working feature is
     /// as wrong as dropping it from a missing one. It was, for three of them.
     ///   library    rescanLinkedFolders / previewLinkedSort -> askAssistantToSort -> AiClient.sortFolders
-    static let aiFeaturesOnThisMac: Set<String> = ["quote", "price", "reply", "assistant", "library"]
+    ///   pictures   rescanLinkedFolders / previewLinkedSort -> checkPictures -> AiClient.checkPicture
+    static let aiFeaturesOnThisMac: Set<String> = ["quote", "price", "reply", "assistant", "library", "pictures"]
 
     static func aiRunsHere(_ id: String) -> Bool { aiFeaturesOnThisMac.contains(id) }
 

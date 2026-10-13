@@ -11776,6 +11776,140 @@ public actor KhaytEngine {
             as: AiLibraryAnswer.self)
     }
 
+    /// Ask the assistant to group the loose files at the top of a linked
+    /// folder (`lib/ai-library.js buildLooseRequest`). Only the files' own
+    /// names go, numbered in copy order, at most `LIMITS.looseNames` — the
+    /// disclosure says so. Consent is the folder sort's, checked here.
+    public func aiLooseRequest(settings: [String: JSONValue], names: [String],
+                               apiKey: String) throws -> AiRequest {
+        try runtime.call2("""
+            (function (a) {
+              if (!KhaytAiPrivacy.isFeatureEnabled((a.settings || {}).ai, 'library')) {
+                throw new Error('AI_FEATURE_NOT_CONSENTED');
+              }
+              var t = KhaytAiLibrary.looseTool();
+              var settings = { ai: Object.assign({}, (a.settings || {}).ai, { apiKey: a.apiKey }) };
+              return KhaytAiProviders.buildRequest(settings, {
+                apiKey: a.apiKey,
+                system: KhaytAiLibrary.buildLooseSystem(),
+                prompt: KhaytAiLibrary.buildLooseRequest(a.names),
+                tool: t.tool,
+                maxTokens: t.maxTokens,
+              });
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "names": .array(names.map(JSONValue.string)),
+                      "apiKey": .string(apiKey)])],
+            as: AiRequest.self)
+    }
+
+    /// The assistant's prints for one batch of loose names, kept only where
+    /// they can be believed (`readLooseAnswer`): members are indices into
+    /// the batch that was sent.
+    public struct AiLooseAnswer: Decodable, Sendable {
+        public struct Print: Decodable, Sendable, Equatable {
+            public let name: String
+            public let members: [Int]
+        }
+        public let ok: Bool
+        public let prints: [Print]
+        public let dropped: Int
+        public let problem: String?
+        public let usage: JSONValue?
+    }
+
+    public func aiLooseRead(settings: [String: JSONValue], response: JSONValue,
+                            count: Int) throws -> AiLooseAnswer {
+        try runtime.call2("""
+            (function (a) {
+              var out = KhaytAiProviders.readResponse(a.settings, a.data);
+              var u = out.usage
+                ? { input_tokens: out.usage.inputTokens, output_tokens: out.usage.outputTokens } : null;
+              if (!out.ok) {
+                return { ok: false, prints: [], dropped: 0,
+                         problem: KhaytAiTools.describeStop(out.stop), usage: u };
+              }
+              var r = KhaytAiLibrary.readLooseAnswer(out.draft, a.count);
+              return { ok: true, prints: r.prints, dropped: r.dropped, problem: null, usage: u };
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "data": response, "count": .number(Double(count))])],
+            as: AiLooseAnswer.self)
+    }
+
+    /// "Check pictures": one photo, and the print's own preview when there
+    /// is one, sent to the assistant (`lib/ai-library.js buildPictureRequest`).
+    /// Its OWN consent (`pictures`), and a provider that takes images — a
+    /// request is never built otherwise (`AI_FEATURE_NOT_CONSENTED`,
+    /// `AI_NO_VISION`). `photo` and `reference` are base64 JPEG.
+    public func aiPictureRequest(settings: [String: JSONValue], printName: String, photo: String,
+                                 reference: String?, apiKey: String) throws -> AiRequest {
+        try runtime.call2("""
+            (function (a) {
+              if (!KhaytAiPrivacy.isFeatureEnabled((a.settings || {}).ai, 'pictures')) {
+                throw new Error('AI_FEATURE_NOT_CONSENTED');
+              }
+              if (!KhaytAiProviders.takesImages(a.settings)) throw new Error('AI_NO_VISION');
+              var t = KhaytAiTools.resolveTool('pictures', KhaytAiLibrary.PICTURE_SCHEMA);
+              var settings = { ai: Object.assign({}, (a.settings || {}).ai, { apiKey: a.apiKey }) };
+              var images = KhaytAiLibrary.pictureImages(a.photo, a.reference);
+              return KhaytAiProviders.buildRequest(settings, {
+                apiKey: a.apiKey,
+                system: KhaytAiLibrary.buildPictureSystem(),
+                prompt: KhaytAiLibrary.buildPictureRequest(a.name, images.length > 1),
+                images: images,
+                tool: t.tool,
+                maxTokens: t.maxTokens,
+              });
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "name": .string(printName), "photo": .string(photo),
+                      "reference": reference.map(JSONValue.string) ?? .null, "apiKey": .string(apiKey)])],
+            as: AiRequest.self)
+    }
+
+    /// Whether the shop's provider takes images at all.
+    public func aiTakesImages(settings: [String: JSONValue]) throws -> Bool {
+        try runtime.call2("KhaytAiProviders.takesImages(ARG0)", [.object(settings)], as: Bool.self)
+    }
+
+    public struct AiPictureAnswer: Decodable, Sendable {
+        public let ok: Bool
+        /// yes / no / unsure.
+        public let verdict: String
+        /// attach / ticked / rejected / unticked (`pictureOutcome`).
+        public let outcome: String
+        public let problem: String?
+        public let usage: JSONValue?
+    }
+
+    public func aiPictureRead(settings: [String: JSONValue], response: JSONValue,
+                              hasReference: Bool) throws -> AiPictureAnswer {
+        try runtime.call2("""
+            (function (a) {
+              var out = KhaytAiProviders.readResponse(a.settings, a.data);
+              var u = out.usage
+                ? { input_tokens: out.usage.inputTokens, output_tokens: out.usage.outputTokens } : null;
+              var v = out.ok ? KhaytAiLibrary.readPictureAnswer(out.draft) : 'unsure';
+              return { ok: !!out.ok, verdict: v, outcome: KhaytAiLibrary.pictureOutcome(v, a.ref),
+                       problem: out.ok ? null : KhaytAiTools.describeStop(out.stop), usage: u };
+            })(ARG0)
+            """,
+            [.object(["settings": .object(settings), "data": response, "ref": .bool(hasReference)])],
+            as: AiPictureAnswer.self)
+    }
+
+    /// The verdict rule alone, for the Mac to follow it without a reply.
+    public func aiPictureOutcome(verdict: String, hasReference: Bool) throws -> String {
+        try runtime.call2("KhaytAiLibrary.pictureOutcome(ARG0, ARG1)", [.string(verdict), .bool(hasReference)],
+                          as: String.self)
+    }
+
+    /// `lib/ai-library.js LIMITS`, for the Mac's batching to agree with.
+    public func aiLibraryLimits() throws -> [String: Int] {
+        try runtime.call2("KhaytAiLibrary.LIMITS", [], as: [String: Int].self)
+    }
+
     /// One call folded into the book's AI spend ledger (`settings.aiUsage`,
     /// `lib/ai-usage.js record`) — the same ledger the desktop keeps.
     public func aiUsageRecord(ledger: JSONValue, task: String, model: String,

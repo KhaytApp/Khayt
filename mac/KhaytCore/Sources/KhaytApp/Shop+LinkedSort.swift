@@ -11,12 +11,20 @@ struct SortAsk: Sendable, Equatable {
     /// Folders not asked about this time because their request kept failing
     /// (`SortFailures`) — sorted on this Mac instead.
     var held = 0
+    /// Loose top-level files it was asked about this time (`LooseCache`).
+    var loose = 0
+    /// Loose files not asked about because their request kept failing.
+    var looseHeld = 0
 
     @MainActor func line(_ words: Words) -> String? {
         var parts: [String] = []
         if let problem { parts.append(words.callIt("mac.sort_ai_failed", ["why": .string(problem)])) }
-        else if sorted > 0 { parts.append(words.callIt("mac.sort_ai_used", ["n": .number(Double(sorted))])) }
+        else {
+            if sorted > 0 { parts.append(words.callIt("mac.sort_ai_used", ["n": .number(Double(sorted))])) }
+            if loose > 0 { parts.append(words.callIt("mac.sort_ai_loose", ["n": .number(Double(loose))])) }
+        }
         if held > 0 { parts.append(words.callIt("mac.sort_ai_held", ["n": .number(Double(held))])) }
+        if looseHeld > 0 { parts.append(words.callIt("mac.sort_ai_loose_held", ["n": .number(Double(looseHeld))])) }
         return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 }
@@ -45,6 +53,24 @@ struct SortPreview: Identifiable {
     let assistant: SortAsk?
     /// The shop has not turned the assistant on for this.
     let assistantOff: Bool
+    /// Models loose at the top of the linked folders, how many of them the
+    /// sort put in a print, and in how many prints (`LooseSort`).
+    var loose = (total: 0, grouped: 0, prints: 0)
+    /// Pictures the sort is not sure of, for the shop to tick or untick.
+    var pictures: [PictureRow] = []
+    /// What "Check pictures" did, when it is on.
+    var pictureAsk: PictureAsk?
+
+    /// The loose figures of some sorted linked folders.
+    nonisolated static func looseCounts(_ plans: [PrintSort.Plan]) -> (total: Int, grouped: Int, prints: Int) {
+        var total = 0, grouped = 0, prints = 0
+        for plan in plans {
+            total += plan.looseModels.count
+            grouped += plan.loose.values.reduce(0) { $0 + $1.members.count }
+            prints += plan.loose.count
+        }
+        return (total, grouped, prints)
+    }
 }
 
 extension Shop {
@@ -70,7 +96,16 @@ extension Shop {
         guard aiLibraryAllowed, let build = source.build, let engine else { return SortAsk() }
         let settings = settingsDict
         let units = plans.flatMap(SortCache.units).filter { !SortCache.isCached($0, in: settings) }
-        guard !units.isEmpty else { return SortAsk() }
+        // The loose top-level files not asked about yet, in copy order — at
+        // most `LooseCache.perScan` names this scan, `perRequest` a request.
+        var looseBatches: [(root: URL, names: [String])] = []
+        var budget = LooseCache.perScan
+        for plan in plans where budget > 0 {
+            let names = Array(LooseCache.pending(plan, settings: settings).prefix(budget))
+            budget -= names.count
+            looseBatches += LooseCache.batches(names, births: plan.births).map { (plan.root, $0) }
+        }
+        guard !units.isEmpty || !looseBatches.isEmpty else { return SortAsk() }
         librarySortAsking = true
         defer { librarySortAsking = false }
 
@@ -82,10 +117,11 @@ extension Shop {
         let today = SortFailures.today()
         let marks = SortFailures.read(settings)
         let batches = SortCache.batches(units)
-        let pending = Set(batches.map(SortCache.signature))
+        let pending = Set(batches.map(SortCache.signature)).union(looseBatches.map { LooseCache.signature($0.names) })
         var asked = Set<String>(), failed = Set<String>()
+        var halted = false
         for batch in batches {
-            if stop?.isStopped == true || Task.isCancelled { break }
+            if halted || stop?.isStopped == true || Task.isCancelled { break }
             let sig = SortCache.signature(batch)
             if !byHand, SortFailures.held(sig, in: marks, today: today) {
                 result.held += batch.count
@@ -105,16 +141,49 @@ extension Shop {
                 }
             } catch AiClient.Failure.notConsented {
                 asked.remove(sig)
-                break                       // switched off meanwhile: the heuristic stands, nothing to say
+                halted = true               // switched off meanwhile: the heuristic stands, nothing to say
             } catch AiClient.Failure.noKey {
                 // Nothing was sent, so nothing to hold against the request.
                 // In the shop's words, not "No API key" in an Arabic sentence.
                 asked.remove(sig)
                 result.problem = words.callIt("mac.ai_no_key")
-                break
+                halted = true
             } catch {
                 // This request failed; the next may not (one too long for
                 // the provider says nothing about the others).
+                failed.insert(sig)
+                result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            }
+        }
+        // THE LOOSE FILES, the same way: names only, a batch at a time, each
+        // answer kept as it comes, a failing request held like a folder's.
+        var looseAnswered: [LooseCache.Answered] = []
+        for batch in looseBatches {
+            if halted || stop?.isStopped == true || Task.isCancelled { break }
+            let sig = LooseCache.signature(batch.names)
+            if !byHand, SortFailures.held(sig, in: marks, today: today) {
+                result.looseHeld += batch.names.count
+                continue
+            }
+            asked.insert(sig)
+            do {
+                let reply = try await AiClient.groupLoose(batch.names, shop: self)
+                looseAnswered.append(LooseCache.answered(root: batch.root, sent: batch.names, prints: reply.prints))
+                result.loose += batch.names.count
+                if let usage = reply.usage, usage != .null,
+                   let next = try? await engine.aiUsageRecord(ledger: ledger, task: "library", model: reply.model,
+                                                              usage: usage, now: Date()) {
+                    ledger = next
+                    spent = true
+                }
+            } catch AiClient.Failure.notConsented {
+                asked.remove(sig)
+                halted = true
+            } catch AiClient.Failure.noKey {
+                asked.remove(sig)
+                result.problem = words.callIt("mac.ai_no_key")
+                halted = true
+            } catch {
                 failed.insert(sig)
                 result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
             }
@@ -125,13 +194,18 @@ extension Shop {
             .map { (unit: $0, answers: got) }
         result.sorted = answered.reduce(0) { $0 + $1.unit.entries.count }
         let nextMarks = SortFailures.after(marks, asked: asked, failed: failed, pending: pending, today: today)
-        guard !answered.isEmpty || spent || nextMarks != marks else { return result }
+        guard !answered.isEmpty || !looseAnswered.isEmpty || spent || nextMarks != marks else { return result }
+        var present: [String: Set<String>] = [:]
+        for plan in plans { present[plan.root.standardizedFileURL.path] = LooseCache.present(plan) }
         do {
             // lock: system — the shop turned this on; it writes only the
             // assistant's answers, their cost and which requests failed.
             try StoreWriter.update(build) { root in
                 SortCache.store(answered, into: &root)
-                if nextMarks != marks { SortFailures.write(nextMarks, into: &root) }
+                LooseCache.store(looseAnswered, present: present, into: &root)
+                if nextMarks != marks {
+                    SortFailures.write(SortFailures.keepingPictures(nextMarks, from: Self.settings(root)), into: &root)
+                }
                 if spent {
                     var s = Self.settings(root)
                     s["aiUsage"] = ledger
@@ -163,45 +237,54 @@ extension Shop {
     func fetchPrintPictures(_ plans: [PrintSort.Plan], stop: ScanStop?) async -> Int {
         guard let build = source.build, let roots = libraryRoots else { return 0 }
         let settings = settingsDict
-        let jobs = PrintPhotos.jobs(plans, looked: PrintPhotos.looked(settings), limit: PrintPhotos.perPass * 4)
+        // Every print still waiting, not the first 160: a print that cannot
+        // be settled yet (its group not filed, its pictures too big) costs no
+        // download, and with a short list enough of them hid every other
+        // print for good (review of #1844).
+        let jobs = PrintPhotos.jobs(plans, looked: PrintPhotos.looked(settings), limit: Int.max)
         guard !jobs.isEmpty else { return 0 }
         let covers = GroupKinds.covers(settings)
         // Linked records with no photo, by the file they point at.
         var photoless = Set<String>()
+        var indexed = Set<String>()
         for case .object(let o) in fileRows {
             guard case .string(let p)? = o["externalPath"], !p.isEmpty else { continue }
             let hasPhoto: Bool = { if case .string(let s)? = o["userPhoto"], !s.isEmpty { true } else { false } }()
             let removed: Bool = { if case .bool(true)? = o["userPhotoRemoved"] { true } else { false } }()
-            if !hasPhoto, !removed { photoless.insert(URL(fileURLWithPath: p).standardizedFileURL.path) }
+            let path = URL(fileURLWithPath: p).standardizedFileURL.path
+            indexed.insert(path)
+            if !hasPhoto, !removed { photoless.insert(path) }
         }
         let primary = roots.primary
+        // The groups records sit in now: a picture for a group nobody is
+        // filed in would be thrown away at the write.
+        let liveNow = Set(GroupKinds.groupPaths(["printFiles": .array(fileRows)]))
+        let covered = Set(covers.keys)
+        let steps = await PinWork.run { [photoless, indexed] in
+            PrintPhotos.pass(jobs, covered: covered, live: liveNow, photoless: photoless, indexed: indexed)
+        }
         var groupPictures: [(group: String, rel: String)] = []
         var modelPhotos: [String: String] = [:]
-        var looked: [String] = []
-        var fetched = 0
-        for job in jobs {
-            if stop?.isStopped == true || Task.isCancelled || fetched >= PrintPhotos.perPass { break }
-            looked.append(job.print)
-            if let group = job.group, covers[group] == nil,
-               let pick = await PinWork.run({ PrintPhotos.pick(job.candidates) }) {
-                fetched += 1
+        var done: [PrintPhotos.Step] = []
+        for var step in steps {
+            if stop?.isStopped == true || Task.isCancelled { break }
+            if let group = step.group, let pick = step.groupPick {
                 if let rel = await PinWork.run({ try? GroupPictures.write(GroupPictures.encode(pick), for: group, under: primary) }) {
                     groupPictures.append((group, rel))
+                } else {
+                    step.settled = false
                 }
             }
-            if let only = job.only, photoless.contains(only),
-               let pick = await PinWork.run({ PrintPhotos.pick(job.candidates) }) {
-                fetched += 1
+            if let only = step.only, let pick = step.onlyPick {
                 if let uri = await PinWork.run({ try? LibraryPhoto.dataURI(of: pick) }) { modelPhotos[only] = uri }
             }
-            for (model, image) in job.modelPictures.sorted(by: { $0.key < $1.key })
-            where photoless.contains(model) && modelPhotos[model] == nil && fetched < PrintPhotos.perPass {
-                guard let pick = await PinWork.run({ PrintPhotos.pick([image]) }) else { continue }
-                fetched += 1
+            for (model, pick) in step.models.sorted(by: { $0.key < $1.key }) {
                 if let uri = await PinWork.run({ try? LibraryPhoto.dataURI(of: pick) }) { modelPhotos[model] = uri }
             }
+            done.append(step)
         }
-        guard !looked.isEmpty else { return 0 }
+        let looked = PrintPhotos.settled(done, notWorn: [])
+        guard !looked.isEmpty || !modelPhotos.isEmpty || !groupPictures.isEmpty else { return 0 }
         var put = 0
         var unused: [String] = []
         do {
@@ -226,12 +309,20 @@ extension Shop {
                 if changed { root["printFiles"] = .array(rows) }
                 let now = GroupKinds.covers(Self.settings(root))
                 let live = Set(GroupKinds.groupPaths(root))
+                var notWorn = Set<String>()
                 for (group, rel) in groupPictures {
-                    guard now[group] == nil, live.contains(where: { Self.isUnder($0, group) }) else { unused.append(rel); continue }
+                    guard now[group] == nil, live.contains(where: { Self.isUnder($0, group) }) else {
+                        unused.append(rel)
+                        // Not filed there after all: no picture went on, so
+                        // the print is not settled. (One that got a cover of
+                        // its own meanwhile is.)
+                        if now[group] == nil { notWorn.insert(group) }
+                        continue
+                    }
                     GroupKinds.setCover(.image(rel), for: group, into: &root)
                     put += 1
                 }
-                PrintPhotos.markLooked(looked, into: &root)
+                PrintPhotos.markLooked(PrintPhotos.settled(done, notWorn: notWorn), into: &root)
             }
         } catch {
             unused = groupPictures.map(\.rel)
@@ -272,11 +363,12 @@ extension Shop {
             // Pressed by hand: always tries, even a request that kept failing.
             let a = await askAssistantToSort(sorted, stop: stop, byHand: true)
             asked = a
-            if a.sorted > 0 {
+            if a.sorted > 0 || a.loose > 0 {
                 await load(source)
                 let answered = settingsDict
                 sorted = await PinWork.run {
-                    walked.map { Shop.sortedPlan(root: $0.root, models: $0.models, images: $0.images, settings: answered) }
+                    walked.map { Shop.sortedPlan(root: $0.root, models: $0.models, images: $0.images,
+                                                 settings: answered, births: $0.plan.births) }
                 }
             }
         }
@@ -300,8 +392,7 @@ extension Shop {
                     perGroup[id, default: 0] += 1
                     if let c = p.collection { collection[id] = c }
                     if picture[id] == nil {
-                        let name = plan.names[print] ?? PrintSort.cleanName(plan.tree[print]?.name ?? print)
-                        if let first = PrintSort.pictures(of: print, in: plan.tree, roles: plan.roles, name: name)
+                        if let first = plan.pictures(ofPrint: print)
                             .lazy.map({ plan.root.appending(path: $0) })
                             .first(where: { !LinkedCloud.isOnlineOnly($0) }) {
                             picture[id] = first
@@ -322,9 +413,27 @@ extension Shop {
             }
             return out.values.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
-        sortPreview = SortPreview(plans: plans, rows: printRows, collections: counted.collections,
+        var preview = SortPreview(plans: plans, rows: printRows, collections: counted.collections,
                                   moved: counted.moved, renamed: counted.renamed, tagged: counted.tagged,
                                   kept: counted.kept, assistant: asked, assistantOff: !aiLibraryAllowed)
+        preview.loose = SortPreview.looseCounts(plans)
+        // The pictures to check — looked at by the assistant first when the
+        // shop turned "Check pictures" on (its own switch).
+        if aiPicturesAllowed, !stop.isStopped {
+            preview.pictureAsk = await checkPictures(plans, stop: stop, byHand: true, put: false)
+        }
+        var outcomes: [String: String] = [:]
+        if let engine {
+            for v in ["yes", "no", "unsure"] {
+                for ref in [true, false] {
+                    outcomes[v + "|\(ref)"] = try? await engine.aiPictureOutcome(verdict: v, hasReference: ref)
+                }
+            }
+        }
+        preview.pictures = PictureRow.rows(plans, settings: settingsDict,
+                                           hasPicture: { self.hasPicture($0, $1) },
+                                           outcome: { outcomes[$0.verdict + "|\($0.reference)"] })
+        sortPreview = preview
     }
 
     /// What applying `plans` to `rows` would change — the same judgement
@@ -366,7 +475,7 @@ extension Shop {
     /// Apply the sort the sheet showed: the records refiled through the same
     /// protections as every refile (judged again on the book as it is now),
     /// then the prints' pictures.
-    func applyLinkedSort(_ preview: SortPreview) async {
+    func applyLinkedSort(_ preview: SortPreview, ticked: Set<String> = [], notThis: Set<String> = []) async {
         guard permitted("inventory", "edit") else { return }
         guard let build = source.build, StoreLock.weOwnIt(build), !libraryMoveBusy else { return }
         sortPreview = nil
@@ -380,9 +489,22 @@ extension Shop {
                                            owns: { StoreLock.weOwnIt(build) },
                                            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
             await load(source)
-            let pictures = stop.isStopped ? 0 : await fetchPrintPictures(preview.plans, stop: stop)
+            var pictures = stop.isStopped ? 0 : await fetchPrintPictures(preview.plans, stop: stop)
             if pictures > 0 { await load(source) }
-            var lines = [words.callIt("mac.linked_regrouped", ["n": .number(Double(n))])]
+            // The pictures to check: ticked ones go on. Unticked means "not
+            // now" -- offered again next time. Only "Not this print" is
+            // remembered, and never offered for that print again.
+            if !preview.pictures.isEmpty, !stop.isStopped {
+                var put: [(plan: PrintSort.Plan, suggestion: LooseSort.Suggestion)] = []
+                for row in preview.pictures where ticked.contains(row.id) && !notThis.contains(row.id) {
+                    if let plan = preview.plans.first(where: { $0.root == row.root }) { put.append((plan, row.suggestion)) }
+                }
+                rejectPictures(preview.pictures.map(\.id).filter(notThis.contains))
+                pictures += await putPictures(put, stop: stop)
+            }
+            // Only pictures applied: say how many went on, not "regrouped: 0".
+            var lines: [String] = []
+            if n > 0 || pictures == 0 { lines.append(words.callIt("mac.linked_regrouped", ["n": .number(Double(n))])) }
             if pictures > 0 { lines.append(words.callIt("mac.sort_pictures_added", ["n": .number(Double(pictures))])) }
             libraryMoveNote = lines.joined(separator: " ")
         } catch {
@@ -397,6 +519,16 @@ struct LinkedSortSheet: View {
     let shop: Shop
     let preview: SortPreview
     @Environment(\.dismiss) private var dismiss
+    /// The pictures to check the shop has ticked (`PictureRow.ticked` to start).
+    @State private var ticks: Set<String>
+    /// Rows the shop said are "Not this print" — remembered on Apply.
+    @State private var notThis: Set<String> = []
+
+    init(shop: Shop, preview: SortPreview) {
+        self.shop = shop
+        self.preview = preview
+        _ticks = State(initialValue: Set(preview.pictures.filter(\.ticked).map(\.id)))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -406,6 +538,11 @@ struct LinkedSortSheet: View {
                 .font(.headline)
             VStack(alignment: .leading, spacing: 3) {
                 Text(shop.words.callIt("mac.sort_moved", ["n": .number(Double(preview.moved))]))
+                if preview.loose.total > 0 {
+                    Text(shop.words.callIt("mac.sort_loose", ["n": .number(Double(preview.loose.grouped)),
+                                                              "total": .number(Double(preview.loose.total)),
+                                                              "prints": .number(Double(preview.loose.prints))]))
+                }
                 if preview.renamed > 0 {
                     Text(shop.words.callIt("mac.sort_renamed", ["n": .number(Double(preview.renamed))]))
                 }
@@ -444,6 +581,29 @@ struct LinkedSortSheet: View {
                 }
             }
             .frame(minHeight: 260)
+            if !preview.pictures.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(shop.words.callIt("mac.sort_pictures_check")).font(.headline)
+                    Text(shop.words.callIt("mac.sort_pictures_check_help"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    if preview.pictureAsk?.unsupported == true {
+                        Label(shop.words.callIt("mac.sort_pictures_ai_off"), systemImage: "sparkles")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else if let n = preview.pictureAsk?.checked, n > 0 {
+                        Label(shop.words.callIt("mac.sort_pictures_checked", ["n": .number(Double(n))]),
+                              systemImage: "sparkles")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                List(preview.pictures) { row in
+                    PictureCheckRow(shop: shop, row: row,
+                                    ticked: Binding(get: { ticks.contains(row.id) },
+                                                    set: { on in if on { ticks.insert(row.id) } else { ticks.remove(row.id) } }),
+                                    notThis: Binding(get: { notThis.contains(row.id) },
+                                                     set: { on in if on { notThis.insert(row.id) } else { notThis.remove(row.id) } }))
+                }
+                .frame(minHeight: 140)
+            }
             HStack {
                 Spacer()
                 Button(shop.words.callIt("common.cancel"), role: .cancel) {
@@ -453,14 +613,84 @@ struct LinkedSortSheet: View {
                 .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("mac.sort_apply")) {
                     let chosen = preview
+                    let picked = ticks
+                    let refused = notThis
                     dismiss()
-                    Task { await shop.applyLinkedSort(chosen) }
+                    Task { await shop.applyLinkedSort(chosen, ticked: picked, notThis: refused) }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!shop.canWrite || preview.moved + preview.renamed + preview.tagged == 0)
+                .disabled(!shop.canWrite
+                          || (preview.moved + preview.renamed + preview.tagged == 0 && preview.pictures.isEmpty))
             }
         }
         .padding(20)
         .frame(minWidth: 520, idealWidth: 560, minHeight: 480)
+    }
+}
+
+/// One picture to check: tick to use it, untick for "not now", or "Not this
+/// print" to never be offered it for this print again. A picture kept only in
+/// the cloud is a placeholder until "Show" brings that one picture down.
+struct PictureCheckRow: View {
+    let shop: Shop
+    let row: PictureRow
+    @Binding var ticked: Bool
+    @Binding var notThis: Bool
+    @State private var brought = false
+    @State private var bringing = false
+
+    private var shownPicture: URL? { row.picture ?? (brought ? row.image : nil) }
+    private var inCloud: Bool { row.online && !brought }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Toggle(isOn: $ticked) { EmptyView() }
+                .labelsHidden()
+                .disabled(notThis)
+            thumb
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: row.name).lineLimit(1).strikethrough(notThis)
+                Text(verbatim: row.image.lastPathComponent)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if inCloud {
+                    HStack(spacing: 6) {
+                        Label(shop.words.callIt("mac.sort_picture_cloud"), systemImage: "icloud")
+                            .font(.caption2).foregroundStyle(.secondary)
+                        Button(shop.words.callIt("mac.sort_picture_show")) { bringDown() }
+                            .buttonStyle(.link).controlSize(.small).font(.caption2)
+                            .disabled(bringing)
+                    }
+                }
+            }
+            Spacer(minLength: 8)
+            Button(shop.words.callIt(notThis ? "mac.sort_picture_undo" : "mac.sort_picture_not_this")) {
+                notThis.toggle()
+                if notThis { ticked = false }
+            }
+            .buttonStyle(.borderless).controlSize(.small)
+        }
+        .opacity(notThis ? 0.55 : 1)
+    }
+
+    @ViewBuilder private var thumb: some View {
+        if let url = shownPicture {
+            Thumbnail(source: .file(url))
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        } else {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(.quaternary)
+                .frame(width: 40, height: 40)
+                .overlay(Image(systemName: inCloud ? "icloud" : "photo").foregroundStyle(.secondary))
+        }
+    }
+
+    private func bringDown() {
+        bringing = true
+        Task {
+            let ok = await shop.bringDownPicture(row.image)
+            bringing = false
+            if ok { brought = true }
+        }
     }
 }

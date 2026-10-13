@@ -88,3 +88,82 @@ test('the task frames itself as sorting folders, with room for a long answer', (
   assert.ok(t.maxTokens >= 16000);
   assert.match(L.buildLibrarySystem(), /PATHS and file NAMES only/);
 });
+
+// ── Loose files at the top of a linked folder ─────────────────────────────
+
+const LOOSE = ['Kart Racer 3MF For Bambu Printers.3mf', 'Plate 2 - Red.stl', 'Plate 1 - Yellow.stl',
+  'v7-QQ - holder.stl', 'v7-QQ - cover.stl', '412.jpg'];
+
+test('loose files go as numbered names in copy order, nothing else', () => {
+  const text = L.buildLooseRequest(LOOSE);
+  const lines = text.split('\n');
+  assert.equal(lines.length, LOOSE.length + 1);
+  assert.equal(lines[1], '0 | Kart Racer 3MF For Bambu Printers.3mf');
+  assert.equal(lines[3], '2 | Plate 1 - Yellow.stl');
+  // A path is cut to its own name, and a name cannot break a line.
+  const sneaky = L.buildLooseRequest(['/Users/x/My Drive/secret/a.stl', 'b\nc.stl', '..\\up.stl']);
+  assert.deepEqual(sneaky.split('\n').slice(1), ['0 | a.stl', '1 | b c.stl', '2 | up.stl']);
+});
+
+test('a loose request holds at most 300 names, each clipped', () => {
+  assert.equal(L.LIMITS.looseNames, 300);
+  assert.equal(L.LIMITS.looseNamesPerScan, 3000);
+  const many = Array.from({ length: 450 }, (_, i) => `part ${i} ${'x'.repeat(200)}.stl`);
+  const lines = L.buildLooseRequest(many).split('\n');
+  assert.equal(lines.length, 301);
+  for (const l of lines.slice(1)) assert.ok(l.split(' | ')[1].length <= L.LIMITS.looseNameLength);
+});
+
+test('loose prints are believed only where they can be', () => {
+  const r = L.readLooseAnswer({ prints: [
+    { name: 'Kart Racer', members: [0, 1, 2] },
+    { name: 'v7-QQ', members: [3, 4] },
+    { name: '..', members: [5, 3] },                 // dots name nothing
+    { name: 'a/b', members: [3, 4] },                // a path, not a name
+    { name: 'Far', members: [4, 99] },               // never sent
+    { name: 'Again', members: [0, 3] },              // already in a print
+    { name: 'Alone', members: [5] },                 // one file is not a print
+    { name: 'Twice', members: [5, 5] },
+    { name: 'Frac', members: [1.5, 2] },
+  ] }, LOOSE.length);
+  assert.deepEqual(r.prints, [{ name: 'Kart Racer', members: [0, 1, 2] }, { name: 'v7-QQ', members: [3, 4] }]);
+  assert.equal(r.dropped, 7);
+  for (const bad of [null, {}, { prints: 'x' }, { prints: [null, 1] }]) {
+    assert.deepEqual(L.readLooseAnswer(bad, 3).prints, []);
+  }
+});
+
+test('Check pictures: published limits, at most two images, verdicts read strictly', () => {
+  assert.equal(L.LIMITS.pictureImages, 2);
+  assert.equal(L.LIMITS.pictureChecksPerScan, 40);
+  assert.equal(L.LIMITS.picturePixels, 512);
+  assert.equal(L.LIMITS.pictureSourceBytes, 8 * 1024 * 1024);
+  assert.equal(L.pictureImages('a', 'b').length, 2);
+  assert.deepEqual(L.pictureImages('a', null).map((i) => i.mediaType), ['image/jpeg']);
+  assert.equal(L.readPictureAnswer({ verdict: 'YES' }), 'yes');
+  assert.equal(L.readPictureAnswer({ verdict: 'maybe' }), 'unsure');
+  assert.equal(L.readPictureAnswer(null), 'unsure');
+  assert.equal(L.pictureOutcome('yes', true), 'attach');
+  assert.equal(L.pictureOutcome('yes', false), 'ticked');
+  assert.equal(L.pictureOutcome('no', true), 'rejected');
+  assert.equal(L.pictureOutcome('unsure', true), 'unticked');
+  assert.match(L.buildPictureRequest('Kart\nRacer', true), /Print: Kart Racer\nImage 1/);
+  const P = require('../lib/ai-providers.js');
+  const req = P.buildRequest({ ai: { provider: 'anthropic', apiKey: 'k' } }, {
+    system: 's', prompt: 'p', images: L.pictureImages('QQ', 'RR'),
+    tool: { name: 't', description: 'd', input_schema: {} }, maxTokens: 10,
+  });
+  const imgs = req.body.messages[0].content.filter((c) => c.type === 'image');
+  assert.equal(imgs.length, 2);
+  assert.equal(imgs[0].source.media_type, 'image/jpeg');
+  assert.equal(P.takesImages({ ai: { provider: 'compatible' } }), false);
+  assert.equal(P.takesImages({ ai: { provider: 'google' } }), true);
+});
+
+test('the loose task frames itself as grouping files', () => {
+  const t = L.looseTool();
+  assert.equal(t.tool.name, 'group_loose_model_files');
+  assert.equal(t.tool.input_schema, L.LOOSE_SCHEMA);
+  assert.ok(t.maxTokens >= 8000);
+  assert.match(L.buildLooseSystem(), /file NAMES only/);
+});

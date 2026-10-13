@@ -545,8 +545,9 @@ test('consent is recorded for known features only', () => {
   const out = apply(heldAi(), { ai: { features: { quote: true, invented: true } } });
   assert.equal(out.ai.features.invented, undefined);
   assert.deepEqual(Object.keys(out.ai.features).sort(),
-    ['assistant', 'library', 'price', 'quote', 'reply']);
+    ['assistant', 'library', 'pictures', 'price', 'quote', 'reply']);
   assert.equal(out.ai.features.library, false, 'opt-in: never granted by a form that did not ask');
+  assert.equal(out.ai.features.pictures, false, 'opt-in: never granted by a form that did not ask');
 });
 
 test('a form without a host-only switch keeps the answer the other app saved', () => {

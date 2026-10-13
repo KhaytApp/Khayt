@@ -34,6 +34,7 @@ struct AiRunsHereTests {
         "reply":     ("draftMessage",             "AiClient.draftReply"),
         "assistant": ("ask",                      "AiClient.ask"),
         "library":   ("previewLinkedSort",        "AiClient.sortFolders"),
+        "pictures":  ("previewLinkedSort",        "AiClient.checkPicture"),
     ]
 
     /// Looped INSIDE the test rather than as `@Test(arguments:)`: the sets are

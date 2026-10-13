@@ -169,15 +169,28 @@ extension Shop {
         if !stopped(), aiLibraryAllowed {
             let asked = await askAssistantToSort(plans, stop: stop)
             assistant = asked
-            if asked.sorted > 0, !stopped() {
+            if asked.sorted > 0 || asked.loose > 0, !stopped() {
+                // The answers were just written to the book, not to this
+                // Shop's copy of its settings: read them back first, or the
+                // plan is the one before them and nothing is regrouped until
+                // the next scan (review of #1844; the preview already did).
+                await load(source)
                 plans = await PinWork.run { [settingsDict] in
-                    walked.map { Shop.sortedPlan(root: $0.root, models: $0.models, images: $0.images, settings: settingsDict) }
+                    walked.map { Shop.sortedPlan(root: $0.root, models: $0.models, images: $0.images,
+                                                 settings: settingsDict, births: $0.plan.births) }
                 }
                 regrouped += (try? Self.regroupLinked(plans, linked: linkedFolders, storeURL: build.storeURL,
                                                       owns: owns, whoHasIt: who)) ?? 0
             }
         }
-        let pictures = stopped() ? 0 : await fetchPrintPictures(plans, stop: stop)
+        var pictures = stopped() ? 0 : await fetchPrintPictures(plans, stop: stop)
+        // "Check pictures" (its own switch): the ones the assistant confirms
+        // against a print's own preview go on; the rest wait in the sheet.
+        if !stopped(), aiPicturesAllowed {
+            pictures += await checkPictures(plans, stop: stop).attached
+        }
+        // What is remembered about pictures and folders that are gone, let go.
+        if !stopped() { await prunePictureMaps(plans) }
         if regrouped > 0 || pictures > 0 || assistant != nil { await load(source) }
 
         var lines: [String] = []
@@ -284,7 +297,8 @@ extension Shop {
             let mine = root.standardizedFileURL.path
             let inner = linkedPaths.filter { $0 != mine && LibraryMove.under($0, mine) }
             func isInner(_ path: String) -> Bool { inner.contains { LibraryMove.under(path, $0) } }
-            let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: LibraryImport.fileKeys,
+            let walker = FileManager.default.enumerator(at: root,
+                                                        includingPropertiesForKeys: LibraryImport.fileKeys + [.creationDateKey],
                                                         options: [.skipsHiddenFiles, .skipsPackageDescendants])
             var models: [URL] = []
             var images: [URL] = []
@@ -303,7 +317,8 @@ extension Shop {
             }
             models.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
             images.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
-            let plan = sortedPlan(root: root, models: models, images: images, settings: settings)
+            let births = Self.births(of: models + images, under: root)
+            let plan = sortedPlan(root: root, models: models, images: images, settings: settings, births: births)
             let new = models.filter { !known.contains($0.standardizedFileURL.path) }
             let photos = ModelPhoto.candidates(for: new, everyModel: models, boundary: root)
             let fresh = new.map { url -> LibraryImport.Incoming in
@@ -322,11 +337,26 @@ extension Shop {
     /// answers from the shop's assistant for any of its top-level folders,
     /// still matching what is on disk — again with those laid over it.
     nonisolated static func sortedPlan(root: URL, models: [URL], images: [URL],
-                                       settings: [String: JSONValue]) -> PrintSort.Plan {
-        let first = PrintSort.plan(root: root, models: models, images: images)
-        let answers = SortCache.answers(settings, for: SortCache.units(first))
+                                       settings: [String: JSONValue],
+                                       births: [String: Double] = [:]) -> PrintSort.Plan {
+        let first = PrintSort.plan(root: root, models: models, images: images, births: births)
+        var answers = SortCache.answers(settings, for: SortCache.units(first))
+        answers.loose = LooseCache.answers(settings, root: root, present: LooseCache.present(first))
         guard answers != PrintSort.Answers() else { return first }
-        return PrintSort.plan(root: root, models: models, images: images, answers: answers)
+        return PrintSort.plan(root: root, models: models, images: images, answers: answers, births: births)
+    }
+
+    /// When each file directly inside `root` was created — its birth time,
+    /// read from the listing (`creationDateKey`), never from the file's
+    /// bytes — the order a copy job dropped the loose models in.
+    nonisolated static func births(of urls: [URL], under root: URL) -> [String: Double] {
+        var out: [String: Double] = [:]
+        for url in urls {
+            guard let rel = PrintSort.rel(url, under: root), !rel.contains("/"),
+                  let made = try? url.resourceValues(forKeys: [.creationDateKey]).creationDate else { continue }
+            out[rel] = made.timeIntervalSince1970
+        }
+        return out
     }
 
     /// File the linked records again by their folders and mark the book as

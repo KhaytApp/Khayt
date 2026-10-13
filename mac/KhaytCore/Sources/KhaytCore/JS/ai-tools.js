@@ -65,6 +65,12 @@ const AI_TASKS = {
     description: 'Say what each folder of a 3D-print shop\'s model library is — a collection, a print, a part of a print, a file-format folder or pictures — and give each print a clean name.',
     maxTokens: 32000,
   },
+  // One photo (and the print's own preview) at a time: a one-word answer.
+  pictures: {
+    name: 'check_print_picture',
+    description: 'Say whether a candidate photo shows the same 3D print as its name and its own preview image: yes, no or unsure.',
+    maxTokens: 4096,
+  },
 };
 
 /** Fallback when a caller sends no task id (older call site, or a bad payload). */
