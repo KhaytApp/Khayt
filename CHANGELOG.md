@@ -18,13 +18,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     loose models it would group, into how many prints.
   - **Your assistant can place the rest.** With "Sort linked folders" on in
     Settings → AI assist, the loose files' names (only names, at most 300 a
-    request and 3,000 a scan, each name sent once) go to your assistant,
+    request and 3,000 a scan; a name that was answered is not sent again) go to your assistant,
     which can put a kit's plainly named parts with their kit.
   - **A picture goes on by itself only when it is certainly the print's.**
     Its name must match the print exactly, mean no other print, and sit with
     it. Anything less (a shared word, a number, a name two prints could
     share) is listed under "Pictures to check" in "Sort linked folders…" to
-    tick or untick; one you untick is not offered again. A print with no
+    tick. One left unticked is offered again next time; "Not this print"
+    turns it down for good. A print with no
     such picture shows its 3MF's own preview first.
   - **Pictures keep coming in.** A print the 40-a-pass limit skipped, or
     whose picture appeared later, gets it on a later pass. A picture you set
@@ -34,7 +35,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     preview. It sends the print's name, the photo redrawn as a new JPEG of
     at most 512 pixels with none of its metadata, and the preview when a
     model is on this Mac: at most 2 images a request and 40 checks a scan,
-    each pair once. A "yes" with a preview puts the picture on; a "no" is
+    and a pair that was judged is not sent again. A "yes" with a preview puts the picture on; a "no" is
     not offered again; anything else waits for you to tick it.
 
 - **Mac: a WhatsApp update sent from the iPhone over Wi-Fi is logged on the
@@ -6927,6 +6928,56 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-alpha.68] - 2026-10-13
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Models lying loose at the top of a linked folder are sorted into prints, and a
+picture goes on a print only when it is certainly that print's.
+
+### New
+
+- **Loose models are grouped.** Files dropped straight into the top of a
+  linked folder are grouped by their names and the order they were copied
+  in: `v4-AA - holder` and `v4-AA - cover` become "v4-AA", next to "v4-AAA";
+  `totoroA.stl` and `totoro-medium.3mf` become "totoro"; a `.u1` copy joins
+  its model. Names made only of parts, colours or numbers, and single files,
+  stay as they are. This happens on your Mac, sends nothing and downloads
+  nothing.
+- **Your assistant can place the rest.** With "Sort linked folders" on in
+  Settings ▸ AI assist, the loose files' names (only names, at most 300 a
+  request and 3,000 a scan) go to your assistant, which can put a kit's
+  plainly named parts, such as "Plate 3", with their kit.
+- **Pictures to check.** A picture goes on by itself only when its name
+  matches the print exactly, could mean no other print, and sits with it.
+  Anything less is listed in "Sort linked folders…" to tick. One left
+  unticked is offered again next time; **Not this print** turns it down for
+  good. A picture kept online only shows as **In the cloud** until you press
+  **Show**.
+- **Check pictures** (Settings ▸ AI assist, off by default, its own switch).
+  Your assistant compares a candidate photo with the print's own preview.
+  It is sent the print's name, the photo redrawn as a new JPEG of at most
+  512 pixels with none of its hidden details, and the preview when the model
+  is on this Mac: at most 2 images a request and 40 checks a scan. A "yes"
+  with a preview puts the picture on; a "no" is not offered again; anything
+  else waits for your tick.
+
+### Changed and fixed
+
+- A print with no picture of its own shows its 3MF's preview first.
+- Prints keep getting their pictures: one skipped by the 40-a-pass limit,
+  or whose picture appeared later, gets it on a later pass. A picture you
+  set or removed is never replaced.
+- Answers from your assistant are used in the same scan that asked for
+  them, not the next one.
+- A request that failed is tried again at most once a day, and after three
+  failures not again until those folders change; pressing "Sort linked
+  folders…" always tries.
+- A WhatsApp update sent from the iPhone over the shop's Wi-Fi is logged on
+  the customer again, and a supplier added on the iPhone reaches the Mac.
+- A group name with emoji or accented letters stays within its length limit.
 
 ## [4.0.0-alpha.67] - 2026-10-13
 
