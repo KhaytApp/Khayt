@@ -18,32 +18,6 @@ struct LooseSortReviewTests {
 
     // MARK: - Check pictures: the budget is for pictures still to judge
 
-    @Test("a judged pair is known without reading the picture, so it neither downloads nor spends the 40")
-    func judgedWithoutReading() {
-        let root = URL(fileURLWithPath: "/Drive/Linked")
-        let target = LooseSort.Suggestion.Target.print("#loose/kart racer")
-        let other = LooseSort.Suggestion.Target.print("#loose/owl lamp")
-        let key = PictureVerdicts.key(hash: "h1", root: root, target: target)
-        let verdicts: [String: PictureVerdicts.Verdict] = [key: .init(verdict: "unsure", reference: false)]
-        let hashes = [root.standardizedFileURL.path + "|kart.jpg": "h1"]
-        let judged = PictureVerdicts.judged(verdicts, hashes: hashes, root: root, image: "kart.jpg", target: target)
-        #expect(judged)
-        let otherPrint = PictureVerdicts.judged(verdicts, hashes: hashes, root: root, image: "kart.jpg", target: other)
-        #expect(!otherPrint)
-        let neverRead = PictureVerdicts.judged(verdicts, hashes: [:], root: root, image: "kart.jpg", target: target)
-        #expect(!neverRead)
-    }
-
-    @Test("checkPictures skips a judged pair before it reads it or counts it")
-    func skipComesFirst() throws {
-        let text = try Self.source("Shop+Pictures.swift")
-        let skip = try #require(text.range(of: "PictureVerdicts.judged("))
-        let spend = try #require(text.range(of: "budget -= 1"))
-        let read = try #require(text.range(of: "Data(contentsOf: url)"))
-        #expect(skip.lowerBound < spend.lowerBound)
-        #expect(spend.lowerBound < read.lowerBound)
-    }
-
     @Test("an answer with no verdict is held like a failure, not sent again every scan")
     func noVerdictIsHeld() throws {
         let text = try Self.source("Shop+Pictures.swift")

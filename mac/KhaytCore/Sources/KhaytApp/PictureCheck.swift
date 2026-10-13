@@ -166,15 +166,6 @@ enum PictureVerdicts {
         return verdicts[key(hash: h, root: root, target: target)]
     }
 
-    /// Whether this pairing already has a verdict, by the hash its picture
-    /// had when it was checked — answered WITHOUT reading the picture, so a
-    /// judged pair is neither downloaded again nor counted against a scan's
-    /// checks. (A picture whose bytes changed keeps its verdict.)
-    nonisolated static func judged(_ verdicts: [String: Verdict], hashes: [String: String], root: URL,
-                                   image: String, target: LooseSort.Suggestion.Target) -> Bool {
-        latest(verdicts, root: root, target: target, image: image, hashes: hashes) != nil
-    }
-
     nonisolated static func write(_ new: [String: Verdict], hashes: [String: String],
                                   into root: inout [String: JSONValue]) {
         write(new, seen: hashes.mapValues { Seen(hash: $0, size: -1, modified: -1) }, into: &root)
