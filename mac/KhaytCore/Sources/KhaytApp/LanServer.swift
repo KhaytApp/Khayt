@@ -1606,7 +1606,7 @@ final class LanServer {
         // operator with no PIN and the `owner` role, promote one, strip a PIN
         // by sending the record without it, or tombstone a staff member: on a
         // desktop with the operator lock on, owner rights from a phone. The
-        // companion writes these five and nothing else (BookWriter.swift), so
+        // companion writes these seven and nothing else (BookWriter.swift), so
         // anything else is dropped and counted as skipped. Dropped, not
         // refused: a 4xx keeps a phone resending the same batch for ever, and
         // its real edits would be stuck behind the one it can never deliver.
@@ -1643,8 +1643,12 @@ final class LanServer {
 
     /// The collections a phone may change: what the companion writes
     /// (`ios/KhaytCompanion/Services/BookWriter.swift`). See `foldFromPhone`.
+    /// `clients` carries a WhatsApp update's line in the customer's comms log,
+    /// and `suppliers` the receipt card's "Add as supplier" (Oct 2026). Before
+    /// `clients` was here, that line was dropped as skipped with a 200 over
+    /// LAN, the phone counted it delivered, and it never reached the book.
     nonisolated static let phoneWritable: Set<String> = [
-        "printLog", "inventory", "waitingList", "expenses", "wasteLog",
+        "printLog", "inventory", "waitingList", "expenses", "wasteLog", "clients", "suppliers",
     ]
 
     nonisolated static let storefrontHookPath = "/api/webhook/"

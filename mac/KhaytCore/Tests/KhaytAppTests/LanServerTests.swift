@@ -530,6 +530,44 @@ struct LanServerTests {
         #expect(bench.foldCalls.n == calls, "the book was rewritten for a batch with nothing to write")
     }
 
+    @Test("a phone's line in a customer's comms log, and a supplier it adds, reach the book")
+    func foldClientsAndSuppliers() async throws {
+        let bench = try await Bench(foldsDeltas: true)
+        defer { bench.stop() }
+        bench.book.value["clients"] = .array([
+            .object(["id": .string("C-1"), "name": .string("Nora"), "rev": .number(1)]),
+        ])
+        // The WhatsApp update's comms entry (BookWriter.addCommEntry) and the
+        // receipt card's "Add as supplier" — dropped as skipped before, with a
+        // 200 the phone read as delivered.
+        let outbox = #"""
+        {"deltas":[
+          {"collection":"clients","record":{"id":"C-1","name":"Nora","rev":2,
+            "commsLog":[{"at":"2026-10-13T09:00:00Z","channel":"whatsapp","text":"Your order is ready"}]}},
+          {"collection":"suppliers","record":{"id":"sup1","name":"Filament Co","vat":"300000000000003",
+            "category":"","phone":"","website":"","notes":"","priceList":[],"leadDays":null,"purchases":[],"rev":1}}],
+         "tombstones":[],"cursor":null}
+        """#
+        let reply = try await bench.post("/api/store/deltas", json: outbox,
+                                         headers: ["x-khayt-pin": "24682468"])
+        #expect(reply.status == 200, Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"applied\":2"), Comment(rawValue: reply.text))
+        #expect(reply.text.contains("\"skipped\":0"), Comment(rawValue: reply.text))
+
+        guard case .array(let clients)? = bench.book.value["clients"], case .object(let client) = clients[0] else {
+            Issue.record("the client went missing"); return
+        }
+        guard case .array(let log)? = client["commsLog"] else {
+            Issue.record("the comms entry did not land"); return
+        }
+        #expect(log.count == 1)
+        guard case .array(let suppliers)? = bench.book.value["suppliers"], case .object(let sup) = suppliers[0] else {
+            Issue.record("the supplier did not land"); return
+        }
+        #expect(sup["name"] == .string("Filament Co"))
+        #expect(LanServer.phoneWritable.contains("operators") == false, "staff stay out of a phone's reach")
+    }
+
     @Test("a Mac that has not switched the capability on says so, rather than failing")
     func foldRefusedWhenUnwired() async throws {
         let bench = try await Bench()          // fold is nil, as on an unwired Mac
