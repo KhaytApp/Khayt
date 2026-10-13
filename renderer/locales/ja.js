@@ -3555,6 +3555,7 @@
   "bnpl.link_generated": "支払いリンクを生成しました",
   "bnpl.confirmed": "「{project}」の {service} 支払いを受け取り、記録しました。",
   "bnpl.confirm_failed": "{service}: 「{project}」の支払いを完了できませんでした: {error}。Khayt が再試行します。{service} のポータルで完了することもできます。",
+  "bnpl.capture_failed": "Tamara: 「{project}」の発送を確定できませんでした: {error}。Khayt が再試行します。Tamara も支払いの 21 日後に自動で確定します。",
   "bnpl.link_copied": "リンクをコピーしました",
   "bnpl.payment_modal": "支払いリンク",
   "bnpl.amount_label": "金額",

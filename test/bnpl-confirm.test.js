@@ -70,7 +70,7 @@ function mainHandlers(fetchImpl, key = 'sk_test_disk') {
     ipcMain: { handle: (n, f) => handlers.set(n, f) },
     resolveStoreSecret: (incoming, getter) => { seenKeys.push(incoming); return key; },
   });
-  return { check: (args) => handlers.get('hub:bnpl-check')(null, args), restore: () => { global.fetch = realFetch; }, seenKeys };
+  return { check: (args) => handlers.get('hub:bnpl-check')(null, args), capture: (args) => handlers.get('hub:bnpl-capture')(null, args), restore: () => { global.fetch = realFetch; }, seenKeys };
 }
 const reply = (status, data) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
 
@@ -107,7 +107,7 @@ test('Tabby: an authorised payment is captured at Tabby\'s own amount, idempoten
     return reply(200, { status: 'CLOSED' });
   });
   try {
-    const r = await h.check({ provider: 'tabby', id: 'pay-12345678' });
+    const r = await h.check({ provider: 'tabby', id: 'pay-12345678', currency: 'AED' });
     assert.deepEqual(r, { ok: true, state: 'paid', remoteStatus: 'CLOSED', step: 'captured' });
     assert.equal(calls[1].url, 'https://api.tabby.ai/api/v2/payments/pay-12345678/captures');
     assert.deepEqual(calls[1].body, { amount: '172.50', reference_id: 'khayt-capture-pay-12345678' });
@@ -160,4 +160,111 @@ test('nothing is checked when neither Tabby nor Tamara is switched on', async ()
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'renderer', 'bnpl-watch.js'), 'utf8') + ';this.checkBnplLinks = checkBnplLinks;', ctx);
   await ctx.checkBnplLinks();
   assert.equal(checks, 0);
+});
+
+// ── Tabby's region, and Tamara's capture at shipment ─────────────────────────
+test('a Saudi Tabby link is asked about on api.tabby.sa, any other on api.tabby.ai', async () => {
+  assert.equal(B.tabbyBase('SAR'), 'https://api.tabby.sa/api/v2');
+  assert.equal(B.tabbyBase('sar'), 'https://api.tabby.sa/api/v2');
+  assert.equal(B.tabbyBase('AED'), 'https://api.tabby.ai/api/v2');
+  assert.equal(B.tabbyBase('KWD'), 'https://api.tabby.ai/api/v2');
+  const urls = [];
+  const h = mainHandlers(async (url) => { urls.push(url); return reply(200, { status: 'CREATED' }); });
+  try {
+    await h.check({ provider: 'tabby', id: 'pay-12345678', currency: 'SAR' });
+    await h.check({ provider: 'tabby', id: 'pay-12345678' });   // a link made before currencies were kept: SAR, as the checkout defaults
+    assert.deepEqual(urls, ['https://api.tabby.sa/api/v2/payments/pay-12345678', 'https://api.tabby.sa/api/v2/payments/pay-12345678']);
+  } finally { h.restore(); }
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'main', 'payment-links.js'), 'utf8');
+  assert.match(src, /fetch\(`\$\{BnplRules\.tabbyBase\(currency \|\| 'SAR'\)\}\/checkout`/, 'the checkout uses the same host');
+  assert.ok(!/'https:\/\/api\.tabby\.ai/.test(src), 'no hard-coded UAE host left');
+});
+
+test('a Tamara link is captured once its job has gone out, inside Tamara\'s 21 days', () => {
+  const now = '2026-10-20T12:00:00Z';
+  const tam = (over) => ({ provider: 'tamara', id: 'x', state: 'paid', remoteStatus: 'authorised', authorisedAt: '2026-10-10T00:00:00Z', ...over });
+  const orders = [
+    { id: 'shipped', shippedAt: '2026-10-19T09:00:00Z', bnplLinks: [tam()] },
+    { id: 'pickup', deliveredAt: '2026-10-19T09:00:00Z', bnplLinks: [tam()] },
+    { id: 'not-out', bnplLinks: [tam()] },
+    { id: 'done', shippedAt: '2026-10-19', bnplLinks: [tam({ capturedAt: '2026-10-19T10:00:00Z' })] },
+    { id: 'gone', shippedAt: '2026-10-19', bnplLinks: [tam({ captureDone: true })] },
+    { id: 'old', shippedAt: '2026-10-19', bnplLinks: [tam({ authorisedAt: '2026-09-20T00:00:00Z' })] },
+    { id: 'tabby', shippedAt: '2026-10-19', bnplLinks: [tam({ provider: 'tabby' })] },
+    { id: 'open', shippedAt: '2026-10-19', bnplLinks: [tam({ state: 'open' })] },
+    { id: 'captured-remote', shippedAt: '2026-10-19', bnplLinks: [tam({ remoteStatus: 'fully_captured' })] },
+  ];
+  assert.deepEqual(B.linksToCapture(orders, now).map((x) => x.orderId), ['shipped', 'pickup']);
+  assert.deepEqual(B.captureShipping({ shippedAt: '2026-10-19T09:00:00Z', courierName: 'SMSA', trackingNumber: ' 123 ', trackingUrl: 'https://t/1' }),
+    { shipped_at: '2026-10-19T09:00:00.000Z', shipping_company: 'SMSA', tracking_number: '123', tracking_url: 'https://t/1' });
+  assert.deepEqual(B.captureShipping({ deliveredAt: '2026-10-19T09:00:00Z', trackingUrl: 'http://t' }),
+    { shipped_at: '2026-10-19T09:00:00.000Z', shipping_company: 'Own delivery' });
+});
+
+test('Tamara capture posts Tamara\'s own total with the shipping, and never a captured order twice', async () => {
+  const calls = [];
+  let status = 'authorised';
+  const h = mainHandlers(async (url, init) => {
+    calls.push({ m: init.method, url, body: init.body && JSON.parse(init.body) });
+    if (init.method === 'GET') return reply(200, { status, total_amount: { amount: 230, currency: 'SAR' } });
+    return reply(200, { status: 'fully_captured', capture_id: 'c1' });
+  });
+  try {
+    const shipping = { shipped_at: '2026-10-19T09:00:00Z', shipping_company: 'SMSA', tracking_number: '123', tracking_url: 'javascript:x' };
+    const r = await h.capture({ provider: 'tamara', id: 'ord-12345678', shipping });
+    assert.deepEqual(r, { ok: true, captured: true, remoteStatus: 'fully_captured' });
+    assert.equal(calls[1].url, 'https://api.tamara.co/payments/capture');
+    assert.deepEqual(calls[1].body, { order_id: 'ord-12345678', total_amount: { amount: 230, currency: 'SAR' },
+      shipping_info: { shipped_at: '2026-10-19T09:00:00.000Z', shipping_company: 'SMSA', tracking_number: '123' } });
+    calls.length = 0; status = 'fully_captured';
+    assert.deepEqual(await h.capture({ provider: 'tamara', id: 'ord-12345678', shipping }), { ok: true, captured: true, remoteStatus: 'fully_captured' });
+    calls.length === 1 || assert.fail('nothing posted for an order already captured');
+    status = 'fully_refunded';
+    assert.deepEqual(await h.capture({ provider: 'tamara', id: 'ord-12345678', shipping }), { ok: true, captured: false, remoteStatus: 'fully_refunded' });
+    assert.equal((await h.capture({ provider: 'tabby', id: 'ord-12345678', shipping })).error, 'Unknown provider');
+    assert.equal((await h.capture({ provider: 'tamara', id: '../x', shipping })).error, 'Invalid payment id');
+    assert.equal((await h.capture({ provider: 'tamara', id: 'ord-12345678', shipping: {} })).error, 'No shipping date');
+  } finally { h.restore(); }
+});
+
+test('the window captures a shipped Tamara job once, and says a failure once', async () => {
+  const order = { id: 'J9', project: 'Vase', shippedAt: new Date().toISOString(), courierName: 'Aramex',
+    bnplLinks: [{ provider: 'tamara', id: 'ord-12345678', state: 'paid', remoteStatus: 'authorised', authorisedAt: new Date().toISOString(), createdAt: new Date().toISOString() }] };
+  const toasts = [];
+  let reply1 = { ok: false, remoteStatus: 'authorised', error: 'down' };
+  let captures = 0;
+  const ctx = {
+    console, setTimeout, setInterval, KhaytBnplConfirm: B, printLog: [order],
+    settings: { bnpl: { tamara: { enabled: true } } },
+    window: { hubAPI: { bnplCheck: async () => ({ ok: true, state: 'open' }),
+      bnplCapture: async (a) => { captures++; assert.equal(a.shipping.shipping_company, 'Aramex'); return reply1; } } },
+    saveAll() {}, toast: (m) => toasts.push(m), t: (k) => k,
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'renderer', 'bnpl-watch.js'), 'utf8') + ';this.checkBnplLinks = checkBnplLinks;', ctx);
+  await ctx.checkBnplLinks();
+  await ctx.checkBnplLinks();
+  assert.equal(captures, 2, 'a failure is retried');
+  assert.deepEqual(toasts, ['bnpl.capture_failed'], 'but said once');
+  reply1 = { ok: true, captured: true, remoteStatus: 'fully_captured' };
+  await ctx.checkBnplLinks();
+  assert.ok(order.bnplLinks[0].capturedAt);
+  assert.equal(order.bnplLinks[0].captureError, undefined);
+  await ctx.checkBnplLinks();
+  assert.equal(captures, 3, 'a captured link is never captured again');
+});
+
+test('a Tamara authorise starts the 21 days', async () => {
+  const order = { id: 'J8', project: 'Cup', price: 100, paidAmount: 0,
+    bnplLinks: [{ provider: 'tamara', id: 'ord-12345678', amount: 100, currency: 'SAR', createdAt: new Date().toISOString(), state: 'open' }] };
+  const OP = require('../lib/order-payment');
+  const ctx = {
+    console, setTimeout, setInterval, KhaytBnplConfirm: B, printLog: [order], settings: { bnpl: { tamara: { enabled: true } } },
+    window: { hubAPI: { bnplCheck: async () => ({ ok: true, state: 'paid', remoteStatus: 'authorised', step: 'authorised' }), bnplCapture: async () => assert.fail('not shipped') } },
+    PaymentRules: () => OP, runPaymentEffects() {}, localDateStr: () => '2026-10-10', saveAll() {}, toast() {}, t: (k) => k,
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'renderer', 'bnpl-watch.js'), 'utf8') + ';this.checkBnplLinks = checkBnplLinks;', ctx);
+  await ctx.checkBnplLinks();
+  assert.equal(order.bnplLinks[0].authorisedAt, order.bnplLinks[0].checkedAt);
 });

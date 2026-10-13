@@ -356,6 +356,7 @@ contextBridge.exposeInMainWorld('hubAPI', {
   bnplTabby:  (opts) => ipcRenderer.invoke('hub:bnpl-tabby',  opts),
   bnplTamara: (opts) => ipcRenderer.invoke('hub:bnpl-tamara', opts),
   bnplCheck:  (opts) => ipcRenderer.invoke('hub:bnpl-check', opts),
+  bnplCapture: (opts) => ipcRenderer.invoke('hub:bnpl-capture', opts),
   bnplStripe: (opts) => ipcRenderer.invoke('hub:bnpl-stripe', opts),
 
   // Telegram notifications

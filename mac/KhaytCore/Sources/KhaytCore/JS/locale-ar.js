@@ -3561,6 +3561,7 @@
   "bnpl.link_generated": "تم إنشاء رابط الدفع",
   "bnpl.confirmed": "تم استلام دفعة {service} لـ «{project}» وتسجيلها.",
   "bnpl.confirm_failed": "{service}: تعذّر إتمام دفعة «{project}»: {error}. سيحاول خيط مجددًا، ويمكنك إتمامها من بوابة {service}.",
+  "bnpl.capture_failed": "تمارا: تعذّر تأكيد شحن «{project}»: {error}. سيحاول خيط مجددًا، وتؤكّده تمارا تلقائيًا بعد ٢١ يومًا من الدفع.",
   "bnpl.link_copied": "تم نسخ الرابط",
   "bnpl.payment_modal": "روابط الدفع",
   "bnpl.amount_label": "المبلغ",
