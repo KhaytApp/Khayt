@@ -121,8 +121,8 @@ extension Shop {
                 // Already judged (by the bytes it had then): not read again —
                 // reading is the download — and not counted against the 40,
                 // or 40 unsure pairs would hold the budget for good.
-                if let h = knownHashes[plan.root.standardizedFileURL.path + "|" + s.image],
-                   verdicts[PictureVerdicts.key(hash: h, root: plan.root, target: s.target)] != nil { continue }
+                if PictureVerdicts.judged(verdicts, hashes: knownHashes, root: plan.root,
+                                          image: s.image, target: s.target) { continue }
                 let listed = LinkedCloud.listedSize(url)
                 guard listed > 0, listed <= PictureSend.maxSourceBytes else { continue }
                 budget -= 1
