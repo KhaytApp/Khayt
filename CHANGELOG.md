@@ -6952,6 +6952,30 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.69] - 2026-10-13
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Shortcuts and Siri find Khayt's actions again, "Sort linked folders…" can
+always be closed, and a large model sent from a phone is no longer cut off.
+
+### Changed and fixed
+
+- **Shortcuts, Siri and Spotlight see Khayt's actions again.** "What is
+  printing" and "What is waiting to print" had been missing from every
+  release since 4.0.0-alpha.40: the build stopped finding what macOS needs
+  to list them, and only warned. It finds it again, and a build without it
+  now fails.
+- **"Sort linked folders…" can always be closed.** With a large drive, the
+  sheet grew taller than the Settings window and its Cancel and Apply
+  buttons were cut off. The title and buttons now stay in place and the
+  list scrolls between them.
+- **A model sent to the shop's Mac over Wi-Fi is no longer cut off when the
+  app is busy.** The Mac counted its own delay in reading an upload against
+  the phone, so a large model could fail with "the network connection was
+  lost". Only time spent waiting for the phone counts now.
+
 ## [4.0.0-alpha.68] - 2026-10-13
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
