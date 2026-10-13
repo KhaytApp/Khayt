@@ -363,28 +363,75 @@ EXTENTS
 
 # The App Intents metadata, into Resources BEFORE signing — it is part of what
 # is signed, and a bundle whose metadata arrives afterwards fails verification.
+#
+# ── A BUILD WITHOUT INTENTS FAILS ─────────────────────────────────────────
+#
+# This used to print a warning and carry on, and nobody read the warning:
+# every release from 4.0.0-alpha.40 on shipped with NO `Metadata.appintents`,
+# so Shortcuts, Spotlight and Siri could not see one of Khayt's actions. The
+# app built, launched and passed every test; nothing on screen says an intent
+# is missing. So a missing or empty bundle now stops the build. A dev build
+# that has no use for intents can opt out, and only explicitly:
+#
+#   KHAYT_ALLOW_NO_INTENTS=1 ./mac/make-app.sh
+ai_fail() {
+  echo "  app intents: $1" >&2
+  shift
+  for line in "$@"; do echo "    $line" >&2; done
+  if [ "${KHAYT_ALLOW_NO_INTENTS:-}" = "1" ]; then
+    echo "    KHAYT_ALLOW_NO_INTENTS=1 — continuing WITHOUT App Intents." >&2
+    echo "    Never ship this build: Shortcuts, Spotlight and Siri will not see Khayt." >&2
+    return 0
+  fi
+  echo "    Refusing to build an app Shortcuts and Siri cannot see." >&2
+  echo "    (A dev build may opt out with KHAYT_ALLOW_NO_INTENTS=1.)" >&2
+  exit 1
+}
+
 AI_TOOL="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor"
 if [ -x "$AI_TOOL" ]; then
   find "$PKG/Sources/KhaytApp" -name '*.swift' > "$PKG/.build/ai-sources.txt"
   # ── WHERE THE CONST VALUES ACTUALLY ARE ──────────────────────────────────
   #
-  # This looked under the `.build/release` symlink and found nothing — every
-  # time, on every build, for the life of this script. That link now points at
-  # `out/Products/Release`, which holds products and not build intermediates;
-  # the `.swiftconstvalues` files land beside the object files, under
-  # `.build/<triple>/release/`.
+  # They have moved twice, and both times this went quiet instead of failing.
   #
-  # `find` does not descend a symlink given as its starting path either, so
-  # the two mistakes hid each other. The result was the `else` branch below
-  # printing a line that reads like a known limitation — and **Shortcuts and
-  # Siri have never seen Khayt's App Intents.**
+  # 1. (#1343) It looked under the `.build/release` symlink, which `find` does
+  #    not descend and which holds products, not intermediates. They were in
+  #    `.build/<triple>/release/KhaytApp.swiftconstvalues`.
   #
-  # Searched by NAME under .build rather than by path, so the next time
-  # SwiftPM moves its layout this keeps working instead of going quiet again.
-  find "$PKG/.build" -name 'KhaytApp.swiftconstvalues' -not -path '*/Intermediates.noindex/*' \
-    > "$PKG/.build/ai-const.txt" 2>/dev/null || true
-  if [ -s "$PKG/.build/ai-const.txt" ]; then
-    "$AI_TOOL" \
+  # 2. (alpha.40, the first release built on a Mac with Xcode 27 / Swift 6.4.)
+  #    SwiftPM now builds through Swift Build (`.build/manifest.pif`,
+  #    `.build/out/`). The KhaytApp module is compiled inside the PRODUCT's
+  #    target, whole-module, so the file is
+  #      .build/out/Intermediates.noindex/KhaytCore.build/Release/
+  #        Khayt-p.build/Objects-normal/arm64/Khayt-primary.swiftconstvalues
+  #    — a different NAME, under the one directory the old `find` excluded.
+  #    The flags did not change and the compiler still emits the values.
+  #
+  # So neither the name nor the path is trusted now. A const-values file is
+  # JSON whose entries carry `"typeName": "Module.Type"`; the files wanted are
+  # the ones naming a `KhaytApp.` type. When more than one build layout is
+  # lying around in .build, only the directory holding the NEWEST such file is
+  # used, so a stale file from an old layout cannot add a second copy.
+  : > "$PKG/.build/ai-const.txt"
+  ai_newest="$(find "$PKG/.build" -name '*.swiftconstvalues' -type f \
+                 -exec grep -l '"KhaytApp\.' {} + 2>/dev/null \
+               | while IFS= read -r f; do stat -f '%m %N' "$f"; done \
+               | sort -rn | head -1 | cut -d' ' -f2- || true)"
+  if [ -n "$ai_newest" ]; then
+    find "$(dirname "$ai_newest")" -maxdepth 1 -name '*.swiftconstvalues' -type f \
+      -exec grep -l '"KhaytApp\.' {} + > "$PKG/.build/ai-const.txt" 2>/dev/null || true
+  fi
+  if [ ! -s "$PKG/.build/ai-const.txt" ]; then
+    ai_fail "NO CONST VALUES FOUND for KhaytApp under $PKG/.build" \
+      "The build asks for them with -emit-const-values. If this is empty," \
+      "SwiftPM has moved or renamed them again. Find them with:" \
+      "  find $PKG/.build -name '*.swiftconstvalues'"
+  else
+    sed 's/^/  app intents: const values from /' "$PKG/.build/ai-const.txt"
+    rm -rf "$APP/Contents/Resources/Metadata.appintents"
+    AI_LOG="$PKG/.build/appintentsmetadataprocessor.log"
+    if ! "$AI_TOOL" \
       --output "$APP/Contents/Resources" \
       --toolchain-dir "$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain" \
       --module-name KhaytApp \
@@ -393,20 +440,22 @@ if [ -x "$AI_TOOL" ]; then
       --platform-family macOS --deployment-target 14.0 \
       --target-triple arm64-apple-macosx14.0 \
       --source-file-list "$PKG/.build/ai-sources.txt" \
-      --swift-const-vals-list "$PKG/.build/ai-const.txt" >/dev/null 2>&1 \
-      && echo "  app intents: $(python3 -c "import json,sys;d=json.load(open('$APP/Contents/Resources/Metadata.appintents/extract.actionsdata'));print(len(d.get('actions',{})))" 2>/dev/null || echo '?') actions"
-  else
-    # LOUD, because this is a silent feature loss and it went unnoticed for
-    # the life of the script. The app still builds and runs; it simply has no
-    # Shortcuts, which nothing on screen would tell anybody.
-    echo "  app intents: NO CONST VALUES FOUND under $PKG/.build —" >&2
-    echo "    Shortcuts and Siri will not see Khayt's intents." >&2
-    echo "    The build emits them with -emit-const-values; if this is empty," >&2
-    echo "    SwiftPM has moved them again. Find them with:" >&2
-    echo "      find $PKG/.build -name '*.swiftconstvalues'" >&2
+      --swift-const-vals-list "$PKG/.build/ai-const.txt" > "$AI_LOG" 2>&1; then
+      tail -20 "$AI_LOG" >&2
+      ai_fail "appintentsmetadataprocessor FAILED (full log: $AI_LOG)"
+    else
+      # Count what it wrote rather than trusting its exit code: an empty
+      # actions table is the same silent loss as no bundle at all.
+      ai_actions="$(python3 -c "import json;d=json.load(open('$APP/Contents/Resources/Metadata.appintents/extract.actionsdata'));print(' '.join(sorted(d.get('actions',{}))))" 2>/dev/null || true)"
+      if [ -z "$ai_actions" ]; then
+        ai_fail "Metadata.appintents is missing or lists NO actions (log: $AI_LOG)"
+      else
+        echo "  app intents: $(echo "$ai_actions" | wc -w | tr -d ' ') actions — $ai_actions"
+      fi
+    fi
   fi
 else
-  echo "  app intents: no Xcode toolchain — skipped"
+  ai_fail "no Xcode toolchain (no appintentsmetadataprocessor at $AI_TOOL)"
 fi
 
 # ── SPARKLE, EMBEDDED AND POINTED AT ──────────────────────────────────────
