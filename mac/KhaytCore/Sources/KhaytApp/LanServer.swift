@@ -552,7 +552,8 @@ final class LanServer {
     // MARK: - One connection
 
     private func serve(_ connection: NWConnection) async {
-        connection.start(queue: DispatchQueue(label: "khayt.lan.connection"))
+        let queue = DispatchQueue(label: "khayt.lan.connection")
+        connection.start(queue: queue)
         defer { connection.cancel() }
         let remote: String = {
             if case .hostPort(let h, _) = connection.endpoint { return "\(h)" }
@@ -560,34 +561,33 @@ final class LanServer {
         }()
         // ── THE READ IS BOUNDED, BY CANCELLING THE CONNECTION ─────────────
         //
-        // A watchdog rather than a race between two tasks, and the difference
-        // is the whole reason this works. `readRequest` parks in a
-        // `withCheckedThrowingContinuation` waiting on `NWConnection.receive`,
-        // and CANCELLING THAT TASK DOES NOT RESUME IT — only the connection's
-        // own callback does. A task group would therefore wait for a child
-        // that can never finish, and the `defer` that cancels the connection
-        // cannot run until the group returns: a deadlock that holds the
-        // connection exactly as long as having no timeout at all did. Measured,
-        // not reasoned about — the first version of this fix was that deadlock
-        // and the stalled connection was still open twenty seconds later.
+        // A deadline that cancels the connection rather than a race between
+        // two tasks, and the difference is the whole reason this works. A read
+        // parks in a continuation waiting on `NWConnection.receive`, and
+        // CANCELLING THAT TASK DOES NOT RESUME IT — only the connection's own
+        // callback does. A task group would therefore wait for a child that can
+        // never finish: a deadlock that holds the connection exactly as long as
+        // having no timeout at all did. Measured, not reasoned about — the
+        // first version of this fix was that deadlock and the stalled
+        // connection was still open twenty seconds later.
         //
         // Cancelling the CONNECTION is what unblocks the read: the pending
         // receive fires with an error, `readRequest` throws, and this function
         // unwinds normally. The client sees the connection close, which is what
         // a read timeout looks like on the wire.
-        let watchdog = Task { [connection] in
-            try? await Task.sleep(nanoseconds: UInt64(readTimeout * 1_000_000_000))
-            guard !Task.isCancelled else { return }
-            connection.cancel()
-        }
-        defer { watchdog.cancel() }
+        //
+        // ── AND IT TIMES THE CLIENT, NOT THE SERVER ───────────────────────
+        //
+        // The deadline was a `Task.sleep` on the main actor, started here and
+        // running through every hop the read made back to it. On a busy main
+        // actor the hops alone outlasted it, so a client that had sent its
+        // whole request was reset (-1005) for the server's own slowness. The
+        // deadline now lives in `gather`, on the connection's queue, and only
+        // runs while the read is waiting for the client's bytes. Oct 2026.
         let slot = LargeBodySlot()
         defer { if slot.held { largeBodies -= 1 } }
         do {
-            guard let request = try await readRequest(connection, remote: remote, slot: slot) else { return }
-            // The head and body are in; the clock stops. A slow READER must not
-            // be killed halfway through the response it asked for.
-            watchdog.cancel()
+            guard let request = try await readRequest(connection, on: queue, remote: remote, slot: slot) else { return }
             let response = await respond(to: request)
             try await write(response, method: request.method, to: connection)
         } catch let error as URLError where error.code == .dataLengthExceedsMaximum {
@@ -608,18 +608,24 @@ final class LanServer {
 
     /// Read one HTTP/1.1 request: the head to the blank line, then as much
     /// body as Content-Length says, capped. Nil when the client sent nothing.
-    private func readRequest(_ connection: NWConnection, remote: String,
+    ///
+    /// Both phases — the head, then the body — are read on the connection's
+    /// own `queue` by `gather`, and share one `readTimeout` of time spent
+    /// waiting for the client. The main actor is visited once between them
+    /// (the large-body questions) and that visit is not on the clock. No
+    /// deadline outlives the read, so a slow READER is never cut off halfway
+    /// through the answer it asked for.
+    private func readRequest(_ connection: NWConnection, on queue: DispatchQueue, remote: String,
                              slot: LargeBodySlot = LargeBodySlot()) async throws -> Request? {
-        var buffer = Data()
         let headEnd = Data("\r\n\r\n".utf8)
-        var headRange: Range<Data.Index>?
-        while headRange == nil {
-            guard let chunk = try await receive(connection) else { return nil }
-            buffer.append(chunk)
-            headRange = buffer.range(of: headEnd)
+        let headPhase = try await Self.gather(connection, on: queue, from: Data(), timeout: readTimeout) { buffer in
             if buffer.count > 64 * 1024 { throw URLError(.badServerResponse) }
+            return buffer.range(of: headEnd) != nil
         }
-        let head = String(decoding: buffer[buffer.startIndex..<headRange!.lowerBound], as: UTF8.self)
+        // The client hung up before the blank line.
+        let buffer = headPhase.data
+        guard !headPhase.ended, let headRange = buffer.range(of: headEnd) else { return nil }
+        let head = String(decoding: buffer[buffer.startIndex..<headRange.lowerBound], as: UTF8.self)
         var lines = head.components(separatedBy: "\r\n")
         let requestLine = lines.removeFirst().split(separator: " ", maxSplits: 2).map(String.init)
         guard requestLine.count >= 2 else { throw URLError(.badServerResponse) }
@@ -630,7 +636,7 @@ final class LanServer {
             let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
             headers[name] = value
         }
-        var body = Data(buffer[headRange!.upperBound...])
+        var body = Data(buffer[headRange.upperBound...])
         let length = Int(headers["content-length"] ?? "0") ?? 0
         if length > Self.maxBody {
             // Only the upload route reads past a megabyte, and the slot is
@@ -657,9 +663,11 @@ final class LanServer {
             largeBodies += 1
             slot.held = true
         }
-        while body.count < length {
-            guard let chunk = try await receive(connection) else { break }
-            body.append(chunk)
+        if body.count < length {
+            // What is left of the client's time; a body that ends early is
+            // taken short, as it always was.
+            let left = readTimeout - headPhase.waited
+            body = try await Self.gather(connection, on: queue, from: body, timeout: left) { $0.count >= length }.data
         }
         // The target: path and query, the query percent-decoded.
         let target = requestLine[1]
@@ -670,13 +678,108 @@ final class LanServer {
                        query: query, headers: headers, body: body, remote: remote)
     }
 
-    private func receive(_ connection: NWConnection) async throws -> Data? {
+    /// What one phase of reading a request came back with.
+    struct Gathered: Sendable {
+        let data: Data
+        /// The client ended the stream before `enough` was satisfied.
+        let ended: Bool
+        /// How long was spent waiting for the CLIENT's bytes — the only time
+        /// the read deadline is charged for.
+        let waited: TimeInterval
+    }
+
+    /// Read from `connection` until `enough` says the bytes are complete, the
+    /// client ends the stream, or `timeout` passes — all of it on the
+    /// connection's own serial queue, never the main actor.
+    ///
+    /// ── WHY NOT A LOOP OF `await receive` ON THE MAIN ACTOR ───────────────
+    ///
+    /// That is what this was, with the deadline a `Task.sleep` on the same
+    /// actor. Every 64 KB chunk was one hop back to the main actor, so a
+    /// megabyte was seventeen hops, and every hop waited behind whatever else
+    /// the main actor had queued — a busy window on a shop's Mac, or the whole
+    /// test bundle on CI, where every `@MainActor` test shares it. The
+    /// deadline counted that waiting against the CLIENT: a phone that had sent
+    /// its whole model in a second was cut off at fifteen because the SERVER
+    /// had not got round to reading it, and saw "the network connection was
+    /// lost". That is `Alpha63ReviewTests`' CI flake (-1005, Oct 2026), and
+    /// `LanBusyMainActorTests` holds it.
+    ///
+    /// Here the next `receive` is asked for inside the previous one's
+    /// callback, on the queue, so the only time on the clock is time spent
+    /// waiting for the client. The deadline still works the only way that
+    /// does (see `serve`): it cancels the connection, which makes the pending
+    /// `receive` fail and the phase throw.
+    nonisolated static func gather(_ connection: NWConnection, on queue: DispatchQueue,
+                                   from start: Data, timeout: TimeInterval,
+                                   enough: @escaping @Sendable (Data) throws -> Bool) async throws -> Gathered {
         try await withCheckedThrowingContinuation { cont in
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { data, _, complete, error in
-                if let error { cont.resume(throwing: error); return }
-                if let data, !data.isEmpty { cont.resume(returning: data); return }
-                cont.resume(returning: complete ? nil : Data())
+            Gather(connection: connection, queue: queue, buffer: start, enough: enough, cont: cont)
+                .start(timeout: timeout)
+        }
+    }
+
+    /// The state of one `gather`. Every member is touched only on `queue`,
+    /// which is serial — the connection's callbacks and the deadline both
+    /// run there — so there is nothing to lock.
+    private final class Gather: @unchecked Sendable {
+        private let connection: NWConnection
+        private let queue: DispatchQueue
+        private var buffer: Data
+        private let enough: @Sendable (Data) throws -> Bool
+        private var cont: CheckedContinuation<Gathered, Error>?
+        private var deadline: DispatchWorkItem?
+        private var began = DispatchTime.now()
+
+        init(connection: NWConnection, queue: DispatchQueue, buffer: Data,
+             enough: @escaping @Sendable (Data) throws -> Bool, cont: CheckedContinuation<Gathered, Error>) {
+            self.connection = connection
+            self.queue = queue
+            self.buffer = buffer
+            self.enough = enough
+            self.cont = cont
+        }
+
+        func start(timeout: TimeInterval) {
+            queue.async { [self] in
+                began = .now()
+                let connection = self.connection
+                let item = DispatchWorkItem { connection.cancel() }
+                deadline = item
+                queue.asyncAfter(deadline: .now() + max(timeout, 0.001), execute: item)
+                step()
             }
+        }
+
+        private func step() {
+            do {
+                if try enough(buffer) { return finish(.success(gathered(ended: false))) }
+            } catch {
+                return finish(.failure(error))
+            }
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [self] data, _, complete, error in
+                if let error { return finish(.failure(error)) }
+                if let data { buffer.append(data) }
+                guard complete else { return step() }
+                do {
+                    finish(.success(gathered(ended: !(try enough(buffer)))))
+                } catch {
+                    finish(.failure(error))
+                }
+            }
+        }
+
+        private func gathered(ended: Bool) -> Gathered {
+            let waited = Double(DispatchTime.now().uptimeNanoseconds - began.uptimeNanoseconds) / 1e9
+            return Gathered(data: buffer, ended: ended, waited: waited)
+        }
+
+        private func finish(_ result: Result<Gathered, Error>) {
+            deadline?.cancel()
+            deadline = nil
+            guard let cont else { return }
+            self.cont = nil
+            cont.resume(with: result)
         }
     }
 

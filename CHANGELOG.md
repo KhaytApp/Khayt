@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a model sent to the shop's Mac over Wi-Fi is no longer cut off
+  when the app is busy.** The Mac counted its own delay in reading an
+  upload against the phone, so a large model sent while the window was
+  busy could fail with "the network connection was lost". Only time spent
+  waiting for the phone counts now.
 - **Mac: loose models in a linked folder are sorted into prints, and only
   the right picture goes on a print.**
   - **Models with no folder of their own are grouped.** Files dropped
