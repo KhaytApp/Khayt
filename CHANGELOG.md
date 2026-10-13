@@ -4,6 +4,41 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a wide picture stays inside its tile in the library.** A model whose
+  picture was wider than it was tall drew a tile wider than its column, over
+  the print next to it. The picture is now cropped to the square. The same
+  fix keeps a photo inside its frame everywhere else a thumbnail is shown,
+  such as the portfolio.
+
+- **(Maintainers) A hung desktop smoke test no longer blocks every merge.**
+  The required "E2E smoke (Electron)" check had no time limit, so a step that
+  hung (the 3MF worker step, for an hour on 12 Oct) held every lane's merges
+  until someone cancelled it. The job now stops after 20 minutes (it takes 4-5)
+  and the 3MF worker step after 5.
+- **Tamara is told when a job ships, so the shop is paid sooner.** Khayt
+  authorised a Tamara payment once the customer completed it, but never
+  confirmed the order shipped, so Tamara held the money until it captured the
+  order by itself 21 days later. Now, once the job is marked shipped (or
+  handed over, for a pickup), Khayt captures the Tamara order with the
+  shipping date, the carrier and the tracking number. It uses Tamara's own
+  order total, and never captures an order that is already captured or
+  refunded. If it fails, Khayt says so once and tries again.
+- **Tabby links for Saudi shops use Tabby's Saudi server.** Tabby runs a
+  separate API for Saudi merchants (`api.tabby.sa`), and a Saudi key can be
+  refused by the one Khayt used (`api.tabby.ai`). A link in riyals now uses
+  the Saudi server for the checkout and every check after it; links in other
+  currencies are unchanged.
+- **Deleting a model on the desktop can keep its online copy.** When your
+  library is backed up to a storage bucket or Google Drive, deleting a model
+  now asks where it should go. **Remove from this computer** is the default:
+  once Khayt has checked that the online copy is the same file, the copy on
+  this computer goes to the Trash and the model stays in your library, ready
+  to open again from the cloud. **Delete completely** removes the online copy
+  first, then the model; if the online copy cannot be removed, the model is
+  kept as it was and Khayt says which one. Models that exist only on this
+  computer are deleted only if you tick the box for them, and files of your
+  own that the library points to are never deleted. Without an online copy,
+  delete works as before. The Mac asks the same question.
 - **Mac: a model sent to the shop's Mac over Wi-Fi is no longer cut off
   when the app is busy.** The Mac counted its own delay in reading an
   upload against the phone, so a large model sent while the window was

@@ -135,18 +135,25 @@ struct Thumbnail: View {
     @Environment(\.photographFlat) private var photographing
 
     var body: some View {
-        ZStack {
-            Rectangle().fill(.quaternary)
-            if let image = image ?? (photographing ? source.flatMap(ThumbnailStore.decode) : nil) {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                Image(systemName: "cube.transparent")
-                    .font(.system(size: 22, weight: .light))
-                    .foregroundStyle(.tertiary)
+        // THE FRAME DECIDES THE SIZE, NEVER THE PICTURE. This was a ZStack, and
+        // a ZStack is as big as its biggest child: a picture filling a square
+        // reported the size it FILLED, so a landscape photo made the library
+        // tile wider than its column and drew over the next print (Oct 13
+        // 2026). The picture is an overlay on a shape that takes the size it is
+        // offered, and is clipped to it — the rule ProductCell already keeps.
+        Rectangle().fill(.quaternary)
+            .overlay {
+                if let image = image ?? (photographing ? source.flatMap(ThumbnailStore.decode) : nil) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    Image(systemName: "cube.transparent")
+                        .font(.system(size: 22, weight: .light))
+                        .foregroundStyle(.tertiary)
+                }
             }
-        }
+            .clipped()
         .task(id: source) {
             guard let source else { image = nil; return }
             image = await ThumbnailStore.shared.image(for: source)
