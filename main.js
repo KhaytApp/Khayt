@@ -3411,6 +3411,162 @@ ipcMain.handle('hub:printlib-delete', async (_e, fullPath) => {
   return ok;
 });
 
+// ── Delete: "Remove from this computer" or "Delete completely" ─────────────
+// The Mac's delete question (#1828): by default a model leaves THIS computer
+// only, and stays in the library as an online model, when its copy in the
+// shop's bucket or Drive is proven to be the same bytes. "Delete completely"
+// removes the online copies first, and a model whose online delete fails keeps
+// its record and files. Rules: lib/print-library-tier.js classifyForDelete.
+
+/**
+ * Is this local file's copy in the remote provably the same bytes? Like
+ * printLibEnsureInBucket, but it NEVER uploads: a delete is not a backup. The
+ * key is tried under the folder name the tier sweep uses and under the record
+ * id the import mirror uses; the two only differ for an id with a slash.
+ */
+async function printLibProveInBucket(remote, id, filename, srcPath) {
+  if (!remote) return { ok: false, error: 'No online storage is configured.' };
+  let sha256, md5, local;
+  try {
+    ({ sha256, md5 } = await printLibDigests(srcPath));
+    local = (await fs.promises.stat(srcPath)).size;
+  } catch (e) { return { ok: false, error: `Could not read the file: ${e.message}` }; }
+  const ids = [...new Set([PLL.itemDirName(id), String(id || '')])].filter(Boolean);
+  let last = 'There is no online copy of this file.';
+  for (const k of ids) {
+    const key = S3C.objectKey(remote.prefix, k, filename);
+    let head = null;
+    try { head = await remote.client.head(key); } catch (e) { last = `Could not reach the online storage: ${e.message}`; continue; }
+    if (!head) continue;
+    if (head.size !== local) { last = `The online copy holds ${head.size} bytes, not ${local}.`; continue; }
+    const verdict = PLT.etagVerdict(head.etag, md5);
+    if (verdict === 'match') return { ok: true, key, sha256 };
+    if (verdict === 'mismatch') { last = 'The online copy holds different bytes.'; continue; }
+    // A checksum that proves nothing (multipart): download and compare.
+    try {
+      const back = await remote.client.get(key);
+      if (back && crypto.createHash('sha256').update(back).digest('hex') === sha256) return { ok: true, key, sha256 };
+      last = 'The online copy does not match this file.';
+    } catch (e) { last = `Could not check the online copy: ${e.message}`; }
+  }
+  return { ok: false, error: last };
+}
+
+/** Model files on disk in one record's folder, by name. */
+async function printLibModelNames(dir) {
+  try { return await fs.promises.readdir(dir); } catch (_) { return []; }
+}
+
+ipcMain.handle('hub:printlib-delete-plan', async (_e, ids) => {
+  try {
+    const remote = printLibRemote();
+    let book = null;
+    try { book = readStoreDecryptedFromDisk(); } catch (_) { book = null; }
+    const recs = new Map(((book && book.printFiles) || []).filter(Boolean).map((r) => [r.id, r]));
+    const items = [];
+    for (const id of (Array.isArray(ids) ? ids : []).slice(0, 1000)) {
+      const dir = printLibItemDir(id);
+      const names = await printLibModelNames(dir);
+      const proven = [];
+      if (remote) {
+        for (const n of names) {
+          if (!PLT.isModelFile(n)) continue;
+          if ((await printLibProveInBucket(remote, id, n, path.join(dir, n))).ok) proven.push(n);
+        }
+      }
+      const c = PLT.classifyForDelete(names, proven);
+      const rec = recs.get(id);
+      items.push({ id, online: c.online, onlineOnly: c.onlineOnly, local: c.local, inPlace: rec && rec.externalPath ? 1 : 0 });
+    }
+    return { ok: true, configured: !!remote, items };
+  } catch (e) { return { ok: false, configured: false, items: [], error: String((e && e.message) || e) }; }
+});
+
+ipcMain.handle('hub:printlib-remove-local', async (_e, id) => {
+  if (printLibSweeping) return { ok: false, removed: 0, kept: [], error: 'A cleanup is already running.' };
+  const remote = printLibRemote();
+  if (!remote) return { ok: false, removed: 0, kept: [], error: 'No online storage is configured.' };
+  printLibSweeping = true;
+  try {
+    const dir = printLibItemDir(id);
+    let removed = 0;
+    const kept = [];
+    for (const n of await printLibModelNames(dir)) {
+      if (!PLT.isModelFile(n)) continue;              // previews and notes stay
+      const full = path.join(dir, n);
+      if (!printLibContains(full)) continue;
+      let st;
+      try { st = await fs.promises.stat(full); } catch (_) { continue; }
+      if (!st.isFile()) continue;
+      // Proven again, now, as its own request: a plan made when the question
+      // opened is not proof at the moment the file goes.
+      const r = await printLibProveInBucket(remote, id, n, full);
+      if (!r.ok) { kept.push({ filename: n, error: r.error }); continue; }
+      // The sidecar first, as the tier sweep does: a crash between the two
+      // leaves a redundant sidecar beside a file still there, never a model
+      // with no record of where it went.
+      const sidePath = full + PLT.SIDECAR_EXT;
+      try {
+        await fs.promises.writeFile(sidePath, JSON.stringify(PLT.makeSidecar({
+          size: st.size, sha256: r.sha256, key: r.key,
+          provider: printLibSidecarProvider(remote), at: new Date().toISOString(),
+        })));
+      } catch (e) { kept.push({ filename: n, error: String(e.message || e) }); continue; }
+      // To the Trash, never unlinked. If the Trash refuses, the model stays
+      // and its sidecar goes, so the listing does not claim it left.
+      try { await shell.trashItem(full); removed += 1; }
+      catch (e) {
+        try { await fs.promises.unlink(sidePath); } catch (_) { /* the sidecar beside a present file is harmless */ }
+        kept.push({ filename: n, error: String(e.message || e) });
+      }
+    }
+    return { ok: true, removed, kept };
+  } catch (e) {
+    return { ok: false, removed: 0, kept: [], error: String((e && e.message) || e) };
+  } finally { printLibSweeping = false; }
+});
+
+ipcMain.handle('hub:printlib-delete-remote', async (_e, id) => {
+  try {
+    const dir = printLibItemDir(id);
+    const names = await printLibModelNames(dir);
+    const sidecars = await printLibSidecarMap(dir);
+    const markers = await printLibOnlineMap(dir);
+    // Every object this record's models may be under, with the remote that holds it.
+    const targets = [];
+    const add = (filename, remote, key) => {
+      if (remote && key && !targets.some((t) => t.remote === remote && t.key === key)) targets.push({ filename, remote, key });
+    };
+    const inUse = printLibRemote();
+    const ids = [...new Set([PLL.itemDirName(id), String(id || '')])].filter(Boolean);
+    const models = new Set(names.filter(PLT.isModelFile));
+    for (const n of sidecars.keys()) if (PLT.isModelFile(n)) models.add(n);
+    for (const n of markers.keys()) if (PLT.isModelFile(n)) models.add(n);
+    for (const n of models) {
+      if (inUse) for (const k of ids) add(n, inUse, S3C.objectKey(inUse.prefix, k, n));
+      const side = sidecars.get(n);
+      if (side && side.key) for (const r of printLibRemotesFor(side.provider)) add(n, r, side.key);
+      const mark = markers.get(n);
+      const bucket = printLibS3({ evenIfOff: true });
+      if (mark && mark.key && bucket) add(n, bucket, mark.key);
+      if (mark && mark.key && !bucket) targets.push({ filename: n, remote: null, key: mark.key });
+    }
+    const failed = [];
+    for (const t of targets) {
+      if (!t.remote) { failed.push({ filename: t.filename, error: 'The bucket this model is in is not set up on this computer.' }); continue; }
+      try {
+        const before = await t.remote.client.head(t.key);
+        if (!before) continue;                         // never there: nothing to delete
+        await t.remote.client.del(t.key);
+        // The S3 client's delete swallows its errors: only a second look proves it went.
+        const after = await t.remote.client.head(t.key);
+        if (after) failed.push({ filename: t.filename, error: 'The online copy is still there after the delete.' });
+      } catch (e) { failed.push({ filename: t.filename, error: String((e && e.message) || e) }); }
+    }
+    return failed.length ? { ok: false, failed } : { ok: true };
+  } catch (e) { return { ok: false, failed: [{ filename: '', error: String((e && e.message) || e) }] }; }
+});
+
 // Save a generated thumbnail / user photo (data URL from the renderer) into the item folder.
 ipcMain.handle('hub:printlib-save-image', async (_e, { id, name, dataUrl } = {}) => {
   try {

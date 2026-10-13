@@ -22,6 +22,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   refused by the one Khayt used (`api.tabby.ai`). A link in riyals now uses
   the Saudi server for the checkout and every check after it; links in other
   currencies are unchanged.
+- **Deleting a model on the desktop can keep its online copy.** When your
+  library is backed up to a storage bucket or Google Drive, deleting a model
+  now asks where it should go. **Remove from this computer** is the default:
+  once Khayt has checked that the online copy is the same file, the copy on
+  this computer goes to the Trash and the model stays in your library, ready
+  to open again from the cloud. **Delete completely** removes the online copy
+  first, then the model; if the online copy cannot be removed, the model is
+  kept as it was and Khayt says which one. Models that exist only on this
+  computer are deleted only if you tick the box for them, and files of your
+  own that the library points to are never deleted. Without an online copy,
+  delete works as before. The Mac asks the same question.
 - **Mac: a model sent to the shop's Mac over Wi-Fi is no longer cut off
   when the app is busy.** The Mac counted its own delay in reading an
   upload against the phone, so a large model sent while the window was

@@ -150,6 +150,9 @@ contextBridge.exposeInMainWorld('hubAPI', {
   printLibUnpackCleanup: (dir)            => ipcRenderer.invoke('hub:printlib-unpack-cleanup', dir),
   printLibList:       (id)                => ipcRenderer.invoke('hub:printlib-list', id),
   printLibDelete:     (fullPath)          => ipcRenderer.invoke('hub:printlib-delete', fullPath),
+  printLibDeletePlan:   (ids)             => ipcRenderer.invoke('hub:printlib-delete-plan', ids),
+  printLibRemoveLocal:  (id)              => ipcRenderer.invoke('hub:printlib-remove-local', id),
+  printLibDeleteRemote: (id)              => ipcRenderer.invoke('hub:printlib-delete-remote', id),
   printLibSaveImage:  (id, name, dataUrl) => ipcRenderer.invoke('hub:printlib-save-image', { id, name, dataUrl }),
   printLibLoadImage:  (fullPath)          => ipcRenderer.invoke('hub:printlib-load-image', fullPath),
   // Thumbnails live in each record's vault folder, not in the store — the

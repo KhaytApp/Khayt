@@ -729,6 +729,11 @@
       return;
     }
     const n = recs.length;
+    askWhereToDelete(recs).then((asked) => { if (!asked) bulkDeletePlain(recs); });
+  }
+
+  function bulkDeletePlain(recs) {
+    const n = recs.length;
     openFormModal({
       title: t('plib.bulk_del_title') || 'Delete the selected files',
       sizeLg: false,
@@ -2298,8 +2303,10 @@
     saveAll(); renderPrintFiles();
   }
 
-  function deletePrintFile(id) {
+  async function deletePrintFile(id) {
     const rec = (printFiles || []).find((r) => r.id === id); if (!rec) return;
+    // A model with an online copy is asked about where it should go (askWhereToDelete).
+    if (await askWhereToDelete([rec])) return;
     openFormModal({
       title: t('plib.delete_title') || 'Delete print file',
       sizeLg: false, saveLabel: t('common.delete') || 'Delete',
@@ -2326,6 +2333,110 @@
         else toast('⚠ ' + (t('plib.delete_partial') || 'Removed from the library, but some files could not be deleted from disk'), 'error', 7000);
       },
     });
+  }
+
+  /* ── Where a deleted model goes ───────────────────────────────────────────
+   * The Mac's delete question (#1828), on the desktop. A model whose copy in
+   * the shop's bucket or Drive is proven the same bytes is, by default, only
+   * removed from THIS computer: it stays in the library and opens again from
+   * the cloud. "Delete completely" removes the online copy first, and a model
+   * whose online delete fails keeps its record and files. A model that is only
+   * on this computer is deleted only when the box for it is ticked. Without an
+   * online copy anywhere, the plain Delete question is asked as before.
+   * Returns false when it did not ask (the caller asks the plain question). */
+  async function trashRecordFiles(hub, id) {
+    let allGone = true;
+    if (hub && hub.printLibList && hub.printLibDelete) {
+      try {
+        const files = await hub.printLibList(id);
+        for (const f of (files || [])) if ((await hub.printLibDelete(f.fullPath)) === false) allGone = false;
+      } catch (e) { console.error('printLibDelete:', e); allGone = false; }
+    }
+    return allGone;
+  }
+
+  async function askWhereToDelete(recs) {
+    const hub = api();
+    const T = (typeof window !== 'undefined' && window.KhaytPrintLibraryTier) || null;
+    if (!hub || !hub.printLibDeletePlan || !hub.printLibRemoveLocal || !hub.printLibDeleteRemote || !T || !T.deleteChoice) return false;
+    let plan = null;
+    try { plan = await hub.printLibDeletePlan(recs.map((r) => r.id)); } catch (_) { plan = null; }
+    if (!plan || !plan.ok || !plan.configured) return false;
+    const choice = T.deleteChoice(plan.items);
+    if (!choice.offer) return false;
+    const byId = new Map(recs.map((r) => [r.id, r]));
+    const nameOf = (id) => { const r = byId.get(id); return (r && (r.name || r.originalName)) || id; };
+    const keepable = choice.keepable.filter((id) => byId.has(id));
+    const localOnly = choice.localOnly.filter((id) => byId.has(id));
+    const inPlace = (plan.items || []).some((i) => i && i.inPlace);
+    const n = recs.length;
+    const removeBtn = t('plib.del_remove_btn') || 'Remove from this computer';
+    const completeBtn = t('plib.del_complete_btn') || 'Delete completely';
+    const list = `<ul class="pf-del-list">${recs.slice(0, 8).map((r) => `<li>${escapeHtml(r.name || r.originalName || r.id)}</li>`).join('')}
+        ${n > 8 ? `<li class="pf-del-more">${escapeHtml(t('plib.and_n_more', { n: String(n - 8) }) || `…and ${n - 8} more`)}</li>` : ''}</ul>`;
+    openFormModal({
+      title: n === 1 ? (t('plib.delete_title') || 'Delete print file') : (t('plib.bulk_del_title') || 'Delete the selected files'),
+      sizeLg: false, saveLabel: removeBtn,
+      bodyHtml: `${list}
+        <div class="pf-del-choice" role="radiogroup">
+          <label class="pf-del-opt"><input type="radio" name="pfDelHow" value="remove" checked>
+            <span><strong>${escapeHtml(removeBtn)}</strong><br><small>${escapeHtml(t('plib.del_remove_hint') || 'Keeps the online copy; the model stays in the library and opens again from the cloud.')}</small></span></label>
+          <label class="pf-del-opt"><input type="radio" name="pfDelHow" value="complete">
+            <span><strong>${escapeHtml(completeBtn)}</strong><br><small>${escapeHtml(t('plib.del_complete_hint') || 'Deletes the online copy too and removes the model from the library. This cannot be undone.')}</small></span></label>
+        </div>
+        ${localOnly.length ? `<label class="pf-del-local" id="pfDelLocalRow"><input type="checkbox" id="pfDelLocal">
+          ${escapeHtml(t('plib.del_local_only', { n: String(localOnly.length) }) || `Also delete the ${localOnly.length} models that are only on this computer, for good`)}</label>` : ''}
+        ${inPlace ? `<p class="hint">${escapeHtml(t('plib.del_in_place') || 'Files of your own that the library points to are never deleted.')}</p>` : ''}`,
+      onMount(modal) {
+        const btn = modal.querySelector('[data-act="save"]');
+        const row = modal.querySelector('#pfDelLocalRow');
+        const sync = () => {
+          const how = (modal.querySelector('input[name="pfDelHow"]:checked') || {}).value;
+          if (btn) { btn.textContent = how === 'complete' ? completeBtn : removeBtn; btn.classList.toggle('danger', how === 'complete'); }
+          if (row) row.hidden = how === 'complete';     // a complete delete takes them anyway
+        };
+        modal.querySelectorAll('input[name="pfDelHow"]').forEach((r) => r.addEventListener('change', sync));
+        sync();
+      },
+      async onSave(modal) {
+        const how = (modal.querySelector('input[name="pfDelHow"]:checked') || {}).value === 'complete' ? 'complete' : 'remove';
+        const alsoLocal = !!(modal.querySelector('#pfDelLocal') || {}).checked;
+        const gone = new Set();       // records leaving the library
+        let removed = 0, partial = false;
+        const kept = [], notDeleted = [];
+        if (how === 'remove') {
+          for (const id of keepable) {
+            let r;
+            try { r = await hub.printLibRemoveLocal(id); } catch (e) { r = { ok: false, error: String(e) }; }
+            if (r && r.ok) { if (r.removed) removed += 1; if (r.kept && r.kept.length) kept.push(nameOf(id)); }
+            else kept.push(nameOf(id));
+          }
+          if (alsoLocal) for (const id of localOnly) { if (!(await trashRecordFiles(hub, id))) partial = true; gone.add(id); }
+        } else {
+          for (const r of recs) {
+            let out;
+            try { out = await hub.printLibDeleteRemote(r.id); } catch (e) { out = { ok: false }; }
+            // The online copy first: if it would not go, the model keeps its record and files.
+            if (!out || !out.ok) { notDeleted.push(nameOf(r.id)); continue; }
+            if (!(await trashRecordFiles(hub, r.id))) partial = true;
+            gone.add(r.id);
+          }
+        }
+        if (gone.size) {
+          printFiles = (printFiles || []).filter((r) => !gone.has(r.id));
+          for (const id of gone) _selected.delete(id);
+        }
+        saveAll(); renderPrintFiles();
+        if (removed) toast(t('plib.del_removed', { n: String(removed) }) || `${removed} removed from this computer; still in the library, online`, 'success');
+        if (gone.size) toast(t('plib.bulk_deleted', { n: String(gone.size) }) || `${gone.size} files deleted`, 'success');
+        if (kept.length) toast('⚠ ' + (t('plib.del_kept', { n: String(kept.length), names: kept.slice(0, 5).join(', ') })
+          || `${kept.length} kept on this computer: their online copy could not be confirmed (${kept.slice(0, 5).join(', ')})`), 'warning', 9000);
+        if (notDeleted.length) toast('⚠ ' + (t('plib.del_remote_failed', { names: notDeleted.slice(0, 5).join(', ') })
+          || `Not deleted: the online copy of ${notDeleted.slice(0, 5).join(', ')} could not be removed. Nothing of theirs was touched.`), 'error', 9000);
+        if (partial) toast('⚠ ' + (t('plib.delete_partial') || 'Removed from the library, but some files could not be deleted from disk'), 'error', 7000);
+      },
+    });
+    return true;
   }
 
   function editPrintFile(id) {
