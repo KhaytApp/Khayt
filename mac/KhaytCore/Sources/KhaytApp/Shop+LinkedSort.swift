@@ -236,11 +236,14 @@ extension Shop {
         let covers = GroupKinds.covers(settings)
         // Linked records with no photo, by the file they point at.
         var photoless = Set<String>()
+        var indexed = Set<String>()
         for case .object(let o) in fileRows {
             guard case .string(let p)? = o["externalPath"], !p.isEmpty else { continue }
             let hasPhoto: Bool = { if case .string(let s)? = o["userPhoto"], !s.isEmpty { true } else { false } }()
             let removed: Bool = { if case .bool(true)? = o["userPhotoRemoved"] { true } else { false } }()
-            if !hasPhoto, !removed { photoless.insert(URL(fileURLWithPath: p).standardizedFileURL.path) }
+            let path = URL(fileURLWithPath: p).standardizedFileURL.path
+            indexed.insert(path)
+            if !hasPhoto, !removed { photoless.insert(path) }
         }
         let primary = roots.primary
         var groupPictures: [(group: String, rel: String)] = []
@@ -249,19 +252,37 @@ extension Shop {
         var fetched = 0
         for job in jobs {
             if stop?.isStopped == true || Task.isCancelled || fetched >= PrintPhotos.perPass { break }
-            looked.append(job.print)
-            if let group = job.group, covers[group] == nil,
-               let pick = await PinWork.run({ PrintPhotos.pick(job.candidates) }) {
-                fetched += 1
-                if let rel = await PinWork.run({ try? GroupPictures.write(GroupPictures.encode(pick), for: group, under: primary) }) {
-                    groupPictures.append((group, rel))
+            // ── LOOKED AT ONLY ONCE SETTLED (Oct 2026) ─────────────────────
+            // A print is remembered as looked at when it got its picture, or
+            // already had one, or the picture would not decode — so a print
+            // left over by the per-pass cap, one whose pictures were all too
+            // big, or a model not indexed yet is tried again next pass, until
+            // every print with a picture wears one. Remembered once it got
+            // one, so a picture the shop took off is never put back.
+            var settled = true
+            if let group = job.group, covers[group] == nil {
+                if let pick = await PinWork.run({ PrintPhotos.pick(job.candidates) }) {
+                    fetched += 1
+                    if let rel = await PinWork.run({ try? GroupPictures.write(GroupPictures.encode(pick), for: group, under: primary) }) {
+                        groupPictures.append((group, rel))
+                    }
+                } else {
+                    settled = false
                 }
             }
-            if let only = job.only, photoless.contains(only),
-               let pick = await PinWork.run({ PrintPhotos.pick(job.candidates) }) {
-                fetched += 1
-                if let uri = await PinWork.run({ try? LibraryPhoto.dataURI(of: pick) }) { modelPhotos[only] = uri }
+            if let only = job.only {
+                if photoless.contains(only) {
+                    if let pick = await PinWork.run({ PrintPhotos.pick(job.candidates) }) {
+                        fetched += 1
+                        if let uri = await PinWork.run({ try? LibraryPhoto.dataURI(of: pick) }) { modelPhotos[only] = uri }
+                    } else {
+                        settled = false
+                    }
+                } else if !indexed.contains(only) {
+                    settled = false                      // not in the book yet
+                }
             }
+            if settled { looked.append(job.print) }
             for (model, image) in job.modelPictures.sorted(by: { $0.key < $1.key })
             where photoless.contains(model) && modelPhotos[model] == nil && fetched < PrintPhotos.perPass {
                 guard let pick = await PinWork.run({ PrintPhotos.pick([image]) }) else { continue }
@@ -269,7 +290,7 @@ extension Shop {
                 if let uri = await PinWork.run({ try? LibraryPhoto.dataURI(of: pick) }) { modelPhotos[model] = uri }
             }
         }
-        guard !looked.isEmpty else { return 0 }
+        guard !looked.isEmpty || !modelPhotos.isEmpty || !groupPictures.isEmpty else { return 0 }
         var put = 0
         var unused: [String] = []
         do {

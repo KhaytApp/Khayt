@@ -35,6 +35,11 @@ const ROLES = ['collection', 'print', 'part', 'format', 'assets'];
 const LIMITS = {
   samples: 5, subfolders: 30, folders: 150, nameLength: 60,
   looseNames: 300, looseNamesPerScan: 3000, looseNameLength: 120,
+  // "Check pictures": at most 2 images a request (the candidate photo and the
+  // print's own preview), at most 40 checks a scan (its own budget, apart from
+  // the 40 picture downloads a pass), each image at most 512 px on its long
+  // side, from a source file of at most 8 MB.
+  pictureImages: 2, pictureChecksPerScan: 40, picturePixels: 512, pictureSourceBytes: 8 * 1024 * 1024,
 };
 
 const LIBRARY_SCHEMA = {
@@ -191,9 +196,26 @@ function buildLooseSystem() {
     'Group the files into prints — one independent thing a customer would order, with all its parts, colours, sizes and file formats (STL and 3MF of the same model, a ".u1" printer variant, a "(1)" copy).',
     'A file named only for a part or a colour ("Plate 3 - Yellow", "KA KEY A", "Charcoal Black 2", "Peg") belongs to the named kit file next to it ("TMNT Van 3MF For Bambu Printers", "3MF - Titan Fighter").',
     'Prefixes like "obj_12_" or "Fig_" and hash names say nothing. Different sizes or versions of one kit with their own names ("v4-AA", "v4-AAA") are separate prints.',
+    'Picture files (.jpg, .png) may be listed with the print they show; a picture alone is not a print.',
     'Only list prints with two or more files; leave single files out. Never put a file in two prints.',
     'Answer with the tool, using the numbers exactly as given.',
   ].join('\n');
+}
+
+/**
+ * The loose sort's tool. Part of the `library` feature (the same switch and
+ * the same disclosure row), so not a task of its own in ai-tools.js — but its
+ * own tool name and framing, because its answer is shaped differently.
+ */
+function looseTool() {
+  return {
+    maxTokens: 16000,
+    tool: {
+      name: 'group_loose_model_files',
+      description: 'Group the loose model files at the top of a 3D-print shop\'s library folder into prints, naming each print and listing the numbers of its files.',
+      input_schema: LOOSE_SCHEMA,
+    },
+  };
 }
 
 /** A loose file's name as it may be sent: its own name only, one line. */
@@ -244,9 +266,86 @@ function readLooseAnswer(draft, count) {
   return { prints, dropped };
 }
 
+// ── Check pictures: is this photo of this print? ────────────────────────────
+//
+// WHY: the shop asked for the RIGHT picture on each print (Oct 2026). A name
+// says a photo is "probably" a print's; this asks the assistant to LOOK. Its
+// own switch ("Check pictures"), off until the shop turns it on.
+//
+// WHAT IS SENT, per check: the print's name; the candidate photo, drawn into a
+// new JPEG of at most 512 px (no metadata survives that); and, when there is
+// one, the print's own preview — the picture embedded in a 3MF on this Mac, or
+// the one this app drew of a model on this Mac. Never a model file. A model
+// kept only in the cloud is never downloaded to make a preview.
+//
+// WHAT COMES BACK: yes, no or unsure. Anything else is "unsure".
+
+const VERDICTS = ['yes', 'no', 'unsure'];
+
+const PICTURE_SCHEMA = {
+  type: 'object',
+  required: ['verdict'],
+  properties: {
+    verdict: {
+      type: 'string',
+      enum: VERDICTS,
+      description: 'yes: the photo shows this very print. no: it shows something else. unsure: cannot tell.',
+    },
+  },
+};
+
+function buildPictureSystem() {
+  return [
+    'You check pictures for a 3D-print shop\'s model library.',
+    'You are given a print\'s name, a candidate photo and, sometimes, the print\'s own preview image rendered from its model file.',
+    'Say "yes" only if the photo shows this same print (the same object, not merely the same subject: a bust is not a figure, two different Luffy prints are different).',
+    'Say "no" if it shows something else, and "unsure" if you cannot tell.',
+    'Answer with the tool.',
+  ].join('\n');
+}
+
+/**
+ * The prompt for one check. The images travel beside it, at most
+ * LIMITS.pictureImages of them: the photo first, then the preview if any.
+ */
+function buildPictureRequest(printName, hasReference) {
+  const name = clip(printName, LIMITS.nameLength) || 'unnamed';
+  return hasReference
+    ? `Print: ${name}\nImage 1 is the candidate photo. Image 2 is the print's own preview. Do they show the same print?`
+    : `Print: ${name}\nThe image is a candidate photo. Does it look like a 3D print called "${name}"?`;
+}
+
+/** The images of one check, capped: never more than LIMITS.pictureImages. */
+function pictureImages(photo, reference) {
+  return [photo, reference].filter((x) => typeof x === 'string' && x.length > 0)
+    .slice(0, LIMITS.pictureImages)
+    .map((data) => ({ data, mediaType: 'image/jpeg' }));
+}
+
+/** The verdict, or "unsure" for anything that is not one. */
+function readPictureAnswer(draft) {
+  const v = draft && typeof draft.verdict === 'string' ? draft.verdict.trim().toLowerCase() : '';
+  return VERDICTS.includes(v) ? v : 'unsure';
+}
+
+/**
+ * What a verdict does — the one rule the Mac follows.
+ *   yes + preview  → attach (unless the shop set or removed a photo there)
+ *   yes, no preview → offer, ticked
+ *   no             → drop, and remember it was turned down
+ *   unsure / error → offer, unticked
+ */
+function pictureOutcome(verdict, hasReference) {
+  if (verdict === 'yes') return hasReference ? 'attach' : 'ticked';
+  if (verdict === 'no') return 'rejected';
+  return 'unticked';
+}
+
 const api = {
   ROLES, LIMITS, LIBRARY_SCHEMA, buildLibrarySystem, buildLibraryRequest, cleanName, readLibraryAnswer,
-  LOOSE_SCHEMA, buildLooseSystem, buildLooseRequest, readLooseAnswer, looseName,
+  LOOSE_SCHEMA, buildLooseSystem, buildLooseRequest, readLooseAnswer, looseName, looseTool,
+  VERDICTS, PICTURE_SCHEMA, buildPictureSystem, buildPictureRequest, pictureImages, readPictureAnswer,
+  pictureOutcome,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof globalThis !== 'undefined') globalThis.KhaytAiLibrary = api;

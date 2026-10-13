@@ -2395,7 +2395,13 @@ final class Words {
         "mac.linked_sort_help": ["en": "Find the prints in your linked folders and make each one a group, with its picture. Shows what would change before anything moves.", "ar": "يجد الطباعات في مجلداتك المرتبطة ويجعل كل طباعة مجموعة بصورتها. يعرض ما سيتغير قبل نقل أي شيء."],
         "mac.ai_feat_library": ["en": "Sort linked folders", "ar": "فرز المجلدات المرتبطة"],
         "mac.ai_data_library": ["en": "the names of the folders in your linked folders, a few file names from each, how many models each folder holds, and the names of the model files lying loose at the top of a linked folder, in the order they were added. Never the files themselves, and never a picture.", "ar": "أسماء المجلدات في مجلداتك المرتبطة، وبضعة أسماء ملفات من كل مجلد، وعدد المجسّمات في كل مجلد، وأسماء ملفات المجسّمات المتفرقة في أعلى المجلد المرتبط بترتيب إضافتها. لا تُرسل الملفات نفسها أبدًا، ولا أي صورة."],
-        "mac.sort_title": ["en": "Sort linked folders", "ar": "فرز المجلدات المرتبطة"],
+        "mac.ai_feat_pictures": ["en": "Check pictures", "ar": "فحص الصور"],
+        "mac.ai_data_pictures": ["en": "the print’s name, the candidate photo redrawn as a new JPEG of at most 512 pixels with none of its metadata, and the print’s own preview when there is one (from a 3MF or a model on this Mac), to confirm they show the same print. At most 2 images a request and 40 checks a scan. Never a model file; nothing kept only in the cloud is downloaded for it.", "ar": "اسم الطباعة، والصورة المرشّحة بعد إعادة رسمها كصورة JPEG جديدة لا تتجاوز 512 بكسل وبلا أي بيانات وصفية، ومعاينة الطباعة نفسها إن وُجدت (من ملف 3MF أو مجسّم على هذا الماك)، للتأكد أنهما للطباعة نفسها. صورتان على الأكثر في الطلب و40 فحصًا على الأكثر في كل مسح. لا يُرسل ملف مجسّم أبدًا، ولا يُنزَّل لذلك أي ملف محفوظ في السحابة فقط."],
+        "mac.sort_pictures_check": ["en": "Pictures to check", "ar": "صور للمراجعة"],
+        "mac.sort_pictures_check_help": ["en": "Not sure these are the right pictures. Tick the ones to use.", "ar": "لسنا متأكدين أن هذه هي الصور الصحيحة. حدّد ما تريد استخدامه."],
+        "mac.sort_pictures_ai_off": ["en": "Your assistant cannot look at pictures with this provider, so they were not checked.", "ar": "لا يستطيع مساعدك رؤية الصور مع هذا المزوّد، فلم تُفحص."],
+        "mac.sort_pictures_checked": ["en": "Pictures your assistant checked: {n}.", "ar": "صور فحصها مساعدك: {n}."],
+        "mac.sort_title":["en": "Sort linked folders", "ar": "فرز المجلدات المرتبطة"],
         // "Collection" is where files came from (a Patreon tier, a pack, a
         // month's release) and becomes a TAG. Not مجموعة in Arabic: that is
         // the library's word for a GROUP, the very thing a collection stops

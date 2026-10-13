@@ -153,6 +153,13 @@ enum LibraryEntry: Identifiable, Hashable {
     static func cover(of held: [LibraryFile], order: (LibraryFile, LibraryFile) -> Bool)
     -> LibraryFile? {
         let sorted = held.sorted(by: order)
-        return sorted.first { $0.thumbFile?.isEmpty == false } ?? sorted.first
+        // A 3MF's own preview first: its slicer drew the print as it will be
+        // printed — the print's own picture for certain, where an STL's is
+        // only its triangles drawn grey. Only a file on this Mac has one
+        // (it is read when the file is indexed or brought down; an online-only
+        // model is never downloaded for it). Oct 2026: the fallback a print
+        // wears when no photo is certainly its own.
+        return sorted.first(where: \.hasEmbeddedPreview)
+            ?? sorted.first { $0.thumbFile?.isEmpty == false } ?? sorted.first
     }
 }

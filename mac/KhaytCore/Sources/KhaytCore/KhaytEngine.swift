@@ -11787,7 +11787,7 @@ public actor KhaytEngine {
               if (!KhaytAiPrivacy.isFeatureEnabled((a.settings || {}).ai, 'library')) {
                 throw new Error('AI_FEATURE_NOT_CONSENTED');
               }
-              var t = KhaytAiTools.resolveTool('loose', KhaytAiLibrary.LOOSE_SCHEMA);
+              var t = KhaytAiLibrary.looseTool();
               var settings = { ai: Object.assign({}, (a.settings || {}).ai, { apiKey: a.apiKey }) };
               return KhaytAiProviders.buildRequest(settings, {
                 apiKey: a.apiKey,
