@@ -635,6 +635,15 @@ final class KhaytAPIClient: ObservableObject {
         try ensureOK(data, response)
     }
 
+    /// Keep a receipt's seller as a supplier, in the book, and send it on like
+    /// any other edit (see `BookWriter.addSupplier`). No desktop route takes
+    /// this, so a phone that keeps no book cannot do it.
+    func addSupplier(name: String, vatNumber: String) async throws {
+        guard try await writeLocally({ try $0.addSupplier(name: name, vatNumber: vatNumber) }) else {
+            throw BookWriter.Refusal.recordHasNoId
+        }
+    }
+
     /**
      * Record a failed print where it happened.
      *

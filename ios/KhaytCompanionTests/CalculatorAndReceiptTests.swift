@@ -140,6 +140,34 @@ final class CalculatorAndReceiptTests: XCTestCase {
         XCTAssertEqual(again.duplicateOf, made["id"].flatMap { if case .string(let s) = $0 { s } else { nil } })
     }
 
+    /// "Add as supplier" writes the row the Mac and the other app write, the
+    /// next read names it, and a second tap adds nothing.
+    func testASellerKeptAsASupplierMatchesTheNextReceipt() async throws {
+        let code = zatca(seller: "مؤسسة الخيوط", vat: "311111111111113",
+                         time: "2026-09-21T10:15:00Z", total: "57.50", tax: "7.50")
+        guard case .draft(let d) = try await reader.readReceipt(code),
+              let seller = d.newSupplier else { return XCTFail("not read as a new seller") }
+
+        let row = try XCTUnwrap(try writer.addSupplier(name: seller.name, vatNumber: "٣١١١١١١١١١١١١١٣"))
+        XCTAssertEqual(row["vat"], .string("311111111111113"), "Arabic digits are kept as Western ones")
+        XCTAssertEqual(row["name"], .string("مؤسسة الخيوط"))
+        XCTAssertEqual(row["purchases"], .array([]), "every reader walks this unchecked")
+        XCTAssertEqual(row["leadDays"], .null)
+        XCTAssertEqual(row["category"], .string("other"))
+        let stored = try book.read()
+        guard case .array(let suppliers)? = stored["suppliers"],
+              case .object(let saved)? = suppliers.last else { return XCTFail("no suppliers") }
+        XCTAssertNotNil(saved["updatedAt"], "stamped, so the change is sent on")
+
+        guard case .draft(let again) = try await reader.readReceipt(code) else { return XCTFail("not read") }
+        XCTAssertNil(again.newSupplier)
+        XCTAssertEqual(again.supplier?.name, "مؤسسة الخيوط")
+
+        XCTAssertNil(try writer.addSupplier(name: "Again", vatNumber: "311111111111113"), "one row per number")
+        guard case .array(let after)? = try book.read()["suppliers"] else { return XCTFail("no suppliers") }
+        XCTAssertEqual(after.count, suppliers.count)
+    }
+
     func testACodeThatIsNotAReceiptSaysWhy() async throws {
         let reading = try await reader.readReceipt("https://example.com/pay")
         guard case .refused(let why) = reading else { return XCTFail("read a link as a receipt") }

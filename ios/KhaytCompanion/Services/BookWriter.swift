@@ -347,6 +347,52 @@ struct BookWriter {
         return record
     }
 
+    // MARK: - Suppliers
+
+    /// Keep a receipt's seller as a supplier: the row the Mac's "Add as
+    /// supplier" writes (`Shop.saveSupplier`) and the other app's
+    /// (`renderer/expenses.js`). The number goes in `vat`, the field
+    /// `lib/zatca-qr.js` matches on, so the next receipt from this seller
+    /// names it. `purchases` is written empty rather than left out, because
+    /// every reader of it walks the array unchecked.
+    ///
+    /// A number the book already holds is not added again. Two rows for one
+    /// seller would split its purchases between them. That case returns nil.
+    @discardableResult
+    func addSupplier(name: String, vatNumber: String, now: Date = Date()) throws -> [String: JSONValue]? {
+        let vat = vatNumber.filter(\.isNumber).map { $0.wholeNumberValue.map(String.init) ?? "" }.joined()
+        let named = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
+        struct AlreadyHeld: Error {}
+        var added: [String: JSONValue]?
+        do {
+            try book.insertRecord(collection: "suppliers", atFront: false) { rows in
+                // Inside the write, so two taps cannot both find no such row.
+                let held = rows.contains {
+                    guard !vat.isEmpty, case .object(let o) = $0, case .string(let v)? = o["vat"] else { return false }
+                    return v == vat
+                }
+                if held { throw AlreadyHeld() }
+                let record: [String: JSONValue] = [
+                    "id": .string(Self.lanId("sup", now: now)),
+                    "name": .string(named.isEmpty ? vat : named),
+                    "vat": .string(vat),
+                    "category": .string("other"),
+                    "phone": .string(""),
+                    "website": .string(""),
+                    "notes": .string(""),
+                    "priceList": .array([]),
+                    "leadDays": .null,
+                    "purchases": .array([]),
+                ]
+                added = record
+                return record
+            }
+        } catch is AlreadyHeld {
+            return nil
+        }
+        return added
+    }
+
     /// `uniqueLanId(prefix)` in `lib/lan-server.js`: prefix, milliseconds, four
     /// random hex digits — so a record reads the same wherever it was made.
     static func lanId(_ prefix: String, now: Date = Date()) -> String {

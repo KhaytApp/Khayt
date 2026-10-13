@@ -46,6 +46,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   to customers and suppliers, which also lets the iPhone add a supplier from a
   receipt. Staff accounts still cannot be changed from a phone.
 
+- **iPhone: add a receipt's seller as a supplier.** A receipt read off its
+  QR from a seller you don't have yet now shows "Add as supplier". Tapping it
+  adds the seller to your suppliers with its VAT number, the same as the Mac and
+  desktop do, so the next receipt from them is matched. A seller already there
+  is not added twice.
 - **A photo you remove from a model on the desktop stays removed on the Mac.**
   The Mac puts pictures it finds in your linked folders on models that have
   none, but skips a model whose photo you took off. Removing a photo on the
