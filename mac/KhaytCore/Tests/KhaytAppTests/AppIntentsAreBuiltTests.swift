@@ -27,6 +27,16 @@ import Testing
 ///
 /// Fixed, and guarded here: the search is by NAME under `.build`, so the next
 /// time SwiftPM moves its layout it keeps working instead of going quiet.
+///
+/// ── AND THEN IT MOVED AGAIN ──────────────────────────────────────────────
+///
+/// Searching by name held until Xcode 27 / Swift 6.4 built SwiftPM through
+/// Swift Build: KhaytApp is compiled whole-module inside the product and its
+/// file is `Khayt-primary.swiftconstvalues`, under `Intermediates.noindex`.
+/// Every release from 4.0.0-alpha.40 to alpha.68 shipped with NO
+/// `Metadata.appintents`, and the warning sat unread in each release log. So
+/// the search is now by CONTENT (a file naming a `KhaytApp.` type), and a
+/// build that finds none STOPS unless a dev build opts out.
 struct AppIntentsAreBuiltTests {
 
     static func script() throws -> String {
@@ -38,11 +48,13 @@ struct AppIntentsAreBuiltTests {
         return try String(contentsOf: url.standardizedFileURL, encoding: .utf8)
     }
 
-    @Test("the const values are searched for by name, not down a symlinked path")
-    func searchIsByName() throws {
+    @Test("the const values are found by what they hold, not by a file name or path")
+    func searchIsByContent() throws {
         let text = try Self.script()
-        #expect(text.contains("-name 'KhaytApp.swiftconstvalues'"),
-                "the search is not by name, so a moved build layout goes quiet again")
+        #expect(text.contains("-name '*.swiftconstvalues'"),
+                "the search is narrowed to one file name again, so a moved build layout goes quiet")
+        #expect(text.contains(#"grep -l '"KhaytApp\.'"#),
+                "the search no longer picks files by the KhaytApp types they name")
         #expect(!text.contains(".build/release/KhaytApp.build"),
                 "the symlinked products path is back; it holds no build intermediates")
     }
@@ -54,14 +66,19 @@ struct AppIntentsAreBuiltTests {
         #expect(try Self.script().contains("-emit-const-values"))
     }
 
-    @Test("a build without them complains on stderr rather than reporting a state")
-    func theFailureIsLoud() throws {
+    @Test("a build without them stops, unless a dev build opts out by name")
+    func theFailureStopsTheBuild() throws {
         let text = try Self.script()
-        let marker = "app intents: NO CONST VALUES FOUND"
-        let line = try #require(text.split(separator: "\n").first { $0.contains(marker) },
-                                "the loud message is gone")
-        #expect(line.contains(">&2"),
-                "the failure prints to stdout, which is how it hid in a build log")
+        #expect(text.contains("ai_fail \"NO CONST VALUES FOUND"),
+                "finding nothing no longer goes through the failing path")
+        // The failing path prints to stderr and exits — a warning is what let
+        // twenty-eight releases ship without Shortcuts.
+        let start = try #require(text.range(of: "ai_fail() {"), "ai_fail is gone")
+        let end = try #require(text.range(of: "\n}", range: start.upperBound..<text.endIndex))
+        let body = String(text[start.upperBound..<end.lowerBound])
+        #expect(body.contains(">&2"), "the failure prints to stdout, which is how it hid in a build log")
+        #expect(body.contains("exit 1"), "the failure warns and carries on; a release can ship without intents")
+        #expect(body.contains("KHAYT_ALLOW_NO_INTENTS"), "the opt-out is no longer named")
     }
 
     @Test("every intent the app declares is one the build can find")
