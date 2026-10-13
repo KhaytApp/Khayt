@@ -4,35 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **(Maintainers) A hung desktop smoke test no longer blocks every merge.**
-  The required "E2E smoke (Electron)" check had no time limit, so a step that
-  hung (the 3MF worker step, for an hour on 12 Oct) held every lane's merges
-  until someone cancelled it. The job now stops after 20 minutes (it takes 4-5)
-  and the 3MF worker step after 5.
-- **Tamara is told when a job ships, so the shop is paid sooner.** Khayt
-  authorised a Tamara payment once the customer completed it, but never
-  confirmed the order shipped, so Tamara held the money until it captured the
-  order by itself 21 days later. Now, once the job is marked shipped (or
-  handed over, for a pickup), Khayt captures the Tamara order with the
-  shipping date, the carrier and the tracking number. It uses Tamara's own
-  order total, and never captures an order that is already captured or
-  refunded. If it fails, Khayt says so once and tries again.
-- **Tabby links for Saudi shops use Tabby's Saudi server.** Tabby runs a
-  separate API for Saudi merchants (`api.tabby.sa`), and a Saudi key can be
-  refused by the one Khayt used (`api.tabby.ai`). A link in riyals now uses
-  the Saudi server for the checkout and every check after it; links in other
-  currencies are unchanged.
-- **Deleting a model on the desktop can keep its online copy.** When your
-  library is backed up to a storage bucket or Google Drive, deleting a model
-  now asks where it should go. **Remove from this computer** is the default:
-  once Khayt has checked that the online copy is the same file, the copy on
-  this computer goes to the Trash and the model stays in your library, ready
-  to open again from the cloud. **Delete completely** removes the online copy
-  first, then the model; if the online copy cannot be removed, the model is
-  kept as it was and Khayt says which one. Models that exist only on this
-  computer are deleted only if you tick the box for them, and files of your
-  own that the library points to are never deleted. Without an online copy,
-  delete works as before. The Mac asks the same question.
 - **Mac: a model sent to the shop's Mac over Wi-Fi is no longer cut off
   when the app is busy.** The Mac counted its own delay in reading an
   upload against the phone, so a large model sent while the window was
@@ -98,11 +69,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   adds the seller to your suppliers with its VAT number, the same as the Mac and
   desktop do, so the next receipt from them is matched. A seller already there
   is not added twice.
-- **A photo you remove from a model on the desktop stays removed on the Mac.**
-  The Mac puts pictures it finds in your linked folders on models that have
-  none, but skips a model whose photo you took off. Removing a photo on the
-  desktop did not say so, so the Mac could put a found picture back on it.
-  It now does; adding a photo again clears that.
 - **Mac: fixes from the 4.0.0-alpha.67 review of sorting linked folders.**
   - **A print keeps the kind and picture you gave it.** When the automatic
     sort took a collection out of a print's path ("Aug26 Giga Tier/Life
@@ -160,12 +126,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     twice, and the app's own sorting is used for anything missing or if
     the assistant fails. Its cost appears in the AI usage figures.
 
-- **The AI spend panel counts what the desktop's AI calls cost again.** Since
-  Khayt learned to use other AI providers, every call made from the desktop
-  was recorded as 0 tokens and $0: the provider's counts arrived under one
-  spelling and the ledger read another. Calls were still counted. New calls
-  now record their tokens and estimated cost; past months stay at $0, because
-  the counts were never kept.
 - **Mac: fixes from the 4.0.0-alpha.66 review of linked and online-only
   models.**
   - **A group's kind and picture move with it.** When "Regroup from folders"
@@ -5374,6 +5334,54 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.11] - 2026-10-13
+
+Deleting keeps the online copy, and Tamara and Tabby, since 3.11.10.
+Individual entries are kept below; this is what changed for you.
+
+Deleting a model can now remove it from this computer only, keeping its online copy, or delete it completely. Tamara is told when a job ships, so the shop is paid sooner, and Tabby links in riyals use Tabby's Saudi server. The AI spend panel counts the desktop's calls again, and a photo removed on the desktop stays removed on the Mac.
+
+- **Tamara is told when a job ships, so the shop is paid sooner.** Khayt
+  authorised a Tamara payment once the customer completed it, but never
+  confirmed the order shipped, so Tamara held the money until it captured the
+  order by itself 21 days later. Now, once the job is marked shipped (or
+  handed over, for a pickup), Khayt captures the Tamara order with the
+  shipping date, the carrier and the tracking number. It uses Tamara's own
+  order total, and never captures an order that is already captured or
+  refunded. If it fails, Khayt says so once and tries again.
+- **Tabby links for Saudi shops use Tabby's Saudi server.** Tabby runs a
+  separate API for Saudi merchants (`api.tabby.sa`), and a Saudi key can be
+  refused by the one Khayt used (`api.tabby.ai`). A link in riyals now uses
+  the Saudi server for the checkout and every check after it; links in other
+  currencies are unchanged.
+- **Deleting a model on the desktop can keep its online copy.** When your
+  library is backed up to a storage bucket or Google Drive, deleting a model
+  now asks where it should go. **Remove from this computer** is the default:
+  once Khayt has checked that the online copy is the same file, the copy on
+  this computer goes to the Trash and the model stays in your library, ready
+  to open again from the cloud. **Delete completely** removes the online copy
+  first, then the model; if the online copy cannot be removed, the model is
+  kept as it was and Khayt says which one. Models that exist only on this
+  computer are deleted only if you tick the box for them, and files of your
+  own that the library points to are never deleted. Without an online copy,
+  delete works as before. The Mac asks the same question.
+- **A photo you remove from a model on the desktop stays removed on the Mac.**
+  The Mac puts pictures it finds in your linked folders on models that have
+  none, but skips a model whose photo you took off. Removing a photo on the
+  desktop did not say so, so the Mac could put a found picture back on it.
+  It now does; adding a photo again clears that.
+- **The AI spend panel counts what the desktop's AI calls cost again.** Since
+  Khayt learned to use other AI providers, every call made from the desktop
+  was recorded as 0 tokens and $0: the provider's counts arrived under one
+  spelling and the ledger read another. Calls were still counted. New calls
+  now record their tokens and estimated cost; past months stay at $0, because
+  the counts were never kept.
+- **(Maintainers) A hung desktop smoke test no longer blocks every merge.**
+  The required "E2E smoke (Electron)" check had no time limit, so a step that
+  hung (the 3MF worker step, for an hour on 12 Oct) held every lane's merges
+  until someone cancelled it. The job now stops after 20 minutes (it takes 4-5)
+  and the 3MF worker step after 5.
 
 ## [3.11.10] - 2026-10-12
 
