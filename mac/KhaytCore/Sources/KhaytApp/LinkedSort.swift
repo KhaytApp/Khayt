@@ -12,6 +12,9 @@ extension PrintSort {
     struct Answers: Sendable, Equatable {
         var roles: [String: Role] = [:]
         var names: [String: String] = [:]
+        /// The print each loose top-level model belongs to, by its path
+        /// (`LooseCache`).
+        var loose: [String: String] = [:]
     }
 
     /// A linked folder, its tree, every folder's role and every model's place.
@@ -24,6 +27,28 @@ extension PrintSort {
         let names: [String: String]
         /// By model path below the linked folder.
         let placed: [String: Placement]
+        /// When each top-level file was created, by path — the copy order the
+        /// loose models are read in (`LooseSort`).
+        var births: [String: Double] = [:]
+        /// The prints found among the loose top-level models, by print key.
+        var loose: [String: LooseSort.Cluster] = [:]
+
+        /// The models at the top of the linked folder, in no sub-folder, in
+        /// copy order.
+        var looseModels: [String] {
+            LooseSort.order(models.compactMap(rel).filter { !$0.contains("/") }, births: births)
+        }
+
+        /// A print's name: the loose print's, the assistant's, or its folder's.
+        func name(ofPrint key: String) -> String {
+            loose[key]?.name ?? names[key] ?? PrintSort.cleanName(tree[key]?.name ?? key)
+        }
+
+        /// A print's pictures, best first, by path below the linked folder.
+        func pictures(ofPrint key: String) -> [String] {
+            if let c = loose[key] { return c.pictures }
+            return PrintSort.pictures(of: key, in: tree, roles: roles, name: name(ofPrint: key))
+        }
 
         func rel(_ url: URL) -> String? { PrintSort.rel(url, under: root) }
 
@@ -59,15 +84,43 @@ extension PrintSort {
 
     /// Sort one linked folder: the heuristic, with whatever the assistant
     /// said laid over it.
-    static func plan(root: URL, models: [URL], images: [URL], answers: Answers = Answers()) -> Plan {
+    ///
+    /// `births` (seconds, by path) is when each top-level file was created —
+    /// the order a copy job dropped the loose models in (`LooseSort`).
+    static func plan(root: URL, models: [URL], images: [URL], answers: Answers = Answers(),
+                     births: [String: Double] = [:]) -> Plan {
         let modelRels = models.compactMap { rel($0, under: root) }
         let imageRels = images.compactMap { rel($0, under: root) }
         let tree = Tree(models: modelRels, images: imageRels)
         let roles = classify(tree, answers: answers.roles)
-        let placed = placements(tree, roles: roles, models: modelRels, names: answers.names)
+        // THE LOOSE ONES, sorted by their names in the order they arrived.
+        let clusters = LooseSort.clusters(models: modelRels.filter { !$0.contains("/") },
+                                          images: imageRels.filter { !$0.contains("/") },
+                                          births: births, assistant: answers.loose)
+        var loose: [String: LooseSort.Cluster] = [:]
+        var printOf: [String: String] = [:]
+        var names = answers.names
+        for c in clusters {
+            let key = looseKey(c.name)
+            if let had = loose[key] {
+                loose[key] = LooseSort.Cluster(name: had.name, members: had.members + c.members,
+                                               pictures: had.pictures + c.pictures,
+                                               byAssistant: had.byAssistant || c.byAssistant)
+            } else {
+                loose[key] = c
+            }
+            names[key] = loose[key]?.name
+            for m in c.members { printOf[m] = key }
+        }
+        let placed = placements(tree, roles: roles, models: modelRels, names: names, loose: printOf)
         return Plan(root: root, models: models, images: images, tree: tree, roles: roles,
-                    names: answers.names, placed: placed)
+                    names: answers.names, placed: placed, births: births, loose: loose)
     }
+
+    /// The key a print found among the loose models goes by. Never a
+    /// folder's: a folder key is a path below the linked folder, and no
+    /// model sits in a folder called `#loose` at the top of one.
+    nonisolated static func looseKey(_ name: String) -> String { "#loose/" + LooseSort.identity(name) }
 }
 
 // MARK: - What the assistant is sent, and what it said, remembered
@@ -225,6 +278,171 @@ enum SortCache {
     }
 }
 
+// MARK: - The loose files: what was sent, and what came back
+
+/// The assistant's grouping of the LOOSE models at the top of a linked
+/// folder (`LooseSort`), cached in the book so a name is never sent twice:
+/// `settings.printLibrary.looseSort`, one entry per linked folder (its
+/// absolute path), holding the prints it named — `{name: [path…]}` — and
+/// `none`, the names it was asked about and put in no print.
+///
+/// ── NAMES ONLY, A FEW HUNDRED AT A TIME ───────────────────────────────────
+///
+/// A request carries at most `perRequest` names (`lib/ai-library.js
+/// LIMITS.looseNames`) and a scan at most `perScan`; the rest wait for the
+/// next scan. Each name is the file's own, below the linked folder — never a
+/// path above it — in the order the files were created, because that is
+/// where a kit's parts sit together.
+enum LooseCache {
+
+    nonisolated static let settingsKey = "looseSort"
+    /// `lib/ai-library.js LIMITS.looseNames` — `LooseSortTests` holds them equal.
+    nonisolated static let perRequest = 300
+    /// `lib/ai-library.js LIMITS.looseNamesPerScan`.
+    nonisolated static let perScan = 3000
+
+    private nonisolated static func entry(_ settings: [String: JSONValue], _ root: URL) -> [String: JSONValue]? {
+        guard case .object(let library)? = settings["printLibrary"],
+              case .object(let map)? = library[settingsKey],
+              case .object(let e)? = map[root.standardizedFileURL.path] else { return nil }
+        return e
+    }
+
+    /// Every loose name the assistant was already asked about, for one
+    /// linked folder.
+    nonisolated static func asked(_ settings: [String: JSONValue], root: URL) -> Set<String> {
+        guard let e = entry(settings, root) else { return [] }
+        var out = Set<String>()
+        if case .object(let prints)? = e["prints"] {
+            for case .array(let rows) in prints.values {
+                for case .string(let r) in rows { out.insert(r) }
+            }
+        }
+        if case .array(let rows)? = e["none"] { for case .string(let r) in rows { out.insert(r) } }
+        return out
+    }
+
+    /// The print each loose model was put in, for the models still there.
+    /// Read back from settings that sync from every device, so each name is
+    /// held to the group rule again (`PrintSort.assistantName`) and each
+    /// path must be one the walk found.
+    nonisolated static func answers(_ settings: [String: JSONValue], root: URL,
+                                    present: Set<String>) -> [String: String] {
+        guard let e = entry(settings, root), case .object(let prints)? = e["prints"] else { return [:] }
+        var out: [String: String] = [:]
+        for (raw, rows) in prints {
+            guard let name = PrintSort.assistantName(raw), case .array(let list) = rows else { continue }
+            for case .string(let r) in list where present.contains(r) && out[r] == nil { out[r] = name }
+        }
+        return out
+    }
+
+    /// The loose names still to ask about, in copy order, at most `perScan`.
+    nonisolated static func pending(_ plan: PrintSort.Plan, settings: [String: JSONValue]) -> [String] {
+        let done = asked(settings, root: plan.root)
+        return Array(plan.looseModels.filter { !done.contains($0) }.prefix(perScan))
+    }
+
+    /// The requests a list of names makes: at most `perRequest` each, and a
+    /// cut made where the copy job paused longest near the end of a full
+    /// batch — so one kit is less often split over two requests.
+    nonisolated static func batches(_ names: [String], births: [String: Double] = [:],
+                                    limit: Int = perRequest) -> [[String]] {
+        var out: [[String]] = []
+        var start = 0
+        while start < names.count {
+            var end = min(start + limit, names.count)
+            if end < names.count, !births.isEmpty {
+                let from = max(start + limit * 4 / 5, start + 1)
+                var best = end, gap = -1.0
+                for i in from..<end {
+                    guard let a = births[names[i - 1]], let b = births[names[i]] else { continue }
+                    if b - a > gap { gap = b - a; best = i }
+                }
+                end = best
+            }
+            out.append(Array(names[start..<end]))
+            start = end
+        }
+        return out
+    }
+
+    /// What one request came back with, by path.
+    struct Answered: Sendable, Equatable {
+        let root: URL
+        let sent: [String]
+        /// Print name → its members' paths.
+        let prints: [String: [String]]
+    }
+
+    /// The assistant's prints as paths: indices into the batch that was sent.
+    nonisolated static func answered(root: URL, sent: [String],
+                                     prints: [KhaytEngine.AiLooseAnswer.Print]) -> Answered {
+        var out: [String: [String]] = [:]
+        for p in prints {
+            guard let name = PrintSort.assistantName(p.name) else { continue }
+            let members = p.members.filter { sent.indices.contains($0) }.map { sent[$0] }
+            guard members.count >= 2 else { continue }
+            out[name, default: []] += members
+        }
+        return Answered(root: root, sent: sent, prints: out)
+    }
+
+    /// Write answers into the book's settings (inside the store's chain).
+    /// Names no longer under the linked folder (`present`) are let go, so the
+    /// entry never outgrows the folder.
+    nonisolated static func store(_ answers: [Answered], present: [String: Set<String>],
+                                  at: Date = Date(), into root: inout [String: JSONValue]) {
+        guard !answers.isEmpty else { return }
+        var settings: [String: JSONValue] = [:]
+        if case .object(let s)? = root["settings"] { settings = s }
+        var library: [String: JSONValue] = [:]
+        if case .object(let l)? = settings["printLibrary"] { library = l }
+        var map: [String: JSONValue] = [:]
+        if case .object(let m)? = library[settingsKey] { map = m }
+        for (folder, group) in Dictionary(grouping: answers, by: { $0.root.standardizedFileURL.path }) {
+            let here = present[folder] ?? []
+            var prints: [String: [String]] = [:]
+            var none: [String] = []
+            if case .object(let e)? = map[folder] {
+                if case .object(let p)? = e["prints"] {
+                    for (name, rows) in p {
+                        if case .array(let list) = rows {
+                            prints[name] = list.compactMap { if case .string(let s) = $0, here.contains(s) { s } else { nil } }
+                        }
+                    }
+                }
+                if case .array(let rows)? = e["none"] {
+                    none = rows.compactMap { if case .string(let s) = $0, here.contains(s) { s } else { nil } }
+                }
+            }
+            for a in group {
+                var placed = Set<String>()
+                for (name, members) in a.prints {
+                    prints[name, default: []] += members
+                    placed.formUnion(members)
+                }
+                none += a.sent.filter { !placed.contains($0) }
+            }
+            let kept = prints.filter { !$0.value.isEmpty }
+            map[folder] = .object([
+                "at": .string(StoreWriter.iso(at)),
+                "prints": .object(kept.mapValues { .array($0.map(JSONValue.string)) }),
+                "none": .array(none.map(JSONValue.string)),
+            ])
+        }
+        library[settingsKey] = .object(map)
+        settings["printLibrary"] = .object(library)
+        root["settings"] = .object(settings)
+    }
+
+    /// A request's signature, for `SortFailures`.
+    nonisolated static func signature(_ names: [String]) -> String {
+        let text = "loose\n" + names.joined(separator: "\n")
+        return SHA256.hash(data: Data(text.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
 // MARK: - Requests that keep failing
 
 /// Requests the assistant failed on, so a failing one is not paid for on
@@ -347,10 +565,10 @@ enum PrintPhotos {
             for key in plan.prints {
                 let abs = plan.root.appending(path: key).standardizedFileURL.path
                 guard !looked.contains(abs) else { continue }
-                let name = plan.names[key] ?? PrintSort.cleanName(plan.tree[key]?.name ?? key)
-                let pics = PrintSort.pictures(of: key, in: plan.tree, roles: plan.roles, name: name)
+                let pics = plan.pictures(ofPrint: key)
                 let models = plan.models(ofPrint: key)
-                let own = PrintSort.modelPictures(of: key, in: plan.tree, models: models)
+                let own = plan.loose[key] != nil ? [:]
+                    : PrintSort.modelPictures(of: key, in: plan.tree, models: models)
                 let group = plan.group(ofPrint: key)
                 var ownPictures: [String: URL] = [:]
                 for (model, image) in own {

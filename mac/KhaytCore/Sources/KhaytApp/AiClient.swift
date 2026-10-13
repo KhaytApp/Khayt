@@ -259,6 +259,35 @@ enum AiClient {
         return (answers, read.usage, request.model)
     }
 
+    /// Ask which prints the loose files at the top of a linked folder make
+    /// (`lib/ai-library.js buildLooseRequest`). `names` are the files' own
+    /// names below the linked folder, in copy order, at most 300 — nothing
+    /// else is sent. Returns the validated prints (indices into `names`)
+    /// and what the call cost.
+    static func groupLoose(_ names: [String], shop: Shop) async throws
+        -> (prints: [KhaytEngine.AiLooseAnswer.Print], usage: JSONValue?, model: String) {
+        guard let engine = shop.engine else { throw Failure.refused("no engine") }
+        let settings = shop.settingsDict
+        var key = ""
+        if case .object(let ai)? = settings["ai"], case .string(let sealed)? = ai["apiKey"],
+           !sealed.isEmpty {
+            key = (try? await Secrets.open(sealed, for: shop.source)) ?? ""
+        }
+        let request: KhaytEngine.AiRequest
+        do {
+            request = try await engine.aiLooseRequest(settings: settings, names: names, apiKey: key)
+        } catch {
+            let said = String(describing: error)
+            if said.contains("AI_FEATURE_NOT_CONSENTED") { throw Failure.notConsented }
+            if said.contains("No API key") { throw Failure.noKey }
+            throw Failure.refused(said)
+        }
+        let data = try await send(request, engine: engine, timeout: timeout * 2)
+        let read = try await engine.aiLooseRead(settings: settings, response: data, count: names.count)
+        guard read.ok else { throw Failure.refused(read.problem ?? "no answer") }
+        return (read.prints, read.usage, request.model)
+    }
+
     /// The session every AI request goes through. Ephemeral, and a redirect
     /// is followed only to the same scheme, host and port: the provider's API
     /// key is in a header, and `URLSession.shared` would carry it along a 30x

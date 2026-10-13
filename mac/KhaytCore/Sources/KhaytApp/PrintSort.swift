@@ -622,8 +622,10 @@ enum PrintSort {
     /// - Parameters:
     ///   - models: relative paths of the models (`a/b/c.stl`).
     ///   - names: clean names the assistant gave prints, by folder key.
+    ///   - loose: models loose at the top of the linked folder that
+    ///     `LooseSort` put in a print, by path — the print's key.
     static func placements(_ tree: Tree, roles: [String: Role], models: [String],
-                           names: [String: String] = [:]) -> [String: Placement] {
+                           names: [String: String] = [:], loose: [String: String] = [:]) -> [String: Placement] {
         struct Spot { let print: String?; let part: String?; let collection: String? }
         var spots: [String: Spot] = [:]
         for rel in models {
@@ -644,6 +646,7 @@ enum PrintSort {
                 default: break
                 }
             }
+            if parts.isEmpty, let key = loose[rel] { print = key }
             spots[rel] = Spot(print: print, part: part, collection: collection)
         }
         // One spelling per print name: the same print from two collections is
