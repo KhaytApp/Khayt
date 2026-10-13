@@ -67,6 +67,26 @@ private let laptopScreenHeight: CGFloat = 875
         return try body()
     }
 
+    /// A sort preview the size of a real shop's drive.
+    static func bigSortPreview() -> SortPreview {
+        let rows = (0..<454).map { i in
+            SortPreview.Row(id: "print-\(i)", name: "Print \(i)", models: i % 40 + 1, picture: nil,
+                            from: i % 3 == 0 ? "Oct26 Giga Tier" : nil)
+        }
+        var preview = SortPreview(plans: [], rows: rows, collections: 10, moved: 336, renamed: 0, tagged: 120,
+                                  kept: 4, assistant: nil, assistantOff: true)
+        preview.loose = (total: 2157, grouped: 1981, prints: 165)
+        let root = URL(fileURLWithPath: "/tmp/linked")
+        preview.pictures = (0..<40).map { i in
+            let image = "Picture.\(i).png"
+            return PictureRow(id: "pic-\(i)", root: root,
+                              suggestion: .init(image: image, target: .print("Print \(i)"), reason: .unsure, ticked: true),
+                              name: "Print \(i)", image: root.appending(path: image), ticked: true,
+                              picture: nil, online: i % 2 == 0)
+        }
+        return preview
+    }
+
     @Test("every sheet fits a 13-inch laptop, buttons included")
     func sheetsFit() throws {
         let shop = Shop()
@@ -99,6 +119,11 @@ private let laptopScreenHeight: CGFloat = 875
                 measured.append(("QcFailSheet", Self.height(of:
                     QcFailSheet(shop: shop, subject: subject))))
             }
+            // "Sort linked folders…" as a real drive filled it (alpha.68, Oct 13
+            // 2026): 454 prints and 40 pictures to check. Its Cancel and Apply
+            // went below the sheet, and the shop could only leave with Escape.
+            measured.append(("LinkedSortSheet", Self.height(of:
+                LinkedSortSheet(shop: shop, preview: Self.bigSortPreview()))))
             // These two take a whole job rather than the lightweight subject.
             if let job = shop.orders.first {
                 measured.append(("MessageSheet", Self.height(of:
