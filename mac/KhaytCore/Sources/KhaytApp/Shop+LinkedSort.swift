@@ -11,12 +11,20 @@ struct SortAsk: Sendable, Equatable {
     /// Folders not asked about this time because their request kept failing
     /// (`SortFailures`) — sorted on this Mac instead.
     var held = 0
+    /// Loose top-level files it was asked about this time (`LooseCache`).
+    var loose = 0
+    /// Loose files not asked about because their request kept failing.
+    var looseHeld = 0
 
     @MainActor func line(_ words: Words) -> String? {
         var parts: [String] = []
         if let problem { parts.append(words.callIt("mac.sort_ai_failed", ["why": .string(problem)])) }
-        else if sorted > 0 { parts.append(words.callIt("mac.sort_ai_used", ["n": .number(Double(sorted))])) }
+        else {
+            if sorted > 0 { parts.append(words.callIt("mac.sort_ai_used", ["n": .number(Double(sorted))])) }
+            if loose > 0 { parts.append(words.callIt("mac.sort_ai_loose", ["n": .number(Double(loose))])) }
+        }
         if held > 0 { parts.append(words.callIt("mac.sort_ai_held", ["n": .number(Double(held))])) }
+        if looseHeld > 0 { parts.append(words.callIt("mac.sort_ai_loose_held", ["n": .number(Double(looseHeld))])) }
         return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 }
@@ -45,6 +53,20 @@ struct SortPreview: Identifiable {
     let assistant: SortAsk?
     /// The shop has not turned the assistant on for this.
     let assistantOff: Bool
+    /// Models loose at the top of the linked folders, how many of them the
+    /// sort put in a print, and in how many prints (`LooseSort`).
+    var loose = (total: 0, grouped: 0, prints: 0)
+
+    /// The loose figures of some sorted linked folders.
+    nonisolated static func looseCounts(_ plans: [PrintSort.Plan]) -> (total: Int, grouped: Int, prints: Int) {
+        var total = 0, grouped = 0, prints = 0
+        for plan in plans {
+            total += plan.looseModels.count
+            grouped += plan.loose.values.reduce(0) { $0 + $1.members.count }
+            prints += plan.loose.count
+        }
+        return (total, grouped, prints)
+    }
 }
 
 extension Shop {
@@ -70,7 +92,16 @@ extension Shop {
         guard aiLibraryAllowed, let build = source.build, let engine else { return SortAsk() }
         let settings = settingsDict
         let units = plans.flatMap(SortCache.units).filter { !SortCache.isCached($0, in: settings) }
-        guard !units.isEmpty else { return SortAsk() }
+        // The loose top-level files not asked about yet, in copy order — at
+        // most `LooseCache.perScan` names this scan, `perRequest` a request.
+        var looseBatches: [(root: URL, names: [String])] = []
+        var budget = LooseCache.perScan
+        for plan in plans where budget > 0 {
+            let names = Array(LooseCache.pending(plan, settings: settings).prefix(budget))
+            budget -= names.count
+            looseBatches += LooseCache.batches(names, births: plan.births).map { (plan.root, $0) }
+        }
+        guard !units.isEmpty || !looseBatches.isEmpty else { return SortAsk() }
         librarySortAsking = true
         defer { librarySortAsking = false }
 
@@ -82,10 +113,11 @@ extension Shop {
         let today = SortFailures.today()
         let marks = SortFailures.read(settings)
         let batches = SortCache.batches(units)
-        let pending = Set(batches.map(SortCache.signature))
+        let pending = Set(batches.map(SortCache.signature)).union(looseBatches.map { LooseCache.signature($0.names) })
         var asked = Set<String>(), failed = Set<String>()
+        var halted = false
         for batch in batches {
-            if stop?.isStopped == true || Task.isCancelled { break }
+            if halted || stop?.isStopped == true || Task.isCancelled { break }
             let sig = SortCache.signature(batch)
             if !byHand, SortFailures.held(sig, in: marks, today: today) {
                 result.held += batch.count
@@ -105,16 +137,49 @@ extension Shop {
                 }
             } catch AiClient.Failure.notConsented {
                 asked.remove(sig)
-                break                       // switched off meanwhile: the heuristic stands, nothing to say
+                halted = true               // switched off meanwhile: the heuristic stands, nothing to say
             } catch AiClient.Failure.noKey {
                 // Nothing was sent, so nothing to hold against the request.
                 // In the shop's words, not "No API key" in an Arabic sentence.
                 asked.remove(sig)
                 result.problem = words.callIt("mac.ai_no_key")
-                break
+                halted = true
             } catch {
                 // This request failed; the next may not (one too long for
                 // the provider says nothing about the others).
+                failed.insert(sig)
+                result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            }
+        }
+        // THE LOOSE FILES, the same way: names only, a batch at a time, each
+        // answer kept as it comes, a failing request held like a folder's.
+        var looseAnswered: [LooseCache.Answered] = []
+        for batch in looseBatches {
+            if halted || stop?.isStopped == true || Task.isCancelled { break }
+            let sig = LooseCache.signature(batch.names)
+            if !byHand, SortFailures.held(sig, in: marks, today: today) {
+                result.looseHeld += batch.names.count
+                continue
+            }
+            asked.insert(sig)
+            do {
+                let reply = try await AiClient.groupLoose(batch.names, shop: self)
+                looseAnswered.append(LooseCache.answered(root: batch.root, sent: batch.names, prints: reply.prints))
+                result.loose += batch.names.count
+                if let usage = reply.usage, usage != .null,
+                   let next = try? await engine.aiUsageRecord(ledger: ledger, task: "library", model: reply.model,
+                                                              usage: usage, now: Date()) {
+                    ledger = next
+                    spent = true
+                }
+            } catch AiClient.Failure.notConsented {
+                asked.remove(sig)
+                halted = true
+            } catch AiClient.Failure.noKey {
+                asked.remove(sig)
+                result.problem = words.callIt("mac.ai_no_key")
+                halted = true
+            } catch {
                 failed.insert(sig)
                 result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
             }
@@ -125,12 +190,15 @@ extension Shop {
             .map { (unit: $0, answers: got) }
         result.sorted = answered.reduce(0) { $0 + $1.unit.entries.count }
         let nextMarks = SortFailures.after(marks, asked: asked, failed: failed, pending: pending, today: today)
-        guard !answered.isEmpty || spent || nextMarks != marks else { return result }
+        guard !answered.isEmpty || !looseAnswered.isEmpty || spent || nextMarks != marks else { return result }
+        var present: [String: Set<String>] = [:]
+        for plan in plans { present[plan.root.standardizedFileURL.path] = Set(plan.looseModels) }
         do {
             // lock: system — the shop turned this on; it writes only the
             // assistant's answers, their cost and which requests failed.
             try StoreWriter.update(build) { root in
                 SortCache.store(answered, into: &root)
+                LooseCache.store(looseAnswered, present: present, into: &root)
                 if nextMarks != marks { SortFailures.write(nextMarks, into: &root) }
                 if spent {
                     var s = Self.settings(root)
@@ -272,11 +340,12 @@ extension Shop {
             // Pressed by hand: always tries, even a request that kept failing.
             let a = await askAssistantToSort(sorted, stop: stop, byHand: true)
             asked = a
-            if a.sorted > 0 {
+            if a.sorted > 0 || a.loose > 0 {
                 await load(source)
                 let answered = settingsDict
                 sorted = await PinWork.run {
-                    walked.map { Shop.sortedPlan(root: $0.root, models: $0.models, images: $0.images, settings: answered) }
+                    walked.map { Shop.sortedPlan(root: $0.root, models: $0.models, images: $0.images,
+                                                 settings: answered, births: $0.plan.births) }
                 }
             }
         }
@@ -300,8 +369,7 @@ extension Shop {
                     perGroup[id, default: 0] += 1
                     if let c = p.collection { collection[id] = c }
                     if picture[id] == nil {
-                        let name = plan.names[print] ?? PrintSort.cleanName(plan.tree[print]?.name ?? print)
-                        if let first = PrintSort.pictures(of: print, in: plan.tree, roles: plan.roles, name: name)
+                        if let first = plan.pictures(ofPrint: print)
                             .lazy.map({ plan.root.appending(path: $0) })
                             .first(where: { !LinkedCloud.isOnlineOnly($0) }) {
                             picture[id] = first
@@ -322,9 +390,11 @@ extension Shop {
             }
             return out.values.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
-        sortPreview = SortPreview(plans: plans, rows: printRows, collections: counted.collections,
+        var preview = SortPreview(plans: plans, rows: printRows, collections: counted.collections,
                                   moved: counted.moved, renamed: counted.renamed, tagged: counted.tagged,
                                   kept: counted.kept, assistant: asked, assistantOff: !aiLibraryAllowed)
+        preview.loose = SortPreview.looseCounts(plans)
+        sortPreview = preview
     }
 
     /// What applying `plans` to `rows` would change — the same judgement
@@ -406,6 +476,11 @@ struct LinkedSortSheet: View {
                 .font(.headline)
             VStack(alignment: .leading, spacing: 3) {
                 Text(shop.words.callIt("mac.sort_moved", ["n": .number(Double(preview.moved))]))
+                if preview.loose.total > 0 {
+                    Text(shop.words.callIt("mac.sort_loose", ["n": .number(Double(preview.loose.grouped)),
+                                                              "total": .number(Double(preview.loose.total)),
+                                                              "prints": .number(Double(preview.loose.prints))]))
+                }
                 if preview.renamed > 0 {
                     Text(shop.words.callIt("mac.sort_renamed", ["n": .number(Double(preview.renamed))]))
                 }
