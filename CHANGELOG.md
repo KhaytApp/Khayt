@@ -7024,6 +7024,19 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.70] - 2026-10-13
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Changed and fixed
+
+- **A wide picture stays inside its tile in the library.** A model whose
+  picture was wider than it was tall drew a tile wider than its column, over
+  the print next to it. The picture is now cropped to the square, and the
+  same fix keeps a photo inside its frame everywhere a thumbnail is shown,
+  such as the portfolio.
+
 ## [4.0.0-alpha.69] - 2026-10-13
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
