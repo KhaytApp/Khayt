@@ -257,59 +257,33 @@ extension Shop {
         }
         let primary = roots.primary
         // The groups records sit in now: a picture for a group nobody is
-        // filed in would be thrown away at the write — and the print marked
-        // looked with no picture, never tried again.
+        // filed in would be thrown away at the write.
         let liveNow = Set(GroupKinds.groupPaths(["printFiles": .array(fileRows)]))
+        let covered = Set(covers.keys)
+        let steps = await PinWork.run { [photoless, indexed] in
+            PrintPhotos.pass(jobs, covered: covered, live: liveNow, photoless: photoless, indexed: indexed)
+        }
         var groupPictures: [(group: String, rel: String)] = []
         var modelPhotos: [String: String] = [:]
-        var looked: [String] = []
-        var printOfGroup: [String: String] = [:]
-        var fetched = 0
-        for job in jobs {
-            if stop?.isStopped == true || Task.isCancelled || fetched >= PrintPhotos.perPass { break }
-            // ── LOOKED AT ONLY ONCE SETTLED (Oct 2026) ─────────────────────
-            // A print is remembered as looked at when it got its picture, or
-            // already had one, or the picture would not decode — so a print
-            // left over by the per-pass cap, one whose pictures were all too
-            // big, or a model not indexed yet is tried again next pass, until
-            // every print with a picture wears one. Remembered once it got
-            // one, so a picture the shop took off is never put back.
-            var settled = true
-            if let group = job.group, covers[group] == nil {
-                if !liveNow.contains(where: { Self.isUnder($0, group) }) {
-                    settled = false                      // nobody filed there yet
-                } else if let pick = await PinWork.run({ PrintPhotos.pick(job.candidates) }) {
-                    fetched += 1
-                    if let rel = await PinWork.run({ try? GroupPictures.write(GroupPictures.encode(pick), for: group, under: primary) }) {
-                        groupPictures.append((group, rel))
-                        printOfGroup[group] = job.print
-                    } else {
-                        settled = false
-                    }
+        var done: [PrintPhotos.Step] = []
+        for var step in steps {
+            if stop?.isStopped == true || Task.isCancelled { break }
+            if let group = step.group, let pick = step.groupPick {
+                if let rel = await PinWork.run({ try? GroupPictures.write(GroupPictures.encode(pick), for: group, under: primary) }) {
+                    groupPictures.append((group, rel))
                 } else {
-                    settled = false
+                    step.settled = false
                 }
             }
-            if let only = job.only {
-                if photoless.contains(only) {
-                    if let pick = await PinWork.run({ PrintPhotos.pick(job.candidates) }) {
-                        fetched += 1
-                        if let uri = await PinWork.run({ try? LibraryPhoto.dataURI(of: pick) }) { modelPhotos[only] = uri }
-                    } else {
-                        settled = false
-                    }
-                } else if !indexed.contains(only) {
-                    settled = false                      // not in the book yet
-                }
+            if let only = step.only, let pick = step.onlyPick {
+                if let uri = await PinWork.run({ try? LibraryPhoto.dataURI(of: pick) }) { modelPhotos[only] = uri }
             }
-            if settled { looked.append(job.print) }
-            for (model, image) in job.modelPictures.sorted(by: { $0.key < $1.key })
-            where photoless.contains(model) && modelPhotos[model] == nil && fetched < PrintPhotos.perPass {
-                guard let pick = await PinWork.run({ PrintPhotos.pick([image]) }) else { continue }
-                fetched += 1
+            for (model, pick) in step.models.sorted(by: { $0.key < $1.key }) {
                 if let uri = await PinWork.run({ try? LibraryPhoto.dataURI(of: pick) }) { modelPhotos[model] = uri }
             }
+            done.append(step)
         }
+        let looked = PrintPhotos.settled(done, notWorn: [])
         guard !looked.isEmpty || !modelPhotos.isEmpty || !groupPictures.isEmpty else { return 0 }
         var put = 0
         var unused: [String] = []
@@ -342,13 +316,13 @@ extension Shop {
                         // Not filed there after all: no picture went on, so
                         // the print is not settled. (One that got a cover of
                         // its own meanwhile is.)
-                        if now[group] == nil, let p = printOfGroup[group] { notWorn.insert(p) }
+                        if now[group] == nil { notWorn.insert(group) }
                         continue
                     }
                     GroupKinds.setCover(.image(rel), for: group, into: &root)
                     put += 1
                 }
-                PrintPhotos.markLooked(looked.filter { !notWorn.contains($0) }, into: &root)
+                PrintPhotos.markLooked(PrintPhotos.settled(done, notWorn: notWorn), into: &root)
             }
         } catch {
             unused = groupPictures.map(\.rel)
@@ -501,7 +475,7 @@ extension Shop {
     /// Apply the sort the sheet showed: the records refiled through the same
     /// protections as every refile (judged again on the book as it is now),
     /// then the prints' pictures.
-    func applyLinkedSort(_ preview: SortPreview, ticked: Set<String> = []) async {
+    func applyLinkedSort(_ preview: SortPreview, ticked: Set<String> = [], notThis: Set<String> = []) async {
         guard permitted("inventory", "edit") else { return }
         guard let build = source.build, StoreLock.weOwnIt(build), !libraryMoveBusy else { return }
         sortPreview = nil
@@ -517,22 +491,20 @@ extension Shop {
             await load(source)
             var pictures = stop.isStopped ? 0 : await fetchPrintPictures(preview.plans, stop: stop)
             if pictures > 0 { await load(source) }
-            // The pictures to check: ticked ones go on, unticked ones are
-            // remembered as turned down and never offered again.
+            // The pictures to check: ticked ones go on. Unticked means "not
+            // now" -- offered again next time. Only "Not this print" is
+            // remembered, and never offered for that print again.
             if !preview.pictures.isEmpty, !stop.isStopped {
                 var put: [(plan: PrintSort.Plan, suggestion: LooseSort.Suggestion)] = []
-                var turned: [String] = []
-                for row in preview.pictures {
-                    if ticked.contains(row.id) {
-                        if let plan = preview.plans.first(where: { $0.root == row.root }) { put.append((plan, row.suggestion)) }
-                    } else {
-                        turned.append(row.id)
-                    }
+                for row in preview.pictures where ticked.contains(row.id) && !notThis.contains(row.id) {
+                    if let plan = preview.plans.first(where: { $0.root == row.root }) { put.append((plan, row.suggestion)) }
                 }
-                rejectPictures(turned)
+                rejectPictures(preview.pictures.map(\.id).filter(notThis.contains))
                 pictures += await putPictures(put, stop: stop)
             }
-            var lines = [words.callIt("mac.linked_regrouped", ["n": .number(Double(n))])]
+            // Only pictures applied: say how many went on, not "regrouped: 0".
+            var lines: [String] = []
+            if n > 0 || pictures == 0 { lines.append(words.callIt("mac.linked_regrouped", ["n": .number(Double(n))])) }
             if pictures > 0 { lines.append(words.callIt("mac.sort_pictures_added", ["n": .number(Double(pictures))])) }
             libraryMoveNote = lines.joined(separator: " ")
         } catch {
@@ -549,6 +521,8 @@ struct LinkedSortSheet: View {
     @Environment(\.dismiss) private var dismiss
     /// The pictures to check the shop has ticked (`PictureRow.ticked` to start).
     @State private var ticks: Set<String>
+    /// Rows the shop said are "Not this print" — remembered on Apply.
+    @State private var notThis: Set<String> = []
 
     init(shop: Shop, preview: SortPreview) {
         self.shop = shop
@@ -622,19 +596,11 @@ struct LinkedSortSheet: View {
                     }
                 }
                 List(preview.pictures) { row in
-                    Toggle(isOn: Binding(get: { ticks.contains(row.id) },
-                                         set: { on in if on { ticks.insert(row.id) } else { ticks.remove(row.id) } })) {
-                        HStack(spacing: 10) {
-                            Thumbnail(source: row.picture.map { ThumbnailSource.file($0) })
-                                .frame(width: 40, height: 40)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(verbatim: row.name).lineLimit(1)
-                                Text(verbatim: row.image.lastPathComponent)
-                                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                        }
-                    }
+                    PictureCheckRow(shop: shop, row: row,
+                                    ticked: Binding(get: { ticks.contains(row.id) },
+                                                    set: { on in if on { ticks.insert(row.id) } else { ticks.remove(row.id) } }),
+                                    notThis: Binding(get: { notThis.contains(row.id) },
+                                                     set: { on in if on { notThis.insert(row.id) } else { notThis.remove(row.id) } }))
                 }
                 .frame(minHeight: 140)
             }
@@ -648,8 +614,9 @@ struct LinkedSortSheet: View {
                 Button(shop.words.callIt("mac.sort_apply")) {
                     let chosen = preview
                     let picked = ticks
+                    let refused = notThis
                     dismiss()
-                    Task { await shop.applyLinkedSort(chosen, ticked: picked) }
+                    Task { await shop.applyLinkedSort(chosen, ticked: picked, notThis: refused) }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!shop.canWrite
@@ -658,5 +625,72 @@ struct LinkedSortSheet: View {
         }
         .padding(20)
         .frame(minWidth: 520, idealWidth: 560, minHeight: 480)
+    }
+}
+
+/// One picture to check: tick to use it, untick for "not now", or "Not this
+/// print" to never be offered it for this print again. A picture kept only in
+/// the cloud is a placeholder until "Show" brings that one picture down.
+struct PictureCheckRow: View {
+    let shop: Shop
+    let row: PictureRow
+    @Binding var ticked: Bool
+    @Binding var notThis: Bool
+    @State private var brought = false
+    @State private var bringing = false
+
+    private var shownPicture: URL? { row.picture ?? (brought ? row.image : nil) }
+    private var inCloud: Bool { row.online && !brought }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Toggle(isOn: $ticked) { EmptyView() }
+                .labelsHidden()
+                .disabled(notThis)
+            thumb
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: row.name).lineLimit(1).strikethrough(notThis)
+                Text(verbatim: row.image.lastPathComponent)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if inCloud {
+                    HStack(spacing: 6) {
+                        Label(shop.words.callIt("mac.sort_picture_cloud"), systemImage: "icloud")
+                            .font(.caption2).foregroundStyle(.secondary)
+                        Button(shop.words.callIt("mac.sort_picture_show")) { bringDown() }
+                            .buttonStyle(.link).controlSize(.small).font(.caption2)
+                            .disabled(bringing)
+                    }
+                }
+            }
+            Spacer(minLength: 8)
+            Button(shop.words.callIt(notThis ? "mac.sort_picture_undo" : "mac.sort_picture_not_this")) {
+                notThis.toggle()
+                if notThis { ticked = false }
+            }
+            .buttonStyle(.borderless).controlSize(.small)
+        }
+        .opacity(notThis ? 0.55 : 1)
+    }
+
+    @ViewBuilder private var thumb: some View {
+        if let url = shownPicture {
+            Thumbnail(source: .file(url))
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        } else {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(.quaternary)
+                .frame(width: 40, height: 40)
+                .overlay(Image(systemName: inCloud ? "icloud" : "photo").foregroundStyle(.secondary))
+        }
+    }
+
+    private func bringDown() {
+        bringing = true
+        Task {
+            let ok = await shop.bringDownPicture(row.image)
+            bringing = false
+            if ok { brought = true }
+        }
     }
 }
