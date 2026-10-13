@@ -9,6 +9,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   upload against the phone, so a large model sent while the window was
   busy could fail with "the network connection was lost". Only time spent
   waiting for the phone counts now.
+- **Mac: "Sort linked folders…" can always be closed.** With a large drive
+  (hundreds of prints and pictures to check), the sheet grew taller than the
+  Settings window, so its Cancel and Apply buttons were cut off below it, and
+  only Escape closed it. The title and buttons now stay in place and the
+  list scrolls between them.
+
 - **Mac: loose models in a linked folder are sorted into prints, and only
   the right picture goes on a print.**
   - **Models with no folder of their own are grouped.** Files dropped

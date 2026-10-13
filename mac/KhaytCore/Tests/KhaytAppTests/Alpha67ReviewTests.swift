@@ -343,6 +343,10 @@ struct Alpha67SnapshotTests {
                    "a67-sort-sheet-assistant-used", sheet, dark: dark)
             await hosted(LinkedSortSheet(shop: shop, preview: Self.preview(SortAsk(sorted: 0, problem: "The provider is busy (HTTP 529). Try again in a minute."), off: false)),
                    "a67-sort-sheet-assistant-failed", sheet, dark: dark)
+            // A real drive's preview in a short window: Cancel and Apply must
+            // stay on the sheet (alpha.68's went below it).
+            await hosted(LinkedSortSheet(shop: shop, preview: SheetsFitALaptopTests.bigSortPreview()),
+                         "a68-sort-sheet-short", CGSize(width: 560, height: 480), dark: dark)
             let settings = CGSize(width: 680, height: 820)
             shop.libraryMoveNote = nil
             await hosted(Form { LibraryLocationSettings(shop: shop) }.formStyle(.grouped), "a67-library-location",

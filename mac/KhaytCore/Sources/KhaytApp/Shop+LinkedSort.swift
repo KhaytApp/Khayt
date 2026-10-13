@@ -531,6 +531,46 @@ struct LinkedSortSheet: View {
     }
 
     var body: some View {
+        // Title and summary on top, Cancel and Apply below, and everything that
+        // grows with the drive (the prints, the pictures to check) in ONE scroll
+        // region between them. It used to be two Lists with minimum heights
+        // (260 + 140) under a 480-high frame: a drive with 454 prints and 40
+        // pictures pushed the buttons out of the sheet, and a sheet cannot be
+        // moved, so only Escape got the shop out (alpha.68, Oct 13 2026; see
+        // SheetFrame for the same trap in the other sheets).
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            ScrollView(.vertical) {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(preview.rows) { row in
+                        printRow(row)
+                        Divider()
+                    }
+                    if !preview.pictures.isEmpty {
+                        picturesHeader.padding(.top, 16).padding(.bottom, 6)
+                        ForEach(preview.pictures) { row in
+                            PictureCheckRow(shop: shop, row: row,
+                                            ticked: Binding(get: { ticks.contains(row.id) },
+                                                            set: { on in if on { ticks.insert(row.id) } else { ticks.remove(row.id) } }),
+                                            notThis: Binding(get: { notThis.contains(row.id) },
+                                                             set: { on in if on { notThis.insert(row.id) } else { notThis.remove(row.id) } }))
+                                .padding(.vertical, 4)
+                            Divider()
+                        }
+                    }
+                }
+                .padding(.trailing, 12)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(minHeight: 120, maxHeight: .infinity)
+            .layoutPriority(-1)
+            footer
+        }
+        .padding(20)
+        .frame(minWidth: 520, idealWidth: 560, maxHeight: SheetMetrics.ceiling)
+    }
+
+    private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(shop.words.callIt("mac.sort_title")).font(.title2.weight(.semibold))
             Text(shop.words.callIt("mac.sort_summary", ["prints": .number(Double(preview.rows.count)),
@@ -563,68 +603,65 @@ struct LinkedSortSheet: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            List(preview.rows) { row in
-                HStack(spacing: 10) {
-                    Thumbnail(source: row.picture)
-                        .frame(width: 40, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: row.name).lineLimit(1)
-                        if let from = row.from {
-                            Text(shop.words.callIt("mac.sort_from", ["name": .string(from)]))
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                    }
-                    Spacer()
-                    Text(shop.words.callIt("mac.sort_models", ["n": .number(Double(row.models))]))
-                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func printRow(_ row: SortPreview.Row) -> some View {
+        HStack(spacing: 10) {
+            Thumbnail(source: row.picture)
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: row.name).lineLimit(1)
+                if let from = row.from {
+                    Text(shop.words.callIt("mac.sort_from", ["name": .string(from)]))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
-            .frame(minHeight: 260)
-            if !preview.pictures.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(shop.words.callIt("mac.sort_pictures_check")).font(.headline)
-                    Text(shop.words.callIt("mac.sort_pictures_check_help"))
-                        .font(.caption).foregroundStyle(.secondary)
-                    if preview.pictureAsk?.unsupported == true {
-                        Label(shop.words.callIt("mac.sort_pictures_ai_off"), systemImage: "sparkles")
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else if let n = preview.pictureAsk?.checked, n > 0 {
-                        Label(shop.words.callIt("mac.sort_pictures_checked", ["n": .number(Double(n))]),
-                              systemImage: "sparkles")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                List(preview.pictures) { row in
-                    PictureCheckRow(shop: shop, row: row,
-                                    ticked: Binding(get: { ticks.contains(row.id) },
-                                                    set: { on in if on { ticks.insert(row.id) } else { ticks.remove(row.id) } }),
-                                    notThis: Binding(get: { notThis.contains(row.id) },
-                                                     set: { on in if on { notThis.insert(row.id) } else { notThis.remove(row.id) } }))
-                }
-                .frame(minHeight: 140)
-            }
-            HStack {
-                Spacer()
-                Button(shop.words.callIt("common.cancel"), role: .cancel) {
-                    shop.sortPreview = nil
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-                Button(shop.words.callIt("mac.sort_apply")) {
-                    let chosen = preview
-                    let picked = ticks
-                    let refused = notThis
-                    dismiss()
-                    Task { await shop.applyLinkedSort(chosen, ticked: picked, notThis: refused) }
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!shop.canWrite
-                          || (preview.moved + preview.renamed + preview.tagged == 0 && preview.pictures.isEmpty))
+            Spacer()
+            Text(shop.words.callIt("mac.sort_models", ["n": .number(Double(row.models))]))
+                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+        }
+        .padding(.vertical, 6)
+    }
+
+    private var picturesHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(shop.words.callIt("mac.sort_pictures_check")).font(.headline)
+            Text(shop.words.callIt("mac.sort_pictures_check_help"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if preview.pictureAsk?.unsupported == true {
+                Label(shop.words.callIt("mac.sort_pictures_ai_off"), systemImage: "sparkles")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if let n = preview.pictureAsk?.checked, n > 0 {
+                Label(shop.words.callIt("mac.sort_pictures_checked", ["n": .number(Double(n))]),
+                      systemImage: "sparkles")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .padding(20)
-        .frame(minWidth: 520, idealWidth: 560, minHeight: 480)
+    }
+
+    private var footer: some View {
+        HStack {
+            Spacer()
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {
+                shop.sortPreview = nil
+                dismiss()
+            }
+            .keyboardShortcut(.cancelAction)
+            Button(shop.words.callIt("mac.sort_apply")) {
+                let chosen = preview
+                let picked = ticks
+                let refused = notThis
+                dismiss()
+                Task { await shop.applyLinkedSort(chosen, ticked: picked, notThis: refused) }
+            }
+            .keyboardShortcut(.defaultAction)
+            .disabled(!shop.canWrite
+                      || (preview.moved + preview.renamed + preview.tagged == 0 && preview.pictures.isEmpty))
+        }
     }
 }
 
