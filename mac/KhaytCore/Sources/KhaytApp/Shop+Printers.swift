@@ -46,7 +46,7 @@ extension Shop {
         // first place.
         let discovered: [JSONValue] = found.compactMap { printer in
             guard let data = try? JSONEncoder().encode(printer),
-                  let value = try? JSONDecoder().decode(JSONValue.self, from: data)
+                  let value = try? JSONValue.decode(JSONValue.self, from: data)
             else { return nil }
             return value
         }

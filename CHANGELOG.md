@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: opening and saving a big book is much faster.** Reading the shop's
+  book (and every change to it) now takes about a tenth of the time it did on
+  a 15 MB library — on the Mac and on the phone — with exactly the same
+  result.
+
 - **(Maintainers) The Mac's road to beta is up to date.** `mac/BETA.md` marks
   the `Shop.swift` split done and crash reports live, lists what alpha.66 to
   alpha.69 shipped untried, and moving a job on by itself is deferred until

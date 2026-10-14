@@ -133,12 +133,12 @@ public struct StoreReader: Sendable {
         guard fm.fileExists(atPath: url.path) else { throw Failure.noStore(url) }
         let data: Data
         do { data = try Data(contentsOf: url) } catch { throw Failure.unreadable(url, error) }
-        var parsed = try? JSONDecoder().decode([String: JSONValue].self, from: data)
+        var parsed = try? JSONValue.decode([String: JSONValue].self, from: data)
         // A primary that will not parse, with a rollback that does: open the
         // rollback, as Electron does. Nothing is overwritten here; the next
         // save replaces the damaged file, and the damaged one becomes `.prev`.
         if parsed == nil, let older = try? Data(contentsOf: prev) {
-            parsed = try? JSONDecoder().decode([String: JSONValue].self, from: older)
+            parsed = try? JSONValue.decode([String: JSONValue].self, from: older)
         }
         guard let root = parsed else { throw Failure.notJSON(url) }
         self.raw = root

@@ -55,7 +55,7 @@ final class EnergyMeter {
         let key = "mac.energyMeters." + book.standardizedFileURL.path
         return EnergyMeter(load: {
             guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
-            return try? JSONDecoder().decode(JSONValue.self, from: data)
+            return try? JSONValue.decode(JSONValue.self, from: data)
         }, save: { memo in
             if let data = try? JSONEncoder().encode(memo) { UserDefaults.standard.set(data, forKey: key) }
         })

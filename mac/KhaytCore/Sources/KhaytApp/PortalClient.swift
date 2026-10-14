@@ -137,7 +137,7 @@ enum PortalClient {
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if (300..<400).contains(status) { throw Failure.redirected }
-        let json = (try? JSONDecoder().decode(JSONValue.self, from: data)) ?? .null
+        let json = (try? JSONValue.decode(JSONValue.self, from: data)) ?? .null
         guard status == 200 else {
             if let said = try? await engine.portalError(status: status, body: json) { throw Failure.owner(said) }
             throw Failure.refused(status, serverReason(data))

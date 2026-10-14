@@ -617,7 +617,7 @@ final class Shop {
                 // apart, and the screens that draw the difference between
                 // today and a due date are the ones that lose their case.
                 root = SampleBook.rebased(
-                    try JSONDecoder().decode([String: JSONValue].self, from: data),
+                    try JSONValue.decode([String: JSONValue].self, from: data),
                     to: day)
             case .store(let build):
                 // ── OFF THE MAIN THREAD ──────────────────────────────────

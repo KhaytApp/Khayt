@@ -1105,7 +1105,7 @@ final class LanServer {
         guard allowed else {
             return .open(429, #"{"error":"Too many submissions — try again later"}"#)
         }
-        guard let body = try? JSONDecoder().decode(JSONValue.self, from: request.body), case .object = body else {
+        guard let body = try? JSONValue.decode(JSONValue.self, from: request.body), case .object = body else {
             return .open(400, #"{"error":"Invalid request — please check your submission and try again"}"#)
         }
         var shopName = "this shop"
@@ -1284,7 +1284,7 @@ final class LanServer {
         var parsed: [String: JSONValue] = [:]
         let trimmed = String(decoding: request.body, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
-            guard let body = try? JSONDecoder().decode(JSONValue.self, from: request.body), case .object(let o) = body else {
+            guard let body = try? JSONValue.decode(JSONValue.self, from: request.body), case .object(let o) = body else {
                 return .json(400, #"{"error":"Invalid JSON"}"#)
             }
             parsed = o
@@ -1385,7 +1385,7 @@ final class LanServer {
         guard await rateStep(\.surveys, request, now: now, limit: limit) else {
             return .open(429, #"{"error":"Too many attempts — try again later"}"#)
         }
-        guard let body = try? JSONDecoder().decode(JSONValue.self, from: request.body), case .object = body else {
+        guard let body = try? JSONValue.decode(JSONValue.self, from: request.body), case .object = body else {
             return .open(400, #"{"error":"Invalid request"}"#)
         }
         guard let check = try? await engine.lanSurveyCheck(body: body) else {
@@ -1690,7 +1690,7 @@ final class LanServer {
             // asking.
             return .json(405, #"{"error":"This Mac does not take changes from a phone."}"#)
         }
-        guard let body = try? JSONDecoder().decode(JSONValue.self, from: request.body),
+        guard let body = try? JSONValue.decode(JSONValue.self, from: request.body),
               case .object(let payload) = body else {
             return .json(400, #"{"error":"Invalid request"}"#)
         }
@@ -1794,7 +1794,7 @@ final class LanServer {
         // exactly as the Node server's `safeJsonParse` hands the rule
         // `undefined`: it is signed, so it IS the storefront, and a row the
         // shop can see beats a delivery silently dropped.
-        let payload = (try? JSONDecoder().decode(JSONValue.self, from: request.body)) ?? .null
+        let payload = (try? JSONValue.decode(JSONValue.self, from: request.body)) ?? .null
         // The early answer, from the book as it is before any write, so a
         // provider's retry costs nothing. The rule asks again inside the write.
         if (try? await host.engine.storefrontAlreadyRecorded(
@@ -1857,7 +1857,7 @@ final class LanServer {
         if replayed(provided, now: now) {
             return .json(409, #"{"error":"Duplicate delivery ignored"}"#)
         }
-        let payload = (try? JSONDecoder().decode(JSONValue.self, from: request.body)) ?? .null
+        let payload = (try? JSONValue.decode(JSONValue.self, from: request.body)) ?? .null
         var config: JSONValue = .object([:])
         if case .object(let settings)? = host.store()["settings"], case .object(let shipping)? = settings["shipping"],
            let mine = shipping[carrier] { config = mine }
