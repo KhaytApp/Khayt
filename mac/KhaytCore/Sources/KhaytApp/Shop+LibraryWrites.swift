@@ -189,6 +189,7 @@ extension Shop {
         var changed = written.changed
         if written.sequence > libraryShownSequence {
             libraryShownSequence = written.sequence
+            libraryEpoch += 1
             libraryShownRows = written.rows
             libraryRows = written.rows
             fileRows = written.rows

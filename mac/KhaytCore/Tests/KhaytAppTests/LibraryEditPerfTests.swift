@@ -314,6 +314,34 @@ struct LibraryEditPerfTests {
         }
     }
 
+    /// Two reloads in flight: the older one read first, and was still working
+    /// when a newer one — after a scan added a model — put the newer library
+    /// up. Finishing last, the older one took its own rows and drew the
+    /// library without the new model (`quickEditsInARow`'s flake under load).
+    @Test("a reload overtaken by a newer one does not put the older library back")
+    func olderReloadFinishingLast() async throws {
+        try await withPerfBook(PerfBook.synthesize(models: 20)) { shop, url in
+            Shop.whileLoadingForTests = {
+                Shop.whileLoadingForTests = nil
+                // A scan's write — not a library edit — then its reload.
+                try? StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+                    var rows = Shop.rows(root, "printFiles")
+                    rows.append(.object(["id": .string("pfscanned0001"), "name": .string("Scanned"),
+                                         "folder": .string(""), "tags": .array([]), "colors": .array([])]))
+                    root["printFiles"] = .array(rows)
+                }
+                await shop.load(shop.source)
+            }
+            await shop.load(shop.source)
+            Shop.whileLoadingForTests = nil
+            await shop.settleLibraryWrites()
+            let written = try diskRows(url)
+            #expect(written.count == 21)
+            #expect(shop.libraryRows == written, "the older reload put its library back over the newer one")
+            #expect(shop.fileRows == written)
+        }
+    }
+
     /// Another app takes the book: a live pid on this host (launchd).
     static func stealBook(_ url: URL) throws -> URL {
         let now = Date().timeIntervalSince1970 * 1000

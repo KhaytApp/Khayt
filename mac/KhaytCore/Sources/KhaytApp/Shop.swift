@@ -558,6 +558,9 @@ final class Shop {
     /// so a test can land a library write in exactly that gap. Nothing in
     /// the app sets it.
     static var afterBookReadForTests: (@MainActor () async -> Void)?
+    /// TESTS ONLY: run once a load has put its models up and is about to do
+    /// the seconds of work after — where a newer load can overtake it.
+    static var whileLoadingForTests: (@MainActor () async -> Void)?
 
     /// Library edits on screen and not yet written (`Shop+LibraryWrites`).
     @ObservationIgnored var pendingLibraryChanges: [PendingLibraryChange] = []
@@ -566,6 +569,9 @@ final class Shop {
     @ObservationIgnored var libraryShownSequence = 0
     /// The library as that write left it, before any pending edit is drawn.
     @ObservationIgnored var libraryShownRows: [JSONValue] = []
+    /// Moved by every load's read and every library write put on screen, so
+    /// a load still working can tell its rows are no longer the newest.
+    @ObservationIgnored var libraryEpoch = 0
     /// Library writes started and not yet waited for (`settleLibraryWrites`).
     @ObservationIgnored var libraryWrites: [Int: Task<LibraryUndo?, Never>] = [:]
     var now: Date { clock ?? Date() }
@@ -599,7 +605,7 @@ final class Shop {
             // The library write on screen when this book was read. Moved on
             // by the time the rows below are taken, a write has landed in
             // between, and its rows are the newer ones.
-            var readMark = libraryShownSequence
+            var readMark = libraryEpoch
             switch next {
             case .sample:
                 guard let url = AppResources.bundle.url(forResource: "sample-shop", withExtension: "json"),
@@ -651,9 +657,21 @@ final class Shop {
                 // This book is now the library on screen: a write it already
                 // holds, heard late, patches from THIS, never from older rows.
                 libraryShownSequence = max(libraryShownSequence, read.holds)
-                libraryShownRows = Self.rows(root, "printFiles")
-                readMark = libraryShownSequence
             }
+            // ── THE NEWEST LIBRARY WINS, WHICHEVER LOAD FINISHES LAST ────
+            //
+            // The generation guard above stops a load whose READ finished
+            // after a newer load began. It cannot stop one that read first
+            // and is still in the seconds of work below when a newer load
+            // (or a library write) puts a newer library up — and that older
+            // load then took its rows at the end and drew the older library:
+            // a scan's models gone again, a star off (the flaky
+            // `quickEditsInARow`, under load). So every read and every write
+            // put on screen moves `libraryEpoch`, and the rows below come
+            // from this read only while it is still the newest.
+            libraryShownRows = Self.rows(root, "printFiles")
+            libraryEpoch += 1
+            readMark = libraryEpoch
             let decoded = try Self.decodeOrders(root)
             orders = decoded.items
             skipped = decoded.skipped
@@ -669,6 +687,7 @@ final class Shop {
             reapplyPendingLibraryChanges()
             libraryGroupKinds = GroupKinds.read(Self.settings(root))
             libraryGroupCovers = GroupKinds.covers(Self.settings(root))
+            if let hook = Self.whileLoadingForTests { await hook() }
             libraryRoots = next.build.map { build in
                 LibraryLocation.resolveRoots(settings: Self.librarySettings(root),
                                              defaultRoot: LibraryLocation.defaultRoot(for: build))
@@ -711,7 +730,7 @@ final class Shop {
             await words.load(wanted, engine: engine)
             // A library write that landed during the await above has put the
             // newer settings (group kinds, covers) on screen already.
-            if libraryShownSequence == readMark { settingsValue = root["settings"] ?? .object([:]) }
+            if libraryEpoch == readMark { settingsValue = root["settings"] ?? .object([:]) }
             await readFeatures()
             // A shop that has just switched to Simple must not be left looking
             // at a screen that is no longer theirs.
@@ -770,7 +789,7 @@ final class Shop {
             // The print files as written. `files` above is the decoded model;
             // this is what the setups and versions rules read, which is a wider
             // set of fields than the model carries.
-            if libraryShownSequence != readMark {
+            if libraryEpoch != readMark {
                 // A library write landed during the work above: its rows
                 // are newer than this read's (`readMark`).
                 fileRows = libraryShownRows
@@ -880,7 +899,7 @@ final class Shop {
             // reason as everything above it: the grid redraws on every
             // keystroke in the search box, and a hop into JavaScript per chip
             // per redraw is a hop for a constant.
-            if libraryShownSequence != readMark {
+            if libraryEpoch != readMark {
                 libraryRows = libraryShownRows
             } else if case .array(let rows)? = root["printFiles"] {
                 libraryRows = rows
