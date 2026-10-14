@@ -52,8 +52,32 @@ final class PendingUndo<Value: Sendable> {
     func drop() {
         guard open else { return }
         open = false
-        undoManager?.removeAllActions(withTarget: ticket)
         continuation.finish()
+        guard let undoManager else { return }
+        // ── NOT WHILE ITS GROUP IS STILL OPEN ─────────────────────────────
+        //
+        // `removeAllActions(withTarget:)` called on a group still being built
+        // empties it but leaves the GROUP: it closes onto the stack with
+        // nothing in it and swallows the next ⌘Z — and no later removal can
+        // reach it (measured). Removed from a closed group, the group goes
+        // too. A write refused before it ever suspends (another app owns the
+        // book) drops inside the click's own group, so the entry is taken off
+        // once that group has closed.
+        guard undoManager.groupingLevel > 0 else {
+            undoManager.removeAllActions(withTarget: ticket)
+            return
+        }
+        let ticket = ticket
+        Task { @MainActor [weak undoManager] in
+            for _ in 0..<600 {
+                guard let undoManager else { return }
+                if undoManager.groupingLevel == 0 {
+                    undoManager.removeAllActions(withTarget: ticket)
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+        }
     }
 }
 
