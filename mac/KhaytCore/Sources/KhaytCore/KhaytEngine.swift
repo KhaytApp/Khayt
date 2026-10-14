@@ -1802,6 +1802,13 @@ public actor KhaytEngine {
 
     /// Native since the port — `KhaytCore.ModelLicence`.
     public func licenceStanding(source: String?, licence: String?) throws -> Standing {
+        Self.standing(source: source, licence: licence)
+    }
+
+    /// The same answer without a hop onto the engine: the rule is Swift, and a
+    /// library of ten thousand models asked one hop at a time paid for the
+    /// queue, not the rule.
+    public nonisolated static func standing(source: String?, licence: String?) -> Standing {
         let s = ModelLicence.standing(source: source, licence: licence)
         return Standing(known: s.known, licence: s.licence, source: s.source,
                         sellable: s.sellable, attribution: s.attribution,
@@ -2346,6 +2353,87 @@ public actor KhaytEngine {
                             bed: (x: Double, y: Double, z: Double)? = nil,
                             bbox: (x: Double, y: Double, z: Double)? = nil)
         throws -> PrintRiskReport {
+        let input = Self.assessInput(analysis: analysis, nozzleDiameter: nozzleDiameter,
+                                     supportThresholdDeg: supportThresholdDeg, bed: bed, bbox: bbox)
+        return try runtime.call2("""
+            (function (input) {
+              var r = KhaytPrintRisk.assessModel(input);
+              // The SAME findings turned into lines by the same rule the other
+              // app's quote screen uses. `riskNote` wants them under `risk`.
+              return Object.assign({}, r, { note: KhaytIntakeView.riskNote({ risk: r }) });
+            })(ARG0)
+            """,
+            [.object(input)], as: PrintRiskReport.self)
+    }
+
+    /// One model for `assessModels`: what `assessModel` takes per model.
+    public struct RiskInput: Sendable {
+        public let analysis: [String: JSONValue]
+        public let bbox: (x: Double, y: Double, z: Double)?
+        public init(analysis: [String: JSONValue], bbox: (x: Double, y: Double, z: Double)?) {
+            self.analysis = analysis
+            self.bbox = bbox
+        }
+    }
+
+    /// `assessModel` for a whole library in ONE crossing, against one nozzle:
+    /// the same report per model, nil wherever the one-model call would have
+    /// thrown.
+    ///
+    /// The input is built by the same function, each report is turned into
+    /// text by the same `JSON.stringify` and decoded by the same decoder, and a
+    /// model whose input JSON cannot carry (an infinite box) is skipped, as the
+    /// one-model call fails to encode it. `EngineBatchParityTests` compares
+    /// the two over a varied library.
+    public func assessModels(_ models: [RiskInput], nozzleDiameter: Double? = nil)
+        throws -> [PrintRiskReport?] {
+        var out = [PrintRiskReport?](repeating: nil, count: models.count)
+        var sent: [JSONValue] = []
+        var at: [Int] = []
+        for (i, model) in models.enumerated() {
+            let input = JSONValue.object(Self.assessInput(analysis: model.analysis,
+                                                         nozzleDiameter: nozzleDiameter,
+                                                         supportThresholdDeg: nil, bed: nil,
+                                                         bbox: model.bbox))
+            guard Self.writable(input) else { continue }
+            sent.append(input)
+            at.append(i)
+        }
+        guard !sent.isEmpty else { return out }
+        let texts = try runtime.call2("""
+            (function (inputs) {
+              return inputs.map(function (input) {
+                try {
+                  var r = KhaytPrintRisk.assessModel(input);
+                  return JSON.stringify(
+                    Object.assign({}, r, { note: KhaytIntakeView.riskNote({ risk: r }) }));
+                } catch (err) { return null; }
+              });
+            })(ARG0)
+            """,
+            [.array(sent)], as: [String?].self)
+        for (k, text) in texts.enumerated() where k < at.count {
+            guard let text, let data = text.data(using: .utf8) else { continue }
+            out[at[k]] = try? JSONValue.decode(PrintRiskReport.self, from: data)
+        }
+        return out
+    }
+
+    /// False when JSON cannot carry `value` — a NaN or an infinity anywhere in
+    /// it — which is when a one-model call fails before it reaches the rule.
+    static func writable(_ value: JSONValue) -> Bool {
+        switch value {
+        case .number(let d): return d.isFinite
+        case .array(let a): return a.allSatisfy(writable)
+        case .object(let o): return o.values.allSatisfy(writable)
+        case .string, .bool, .null: return true
+        }
+    }
+
+    static func assessInput(analysis: [String: JSONValue], nozzleDiameter: Double?,
+                            supportThresholdDeg: Double?,
+                            bed: (x: Double, y: Double, z: Double)?,
+                            bbox: (x: Double, y: Double, z: Double)?) -> [String: JSONValue] {
         var input: [String: JSONValue] = ["analysis": .object(analysis)]
         if let n = nozzleDiameter, n > 0 { input["nozzleDiameter"] = .number(n) }
         if let d = supportThresholdDeg, d > 0 { input["supportThresholdDeg"] = .number(d) }
@@ -2363,15 +2451,7 @@ public actor KhaytEngine {
                 "areaMm2": analysis["totalAreaMm2"] ?? .number(0),
             ])
         }
-        return try runtime.call2("""
-            (function (input) {
-              var r = KhaytPrintRisk.assessModel(input);
-              // The SAME findings turned into lines by the same rule the other
-              // app's quote screen uses. `riskNote` wants them under `risk`.
-              return Object.assign({}, r, { note: KhaytIntakeView.riskNote({ risk: r }) });
-            })(ARG0)
-            """,
-            [.object(input)], as: PrintRiskReport.self)
+        return input
     }
 
     // MARK: - Finding a filament somebody else wrote down
@@ -3099,6 +3179,12 @@ public actor KhaytEngine {
     /// Native since the port — `KhaytCore.PrintFit`.
     public func bestFit(_ bounds: (x: Double, y: Double, z: Double),
                         among machines: [JSONValue]) throws -> Fit {
+        Self.fit(bounds, among: machines)
+    }
+
+    /// The same answer without a hop onto the engine — see `standing`.
+    public nonisolated static func fit(_ bounds: (x: Double, y: Double, z: Double),
+                                       among machines: [JSONValue]) -> Fit {
         let best = PrintFit.bestFit(
             bounds: .object(["x": .number(bounds.x), "y": .number(bounds.y),
                              "z": .number(bounds.z)]),
@@ -4779,6 +4865,93 @@ public actor KhaytEngine {
                                        "z": .number(bbox.z)]),
                       "settings": .object(settings), "orders": .array(orders)])],
             as: MeshEstimate.self)
+    }
+
+    /// One mesh for `estimateMeshes`: the three things `estimateMesh` takes
+    /// per model.
+    public struct MeshInput: Sendable, Hashable {
+        public let volumeMm3: Double
+        public let areaMm2: Double
+        public let x: Double, y: Double, z: Double
+        public init(volumeMm3: Double, areaMm2: Double, bbox: (x: Double, y: Double, z: Double)) {
+            self.volumeMm3 = volumeMm3
+            self.areaMm2 = areaMm2
+            x = bbox.x; y = bbox.y; z = bbox.z
+        }
+
+        /// As `estimateMesh` hands it over — or nil when JSON cannot carry it
+        /// (a NaN or an infinity): that call then fails to encode its argument
+        /// and answers nothing for the model, so the batch skips it too.
+        var json: JSONValue? {
+            guard [volumeMm3, areaMm2, x, y, z].allSatisfy(\.isFinite) else { return nil }
+            return .object(["volumeMm3": .number(volumeMm3), "areaMm2": .number(areaMm2),
+                            "bbox": .object(["x": .number(x), "y": .number(y), "z": .number(z)])])
+        }
+    }
+
+    /// `estimateMesh` for a whole library in ONE crossing: the same answer per
+    /// mesh, nil wherever the one-mesh call would have thrown.
+    ///
+    /// ── WHY ───────────────────────────────────────────────────────────────
+    ///
+    /// The one-mesh call hands over the shop's whole settings and print log and
+    /// learns the rate again each time. On the shop's real book the settings are
+    /// 1.1 MB — the logo rides in them — and `load` paid that for each of 3,553
+    /// measured models: four gigabytes of JSON written and parsed per launch.
+    /// Here the settings and the log cross once and the rate is learned once.
+    ///
+    /// ── THE SAME ANSWER ───────────────────────────────────────────────────
+    ///
+    /// The script below is `estimateMesh`'s, split where the rate ends: the
+    /// rate part runs once, the per-mesh part per mesh, and each mesh's answer
+    /// is turned into text by the same `JSON.stringify` and decoded by the same
+    /// decoder as the one-mesh call — so a value that decodes there decodes
+    /// here, and one that fails (a NaN written as null) fails for that mesh
+    /// alone. A throw inside the rule costs that mesh, not the batch.
+    /// `EngineBatchParityTests` compares the two over a varied library.
+    public func estimateMeshes(_ meshes: [MeshInput], settings: [String: JSONValue],
+                               orders: [JSONValue]) throws -> [MeshEstimate?] {
+        var out = [MeshEstimate?](repeating: nil, count: meshes.count)
+        var sent: [JSONValue] = []
+        var at: [Int] = []
+        for (i, mesh) in meshes.enumerated() {
+            guard let json = mesh.json else { continue }
+            sent.append(json)
+            at.append(i)
+        }
+        guard !sent.isEmpty else { return out }
+        let texts = try runtime.call2("""
+            (function (a) {
+              var opts = KhaytStl.fromSettings(a.settings || {});
+              var cal = KhaytEstimateCalibration.calibrate(a.orders || [], {
+                allocate: KhaytOrderFileLink && KhaytOrderFileLink.allocateActuals,
+              }, {});
+              var used = cal ? KhaytEstimateCalibration.applyCalibration(opts, cal) : opts;
+              return a.meshes.map(function (m) {
+                try {
+                  var e = KhaytStl.estimateFromStl(
+                    { volumeMm3: m.volumeMm3, areaMm2: m.areaMm2, bbox: m.bbox }, used) || {};
+                  return JSON.stringify({
+                    grams: Number(e.estWeightG || 0),
+                    hours: Number(e.estPrintTimeH || 0),
+                    scope: cal ? String(cal.scope || 'shop') : null,
+                    jobs: cal ? Number(cal.jobs || 0) : null,
+                    gramsPerHour: cal ? Number(cal.gramsPerHour || 0) : null,
+                    shellUnreliable: e.reliable === false,
+                    shellSource: e.shellSource ? String(e.shellSource) : null,
+                  });
+                } catch (err) { return null; }
+              });
+            })(ARG0)
+            """,
+            [.object(["meshes": .array(sent), "settings": .object(settings),
+                      "orders": .array(orders)])],
+            as: [String?].self)
+        for (k, text) in texts.enumerated() where k < at.count {
+            guard let text, let data = text.data(using: .utf8) else { continue }
+            out[at[k]] = try? JSONValue.decode(MeshEstimate.self, from: data)
+        }
+        return out
     }
 
     // MARK: - A printer that changed address

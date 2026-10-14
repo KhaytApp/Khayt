@@ -686,7 +686,11 @@ extension Shop {
     func readKits(_ root: [String: JSONValue]) async {
         if case .array(let rows)? = Self.settings(root)["kits"] { kitDefs = rows }
         else { kitDefs = [] }
-        kits = (try? await engine?.kits(orders: orderRows, defs: kitDefs)) ?? []
+        let ticket = loadGeneration
+        let rolled = (try? await engine?.kits(orders: orderRows, defs: kitDefs)) ?? []
+        // Not over a newer load's answer (`Shop.load`).
+        guard ticket == loadGeneration else { return }
+        kits = rolled
     }
 
     /// File every job named under one kit, creating it if the name is new.

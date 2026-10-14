@@ -895,18 +895,11 @@ extension Shop {
         if let report { risks[file.id] = report }
     }
 
-    /// Judge every model that already has a stored summary.
-    ///
-    /// Runs on load and after a settings change, because both move the answer:
-    /// a shop that fits a 0.6 mm nozzle stops having thin-wall warnings on half
-    /// its library, and it should not have to re-read a single file to find out.
-    func rejudgeStoredRisks() async {
-        guard let engine else { return }
-        for file in files {
-            guard let analysis = file.riskAnalysis else { continue }
-            await judge(analysis, for: file, engine: engine)
-        }
-    }
+    // Every model with a stored summary is judged again on every load — a
+    // settings change reloads — because both move the answer: a shop that
+    // fits a 0.6 mm nozzle stops having thin-wall warnings on half its
+    // library, and it should not have to re-read a single file to find out.
+    // That is `LoadFigures`, in batches, with the same input as `judge`.
 
     /// The nozzle to judge against: the widest any machine has, or nil.
     ///
@@ -914,7 +907,7 @@ extension Shop {
     /// on a nozzle too fat to lay it — reporting against the finest nozzle in
     /// the shop would warn about walls the shop can print. Nil when no machine
     /// records one, and the shared rule's own 0.4 default then applies.
-    private var nozzleForRisk: Double? {
+    var nozzleForRisk: Double? {
         var widest: Double?
         for row in machineRows {
             guard case .object(let m) = row, case .number(let d)? = m["nozzleDiameter"], d > 0
