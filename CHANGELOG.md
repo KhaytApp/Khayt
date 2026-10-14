@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a malformed request on the shop's Wi-Fi can no longer crash the
+  app.** The Mac's own server read a request nested a few hundred levels deep
+  in a way that ran out of memory and closed Khayt, and the order form and the
+  storefront webhooks read their request before checking a PIN or a
+  signature. A request nested deeper than any real one (32 levels) is now
+  refused without being read.
+
 - **Mac: opening and saving a big book is much faster.** Reading the shop's
   book (and every change to it) now takes about a tenth of the time it did on
   a 15 MB library — on the Mac and on the phone — with exactly the same
