@@ -67,12 +67,14 @@ enum PerfBook {
     /// folder, and point the app at it.
     @MainActor
     static func install(_ root: [String: JSONValue]) throws -> URL {
+        // Named like the real one, so a path another test checks while this
+        // is set still reads `Application Support/khayt/`.
         let support = FileManager.default.temporaryDirectory
-            .appending(path: "khayt-perf-\(UUID().uuidString)")
+            .appending(path: "khayt-perf-\(UUID().uuidString)/Application Support")
         let folder = support.appending(path: StoreReader.Build.shipped.rawValue)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try JSONEncoder().encode(root).write(to: folder.appending(path: "khayt-store.json"))
-        StoreReader.Build.supportFolderForTests[.shipped] = support
+        StoreReader.Build.supportFolderForTests = support
         return support
     }
 }
@@ -137,9 +139,9 @@ func withPerfBook(_ root: [String: JSONValue],
     }
     await shop.settleLibraryWrites()
     await shop.load(.sample)
-    StoreReader.Build.supportFolderForTests[.shipped] = nil
+    StoreReader.Build.supportFolderForTests = nil
     UserDefaults.standard.set(spotlight, forKey: Spotlight.defaultsKey)
-    try? FileManager.default.removeItem(at: support)
+    try? FileManager.default.removeItem(at: support.deletingLastPathComponent())
 }
 
 /// The book's `printFiles`, as on disk now.
@@ -328,9 +330,9 @@ struct LibraryEditPerfTests {
         UserDefaults.standard.set(false, forKey: Spotlight.defaultsKey)
         let shop = Shop()
         defer {
-            StoreReader.Build.supportFolderForTests[.shipped] = nil
+            StoreReader.Build.supportFolderForTests = nil
             UserDefaults.standard.set(spotlight, forKey: Spotlight.defaultsKey)
-            try? FileManager.default.removeItem(at: support)
+            try? FileManager.default.removeItem(at: support.deletingLastPathComponent())
         }
 
         meter.start()
