@@ -324,35 +324,29 @@ extension Shop {
     /// never blocking a cooperative-pool thread.
     static func adoptFromStorage(root: URL, past: [URL] = [], excluding: [String] = [],
                                  storeURL: URL, engine: KhaytEngine,
-                                 owns: @escaping () -> Bool,
-                                 whoHasIt: @escaping () -> String?,
+                                 owns: @escaping @Sendable () -> Bool,
+                                 whoHasIt: @escaping @Sendable () -> String?,
                                  stop: ScanStop? = nil,
                                  isOnline: (@Sendable (URL) -> Bool)? = nil,
                                  progress: @escaping (Int, Int, URL) -> Void) async -> StorageReport {
         // lock: callers — rescanStorage
-        guard let book = readBook(storeURL) else { return StorageReport() }
-        let rows = Self.rows(book, "printFiles")
-        let ledger = StorageLedger.read(Self.settings(book))
+        // The book read, and what is worked out from it, on a dispatch queue:
+        // 16 MB decoded on the main actor held the window for over a second.
+        guard let start = await PinWork.run({ () -> StorageStart? in
+            guard let book = readBook(storeURL) else { return nil }
+            return StorageStart(book)
+        }) else { return StorageReport() }
+        let rows = start.rows, ledger = start.ledger
         let skipped = ledger.skipped, seen = ledger.duplicateSet
 
         var report = StorageReport()
         var adopted: [String] = [], duplicates: [String] = []
-        var names: [String: String] = [:]
-        var hashes: Set<String> = []
-        for row in rows {
-            guard case .object(let o) = row, case .string(let h)? = o["contentHash"] else { continue }
-            hashes.insert(h)
-            if names[h] == nil, case .string(let n)? = o["name"] { names[h] = n }
-        }
+        let names = start.names
+        var hashes = start.hashes
         // The primary in place; each past location by copy.
         // Online-only files in the primary (an iCloud Drive library with
         // Optimise Storage on) are known by name and size — see `LinkedCloud`.
-        var nameSizes: Set<String> = []
-        for case .object(let o) in rows {
-            guard case .object(let sf)? = o["sourceFile"], case .number(let size)? = sf["size"], size > 0,
-                  case .string(let name)? = o["originalName"] ?? sf["originalName"] else { continue }
-            nameSizes.insert(LibraryImport.nameSize(Int(size), name))
-        }
+        let nameSizes = start.nameSizes
         for (where_, inPlace) in [(root, true)] + past.map({ ($0, false) }) {
             if stop?.isStopped == true || Task.isCancelled { report.stopped = true; break }
             guard FileManager.default.fileExists(atPath: where_.path) else { continue }
@@ -382,23 +376,45 @@ extension Shop {
             adopted += done.addedURLs.map(canonical)
             duplicates += done.duplicateURLs.compactMap(signature)
             // What came in this pass is known to the next location's walk.
-            if let fresh = readBook(storeURL) {
-                for case .object(let o) in Self.rows(fresh, "printFiles") {
-                    if case .string(let h)? = o["contentHash"] { hashes.insert(h) }
-                }
+            if let fresh = await PinWork.run({ readBook(storeURL).map(StorageStart.init) }) {
+                hashes.formUnion(fresh.hashes)
             }
         }
         let visible = ([root] + past).filter { FileManager.default.fileExists(atPath: $0.path) }.map(canonical)
         let next = ledgerAfter(ledger, adopted: adopted, duplicates: duplicates, visibleRoots: visible)
         if next != ledger {
             // lock: callers — rescanStorage
-            try? StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
-                var settings = Self.settings(book)
-                Self.ledgerMerged(next, over: ledger, into: StorageLedger.read(settings)).write(into: &settings)
+            try? await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
+                var settings = Shop.settings(book)
+                Shop.ledgerMerged(next, over: ledger, into: StorageLedger.read(settings)).write(into: &settings)
                 book["settings"] = .object(settings)
             }
         }
         return report
+    }
+
+    /// What the storage pass needs from the book before it walks, worked out
+    /// off the main actor.
+    struct StorageStart: Sendable {
+        let rows: [JSONValue]
+        let ledger: StorageLedger
+        var hashes: Set<String> = []
+        var names: [String: String] = [:]
+        var nameSizes: Set<String> = []
+
+        nonisolated init(_ book: [String: JSONValue]) {
+            rows = Shop.rows(book, "printFiles")
+            ledger = StorageLedger.read(Shop.settings(book))
+            for case .object(let o) in rows {
+                if case .string(let h)? = o["contentHash"] {
+                    hashes.insert(h)
+                    if names[h] == nil, case .string(let n)? = o["name"] { names[h] = n }
+                }
+                guard case .object(let sf)? = o["sourceFile"], case .number(let size)? = sf["size"], size > 0,
+                      case .string(let name)? = o["originalName"] ?? sf["originalName"] else { continue }
+                nameSizes.insert(LibraryImport.nameSize(Int(size), name))
+            }
+        }
     }
 
     // MARK: - The bucket
@@ -516,14 +532,17 @@ extension Shop {
     /// invisible to it, and there is nothing to adopt.
     static func adoptFromBucket(_ c: S3Config, provider: String, root: URL,
                                 storeURL: URL, fetch: @escaping S3.Fetch,
-                                owns: @escaping () -> Bool,
-                                whoHasIt: @escaping () -> String?,
+                                owns: @escaping @Sendable () -> Bool,
+                                whoHasIt: @escaping @Sendable () -> String?,
                                 stop: ScanStop? = nil,
                                 progress: (Int, Int, String) -> Void) async throws -> StorageReport {
         // lock: callers — rescanStorage
-        guard let book = readBook(storeURL) else { return StorageReport() }
-        let rows = Self.rows(book, "printFiles")
-        let ledger = StorageLedger.read(Self.settings(book))
+        // Read off the main actor, as the local pass reads it (`StorageStart`).
+        guard let start = await PinWork.run({ readBook(storeURL).map(StorageStart.init) }) else {
+            return StorageReport()
+        }
+        let rows = start.rows
+        let ledger = start.ledger
         let base = c.prefix.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let listPrefix = base.isEmpty ? "" : base + "/"
         let listed = try await S3.list(c, prefix: listPrefix, fetch: fetch)
@@ -664,14 +683,16 @@ extension Shop {
             return present.contains(String(sig.split(separator: "|").first ?? ""))
         }, adding: duplicates)
         guard !records.isEmpty || next != ledger else { return report }
+        let newRecords = records, nextLedger = next
         do {
             // lock: callers — rescanStorage
-            try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
-                var rows = Self.rows(book, "printFiles")
-                rows.insert(contentsOf: records.map(JSONValue.object), at: 0)
+            // One write, off the main actor.
+            try await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
+                var rows = Shop.rows(book, "printFiles")
+                rows.insert(contentsOf: newRecords.map(JSONValue.object), at: 0)
                 book["printFiles"] = .array(rows)
-                var settings = Self.settings(book)
-                Self.ledgerMerged(next, over: ledger, into: StorageLedger.read(settings)).write(into: &settings)
+                var settings = Shop.settings(book)
+                Shop.ledgerMerged(nextLedger, over: ledger, into: StorageLedger.read(settings)).write(into: &settings)
                 book["settings"] = .object(settings)
             }
         } catch {
@@ -725,8 +746,8 @@ extension Shop {
     /// indexed online only, once it is on this Mac (`Shop.fillNowLocal`).
     @discardableResult
     static func fillDownloaded(id: String, file: URL, pictures: URL? = nil, storeURL: URL, engine: KhaytEngine,
-                               owns: @escaping () -> Bool,
-                               whoHasIt: @escaping () -> String?) async throws -> String? {
+                               owns: @escaping @Sendable () -> Bool,
+                               whoHasIt: @escaping @Sendable () -> String?) async throws -> String? {
         // lock: callers — bringDownOnline, fillNowLocal, bringDownLinked
         let ext = file.pathExtension.lowercased()
         let hash = await LibraryImport.offMain { try? LibraryImport.contentHash(of: file) } ?? nil
@@ -740,12 +761,17 @@ extension Shop {
         }
         let a = await LibraryImport.analyse(file, ext: ext, dir: pictures ?? file.deletingLastPathComponent(),
                                             engine: engine, analyseRisk: false)
-        var duplicateOf: String?
-        try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
-            var rows = Self.rows(book, "printFiles")
+        let key = a.key, reader = a.reader, colours = a.colours, swapCount = a.swapCount
+        let thumbFile = a.thumbFile, parsed = a.parsed, size = a.size
+        let designer = a.provenance?.designer
+        let licence = a.provenance.flatMap { ModelLicence.fromFile($0.licence)?.id }
+        // Off the main actor: the whole book is read and written for one record.
+        return try await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
+            var duplicateOf: String?
+            var rows = Shop.rows(book, "printFiles")
             for (i, row) in rows.enumerated() {
                 guard case .object(var o) = row else { continue }
-                if Self.recordId(row) != id {
+                if Shop.recordId(row) != id {
                     if case .string(hash)? = o["contentHash"], case .string(let n)? = o["name"] { duplicateOf = n }
                     continue
                 }
@@ -754,23 +780,21 @@ extension Shop {
                                   case .array(let x)?: x.isEmpty; case .object(let x)?: x.isEmpty; default: false }
                 }
                 o["contentHash"] = .string(hash)
-                if let key = a.key { o["geometryKey"] = .string(key) }
-                if let r = a.reader { o["geometryReader"] = .number(Double(r)) }
-                if empty("colors") { o["colors"] = .array(a.colours); o["swapCount"] = .number(Double(a.swapCount)) }
-                if empty("thumbFile"), let t = a.thumbFile { o["thumbFile"] = .string(t); o["thumbSource"] = .string("embedded") }
-                if empty("parsed") { o["parsed"] = .object(a.parsed) }
-                if empty("source"), let d = a.provenance?.designer { o["source"] = .string(d) }
-                if empty("licence"), let l = a.provenance.flatMap({ ModelLicence.fromFile($0.licence)?.id }) {
-                    o["licence"] = .string(l)
-                }
-                if case .object(var sf)? = o["sourceFile"] { sf["size"] = .number(Double(a.size)); o["sourceFile"] = .object(sf) }
+                if let key { o["geometryKey"] = .string(key) }
+                if let reader { o["geometryReader"] = .number(Double(reader)) }
+                if empty("colors") { o["colors"] = .array(colours); o["swapCount"] = .number(Double(swapCount)) }
+                if empty("thumbFile"), let thumbFile { o["thumbFile"] = .string(thumbFile); o["thumbSource"] = .string("embedded") }
+                if empty("parsed") { o["parsed"] = .object(parsed) }
+                if empty("source"), let designer { o["source"] = .string(designer) }
+                if empty("licence"), let licence { o["licence"] = .string(licence) }
+                if case .object(var sf)? = o["sourceFile"] { sf["size"] = .number(Double(size)); o["sourceFile"] = .object(sf) }
                 // Read now: no longer a record of what the drive listed.
                 o.removeValue(forKey: "indexedOnline")
                 rows[i] = .object(o)
             }
             book["printFiles"] = .array(rows)
+            return duplicateOf
         }
-        return duplicateOf
     }
 
     // MARK: - Photos for models already in the library
@@ -851,22 +875,31 @@ extension Shop {
     /// another Mac the unstamped mark may be lost to a merge, and that Mac
     /// looks once more — finding what this one found.
     static func backfillPhotos(storeURL: URL, roots: [String], linked: [String],
-                               owns: @escaping () -> Bool,
-                               whoHasIt: @escaping () -> String?,
-                               cap: Int = 2000) async -> Int {
+                               owns: @escaping @Sendable () -> Bool,
+                               whoHasIt: @escaping @Sendable () -> String?,
+                               cap: Int = 2000,
+                               isOnline: (@Sendable (URL) -> Bool)? = nil) async -> Int {
+        let isOnline: @Sendable (URL) -> Bool = isOnline ?? { LinkedCloud.isOnlineOnly($0) }
         // lock: callers — rescanStorage
-        guard let book = readBook(storeURL) else { return 0 }
-        var due: [(id: String, model: URL, boundary: URL?, vault: Bool, thumb: String?)] = []
-        for case .object(let o) in Self.rows(book, "printFiles") where photoDue(o) {
-            guard case .string(let id)? = o["id"] else { continue }
-            if due.count >= cap { break }
-            guard let place = photoPlace(o, roots: roots, linked: linked) else { continue }
-            // A model the cloud has not downloaded is looked at once it is
-            // here, as one on an unplugged drive is — left unmarked.
-            if LinkedCloud.isOnlineOnly(place.model) { continue }
-            var thumb: String?
-            if case .string(let t)? = o["thumbFile"] { thumb = t }
-            due.append((id, place.model, place.boundary, place.vault, thumb))
+        // Read, and every record looked at, on a dispatch queue: a stat per
+        // model (thousands of them, on a cloud drive) and the 16 MB book
+        // decoded used to hold the window at every launch.
+        let due = await PinWork.run { () -> [PhotoDue] in
+            guard let book = readBook(storeURL) else { return [] }
+            var due: [PhotoDue] = []
+            for case .object(let o) in Shop.rows(book, "printFiles") where photoDue(o) {
+                guard case .string(let id)? = o["id"] else { continue }
+                if due.count >= cap { break }
+                guard let place = photoPlace(o, roots: roots, linked: linked) else { continue }
+                // A model the cloud has not downloaded is looked at once it is
+                // here, as one on an unplugged drive is — left unmarked.
+                if isOnline(place.model) { continue }
+                var thumb: String?
+                if case .string(let t)? = o["thumbFile"] { thumb = t }
+                due.append(PhotoDue(id: id, model: place.model, boundary: place.boundary, vault: place.vault,
+                                    thumb: thumb))
+            }
+            return due
         }
         guard !due.isEmpty else { return 0 }
         let looked = due
@@ -893,21 +926,20 @@ extension Shop {
                     }
                 }
                 // Never a picture the cloud would have to download to decode.
-                found = found.filter { !LinkedCloud.isOnlineOnly($0) }
+                found = found.filter { !isOnline($0) }
                 if let uri = LibraryImport.firstPhoto(found) { out[item.id] = uri }
             }
             return out
         }
         let ids = Set(looked.map(\.id))
         let mark = JSONValue.string(StoreWriter.iso(Date()))
-        var set = 0
         do {
-            try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt,
-                                   recordingDeletes: false) { book in
-                var rows = Self.rows(book, "printFiles")
-                set = 0
+            return try await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt,
+                                                       recordingDeletes: false) { book in
+                var rows = Shop.rows(book, "printFiles")
+                var set = 0
                 for (i, row) in rows.enumerated() {
-                    guard let id = Self.recordId(row), ids.contains(id),
+                    guard let id = Shop.recordId(row), ids.contains(id),
                           case .object(var o) = row, photoDue(o) else { continue }
                     o["photoLookedFor"] = mark
                     if let uri = photos[id] {
@@ -918,9 +950,18 @@ extension Shop {
                     rows[i] = .object(o)
                 }
                 book["printFiles"] = .array(rows)
+                return set
             }
         } catch { return 0 }
-        return set
+    }
+
+    /// A record the photo backfill will look for a photo for.
+    struct PhotoDue: Sendable {
+        let id: String
+        let model: URL
+        let boundary: URL?
+        let vault: Bool
+        let thumb: String?
     }
 
     // MARK: - The pass
@@ -944,15 +985,19 @@ extension Shop {
         let stop = ScanStop()
         libraryScanStop = stop
         defer { libraryMoveBusy = false; libraryMoveProgress = nil; libraryScanStop = nil }
-        let owns = { StoreLock.weOwnIt(build) }
-        let who = { StoreLock.describe(StoreLock.verdict(for: build)) }
+        let owns: @Sendable () -> Bool = { StoreLock.weOwnIt(build) }
+        let who: @Sendable () -> String? = { StoreLock.describe(StoreLock.verdict(for: build)) }
         let past = Self.pastLocations(roots, builtIn: LibraryLocation.defaultRoot(for: build))
             .map { URL(fileURLWithPath: $0) }
+        // Reloaded at the end only if the pass wrote — see `rescanLinkedFolders`.
+        let bookAt = Self.bookStamp(build.storeURL)
+        let drawn = ScanProgress()
         var report = await Self.adoptFromStorage(
             root: root, past: past, excluding: roots.roots.filter { $0 != roots.primary } + [roots.mirror].compactMap { $0 } + linkedFolders,
             storeURL: build.storeURL, engine: engine,
-            owns: owns, whoHasIt: who, stop: stop, isOnline: LinkedCloud.isOnlineOnly,
+            owns: owns, whoHasIt: who, stop: stop, isOnline: linkedIsOnline,
             progress: { [weak self] done, total, url in
+                guard drawn.due(done, of: total) else { return }
                 self?.libraryMoveProgress = (done, total, url.lastPathComponent)
             })
         // The bucket, when the library's remote is one. Drive: see
@@ -963,6 +1008,7 @@ extension Shop {
                     c, provider: config.provider, root: root, storeURL: build.storeURL,
                     fetch: CloudLibrary.fetch, owns: owns, whoHasIt: who, stop: stop,
                     progress: { [weak self] done, total, name in
+                        guard drawn.due(done, of: total) else { return }
                         self?.libraryMoveProgress = (done, total, name)
                     }))
             } catch {
@@ -971,9 +1017,10 @@ extension Shop {
         }
         if !report.stopped, !stop.isStopped {
             report.photos += await Self.backfillPhotos(storeURL: build.storeURL, roots: roots.roots,
-                                                       linked: linkedFolders, owns: owns, whoHasIt: who)
+                                                       linked: linkedFolders, owns: owns, whoHasIt: who,
+                                                       isOnline: linkedIsOnline)
         }
-        await load(source)
+        await reloadIfWritten(since: bookAt)
         if !report.addedIds.isEmpty {
             let ids = report.addedIds
             Task { [weak self] in await self?.backUpToCloud(ids: ids) }
