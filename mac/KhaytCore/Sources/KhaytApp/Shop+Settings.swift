@@ -515,7 +515,7 @@ extension Shop {
     /// mirrored to the default "so existing consumers keep working unchanged"
     /// — the kanban print, machine slice-and-print and the quote slice all
     /// still read it, in the app next to this one.
-    static func slicerFields(_ list: [KhaytEngine.Slicer], defaultId: String) -> [String: JSONValue] {
+    nonisolated static func slicerFields(_ list: [KhaytEngine.Slicer], defaultId: String) -> [String: JSONValue] {
         var out: [String: JSONValue] = [
             "slicers": .array(list.map { slicer in
                 .object(["id": .string(slicer.id), "name": .string(slicer.name),
@@ -554,11 +554,7 @@ extension Shop {
             settingsProblem = words.callIt("mac.settings_sample"); return
         }
         do {
-            try await StoreWriter.update(
-                storeURL: build.storeURL,
-                owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-            ) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 let settings = Self.settingsKeys(
                     Self.slicerFields(list, defaultId: defaultId),
                     opened: opened.map { Self.slicerFields($0.list, defaultId: $0.defaultId) },
@@ -636,7 +632,7 @@ extension Shop {
     /// only writes it, so the rule about what a re-save under one name does
     /// lives in one place and both apps obey it.
     /// The saved reports, as settings holds them.
-    static func reportFields(_ list: [KhaytEngine.SavedReport]) -> [String: JSONValue] {
+    nonisolated static func reportFields(_ list: [KhaytEngine.SavedReport]) -> [String: JSONValue] {
         ["savedReports": .array(list.map { r in
             .object(["id": .string(r.id), "name": .string(r.name),
                      "fields": .array(r.fields.map { .string($0) }),
@@ -654,11 +650,7 @@ extension Shop {
             settingsProblem = words.callIt("mac.settings_sample"); return
         }
         do {
-            try await StoreWriter.update(
-                storeURL: build.storeURL,
-                owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-            ) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 let settings = Self.settingsKeys(Self.reportFields(list),
                                                  opened: opened.map(Self.reportFields),
                                                  over: Self.settings(root))

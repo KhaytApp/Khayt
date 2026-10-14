@@ -11,6 +11,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   signature. A request nested deeper than any real one (32 levels) is now
   refused without being read.
 
+- **Mac: things that happen on their own no longer freeze the window.** On a
+  big book, the photo and energy reading saved at the end of a print, a
+  customer's request over the shop's Wi-Fi, re-measured models, a print-risk
+  check and a few cloud steps each stopped the window while the whole book was
+  saved — and for longer if a library scan was saving at the same moment. They
+  are now saved in the background. So are marking a bed clear, accepting the
+  suggested printer, applying a schedule and saving slicers or reports.
+
 - **Mac: opening and saving a big book is much faster.** Reading the shop's
   book (and every change to it) now takes about a tenth of the time it did on
   a 15 MB library — on the Mac and on the phone — with exactly the same

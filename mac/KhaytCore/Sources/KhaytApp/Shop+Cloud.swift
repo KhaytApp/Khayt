@@ -219,7 +219,7 @@ extension Shop {
     /// The book's side of signing out: `settings.cloud.enabled = false`, and
     /// everything else in `settings.cloud` left as it was — the other app's
     /// Disconnect writes exactly this.
-    static func markSignedOut(_ root: inout [String: JSONValue]) {
+    nonisolated static func markSignedOut(_ root: inout [String: JSONValue]) {
         var settings = Self.settings(root)
         guard case .object(var cloud)? = settings["cloud"] else { return }
         cloud["enabled"] = .bool(false)
@@ -238,11 +238,7 @@ extension Shop {
         forgetCloudKey()
         guard let build = source.build else { return }
         do {
-            try await StoreWriter.update(
-                storeURL: build.storeURL,
-                owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-            ) { root in Self.markSignedOut(&root) }
+            try await StoreWriter.updateOffMain(build) { root in Self.markSignedOut(&root) }
             await load(source)
             moveNotices = [words.callIt("mac.cloud_signed_out")]
         } catch {
@@ -379,11 +375,7 @@ extension Shop {
                                                kdf: SyncCrypto.Kdf.from(keyset["kdf"]))
             let sealed = try await Secrets.seal(session.token, for: build)
 
-            try await StoreWriter.update(
-                storeURL: build.storeURL,
-                owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-            ) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var settings = Self.settings(root)
                 // `lastServerRev: 0` on purpose, exactly as the other app writes
                 // it: this machine has seen nothing from the server yet, and a

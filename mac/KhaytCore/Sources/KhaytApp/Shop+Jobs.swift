@@ -497,10 +497,11 @@ extension Shop {
             moveProblem = words.callIt("mac.move_sample"); return
         }
         do {
-            try StoreWriter.updateRecord(build, collection: "printLog",
-                                         id: proposal.orderId) { record in
+            let machineId = proposal.machineId
+            try await StoreWriter.updateRecordOffMain(build, collection: "printLog",
+                                                      id: proposal.orderId) { record in
                 guard (Self.plainString(record["machineId"]) ?? "").isEmpty else { return }
-                record["machineId"] = .string(proposal.machineId)
+                record["machineId"] = .string(machineId)
             }
             await load(source)
             await planDispatch()
@@ -580,7 +581,7 @@ extension Shop {
             moveProblem = words.callIt("mac.move_sample"); return
         }
         do {
-            try StoreWriter.updateRecord(build, collection: "machines", id: machine.id) { record in
+            try await StoreWriter.updateRecordOffMain(build, collection: "machines", id: machine.id) { record in
                 record["bedClearedAt"] = .string(StoreWriter.iso(Date()))
             }
             await load(source)
@@ -1092,16 +1093,12 @@ extension Shop {
         }
         let wanted = Dictionary(plan.assignments.map { ($0.orderId, $0.machineId) },
                                 uniquingKeysWith: { first, _ in first })
-        var moved = 0
         do {
-            try await StoreWriter.update(
-                storeURL: build.storeURL,
-                owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-            ) { root in
+            let moved = try await StoreWriter.updateOffMain(build) { root -> Int in
                 // Read INSIDE the write: the book on disk may have moved since
                 // the proposal was drawn, and a job somebody assigned by hand in
                 // the meantime must not be overwritten by a stale suggestion.
+                var moved = 0
                 let orders = Self.rows(root, "printLog")
                 var out: [JSONValue] = []
                 out.reserveCapacity(orders.count)
@@ -1117,6 +1114,7 @@ extension Shop {
                     moved += 1
                 }
                 root["printLog"] = .array(out)
+                return moved
             }
             scheduleApplied = moved
             schedulePlan = nil
