@@ -406,7 +406,8 @@ extension Shop {
             hash = h
         }
         do {
-            try StoreWriter.update(build) { root in Self.writePinHash(into: &root, id: id, hash: hash) }
+            let hashed = hash
+            try await StoreWriter.updateOffMain(build) { root in Self.writePinHash(into: &root, id: id, hash: hashed) }
             await load(source)
         } catch { moveProblem = String(describing: error) }
     }
@@ -473,7 +474,7 @@ extension Shop {
         guard let build = source.build else { moveProblem = words.callIt("mac.move_sample"); return }
         do {
             // lock: callers — switchLockOn, switchLockOff
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var settings: [String: JSONValue] = [:]
                 if case .object(let s)? = root["settings"] { settings = s }
                 settings["operatorLockEnabled"] = .bool(on)
@@ -495,7 +496,7 @@ extension Shop {
         guard let hash = await PinWork.run({ PinHash.hash(plain) })
         else { moveProblem = words.callIt("mac.lock_failed"); return nil }
         do {
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var settings: [String: JSONValue] = [:]
                 if case .object(let s)? = root["settings"] { settings = s }
                 settings["recoveryCodeHash"] = .string(hash)

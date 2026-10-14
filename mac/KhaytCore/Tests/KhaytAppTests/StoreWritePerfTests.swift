@@ -63,7 +63,7 @@ extension LibraryEditPerfTests {
     }
 
     /// The record `id` of `collection`, as on disk now.
-    static func onDisk(_ url: URL, _ collection: String, _ id: String) throws -> [String: JSONValue]? {
+    nonisolated static func onDisk(_ url: URL, _ collection: String, _ id: String) throws -> [String: JSONValue]? {
         let root = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: url))
         for case .object(let o) in Shop.rows(root, collection) where o["id"] == .string(id) { return o }
         return nil
@@ -134,6 +134,73 @@ extension LibraryEditPerfTests {
             #expect(held.count == 0, "the main thread waited \(Int(held.worstMs)) ms on a whole-book write")
             let moved = try Self.onDisk(url, "printLog", "JPERF2")
             #expect(moved?["status"] == .string("printing"))
+        }
+    }
+
+    /// The everyday saves: a setting, a location, a note on a customer.
+    @Test("a settings save, a location and a customer's note write the book off the main thread")
+    func savesAreOffMain() async throws {
+        try await withPerfBook(Self.shopBook()) { shop, url in
+            let wanted = shop.mode == "simple" ? "professional" : "simple"
+            let entry = CommEntry(id: "COMMPERF1", kind: "note", note: "rang", at: Date())
+            let held = await Self.held {
+                await shop.chooseMode(wanted)
+                await shop.saveLocation(id: nil, name: "Back room", address: "")
+                await shop.addCommunication(entry, to: "CPERF1")
+            }
+            #expect(shop.writeProblem == nil)
+            #expect(shop.moveProblem == nil)
+            #expect(held.count == 0, "the main thread waited \(Int(held.worstMs)) ms on a whole-book write")
+            let root = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: url))
+            #expect(Shop.settings(root)["mode"] == .string(wanted))
+            let named = Shop.rows(root, "locations").contains { row in
+                guard case .object(let o) = row else { return false }
+                return o["name"] == .string("Back room")
+            }
+            #expect(named, "the location never reached the book")
+            let client = try Self.onDisk(url, "clients", "CPERF1")
+            guard case .array(let log)? = client?["commLog"] else {
+                Issue.record("the note never reached the book"); return
+            }
+            #expect(log.count == 1)
+            #expect(shop.mode == wanted, "the screen does not show the mode just saved")
+        }
+    }
+
+    /// An undo written on the chain still puts its redo on the REDO stack:
+    /// registered inside the undo, against the write still in flight.
+    @Test("undoing a job move is written off the main thread, and Redo still redoes it")
+    func moveUndoIsOffMain() async throws {
+        try await withPerfBook(Self.shopBook(models: 40)) { shop, url in
+            let undo = UndoManager()
+            undo.groupsByEvent = false
+            shop.undoManager = undo
+            func status() throws -> JSONValue? { try Self.onDisk(url, "printLog", "JPERF2")?["status"] }
+            /// The write lands on the chain, not on a main-thread deadline.
+            func until(_ wanted: JSONValue) async throws -> Bool {
+                for _ in 0..<600 {
+                    if try status() == wanted { return true }
+                    try await Task.sleep(for: .milliseconds(50))
+                }
+                return false
+            }
+            undo.beginUndoGrouping()
+            await shop.moveJob("JPERF2", to: .printing)
+            undo.endUndoGrouping()
+            let moved = try status()
+            #expect(moved == .string("printing"))
+            #expect(undo.canUndo, "the move left nothing to undo")
+
+            let held = await Self.held { undo.undo() }
+            #expect(held.count == 0, "the undo held the main thread \(Int(held.worstMs)) ms")
+            let undone = try await until(.string("pending"))
+            #expect(undone, "the undo never reached the book")
+            #expect(undo.canRedo, "the undo's redo went on the wrong stack")
+
+            undo.redo()
+            let redone = try await until(.string("printing"))
+            #expect(redone, "the redo never reached the book")
+            shop.undoManager = nil
         }
     }
 

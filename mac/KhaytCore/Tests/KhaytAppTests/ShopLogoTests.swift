@@ -147,7 +147,7 @@ struct ShopLogoTests {
     func sampleRefuses() async throws {
         let shop = Shop()
         await shop.load(.sample)
-        shop.setLogo(from: try png(64))
+        await shop.setLogo(from: try png(64))
         #expect(shop.writeProblem == shop.words.callIt("mac.move_sample"))
         #expect(shop.bizLogo.isEmpty)
     }

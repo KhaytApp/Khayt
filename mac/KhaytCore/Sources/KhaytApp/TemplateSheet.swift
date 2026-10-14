@@ -107,10 +107,12 @@ struct TemplateSheet: View {
                 Button(shop.words.callIt("common.cancel")) { shop.editingTemplate = nil }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
-                    shop.saveTemplate(id: isNew ? nil : template.id, name: name, body: message,
-                                      milestone: milestone, lang: milestone.isEmpty ? "" : lang,
-                                      opened: isNew ? nil : template)
-                    if shop.writeProblem == nil { shop.editingTemplate = nil }
+                    Task {
+                        await shop.saveTemplate(id: isNew ? nil : template.id, name: name, body: message,
+                                                milestone: milestone, lang: milestone.isEmpty ? "" : lang,
+                                                opened: isNew ? nil : template)
+                        if shop.writeProblem == nil { shop.editingTemplate = nil }
+                    }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty
@@ -125,8 +127,10 @@ struct TemplateSheet: View {
                   message: { _ in shop.words.callIt("mac.no_undo") },
                   confirm: shop.words.callIt("common.delete"),
                   cancel: shop.words.callIt("common.cancel")) { chosen in
-            shop.deleteTemplate(chosen.id)
-            if shop.writeProblem == nil { shop.editingTemplate = nil }
+            Task {
+                await shop.deleteTemplate(chosen.id)
+                if shop.writeProblem == nil { shop.editingTemplate = nil }
+            }
         }
         .task {
             guard !loaded else { return }

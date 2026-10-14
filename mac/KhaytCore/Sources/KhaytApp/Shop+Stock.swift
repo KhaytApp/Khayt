@@ -544,15 +544,15 @@ extension Shop {
             moveProblem = words.callIt("sup.amount_required"); return
         }
 
-        var undo: [ChangedRecord] = []
+        let gone = words.callIt("mac.move_gone")
         do {
-            try StoreWriter.update(build) { root in
+            let undo = try await StoreWriter.updateOffMain(build) { root -> [ChangedRecord] in
                 var rows = Self.rows(root, "suppliers")
                 guard let at = rows.firstIndex(where: { Self.recordId($0) == supplierId }),
                       case .object(var record) = rows[at] else {
-                    throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
+                    throw MoveRefused(sentence: gone)
                 }
-                undo.append(ChangedRecord(collection: "suppliers", id: supplierId, was: record))
+                var undo = [ChangedRecord(collection: "suppliers", id: supplierId, was: record)]
                 var log: [JSONValue] = []
                 if case .array(let existing)? = record["purchases"] { log = existing }
                 var written = entry
@@ -563,6 +563,7 @@ extension Shop {
                 rows[at] = .object(record)
                 root["suppliers"] = .array(rows)
                 Self.sealUndo(&undo, in: root)
+                return undo
             }
             registerMoveUndo(undo, named: words.callIt("sup.log_purchase"))
             await load(source)
@@ -615,7 +616,10 @@ extension Shop {
 
         var undo: [ChangedRecord] = []
         do {
-            try StoreWriter.update(build) { root in
+            // The async update: `supplierRecord` asks the sheet's own rules,
+            // which live on the main actor. Only this closure runs here.
+            try await StoreWriter.updateAsync(build) { root in
+                undo = []
                 var rows = Self.rows(root, "suppliers")
                 let edits = supplier.edits
                 if let at = rows.firstIndex(where: { Self.recordId($0) == supplier.id }),
@@ -673,17 +677,15 @@ extension Shop {
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
-        var removed: [String: JSONValue]?
-        var unlinked: [ChangedRecord] = []
         do {
-            try StoreWriter.update(build) { root in
+            let (removed, unlinked) = try await StoreWriter.updateOffMain(build) { root
+                -> ([String: JSONValue]?, [ChangedRecord]) in
                 var rows = Self.rows(root, "suppliers")
                 guard let at = rows.firstIndex(where: { Self.recordId($0) == id }),
-                      case .object(let was) = rows[at] else { return }
-                removed = was
+                      case .object(let was) = rows[at] else { return (nil, []) }
                 rows.remove(at: at)
                 root["suppliers"] = .array(rows)
-                unlinked = Self.unpointing(&root, from: id)
+                return (was, Self.unpointing(&root, from: id))
             }
             if let removed { registerSupplierUndo(removed, relinking: unlinked) }
             await load(source)
@@ -697,7 +699,7 @@ extension Shop {
     ///
     /// The other app's delete walks exactly these two, and a third one growing
     /// the field on either side is the way this quietly stops being true.
-    static let pointAtSuppliers = ["inventory", "purchaseOrders"]
+    nonisolated static let pointAtSuppliers = ["inventory", "purchaseOrders"]
 
     /// Null out every `supplierId` that names this supplier, and say what was
     /// changed so an undo can point them back.
@@ -705,7 +707,7 @@ extension Shop {
     /// Static and taking `root` so it can be driven by a test with a plain
     /// book: the write path around it is an atomic swap against a real file,
     /// which is not a thing a test can assert one field of.
-    static func unpointing(_ root: inout [String: JSONValue],
+    nonisolated static func unpointing(_ root: inout [String: JSONValue],
                            from id: String) -> [ChangedRecord] {
         var changed: [ChangedRecord] = []
         for collection in pointAtSuppliers {
@@ -742,8 +744,9 @@ extension Shop {
               case .string(let id)? = record["id"] else { return }
         undoManager.setActionName(words.callIt("sup.deleted"))
         undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
-            do {
-                try StoreWriter.update(build) { root in
+            // Written on the chain; the undo itself returns at once.
+            Task { do {
+                try await StoreWriter.updateOffMain(build) { root in
                     var rows = Self.rows(root, "suppliers")
                     guard !rows.contains(where: { Self.recordId($0) == id }) else { return }
                     rows.append(.object(record))
@@ -766,7 +769,7 @@ extension Shop {
                 }
             } catch {
                 shop.moveProblem = String(describing: error)
-            }
+            } }
         }
     }
 
@@ -1211,7 +1214,7 @@ extension Shop {
 
     /// Today, as the book writes a day: Gregorian, in the shop's time zone —
     /// see `Calendar.book`.
-    static func today(_ now: Date = Date()) -> String {
+    nonisolated static func today(_ now: Date = Date()) -> String {
         let c = Calendar.book.dateComponents([.year, .month, .day], from: now)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
@@ -1393,15 +1396,14 @@ extension Shop {
         guard let build = source.build else {
             spendProblem = words.callIt("mac.move_sample"); return
         }
-        var removed: [String: JSONValue]?
         do {
-            try StoreWriter.update(build) { root in
+            let removed = try await StoreWriter.updateOffMain(build) { root -> [String: JSONValue]? in
                 var shelf = Self.rows(root, "inventory")
                 guard let at = shelf.firstIndex(where: { Self.recordId($0) == id }),
-                      case .object(let was) = shelf[at] else { return }
-                removed = was
+                      case .object(let was) = shelf[at] else { return nil }
                 shelf.remove(at: at)
                 root["inventory"] = .array(shelf)
+                return was
             }
             if let removed { registerSpoolUndo(removed) }
             await load(source)
@@ -1496,16 +1498,19 @@ extension Shop {
               case .string(let id)? = record["id"] else { return }
         undoManager.setActionName(words.callIt("cons.title"))
         undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
-            do {
-                try StoreWriter.update(build) { root in
-                    var shelf = Self.rows(root, "consumables")
-                    guard !shelf.contains(where: { Self.recordId($0) == id }) else { return }
-                    shelf.append(.object(record))
-                    root["consumables"] = .array(shelf)
+            // Written on the chain; the undo itself returns at once.
+            Task {
+                do {
+                    try await StoreWriter.updateOffMain(build) { root in
+                        var shelf = Self.rows(root, "consumables")
+                        guard !shelf.contains(where: { Self.recordId($0) == id }) else { return }
+                        shelf.append(.object(record))
+                        root["consumables"] = .array(shelf)
+                    }
+                    await shop.load(shop.source)
+                } catch {
+                    shop.spendProblem = String(describing: error)
                 }
-                Task { await shop.load(shop.source) }
-            } catch {
-                shop.spendProblem = String(describing: error)
             }
         }
     }
@@ -1524,15 +1529,14 @@ extension Shop {
         guard let build = source.build else {
             spendProblem = words.callIt("mac.move_sample"); return
         }
-        var undo: [ChangedRecord] = []
         do {
-            try StoreWriter.update(build) { root in
+            let undo = try await StoreWriter.updateOffMain(build) { root -> [ChangedRecord] in
                 var shelf = Self.rows(root, "consumables")
                 guard let at = shelf.firstIndex(where: { Self.recordId($0) == id }),
-                      case .object(let was) = shelf[at] else { return }
-                undo.append(ChangedRecord(collection: "consumables", id: id, was: was))
+                      case .object(let was) = shelf[at] else { return [] }
                 shelf.remove(at: at)
                 root["consumables"] = .array(shelf)
+                return [ChangedRecord(collection: "consumables", id: id, was: was)]
             }
             // NOT registerMoveUndo: that puts back rows that are still there,
             // and a deleted row is not, so Undo did nothing at all.

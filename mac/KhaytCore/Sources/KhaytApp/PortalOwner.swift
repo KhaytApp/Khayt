@@ -102,7 +102,9 @@ extension Shop {
         // The token, the deposit and the trial's start — one write, before the PUT.
         var written: [String: JSONValue]?
         do {
-            try StoreWriter.update(build) { root in
+            // The async update: only this closure runs on the main actor.
+            try await StoreWriter.updateAsync(build) { root in
+                written = nil
                 var log = Self.rows(root, "printLog")
                 guard let at = log.firstIndex(where: { Self.recordId($0) == id }),
                       case .object(var record) = log[at] else { return }
@@ -143,7 +145,7 @@ extension Shop {
             let creds = try await portalCredentials()
             let note = try await PortalClient.publish(request, baseUrl: creds.url, shopId: creds.shopId,
                                                       token: creds.token, engine: engine)
-            try StoreWriter.updateRecord(build, collection: "printLog", id: id) { r in
+            try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: id) { r in
                 r["cloudPublished"] = .bool(true)
             }
             await load(source)
@@ -165,7 +167,7 @@ extension Shop {
             let creds = try await portalCredentials()
             try await PortalClient.unpublish(pubToken: tok, baseUrl: creds.url, shopId: creds.shopId,
                                              token: creds.token, engine: engine)
-            try StoreWriter.updateRecord(build, collection: "printLog", id: id) { r in
+            try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: id) { r in
                 r["cloudPublished"] = .bool(false)
             }
             await load(source)

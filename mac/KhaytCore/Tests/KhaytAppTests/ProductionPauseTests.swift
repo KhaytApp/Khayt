@@ -52,10 +52,10 @@ struct ProductionPauseTests {
     func sampleRefuses() async throws {
         let shop = Shop()
         await shop.load(.sample)
-        shop.pauseProduction(reason: "waiting on filament")
+        await shop.pauseProduction(reason: "waiting on filament")
         #expect(shop.writeProblem == shop.words.callIt("mac.move_sample"))
         #expect(shop.productionPaused == false, "the sample stopped its floor")
-        shop.resumeProduction()
+        await shop.resumeProduction()
         #expect(shop.writeProblem == shop.words.callIt("mac.move_sample"))
     }
 

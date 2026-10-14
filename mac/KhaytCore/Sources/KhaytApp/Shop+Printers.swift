@@ -133,11 +133,12 @@ extension Shop {
             relocateProblem = words.callIt("mac.moved_failed"); return
         }
         do {
-            try StoreWriter.update(build) { root in
+            let machineId = move.machineId
+            try await StoreWriter.updateOffMain(build) { root in
                 guard case .array(var rows)? = root["machines"] else { return }
                 for i in rows.indices {
                     guard case .object(let m) = rows[i],
-                          case .string(let id)? = m["id"], id == move.machineId else { continue }
+                          case .string(let id)? = m["id"], id == machineId else { continue }
                     var next = record
                     StoreWriter.stamp(&next)
                     rows[i] = .object(next)
@@ -186,20 +187,22 @@ extension Shop {
                     .object(record), catalogId: catalogId, settings: settings)
                 if case .object(let filled)? = written?.machine { record = filled }
             }
-            try StoreWriter.update(build) { root in
+            let host = printer.host, adding = record
+            added = try await StoreWriter.updateOffMain(build) { root -> Bool in
                 var fleet = Self.rows(root, "machines")
                 // A printer already written down at this address is the same
                 // printer. Adding it twice gives a shop two cards that disagree.
                 guard !fleet.contains(where: { row in
                     guard case .object(let m) = row,
                           case .object(let api)? = m["printerApi"],
-                          case .string(let host)? = api["host"] else { return false }
-                    return host == printer.host
-                }) else { return }
-                StoreWriter.stamp(&record)
-                fleet.append(.object(record))
+                          case .string(let had)? = api["host"] else { return false }
+                    return had == host
+                }) else { return false }
+                var stamped = adding
+                StoreWriter.stamp(&stamped)
+                fleet.append(.object(stamped))
                 root["machines"] = .array(fleet)
-                added = true
+                return true
             }
             if added, Self.linksPrinter(record, over: nil) { Telemetry.feature(.printerLinked, in: self) }
             await load(source)
