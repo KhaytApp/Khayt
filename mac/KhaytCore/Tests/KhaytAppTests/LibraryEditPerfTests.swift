@@ -282,6 +282,40 @@ struct LibraryEditPerfTests {
         }
     }
 
+    /// A reload whose read of the book came BEFORE a library write, finishing
+    /// AFTER that write was put on screen, drew the older book: the star went
+    /// off again (a deleted model came back) with nothing pending to fix it.
+    @Test("a reload that read the book before an edit landed does not undo it on screen")
+    func reloadOlderThanAWrite() async throws {
+        try await withPerfBook(PerfBook.synthesize(models: 20)) { shop, url in
+            let file = try #require(shop.files.first { !$0.isFavourite })
+            // Hold the write chain, so the edit's write waits behind it.
+            let release = DispatchSemaphore(value: 0)
+            await withCheckedContinuation { (held: CheckedContinuation<Void, Never>) in
+                DispatchQueue.global().async {
+                    StoreWriter.serialised { held.resume(); release.wait() }
+                }
+            }
+            shop.toggleFavourite(file)
+            DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(150)) { release.signal() }
+            // Between the reload's read and its use of it, the edit lands and
+            // is put on screen.
+            Shop.afterBookReadForTests = {
+                Shop.afterBookReadForTests = nil
+                await shop.settleLibraryWrites()
+            }
+            await shop.load(shop.source)
+            Shop.afterBookReadForTests = nil
+            await shop.settleLibraryWrites()
+            var onDisk: JSONValue?
+            for case .object(let o) in try diskRows(url) where o["id"] == .string(file.id) { onDisk = o["favorite"] }
+            #expect(onDisk == .bool(true))
+            let starred = shop.files.first { $0.id == file.id }?.isFavourite
+            #expect(starred == true, "the reload put the older book back on screen")
+            #expect(shop.libraryRows == (try diskRows(url)), "the screen and the book disagree")
+        }
+    }
+
     @Test("a delete that cannot be written puts the models back on screen")
     func failedDeleteComesBack() async throws {
         try await withPerfBook(PerfBook.synthesize(models: 20)) { shop, url in

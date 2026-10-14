@@ -23,6 +23,9 @@ struct LibraryWritten: Sendable {
     /// Counted inside the chain, so the order is the order they were written.
     static let written = OSAllocatedUnfairLock(initialState: 0)
     static func next() -> Int { written.withLock { $0 += 1; return $0 } }
+    /// The last number handed out. Read ON the chain (`Shop.load`), it says
+    /// which library writes a book read straight after already holds.
+    static var current: Int { written.withLock { $0 } }
 }
 
 /// The library a write compares the book against (`Shop.libraryBase`).

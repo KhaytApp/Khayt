@@ -554,6 +554,11 @@ final class Shop {
     /// first must not finish last and put the older book on screen.
     private var loadGeneration = 0
 
+    /// TESTS ONLY: run between a load's read of the book and its use of it,
+    /// so a test can land a library write in exactly that gap. Nothing in
+    /// the app sets it.
+    static var afterBookReadForTests: (@MainActor () async -> Void)?
+
     /// Library edits on screen and not yet written (`Shop+LibraryWrites`).
     @ObservationIgnored var pendingLibraryChanges: [PendingLibraryChange] = []
     @ObservationIgnored var pendingLibraryToken = 0
@@ -591,6 +596,10 @@ final class Shop {
         do {
             let root: [String: JSONValue]
             var library: (items: [LibraryFile], skipped: [String])?
+            // The library write on screen when this book was read. Moved on
+            // by the time the rows below are taken, a write has landed in
+            // between, and its rows are the newer ones.
+            var readMark = libraryShownSequence
             switch next {
             case .sample:
                 guard let url = AppResources.bundle.url(forResource: "sample-shop", withExtension: "json"),
@@ -611,16 +620,39 @@ final class Shop {
                 // then its library into `LibraryFile`s, held the main thread
                 // for seconds on every reload — and every write reloads, so
                 // deleting one model froze the window (`LibraryEditPerfTests`).
-                let read = try await BookWork.run { () throws -> ([String: JSONValue], ([LibraryFile], [String])) in
-                    let raw = try StoreReader(build: build).raw
-                    let files = Self.decodeFiles(raw)
-                    return (raw, (files.items, files.skipped))
-                }
-                // A later load started while this one was reading: it has
-                // the newer book, and it will put everything on screen.
-                guard generation == loadGeneration else { return }
-                root = read.0
-                library = (items: read.1.0, skipped: read.1.1)
+                //
+                // ── A READ OLDER THAN A WRITE ALREADY ON SCREEN ──────────
+                //
+                // The read is not on the write chain, so a library edit can
+                // land, and be put on screen (`showLibraryWritten`), while
+                // this read of the book from BEFORE it is still decoding.
+                // Shown after it, that book put the deleted model back on
+                // screen, or took the star off again, with nothing pending
+                // to correct it. So each read notes, on the chain, how many
+                // library writes it already holds; one older than what is on
+                // screen is read again.
+                var read: (root: [String: JSONValue], files: [LibraryFile], skipped: [String], holds: Int)
+                var tries = 0
+                repeat {
+                    read = try await BookWork.run { () throws -> ([String: JSONValue], [LibraryFile], [String], Int) in
+                        let holds = StoreWriter.serialised { LibraryWritten.current }
+                        let raw = try StoreReader(build: build).raw
+                        let files = Self.decodeFiles(raw)
+                        return (raw, files.items, files.skipped, holds)
+                    }
+                    if let hook = Self.afterBookReadForTests { await hook() }
+                    // A later load started while this one was reading: it has
+                    // the newer book, and it will put everything on screen.
+                    guard generation == loadGeneration else { return }
+                    tries += 1
+                } while read.holds < libraryShownSequence && tries < 10
+                root = read.root
+                library = (items: read.files, skipped: read.skipped)
+                // This book is now the library on screen: a write it already
+                // holds, heard late, patches from THIS, never from older rows.
+                libraryShownSequence = max(libraryShownSequence, read.holds)
+                libraryShownRows = Self.rows(root, "printFiles")
+                readMark = libraryShownSequence
             }
             let decoded = try Self.decodeOrders(root)
             orders = decoded.items
@@ -631,6 +663,10 @@ final class Shop {
             let decodedFiles = library ?? Self.decodeFiles(root)
             files = decodedFiles.items
             skipped += decodedFiles.skipped
+            // In the same breath, not after the seconds of work below: a
+            // model being deleted must not reappear (and be choosable) for
+            // the length of a reload.
+            reapplyPendingLibraryChanges()
             libraryGroupKinds = GroupKinds.read(Self.settings(root))
             libraryGroupCovers = GroupKinds.covers(Self.settings(root))
             libraryRoots = next.build.map { build in
@@ -673,7 +709,9 @@ final class Shop {
             // right-to-left screen that is wrong.
             if let forced = ProcessInfo.processInfo.environment["KHAYT_LANG"] { wanted = forced }
             await words.load(wanted, engine: engine)
-            settingsValue = root["settings"] ?? .object([:])
+            // A library write that landed during the await above has put the
+            // newer settings (group kinds, covers) on screen already.
+            if libraryShownSequence == readMark { settingsValue = root["settings"] ?? .object([:]) }
             await readFeatures()
             // A shop that has just switched to Simple must not be left looking
             // at a screen that is no longer theirs.
@@ -732,7 +770,11 @@ final class Shop {
             // The print files as written. `files` above is the decoded model;
             // this is what the setups and versions rules read, which is a wider
             // set of fields than the model carries.
-            if case .array(let library)? = root["printFiles"] {
+            if libraryShownSequence != readMark {
+                // A library write landed during the work above: its rows
+                // are newer than this read's (`readMark`).
+                fileRows = libraryShownRows
+            } else if case .array(let library)? = root["printFiles"] {
                 fileRows = library
             } else {
                 fileRows = []
@@ -838,7 +880,13 @@ final class Shop {
             // reason as everything above it: the grid redraws on every
             // keystroke in the search box, and a hop into JavaScript per chip
             // per redraw is a hop for a constant.
-            if case .array(let rows)? = root["printFiles"] { libraryRows = rows } else { libraryRows = [] }
+            if libraryShownSequence != readMark {
+                libraryRows = libraryShownRows
+            } else if case .array(let rows)? = root["printFiles"] {
+                libraryRows = rows
+            } else {
+                libraryRows = []
+            }
             // A library edit still being written stays on screen as asked,
             // not as the book held it a moment before (`Shop+LibraryWrites`).
             libraryShownRows = libraryRows
