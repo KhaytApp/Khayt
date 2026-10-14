@@ -122,7 +122,10 @@ extension LibraryEditPerfTests {
 
     @Test("Stop ends a 10,000-model scan, and what it indexed before stays")
     func linkedScanStops() async throws {
-        let drive = try Self.drive()
+        // A smaller drive than the timing test's: Stop is pressed at the first
+        // progress, ~50 models in, so 1,600 is as good a guard and a third of
+        // the CI time (review of #1860).
+        let drive = try Self.drive(folders: 200, perFolder: 6, loose: 400)
         defer { try? FileManager.default.removeItem(at: drive.deletingLastPathComponent()) }
         try await Self.withScanBook(drive) { shop, url in
             let scan = Task { await shop.rescanLinkedFolders() }
@@ -135,7 +138,7 @@ extension LibraryEditPerfTests {
             await scan.value
             let added = try diskRows(url).count - 10_000
             #expect(added > 0, "what was indexed before the Stop was written")
-            #expect(added < 9_800, "the scan stopped")
+            #expect(added < 1_600, "the scan stopped")
             #expect(shop.libraryScanStop == nil && !shop.libraryMoveBusy, "the scan let go of the library")
         }
     }
