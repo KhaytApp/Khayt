@@ -250,6 +250,10 @@ struct OperatorEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var fields = ShopOperator.Fields(name: "", role: "", roleKey: "operator",
                                                     hourlyRate: 0, active: true)
+    /// A save is on its way to the book. The write no longer holds the
+    /// window, so a second click would start a second save — for a new
+    /// operator, a second operator under another id.
+    @State private var saving = false
 
     var body: some View {
         let words = shop.words
@@ -284,13 +288,16 @@ struct OperatorEditor: View {
                 Button(words.callIt("common.cancel")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(words.callIt("common.save")) {
+                    guard !saving else { return }
+                    saving = true
                     Task {
                         await shop.saveOperator(id: original?.id, fields, opened: original?.fields)
+                        saving = false
                         if shop.moveProblem == nil { dismiss() }
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(fields.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(saving || fields.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
         .padding(20)

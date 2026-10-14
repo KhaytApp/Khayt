@@ -10,6 +10,8 @@ import Testing
 /// second click on Save for a NEW message template wrote a second template
 /// under another id (`saveTemplate` mints the id per call). The pause sheet's
 /// Return wrote the pause twice, the second over the first's `pausedAt`.
+/// A new location, operator or supplier mints its id inside the save, so a
+/// second click there made a second record too.
 ///
 /// A view cannot be clicked from here, so this reads the source: each of these
 /// sheets keeps a `saving` flag, refuses a second start while it is set, and
@@ -23,8 +25,9 @@ struct SaveInFlightTests {
             .appending(path: "Sources/KhaytApp/\(file)"), encoding: .utf8)
     }
 
-    @Test("the template sheet and the pause sheet take one save at a time",
-          arguments: ["TemplateSheet.swift", "PauseSheet.swift"])
+    @Test("a sheet whose save is off the main thread takes one save at a time",
+          arguments: ["TemplateSheet.swift", "PauseSheet.swift", "LocationsSection.swift",
+                     "Operators.swift", "SupplierSheet.swift"])
     func oneSaveAtATime(file: String) throws {
         let text = try Self.source(file)
         #expect(text.contains("@State private var saving = false"), "\(file) has no in-flight flag")
