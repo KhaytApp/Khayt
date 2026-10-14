@@ -75,14 +75,6 @@ enum PerfBook {
         StoreReader.Build.supportFolderForTests = support
         return support
     }
-
-    /// Or a local copy of a real book, for measuring by hand. NEVER commit one.
-    @MainActor
-    static func installRealIfAsked() throws -> URL? {
-        guard let path = ProcessInfo.processInfo.environment["KHAYT_PERF_BOOK"] else { return nil }
-        let data = try Data(contentsOf: URL(fileURLWithPath: path))
-        return try install(JSONDecoder().decode([String: JSONValue].self, from: data))
-    }
 }
 
 /// The longest the main thread went without servicing its queue.
@@ -126,73 +118,230 @@ func ms(_ d: Duration) -> Double {
     Double(d.components.seconds) * 1000 + Double(d.components.attoseconds) / 1e15
 }
 
+/// Open `root` as a real book in a temp folder, run `body`, and put
+/// everything back — the sample book loaded again stops the printers, the
+/// cameras and the timers a real book starts, before the folder goes.
+@MainActor
+func withPerfBook(_ root: [String: JSONValue],
+                  _ body: (Shop, URL) async throws -> Void) async throws {
+    let support = try PerfBook.install(root)
+    // Never into this Mac's own Spotlight from a test.
+    let spotlight = UserDefaults.standard.object(forKey: Spotlight.defaultsKey)
+    UserDefaults.standard.set(false, forKey: Spotlight.defaultsKey)
+    let shop = Shop()
+    do {
+        await shop.load(.store(.shipped))
+        try await body(shop, StoreReader.Build.shipped.storeURL)
+    } catch {
+        Issue.record(error)
+    }
+    await shop.settleLibraryWrites()
+    await shop.load(.sample)
+    StoreReader.Build.supportFolderForTests = nil
+    UserDefaults.standard.set(spotlight, forKey: Spotlight.defaultsKey)
+    try? FileManager.default.removeItem(at: support)
+}
+
+/// The book's `printFiles`, as on disk now.
+func diskRows(_ url: URL) throws -> [JSONValue] {
+    let root = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: url))
+    if case .array(let rows)? = root["printFiles"] { return rows }
+    return []
+}
+
+func diskIds(_ url: URL) throws -> Set<String> {
+    Set(try diskRows(url).compactMap(Shop.recordId))
+}
+
 @MainActor
 @Suite(.serialized)
 struct LibraryEditPerfTests {
 
-    @Test("measure: library edits at real size (prints timings)")
+    /// How long one delete may hold the main thread at 10,000 models.
+    ///
+    /// Measured on a debug build (the one `swift test` runs): ~3,800 ms
+    /// before — the whole book decoded, encoded and read back on the main
+    /// thread — and ~100 ms after, the rest being the library's own chips
+    /// recounted in Swift. 500 ms leaves a slow CI runner five times the
+    /// room, and is still a seventh of what the freeze was.
+    static let budgetMs = 500.0
+
+    @Test("deleting one model from a 10,000-model book does not freeze the window")
+    func deleteDoesNotFreeze() async throws {
+        try await withPerfBook(PerfBook.synthesize()) { shop, url in
+            #expect(shop.files.count == 10_000)
+            let meter = MainStallMeter()
+            // The best of three: another test sharing the main thread can
+            // stall one run, but the freeze this guards against stalled
+            // every one of them by seconds.
+            var best = Double.infinity
+            var gone: [String] = []
+            for i in 0..<3 {
+                let one = shop.files[i * 100]
+                gone.append(one.id)
+                meter.start()
+                await shop.deleteLibraryFiles([one])
+                best = min(best, await meter.stop())
+                let drawn = shop.files.contains { $0.id == one.id }
+                #expect(!drawn, "still on screen")
+            }
+            #expect(best < Self.budgetMs, "a delete held the main thread \(Int(best)) ms")
+            let onDisk = try diskIds(url)
+            #expect(onDisk.count == 9_997)
+            #expect(onDisk.isDisjoint(with: gone), "a delete never reached the book")
+            #expect(shop.files.count == 9_997)
+            #expect(shop.libraryRows.count == 9_997)
+        }
+    }
+
+    @Test("a delete leaves the screen at once, and the book when it is written")
+    func deleteIsOptimisticThenWritten() async throws {
+        try await withPerfBook(PerfBook.synthesize(models: 40)) { shop, url in
+            let doomed = Array(shop.files.prefix(3))
+            let ids = Set(doomed.map(\.id))
+            let write = Task { await shop.deleteLibraryFiles(doomed) }
+            // The first hop is the Trash, off the main thread: by the time it
+            // is under way the models are already off the screen.
+            await Task.yield()
+            let drawn = shop.files.contains { ids.contains($0.id) }
+            #expect(!drawn, "still drawn while it is written")
+            await write.value
+            #expect(try diskIds(url).isDisjoint(with: ids))
+            #expect(shop.files.count == 37)
+            // One write, and its tombstones — or the next sync puts them back.
+            let root = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: url))
+            let tombs = Shop.rows(root, "tombstones").compactMap { row -> String? in
+                guard case .object(let t) = row, case .string(let id)? = t["id"] else { return nil }
+                return id
+            }
+            #expect(ids.isSubset(of: Set(tombs)))
+            // What is on screen is what is in the book.
+            let written = try diskRows(url)
+            #expect(shop.libraryRows == written)
+        }
+    }
+
+    @Test("a favourite shows at once, lands in the book, and undoes and redoes")
+    func favouriteRoundTrip() async throws {
+        try await withPerfBook(PerfBook.synthesize(models: 40)) { shop, url in
+            let undo = UndoManager()
+            undo.groupsByEvent = false
+            shop.undoManager = undo
+            let plain = shop.files.first { !$0.isFavourite }
+            let file = try #require(plain)
+            undo.beginUndoGrouping()
+            shop.toggleFavourite(file)
+            undo.endUndoGrouping()
+            @MainActor func starred() -> Bool? { shop.files.first { $0.id == file.id }?.isFavourite }
+            #expect(starred() == true, "the star waits for the write")
+            await shop.settleLibraryWrites()
+            func onDisk() throws -> [String: JSONValue]? {
+                for case .object(let o) in try diskRows(url) where o["id"] == .string(file.id) { return o }
+                return nil
+            }
+            #expect(try onDisk()?["favorite"] == .bool(true))
+            let written = try diskRows(url)
+            #expect(shop.libraryRows == written, "the screen and the book disagree")
+
+            undo.undo()
+            await shop.settleLibraryWrites()
+            #expect(try onDisk()?["favorite"] == .bool(false), "undo did not reach the book")
+            #expect(starred() == false)
+            #expect(undo.canRedo, "the undo's redo went on the wrong stack")
+
+            undo.redo()
+            await shop.settleLibraryWrites()
+            #expect(try onDisk()?["favorite"] == .bool(true), "redo did not reach the book")
+            shop.undoManager = nil
+        }
+    }
+
+    @Test("a delete that cannot be written puts the models back on screen")
+    func failedDeleteComesBack() async throws {
+        try await withPerfBook(PerfBook.synthesize(models: 20)) { shop, url in
+            // Another app takes the book (a live pid on this host: launchd).
+            let now = Date().timeIntervalSince1970 * 1000
+            let thief = StoreLock.Record(app: "Khayt", pid: 1, host: ProcessInfo.processInfo.hostName,
+                                         takenAt: now, heartbeat: now)
+            let lock = url.deletingLastPathComponent().appending(path: StoreLock.filename)
+            try JSONEncoder().encode(thief).write(to: lock)
+            let file = shop.files[0]
+            await shop.deleteLibraryFiles([file])
+            #expect(shop.importProblem != nil, "a refused delete said nothing")
+            let back = shop.files.contains { $0.id == file.id }
+            #expect(back, "a model the book still holds vanished")
+            #expect(try diskIds(url).contains(file.id))
+        }
+    }
+
+    @Test("the write runs on the write chain, never on the main thread")
+    func writeIsOffMain() async throws {
+        try await withPerfBook(PerfBook.synthesize(models: 5)) { _, url in
+            let probe: @Sendable (inout [String: JSONValue]) -> Bool = { _ in Thread.isMainThread }
+            let onMain = try await StoreWriter.updateOffMain(storeURL: url, owns: { true },
+                                                             whoHasIt: { nil }, mutate: probe)
+            #expect(!onMain)
+        }
+    }
+
+    /// Opt-in: `KHAYT_PERF_MEASURE=1` prints the timings this file's budget
+    /// was chosen from; `KHAYT_PERF_BOOK=<path>` measures a local copy of a
+    /// real book instead (never commit one).
+    @Test("measure: library edits at real size (prints timings)",
+          .enabled(if: ProcessInfo.processInfo.environment["KHAYT_PERF_MEASURE"] != nil))
     func measure() async throws {
-        let support: URL
-        if let real = try PerfBook.installRealIfAsked() { support = real }
-        else { support = try PerfBook.install(PerfBook.synthesize()) }
-        // Never into this Mac's own Spotlight from a test.
-        let spotlight = UserDefaults.standard.object(forKey: Spotlight.defaultsKey)
-        UserDefaults.standard.set(false, forKey: Spotlight.defaultsKey)
-        defer {
-            StoreReader.Build.supportFolderForTests = nil
-            try? FileManager.default.removeItem(at: support)
-            UserDefaults.standard.set(spotlight, forKey: Spotlight.defaultsKey)
+        let book: [String: JSONValue]
+        if let path = ProcessInfo.processInfo.environment["KHAYT_PERF_BOOK"] {
+            book = try JSONDecoder().decode([String: JSONValue].self,
+                                            from: Data(contentsOf: URL(fileURLWithPath: path)))
+        } else {
+            book = PerfBook.synthesize()
         }
         let clock = ContinuousClock()
-        let shop = Shop()
         let meter = MainStallMeter()
+        let support = try PerfBook.install(book)
+        let spotlight = UserDefaults.standard.object(forKey: Spotlight.defaultsKey)
+        UserDefaults.standard.set(false, forKey: Spotlight.defaultsKey)
+        let shop = Shop()
+        defer {
+            StoreReader.Build.supportFolderForTests = nil
+            UserDefaults.standard.set(spotlight, forKey: Spotlight.defaultsKey)
+            try? FileManager.default.removeItem(at: support)
+        }
 
         meter.start()
         var t = clock.now
         await shop.load(.store(.shipped))
         print("PERF load: wall \(ms(clock.now - t)) ms, worst main stall \(await meter.stop()) ms, files \(shop.files.count)")
 
-        let url = StoreReader.Build.shipped.storeURL
-        t = clock.now
-        let data = try Data(contentsOf: url)
-        let read = ms(clock.now - t)
-        t = clock.now
-        var root = try JSONDecoder().decode([String: JSONValue].self, from: data)
-        let decode = ms(clock.now - t)
-        let before = root
-        if case .array(var rows)? = root["printFiles"] { rows.removeFirst(); root["printFiles"] = .array(rows) }
-        t = clock.now
-        StoreWriter.reviveUnderNewIds(before: before, after: &root)
-        StoreWriter.recordDeletions(before: before, after: &root)
-        StoreWriter.stampChanged(before: before, after: &root)
-        let bookkeeping = ms(clock.now - t)
-        t = clock.now
-        let encoded = try JSONEncoder().encode(root)
-        let encode = ms(clock.now - t)
-        print("PERF parts: read \(read) ms, decode \(decode) ms, revive+tombstone+stamp \(bookkeeping) ms, encode \(encode) ms (\(encoded.count) bytes)")
-
-        // One model.
-        guard let one = shop.files.first else { Issue.record("no files"); return }
+        let one = try #require(shop.files.first)
         meter.start()
         t = clock.now
         await shop.deleteLibraryFiles([one])
-        print("PERF delete one: wall \(ms(clock.now - t)) ms, worst main stall \(await meter.stop()) ms, files \(shop.files.count)")
+        print("PERF delete one: wall \(ms(clock.now - t)) ms, worst main stall \(await meter.stop()) ms")
 
-        // Twenty at once.
         let many = Array(shop.files.prefix(20))
         meter.start()
         t = clock.now
         await shop.deleteLibraryFiles(many)
-        print("PERF delete twenty: wall \(ms(clock.now - t)) ms, worst main stall \(await meter.stop()) ms, files \(shop.files.count)")
+        print("PERF delete twenty: wall \(ms(clock.now - t)) ms, worst main stall \(await meter.stop()) ms")
 
-        // Favourite (fire-and-forget reload inside).
         let fav = shop.files[5]
         meter.start()
         t = clock.now
         shop.toggleFavourite(fav)
         let favSync = ms(clock.now - t)
         await shop.settleLibraryWrites()
-        try? await Task.sleep(for: .seconds(4))
-        print("PERF favourite: synchronous \(favSync) ms, worst main stall incl. reload \(await meter.stop()) ms, now \(shop.files.first { $0.id == fav.id }?.isFavourite ?? false)")
+        print("PERF favourite: on screen in \(favSync) ms, written in \(ms(clock.now - t)) ms, worst main stall \(await meter.stop()) ms")
+
+        let moving = Set(shop.files.dropFirst(10).prefix(5).map(\.id))
+        shop.fileSelection = moving
+        meter.start()
+        t = clock.now
+        await shop.fileSelection(under: "Perf Moved")
+        await shop.settleLibraryWrites()
+        print("PERF move five to a group: wall \(ms(clock.now - t)) ms, worst main stall \(await meter.stop()) ms")
+
+        await shop.load(.sample)
     }
 }
