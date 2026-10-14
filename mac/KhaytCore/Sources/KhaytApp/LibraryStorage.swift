@@ -990,7 +990,7 @@ extension Shop {
         let past = Self.pastLocations(roots, builtIn: LibraryLocation.defaultRoot(for: build))
             .map { URL(fileURLWithPath: $0) }
         // Reloaded at the end only if the pass wrote — see `rescanLinkedFolders`.
-        let bookAt = Self.bookStamp(build.storeURL)
+        var bookAt = Self.bookStamp(build.storeURL)
         let drawn = ScanProgress()
         var report = await Self.adoptFromStorage(
             root: root, past: past, excluding: roots.roots.filter { $0 != roots.primary } + [roots.mirror].compactMap { $0 } + linkedFolders,
@@ -1020,7 +1020,7 @@ extension Shop {
                                                        linked: linkedFolders, owns: owns, whoHasIt: who,
                                                        isOnline: linkedIsOnline)
         }
-        await reloadIfWritten(since: bookAt)
+        await reloadIfWritten(since: &bookAt)
         if !report.addedIds.isEmpty {
             let ids = report.addedIds
             Task { [weak self] in await self?.backUpToCloud(ids: ids) }
