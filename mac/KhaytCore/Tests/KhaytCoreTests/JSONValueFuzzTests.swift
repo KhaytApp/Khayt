@@ -137,8 +137,12 @@ struct JSONValueFuzzTests {
             }
             return .string(s)
         case 1:
-            switch r.int(4) {
+            switch r.int(5) {
             case 0: return .number(Double(r.int(2_000_000)) - 1_000_000)
+            case 4:
+                // Whole numbers of every magnitude, and powers of ten, either side of 2^53.
+                let n = Double(r.next() >> UInt64(r.int(53))) * (r.int(2) == 0 ? 1 : -1)
+                return .number(r.int(3) == 0 ? (n < 0 ? -1 : 1) * pow(10, Double(r.int(30))) : n)
             case 1: return .number(r.pick([0, -0.0, 1e-7, 1e16, 9007199254740992, 9007199254740993, -9007199254740991,
                                            1e21, 1e22, 1e23, 5e-324, .greatestFiniteMagnitude, 0.1, 1.5, 123456.789]))
             default:
