@@ -532,7 +532,7 @@ extension Shop {
     /// Settings keys an editor rewrites, laid over `settings` keeping what it
     /// did not change as the book spells it (`RoundTrip`). A slicer the other
     /// app stored with a field of its own keeps it; so does a saved report.
-    static func settingsKeys(_ written: [String: JSONValue], opened: [String: JSONValue]?,
+    nonisolated static func settingsKeys(_ written: [String: JSONValue], opened: [String: JSONValue]?,
                              over settings: [String: JSONValue]) -> [String: JSONValue] {
         var out = settings
         var keys = written

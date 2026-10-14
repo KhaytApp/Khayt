@@ -27,6 +27,38 @@ extension StoreWriter {
                    mutate: mutate)
     }
 
+    /// The same, on the write chain, without holding the main thread.
+    ///
+    /// The store's path is taken HERE, on the caller's thread, so the write
+    /// addresses the book the caller meant even if a test points the app at
+    /// another folder before the queue gets to it.
+    static func updateOffMain<T: Sendable>(_ build: StoreReader.Build,
+                                           recordingDeletes: Bool = true,
+                                           mutate: @escaping @Sendable (inout [String: JSONValue]) throws -> T)
+        async throws -> T {
+        try await updateOffMain(storeURL: build.storeURL,
+                                owns: { StoreLock.weOwnIt(build) },
+                                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
+                                recordingDeletes: recordingDeletes,
+                                mutate: mutate)
+    }
+
+    /// `updateRecord`, on the write chain without holding the main thread.
+    static func updateRecordOffMain(_ build: StoreReader.Build, collection: String, id: String,
+                                    change: @escaping @Sendable (inout [String: JSONValue]) -> Void)
+        async throws {
+        _ = try await updateOffMain(build) { root -> Bool in
+            guard case .array(var rows)? = root[collection],
+                  let index = rows.firstIndex(where: { Shop.recordId($0) == id }),
+                  case .object(var record) = rows[index] else { return false }
+            change(&record)
+            stamp(&record)
+            rows[index] = .object(record)
+            root[collection] = .array(rows)
+            return true
+        }
+    }
+
     /// Change one record of one collection in place, stamping it.
     static func updateRecord(_ build: StoreReader.Build, collection: String, id: String,
                              change: (inout [String: JSONValue]) -> Void) throws {

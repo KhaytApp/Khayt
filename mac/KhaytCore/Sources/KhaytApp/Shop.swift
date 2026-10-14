@@ -47,6 +47,11 @@ final class Shop {
     private(set) var orders: [Order] = []
     private(set) var files: [LibraryFile] = []
 
+    /// The library on screen, patched in place by a library edit
+    /// (`Shop+LibraryWrites.swift`) rather than by reloading the whole book.
+    /// Only ever the book's own records: a put-aside model stays in here.
+    func showLibraryFiles(_ next: [LibraryFile]) { files = next }
+
     /// Show the models that have been put aside. Off: they are still there.
     var libraryShowArchived = false {
         didSet { if libraryShowArchived != oldValue { pruneSelectionToVisible() } }
@@ -543,6 +548,32 @@ final class Shop {
     /// month the rebased sample has nothing in "this month" otherwise, and
     /// every test that looks at this month failed on the calendar, not code.
     private(set) var clock: Date?
+
+    /// Which `load` is the latest. A real book is read off the main thread
+    /// now, so two loads can be in flight at once — and the one that started
+    /// first must not finish last and put the older book on screen.
+    private var loadGeneration = 0
+
+    /// TESTS ONLY: run between a load's read of the book and its use of it,
+    /// so a test can land a library write in exactly that gap. Nothing in
+    /// the app sets it.
+    static var afterBookReadForTests: (@MainActor () async -> Void)?
+    /// TESTS ONLY: run once a load has put its models up and is about to do
+    /// the seconds of work after — where a newer load can overtake it.
+    static var whileLoadingForTests: (@MainActor () async -> Void)?
+
+    /// Library edits on screen and not yet written (`Shop+LibraryWrites`).
+    @ObservationIgnored var pendingLibraryChanges: [PendingLibraryChange] = []
+    @ObservationIgnored var pendingLibraryToken = 0
+    /// The latest library write on screen (`LibraryWritten.sequence`).
+    @ObservationIgnored var libraryShownSequence = 0
+    /// The library as that write left it, before any pending edit is drawn.
+    @ObservationIgnored var libraryShownRows: [JSONValue] = []
+    /// Moved by every load's read and every library write put on screen, so
+    /// a load still working can tell its rows are no longer the newest.
+    @ObservationIgnored var libraryEpoch = 0
+    /// Library writes started and not yet waited for (`settleLibraryWrites`).
+    @ObservationIgnored var libraryWrites: [Int: Task<LibraryUndo?, Never>] = [:]
     var now: Date { clock ?? Date() }
 
     init(source: Source = .sample) {
@@ -566,8 +597,15 @@ final class Shop {
         source = next
         problem = nil
         skipped = []
+        loadGeneration += 1
+        let generation = loadGeneration
         do {
             let root: [String: JSONValue]
+            var library: (items: [LibraryFile], skipped: [String])?
+            // The library write on screen when this book was read. Moved on
+            // by the time the rows below are taken, a write has landed in
+            // between, and its rows are the newer ones.
+            var readMark = libraryEpoch
             switch next {
             case .sample:
                 guard let url = AppResources.bundle.url(forResource: "sample-shop", withExtension: "json"),
@@ -582,19 +620,74 @@ final class Shop {
                     try JSONDecoder().decode([String: JSONValue].self, from: data),
                     to: day)
             case .store(let build):
-                root = try StoreReader(build: build).raw
+                // ── OFF THE MAIN THREAD ──────────────────────────────────
+                //
+                // A shop's book of 9,802 models is 15 MB; decoding it, and
+                // then its library into `LibraryFile`s, held the main thread
+                // for seconds on every reload — and every write reloads, so
+                // deleting one model froze the window (`LibraryEditPerfTests`).
+                //
+                // ── A READ OLDER THAN A WRITE ALREADY ON SCREEN ──────────
+                //
+                // The read is not on the write chain, so a library edit can
+                // land, and be put on screen (`showLibraryWritten`), while
+                // this read of the book from BEFORE it is still decoding.
+                // Shown after it, that book put the deleted model back on
+                // screen, or took the star off again, with nothing pending
+                // to correct it. So each read notes, on the chain, how many
+                // library writes it already holds; one older than what is on
+                // screen is read again.
+                var read: (root: [String: JSONValue], files: [LibraryFile], skipped: [String], holds: Int)
+                var tries = 0
+                repeat {
+                    read = try await BookWork.run { () throws -> ([String: JSONValue], [LibraryFile], [String], Int) in
+                        let holds = StoreWriter.serialised { LibraryWritten.current }
+                        let raw = try StoreReader(build: build).raw
+                        let files = Self.decodeFiles(raw)
+                        return (raw, files.items, files.skipped, holds)
+                    }
+                    if let hook = Self.afterBookReadForTests { await hook() }
+                    // A later load started while this one was reading: it has
+                    // the newer book, and it will put everything on screen.
+                    guard generation == loadGeneration else { return }
+                    tries += 1
+                } while read.holds < libraryShownSequence && tries < 10
+                root = read.root
+                library = (items: read.files, skipped: read.skipped)
+                // This book is now the library on screen: a write it already
+                // holds, heard late, patches from THIS, never from older rows.
+                libraryShownSequence = max(libraryShownSequence, read.holds)
             }
+            // ── THE NEWEST LIBRARY WINS, WHICHEVER LOAD FINISHES LAST ────
+            //
+            // The generation guard above stops a load whose READ finished
+            // after a newer load began. It cannot stop one that read first
+            // and is still in the seconds of work below when a newer load
+            // (or a library write) puts a newer library up — and that older
+            // load then took its rows at the end and drew the older library:
+            // a scan's models gone again, a star off (the flaky
+            // `quickEditsInARow`, under load). So every read and every write
+            // put on screen moves `libraryEpoch`, and the rows below come
+            // from this read only while it is still the newest.
+            libraryShownRows = Self.rows(root, "printFiles")
+            libraryEpoch += 1
+            readMark = libraryEpoch
             let decoded = try Self.decodeOrders(root)
             orders = decoded.items
             skipped = decoded.skipped
             machines = Self.decode(root, "machines", as: Machine.self)
             spools = Self.decode(root, "inventory", as: Spool.self)
             consumables = Self.decode(root, "consumables", as: Consumable.self)
-            let library = Self.decodeFiles(root)
-            files = library.items
-            skipped += library.skipped
+            let decodedFiles = library ?? Self.decodeFiles(root)
+            files = decodedFiles.items
+            skipped += decodedFiles.skipped
+            // In the same breath, not after the seconds of work below: a
+            // model being deleted must not reappear (and be choosable) for
+            // the length of a reload.
+            reapplyPendingLibraryChanges()
             libraryGroupKinds = GroupKinds.read(Self.settings(root))
             libraryGroupCovers = GroupKinds.covers(Self.settings(root))
+            if let hook = Self.whileLoadingForTests { await hook() }
             libraryRoots = next.build.map { build in
                 LibraryLocation.resolveRoots(settings: Self.librarySettings(root),
                                              defaultRoot: LibraryLocation.defaultRoot(for: build))
@@ -635,7 +728,9 @@ final class Shop {
             // right-to-left screen that is wrong.
             if let forced = ProcessInfo.processInfo.environment["KHAYT_LANG"] { wanted = forced }
             await words.load(wanted, engine: engine)
-            settingsValue = root["settings"] ?? .object([:])
+            // A library write that landed during the await above has put the
+            // newer settings (group kinds, covers) on screen already.
+            if libraryEpoch == readMark { settingsValue = root["settings"] ?? .object([:]) }
             await readFeatures()
             // A shop that has just switched to Simple must not be left looking
             // at a screen that is no longer theirs.
@@ -694,7 +789,11 @@ final class Shop {
             // The print files as written. `files` above is the decoded model;
             // this is what the setups and versions rules read, which is a wider
             // set of fields than the model carries.
-            if case .array(let library)? = root["printFiles"] {
+            if libraryEpoch != readMark {
+                // A library write landed during the work above: its rows
+                // are newer than this read's (`readMark`).
+                fileRows = libraryShownRows
+            } else if case .array(let library)? = root["printFiles"] {
                 fileRows = library
             } else {
                 fileRows = []
@@ -800,7 +899,17 @@ final class Shop {
             // reason as everything above it: the grid redraws on every
             // keystroke in the search box, and a hop into JavaScript per chip
             // per redraw is a hop for a constant.
-            if case .array(let rows)? = root["printFiles"] { libraryRows = rows } else { libraryRows = [] }
+            if libraryEpoch != readMark {
+                libraryRows = libraryShownRows
+            } else if case .array(let rows)? = root["printFiles"] {
+                libraryRows = rows
+            } else {
+                libraryRows = []
+            }
+            // A library edit still being written stays on screen as asked,
+            // not as the book held it a moment before (`Shop+LibraryWrites`).
+            libraryShownRows = libraryRows
+            reapplyPendingLibraryChanges()
             await readLibraryFacets()
             // And the names those chips can be filed under, which is the whole
             // book rather than what the chips are currently counting.
@@ -1232,9 +1341,9 @@ final class Shop {
 
     /// The library's group kinds, by path, as the book's settings hold them.
     /// See `GroupKind`.
-    private(set) var libraryGroupKinds: [String: GroupKind] = [:]
+    internal(set) var libraryGroupKinds: [String: GroupKind] = [:]
     /// The pictures the shop chose for its groups, by path. See `GroupCover`.
-    private(set) var libraryGroupCovers: [String: GroupCover] = [:]
+    internal(set) var libraryGroupCovers: [String: GroupCover] = [:]
 
     /// The Mac's undo stack, handed over by the window.
     ///
@@ -1300,7 +1409,7 @@ final class Shop {
     /// Not per redraw: the calibration reads the whole print log, and a grid of
     /// four hundred models asking for that on every frame is four hundred trips
     /// through the runtime for one number that cannot have changed.
-    private(set) var estimates: [String: KhaytEngine.MeshEstimate] = [:]
+    internal(set) var estimates: [String: KhaytEngine.MeshEstimate] = [:]
 
     // Stored for "A printer that changed address" (Shop+Printers.swift).
     /// Machines whose address appears to have moved, and where to.
@@ -1443,7 +1552,7 @@ final class Shop {
     private(set) var presetRows: [JSONValue] = []
 
     /// `printFiles` as written. See `setups(for:)` and `versions(for:)`.
-    private(set) var fileRows: [JSONValue] = []
+    internal(set) var fileRows: [JSONValue] = []
 
     /// The book as the LAN server's shared pages read it — `printLog`,
     /// `waitingList`, `settings` and `machines`, raw. See `LanServer`.
@@ -2327,7 +2436,7 @@ final class Shop {
     /// What each model's licence permits, by model id. Absent for a model
     /// nobody has recorded one for, which is NOT the same as one that may not
     /// be sold — the screen says nothing rather than something wrong.
-    private(set) var licences: [String: KhaytEngine.Standing] = [:]
+    internal(set) var licences: [String: KhaytEngine.Standing] = [:]
 
     /// The printers a model can be converted for, from the shared rule.
     private(set) var printerProfiles: [KhaytEngine.PrinterProfile] = []
@@ -2405,7 +2514,7 @@ final class Shop {
     /// Which machine each model fits, keyed by the model's id. Worked out once
     /// when the book loads rather than per row: a grid of four hundred models
     /// asking the runtime on every redraw is four hundred context hops.
-    private(set) var fits: [String: KhaytEngine.Fit] = [:]
+    internal(set) var fits: [String: KhaytEngine.Fit] = [:]
     /// The cards the shop has issued, and what each one is today.
     private(set) var giftCards: [GiftCard] = []
     private(set) var giftCardRows: [JSONValue] = []

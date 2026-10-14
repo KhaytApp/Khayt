@@ -1,6 +1,7 @@
 import Foundation
 import KhaytCore
 import Security
+import os
 
 /// Opens a Khayt store for reading. It has no code that writes.
 ///
@@ -53,9 +54,35 @@ public struct StoreReader: Sendable {
         case shipped = "Khayt"
 
         public var storeURL: URL {
-            FileManager.default.homeDirectoryForCurrentUser
-                .appending(path: "Library/Application Support/\(rawValue)/khayt-store.json")
+            supportFolder.appending(path: "\(rawValue)/khayt-store.json")
         }
+
+        /// `~/Library/Application Support`, unless a test moved it.
+        public var supportFolder: URL {
+            Self.supportFolderForTests ?? FileManager.default.homeDirectoryForCurrentUser
+                .appending(path: "Library/Application Support")
+        }
+
+        /// TESTS ONLY: open a book from a temp folder instead of the shop's.
+        ///
+        /// Nothing could load a real-sized book through `Shop.load(.store)`
+        /// without pointing it at the live one, so the library's write paths
+        /// were never timed at the size a shop keeps (`LibraryEditPerfTests`).
+        ///
+        /// For EVERY build and every thread, on purpose: a book loaded from
+        /// here starts background work (backups, the lock's heartbeat, a
+        /// rescan), and any of it that missed the override would be reading
+        /// and writing the shop's real folder. The folder it names ends in
+        /// `Application Support`, so the paths other tests check while it is
+        /// set still read the way they do on a Mac. Set and cleared by that
+        /// one serialised suite; nothing in the app sets it.
+        public static var supportFolderForTests: URL? {
+            get { testFolder.withLock { $0 } }
+            set { testFolder.withLock { $0 = newValue } }
+        }
+        // Locked: every path in the app reads it, from any thread, while the
+        // one suite that sets it runs beside the others.
+        private static let testFolder = OSAllocatedUnfairLock<URL?>(initialState: nil)
         public var keychainService: String { "\(rawValue) Safe Storage" }
 
         /// The other build, whose Keychain item may hold the key to a field in

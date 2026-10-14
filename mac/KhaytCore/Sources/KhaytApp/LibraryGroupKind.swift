@@ -128,7 +128,7 @@ enum GroupKinds {
     /// entry this did not touch goes back exactly as it was spelled, and a
     /// touched entry keeps any field beside `kind`. Entries for groups no file
     /// sits under any more are pruned in the same write (`prune`).
-    static func write(_ changes: [String: GroupKind], into root: inout [String: JSONValue]) {
+    nonisolated static func write(_ changes: [String: GroupKind], into root: inout [String: JSONValue]) {
         guard !changes.isEmpty else { return }
         let settings = Shop.settings(root)
         let stored = settings[settingsKey]
@@ -199,7 +199,7 @@ enum GroupKinds {
     /// Call it AFTER the files are rewritten (it runs as `editFiles`'s
     /// `alsoRoot`): what else sits under the destination is read from the
     /// book as it stands, minus the moving files.
-    static func carry(from path: String, to destination: String, moving: Set<String>,
+    nonisolated static func carry(from path: String, to destination: String, moving: Set<String>,
                       in root: inout [String: JSONValue]) {
         carry([(from: path, to: destination)], moving: moving, in: &root)
     }
@@ -219,7 +219,7 @@ enum GroupKinds {
     /// `moving` is every file the batch moves. The moves' sources must not
     /// nest and their destinations must differ (`Shop.planGroupMove` makes
     /// sure), so no move reaches into another's subtree.
-    static func carry(_ moves: [(from: String, to: String)], moving: Set<String>,
+    nonisolated static func carry(_ moves: [(from: String, to: String)], moving: Set<String>,
                       in root: inout [String: JSONValue]) {
         let moves = moves.filter { $0.from != $0.to }
         guard !moves.isEmpty else { return }
@@ -278,7 +278,7 @@ enum GroupKinds {
 
     /// Put some entries back as they were (nil: the entry was not there), for
     /// an undo. Round-trip like every other write, and pruned like one.
-    static func restore(_ entries: [String: JSONValue?], into root: inout [String: JSONValue]) {
+    nonisolated static func restore(_ entries: [String: JSONValue?], into root: inout [String: JSONValue]) {
         guard !entries.isEmpty else { return }
         let settings = Shop.settings(root)
         let stored = settings[settingsKey]
@@ -320,7 +320,7 @@ enum GroupKinds {
         return map.filter { key, _ in live.contains { Shop.isUnder($0, key) } }
     }
 
-    private static func write(map: [String: JSONValue], stored: JSONValue?,
+    nonisolated private static func write(map: [String: JSONValue], stored: JSONValue?,
                               settings: [String: JSONValue], into root: inout [String: JSONValue]) {
         let kept = prune(map, root: root)
         // Nothing changed: leave the settings exactly as they are — not even
