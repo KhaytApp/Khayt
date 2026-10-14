@@ -197,10 +197,13 @@ extension Shop {
         guard !answered.isEmpty || !looseAnswered.isEmpty || spent || nextMarks != marks else { return result }
         var present: [String: Set<String>] = [:]
         for plan in plans { present[plan.root.standardizedFileURL.path] = LooseCache.present(plan) }
+        let looseNow = looseAnswered, paid = spent, cost = ledger, presentNow = present
         do {
             // lock: system — the shop turned this on; it writes only the
             // assistant's answers, their cost and which requests failed.
-            try StoreWriter.update(build) { root in
+            // Off the main actor.
+            try await StoreWriter.updateOffMain(build) { root in
+                let looseAnswered = looseNow, spent = paid, ledger = cost, present = presentNow
                 SortCache.store(answered, into: &root)
                 LooseCache.store(looseAnswered, present: present, into: &root)
                 if nextMarks != marks {
@@ -237,32 +240,36 @@ extension Shop {
     func fetchPrintPictures(_ plans: [PrintSort.Plan], stop: ScanStop?) async -> Int {
         guard let build = source.build, let roots = libraryRoots else { return 0 }
         let settings = settingsDict
-        // Every print still waiting, not the first 160: a print that cannot
-        // be settled yet (its group not filed, its pictures too big) costs no
-        // download, and with a short list enough of them hid every other
-        // print for good (review of #1844).
-        let jobs = PrintPhotos.jobs(plans, looked: PrintPhotos.looked(settings), limit: Int.max)
-        guard !jobs.isEmpty else { return 0 }
-        let covers = GroupKinds.covers(settings)
-        // Linked records with no photo, by the file they point at.
-        var photoless = Set<String>()
-        var indexed = Set<String>()
-        for case .object(let o) in fileRows {
-            guard case .string(let p)? = o["externalPath"], !p.isEmpty else { continue }
-            let hasPhoto: Bool = { if case .string(let s)? = o["userPhoto"], !s.isEmpty { true } else { false } }()
-            let removed: Bool = { if case .bool(true)? = o["userPhotoRemoved"] { true } else { false } }()
-            let path = URL(fileURLWithPath: p).standardizedFileURL.path
-            indexed.insert(path)
-            if !hasPhoto, !removed { photoless.insert(path) }
-        }
+        let rows = fileRows
         let primary = roots.primary
-        // The groups records sit in now: a picture for a group nobody is
-        // filed in would be thrown away at the write.
-        let liveNow = Set(GroupKinds.groupPaths(["printFiles": .array(fileRows)]))
-        let covered = Set(covers.keys)
-        let steps = await PinWork.run { [photoless, indexed] in
-            PrintPhotos.pass(jobs, covered: covered, live: liveNow, photoless: photoless, indexed: indexed)
+        // The planning — every print in every linked folder, every linked
+        // record — on a dispatch queue: it grows with the drive.
+        let steps = await PinWork.run { () -> [PrintPhotos.Step] in
+            // Every print still waiting, not the first 160: a print that cannot
+            // be settled yet (its group not filed, its pictures too big) costs no
+            // download, and with a short list enough of them hid every other
+            // print for good (review of #1844).
+            let jobs = PrintPhotos.jobs(plans, looked: PrintPhotos.looked(settings), limit: Int.max)
+            guard !jobs.isEmpty else { return [] }
+            let covers = GroupKinds.covers(settings)
+            // Linked records with no photo, by the file they point at.
+            var photoless = Set<String>()
+            var indexed = Set<String>()
+            for case .object(let o) in rows {
+                guard case .string(let p)? = o["externalPath"], !p.isEmpty else { continue }
+                let hasPhoto: Bool = { if case .string(let s)? = o["userPhoto"], !s.isEmpty { true } else { false } }()
+                let removed: Bool = { if case .bool(true)? = o["userPhotoRemoved"] { true } else { false } }()
+                let path = URL(fileURLWithPath: p).standardizedFileURL.path
+                indexed.insert(path)
+                if !hasPhoto, !removed { photoless.insert(path) }
+            }
+            // The groups records sit in now: a picture for a group nobody is
+            // filed in would be thrown away at the write.
+            let liveNow = Set(GroupKinds.groupPaths(["printFiles": .array(rows)]))
+            return PrintPhotos.pass(jobs, covered: Set(covers.keys), live: liveNow,
+                                    photoless: photoless, indexed: indexed)
         }
+        guard !steps.isEmpty else { return 0 }
         var groupPictures: [(group: String, rel: String)] = []
         var modelPhotos: [String: String] = [:]
         var done: [PrintPhotos.Step] = []
@@ -287,10 +294,14 @@ extension Shop {
         guard !looked.isEmpty || !modelPhotos.isEmpty || !groupPictures.isEmpty else { return 0 }
         var put = 0
         var unused: [String] = []
+        let settledSteps = done, wantedPhotos = modelPhotos, wantedCovers = groupPictures
         do {
             // lock: system — part of the linked pass: pictures for the prints
-            // it filed, never over one the shop chose.
-            try StoreWriter.update(build) { root in
+            // it filed, never over one the shop chose. Off the main actor.
+            (put, unused) = try await StoreWriter.updateOffMain(build) { root -> (Int, [String]) in
+                let modelPhotos = wantedPhotos, groupPictures = wantedCovers, done = settledSteps
+                var put = 0
+                var unused: [String] = []
                 var rows: [JSONValue] = []
                 if case .array(let r)? = root["printFiles"] { rows = r }
                 var changed = false
@@ -323,6 +334,7 @@ extension Shop {
                     put += 1
                 }
                 PrintPhotos.markLooked(PrintPhotos.settled(done, notWorn: notWorn), into: &root)
+                return (put, unused)
             }
         } catch {
             unused = groupPictures.map(\.rel)
@@ -430,9 +442,25 @@ extension Shop {
                 }
             }
         }
+        // Which of the offered pictures the drive keeps online, asked off the
+        // main actor (a stat each, slow on a cloud drive), and the records
+        // looked up in one index rather than the whole library per picture.
+        let isOnline = linkedIsOnline
+        let online = await PinWork.run { () -> Set<URL> in
+            var out = Set<URL>()
+            for plan in plans {
+                for s in plan.suggestions {
+                    let url = plan.root.appending(path: s.image)
+                    if isOnline(url) { out.insert(url) }
+                }
+            }
+            return out
+        }
+        let index = pictureIndex()
         preview.pictures = PictureRow.rows(plans, settings: settingsDict,
-                                           hasPicture: { self.hasPicture($0, $1) },
-                                           outcome: { outcomes[$0.verdict + "|\($0.reference)"] })
+                                           hasPicture: { self.hasPicture($0, $1, index: index) },
+                                           outcome: { outcomes[$0.verdict + "|\($0.reference)"] },
+                                           isOnline: { online.contains($0) })
         sortPreview = preview
     }
 
@@ -485,9 +513,15 @@ extension Shop {
         libraryScanStop = stop
         defer { libraryMoveBusy = false; libraryMoveProgress = nil; libraryScanStop = nil }
         do {
-            let n = try Self.regroupLinked(preview.plans, linked: linkedFolders, storeURL: build.storeURL,
+            let plans = preview.plans, linked = linkedFolders
+            // The refile — the whole book read and written — off the main actor.
+            let n = try await PinWork.run { () -> Result<Int, any Error> in
+                Result {
+                    try Shop.regroupLinked(plans, linked: linked, storeURL: build.storeURL,
                                            owns: { StoreLock.weOwnIt(build) },
                                            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
+                }
+            }.get()
             await load(source)
             var pictures = stop.isStopped ? 0 : await fetchPrintPictures(preview.plans, stop: stop)
             if pictures > 0 { await load(source) }

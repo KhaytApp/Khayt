@@ -1240,6 +1240,10 @@ final class Shop {
     var linkedScannedBooks: Set<String> = []
     /// That pass in flight, so the storage pass can wait its turn.
     var linkedScan: Task<Void, Never>?
+    /// Whether a linked file is kept online only — `LinkedCloud.isOnlineOnly`.
+    /// A test hands in its own: a dataless placeholder cannot be made in one,
+    /// and a scan of ten thousand "local" files reads every one of them.
+    var linkedIsOnline: @Sendable (URL) -> Bool = { LinkedCloud.isOnlineOnly($0) }
     /// The books whose own library folder this launch has already looked through.
     var storageScannedBooks: Set<String> = []
     /// That pass in flight, so Stop can cancel it.

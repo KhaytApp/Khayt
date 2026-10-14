@@ -73,7 +73,7 @@ enum LibraryImport {
         /// True when the original was taken in rather than copied. False for
         /// `keepOriginal`, and false when the removal did not work — a file on
         /// a read-only volume is still imported, it just also stays put.
-        let movedIn: Bool
+        var movedIn: Bool
         /// True when a photo found beside the file became its `userPhoto` —
         /// see `ModelPhoto`.
         var photo: Bool = false
@@ -214,8 +214,92 @@ enum LibraryImport {
                     photos: [URL] = [],
                     analyseRisk: Bool = false,
                     online: Bool = false,
-                    owns: @escaping () -> Bool,
-                    whoHasIt: @escaping () -> String?) async throws -> Added {
+                    owns: @escaping @Sendable () -> Bool,
+                    whoHasIt: @escaping @Sendable () -> String?) async throws -> Added {
+        let made = try await prepare(source, libraryRoot: libraryRoot, knownHashes: knownHashes,
+                                     nameOfExisting: nameOfExisting, engine: engine,
+                                     inPlace: inPlace, group: group, documents: documents, title: title,
+                                     tags: tags, photos: photos, analyseRisk: analyseRisk, online: online)
+        do {
+            // lock: callers — convertModel, addModelToLibrary, addModelsToLibrary, addMany
+            try await write([made], storeURL: storeURL, owns: owns, whoHasIt: whoHasIt)
+        } catch {
+            // The book refused it, so the copy has no record to belong to.
+            try? FileManager.default.removeItem(at: made.dir)
+            throw Failure.failed(String(describing: error))
+        }
+
+        // THE LAST THING, AFTER EVERYTHING ELSE HAS SUCCEEDED.
+        //
+        // The original is removed here and nowhere else, and only once all
+        // three things are true: the bytes are at the destination, they have
+        // been read back and match, and the book has a record pointing at them.
+        // Every failure above returns with the source exactly as it was, which
+        // is why none of them needs a way to put it back.
+        //
+        // `keepOriginal` is for a source that is not the shop's to consume — a
+        // USB stick, a customer's share, a read-only volume. A failure to
+        // remove is NOT a failed import: the file is in the library and in the
+        // book, and the worst case is one duplicate left in a downloads folder,
+        // which is the recoverable half of the rule above.
+        var added = made.added
+        // To the TRASH, not deleted. The copy is verified and recorded by now,
+        // but the original may be in iCloud Drive or Dropbox, where deleting
+        // it deletes it on every device; the Trash is the Finder's own undo.
+        // A source the Trash will not take is simply left where it was.
+        // NEVER for a linked model: its file is the shop's, where it put it.
+        if !keepOriginal && !inPlace {
+            do { try FileManager.default.trashItem(at: source, resultingItemURL: nil); added.movedIn = true }
+            catch { added.movedIn = false }
+        }
+        return added
+    }
+
+    /// A model made ready to go into the book — its record, and its folder in
+    /// the vault — with nothing written to the book yet.
+    struct Prepared: Sendable {
+        let dir: URL
+        let record: [String: JSONValue]
+        var added: Added
+    }
+
+    /// Put prepared records into the book: ONE write for all of them, newest
+    /// first as the other app does (a shop that has just added something
+    /// looks for it at the top), and off the main actor. A 16 MB book takes
+    /// seconds to write, and a scan that wrote once per model held the window
+    /// for all of them (Oct 2026).
+    static func write(_ made: [Prepared], storeURL: URL,
+                      owns: @escaping @Sendable () -> Bool,
+                      whoHasIt: @escaping @Sendable () -> String?) async throws {
+        // lock: callers — add, flush
+        guard !made.isEmpty else { return }
+        let records = made.reversed().map { JSONValue.object($0.record) }
+        try await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
+            var rows: [JSONValue] = []
+            if case .array(let existing)? = root["printFiles"] { rows = existing }
+            rows.insert(contentsOf: records, at: 0)
+            root["printFiles"] = .array(rows)
+        }
+    }
+
+    /// Everything an import does short of writing the record: hashed,
+    /// refused if the library has it, copied in (or, linked, left in place),
+    /// measured and pictured. The caller writes the record — at once for a
+    /// single import, a batch at a time for a scan (`addMany`).
+    static func prepare(_ source: URL, libraryRoot: URL,
+                        knownHashes: Set<String>,
+                        nameOfExisting: (String) -> String?,
+                        engine: KhaytEngine,
+                        inPlace: Bool = false,
+                        group: String? = nil,
+                        documents: [URL] = [],
+                        title: String? = nil,
+                        tags: [String] = [],
+                        photos: [URL] = [],
+                        analyseRisk: Bool = false,
+                        online: Bool = false,
+                        id fixedId: String? = nil) async throws -> Prepared {
+        // lock: callers — add, addMany
         let ext = source.pathExtension.lowercased()
         guard kinds.contains(ext) else { throw Failure.unknownKind(ext) }
 
@@ -235,9 +319,8 @@ enum LibraryImport {
         // A LINKED file the cloud has not downloaded: named, sized and filed
         // from what the drive lists, and never read — see `LinkedCloud`.
         if inPlace && online {
-            return try await addOnline(source, storeURL: storeURL, libraryRoot: libraryRoot,
-                                       group: group, title: title, tags: tags, photos: photos,
-                                       owns: owns, whoHasIt: whoHasIt)
+            return try await prepareOnline(source, libraryRoot: libraryRoot, group: group, title: title,
+                                           tags: tags, photos: photos, id: fixedId)
         }
 
         // THE SOURCE IS HASHED FIRST, and that is the whole shape of this.
@@ -250,7 +333,7 @@ enum LibraryImport {
         //
         // So: know the bytes, refuse duplicates while the file is still sitting
         // untouched where its owner put it, and only then begin.
-        guard let hash = await offMain({ try? LibraryImport.contentHash(of: source) }) ?? nil else {
+        guard let hash = await PinWork.run({ try? LibraryImport.contentHash(of: source) }) ?? nil else {
             throw Failure.failed("could not read \(originalName)")
         }
         if knownHashes.contains(hash) {
@@ -262,7 +345,7 @@ enum LibraryImport {
         // `PF--mtppyk14XFK`, beside Khayt's own `PF-mtjwvj1w05A`. Nothing reads
         // the shape, so it broke nothing; it just did not match the book it was
         // writing into, and every folder in the vault wore the extra dash.
-        let id = Shop.uid("PF")
+        let id = fixedId ?? Shop.uid("PF")
         let dir = libraryRoot.appending(path: LibraryLocation.itemDirName(id))
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -277,7 +360,7 @@ enum LibraryImport {
         let filename = inPlace ? originalName : vaultFilename(in: dir, originalName: originalName, ext: ext)
         let destination = inPlace ? source : dir.appending(path: filename)
         if !inPlace {
-            let copied: String? = await offMain {
+            let copied: String? = await PinWork.run {
                 do { try FileManager.default.copyItem(at: source, to: destination); return nil }
                 catch { return error.localizedDescription }
             }
@@ -291,7 +374,7 @@ enum LibraryImport {
             // follows: "a duplicate is recoverable, a deletion is not", and a short
             // write to a share that dropped mid-transfer returns without throwing
             // exactly like a good one does.
-            guard await offMain({ try? LibraryImport.contentHash(of: destination) }) == hash else {
+            guard await PinWork.run({ try? LibraryImport.contentHash(of: destination) }) == hash else {
                 try? FileManager.default.removeItem(at: dir)
                 throw Failure.failed("\(originalName) did not arrive intact")
             }
@@ -335,53 +418,14 @@ enum LibraryImport {
         // THE PHOTO THAT CAME WITH IT, when there was one — see `ModelPhoto`.
         // The record is new, so there is no photo of the shop's to keep; and a
         // picture that will not decode is passed over, never a failed import.
-        // Read before the original goes to the Trash below, though only the
-        // model is ever taken: the picture stays where it was.
+        // Read before the original goes to the Trash, though only the model is
+        // ever taken: the picture stays where it was.
         let photo = await PinWork.run { firstPhoto(photos) }
         if let photo { record["userPhoto"] = .string(photo) }
-        do {
-            // lock: callers — convertModel, addModelToLibrary, addModelsToLibrary
-            try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
-                var rows: [JSONValue] = []
-                if case .array(let existing)? = root["printFiles"] { rows = existing }
-                // Newest first, as the other app does — a shop that has just
-                // added something looks for it at the top.
-                rows.insert(.object(record), at: 0)
-                root["printFiles"] = .array(rows)
-            }
-        } catch {
-            // The book refused it, so the copy has no record to belong to.
-            try? FileManager.default.removeItem(at: dir)
-            throw Failure.failed(String(describing: error))
-        }
-
-        // THE LAST THING, AFTER EVERYTHING ELSE HAS SUCCEEDED.
-        //
-        // The original is removed here and nowhere else, and only once all
-        // three things are true: the bytes are at the destination, they have
-        // been read back and match, and the book has a record pointing at them.
-        // Every failure above returns with the source exactly as it was, which
-        // is why none of them needs a way to put it back.
-        //
-        // `keepOriginal` is for a source that is not the shop's to consume — a
-        // USB stick, a customer's share, a read-only volume. A failure to
-        // remove is NOT a failed import: the file is in the library and in the
-        // book, and the worst case is one duplicate left in a downloads folder,
-        // which is the recoverable half of the rule above.
-        var movedIn = false
-        // To the TRASH, not deleted. The copy is verified and recorded by now,
-        // but the original may be in iCloud Drive or Dropbox, where deleting
-        // it deletes it on every device; the Trash is the Finder's own undo.
-        // A source the Trash will not take is simply left where it was.
-        // NEVER for a linked model: its file is the shop's, where it put it.
-        if !keepOriginal && !inPlace {
-            do { try FileManager.default.trashItem(at: source, resultingItemURL: nil); movedIn = true }
-            catch { movedIn = false }
-        }
-
-        return Added(id: id, name: name, triangleCount: geometry?.triangleCount,
-                     colours: colours.count, contentHash: hash, movedIn: movedIn,
-                     photo: photo != nil)
+        return Prepared(dir: dir, record: record,
+                        added: Added(id: id, name: name, triangleCount: geometry?.triangleCount,
+                                     colours: colours.count, contentHash: hash, movedIn: false,
+                                     photo: photo != nil))
     }
 
     /// A linked model that is online only, indexed without a byte of it read.
@@ -394,13 +438,13 @@ enum LibraryImport {
     /// to "available offline"); `fillDownloaded` then writes the rest, as it
     /// does for a bucket model brought down. A photo only from a picture
     /// that is itself here — the caller has already left the others out.
-    static func addOnline(_ source: URL, storeURL: URL, libraryRoot: URL,
-                          group: String?, title: String?, tags: [String] = [], photos: [URL],
-                          owns: @escaping () -> Bool,
-                          whoHasIt: @escaping () -> String?) async throws -> Added {
+    /// The record is made here and written by the caller (`prepare`).
+    static func prepareOnline(_ source: URL, libraryRoot: URL,
+                              group: String?, title: String?, tags: [String] = [], photos: [URL],
+                              id fixedId: String? = nil) async throws -> Prepared {
         let originalName = source.lastPathComponent
         let ext = source.pathExtension.lowercased()
-        let id = Shop.uid("PF")
+        let id = fixedId ?? Shop.uid("PF")
         // The record's vault folder, as for any linked model: where its
         // picture goes once it has one, and what "on this Mac" is read from.
         let dir = libraryRoot.appending(path: LibraryLocation.itemDirName(id))
@@ -416,22 +460,11 @@ enum LibraryImport {
         record["autoName"] = .string(name)
         if !tags.isEmpty { record["tags"] = .array(tags.map(JSONValue.string)) }
         record["indexedOnline"] = .string(StoreWriter.iso(Date()))
-        let photo = await PinWork.run { firstPhoto(photos) }
+        let photo = photos.isEmpty ? nil : await PinWork.run { firstPhoto(photos) }
         if let photo { record["userPhoto"] = .string(photo) }
-        do {
-            // lock: callers — add
-            try StoreWriter.update(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
-                var rows: [JSONValue] = []
-                if case .array(let existing)? = root["printFiles"] { rows = existing }
-                rows.insert(.object(record), at: 0)
-                root["printFiles"] = .array(rows)
-            }
-        } catch {
-            try? FileManager.default.removeItem(at: dir)
-            throw Failure.failed(String(describing: error))
-        }
-        return Added(id: id, name: name, triangleCount: nil, colours: 0, contentHash: nil,
-                     movedIn: false, photo: photo != nil)
+        return Prepared(dir: dir, record: record,
+                        added: Added(id: id, name: name, triangleCount: nil, colours: 0, contentHash: nil,
+                                     movedIn: false, photo: photo != nil))
     }
 
     /// `size|name` — how a file the cloud has not downloaded is recognised
@@ -644,6 +677,18 @@ enum LibraryImport {
         }
     }
 
+    /// When a scan writes the models it indexed IN PLACE: once this many are
+    /// held, or once this long has passed since the last write — never once
+    /// per model. A linked drive of ten thousand models wrote its 16 MB book
+    /// ten thousand times, two to three seconds each, on the main actor (Oct
+    /// 2026). A drive kept online is indexed from its listing in seconds, so
+    /// it is ONE write; models that have to be read and measured are written
+    /// a minute's worth at a time, so a crash loses little (what was not
+    /// written is found again by the next scan) and the book's chain is not
+    /// held for most of a long scan, which every other write would wait on.
+    static let writeBatch = 5000
+    static let writeEvery: TimeInterval = 60
+
     static func addMany(_ files: [Incoming],
                         storeURL: URL, libraryRoot: URL,
                         knownHashes: Set<String>,
@@ -654,10 +699,11 @@ enum LibraryImport {
                         analyseRisk: Bool = false,
                         knownNameSizes: Set<String> = [],
                         isOnline: ((URL) -> Bool)? = nil,
-                        owns: @escaping () -> Bool,
-                        whoHasIt: @escaping () -> String?,
-                        shouldStop: () -> Bool = { false },
-                        progress: (Int, Int, URL) -> Void = { _, _, _ in }) async -> Report {
+                        owns: @escaping @Sendable () -> Bool,
+                        whoHasIt: @escaping @Sendable () -> String?,
+                        shouldStop: (() -> Bool)? = nil,
+                        progress: ((Int, Int, URL) -> Void)? = nil) async -> Report {
+        // lock: callers — rescanLinkedFolders, adoptFromStorage, addModelsToLibrary, run
         var report = Report()
         var known = knownHashes
         // Online-only files are recognised by name and size (`nameSize`);
@@ -667,11 +713,29 @@ enum LibraryImport {
         // Optional rather than defaulted to a closure: a `{ … }` in a
         // parameter list reads as the body to `WritersAreGatedTests`.
         let isOnline: (URL) -> Bool = isOnline ?? { _ in false }
+
+        // ── IN PLACE, A BATCH AT A TIME ────────────────────────────────────
+        //
+        // A model indexed in place (a linked folder, the library's own
+        // folder) is not moved, so nothing waits on its record being written:
+        // records are held and written `writeBatch` at a time, and whatever
+        // is held when the scan ends or is stopped is written then — what was
+        // indexed before a Stop stays. A copy (`!inPlace`) is still written
+        // one at a time, because its original goes to the Trash only after
+        // the book holds its record.
+        var held: [Held] = []
+        var ids = Set<String>()
+        var wroteAt = Date()
+
         for (i, file) in files.enumerated() {
             // Between files, never inside one: a file is indexed whole or not
             // at all, and everything before the Stop stays indexed.
-            if shouldStop() { report.stopped = true; break }
-            progress(i, files.count, file.url)
+            if shouldStop?() == true { report.stopped = true; break }
+            progress?(i, files.count, file.url)
+            // A file kept online is indexed without one suspension, so ten
+            // thousand of them in a row would hold the main actor for seconds:
+            // let the window draw between every few dozen.
+            if i % 50 == 49 { await Task.yield() }
             // Only a LINKED file is ever left online: an import or a past
             // location is copied, and a copy is a read.
             let online = inPlace && isOnline(file.url)
@@ -684,19 +748,40 @@ enum LibraryImport {
                 continue
             }
             do {
+                // Never a picture the cloud would have to download.
+                let photos = inPlace ? file.photos.filter { !isOnline($0) } : file.photos
+                if inPlace {
+                    // Two models prepared in the same millisecond can draw the
+                    // same id (`Shop.uid`); one batch must not hold both.
+                    var id = Shop.uid("PF")
+                    while !ids.insert(id).inserted { id = Shop.uid("PF") }
+                    let made = try await prepare(file.url, libraryRoot: libraryRoot,
+                                                 knownHashes: known, nameOfExisting: nameOfExisting,
+                                                 engine: engine, inPlace: true,
+                                                 group: file.group, documents: file.documents,
+                                                 title: file.title, tags: file.tags, photos: photos,
+                                                 analyseRisk: analyseRisk, online: online, id: id)
+                    knownNames.insert(sig)
+                    if let hash = made.added.contentHash { known.insert(hash) }
+                    held.append((made, file.url, online))
+                    if held.count >= writeBatch || Date().timeIntervalSince(wroteAt) >= writeEvery {
+                        await flush(held, storeURL: storeURL, owns: owns, whoHasIt: whoHasIt, into: &report)
+                        held = []
+                        wroteAt = Date()
+                    }
+                    continue
+                }
                 let added = try await add(file.url, storeURL: storeURL, libraryRoot: libraryRoot,
                                           knownHashes: known, nameOfExisting: nameOfExisting,
-                                          engine: engine, keepOriginal: keepOriginal, inPlace: inPlace,
+                                          engine: engine, keepOriginal: keepOriginal, inPlace: false,
                                           group: file.group, documents: file.documents,
                                           title: file.title,
                                           tags: file.tags,
-                                          // Never a picture the cloud would have to download.
-                                          photos: inPlace ? file.photos.filter { !isOnline($0) } : file.photos,
+                                          photos: photos,
                                           analyseRisk: analyseRisk,
-                                          online: online,
+                                          online: false,
                                           owns: owns, whoHasIt: whoHasIt)
                 knownNames.insert(sig)
-                if online { report.online += 1 }
                 report.moved += 1
                 report.addedIds.append(added.id)
                 report.addedURLs.append(file.url)
@@ -710,7 +795,38 @@ enum LibraryImport {
                 report.failures.append("\(file.url.lastPathComponent): \(error)")
             }
         }
+        await flush(held, storeURL: storeURL, owns: owns, whoHasIt: whoHasIt, into: &report)
         return report
+    }
+
+    /// A model `addMany` has prepared and is holding until its batch is written.
+    typealias Held = (made: Prepared, url: URL, online: Bool)
+
+    /// Write what `addMany` holds, in ONE write, and count it in — or, when the
+    /// book refuses, take its vault folders away again and name each file.
+    private static func flush(_ batch: [Held], storeURL: URL,
+                              owns: @escaping @Sendable () -> Bool,
+                              whoHasIt: @escaping @Sendable () -> String?,
+                              into report: inout Report) async {
+        // lock: callers — addMany
+        guard !batch.isEmpty else { return }
+        do {
+            try await write(batch.map(\.made), storeURL: storeURL, owns: owns, whoHasIt: whoHasIt)
+            for item in batch {
+                if item.online { report.online += 1 }
+                report.moved += 1
+                report.addedIds.append(item.made.added.id)
+                report.addedURLs.append(item.url)
+                if item.made.added.photo { report.photos += 1 }
+            }
+        } catch {
+            // The book refused them: their vault folders have no record to
+            // belong to. Each is named, and the next scan finds it again.
+            for item in batch {
+                try? FileManager.default.removeItem(at: item.made.dir)
+                report.failures.append("\(item.url.lastPathComponent): \(Failure.failed(String(describing: error)))")
+            }
+        }
     }
 
     /// The record itself.

@@ -618,7 +618,7 @@ extension Shop {
         }
     }
 
-    static func plainString(_ value: JSONValue?) -> String? {
+    nonisolated static func plainString(_ value: JSONValue?) -> String? {
         if case .string(let s)? = value { return s }
         return nil
     }

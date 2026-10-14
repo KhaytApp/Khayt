@@ -1559,7 +1559,7 @@ extension Shop {
         return plainString(tax["country"]) ?? ""
     }
 
-    static func plainNumber(_ value: JSONValue?) -> Double? {
+    nonisolated static func plainNumber(_ value: JSONValue?) -> Double? {
         switch value {
         case .number(let n)?: return n
         case .string(let s)?: return Double(s.trimmingCharacters(in: .whitespaces))
@@ -2316,7 +2316,7 @@ extension Shop {
         return []
     }
 
-    static func asObject(_ value: JSONValue) -> [String: JSONValue]? {
+    nonisolated static func asObject(_ value: JSONValue) -> [String: JSONValue]? {
         if case .object(let o) = value { return o }
         return nil
     }

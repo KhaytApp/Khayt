@@ -20,6 +20,27 @@ final class ScanStop: @unchecked Sendable {
     func stop() { lock.withLock { stopped = true } }
 }
 
+/// A scan's progress, drawn a few times a second rather than once per file.
+///
+/// `libraryMoveProgress` is observed, and every change to it redraws what
+/// reads it. Set once per file, a drive of ten thousand models asked for ten
+/// thousand redraws while it was indexed (Oct 2026). The first and the last
+/// are always drawn, so a count never stops short of where it ended.
+@MainActor
+final class ScanProgress {
+    private var last: UInt64 = 0
+    private let every: UInt64
+
+    init(perSecond: Double = 8) { every = UInt64(1_000_000_000 / perSecond) }
+
+    func due(_ done: Int, of total: Int) -> Bool {
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard done == 0 || done >= total - 1 || now &- last >= every else { return false }
+        last = now
+        return true
+    }
+}
+
 /// Files a cloud drive lists but has not downloaded.
 ///
 /// ── READING ONE IS DOWNLOADING IT ─────────────────────────────────────────
