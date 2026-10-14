@@ -677,6 +677,12 @@ extension Shop {
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
+        // On the stack at the click, against the write below (`PendingUndo`).
+        let pending: PendingUndo<([String: JSONValue], [ChangedRecord])> =
+            pendingUndo(named: words.callIt("sup.deleted")) { shop, gone in
+                shop.putBackSupplier(gone.0, relinking: gone.1, in: build)
+            }
+        defer { pending.drop() }
         do {
             let (removed, unlinked) = try await StoreWriter.updateOffMain(build) { root
                 -> ([String: JSONValue]?, [ChangedRecord]) in
@@ -687,7 +693,7 @@ extension Shop {
                 root["suppliers"] = .array(rows)
                 return (was, Self.unpointing(&root, from: id))
             }
-            if let removed { registerSupplierUndo(removed, relinking: unlinked) }
+            if let removed { pending.keep((removed, unlinked)) }
             await load(source)
             moveNotices = [words.callIt("sup.deleted")]
         } catch {
@@ -738,39 +744,41 @@ extension Shop {
     /// An undo that returned the row and left the spools unlinked would be a
     /// half-undo, and the half it left out is the half nobody would notice
     /// until a drafted order was priced without the quote it should have had.
-    private func registerSupplierUndo(_ record: [String: JSONValue],
-                                      relinking unlinked: [ChangedRecord]) {
-        guard let undoManager, let build = source.build,
+    private func putBackSupplier(_ record: [String: JSONValue],
+                                      relinking unlinked: [ChangedRecord], in build: StoreReader.Build) {
+        guard permitted("inventory", "edit"),
               case .string(let id)? = record["id"] else { return }
-        undoManager.setActionName(words.callIt("sup.deleted"))
-        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
-            // Written on the chain; the undo itself returns at once.
-            Task { do {
-                try await StoreWriter.updateOffMain(build) { root in
-                    var rows = Self.rows(root, "suppliers")
-                    guard !rows.contains(where: { Self.recordId($0) == id }) else { return }
-                    rows.append(.object(record))
-                    root["suppliers"] = .array(rows)
-                    for (collection, wanted) in Dictionary(grouping: unlinked, by: \.collection) {
-                        var records = Self.rows(root, collection)
-                        let ids = Set(wanted.map(\.id))
-                        var touched = false
-                        for i in records.indices {
-                            guard case .object(var r) = records[i],
-                                  let rid = Self.recordId(records[i]), ids.contains(rid),
-                                  Self.plainString(r["supplierId"]) == nil else { continue }
-                            r["supplierId"] = .string(id)
-                            StoreWriter.stamp(&r)
-                            records[i] = .object(r)
-                            touched = true
-                        }
-                        if touched { root[collection] = .array(records) }
+
+        let shop = self
+        // Written on the chain; the undo itself returns at once.
+        Task { do {
+            try await StoreWriter.updateOffMain(build) { root in
+                var rows = Self.rows(root, "suppliers")
+                guard !rows.contains(where: { Self.recordId($0) == id }) else { return }
+                rows.append(.object(record))
+                root["suppliers"] = .array(rows)
+                for (collection, wanted) in Dictionary(grouping: unlinked, by: \.collection) {
+                    var records = Self.rows(root, collection)
+                    let ids = Set(wanted.map(\.id))
+                    var touched = false
+                    for i in records.indices {
+                        guard case .object(var r) = records[i],
+                              let rid = Self.recordId(records[i]), ids.contains(rid),
+                              Self.plainString(r["supplierId"]) == nil else { continue }
+                        r["supplierId"] = .string(id)
+                        StoreWriter.stamp(&r)
+                        records[i] = .object(r)
+                        touched = true
                     }
+                    if touched { root[collection] = .array(records) }
                 }
-            } catch {
-                shop.moveProblem = String(describing: error)
-            } }
-        }
+            }
+            // Read back, or the supplier is in the book and not on screen
+            // until something else reloads it.
+            await shop.load(shop.source)
+        } catch {
+            shop.moveProblem = String(describing: error)
+        } }
     }
 
     // MARK: - What the shop spent, and what it wasted
@@ -1396,6 +1404,10 @@ extension Shop {
         guard let build = source.build else {
             spendProblem = words.callIt("mac.move_sample"); return
         }
+        // On the stack at the click, against the write below (`PendingUndo`).
+        let pending: PendingUndo<[String: JSONValue]> =
+            pendingUndo(named: words.callIt("inv.removed")) { shop, gone in shop.putBackSpool(gone, in: build) }
+        defer { pending.drop() }
         do {
             let removed = try await StoreWriter.updateOffMain(build) { root -> [String: JSONValue]? in
                 var shelf = Self.rows(root, "inventory")
@@ -1405,7 +1417,7 @@ extension Shop {
                 root["inventory"] = .array(shelf)
                 return was
             }
-            if let removed { registerSpoolUndo(removed) }
+            if let removed { pending.keep(removed) }
             await load(source)
             spendNote = words.callIt("inv.removed")
         } catch {
@@ -1493,24 +1505,23 @@ extension Shop {
     /// Undo a consumable delete: put the row back. It returns under a new id
     /// (see `StoreWriter.reviveUnderNewIds`), because the delete's tombstone
     /// may already have reached the cloud, where it wins over the old one.
-    private func registerConsumableUndo(_ record: [String: JSONValue]) {
-        guard let undoManager, let build = source.build,
+    private func putBackConsumable(_ record: [String: JSONValue], in build: StoreReader.Build) {
+        guard permitted("inventory", "edit"),
               case .string(let id)? = record["id"] else { return }
-        undoManager.setActionName(words.callIt("cons.title"))
-        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
-            // Written on the chain; the undo itself returns at once.
-            Task {
-                do {
-                    try await StoreWriter.updateOffMain(build) { root in
-                        var shelf = Self.rows(root, "consumables")
-                        guard !shelf.contains(where: { Self.recordId($0) == id }) else { return }
-                        shelf.append(.object(record))
-                        root["consumables"] = .array(shelf)
-                    }
-                    await shop.load(shop.source)
-                } catch {
-                    shop.spendProblem = String(describing: error)
+
+        let shop = self
+        // Written on the chain; the undo itself returns at once.
+        Task {
+            do {
+                try await StoreWriter.updateOffMain(build) { root in
+                    var shelf = Self.rows(root, "consumables")
+                    guard !shelf.contains(where: { Self.recordId($0) == id }) else { return }
+                    shelf.append(.object(record))
+                    root["consumables"] = .array(shelf)
                 }
+                await shop.load(shop.source)
+            } catch {
+                shop.spendProblem = String(describing: error)
             }
         }
     }
@@ -1529,6 +1540,10 @@ extension Shop {
         guard let build = source.build else {
             spendProblem = words.callIt("mac.move_sample"); return
         }
+        // On the stack at the click, against the write below (`PendingUndo`).
+        let pending: PendingUndo<[String: JSONValue]> =
+            pendingUndo(named: words.callIt("cons.title")) { shop, gone in shop.putBackConsumable(gone, in: build) }
+        defer { pending.drop() }
         do {
             let undo = try await StoreWriter.updateOffMain(build) { root -> [ChangedRecord] in
                 var shelf = Self.rows(root, "consumables")
@@ -1540,7 +1555,7 @@ extension Shop {
             }
             // NOT registerMoveUndo: that puts back rows that are still there,
             // and a deleted row is not, so Undo did nothing at all.
-            if let gone = undo.first { registerConsumableUndo(gone.was) }
+            if let gone = undo.first { pending.keep(gone.was) }
             await load(source)
             spendNote = words.callIt("inv.removed")
         } catch {
