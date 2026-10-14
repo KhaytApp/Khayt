@@ -11,8 +11,8 @@ import KhaytCore
 /// what it found in ITS book — the print log, the customers, every model's
 /// fit and licence — over the newer one's.
 ///
-/// In `LibraryEditPerfTests`, the one serialised suite that may set the test
-/// support folder (a single global).
+/// In `LibraryEditPerfTests` — declared `@Suite(.serialized)` — the one suite
+/// that may set the test support folder and the load hooks (both globals).
 extension LibraryEditPerfTests {
 
     @Test("an overtaken reload puts none of the older book's jobs, customers or figures back")
