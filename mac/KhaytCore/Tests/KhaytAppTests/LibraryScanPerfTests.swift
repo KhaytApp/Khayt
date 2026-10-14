@@ -21,14 +21,6 @@ import KhaytCore
 /// one global test seam.
 extension LibraryEditPerfTests {
 
-    /// How long a scan may hold the main thread at 10,000 models, in one go.
-    ///
-    /// Measured on a debug build: the whole-scan holds were seconds before
-    /// (each indexed model a 15 MB write on the main thread); after, the
-    /// longest is the library's own chips recounted on the reload — the same
-    /// ~100–200 ms; the edits' `budgetMs` (1,500 ms on CI's crowded main thread). Shared budget.
-    static let scanBudgetMs = budgetMs
-
     /// A linked "drive": `folders` folders of `perFolder` models, and `loose`
     /// models at its top, with a picture in every tenth folder. One byte each —
     /// the scan reads none of them, as it reads none of a drive kept online.
@@ -94,29 +86,42 @@ extension LibraryEditPerfTests {
         let drive = try Self.drive()
         defer { try? FileManager.default.removeItem(at: drive.deletingLastPathComponent()) }
         try await Self.withScanBook(drive) { shop, url in
+            // ── MEASURED ON THE WRITER'S CLOCK, NOT THE MAIN QUEUE'S ─────
+            //
+            // This was a timer on the main queue (`MainStallMeter`), and it
+            // failed at 1,914 ms against the 1,500 ms budget with a second
+            // full suite running on the same Mac (review of #1866): how late
+            // the main thread answers measures whatever else is queued on
+            // it, not the scan. What froze the shop's window was the scan
+            // writing the whole book ON the main thread, once per model, and
+            // that is what `MainHold` counts, on the writer's own clock — the
+            // same guard as `StoreWritePerfTests`. The stall is still printed
+            // under `KHAYT_PERF_MEASURE=1` for a person to read.
+            let measuring = ProcessInfo.processInfo.environment["KHAYT_PERF_MEASURE"] != nil
             let meter = MainStallMeter()
 
-            meter.start()
-            await shop.rescanLinkedFolders()
-            let full = await meter.stop()
+            if measuring { meter.start() }
+            let full = await Self.held { await shop.rescanLinkedFolders() }
+            if measuring { print("PERF full scan: worst main stall \(Int(await meter.stop())) ms") }
             let rows = try diskRows(url)
             #expect(rows.count == 19_800, "the drive's models went into the book: \(rows.count)")
             #expect(shop.files.count == rows.count, "the library on screen is the book")
-            #expect(full < Self.scanBudgetMs, "the full scan held the main thread \(Int(full)) ms")
+            #expect(full.count == 0,
+                    "the full scan wrote the whole book on the main thread \(full.count)x, worst \(Int(full.worstMs)) ms")
 
             // Nothing new: nothing written, nothing reloaded, no freeze.
             let before = Self.written(url)
-            meter.start()
-            await shop.rescanLinkedFolders()
-            let again = await meter.stop()
+            if measuring { meter.start() }
+            let again = await Self.held { await shop.rescanLinkedFolders() }
+            if measuring { print("PERF rescan: worst main stall \(Int(await meter.stop())) ms") }
             #expect(Self.written(url) == before, "a scan that found nothing new wrote to the book")
-            #expect(again < Self.scanBudgetMs, "the rescan held the main thread \(Int(again)) ms")
+            #expect(again.count == 0, "the rescan wrote the whole book on the main thread \(again.count)x")
 
             // The library's own folder, with a vault folder for every record.
-            meter.start()
-            await shop.rescanStorage()
-            let storage = await meter.stop()
-            #expect(storage < Self.scanBudgetMs, "the storage pass held the main thread \(Int(storage)) ms")
+            if measuring { meter.start() }
+            let storage = await Self.held { await shop.rescanStorage() }
+            if measuring { print("PERF storage pass: worst main stall \(Int(await meter.stop())) ms") }
+            #expect(storage.count == 0, "the storage pass wrote the whole book on the main thread \(storage.count)x")
         }
     }
 
