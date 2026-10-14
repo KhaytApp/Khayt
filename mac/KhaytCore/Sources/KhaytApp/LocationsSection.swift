@@ -111,6 +111,10 @@ struct LocationEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var address = ""
+    /// A save is on its way to the book. The write no longer holds the
+    /// window, so a second click would start a second save — for a new
+    /// record, a second record under another id.
+    @State private var saving = false
 
     var body: some View {
         let words = shop.words
@@ -130,14 +134,17 @@ struct LocationEditor: View {
                 Button(words.callIt("common.cancel")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(words.callIt("common.save")) {
+                    guard !saving else { return }
+                    saving = true
                     Task {
                         await shop.saveLocation(id: location.id.isEmpty ? nil : location.id,
                                                 name: name, address: address)
+                        saving = false
                         if shop.moveProblem == nil { dismiss() }
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(saving || name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
         .padding(20)
