@@ -1835,6 +1835,10 @@ extension Shop {
             return
         }
 
+        // On the stack NOW, at the click: the write below suspends, and an
+        // undo registered after it went on after whatever came next.
+        let pending = pendingMoveUndo(named: words.callIt("mac.move_action"))
+        defer { pending.drop() }
         var undoSnapshot: [ChangedRecord] = []
         var said: [String] = []
         var telegram: TelegramMessage?
@@ -1859,7 +1863,7 @@ extension Shop {
             // and a shop told which spools were emptied by a move that was
             // refused would be worse than being told nothing.
             moveNotices = said
-            registerMoveUndo(undoSnapshot, named: words.callIt("mac.move_action"))
+            pending.keepUnlessEmpty(undoSnapshot)
             Telemetry.feature(.orderMoved, in: self)
             await load(source)
             // AFTER the write, and only if it succeeded. A message about a job
@@ -2442,7 +2446,7 @@ extension Shop {
     /// registered at once against the write still in flight, the way the
     /// library's undo is (`registerUndo(after:named:)`), and taken off again
     /// if the write turns out to have put nothing back.
-    private func restoreMove(after earlier: Task<[ChangedRecord]?, Never>, named actionName: String) {
+    func restoreMove(after earlier: Task<[ChangedRecord]?, Never>, named actionName: String) {
         guard let build = source.build else { return }
         let write = Task { () -> [ChangedRecord]? in
             guard let snapshot = await earlier.value, !snapshot.isEmpty else { return nil }

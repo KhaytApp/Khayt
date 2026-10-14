@@ -1127,6 +1127,12 @@ extension Shop {
         guard let build = source.build else {
             productProblem = words.callIt("mac.move_sample"); return
         }
+        // On the stack at the click, against the write below (`PendingUndo`).
+        let pending: PendingUndo<([String: JSONValue], [String], [String], [String])> =
+            pendingUndo(named: words.callIt("pe.deleted")) { shop, gone in
+                shop.putBackProduct(gone.0, unlinked: gone.1, bundles: gone.2, pictures: gone.3, in: build)
+            }
+        defer { pending.drop() }
         // The pictures, read BEFORE the record goes: afterwards there is
         // nothing left to read their names off.
         let pictureNames = await pictures(of: id).compactMap(\.path)
@@ -1188,7 +1194,7 @@ extension Shop {
                 && ProductPhotos.mayTouch(name, productId: id, othersUse: othersUse) {
                 ProductPhotos.delete(name, in: build)
             }
-            registerProductUndo(removed, unlinked: unlinked, bundles: bundles, pictures: pictureNames)
+            pending.keep((removed, unlinked, bundles, pictureNames))
             await load(source)
             productNote = words.callIt("pe.deleted")
         } catch {
@@ -1202,85 +1208,85 @@ extension Shop {
     /// that silently restored a record naming files that are gone would put a
     /// broken thumbnail on the catalogue. The record is restored without them,
     /// which is honest and which the shop can see.
-    private func registerProductUndo(_ record: [String: JSONValue], unlinked: [String],
-                                     bundles: [String], pictures: [String]) {
-        guard let undoManager, let build = source.build,
+    private func putBackProduct(_ record: [String: JSONValue], unlinked: [String],
+                                     bundles: [String], pictures: [String], in build: StoreReader.Build) {
+        guard permitted("inventory", "edit"),
               case .string(let id)? = record["id"] else { return }
         var restored = record
         if !pictures.isEmpty {
             for key in ["images", "imagePath", "thumbnail"] { restored.removeValue(forKey: key) }
         }
-        undoManager.setActionName(words.callIt("pe.deleted"))
-        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
-            Task { do {
-                try await StoreWriter.updateAsync(build) { root in
-                    var rows = Self.rows(root, "products")
-                    guard !rows.contains(where: { Self.recordId($0) == id }) else { return }
-                    rows.append(.object(restored))
-                    root["products"] = .array(rows)
+        let shop = self
+        Task { do {
+            try await StoreWriter.updateAsync(build) { root in
+                var rows = Self.rows(root, "products")
+                guard !rows.contains(where: { Self.recordId($0) == id }) else { return }
+                rows.append(.object(restored))
+                root["products"] = .array(rows)
 
-                    var log = Self.rows(root, "printLog")
-                    var touchedLog = false
-                    for i in log.indices {
-                        guard case .object(var order) = log[i],
-                              case .string(let orderId)? = order["id"], unlinked.contains(orderId) else { continue }
-                        // Only a job still pointing at nothing: one re-pointed
-                        // at another product since is someone's later choice.
-                        switch order["productId"] {
-                        case nil, .null?: break
-                        default: continue
-                        }
-                        order["productId"] = .string(id)
-                        StoreWriter.stamp(&order)
-                        log[i] = .object(order)
-                        touchedLog = true
+                var log = Self.rows(root, "printLog")
+                var touchedLog = false
+                for i in log.indices {
+                    guard case .object(var order) = log[i],
+                          case .string(let orderId)? = order["id"], unlinked.contains(orderId) else { continue }
+                    // Only a job still pointing at nothing: one re-pointed
+                    // at another product since is someone's later choice.
+                    switch order["productId"] {
+                    case nil, .null?: break
+                    default: continue
                     }
-                    if touchedLog { root["printLog"] = .array(log) }
-
-                    var settings = Self.settings(root)
-                    if case .array(var list)? = settings["bundles"], !bundles.isEmpty {
-                        for i in list.indices {
-                            guard case .object(var bundle) = list[i],
-                                  case .string(let bundleId)? = bundle["id"], bundles.contains(bundleId) else { continue }
-                            var ids: [JSONValue] = []
-                            if case .array(let had)? = bundle["productIds"] { ids = had }
-                            guard !ids.contains(.string(id)) else { continue }
-                            ids.append(.string(id))
-                            bundle["productIds"] = .array(ids)
-                            list[i] = .object(bundle)
-                        }
-                        settings["bundles"] = .array(list)
-                        root["settings"] = .object(settings)
-                    }
+                    order["productId"] = .string(id)
+                    StoreWriter.stamp(&order)
+                    log[i] = .object(order)
+                    touchedLog = true
                 }
-                await shop.load(shop.source)
-            } catch {
-                shop.productProblem = String(describing: error)
-            } }
-        }
+                if touchedLog { root["printLog"] = .array(log) }
+
+                var settings = Self.settings(root)
+                if case .array(var list)? = settings["bundles"], !bundles.isEmpty {
+                    for i in list.indices {
+                        guard case .object(var bundle) = list[i],
+                              case .string(let bundleId)? = bundle["id"], bundles.contains(bundleId) else { continue }
+                        var ids: [JSONValue] = []
+                        if case .array(let had)? = bundle["productIds"] { ids = had }
+                        guard !ids.contains(.string(id)) else { continue }
+                        ids.append(.string(id))
+                        bundle["productIds"] = .array(ids)
+                        list[i] = .object(bundle)
+                    }
+                    settings["bundles"] = .array(list)
+                    root["settings"] = .object(settings)
+                }
+            }
+            await shop.load(shop.source)
+        } catch {
+            shop.productProblem = String(describing: error)
+        } }
     }
 
     /// Put a deleted spool back, and make THAT undoable.
     ///
     /// `registerMoveUndo` restores fields onto records that are still there; a
     /// deleted spool is not, so it needs its own path.
-    func registerSpoolUndo(_ record: [String: JSONValue]) {
-        guard let undoManager, let build = source.build,
+    func putBackSpool(_ record: [String: JSONValue], in build: StoreReader.Build) {
+        guard permitted("inventory", "edit"),
               case .string(let id)? = record["id"] else { return }
-        undoManager.setActionName(words.callIt("inv.removed"))
-        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("inventory", "edit") else { return }
-            // Written on the chain; the undo itself returns at once.
-            Task {
-                do {
-                    try await StoreWriter.updateOffMain(build) { root in
-                        var shelf = Self.rows(root, "inventory")
-                        guard !shelf.contains(where: { Self.recordId($0) == id }) else { return }
-                        shelf.append(.object(record))
-                        root["inventory"] = .array(shelf)
-                    }
-                } catch {
-                    shop.spendProblem = String(describing: error)
+
+        let shop = self
+        // Written on the chain; the undo itself returns at once.
+        Task {
+            do {
+                try await StoreWriter.updateOffMain(build) { root in
+                    var shelf = Self.rows(root, "inventory")
+                    guard !shelf.contains(where: { Self.recordId($0) == id }) else { return }
+                    shelf.append(.object(record))
+                    root["inventory"] = .array(shelf)
                 }
+                // Read back, or the spool is in the book and not on screen
+                // until something else reloads it.
+                await shop.load(shop.source)
+            } catch {
+                shop.spendProblem = String(describing: error)
             }
         }
     }

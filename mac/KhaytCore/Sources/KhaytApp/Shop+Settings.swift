@@ -93,6 +93,12 @@ extension Shop {
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
+        // On the stack at the click, against the write below (`PendingUndo`).
+        let pending: PendingUndo<([String: JSONValue], [ChangedRecord])> =
+            pendingUndo(named: words.callIt("set.locations")) { shop, gone in
+                shop.putBackLocation(gone.0, relinking: gone.1, in: build)
+            }
+        defer { pending.drop() }
         do {
             let (removed, unlinked) = try await StoreWriter.updateOffMain(build) { root
                 -> ([String: JSONValue]?, [ChangedRecord]) in
@@ -103,7 +109,7 @@ extension Shop {
                 root["locations"] = .array(rows)
                 return (was, Self.unpointingLocation(&root, from: id))
             }
-            if let removed { registerLocationUndo(removed, relinking: unlinked) }
+            if let removed { pending.keep((removed, unlinked)) }
             await load(source)
         } catch {
             moveProblem = String(describing: error)
@@ -164,22 +170,21 @@ extension Shop {
         }
     }
 
-    private func registerLocationUndo(_ record: [String: JSONValue],
-                                      relinking unlinked: [ChangedRecord]) {
-        guard let undoManager, let build = source.build,
+    private func putBackLocation(_ record: [String: JSONValue],
+                                      relinking unlinked: [ChangedRecord], in build: StoreReader.Build) {
+        guard permitted("settings", "edit"),
               case .string(let id)? = record["id"] else { return }
-        undoManager.setActionName(words.callIt("set.locations"))
-        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("settings", "edit") else { return }
-            // Written on the chain; the undo itself returns at once.
-            Task {
-                do {
-                    try await StoreWriter.updateOffMain(build) { root in
-                        Self.relinkingLocation(&root, record: record, id: id, unlinked: unlinked)
-                    }
-                    await shop.load(shop.source)
-                } catch {
-                    shop.moveProblem = String(describing: error)
+
+        let shop = self
+        // Written on the chain; the undo itself returns at once.
+        Task {
+            do {
+                try await StoreWriter.updateOffMain(build) { root in
+                    Self.relinkingLocation(&root, record: record, id: id, unlinked: unlinked)
                 }
+                await shop.load(shop.source)
+            } catch {
+                shop.moveProblem = String(describing: error)
             }
         }
     }
