@@ -9,6 +9,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   alpha.69 shipped untried, and moving a job on by itself is deferred until
   after beta.1.
 
+- **Mac: scanning the library no longer freezes the window.** With a linked
+  folder of ten thousand models (a Google Drive, say), the scan stopped the
+  window for two to three seconds for every new model it found, and again for
+  seconds at a time even when nothing was new. New models are now saved
+  together in the background, a scan that finds nothing new saves nothing, and
+  the window stays usable throughout. Stop still stops it, keeping what was
+  found before.
+
 - **Mac: deleting or editing a model no longer freezes a big library.** With
   ten thousand models, deleting one stopped the window for three to five
   seconds while the whole book was read and saved, and favouriting, moving to
