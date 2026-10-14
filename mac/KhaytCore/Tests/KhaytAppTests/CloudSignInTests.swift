@@ -59,7 +59,7 @@ struct CloudSignInTests {
         let body = source[fn.lowerBound...].prefix(4000)
         guard let unwrap = body.range(of: "SyncCrypto.unwrapDek("),
               let seal = body.range(of: "Secrets.seal("),
-              let write = body.range(of: "StoreWriter.update(") else {
+              let write = body.range(of: "StoreWriter.update") else {
             Issue.record("sign-in no longer unwraps, seals and writes"); return
         }
         #expect(unwrap.lowerBound < write.lowerBound,
