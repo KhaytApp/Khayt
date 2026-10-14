@@ -28,6 +28,10 @@ struct LibraryWritten: Sendable {
     static var current: Int { written.withLock { $0 } }
 }
 
+/// One undo entry's own target, so that entry alone can be taken off the
+/// stack when its write fails (`Shop.registerUndo(after:named:)`).
+final class UndoTicket: Sendable {}
+
 /// The library a write compares the book against (`Shop.libraryBase`).
 struct LibraryBase: Sendable {
     var rows: [JSONValue]

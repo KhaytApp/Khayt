@@ -83,12 +83,22 @@ public enum StoreWriter {
         }
     }
 
+    /// Marks a thread that is inside a read-modify-write (debug check only).
+    private static let insideWriteKey = "khayt.store-writer.inside-write"
+
     /// The read-modify-write itself. Only ever run inside `serialised`.
     private static func readModifyWrite(storeURL url: URL,
                                         owns: () -> Bool,
                                         whoHasIt: () -> String?,
                                         recordingDeletes: Bool,
                                         mutate: (inout [String: JSONValue]) throws -> Void) throws {
+        // Never a write from inside a write: the outer one would save its
+        // older copy over this one's change (see `chain`).
+        let thread = Thread.current.threadDictionary
+        assert(thread[insideWriteKey] == nil,
+               "StoreWriter: a write from inside a write — the outer write will save over it")
+        thread[insideWriteKey] = true
+        defer { thread.removeObject(forKey: insideWriteKey) }
         guard owns() else {
             throw Refusal.notOurs(whoHasIt() ?? "Another app owns this book")
         }
@@ -222,8 +232,17 @@ public enum StoreWriter {
     /// through this one serial queue, so a read inside one can never be
     /// overtaken by another's swap.
     ///
-    /// Re-entrant: a write already running on the chain that writes again
-    /// runs inline rather than waiting on itself.
+    /// Re-entrant, so work already on the chain that asks for it again (a
+    /// read, a counter) runs inline rather than deadlocking on itself.
+    ///
+    /// ── NEVER WRITE FROM INSIDE A WRITE ──────────────────────────────────
+    ///
+    /// Re-entrancy does NOT make a nested write safe. A `StoreWriter.update`
+    /// called from inside another write's `mutate` reads the book, writes
+    /// its change — and then the outer write saves the copy IT read before,
+    /// over it. The nested change is lost without a word. Make the change in
+    /// the outer `mutate` instead. Debug builds stop on it
+    /// (`readModifyWrite`).
     static let chain = DispatchQueue(label: "khayt.store-write-chain", qos: .userInitiated)
     private static let onChain = DispatchSpecificKey<Bool>()
     private static let chainKeyed: Void = { chain.setSpecific(key: onChain, value: true) }()
@@ -238,7 +257,8 @@ public enum StoreWriter {
         }
     }
 
-    /// Run `work` on the write chain and wait for it. Re-entrant.
+    /// Run `work` on the write chain and wait for it. Re-entrant — but never
+    /// write from inside a write (see `chain`): a nested write is lost.
     public static func serialised<T>(_ work: () throws -> T) rethrows -> T {
         _ = chainKeyed
         if DispatchQueue.getSpecific(key: onChain) == true { return try work() }

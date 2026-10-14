@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 import AppKit
 import Observation
 import KhaytCore
+import os
 
 extension Shop {
 
@@ -779,14 +780,26 @@ extension Shop {
         return lines
     }
 
-    /// Delete several models at once: every folder to the Trash, then ONE
-    /// write that takes all their records out of the book.
+    /// Delete several models at once: ONE write that takes all their records
+    /// out of the book, then — for the records that write took out — every
+    /// folder to the Trash.
     ///
     /// The shop could select many models and group or tag them together, but
     /// delete took one at a time ("I tried to delete multiple files from the
     /// library but can't, only one at a time"). One write rather than one per
     /// model, so a delete of fifty is one change to sync and one undo-free
     /// moment rather than fifty.
+    ///
+    /// ── THE BOOK FIRST, THEN THE TRASH ──────────────────────────────────
+    ///
+    /// The folders went to the Trash first and the book was written after.
+    /// A write then refused (the other app took the book) put every record
+    /// back on screen with its files already gone: a model that looks
+    /// present and is not. Now nothing leaves the disk until its record has
+    /// left the book, and only the records the write actually took out. A
+    /// folder the Trash then refuses stays where it is — an orphaned folder
+    /// is recoverable; a record whose files went without it is not — and the
+    /// delete says it was partial.
     func deleteLibraryFiles(_ files: [LibraryFile]) async {
         guard permitted("inventory", "delete") else { return }
         clearLastOutcome()
@@ -802,29 +815,14 @@ extension Shop {
         // Off the screen NOW — see `Shop+LibraryWrites.swift`. Everything
         // below is off the main thread until the book is written.
         let pending = beginLibraryChange(ids, change: nil)
-
-        // The folders to the Trash, off the main thread too: a model on a
-        // network share or an online-only cloud folder can hold `trashItem`
-        // for seconds, and that was the window frozen.
         let chosen = files
-        let allGone = await BookWork.run { () -> Bool in
-            var allGone = true
-            for file in chosen {
-                guard let dir = LibraryLocation.directory(for: file.id, roots: roots) else { continue }
-                var thisGone = true
-                let contents = (try? FileManager.default.contentsOfDirectory(at: dir,
-                    includingPropertiesForKeys: nil)) ?? []
-                for url in contents {
-                    do { try Self.trash(url) } catch { thisGone = false }
-                }
-                if thisGone { try? Self.trash(dir) } else { allGone = false }
-            }
-            return allGone
-        }
+        let written: LibraryWritten
+        let removed: Set<String>
         do {
-            let written = try await StoreWriter.updateOffMain(build) { root -> LibraryWritten in
+            (written, removed) = try await StoreWriter.updateOffMain(build) { root -> (LibraryWritten, Set<String>) in
                 let before = Self.rows(root, "printFiles")
                 var rows = before
+                let present = Set(before.compactMap(Self.recordId)).intersection(ids)
                 rows.removeAll { Self.recordId($0).map(ids.contains) ?? false }
                 root["printFiles"] = .array(rows)
                 // A model ADOPTED from the library's own folder keeps its file
@@ -841,27 +839,55 @@ extension Shop {
                     settings["printLibrary"] = .object(library)
                     root["settings"] = .object(settings)
                 }
-                return Self.libraryWritten(root, touched: ids, before: before, base: base)
-            }
-            endLibraryChange(pending)
-            // One delete, however many models it took.
-            Telemetry.feature(.libraryDelete, in: self)
-            await showLibraryWritten(written, touched: ids)
-            if !allGone {
-                importProblem = words.callIt("plib.delete_partial")
-            } else if chosen.count == 1 {
-                importNote = words.callIt("plib.deleted")
-            } else {
-                importNote = words.counting(chosen.count, "mac.deleted_n_models")
+                return (Self.libraryWritten(root, touched: ids, before: before, base: base), present)
             }
         } catch {
             endLibraryChange(pending)
             importProblem = String(describing: error)
-            // Nothing was written: the book still holds them, so the screen
-            // must too.
+            // Nothing was written, and nothing went to the Trash: the book
+            // still holds them, with their files, so the screen must too.
             await load(source)
+            return
+        }
+        endLibraryChange(pending)
+        // One delete, however many models it took.
+        Telemetry.feature(.libraryDelete, in: self)
+        await showLibraryWritten(written, touched: ids)
+
+        // The folders to the Trash — only of records the write took out —
+        // off the main thread: a model on a network share or an online-only
+        // cloud folder can hold `trashItem` for seconds.
+        let allGone = await BookWork.run { () -> Bool in
+            var allGone = true
+            for file in chosen where removed.contains(file.id) {
+                guard let dir = LibraryLocation.directory(for: file.id, roots: roots) else { continue }
+                var thisGone = true
+                let contents = (try? FileManager.default.contentsOfDirectory(at: dir,
+                    includingPropertiesForKeys: nil)) ?? []
+                for url in contents {
+                    do { try Self.trash(url) } catch {
+                        thisGone = false
+                        Self.deleteLog.error("""
+                            deleted \(file.id, privacy: .public) from the book; its file \
+                            \(url.path, privacy: .private) stays: \(error.localizedDescription, privacy: .public)
+                            """)
+                    }
+                }
+                if thisGone { try? Self.trash(dir) } else { allGone = false }
+            }
+            return allGone
+        }
+        if !allGone {
+            importProblem = words.callIt("plib.delete_partial")
+        } else if chosen.count == 1 {
+            importNote = words.callIt("plib.deleted")
+        } else {
+            importNote = words.counting(chosen.count, "mac.deleted_n_models")
         }
     }
+
+    /// Where a delete says which files it had to leave behind.
+    nonisolated static let deleteLog = Logger(subsystem: "app.khayt.mac", category: "library-delete")
 
     func directory(for file: LibraryFile) -> URL? {
         guard let roots = libraryRoots else { return nil }

@@ -54,7 +54,7 @@ struct StoreWriteChainTests {
         #expect(ids.count == 24, "a write was overtaken and lost: \(24 - ids.count) missing")
     }
 
-    @Test("a write already on the chain may write again without waiting on itself")
+    @Test("work already on the chain may ask for the chain again without waiting on itself (never to write)")
     func reentrant() async throws {
         let url = try book()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }

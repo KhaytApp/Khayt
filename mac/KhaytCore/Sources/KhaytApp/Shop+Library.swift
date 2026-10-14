@@ -726,11 +726,30 @@ extension Shop {
     /// undo registered later goes on the stack after whatever the shop did
     /// next — and a redo registered later than its undo goes on the UNDO
     /// stack instead.
+    ///
+    /// ── A WRITE THAT FAILS TAKES ITS UNDO WITH IT ─────────────────────────
+    ///
+    /// Registered before the write is known to land, so a write that then
+    /// fails (another app took the book, the disk refused) left an entry on
+    /// the stack that did nothing: ⌘Z was swallowed by it instead of
+    /// reaching the shop's previous real change. Each entry is registered
+    /// against a target of its own, so exactly that entry can be taken off
+    /// again — from the undo stack, or the redo stack for an undo's redo —
+    /// once its write says there is nothing to undo.
     func registerUndo(after write: Task<LibraryUndo?, Never>, named actionName: String) {
         guard let undoManager else { return }
+        let ticket = UndoTicket()
         undoManager.setActionName(actionName)
-        undoManager.registerUndo(withTarget: self) { shop in
-            shop.restore(after: write, named: actionName)
+        undoManager.registerUndo(withTarget: ticket) { [weak self] _ in
+            // The entry holds the ticket alive for as long as it exists.
+            _ = ticket
+            self?.restore(after: write, named: actionName)
+        }
+        Task { [weak undoManager] in
+            let landed = await write.value
+            if landed == nil || landed?.isEmpty == true {
+                undoManager?.removeAllActions(withTarget: ticket)
+            }
         }
     }
 

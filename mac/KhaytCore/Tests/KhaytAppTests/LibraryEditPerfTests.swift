@@ -316,6 +316,73 @@ struct LibraryEditPerfTests {
         }
     }
 
+    /// Another app takes the book: a live pid on this host (launchd).
+    static func stealBook(_ url: URL) throws -> URL {
+        let now = Date().timeIntervalSince1970 * 1000
+        let thief = StoreLock.Record(app: "Khayt", pid: 1, host: ProcessInfo.processInfo.hostName,
+                                     takenAt: now, heartbeat: now)
+        let lock = url.deletingLastPathComponent().appending(path: StoreLock.filename)
+        try JSONEncoder().encode(thief).write(to: lock)
+        return lock
+    }
+
+    @Test("an edit whose write is refused leaves no undo behind, so ⌘Z reaches the change before it")
+    func refusedEditLeavesNoUndo() async throws {
+        try await withPerfBook(PerfBook.synthesize(models: 20)) { shop, url in
+            let undo = UndoManager()
+            undo.groupsByEvent = false
+            shop.undoManager = undo
+            let plain = shop.files.filter { !$0.isFavourite }
+            let first = try #require(plain.first), second = try #require(plain.dropFirst().first)
+            func favourite(_ id: String) throws -> JSONValue? {
+                for case .object(let o) in try diskRows(url) where o["id"] == .string(id) { return o["favorite"] }
+                return nil
+            }
+            undo.beginUndoGrouping()
+            shop.toggleFavourite(first)
+            undo.endUndoGrouping()
+            await shop.settleLibraryWrites()
+            #expect(try favourite(first.id) == .bool(true))
+
+            let lock = try Self.stealBook(url)
+            undo.beginUndoGrouping()
+            shop.toggleFavourite(second)
+            undo.endUndoGrouping()
+            await shop.settleLibraryWrites()
+            // Let the undo's own clean-up hear that the write failed.
+            for _ in 0..<20 { await Task.yield() }
+            #expect(shop.writeProblem != nil, "a refused edit said nothing")
+            #expect(try favourite(second.id) != .bool(true))
+            try FileManager.default.removeItem(at: lock)
+            #expect(StoreLock.take(for: .shipped) != nil, "the book could not be taken back")
+
+            undo.undo()
+            await shop.settleLibraryWrites()
+            #expect(try favourite(first.id) == .bool(false), "⌘Z was swallowed by the refused edit")
+            #expect(!undo.canUndo, "the refused edit is still on the undo stack")
+            shop.undoManager = nil
+        }
+    }
+
+    @Test("a delete that cannot be written leaves the model's files where they are")
+    func refusedDeleteKeepsFiles() async throws {
+        try await withPerfBook(PerfBook.synthesize(models: 10)) { shop, url in
+            let file = shop.files[0]
+            let primary = try #require(shop.libraryRoots?.primary)
+            let folder = URL(fileURLWithPath: primary).appending(path: LibraryLocation.itemDirName(file.id))
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let model = folder.appending(path: "model.3mf")
+            try Data("solid".utf8).write(to: model)
+            _ = try Self.stealBook(url)
+            await shop.deleteLibraryFiles([file])
+            #expect(shop.importProblem != nil, "a refused delete said nothing")
+            #expect(try diskIds(url).contains(file.id))
+            #expect(FileManager.default.fileExists(atPath: model.path),
+                    "the files went to the Trash though the record stayed in the book")
+            #expect(shop.files.contains { $0.id == file.id })
+        }
+    }
+
     @Test("a delete that cannot be written puts the models back on screen")
     func failedDeleteComesBack() async throws {
         try await withPerfBook(PerfBook.synthesize(models: 20)) { shop, url in
