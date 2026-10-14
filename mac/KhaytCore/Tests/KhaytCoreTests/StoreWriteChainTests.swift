@@ -69,33 +69,40 @@ struct StoreWriteChainTests {
     /// `chain.sync` on the main thread: a scan's whole-book write ahead of it
     /// froze the window for its full length.
     ///
-    /// Asked of the main thread by the write holding the chain, not timed by
-    /// a clock: the whole suite shares the main thread, so a stopwatch here
-    /// measured the other tests. A main thread stuck in `chain.sync` behind
-    /// the holder cannot answer it at all.
-    @MainActor
-    @Test("the async update waits for a busy chain without holding the main thread")
-    func asyncUpdateWaitsOffMain() async throws {
+    /// Checked by what the code DOES, not by asking the main thread to answer
+    /// while the chain is held. That first version deadlocked on CI and only
+    /// there: other suites run beside this one, and one of them doing a
+    /// synchronous write on the main thread waited for the chain this test
+    /// held, while this test waited for the main thread (Oct 14 2026). A test
+    /// must not hold the chain and wait on anything outside it, which is the
+    /// rule the code keeps too.
+    @Test("the async update takes the chain without holding its caller's thread")
+    func asyncUpdateNeverWaitsOnTheCallersThread() throws {
+        let source = try Self.writerSource()
+        let start = try #require(source.range(of: "owns: @Sendable () -> Bool,"),
+                                 "the async update's signature moved")
+        let end = try #require(source.range(of: "// MARK: - The write chain", range: start.upperBound..<source.endIndex))
+        // The code only: the comments there tell the story of `serialised`.
+        let body = source[start.upperBound..<end.lowerBound]
+            .split(separator: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        #expect(body.contains("try await onChain {"), "the swap no longer waits for the chain off the caller's thread")
+        #expect(!body.contains("serialised"), "the swap waits for the chain with chain.sync on the caller's thread again")
+        #expect(!body.contains("chain.sync"), "the swap waits for the chain with chain.sync on the caller's thread again")
+    }
+
+    @Test("an async update behind a busy chain waits for it and loses nothing")
+    func asyncUpdateBehindABusyChain() async throws {
         let url = try book()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let answered = Answer()
-        // The chain held by another writer, which — once the update is
-        // waiting behind it — asks the main thread to do one small thing.
-        // Let go by the holding thread itself, so nothing depends on the
-        // cooperative pool (`noLostUpdates` fills it with blocked writes).
+        // The chain held for a moment by another writer that waits on nothing
+        // outside it, and lets go by itself.
         await withCheckedContinuation { (held: CheckedContinuation<Void, Never>) in
             DispatchQueue.global().async {
                 StoreWriter.serialised {
                     held.resume()
-                    Thread.sleep(forTimeInterval: 0.2)
-                    let main = DispatchSemaphore(value: 0)
-                    DispatchQueue.main.async { main.signal() }
-                    // Generous on purpose. A main thread stuck in `chain.sync`
-                    // behind this holder never answers, so the bug still
-                    // fails here; a main thread that is merely BUSY (on CI
-                    // the whole suite queues on it) answers late. Three
-                    // seconds failed a correct build on CI (Oct 14 2026).
-                    answered.set(main.wait(timeout: .now() + 120) == .success)
+                    Thread.sleep(forTimeInterval: 0.3)
                 }
             }
         }
@@ -103,17 +110,24 @@ struct StoreWriteChainTests {
             await Task.yield()   // an async mutate: the async `update`, not the synchronous one
             Self.append("async", to: &root)
         }
-        // And a synchronous write from main straight after still gets in.
         try StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
             Self.append("sync", to: &root)
         }
-        #expect(answered.value == true, "the main thread was held while the chain was busy")
         let root = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: url))
         var ids = Set<String>()
         if case .array(let rows)? = root["counters"] {
             for case .object(let o) in rows { if case .string(let id)? = o["id"] { ids.insert(id) } }
         }
         #expect(ids == ["async", "sync"])
+    }
+
+    static func writerSource() throws -> String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // …/Tests/KhaytCoreTests
+            .deletingLastPathComponent()   // …/Tests
+            .deletingLastPathComponent()   // …/KhaytCore
+            .appending(path: "Sources/KhaytCore/StoreWriter.swift")
+        return try String(contentsOf: url, encoding: .utf8)
     }
 
     @Test("a refused write throws, and the book is untouched")
@@ -130,12 +144,4 @@ struct StoreWriteChainTests {
         }
         #expect(try Data(contentsOf: url) == before)
     }
-}
-
-/// What the holding writer heard back from the main thread.
-private final class Answer: @unchecked Sendable {
-    private let lock = NSLock()
-    private var got: Bool?
-    func set(_ v: Bool) { lock.withLock { got = v } }
-    var value: Bool? { lock.withLock { got } }
 }
