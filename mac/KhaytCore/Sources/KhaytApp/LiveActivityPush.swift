@@ -123,7 +123,7 @@ enum LiveActivityPush {
     /// was meant for. Nil when the reply does not say (an older cloud), which
     /// is read as sent.
     static func tokens(in data: Data) -> Int? {
-        guard case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: data),
+        guard case .object(let o)? = try? JSONValue.decode(JSONValue.self, from: data),
               case .number(let n)? = o["tokens"], n.isFinite else { return nil }
         return Int(max(0, min(n, 1e9)))
     }

@@ -179,7 +179,7 @@ enum Restore {
         do { data = try Data(contentsOf: source) } catch {
             throw Refusal.unreadable(error.localizedDescription)
         }
-        guard var snapshot = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
+        guard var snapshot = try? JSONValue.decode([String: JSONValue].self, from: data) else {
             throw Refusal.unreadable("\(name) is not JSON")
         }
 
@@ -199,7 +199,7 @@ enum Restore {
         // here rather than passed in, and read INSIDE the restore, for the same
         // reason every other write in this app does it.
         let current = (try? Data(contentsOf: storeURL))
-            .flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) }
+            .flatMap { try? JSONValue.decode([String: JSONValue].self, from: $0) }
 
         if let current {
             // Copy the book before replacing it. If that fails, stop: a restore
@@ -234,7 +234,7 @@ enum Restore {
             snapshot = RestoreGuard.carryTombstones(into: snapshot, from: current)
         }
 
-        let next = try JSONEncoder().encode(snapshot)
+        let next = try JSONValue.encode(snapshot)
         guard next.count <= StoreWriter.maxStoreBytes else {
             throw StoreWriter.Refusal.tooLarge(next.count)
         }

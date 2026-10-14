@@ -154,6 +154,6 @@ enum SmartPlug {
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw Failure.refused(http.statusCode)
         }
-        return (try? JSONDecoder().decode(JSONValue.self, from: data)) ?? .null
+        return (try? JSONValue.decode(JSONValue.self, from: data)) ?? .null
     }
 }

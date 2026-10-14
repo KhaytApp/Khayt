@@ -546,7 +546,7 @@ extension Shop {
             // screens decode two collections out of thirty-three, and a
             // comparison built from those would report thirty-one as missing.
             let mine = (try? Data(contentsOf: build.storeURL))
-                .flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) } ?? [:]
+                .flatMap { try? JSONValue.decode([String: JSONValue].self, from: $0) } ?? [:]
             let collections = (try? await engine.storeCollections()) ?? []
             cloudCheck = CloudCompare.compare(here: mine, there: folded.store,
                                               collections: collections, cloudRev: reply.rev,
@@ -619,7 +619,7 @@ extension Shop {
             // payload built from those would claim the other thirty-one are
             // gone.
             let mine = (try? Data(contentsOf: build.storeURL))
-                .flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) } ?? [:]
+                .flatMap { try? JSONValue.decode([String: JSONValue].self, from: $0) } ?? [:]
             // MASKED FIRST, like the whole-book push. `machines` is an array
             // collection, so deltas carry it, and its printer access codes and
             // smart-plug passwords are sealed on disk with THIS Mac's key. Sent
@@ -834,7 +834,7 @@ extension Shop {
             // Say what is true now rather than what was true before: compare
             // the book as it stands against the store that was just folded in.
             let mine = (try? Data(contentsOf: build.storeURL))
-                .flatMap { try? JSONDecoder().decode([String: JSONValue].self, from: $0) } ?? [:]
+                .flatMap { try? JSONValue.decode([String: JSONValue].self, from: $0) } ?? [:]
             let collections = (try? await engine.storeCollections()) ?? []
             await noteSyncAgreement(build: build, shopId: connection.shopId, engine: engine,
                                     book: mine, cloud: folded.store)

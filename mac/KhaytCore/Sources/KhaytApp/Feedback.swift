@@ -237,7 +237,7 @@ enum Feedback {
             guard let url = AppResources.bundle.url(forResource: "sample-shop", withExtension: "json") else {
                 return [:]
             }
-            let root = try JSONDecoder().decode([String: JSONValue].self, from: Data(contentsOf: url))
+            let root = try JSONValue.decode([String: JSONValue].self, from: Data(contentsOf: url))
             return SampleBook.rebased(root, to: Date())
         }
     }

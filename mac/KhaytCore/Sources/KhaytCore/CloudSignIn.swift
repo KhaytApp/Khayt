@@ -180,7 +180,7 @@ public enum CloudSignIn {
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if (300..<400).contains(status) { throw Failure.redirected }
-        let body = (try? JSONDecoder().decode([String: JSONValue].self, from: data)) ?? [:]
+        let body = (try? JSONValue.decode([String: JSONValue].self, from: data)) ?? [:]
         guard status == 200 else {
             // The server's own sentence where it has one: "that code has
             // expired" is a thing a shop can act on and an HTTP number is not.

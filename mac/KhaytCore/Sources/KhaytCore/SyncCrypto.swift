@@ -186,7 +186,7 @@ public enum SyncCrypto {
     /// The same, decoded.
     public static func store(_ blob: Blob, dek: Data) throws -> [String: JSONValue] {
         let json = try openStore(blob, dek: dek)
-        guard let out = try? JSONDecoder().decode([String: JSONValue].self, from: json) else {
+        guard let out = try? JSONValue.decode([String: JSONValue].self, from: json) else {
             throw Failure.notJSON
         }
         return out

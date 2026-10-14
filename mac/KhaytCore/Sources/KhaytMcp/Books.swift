@@ -51,7 +51,7 @@ struct Books: Sendable {
 
     /// Read a store's bytes and mask them. Throws on a book that is not JSON.
     static func open(_ data: Data, engine: KhaytEngine) async throws -> Books {
-        let raw = try JSONDecoder().decode([String: JSONValue].self, from: data)
+        let raw = try JSONValue.decode([String: JSONValue].self, from: data)
         return Books(book: try await engine.storeForPhone(raw), engine: engine)
     }
 

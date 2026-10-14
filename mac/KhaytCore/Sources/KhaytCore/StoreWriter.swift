@@ -106,7 +106,7 @@ public enum StoreWriter {
         let data: Data
         do { data = try Data(contentsOf: url) }
         catch { throw Refusal.unreadable(error.localizedDescription) }
-        guard var root = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
+        guard var root = try? JSONValue.decode([String: JSONValue].self, from: data) else {
             throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
         }
 
@@ -118,8 +118,7 @@ public enum StoreWriter {
             stampChanged(before: before, after: &root)
         }
 
-        let encoder = JSONEncoder()
-        let next = try encoder.encode(root)
+        let next = try JSONValue.encode(root)
         guard next.count <= maxStoreBytes else { throw Refusal.tooLarge(next.count) }
 
         // Asked again, as late as it can be. Electron takes ownership on startup
@@ -178,7 +177,7 @@ public enum StoreWriter {
                 let data: Data
                 do { data = try Data(contentsOf: url) }
                 catch { throw Refusal.unreadable(error.localizedDescription) }
-                guard let root = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
+                guard let root = try? JSONValue.decode([String: JSONValue].self, from: data) else {
                     throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
                 }
                 return (data, root)
@@ -194,7 +193,7 @@ public enum StoreWriter {
                     recordDeletions(before: decoded, after: &root)
                     stampChanged(before: decoded, after: &root)
                 }
-                let next = try JSONEncoder().encode(root)
+                let next = try JSONValue.encode(root)
                 guard next.count <= maxStoreBytes else { throw Refusal.tooLarge(next.count) }
                 return next
             }

@@ -52,7 +52,7 @@ public enum BambuReport {
     /// several times a second.
     public static func parse(_ payload: String) -> JSONValue? {
         guard let data = payload.data(using: .utf8),
-              let root = try? JSONDecoder().decode(JSONValue.self, from: data),
+              let root = try? JSONValue.decode(JSONValue.self, from: data),
               case .object(let obj) = root,
               case .object(let print)? = obj["print"]
         else { return nil }

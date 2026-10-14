@@ -86,7 +86,7 @@ struct CustomerNames: @unchecked Sendable {
     /// From the book's bytes. A book that will not parse knows no names, and
     /// shares none.
     static func read(data: Data) -> CustomerNames {
-        guard let book = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
+        guard let book = try? JSONValue.decode([String: JSONValue].self, from: data) else {
             return .none
         }
         return CustomerNames(book: book)

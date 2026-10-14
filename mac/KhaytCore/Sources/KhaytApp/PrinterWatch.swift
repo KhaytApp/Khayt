@@ -309,7 +309,7 @@ final class PrinterWatch {
         // exactly this, and a status assembled field by field here would drop
         // whatever somebody adds to it next without anything saying so.
         guard let data = try? JSONEncoder().encode(status),
-              let row = try? JSONDecoder().decode(JSONValue.self, from: data) else { return }
+              let row = try? JSONValue.decode(JSONValue.self, from: data) else { return }
         // THE END OF A PRINT, and the printer's own photo of it. Its own
         // memory and its own rule (`print-finish-photo`), because a completion
         // is frozen for a cancelled print too and a photo must not be — the
@@ -873,7 +873,7 @@ final class PrinterWatch {
             // — PrusaLink sends it when nothing is printing.
             if http.statusCode == 204 { return [:] }
         }
-        guard let decoded = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
+        guard let decoded = try? JSONValue.decode([String: JSONValue].self, from: data) else {
             throw Refusal.notJSON
         }
         return decoded
@@ -925,7 +925,7 @@ final class PrinterWatch {
         // A command's answer is usually empty and always uninteresting — what
         // matters is that it was accepted. An unparseable body is not a failure
         // here, unlike in `get` where the body IS the answer.
-        return (try? JSONDecoder().decode([String: JSONValue].self, from: data)) ?? [:]
+        return (try? JSONValue.decode([String: JSONValue].self, from: data)) ?? [:]
     }
 
     /// One upload of a whole sliced file, with the same refusals as `send`.

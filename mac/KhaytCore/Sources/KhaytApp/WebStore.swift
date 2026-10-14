@@ -83,7 +83,7 @@ enum CatalogPublisher {
         let (data, response) = try await fetch(request)
         switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
         case 200:
-            let body = try? JSONDecoder().decode(JSONValue.self, from: data)
+            let body = try? JSONValue.decode(JSONValue.self, from: data)
             guard case .object(let o)? = body, case .object(let catalog)? = o["catalog"] else {
                 return Held(live: false)
             }
