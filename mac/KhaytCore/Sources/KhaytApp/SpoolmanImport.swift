@@ -64,7 +64,7 @@ enum SpoolmanImport {
                 guard (200..<300).contains(http.statusCode) else { throw Problem.refused(http.statusCode) }
                 total = (http.value(forHTTPHeaderField: "x-total-count")).flatMap { Int($0) }
             }
-            guard case .array(let rows)? = try? JSONDecoder().decode(JSONValue.self, from: data) else {
+            guard case .array(let rows)? = try? JSONValue.decode(JSONValue.self, from: data) else {
                 throw Problem.notSpoolman
             }
             out.append(contentsOf: rows)

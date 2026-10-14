@@ -284,7 +284,7 @@ public final class JSRuntime {
         guard let json = value.toString(), json != "undefined", let data = json.data(using: .utf8) else {
             throw KhaytJSError.unexpectedResult("\(object).\(method) returned undefined")
         }
-        return try JSONDecoder().decode(T.self, from: data)
+        return try JSONValue.decode(T.self, from: data)
     }
 
     /// Evaluate an expression with arguments substituted for `ARG0`, `ARG1`, …
@@ -357,15 +357,14 @@ public final class JSRuntime {
         // as a VALUE and bound to its own global, and only the expression the
         // developer wrote is rewritten — `ARG3` becomes `__karg3`, in one pass,
         // over text no argument can reach.
-        let encoder = JSONEncoder()
-        let bound = try bind(args.map { String(data: try encoder.encode($0), encoding: .utf8) ?? "null" })
+        let bound = try bind(args.map { String(data: try JSONValue.encode($0), encoding: .utf8) ?? "null" })
         defer { unbind(bound) }
         let script = expression.replacing(/\bARG(\d+)\b/) { match in "__karg" + match.output.1 }
         let value = try evaluate("JSON.stringify(\(script))")
         guard let json = value.toString(), json != "undefined", let data = json.data(using: .utf8) else {
             throw KhaytJSError.unexpectedResult(expression)
         }
-        return try JSONDecoder().decode(T.self, from: data)
+        return try JSONValue.decode(T.self, from: data)
     }
 
     /// Parse each JSON text with `JSON.parse` — handed over as a VALUE, never
@@ -398,7 +397,7 @@ public final class JSRuntime {
         guard let json = js.toString(), json != "undefined", let data = json.data(using: .utf8) else {
             throw KhaytJSError.unexpectedResult("\(object).\(property) is undefined")
         }
-        return try JSONDecoder().decode(T.self, from: data)
+        return try JSONValue.decode(T.self, from: data)
     }
 }
 

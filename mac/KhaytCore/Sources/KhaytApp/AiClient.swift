@@ -353,12 +353,12 @@ enum AiClient {
 
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             if (200..<300).contains(status) {
-                return (try? JSONDecoder().decode(JSONValue.self, from: body)) ?? .object([:])
+                return (try? JSONValue.decode(JSONValue.self, from: body)) ?? .object([:])
             }
 
             // The SHARED sentence, and the shared decision about whether this
             // is worth trying again.
-            let parsed = (try? JSONDecoder().decode(JSONValue.self, from: body)) ?? .null
+            let parsed = (try? JSONValue.decode(JSONValue.self, from: body)) ?? .null
             last = (try? await engine.aiHttpError(status: status, body: parsed)) ?? last
             let after = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "retry-after")
             let policy = try? await engine.aiRetry(status: status, attempt: attempt, retryAfter: after)

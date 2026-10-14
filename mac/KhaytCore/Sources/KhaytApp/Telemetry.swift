@@ -110,7 +110,7 @@ struct TelemetryQueueFile: Sendable {
 
     func read() -> [JSONValue] {
         guard let data = try? Data(contentsOf: url),
-              let list = try? JSONDecoder().decode([JSONValue].self, from: data) else { return [] }
+              let list = try? JSONValue.decode([JSONValue].self, from: data) else { return [] }
         return list
     }
 
@@ -602,7 +602,7 @@ final class Telemetry {
         await withCheckedContinuation { done in
             DispatchQueue.global(qos: .utility).async {
                 guard let data = try? Data(contentsOf: url),
-                      let root = try? JSONDecoder().decode([String: JSONValue].self, from: data),
+                      let root = try? JSONValue.decode([String: JSONValue].self, from: data),
                       case .object(let settings)? = root["settings"] else {
                     done.resume(returning: nil); return
                 }

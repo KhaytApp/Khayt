@@ -106,7 +106,7 @@ enum PrinterSweep {
             for (type, host, status, data) in answers {
                 // The RULE decides whether this was a printer, from the body it
                 // verified against a real U1 — not a guess made here.
-                guard let body = try? JSONDecoder().decode(JSONValue.self, from: data),
+                guard let body = try? JSONValue.decode(JSONValue.self, from: data),
                       let record = try? await engine.identifySweep(type: type, host: host,
                                                                    status: status, body: body)
                 else { continue }

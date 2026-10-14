@@ -1218,7 +1218,7 @@ extension Shop {
             // From disk, not from what this app is holding: the screens decode
             // two collections out of thirty-three, and an export built from
             // those would be an export missing thirty-one.
-            let root = try JSONDecoder().decode([String: JSONValue].self,
+            let root = try JSONValue.decode([String: JSONValue].self,
                                                 from: Data(contentsOf: build.storeURL))
             try await Export.payload(from: root, engine: engine).write(to: url, options: .atomic)
             spendNote = words.callIt("mac.exported_to") + " " + url.lastPathComponent
@@ -1265,7 +1265,7 @@ extension Shop {
         panel.message = words.callIt("mac.export_csv_where")
         guard panel.runModal() == .OK, let dir = panel.url else { return }
         do {
-            let root = try JSONDecoder().decode([String: JSONValue].self,
+            let root = try JSONValue.decode([String: JSONValue].self,
                                                 from: Data(contentsOf: build.storeURL))
             let files = try await engine.csvBundle(root)
             guard !files.isEmpty else {

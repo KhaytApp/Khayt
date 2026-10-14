@@ -9143,7 +9143,7 @@ public actor KhaytEngine {
     /// The ids of the library rows that can start now on a machine with this
     /// loaded. Rows are the book's own `printFiles` records.
     public func readyToPrint(_ rows: [JSONValue], loaded: [LoadedSlot]) throws -> [String] {
-        let slots = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(loaded))
+        let slots = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(loaded))
         return try runtime.call2("""
         ARG0.filter(function (m) { return m && m.id && KhaytLoadedColours.fit(m, ARG1).fits; })
              .map(function (m) { return String(m.id); })
@@ -9159,7 +9159,7 @@ public actor KhaytEngine {
     public func swapQueue(jobs: [JSONValue], loaded: [LoadedSlot], heads: Int,
                           swapMinutes: Double, startHours: Double,
                           now: Date = Date()) throws -> SwapQueue {
-        let slots = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(loaded))
+        let slots = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(loaded))
         return try runtime.call2(
             "KhaytSwapQueue.plan(ARG0, { loaded: ARG1, heads: ARG2, swapMinutes: ARG3, startHours: ARG4, now: ARG5 })",
             [.array(jobs), slots, .number(Double(heads)), .number(swapMinutes), .number(startHours),
@@ -9213,7 +9213,7 @@ public actor KhaytEngine {
 
     /// One model against what is loaded.
     public func loadedFit(_ row: JSONValue, loaded: [LoadedSlot]) throws -> LoadedFit {
-        let slots = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(loaded))
+        let slots = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(loaded))
         return try runtime.call2("KhaytLoadedColours.fit(ARG0, ARG1)", [row, slots], as: LoadedFit.self)
     }
 
@@ -9352,7 +9352,7 @@ public actor KhaytEngine {
 
     /// Which models may leave this Mac now, biggest first.
     public func tierPlan(_ files: [TierFile], policy: JSONValue, now: Date) throws -> TierPlan {
-        let rows = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(files))
+        let rows = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(files))
         return try runtime.call2("KhaytPrintLibraryTier.plan(ARG0, ARG1, ARG2)",
                                  [rows, policy, .number(now.timeIntervalSince1970 * 1000)], as: TierPlan.self)
     }
@@ -9379,7 +9379,7 @@ public actor KhaytEngine {
     /// apps: the Mac's Swift copy of it (#1706) is gone.
     public func tierAnnotate(_ files: [TierFile], printFiles: [JSONValue], orders: [JSONValue],
                              dirNames: [String: String]) throws -> [TierFile] {
-        let rows = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(files))
+        let rows = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(files))
         return try runtime.call2(
             "KhaytPrintLibraryTier.annotate(ARG3, KhaytPrintLibraryTier.usageFromBook(\(Self.tierBook)))",
             [.array(printFiles), .array(orders), .object(dirNames.mapValues(JSONValue.string)), rows],
@@ -9426,7 +9426,7 @@ public actor KhaytEngine {
 
     /// Did the bytes that came back match what went up — size, then SHA-256?
     public func verifyRehydrate(_ side: Sidecar, size: Int, sha256: String) throws -> Verdict {
-        let raw = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(side))
+        let raw = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(side))
         return try runtime.call2("KhaytPrintLibraryTier.verifyRehydrate(ARG0, ARG1, ARG2)",
                                  [raw, .number(Double(size)), .string(sha256)], as: Verdict.self)
     }
@@ -11371,7 +11371,7 @@ public actor KhaytEngine {
 
     /// What makes two updates the same one — what a host remembers it sent.
     public func webStoreFingerprint(_ update: WebStoreStatus) throws -> String {
-        let value = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(update))
+        let value = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(update))
         return try runtime.call2("KhaytWebstoreOrder.fingerprint(ARG0)", [value], as: String.self)
     }
 

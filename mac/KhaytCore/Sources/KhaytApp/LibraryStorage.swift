@@ -310,7 +310,7 @@ extension Shop {
     /// The book as it is on disk now — rows and settings.
     nonisolated static func readBook(_ storeURL: URL) -> [String: JSONValue]? {
         guard let data = try? Data(contentsOf: storeURL) else { return nil }
-        return try? JSONDecoder().decode([String: JSONValue].self, from: data)
+        return try? JSONValue.decode([String: JSONValue].self, from: data)
     }
 
     // MARK: - Local folders
