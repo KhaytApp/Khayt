@@ -163,7 +163,7 @@ enum GroupKinds {
     /// cover the entry held before, so a picture file nobody wears any more
     /// can be put in the Trash.
     @discardableResult
-    static func setCover(_ cover: GroupCover?, for path: String,
+    nonisolated static func setCover(_ cover: GroupCover?, for path: String,
                          into root: inout [String: JSONValue]) -> GroupCover? {
         guard !path.isEmpty else { return nil }
         let settings = Shop.settings(root)

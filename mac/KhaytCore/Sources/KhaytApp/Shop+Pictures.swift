@@ -16,35 +16,59 @@ extension Shop {
 
     // MARK: - Whether a print already wears a picture
 
+    /// What `hasPicture` and `reference` look things up in, worked out ONCE
+    /// for a pass over the pictures rather than once per picture: each of
+    /// those used to walk every record in the library (standardising every
+    /// linked path as it went) and parse the settings again — for every
+    /// picture the sort offered, thousands of them on a linked drive.
+    struct PictureIndex {
+        /// The linked records, by the standardised path they point at.
+        var byPath: [String: LibraryFile] = [:]
+        /// The records whose photo the shop took off (`userPhotoRemoved`).
+        var photoRemoved: Set<String> = []
+        var looked: Set<String> = []
+        var covers: [String: GroupCover] = [:]
+    }
+
+    func pictureIndex() -> PictureIndex {
+        var index = PictureIndex(looked: PrintPhotos.looked(settingsDict), covers: GroupKinds.covers(settingsDict))
+        for file in files {
+            guard let p = file.externalPath, !p.isEmpty else { continue }
+            let path = URL(fileURLWithPath: p).standardizedFileURL.path
+            if index.byPath[path] == nil { index.byPath[path] = file }
+        }
+        for case .object(let o) in fileRows {
+            if case .bool(true)? = o["userPhotoRemoved"], case .string(let id)? = o["id"] { index.photoRemoved.insert(id) }
+        }
+        return index
+    }
+
     /// The book's linked record for a model, by its path below the linked folder.
-    private func record(_ plan: PrintSort.Plan, _ rel: String) -> LibraryFile? {
-        let path = plan.root.appending(path: rel).standardizedFileURL.path
-        return files.first { ($0.externalPath).map { URL(fileURLWithPath: $0).standardizedFileURL.path } == path }
+    private func record(_ plan: PrintSort.Plan, _ rel: String, _ index: PictureIndex) -> LibraryFile? {
+        index.byPath[plan.root.appending(path: rel).standardizedFileURL.path]
     }
 
     /// Whether a picture is already on it: the group's cover, or the model's
     /// own photo — or one the shop took off (`userPhotoRemoved`). Never put
-    /// over either.
-    func hasPicture(_ plan: PrintSort.Plan, _ target: LooseSort.Suggestion.Target) -> Bool {
+    /// over either. Pass the `pictureIndex()` when asking about many.
+    func hasPicture(_ plan: PrintSort.Plan, _ target: LooseSort.Suggestion.Target,
+                    index: PictureIndex? = nil) -> Bool {
+        let index = index ?? pictureIndex()
         switch target {
         case .print(let key):
             // Settled once with a picture (`PrintPhotos.markLooked`): one the
             // shop took off a GROUP leaves no marker of its own, so without
             // this the sheet offered it again, ticked (review of #1844).
-            if PrintPhotos.looked(settingsDict).contains(plan.root.appending(path: key).standardizedFileURL.path) {
+            if index.looked.contains(plan.root.appending(path: key).standardizedFileURL.path) {
                 return true
             }
-            if let group = plan.group(ofPrint: key) { return GroupKinds.covers(settingsDict)[group] != nil }
+            if let group = plan.group(ofPrint: key) { return index.covers[group] != nil }
             guard let only = plan.models(ofPrint: key).first else { return true }
-            return hasPicture(plan, .model(only))
+            return hasPicture(plan, .model(only), index: index)
         case .model(let rel):
-            guard let file = record(plan, rel) else { return false }
+            guard let file = record(plan, rel, index) else { return false }
             if file.userPhoto?.isEmpty == false { return true }
-            return fileRows.contains { row in
-                guard case .object(let o) = row, case .string(file.id)? = o["id"] else { return false }
-                if case .bool(true)? = o["userPhotoRemoved"] { return true }
-                return false
-            }
+            return index.photoRemoved.contains(file.id)
         }
     }
 
@@ -52,15 +76,17 @@ extension Shop {
     /// picture its 3MF carries first, else the one this app drew of it. Read
     /// from the vault, where indexing a downloaded file put it — a model kept
     /// only in the cloud has none, and is never downloaded to make one.
-    func reference(_ plan: PrintSort.Plan, _ target: LooseSort.Suggestion.Target) -> URL? {
+    func reference(_ plan: PrintSort.Plan, _ target: LooseSort.Suggestion.Target,
+                   index: PictureIndex? = nil) -> URL? {
         guard let roots = libraryRoots?.roots else { return nil }
+        let index = index ?? pictureIndex()
         let rels: [String] = {
             switch target {
             case .print(let key): plan.models(ofPrint: key)
             case .model(let rel): [rel]
             }
         }()
-        let held = rels.compactMap { record(plan, $0) }.filter { $0.thumbFile?.isEmpty == false }
+        let held = rels.compactMap { record(plan, $0, index) }.filter { $0.thumbFile?.isEmpty == false }
         let ordered = held.filter(\.hasEmbeddedPreview) + held.filter { !$0.hasEmbeddedPreview }
         for file in ordered {
             guard let thumb = file.thumbFile, let dir = LibraryLocation.directory(for: file.id, roots: roots) else { continue }
@@ -112,11 +138,12 @@ extension Shop {
         var rejects: [String] = []
         var attach: [(plan: PrintSort.Plan, suggestion: LooseSort.Suggestion)] = []
         var budget = PictureSend.checksPerScan
+        let index = pictureIndex()
         outer: for plan in plans {
             for s in plan.suggestions {
                 if budget <= 0 || stop?.isStopped == true || Task.isCancelled { break outer }
                 guard !rejected.contains(PictureRejects.id(root: plan.root, image: s.image, target: s.target)),
-                      !hasPicture(plan, s.target) else { continue }
+                      !hasPicture(plan, s.target, index: index) else { continue }
                 let url = plan.root.appending(path: s.image)
                 let listed = LinkedCloud.listedSize(url)
                 guard listed > 0, listed <= PictureSend.maxSourceBytes else { continue }
@@ -140,7 +167,7 @@ extension Shop {
                 let sig = "picture:" + key
                 if !byHand, SortFailures.held(sig, in: marks, today: today) { continue }
                 guard let photo = await PinWork.run({ try? PictureSend.jpeg(data: data) }) else { continue }
-                let ref = reference(plan, s.target)
+                let ref = reference(plan, s.target, index: index)
                 let refData = await PinWork.run { ref.flatMap { try? PictureSend.jpeg(url: $0) } }
                 let name: String = {
                     switch s.target {
@@ -192,8 +219,10 @@ extension Shop {
         if !newVerdicts.isEmpty || !hashes.isEmpty || !rejects.isEmpty || spent || !changedSigs.isEmpty {
             // lock: system — the shop turned "Check pictures" on; this writes
             // only the verdicts, which pairings were turned down, their cost
-            // and which checks failed.
-            try? StoreWriter.update(build) { root in
+            // and which checks failed. Off the main actor.
+            let written = newVerdicts, seenNow = hashes, turnedDown = rejects, cost = ledger, paid = spent
+            try? await StoreWriter.updateOffMain(build) { root in
+                let newVerdicts = written, hashes = seenNow, rejects = turnedDown, ledger = cost, spent = paid
                 PictureVerdicts.write(newVerdicts, seen: hashes, into: &root)
                 PictureRejects.add(rejects, into: &root)
                 if !changedSigs.isEmpty {
@@ -253,11 +282,15 @@ extension Shop {
         guard !groupPictures.isEmpty || !modelPhotos.isEmpty else { return 0 }
         var put = 0
         var unused: [String] = []
+        let wantedPhotos = modelPhotos, wantedCovers = groupPictures, lookedAt = looked
         do {
             // lock: system — pictures the shop ticked, or the assistant
             // confirmed against the print's own preview; never over one the
-            // shop chose.
-            try StoreWriter.update(build) { root in
+            // shop chose. Off the main actor.
+            (put, unused) = try await StoreWriter.updateOffMain(build) { root -> (Int, [String]) in
+                let modelPhotos = wantedPhotos, groupPictures = wantedCovers, looked = lookedAt
+                var put = 0
+                var unused: [String] = []
                 var rows: [JSONValue] = []
                 if case .array(let r)? = root["printFiles"] { rows = r }
                 var changed = false
@@ -281,6 +314,7 @@ extension Shop {
                     put += 1
                 }
                 PrintPhotos.markLooked(looked, into: &root)
+                return (put, unused)
             }
         } catch {
             unused = groupPictures.map(\.rel)
@@ -303,11 +337,17 @@ extension Shop {
     /// (`PictureMaps`): run on each scan, written only when something goes.
     func prunePictureMaps(_ plans: [PrintSort.Plan]) async {
         guard let build = source.build, !plans.isEmpty else { return }
-        var probe: [String: JSONValue] = ["settings": .object(settingsDict)]
-        guard PictureMaps.prune(&probe, plans: plans) else { return }
+        let settings = settingsDict
+        // Judged, and when something goes written, off the main actor: the
+        // maps are keyed by every picture in every linked folder.
+        let pruned = await PinWork.run { () -> Bool in
+            var probe: [String: JSONValue] = ["settings": .object(settings)]
+            return PictureMaps.prune(&probe, plans: plans)
+        }
+        guard pruned else { return }
         // lock: system — pruning the app's own caches of files no longer in
         // the linked folders it just walked.
-        try? StoreWriter.update(build) { root in PictureMaps.prune(&root, plans: plans) }
+        _ = try? await StoreWriter.updateOffMain(build) { root in PictureMaps.prune(&root, plans: plans) }
         await load(source)
     }
 

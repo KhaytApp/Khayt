@@ -106,7 +106,7 @@ extension Shop {
     /// its derived fields (plates, per-spool grams, the colour list's grams)
     /// with `rev` and `updatedAt` untouched: each machine re-reads by version
     /// on its own, and an edit made elsewhere still wins the merge.
-    static func applySlicerFigures(_ found: [String: [String: JSONValue]],
+    nonisolated static func applySlicerFigures(_ found: [String: [String: JSONValue]],
                                    extOf: [String: String],
                                    to root: inout [String: JSONValue]) {
         guard case .array(var rows)? = root["printFiles"] else { return }
@@ -164,27 +164,32 @@ extension Shop {
         guard case .store(let build) = source, let engine,
               !slicerFiguresReadBooks.contains(build.rawValue) else { return }
         slicerFiguresReadBooks.insert(build.rawValue)
-        // Indexed once. `row(for:)` walks every record, and asking it once per
-        // model was 10,000 × 10,000 comparisons on the main thread at launch —
-        // eighteen seconds frozen on a book that size (`LibraryEditPerfTests`).
-        var byId: [String: [String: JSONValue]] = [:]
+        // Each record found by its id ONCE: `row(for:)` walks the whole
+        // library, and asking it once per model was ten thousand walks of ten
+        // thousand records on the main actor at every launch (Oct 2026).
+        var rowsById: [String: [String: JSONValue]] = [:]
         for case .object(let rec) in fileRows {
-            if case .string(let id)? = rec["id"], byId[id] == nil { byId[id] = rec }
+            if case .string(let id)? = rec["id"], rowsById[id] == nil { rowsById[id] = rec }
         }
-        let due: [(id: String, url: URL, ext: String)] = files.compactMap { file in
-            guard let rec = byId[file.id], let url = modelFile(for: file) else { return nil }
-            // Not a file the cloud would have to download to be read: a
-            // linked Drive's online models are read when they are here.
-            if file.isLinked, LinkedCloud.isOnlineOnly(url) { return nil }
+        let wanted: [(id: String, url: URL, ext: String, linked: Bool)] = files.compactMap { file in
+            guard let rec = rowsById[file.id], let url = modelFile(for: file) else { return nil }
             let ext = url.pathExtension.lowercased()
             guard ["3mf", "gcode", "gco"].contains(ext) else { return nil }
             // Empty, or a 3MF read before plates were read one by one (its
             // time was one plate's and its grams every plate's).
             guard Self.slicerFiguresDue(rec["parsed"], ext: ext) else { return nil }
-            return (file.id, url, ext)
+            return (file.id, url, ext, file.isLinked)
         }
-        guard !due.isEmpty else { return }
+        guard !wanted.isEmpty else { return }
+        let isOnline = linkedIsOnline
         Task { [weak self] in
+            // Not a file the cloud would have to download to be read: a
+            // linked Drive's online models are read when they are here. Asked
+            // off the main actor — a cloud drive answers slowly.
+            let due = await PinWork.run {
+                wanted.filter { !($0.linked && isOnline($0.url)) }.map { (id: $0.id, url: $0.url, ext: $0.ext) }
+            }
+            guard !due.isEmpty else { return }
             var found: [String: [String: JSONValue]] = [:]
             let extOf = Dictionary(due.map { ($0.id, $0.ext) }, uniquingKeysWith: { a, _ in a })
             for item in due {
@@ -195,12 +200,14 @@ extension Shop {
                 else if item.ext == "3mf" { found[item.id] = ["platesRead": .number(Self.platesReadVersion)] }
             }
             guard let self, !found.isEmpty else { return }
+            let figures = found
             do {
                 // `recordingDeletes: false`: nothing is deleted here, and the
                 // automatic stamp must not run — see `applySlicerFigures`.
+                // Off the main actor: the whole book is read and written.
                 // lock: system — background: the slicer's own figures read out of files already in the library.
-                try StoreWriter.update(build, recordingDeletes: false) { root in
-                    Self.applySlicerFigures(found, extOf: extOf, to: &root)
+                try await StoreWriter.updateOffMain(build, recordingDeletes: false) { root in
+                    Shop.applySlicerFigures(figures, extOf: extOf, to: &root)
                 }
                 await self.load(self.source)
                 FileHandle.standardError.write(Data("slicer figures: \(found.count) model(s) filled\n".utf8))
@@ -1430,21 +1437,23 @@ extension Shop {
         // Read first, write once, and read OFF the main thread: this opens
         // up to a few hundred model zips, and doing that on the MainActor
         // froze the window just after launch.
-        let jobs: [(id: LibraryFile.ID, url: URL)] = candidates.compactMap { file in
+        let jobs: [(id: LibraryFile.ID, url: URL, linked: Bool)] = candidates.compactMap { file in
             guard let url = modelFile(for: file) else { return nil }
-            // Never a linked file the cloud would have to download first.
-            if file.isLinked, LinkedCloud.isOnlineOnly(url) { return nil }
-            return (file.id, url)
+            return (file.id, url, file.isLinked)
         }
-        let read: [LibraryFile.ID: (designer: String, licence: String)] = await Task.detached {
+        let isOnline = linkedIsOnline
+        // On a dispatch queue, not a detached task holding a cooperative
+        // thread for a few hundred zips.
+        let read: [LibraryFile.ID: (designer: String, licence: String)] = await PinWork.run {
             var out: [LibraryFile.ID: (designer: String, licence: String)] = [:]
             for job in jobs {
-                if Task.isCancelled { break }
+                // Never a linked file the cloud would have to download first.
+                if job.linked, isOnline(job.url) { continue }
                 guard let said = Mesh.provenance(of: job.url) else { continue }
                 out[job.id] = (said.designer, said.licence)
             }
             return out
-        }.value
+        }
         var found: [LibraryFile.ID: (source: String, licence: String)] = [:]
         for (id, said) in read {
             let licence = ModelLicence.fromFile(said.licence)?.id ?? ""
@@ -1458,9 +1467,12 @@ extension Shop {
         // filled only if it is STILL blank in the book as it is now — a
         // source typed while the zips were being read is the shop's, and
         // wins. Found by the September 2026 scan.
+        let filled = found
         do {
             // lock: system — background: where a model came from, read out of the files themselves.
-            try StoreWriter.update(build) { root in
+            // Off the main actor: the whole book is read and written.
+            try await StoreWriter.updateOffMain(build) { root in
+                let found = filled
                 guard case .array(var rows)? = root["printFiles"] else { return }
                 for i in rows.indices {
                     guard case .object(var record) = rows[i],

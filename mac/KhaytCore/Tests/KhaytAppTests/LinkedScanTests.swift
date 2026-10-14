@@ -107,6 +107,50 @@ struct LinkedScanTests {
         #expect(beside == ["cube.stl"], "nothing of the app's written into the shop's folder: \(beside)")
     }
 
+    // MARK: - A batch never written (review of #1860)
+
+    static func vaultFolders(_ bench: Bench) -> [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: bench.library.path)) ?? [])
+            .filter { $0.hasPrefix("PF") }
+    }
+
+    @Test("a model prepared online but never written leaves no vault folder; the write makes it")
+    func onlineFolderOnlyOnceWritten() async throws {
+        let bench = try LibraryImportEndToEndTests.bench()
+        defer { try? FileManager.default.removeItem(at: bench.dir) }
+        let file = bench.dir.appending(path: "Drive/a/dragon.stl")
+        try Self.model(file)
+        // What a quit, a crash or a force-quit in the middle of a scan leaves:
+        // prepared, held, and the batch never written.
+        let made = try await LibraryImport.prepare(file, libraryRoot: bench.library, knownHashes: [],
+                                                   nameOfExisting: { _ in nil }, engine: try KhaytEngine(),
+                                                   inPlace: true, online: true)
+        #expect(Self.vaultFolders(bench).isEmpty, "an empty vault folder with no record: \(Self.vaultFolders(bench))")
+        try await LibraryImport.write([made], storeURL: bench.store, owns: { true }, whoHasIt: { nil })
+        #expect(Self.vaultFolders(bench) == [LibraryLocation.itemDirName(made.added.id)])
+        #expect(try Self.objects(bench).count == 1)
+    }
+
+    @Test("a batch the book refuses takes its vault folders away again and names every file")
+    func refusedBatchLeavesNoFolders() async throws {
+        let bench = try LibraryImportEndToEndTests.bench()
+        defer { try? FileManager.default.removeItem(at: bench.dir) }
+        let online = bench.dir.appending(path: "Drive/a/dragon.stl"), local = bench.dir.appending(path: "Drive/b/egg.stl")
+        try Self.model(online, size: 10)
+        try Self.model(local, size: 12)
+        let report = await LibraryImport.addMany(
+            LibraryImport.Incoming.ungrouped([online, local]),
+            storeURL: bench.store, libraryRoot: bench.library, knownHashes: [], nameOfExisting: { _ in nil },
+            engine: try KhaytEngine(), keepOriginal: true, inPlace: true,
+            isOnline: { $0.lastPathComponent == "dragon.stl" },
+            owns: { false }, whoHasIt: { "the other app" })
+        #expect(report.moved == 0 && report.failures.count == 2)
+        #expect(Self.vaultFolders(bench).isEmpty, "\(Self.vaultFolders(bench))")
+        #expect(try Self.objects(bench).isEmpty)
+        #expect(FileManager.default.fileExists(atPath: online.path) && FileManager.default.fileExists(atPath: local.path),
+                "the shop's files are where it put them")
+    }
+
     // MARK: - Stop
 
     @Test("Stop between files keeps what was indexed, and says it stopped")
