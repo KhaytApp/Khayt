@@ -26,7 +26,7 @@ extension LibraryEditPerfTests {
     /// Measured on a debug build: the whole-scan holds were seconds before
     /// (each indexed model a 15 MB write on the main thread); after, the
     /// longest is the library's own chips recounted on the reload — the same
-    /// ~100–200 ms `budgetMs` allows the edits. Shared budget, five times room.
+    /// ~100–200 ms; the edits' `budgetMs` (1,500 ms on CI's crowded main thread). Shared budget.
     static let scanBudgetMs = budgetMs
 
     /// A linked "drive": `folders` folders of `perFolder` models, and `loose`

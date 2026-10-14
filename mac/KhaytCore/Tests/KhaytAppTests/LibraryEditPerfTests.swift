@@ -164,9 +164,12 @@ struct LibraryEditPerfTests {
     /// Measured on a debug build (the one `swift test` runs): ~3,800 ms
     /// before — the whole book decoded, encoded and read back on the main
     /// thread — and ~100 ms after, the rest being the library's own chips
-    /// recounted in Swift. 500 ms leaves a slow CI runner five times the
-    /// room, and is still a seventh of what the freeze was.
-    static let budgetMs = 500.0
+    /// recounted in Swift. 500 ms was not enough on CI: with the whole suite
+    /// queued on the same main thread, the best of three came in at 652 ms
+    /// on a correct build (Oct 14 2026). 1,500 ms still fails the freeze it
+    /// guards against by more than two times, and does not measure the
+    /// other tests.
+    static let budgetMs = 1_500.0
 
     @Test("deleting one model from a 10,000-model book does not freeze the window")
     func deleteDoesNotFreeze() async throws {
