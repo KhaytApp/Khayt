@@ -255,11 +255,34 @@ struct JSONValueFuzzTests {
 
     @Test("nesting past the fast reader's limit reads as JSONDecoder reads it")
     func deepNesting() {
-        for depth in [63, 64, 65, 66, 200] {
-            for (open, close) in [("[", "]"), ("{\"k\":", "}")] {
-                let text = String(repeating: open, count: depth) + "1" + String(repeating: close, count: depth)
-                #expect(Self.disagreement(Data(text.utf8)) == nil, "depth \(depth) \(open)")
+        // On a thread with a big stack. Past 64 the text goes to JSONDecoder,
+        // which recurses once per level: on a test thread's small stack, CI's
+        // older toolchain died of SIGBUS before depth 200 (Oct 14 2026) and
+        // took the whole test run with it. What this pins is that the two
+        // readers AGREE, not how deep a small stack goes.
+        let found = Found()
+        let done = DispatchSemaphore(value: 0)
+        let thread = Thread {
+            for depth in [63, 64, 65, 66, 200] {
+                for (open, close) in [("[", "]"), ("{\"k\":", "}")] {
+                    let text = String(repeating: open, count: depth) + "1" + String(repeating: close, count: depth)
+                    if let wrong = Self.disagreement(Data(text.utf8)) { found.add("depth \(depth) \(open): \(wrong)") }
+                }
             }
+            done.signal()
         }
+        thread.stackSize = 16 << 20
+        thread.start()
+        done.wait()
+        let wrong = found.all
+        #expect(wrong.isEmpty, "\(wrong)")
     }
+}
+
+/// What the big-stack thread found, read back once it is done.
+private final class Found: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [String] = []
+    func add(_ s: String) { lock.withLock { items.append(s) } }
+    var all: [String] { lock.withLock { items } }
 }
