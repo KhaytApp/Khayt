@@ -7045,6 +7045,34 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.71] - 2026-10-14
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The library no longer freezes the window when you delete, edit or scan, even
+with ten thousand models.
+
+### Changed and fixed
+
+- **Deleting and editing models is instant.** Deleting, favouriting, moving
+  to a group, renaming and other library edits show at once and are saved in
+  the background. On a library of about 10,000 models, a delete used to
+  freeze the window for about 5 seconds; it now takes about a tenth of a
+  second. If a save fails, the library goes back to what is saved, and Undo
+  skips the change that did not land.
+- **A delete saves the book before it moves anything to the Trash.** If the
+  save is refused, the model's files stay where they are.
+- **Scanning the library and linked folders no longer freezes the window.**
+  New models are saved in batches instead of one at a time, and the work
+  runs in the background. A scan of a drive with thousands of new models
+  keeps the window responsive, Stop keeps what was found, and a scan that
+  finds nothing new changes nothing.
+- **"Sort linked folders…" opens quickly**, in about a quarter of a second
+  instead of several seconds on a large drive.
+- **Opening the library is faster**, and the window stays responsive while
+  its figures are worked out.
+
 ## [4.0.0-alpha.70] - 2026-10-13
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
