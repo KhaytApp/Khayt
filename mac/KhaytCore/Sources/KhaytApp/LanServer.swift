@@ -1105,7 +1105,7 @@ final class LanServer {
         guard allowed else {
             return .open(429, #"{"error":"Too many submissions — try again later"}"#)
         }
-        guard let body = try? JSONValue.decode(JSONValue.self, from: request.body), case .object = body else {
+        guard let body = Self.body(request.body), case .object = body else {
             return .open(400, #"{"error":"Invalid request — please check your submission and try again"}"#)
         }
         var shopName = "this shop"
@@ -1284,7 +1284,7 @@ final class LanServer {
         var parsed: [String: JSONValue] = [:]
         let trimmed = String(decoding: request.body, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
-            guard let body = try? JSONValue.decode(JSONValue.self, from: request.body), case .object(let o) = body else {
+            guard let body = Self.body(request.body), case .object(let o) = body else {
                 return .json(400, #"{"error":"Invalid JSON"}"#)
             }
             parsed = o
@@ -1385,7 +1385,7 @@ final class LanServer {
         guard await rateStep(\.surveys, request, now: now, limit: limit) else {
             return .open(429, #"{"error":"Too many attempts — try again later"}"#)
         }
-        guard let body = try? JSONValue.decode(JSONValue.self, from: request.body), case .object = body else {
+        guard let body = Self.body(request.body), case .object = body else {
             return .open(400, #"{"error":"Invalid request"}"#)
         }
         guard let check = try? await engine.lanSurveyCheck(body: body) else {
@@ -1690,7 +1690,7 @@ final class LanServer {
             // asking.
             return .json(405, #"{"error":"This Mac does not take changes from a phone."}"#)
         }
-        guard let body = try? JSONValue.decode(JSONValue.self, from: request.body),
+        guard let body = Self.body(request.body),
               case .object(let payload) = body else {
             return .json(400, #"{"error":"Invalid request"}"#)
         }
@@ -1740,6 +1740,54 @@ final class LanServer {
             // again — which is why it must not read this as "delivered".
             return .json(500, #"{"error":"The change could not be written to the book."}"#)
         }
+    }
+
+    // MARK: - Request bodies
+
+    /// A request's body as JSON, or nil — and nil, without reading it, when it
+    /// nests deeper than any request a phone, a storefront or the order form
+    /// sends.
+    ///
+    /// Past 64 levels the book's reader hands the text to `JSONDecoder`, which
+    /// recurses once per level, and a request is served on a thread with a
+    /// small stack: a few hundred `[` from anyone on the shop's Wi-Fi were a
+    /// crash of the whole app (review of #1861, Oct 2026). The intake and the
+    /// storefront webhooks read their body before any PIN or signature, so
+    /// the depth is counted first, in one pass that recurses on nothing.
+    nonisolated static func body(_ data: Data) -> JSONValue? {
+        guard nesting(data, limit: maxBodyDepth) <= maxBodyDepth else { return nil }
+        return try? JSONValue.decode(JSONValue.self, from: data)
+    }
+
+    /// Deeper than any real request: the phone's deltas are a record inside an
+    /// array inside an object, and a storefront order is a handful of levels.
+    nonisolated static let maxBodyDepth = 32
+
+    /// How deep `data` nests, counting `[` and `{` outside strings. Stops
+    /// counting once it passes `limit`.
+    nonisolated static func nesting(_ data: Data, limit: Int) -> Int {
+        var depth = 0, deepest = 0
+        var inString = false, escaped = false
+        for byte in data {
+            if inString {
+                if escaped { escaped = false }
+                else if byte == UInt8(ascii: "\\") { escaped = true }
+                else if byte == UInt8(ascii: "\"") { inString = false }
+                continue
+            }
+            switch byte {
+            case UInt8(ascii: "\""): inString = true
+            case UInt8(ascii: "["), UInt8(ascii: "{"):
+                depth += 1
+                if depth > deepest {
+                    deepest = depth
+                    if deepest > limit { return deepest }
+                }
+            case UInt8(ascii: "]"), UInt8(ascii: "}"): depth = max(0, depth - 1)
+            default: break
+            }
+        }
+        return deepest
     }
 
     // MARK: - Storefront order webhooks
@@ -1794,7 +1842,7 @@ final class LanServer {
         // exactly as the Node server's `safeJsonParse` hands the rule
         // `undefined`: it is signed, so it IS the storefront, and a row the
         // shop can see beats a delivery silently dropped.
-        let payload = (try? JSONValue.decode(JSONValue.self, from: request.body)) ?? .null
+        let payload = Self.body(request.body) ?? .null
         // The early answer, from the book as it is before any write, so a
         // provider's retry costs nothing. The rule asks again inside the write.
         if (try? await host.engine.storefrontAlreadyRecorded(
@@ -1857,7 +1905,7 @@ final class LanServer {
         if replayed(provided, now: now) {
             return .json(409, #"{"error":"Duplicate delivery ignored"}"#)
         }
-        let payload = (try? JSONValue.decode(JSONValue.self, from: request.body)) ?? .null
+        let payload = Self.body(request.body) ?? .null
         var config: JSONValue = .object([:])
         if case .object(let settings)? = host.store()["settings"], case .object(let shipping)? = settings["shipping"],
            let mine = shipping[carrier] { config = mine }

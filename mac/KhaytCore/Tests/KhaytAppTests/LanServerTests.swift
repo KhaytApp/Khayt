@@ -827,6 +827,32 @@ struct LanServerTests {
         else { Issue.record("no consent record") }
     }
 
+    @Test("a body nested thousands deep is refused, and the Mac keeps serving")
+    func deepBodyIsRefused() async throws {
+        let bench = try await Bench()
+        defer { bench.stop() }
+        let (_, cookie) = try await bench.openForm()
+        // Past 64 levels the reader hands the text to JSONDecoder, which recurses
+        // per level on a request's small stack: this was a crash of the app.
+        let deep = String(repeating: "[", count: 5_000) + String(repeating: "]", count: 5_000)
+        let reply = try await bench.post("/api/intake", json: deep, headers: ["Cookie": cookie])
+        #expect(reply.status == 400, Comment(rawValue: reply.text))
+        #expect(bench.recorded.entries.isEmpty)
+        let alive = try await bench.get("/api/status")
+        #expect(alive.status != 0)
+    }
+
+    @Test("the depth is counted outside strings, and stops counting past the limit")
+    func nestingCount() {
+        #expect(LanServer.nesting(Data(#"{"a":[1,{"b":2}]}"#.utf8), limit: 32) == 3)
+        #expect(LanServer.nesting(Data(#"{"a":"[[[[{{{{"}"#.utf8), limit: 32) == 1)
+        #expect(LanServer.nesting(Data(#"{"a":"\"[[[["}"#.utf8), limit: 32) == 1)
+        let deep = Data((String(repeating: "[", count: 100) + String(repeating: "]", count: 100)).utf8)
+        #expect(LanServer.nesting(deep, limit: 32) == 33)
+        #expect(LanServer.body(deep) == nil)
+        #expect(LanServer.body(Data(#"{"ok":true}"#.utf8)) == .object(["ok": .bool(true)]))
+    }
+
     @Test("without a session or the intake token a submission is refused; with the token it is taken")
     func intakeGate() async throws {
         let bench = try await Bench(intakeToken: "tok-9")
