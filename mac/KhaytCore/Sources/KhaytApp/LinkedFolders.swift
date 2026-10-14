@@ -176,7 +176,7 @@ extension Shop {
                 })
         }
         // Reloaded only when something above wrote to the book.
-        if await reloadIfWritten(since: bookAt) { bookAt = Self.bookStamp(build.storeURL) }
+        await reloadIfWritten(since: &bookAt)
 
         // INDEXED FIRST, REFINED AFTER: the library is already filed by the
         // heuristic and on screen; the assistant (when the shop turned it on)
@@ -191,8 +191,10 @@ extension Shop {
                 // Shop's copy of its settings: read them back first, or the
                 // plan is the one before them and nothing is regrouped until
                 // the next scan (review of #1844; the preview already did).
-                await load(source)
+                // Stamped BEFORE the load: a write landing while it decodes
+                // is still seen by the check at the end.
                 bookAt = Self.bookStamp(build.storeURL)
+                await load(source)
                 plans = await PinWork.run { [settingsDict] in
                     walked.map { Shop.sortedPlan(root: $0.root, models: $0.models, images: $0.images,
                                                  settings: settingsDict, births: $0.plan.births) }
@@ -211,7 +213,7 @@ extension Shop {
         }
         // What is remembered about pictures and folders that are gone, let go.
         if !stopped() { await prunePictureMaps(plans) }
-        await reloadIfWritten(since: bookAt)
+        await reloadIfWritten(since: &bookAt)
 
         var lines: [String] = []
         if report.stopped || stopped() {
@@ -245,9 +247,18 @@ extension Shop {
     /// decodes the whole book and works out every screen's figures again,
     /// and a scan that found nothing new has no reason to pay for that.
     /// Returns whether it reloaded.
+    ///
+    /// `stamp` moves to the book as it was just BEFORE the load: a write that
+    /// lands while the load decodes (a sync, a LAN fold, the scan's own next
+    /// step) then still differs at the next check. Stamped after the load,
+    /// that write was taken for one already on screen and skipped (review of
+    /// #1860).
     @discardableResult
-    func reloadIfWritten(since stamp: String?) async -> Bool {
-        guard let build = source.build, Self.bookStamp(build.storeURL) != stamp else { return false }
+    func reloadIfWritten(since stamp: inout String?) async -> Bool {
+        guard let build = source.build else { return false }
+        let now = Self.bookStamp(build.storeURL)
+        guard now != stamp else { return false }
+        stamp = now
         await load(source)
         return true
     }

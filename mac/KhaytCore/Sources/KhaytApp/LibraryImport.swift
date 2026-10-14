@@ -280,6 +280,16 @@ enum LibraryImport {
             rows.insert(contentsOf: records, at: 0)
             root["printFiles"] = .array(rows)
         }
+        // The vault folder of a model indexed ONLINE is made only now that
+        // its record is in the book (`prepareOnline` leaves it). A batch is
+        // held for the whole of a drive kept online, so a quit, a crash or a
+        // force-quit before its write left one empty `PF-…` folder per model
+        // in the library — thousands, every launch the scan was cut short
+        // (review of #1860). A folder that is already there is left alone.
+        let dirs = made.map(\.dir)
+        await PinWork.run {
+            for dir in dirs { try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
+        }
     }
 
     /// Everything an import does short of writing the record: hashed,
@@ -447,9 +457,10 @@ enum LibraryImport {
         let id = fixedId ?? Shop.uid("PF")
         // The record's vault folder, as for any linked model: where its
         // picture goes once it has one, and what "on this Mac" is read from.
+        // NOT made here: nothing goes into it until the file is on this Mac,
+        // and `write` makes it once the record is in the book — so a scan
+        // cut short before its batch was written leaves no empty folders.
         let dir = libraryRoot.appending(path: LibraryLocation.itemDirName(id))
-        do { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
-        catch { throw Failure.failed(error.localizedDescription) }
         let name = title.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
             ?? originalName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
         var record = self.record(id: id, name: name, originalName: originalName, filename: originalName,
