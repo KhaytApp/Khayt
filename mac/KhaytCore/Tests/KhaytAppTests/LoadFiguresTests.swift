@@ -120,6 +120,36 @@ struct LoadFiguresTests {
         #expect(stale.allSatisfy { new.risks[$0.id] == nil })
     }
 
+    @Test("work an overtaken load no longer wants stops between batches")
+    func unwantedWorkStops() async throws {
+        let engine = try KhaytEngine()
+        let given = Self.inputs(FiguresBook.synthesize(models: LoadFigures.batch * 3, logo: false))
+        var asked = 0
+        let answer = await LoadFigures.work(given, engine: engine, wanted: {
+            asked += 1
+            return asked < 2
+        })
+        #expect(answer == nil)
+        // Asked after the Swift figures, then after the first batch — and
+        // not a third time, because it had already stopped.
+        #expect(asked == 2)
+    }
+
+    @Test("no engine, no figures — as when every figure went through it")
+    func noEngineNoFigures() async throws {
+        let given = Self.inputs(FiguresBook.synthesize(models: 50, logo: false))
+        let answer = await LoadFigures.work(given, engine: nil, wanted: { true })
+        let figures = try #require(answer)
+        #expect(figures.fits.isEmpty && figures.estimates.isEmpty)
+        #expect(figures.licences.isEmpty && figures.risks.isEmpty)
+    }
+}
+
+/// The two that open a book live in the one serialised suite that sets the
+/// test support folder (`StoreReader.Build.supportFolderForTests`): it is a
+/// single global, and two suites setting it at once open each other's books.
+extension LibraryEditPerfTests {
+
     @Test("a load puts up exactly the per-model figures")
     func loadEqualsOneAtATime() async throws {
         try await withPerfBook(FiguresBook.synthesize(models: 900, logo: false)) { shop, _ in
@@ -151,29 +181,5 @@ struct LoadFiguresTests {
             #expect(described(shop.fits[file.id]) == described(old.fits[file.id]))
             #expect(shop.risks[file.id] == old.risks[file.id])
         }
-    }
-
-    @Test("work an overtaken load no longer wants stops between batches")
-    func unwantedWorkStops() async throws {
-        let engine = try KhaytEngine()
-        let given = Self.inputs(FiguresBook.synthesize(models: LoadFigures.batch * 3, logo: false))
-        var asked = 0
-        let answer = await LoadFigures.work(given, engine: engine, wanted: {
-            asked += 1
-            return asked < 2
-        })
-        #expect(answer == nil)
-        // Asked after the Swift figures, then after the first batch — and
-        // not a third time, because it had already stopped.
-        #expect(asked == 2)
-    }
-
-    @Test("no engine, no figures — as when every figure went through it")
-    func noEngineNoFigures() async throws {
-        let given = Self.inputs(FiguresBook.synthesize(models: 50, logo: false))
-        let answer = await LoadFigures.work(given, engine: nil, wanted: { true })
-        let figures = try #require(answer)
-        #expect(figures.fits.isEmpty && figures.estimates.isEmpty)
-        #expect(figures.licences.isEmpty && figures.risks.isEmpty)
     }
 }
