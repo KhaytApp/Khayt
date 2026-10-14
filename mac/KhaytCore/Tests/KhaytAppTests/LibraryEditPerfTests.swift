@@ -290,14 +290,12 @@ struct LibraryEditPerfTests {
         try await withPerfBook(PerfBook.synthesize(models: 20)) { shop, url in
             let file = try #require(shop.files.first { !$0.isFavourite })
             // Hold the write chain, so the edit's write waits behind it.
-            let release = DispatchSemaphore(value: 0)
             await withCheckedContinuation { (held: CheckedContinuation<Void, Never>) in
                 DispatchQueue.global().async {
-                    StoreWriter.serialised { held.resume(); release.wait() }
+                    StoreWriter.serialised { held.resume(); Thread.sleep(forTimeInterval: 0.15) }
                 }
             }
             shop.toggleFavourite(file)
-            DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(150)) { release.signal() }
             // Between the reload's read and its use of it, the edit lands and
             // is put on screen.
             Shop.afterBookReadForTests = {

@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import KhaytCore
+import os
 @testable import KhaytApp
 
 /// Moving a job is the most consequential write this app makes.
@@ -798,10 +799,10 @@ struct MoveJobOnDiskTests {
         // Ours for the read, somebody else's by the time the swap comes round —
         // which is the window the second ownership check exists to close, and
         // it is a JavaScript call wide now rather than a serialisation.
-        var asked = 0
+        let asked = OSAllocatedUnfairLock(initialState: 0)   // `owns` runs on the write chain
         await #expect(throws: StoreWriter.Refusal.self) {
             try await StoreWriter.update(storeURL: url,
-                                         owns: { asked += 1; return asked == 1 },
+                                         owns: { asked.withLock { $0 += 1; return $0 == 1 } },
                                          whoHasIt: { "Khayt on this Mac" }) { root in
                 _ = try await Shop.applyMove(to: &root, id: "J1", stage: .completed,
                                              engine: engine, words: words)

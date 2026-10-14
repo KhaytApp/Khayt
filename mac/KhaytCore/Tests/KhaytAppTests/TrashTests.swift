@@ -63,7 +63,7 @@ struct TrashTests {
         guard let at = source.range(of: "func deleteLibraryFiles(") else {
             Issue.record("deleteLibraryFiles is gone"); return
         }
-        let body = String(source[at.lowerBound...].prefix(1600))
+        let body = String(source[at.lowerBound...].prefix(6000))   // the book is written first now
         #expect(body.contains("Self.trash(url)"), "a deleted model is gone for good again")
         #expect(!body.contains("FileManager.default.removeItem(at: url)"),
                 "the permanent delete is back beside the recoverable one")

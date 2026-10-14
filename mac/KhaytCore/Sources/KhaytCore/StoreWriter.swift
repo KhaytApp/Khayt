@@ -148,8 +148,8 @@ public enum StoreWriter {
     /// closures across an isolation boundary they have no reason to cross.
     @MainActor
     public static func update(storeURL url: URL,
-                       owns: () -> Bool,
-                       whoHasIt: () -> String?,
+                       owns: @Sendable () -> Bool,
+                       whoHasIt: @Sendable () -> String?,
                        recordingDeletes: Bool = true,
                        mutate: (inout [String: JSONValue]) async throws -> Void) async throws {
         guard owns() else {
@@ -201,13 +201,25 @@ public enum StoreWriter {
             // Moved while we were away: start again from what is there now.
             // The compare and the swap inside the chain, so a write running
             // off the main thread (`updateOffMain`) cannot land between them.
-            let swapped: Bool = try serialised {
-                if (try? Data(contentsOf: url)) != data { return false }
-                guard owns() else {
-                    throw Refusal.notOurs(whoHasIt() ?? "Another app took the book")
+            // ON the chain, but never waited for ON the main thread:
+            // `serialised` here held the window frozen for as long as a scan's
+            // whole-book write was ahead of it on the chain. `owns` and
+            // `whoHasIt` are `@Sendable` for this — they read the lock file,
+            // never the caller's state — so the last ownership check still
+            // sits right before the swap.
+            // Not escaping in fact: this waits for the chain to finish with
+            // them before it returns.
+            let swapped: Bool = try await withoutActuallyEscaping(owns) { owns in
+                try await withoutActuallyEscaping(whoHasIt) { whoHasIt in
+                    try await onChain {
+                        if (try? Data(contentsOf: url)) != data { return false }
+                        guard owns() else {
+                            throw Refusal.notOurs(whoHasIt() ?? "Another app took the book")
+                        }
+                        try atomicWrite(next, to: url)
+                        return true
+                    }
                 }
-                try atomicWrite(next, to: url)
-                return true
             }
             if !swapped { continue }
             return
@@ -244,8 +256,8 @@ public enum StoreWriter {
     /// the outer `mutate` instead. Debug builds stop on it
     /// (`readModifyWrite`).
     static let chain = DispatchQueue(label: "khayt.store-write-chain", qos: .userInitiated)
-    private static let onChain = DispatchSpecificKey<Bool>()
-    private static let chainKeyed: Void = { chain.setSpecific(key: onChain, value: true) }()
+    private static let onChainKey = DispatchSpecificKey<Bool>()
+    private static let chainKeyed: Void = { chain.setSpecific(key: onChainKey, value: true) }()
 
     /// Blocking work off the caller's thread — a dispatch queue and a
     /// continuation, never the cooperative pool (see `updateOffMain`).
@@ -261,8 +273,23 @@ public enum StoreWriter {
     /// write from inside a write (see `chain`): a nested write is lost.
     public static func serialised<T>(_ work: () throws -> T) rethrows -> T {
         _ = chainKeyed
-        if DispatchQueue.getSpecific(key: onChain) == true { return try work() }
+        if DispatchQueue.getSpecific(key: onChainKey) == true { return try work() }
         return try chain.sync(execute: work)
+    }
+
+    /// Run `work` on the write chain and wait for it WITHOUT holding the
+    /// caller's thread: a dispatch queue and a continuation, resumed once.
+    ///
+    /// Not a lease the main thread holds while it runs `work` itself: the
+    /// main thread can be inside `chain.sync` (any synchronous `update`)
+    /// behind such a lease, waiting for a chain that waits for it.
+    static func onChain<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        _ = chainKeyed
+        return try await withCheckedThrowingContinuation { done in
+            chain.async {
+                do { done.resume(returning: try work()) } catch { done.resume(throwing: error) }
+            }
+        }
     }
 
     /// The same read-modify-write as `update`, done on the write chain WITHOUT
