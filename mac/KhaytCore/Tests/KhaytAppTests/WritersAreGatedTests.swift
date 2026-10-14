@@ -31,7 +31,7 @@ struct WritersAreGatedTests {
     // MARK: - What counts
 
     static let writes = ["StoreWriter.update(", "StoreWriter.updateRecord(", "StoreWriter.atomicWrite(",
-                         "StoreWriter.updateOffMain("]
+                         "StoreWriter.updateOffMain(", "StoreWriter.updateRecordOffMain("]
     /// What reaches outside the book: a printer, a plug, the web store, the
     /// library's files, the outgoing mail, a restore over the book.
     static let effects = ["PrinterControl.", "PrinterSend.send", "SmartPlug.send",
