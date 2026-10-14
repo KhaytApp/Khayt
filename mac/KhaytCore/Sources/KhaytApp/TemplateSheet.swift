@@ -31,6 +31,10 @@ struct TemplateSheet: View {
     /// The default words last put in the box, so they can be swapped for
     /// another milestone's without asking — they are not the shop's edit.
     @State private var defaults = ""
+    /// A save or delete is on its way to the book. The write no longer holds
+    /// the window, so Save stays clickable while it runs — and a second click
+    /// on a NEW template wrote a second template under another id.
+    @State private var saving = false
 
     private var isNew: Bool { template.id.isEmpty }
 
@@ -107,15 +111,18 @@ struct TemplateSheet: View {
                 Button(shop.words.callIt("common.cancel")) { shop.editingTemplate = nil }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save")) {
+                    guard !saving else { return }
+                    saving = true
                     Task {
                         await shop.saveTemplate(id: isNew ? nil : template.id, name: name, body: message,
                                                 milestone: milestone, lang: milestone.isEmpty ? "" : lang,
                                                 opened: isNew ? nil : template)
+                        saving = false
                         if shop.writeProblem == nil { shop.editingTemplate = nil }
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty
+                .disabled(saving || name.trimmingCharacters(in: .whitespaces).isEmpty
                           || message.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -127,8 +134,11 @@ struct TemplateSheet: View {
                   message: { _ in shop.words.callIt("mac.no_undo") },
                   confirm: shop.words.callIt("common.delete"),
                   cancel: shop.words.callIt("common.cancel")) { chosen in
+            guard !saving else { return }
+            saving = true
             Task {
                 await shop.deleteTemplate(chosen.id)
+                saving = false
                 if shop.writeProblem == nil { shop.editingTemplate = nil }
             }
         }
