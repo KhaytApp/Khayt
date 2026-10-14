@@ -425,11 +425,14 @@ extension Shop {
         guard permitted("inventory", "edit") else { return }
         guard let build = source.build, !path.isEmpty, groupKind(path) != kind else { return }
         do {
-            var covers = GroupCoverChange()
-            try StoreWriter.update(build) { root in
+            // On the write chain: a whole book written on the main thread
+            // froze the window for seconds at 10,000 models.
+            let covers = try await StoreWriter.updateOffMain(build) { root -> GroupCoverChange in
+                var covers = GroupCoverChange()
                 covers.before = GroupKinds.covers(Self.settings(root))
                 GroupKinds.write([path: kind], into: &root)
                 covers.after = GroupKinds.covers(Self.settings(root))
+                return covers
             }
             writeProblem = nil
             settleGroupPictures(covers)
@@ -676,7 +679,7 @@ extension Shop {
         guard permitted("inventory", "edit") else { return false }
         guard let build = source.build, !ids.isEmpty else { return false }
         writeProblem = nil
-        let base = libraryRows
+        let base = libraryBase()
         let pending = beginLibraryChange(ids, change: change)
         // The write, and what Undo needs from it. Started now and registered
         // now, so the undo stack holds this edit in the order it was made —
@@ -748,8 +751,9 @@ extension Shop {
 
     /// An Undo's write, on the write chain. Returns what Redo needs.
     private func restoreWritten(_ snapshot: LibraryUndo, build: StoreReader.Build) async -> LibraryUndo? {
+        guard permitted("inventory", "edit") else { return nil }
         let ids = Set(snapshot.files.keys)
-        let base = libraryRows
+        let base = libraryBase()
         do {
             let (redo, covers, library) = try await StoreWriter.updateOffMain(build) { root in
                 let before = Self.rows(root, "printFiles")
@@ -1242,7 +1246,7 @@ extension Shop {
         guard let build = source.build else { return }
         let now = ISO8601DateFormatter().string(from: Date())
         do {
-            try StoreWriter.updateRecord(build, collection: "printFiles", id: original.id) { record in
+            try await StoreWriter.updateRecordOffMain(build, collection: "printFiles", id: original.id) { record in
                 record["archivedAt"] = .string(now)
                 record["supersededBy"] = .string(replacement)
             }
@@ -1261,7 +1265,7 @@ extension Shop {
         guard permitted("inventory", "edit") else { return }
         guard let build = source.build else { return }
         do {
-            try StoreWriter.updateRecord(build, collection: "printFiles", id: file.id) { record in
+            try await StoreWriter.updateRecordOffMain(build, collection: "printFiles", id: file.id) { record in
                 record.removeValue(forKey: "archivedAt")
                 record.removeValue(forKey: "supersededBy")
             }

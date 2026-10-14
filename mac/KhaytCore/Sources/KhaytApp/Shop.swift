@@ -45,9 +45,12 @@ final class Shop {
 
     private(set) var source: Source
     private(set) var orders: [Order] = []
-    // Settable from `Shop+LibraryWrites.swift`, which patches a library edit
-    // in place rather than reloading the whole book.
-    internal(set) var files: [LibraryFile] = []
+    private(set) var files: [LibraryFile] = []
+
+    /// The library on screen, patched in place by a library edit
+    /// (`Shop+LibraryWrites.swift`) rather than by reloading the whole book.
+    /// Only ever the book's own records: a put-aside model stays in here.
+    func showLibraryFiles(_ next: [LibraryFile]) { files = next }
 
     /// Show the models that have been put aside. Off: they are still there.
     var libraryShowArchived = false {
@@ -554,6 +557,10 @@ final class Shop {
     /// Library edits on screen and not yet written (`Shop+LibraryWrites`).
     @ObservationIgnored var pendingLibraryChanges: [PendingLibraryChange] = []
     @ObservationIgnored var pendingLibraryToken = 0
+    /// The latest library write on screen (`LibraryWritten.sequence`).
+    @ObservationIgnored var libraryShownSequence = 0
+    /// The library as that write left it, before any pending edit is drawn.
+    @ObservationIgnored var libraryShownRows: [JSONValue] = []
     /// Library writes started and not yet waited for (`settleLibraryWrites`).
     @ObservationIgnored var libraryWrites: [Int: Task<LibraryUndo?, Never>] = [:]
     var now: Date { clock ?? Date() }
@@ -834,6 +841,7 @@ final class Shop {
             if case .array(let rows)? = root["printFiles"] { libraryRows = rows } else { libraryRows = [] }
             // A library edit still being written stays on screen as asked,
             // not as the book held it a moment before (`Shop+LibraryWrites`).
+            libraryShownRows = libraryRows
             reapplyPendingLibraryChanges()
             await readLibraryFacets()
             // And the names those chips can be filed under, which is the whole

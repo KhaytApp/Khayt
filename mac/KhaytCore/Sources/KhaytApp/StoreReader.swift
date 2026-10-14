@@ -1,6 +1,7 @@
 import Foundation
 import KhaytCore
 import Security
+import os
 
 /// Opens a Khayt store for reading. It has no code that writes.
 ///
@@ -53,22 +54,31 @@ public struct StoreReader: Sendable {
         case shipped = "Khayt"
 
         public var storeURL: URL {
-            Self.supportFolder.appending(path: "\(rawValue)/khayt-store.json")
+            supportFolder.appending(path: "\(rawValue)/khayt-store.json")
         }
 
-        /// `~/Library/Application Support`, unless a test moved it.
-        public static var supportFolder: URL {
-            supportFolderForTests ?? FileManager.default.homeDirectoryForCurrentUser
+        /// `~/Library/Application Support`, unless a test moved this build's.
+        public var supportFolder: URL {
+            Self.supportFolderForTests[self] ?? FileManager.default.homeDirectoryForCurrentUser
                 .appending(path: "Library/Application Support")
         }
 
-        /// TESTS ONLY: open a book from a temp folder instead of the shop's.
+        /// TESTS ONLY: open one build's book from a temp folder instead of the
+        /// shop's.
         ///
         /// Nothing could load a real-sized book through `Shop.load(.store)`
         /// without pointing it at the live one, so the library's write paths
         /// were never timed at the size a shop keeps (`LibraryEditPerfTests`).
-        /// Set and cleared by one serialised suite; nothing in the app sets it.
-        nonisolated(unsafe) public static var supportFolderForTests: URL?
+        /// Per build, so the suite that moves `.shipped` cannot move the
+        /// `.development` paths other tests read at the same time. Set and
+        /// cleared by that one serialised suite; nothing in the app sets it.
+        public static var supportFolderForTests: [Build: URL] {
+            get { testFolders.withLock { $0 } }
+            set { testFolders.withLock { $0 = newValue } }
+        }
+        // Locked: every path in the app reads it, from any thread, while the
+        // one suite that sets it runs beside the others.
+        private static let testFolders = OSAllocatedUnfairLock<[Build: URL]>(initialState: [:])
         public var keychainService: String { "\(rawValue) Safe Storage" }
 
         /// The other build, whose Keychain item may hold the key to a field in

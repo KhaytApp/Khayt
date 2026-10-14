@@ -72,7 +72,7 @@ enum PerfBook {
         let folder = support.appending(path: StoreReader.Build.shipped.rawValue)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try JSONEncoder().encode(root).write(to: folder.appending(path: "khayt-store.json"))
-        StoreReader.Build.supportFolderForTests = support
+        StoreReader.Build.supportFolderForTests[.shipped] = support
         return support
     }
 }
@@ -137,7 +137,7 @@ func withPerfBook(_ root: [String: JSONValue],
     }
     await shop.settleLibraryWrites()
     await shop.load(.sample)
-    StoreReader.Build.supportFolderForTests = nil
+    StoreReader.Build.supportFolderForTests[.shipped] = nil
     UserDefaults.standard.set(spotlight, forKey: Spotlight.defaultsKey)
     try? FileManager.default.removeItem(at: support)
 }
@@ -256,6 +256,30 @@ struct LibraryEditPerfTests {
         }
     }
 
+    @Test("edits made faster than they are written all land, and stay on screen")
+    func quickEditsInARow() async throws {
+        try await withPerfBook(PerfBook.synthesize(models: 30)) { shop, url in
+            let chosen = Array(shop.files.filter { !$0.isFavourite }.prefix(4))
+            for file in chosen { shop.toggleFavourite(file) }
+            // A delete queued behind them, of a model none of them touched.
+            let doomed = shop.files[20]
+            await shop.deleteLibraryFiles([doomed])
+            await shop.settleLibraryWrites()
+            let ids = Set(chosen.map(\.id))
+            var starredOnDisk = 0
+            for case .object(let o) in try diskRows(url) where ids.contains(Shop.recordId(.object(o)) ?? "") {
+                if o["favorite"] == .bool(true) { starredOnDisk += 1 }
+            }
+            #expect(starredOnDisk == 4, "an edit was lost behind another")
+            let starredOnScreen = shop.files.filter { ids.contains($0.id) && $0.isFavourite }.count
+            #expect(starredOnScreen == 4)
+            let onDisk = try diskIds(url)
+            #expect(!onDisk.contains(doomed.id))
+            let written = try diskRows(url)
+            #expect(shop.libraryRows == written, "the screen and the book disagree")
+        }
+    }
+
     @Test("a delete that cannot be written puts the models back on screen")
     func failedDeleteComesBack() async throws {
         try await withPerfBook(PerfBook.synthesize(models: 20)) { shop, url in
@@ -304,7 +328,7 @@ struct LibraryEditPerfTests {
         UserDefaults.standard.set(false, forKey: Spotlight.defaultsKey)
         let shop = Shop()
         defer {
-            StoreReader.Build.supportFolderForTests = nil
+            StoreReader.Build.supportFolderForTests[.shipped] = nil
             UserDefaults.standard.set(spotlight, forKey: Spotlight.defaultsKey)
             try? FileManager.default.removeItem(at: support)
         }

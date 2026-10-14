@@ -1,5 +1,6 @@
 import Foundation
 import KhaytCore
+import os
 
 /// What a library write hands back from inside the write chain: the library
 /// as it now sits in the book, read there rather than reloaded afterwards.
@@ -14,6 +15,20 @@ struct LibraryWritten: Sendable {
     /// (the other app, a sync), so patching the touched records alone would
     /// leave the screen describing a book that no longer exists.
     var moved: Bool
+    /// Where this write came on the write chain. Writes land in order, but
+    /// the main thread can hear about them out of order — and a write heard
+    /// late must not put an older library back on screen.
+    var sequence: Int
+
+    /// Counted inside the chain, so the order is the order they were written.
+    static let written = OSAllocatedUnfairLock(initialState: 0)
+    static func next() -> Int { written.withLock { $0 += 1; return $0 } }
+}
+
+/// The library a write compares the book against (`Shop.libraryBase`).
+struct LibraryBase: Sendable {
+    var rows: [JSONValue]
+    var skipping: Set<String>
 }
 
 /// A library edit shown on screen whose write has not landed yet. `change`
@@ -50,6 +65,16 @@ struct PendingLibraryChange {
 /// was written, so the book on disk is still the truth.
 extension Shop {
 
+    /// The library as this app last read it, for a write to compare against:
+    /// the records an edit of this app's own is still changing are left out
+    /// of the comparison, so two quick edits in a row are not mistaken for
+    /// the other app changing the book.
+    func libraryBase() -> LibraryBase {
+        var skipping = Set<String>()
+        for pending in pendingLibraryChanges { skipping.formUnion(pending.ids) }
+        return LibraryBase(rows: libraryRows, skipping: skipping)
+    }
+
     /// The library as written, worked out inside the write — `before` is the
     /// library the write found on disk, `base` the one this app had on
     /// screen before the edit.
@@ -59,21 +84,18 @@ extension Shop {
     /// adds and renames nothing, and an edit stamps its own records
     /// (`applyFileEdit`), so `stampChanged` leaves them as they are.
     nonisolated static func libraryWritten(_ root: [String: JSONValue], touched: Set<String>,
-                                           before: [JSONValue], base: [JSONValue]) -> LibraryWritten {
+                                           before: [JSONValue], base: LibraryBase) -> LibraryWritten {
         let rows = Self.rows(root, "printFiles")
         let settings = root["settings"] ?? .object([:])
-        guard before == base else {
-            return LibraryWritten(rows: rows, settings: settings, changed: [:], moved: true)
+        let skip = base.skipping.union(touched)
+        let others: (JSONValue) -> Bool = { row in !(Self.recordId(row).map(skip.contains) ?? false) }
+        guard before.filter(others) == base.rows.filter(others) else {
+            return LibraryWritten(rows: rows, settings: settings, changed: [:], moved: true,
+                                  sequence: LibraryWritten.next())
         }
-        let encoder = JSONEncoder(), decoder = JSONDecoder()
-        var changed: [String: LibraryFile] = [:]
-        for row in rows {
-            guard let id = Self.recordId(row), touched.contains(id),
-                  let data = try? encoder.encode(row),
-                  let file = try? decoder.decode(LibraryFile.self, from: data) else { continue }
-            changed[id] = file
-        }
-        return LibraryWritten(rows: rows, settings: settings, changed: changed, moved: false)
+        let changed = Self.decoded(touched, in: rows)
+        return LibraryWritten(rows: rows, settings: settings, changed: changed, moved: false,
+                              sequence: LibraryWritten.next())
     }
 
     /// Step 1, remembered until its write lands — so a reload, or an earlier
@@ -102,10 +124,23 @@ extension Shop {
         else { removeFromScreen(pending.ids) }
     }
 
+    /// Those records of `rows`, decoded.
+    nonisolated static func decoded(_ ids: Set<String>, in rows: [JSONValue]) -> [String: LibraryFile] {
+        let encoder = JSONEncoder(), decoder = JSONDecoder()
+        var out: [String: LibraryFile] = [:]
+        for row in rows {
+            guard let id = Self.recordId(row), ids.contains(id),
+                  let data = try? encoder.encode(row),
+                  let file = try? decoder.decode(LibraryFile.self, from: data) else { continue }
+            out[id] = file
+        }
+        return out
+    }
+
     /// Step 1 for a delete: off the screen now.
     func removeFromScreen(_ ids: Set<LibraryFile.ID>) {
         guard !ids.isEmpty else { return }
-        files.removeAll { ids.contains($0.id) }
+        showLibraryFiles(files.filter { !ids.contains($0.id) })
         let keep: (JSONValue) -> Bool = { row in !(Self.recordId(row).map(ids.contains) ?? false) }
         libraryRows = libraryRows.filter(keep)
         fileRows = fileRows.filter(keep)
@@ -138,30 +173,42 @@ extension Shop {
         guard !edited.isEmpty else { return }
         var next = files
         for i in next.indices { if let file = edited[next[i].id] { next[i] = file } }
-        files = next
+        showLibraryFiles(next)
     }
 
     /// Step 3: the book as written, on screen — the touched records only.
     func showLibraryWritten(_ written: LibraryWritten, touched: Set<LibraryFile.ID>) async {
         guard !written.moved else { await load(source); return }
-        libraryRows = written.rows
-        fileRows = written.rows
+        var changed = written.changed
+        if written.sequence > libraryShownSequence {
+            libraryShownSequence = written.sequence
+            libraryShownRows = written.rows
+            libraryRows = written.rows
+            fileRows = written.rows
+            settingsValue = written.settings
+        } else {
+            // A later write is already on screen, and it was written on top
+            // of this one: the touched records are read from THAT, never put
+            // back as this write left them. The rows go back to it too —
+            // this edit was still drawn over them as pending.
+            libraryRows = libraryShownRows
+            fileRows = libraryShownRows
+            changed = Self.decoded(touched, in: libraryShownRows)
+        }
         var next = files
         // Gone from the book: gone from the screen (a delete, or the other
         // app's delete of a model this app had just edited).
-        next.removeAll { touched.contains($0.id) && written.changed[$0.id] == nil }
-        for i in next.indices { if let file = written.changed[next[i].id] { next[i] = file } }
-        files = next
+        next.removeAll { touched.contains($0.id) && changed[$0.id] == nil }
+        for i in next.indices { if let file = changed[next[i].id] { next[i] = file } }
+        showLibraryFiles(next)
         reapplyPendingLibraryChanges()
-        let settings: [String: JSONValue]
-        if case .object(let s) = written.settings { settings = s } else { settings = [:] }
-        settingsValue = written.settings
+        let settings = settingsDict
         libraryGroupKinds = GroupKinds.read(settings)
         libraryGroupCovers = GroupKinds.covers(settings)
 
         // What `load` works out per model, for the touched ones only.
-        let touchedFiles = written.changed.values.sorted { $0.id < $1.id }
-        for id in touched where written.changed[id] == nil {
+        let touchedFiles = changed.values.sorted { $0.id < $1.id }
+        for id in touched where changed[id] == nil {
             fits[id] = nil; estimates[id] = nil; licences[id] = nil; risks[id] = nil
         }
         if !touchedFiles.isEmpty {

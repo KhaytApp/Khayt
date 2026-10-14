@@ -9,6 +9,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   alpha.69 shipped untried, and moving a job on by itself is deferred until
   after beta.1.
 
+- **Mac: deleting or editing a model no longer freezes a big library.** With
+  ten thousand models, deleting one stopped the window for three to five
+  seconds while the whole book was read and saved, and favouriting, moving to
+  a group, renaming a group or changing a photo stopped it for one to two. The
+  change now shows at once and is saved in the background. If it cannot be
+  saved, the app says so and shows the library as it really is. Opening a big
+  book also no longer freezes the window for several seconds.
+
 - **Mac: a wide picture stays inside its tile in the library.** A model whose
   picture was wider than it was tall drew a tile wider than its column, over
   the print next to it. The picture is now cropped to the square. The same

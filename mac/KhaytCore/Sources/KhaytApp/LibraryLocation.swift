@@ -66,7 +66,7 @@ enum LibraryLocation {
 
     /// The built-in vault — where the library lived when it could only live here.
     static func defaultRoot(for build: StoreReader.Build) -> String {
-        StoreReader.Build.supportFolder
+        build.supportFolder
             .appending(path: "\(build.rawValue)/print-files-vault")
             .path
     }

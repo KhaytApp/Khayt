@@ -798,7 +798,7 @@ extension Shop {
         }
         let ids = Set(files.map(\.id))
         let roots = libraryRoots?.roots ?? []
-        let base = libraryRows
+        let base = libraryBase()
         // Off the screen NOW — see `Shop+LibraryWrites.swift`. Everything
         // below is off the main thread until the book is written.
         let pending = beginLibraryChange(ids, change: nil)
