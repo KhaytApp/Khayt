@@ -64,4 +64,25 @@ extension LibraryEditPerfTests {
             #expect(shop.estimates[model.id]?.grams != nil)
         }
     }
+    @Test("a library edit that lands while a load works out figures keeps its own figures")
+    func editDuringFiguresIsKept() async throws {
+        try await withPerfBook(FiguresBook.synthesize(models: 40, logo: false)) { shop, _ in
+            let model = try #require(shop.files.first { $0.licence == nil && $0.source == nil })
+            #expect(shop.licences[model.id] == nil)
+            Shop.whileFiguringForTests = {
+                Shop.whileFiguringForTests = nil
+                // Marked non-commercial while the load's figures (worked out
+                // from the record before) wait to be put up.
+                shop.fileSelection = [model.id]
+                await shop.fileSelection(licence: "cc-by-nc")
+                await shop.settleLibraryWrites()
+                #expect(shop.licences[model.id]?.sellable == false, "the edit did not put its figure up")
+            }
+            await shop.load(shop.source)
+            Shop.whileFiguringForTests = nil
+            #expect(shop.files.first { $0.id == model.id }?.licence == "cc-by-nc")
+            #expect(shop.licences[model.id]?.sellable == false,
+                    "the load put the older record's licence back over the edit")
+        }
+    }
 }
