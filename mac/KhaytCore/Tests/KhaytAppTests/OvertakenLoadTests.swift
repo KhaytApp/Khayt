@@ -10,9 +10,10 @@ import KhaytCore
 /// on through every await after the newer one had put its book up, and set
 /// what it found in ITS book — the print log, the customers, every model's
 /// fit and licence — over the newer one's.
-@MainActor
-@Suite(.serialized)
-struct OvertakenLoadTests {
+///
+/// In `LibraryEditPerfTests`, the one serialised suite that may set the test
+/// support folder (a single global).
+extension LibraryEditPerfTests {
 
     @Test("an overtaken reload puts none of the older book's jobs, customers or figures back")
     func overtakenLoadPutsNothingBack() async throws {
