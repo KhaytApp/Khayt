@@ -352,9 +352,9 @@ extension Shop {
     }
 
     /// Remember pairings the shop turned down, so they are never offered again.
-    func rejectPictures(_ ids: [String]) {
+    func rejectPictures(_ ids: [String]) async {
         guard let build = source.build, !ids.isEmpty else { return }
         // lock: system — the shop's own answer in the sort sheet.
-        try? StoreWriter.update(build) { root in PictureRejects.add(ids, into: &root) }
+        _ = try? await StoreWriter.updateOffMain(build) { root in PictureRejects.add(ids, into: &root) }
     }
 }

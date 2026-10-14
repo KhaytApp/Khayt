@@ -1045,7 +1045,7 @@ extension Shop {
         if let clientSecret { sealedSecret = clientSecret.isEmpty ? "" : try await Secrets.seal(clientSecret, for: build) }
         var sealedToken: String?
         if let refreshToken { sealedToken = refreshToken.isEmpty ? "" : try await Secrets.seal(refreshToken, for: build) }
-        try StoreWriter.update(build) { root in
+        try await StoreWriter.updateAsync(build) { root in
             var settings = Self.settings(root)
             var library: [String: JSONValue] = [:]
             if case .object(let l)? = settings["printLibrary"] { library = l }
@@ -1181,7 +1181,7 @@ extension Shop {
         // nothing checks them, and it is the remote a shop then disconnects.
         guard await maySwitchRemote(to: remote) else { return }
         do {
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateAsync(build) { root in
                 var settings = Self.settings(root)
                 var library: [String: JSONValue] = [:]
                 if case .object(let l)? = settings["printLibrary"] { library = l }
@@ -1210,7 +1210,7 @@ extension Shop {
         guard let build = source.build else { cloudLibraryProblem = words.callIt("mac.settings_sample"); return }
         do {
             let using = await CloudLibrary.remoteInUse(settingsDict, build: source.build)
-            try StoreWriter.update(build) { root in CloudLibrary.applyOptions(options, using: using, to: &root) }
+            try await StoreWriter.updateAsync(build) { root in CloudLibrary.applyOptions(options, using: using, to: &root) }
             await load(source)
         } catch {
             cloudLibraryProblem = cloudSay(error)
@@ -1271,7 +1271,7 @@ extension Shop {
             catch { cloudLibraryProblem = cloudSay(error); return }
         }
         do {
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateAsync(build) { root in
                 var settings = Self.settings(root)
                 var library: [String: JSONValue] = [:]
                 if case .object(let l)? = settings["printLibrary"] { library = l }

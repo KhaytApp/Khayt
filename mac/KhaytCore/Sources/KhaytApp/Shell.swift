@@ -461,7 +461,7 @@ struct ShellSidebar: View {
                              : shop.words.callIt("prod.paused_banner") + " — " + shop.pauseReason,
                            "pause.circle", Role.lateOnNavy,
                            help: shop.words.callIt("prod.resume"))
-                    .onTapGesture { shop.resumeProduction() }
+                    .onTapGesture { Task { await shop.resumeProduction() } }
             }
             if !shop.skipped.isEmpty {
                 // The app DROPPED data. Whatever else is wrong, a shop should

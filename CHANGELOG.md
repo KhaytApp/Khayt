@@ -11,6 +11,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   signature. A request nested deeper than any real one (32 levels) is now
   refused without being read.
 
+- **Mac: saving no longer freezes the window on a big book.** Saving a
+  setting, a location, a staff member or their time, a supplier, a spool, a
+  customer or a note on one, a product, a gift card, a maintenance task,
+  the web store's settings or the library's cloud storage — and undoing a
+  job move — stopped the window while the whole book was saved. They are now
+  saved in the background, and the window shows the change once it is saved.
+
 - **Mac: things that happen on their own no longer freeze the window.** On a
   big book, the photo and energy reading saved at the end of a print, a
   customer's request over the shop's Wi-Fi, re-measured models, a print-risk

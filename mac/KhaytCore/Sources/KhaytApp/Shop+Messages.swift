@@ -504,7 +504,9 @@ extension Shop {
 
         var undo: [ChangedRecord] = []
         do {
-            try StoreWriter.update(build) { root in
+            // The async update: only this closure runs on the main actor.
+            try await StoreWriter.updateAsync(build) { root in
+                undo = []
                 var rows = Self.rows(root, "products")
                 var record = product.record(keys: keys)
                 for (key, value) in pictureFields { record[key] = value }
@@ -581,7 +583,7 @@ extension Shop {
     /// trailing newline, a milestone this build has no menu item for.
     func saveTemplate(id: String?, name: String, body: String,
                       milestone: String = "", lang: String = "",
-                      opened: MessageTemplate?) {
+                      opened: MessageTemplate?) async {
         writeProblem = nil
         // THE FIELDS BEFORE THE BOOK. What is wrong with the two strings is a
         // fact about the arguments, true whichever book is open, so the answer
@@ -596,7 +598,7 @@ extension Shop {
         // `uid('WATPL')`, the other app's own shape, so a template made here
         // looks like one made there to anything that sorts or dedupes ids.
         let wanted = id ?? Self.uid("WATPL")
-        write(as: .person("settings", "edit")) { root in
+        await write(as: .person("settings", "edit")) { root in
             var rows = Self.rows(root, MessageTemplate.collection)
             // `milestone` and `lang` only when set: the WhatsApp milestone
             // updates read them (`lib/whatsapp-message.js:templateFor`), and a
@@ -626,7 +628,7 @@ extension Shop {
     /// Any other field the stored row carries is kept — a field this app does
     /// not edit is not this app's to drop — and so is any field the shop did
     /// not change, as the book spells it.
-    static func templateRow(id: String, name: String, body: String, milestone: String,
+    nonisolated static func templateRow(id: String, name: String, body: String, milestone: String,
                             lang: String, over was: [String: JSONValue],
                             opened: MessageTemplate?) -> [String: JSONValue] {
         func laid(_ name: String, _ body: String, _ milestone: String,
@@ -648,11 +650,11 @@ extension Shop {
     }
 
     /// Take one off the list. An id nobody has is not an error.
-    func deleteTemplate(_ id: String) {
+    func deleteTemplate(_ id: String) async {
         writeProblem = nil
         guard permitted("settings", "edit") else { return }
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
-        write(as: .person("settings", "edit")) { root in
+        await write(as: .person("settings", "edit")) { root in
             let rows = Self.rows(root, MessageTemplate.collection)
                 .filter { Self.recordId($0) != id }
             root[MessageTemplate.collection] = .array(rows)

@@ -27,6 +27,28 @@ extension StoreWriter {
                    mutate: mutate)
     }
 
+    /// The ASYNC update, by a name no synchronous closure can fall into.
+    ///
+    /// For a change that needs the main actor (a sheet's own rules, the
+    /// app's words): the book is read, decoded, encoded and swapped off the
+    /// main thread and only `mutate` runs here. `try await update(...)` with a
+    /// closure that never awaits compiles to the SYNCHRONOUS update — this
+    /// cannot.
+    ///
+    /// `mutate` may run MORE THAN ONCE: when the book moved while the change
+    /// was being worked out, it is worked out again on the book as it is now.
+    /// Whatever it collects must start empty inside it.
+    @MainActor
+    static func updateAsync(_ build: StoreReader.Build,
+                            recordingDeletes: Bool = true,
+                            mutate: (inout [String: JSONValue]) async throws -> Void) async throws {
+        try await update(storeURL: build.storeURL,
+                         owns: { StoreLock.weOwnIt(build) },
+                         whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
+                         recordingDeletes: recordingDeletes,
+                         mutate: mutate)
+    }
+
     /// The same, on the write chain, without holding the main thread.
     ///
     /// The store's path is taken HERE, on the caller's thread, so the write

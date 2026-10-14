@@ -22,10 +22,10 @@ extension Shop {
         return rows.compactMap { if case .string(let s) = $0, !s.isEmpty { s } else { nil } }
     }
 
-    private func writeLinked(_ paths: [String]) throws {
+    private func writeLinked(_ paths: [String]) async throws {
         guard permitted("settings", "edit") else { throw Shop.MoveRefused(sentence: moveProblem ?? "") }
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
-        try StoreWriter.update(build) { root in
+        try await StoreWriter.updateOffMain(build) { root in
             var settings = Self.settings(root)
             var library: [String: JSONValue] = [:]
             if case .object(let l)? = settings["printLibrary"] { library = l }
@@ -47,7 +47,7 @@ extension Shop {
         }) {
             libraryMoveProblem = words.callIt("mac.linked_not_vault"); return
         }
-        do { try writeLinked(linkedFolders + [path]) }
+        do { try await writeLinked(linkedFolders + [path]) }
         catch { libraryMoveProblem = String(describing: error); return }
         await load(source)
         await rescanLinkedFolders()
@@ -60,9 +60,9 @@ extension Shop {
         libraryMoveProblem = nil
         guard let build = source.build else { return }
         do {
-            try writeLinked(linkedFolders.filter { $0 != path })
+            try await writeLinked(linkedFolders.filter { $0 != path })
             let gone = Set(files.filter { $0.isLinked && LibraryMove.under($0.externalPath ?? "", path) }.map(\.id))
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var rows = Self.rows(root, "printFiles")
                 rows.removeAll { Self.recordId($0).map(gone.contains) ?? false }
                 root["printFiles"] = .array(rows)

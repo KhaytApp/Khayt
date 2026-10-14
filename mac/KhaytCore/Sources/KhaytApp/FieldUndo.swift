@@ -82,7 +82,7 @@ extension Shop {
     /// after-copy is exactly what reached the file. A record already carrying
     /// its after-copy (`write(_:_:changed:before:into:)` fills it in itself)
     /// is left as it is.
-    static func sealUndo(_ undo: inout [ChangedRecord], in root: [String: JSONValue]) {
+    nonisolated static func sealUndo(_ undo: inout [ChangedRecord], in root: [String: JSONValue]) {
         for i in undo.indices where undo[i].now == nil && undo[i].kind != .deleted {
             let id = undo[i].id
             if let row = rows(root, undo[i].collection).first(where: { recordId($0) == id }),
@@ -199,7 +199,7 @@ extension Shop {
     /// material returned through the shared `returnForOrder`, then merged in by
     /// sync — has had its stock settled ALREADY, and the spool's and the
     /// consumables' deltas in the same snapshot are left alone.
-    static func deductionStillStands(_ snapshot: [ChangedRecord],
+    nonisolated static func deductionStillStands(_ snapshot: [ChangedRecord],
                                      in root: [String: JSONValue]) -> Bool {
         let jobs = rows(root, undoJobsCollection)
         for change in snapshot where change.collection == undoJobsCollection && change.kind == .edited {
@@ -215,7 +215,7 @@ extension Shop {
 
     /// Undo a whole change set on a book in memory. Pure, so a test can drive
     /// it with a plain book; `restoreMove` runs it inside the write.
-    static func undoing(_ snapshot: [ChangedRecord],
+    nonisolated static func undoing(_ snapshot: [ChangedRecord],
                         in root: inout [String: JSONValue]) -> UndoOutcome {
         var outcome = UndoOutcome()
         // Collections in the order the action first touched them, so a redo

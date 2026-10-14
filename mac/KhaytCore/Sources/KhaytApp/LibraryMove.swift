@@ -224,7 +224,7 @@ extension Shop {
             // The built-in vault is spelled as blank, as the other app does.
             let next = folder.standardizedFileURL.path == URL(fileURLWithPath: defaultRoot).standardizedFileURL.path
                 ? "" : folder.standardizedFileURL.path
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var settings = Self.settings(root)
                 var library: [String: JSONValue] = [:]
                 if case .object(let l)? = settings["printLibrary"] { library = l }

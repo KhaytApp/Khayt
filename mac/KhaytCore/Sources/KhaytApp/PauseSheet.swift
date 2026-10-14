@@ -38,7 +38,9 @@ struct PauseSheet: View {
     }
 
     private func pause() {
-        shop.pauseProduction(reason: reason)
-        if shop.writeProblem == nil { shop.pausingProduction = false }
+        Task {
+            await shop.pauseProduction(reason: reason)
+            if shop.writeProblem == nil { shop.pausingProduction = false }
+        }
     }
 }

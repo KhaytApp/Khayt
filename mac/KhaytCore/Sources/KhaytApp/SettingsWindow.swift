@@ -380,7 +380,7 @@ struct BusinessPane: View {
                 .confirmationDialog(shop.words.callIt("mac.remove_logo_q"),
                                     isPresented: $askingLogo, titleVisibility: .visible) {
                     Button(shop.words.callIt("set.logo_remove"), role: .destructive) {
-                        shop.clearLogo()
+                        Task { await shop.clearLogo() }
                     }
                     Button(shop.words.callIt("common.cancel"), role: .cancel) {}
                 } message: {
@@ -1560,7 +1560,7 @@ extension Shop {
         guard permitted(LockGate.person("settings", "edit")) else { return }
         guard let build = source.build else { return }
         do {
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 root["settings"] = .object(Self.sharingCustomerNames(on, over: Self.settings(root)))
             }
         } catch {

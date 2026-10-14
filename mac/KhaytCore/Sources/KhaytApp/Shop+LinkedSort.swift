@@ -533,7 +533,7 @@ extension Shop {
                 for row in preview.pictures where ticked.contains(row.id) && !notThis.contains(row.id) {
                     if let plan = preview.plans.first(where: { $0.root == row.root }) { put.append((plan, row.suggestion)) }
                 }
-                rejectPictures(preview.pictures.map(\.id).filter(notThis.contains))
+                await rejectPictures(preview.pictures.map(\.id).filter(notThis.contains))
                 pictures += await putPictures(put, stop: stop)
             }
             // Only pictures applied: say how many went on, not "regrouped: 0".
