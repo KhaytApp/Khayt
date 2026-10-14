@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Maintainers) The Mac's road to beta is up to date.** `mac/BETA.md` marks
+  the `Shop.swift` split done and crash reports live, lists what alpha.66 to
+  alpha.69 shipped untried, and moving a job on by itself is deferred until
+  after beta.1.
+
 - **Mac: a wide picture stays inside its tile in the library.** A model whose
   picture was wider than it was tall drew a tile wider than its column, over
   the print next to it. The picture is now cropped to the square. The same

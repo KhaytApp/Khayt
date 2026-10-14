@@ -1105,6 +1105,7 @@ Moving a job on by itself when its print starts, finishes or is cancelled —
 what the desktop's printer webhook does. The Mac will not serve that webhook
 (decided October 2026), because it polls its printers itself; the move belongs
 at the finish seam in `Shop.printFinished`, from its own polling, opt-in.
+DEFERRED until after 4.0.0-beta.1 (decided 14 October 2026).
 
 THE PARAGRAPH ABOVE IS THE LIST, and `NotYetBuiltTests` reads exactly it — the
 first paragraph of this section and nothing after it. That is the guard, and it
