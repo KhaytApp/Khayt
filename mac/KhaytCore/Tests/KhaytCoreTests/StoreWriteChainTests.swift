@@ -90,7 +90,12 @@ struct StoreWriteChainTests {
                     Thread.sleep(forTimeInterval: 0.2)
                     let main = DispatchSemaphore(value: 0)
                     DispatchQueue.main.async { main.signal() }
-                    answered.set(main.wait(timeout: .now() + 3) == .success)
+                    // Generous on purpose. A main thread stuck in `chain.sync`
+                    // behind this holder never answers, so the bug still
+                    // fails here; a main thread that is merely BUSY (on CI
+                    // the whole suite queues on it) answers late. Three
+                    // seconds failed a correct build on CI (Oct 14 2026).
+                    answered.set(main.wait(timeout: .now() + 120) == .success)
                 }
             }
         }
