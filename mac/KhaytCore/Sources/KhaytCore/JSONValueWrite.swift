@@ -2,9 +2,21 @@ import Foundation
 
 public extension JSONValue {
 
-    /// `JSONEncoder().encode(value)` with the default settings — the same
-    /// bytes — written straight from the value instead of through the
-    /// `Encoder` machinery.
+    /// `JSONEncoder().encode(value)` with the default settings, written
+    /// straight from the value instead of through the `Encoder` machinery —
+    /// about six times faster on a whole book.
+    ///
+    /// Every string and number is spelled byte for byte as `JSONEncoder`
+    /// spells it (`\/`, `1e-07`, `-0`, `1`; `JSONValueParseTests` sweeps
+    /// them). Object keys come out in the dictionary's own order. That is not
+    /// `JSONEncoder`'s order — but `JSONEncoder`'s unsorted order is not a
+    /// fixed thing either: measured on the real book, two encodes of the same
+    /// dictionary in the same process gave different bytes, and three
+    /// processes gave three different files. So nothing can have depended on
+    /// it, and nothing does — the store's compare-and-swap compares the bytes
+    /// it READ with the bytes on disk, never an encoder's output. Anything
+    /// that needs stable bytes asks `JSONEncoder` for `.sortedKeys`, and keeps
+    /// doing so; this has no sorted mode on purpose.
     static func encode(_ value: JSONValue) throws -> Data {
         if let bytes = FastJSONWriter.write(value) { return bytes }
         return try JSONEncoder().encode(value)

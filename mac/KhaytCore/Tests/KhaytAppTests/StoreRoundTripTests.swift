@@ -35,8 +35,9 @@ struct StoreRoundTripTests {
     @Test("a store decoded and re-encoded is the same store, value for value")
     func valuesSurvive() throws {
         let (name, data) = try Self.source()
-        let decoded = try JSONDecoder().decode([String: JSONValue].self, from: data)
-        let reencoded = try JSONEncoder().encode(decoded)
+        // Through the same reader and writer `StoreWriter` uses.
+        let decoded = try JSONValue.decode([String: JSONValue].self, from: data)
+        let reencoded = try JSONValue.encode(decoded)
 
         // Compared through Node, because Node is what has to read this back and
         // it is Node's own idea of equality that matters.
