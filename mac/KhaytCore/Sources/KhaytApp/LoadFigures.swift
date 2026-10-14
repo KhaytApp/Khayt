@@ -99,6 +99,41 @@ enum LoadFigures {
         return out
     }
 
+    /// `worked`, out of `figured`, for a library that is `now` — with the
+    /// figures on screen (`shown`) kept for every model whose record changed
+    /// in between.
+    ///
+    /// A library edit that lands while a load is working (a licence set, a
+    /// model re-measured) puts its own figures up for the models it touched,
+    /// from the newer record (`Shop.showLibraryWritten`). The load's figures
+    /// for those models came from the older record, and putting them up
+    /// would show a model just marked non-commercial as sellable again until
+    /// the next reload. A model the edit is still writing keeps what is shown,
+    /// and its write puts the right figures up when it lands.
+    ///
+    /// Risks are merged by the caller, so a changed model's risk is simply
+    /// left out here: the merge then keeps whatever is shown.
+    static func settle(_ worked: ModelFigures, figured: [LibraryFile], now: [LibraryFile],
+                       shown: ModelFigures) -> ModelFigures {
+        var was: [String: LibraryFile] = [:]
+        for file in figured { was[file.id] = file }
+        var out = worked
+        var present = Set<String>()
+        for file in now {
+            present.insert(file.id)
+            guard was[file.id] != file else { continue }
+            out.fits[file.id] = shown.fits[file.id]
+            out.estimates[file.id] = shown.estimates[file.id]
+            out.licences[file.id] = shown.licences[file.id]
+            out.risks[file.id] = nil
+        }
+        // Gone from the library meanwhile: no figures to put back for it.
+        for id in was.keys where !present.contains(id) {
+            out.fits[id] = nil; out.estimates[id] = nil; out.licences[id] = nil; out.risks[id] = nil
+        }
+        return out
+    }
+
     /// Fits and licences: Swift rules, no engine needed.
     static func native(_ inputs: Inputs) -> ModelFigures {
         var out = ModelFigures()

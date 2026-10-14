@@ -561,6 +561,9 @@ final class Shop {
     /// TESTS ONLY: run once a load has put its models up and is about to do
     /// the seconds of work after — where a newer load can overtake it.
     static var whileLoadingForTests: (@MainActor () async -> Void)?
+    /// TESTS ONLY: run after a load has worked out every model's figures and
+    /// before it puts them up, so a test can land a library edit in that gap.
+    static var whileFiguringForTests: (@MainActor () async -> Void)?
 
     /// Library edits on screen and not yet written (`Shop+LibraryWrites`).
     @ObservationIgnored var pendingLibraryChanges: [PendingLibraryChange] = []
@@ -893,11 +896,20 @@ final class Shop {
             // is still the newest load. Re-judged on every load rather than
             // cached with the verdict, because the nozzle and the plate come
             // from the machines and those change.
-            let figures = await LoadFigures.work(
-                .init(files: files, machines: machineRows, settings: Self.settings(root),
+            let figured = files
+            let worked = await LoadFigures.work(
+                .init(files: figured, machines: machineRows, settings: Self.settings(root),
                       orders: orderRows, nozzle: nozzleForRisk),
                 engine: engine, wanted: { generation == self.loadGeneration })
-            guard let figures, !overtaken() else { return }
+            if let hook = Self.whileFiguringForTests { await hook() }
+            guard let worked, !overtaken() else { return }
+            // A library edit that landed while they were worked out (a licence
+            // set, a model re-measured) has put its own figures up for the
+            // models it touched (`showLibraryWritten`), from the newer record.
+            // Those are kept, never put back as the older record had them.
+            let figures = files == figured ? worked : LoadFigures.settle(
+                worked, figured: figured, now: files,
+                shown: ModelFigures(fits: fits, estimates: estimates, licences: licences, risks: risks))
             fits = figures.fits
             estimates = figures.estimates
             licences = figures.licences
