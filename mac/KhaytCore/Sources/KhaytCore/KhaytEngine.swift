@@ -10,8 +10,17 @@ import Foundation
 /// A `JSContext` must be touched from one thread at a time, so the runtime is
 /// confined to an actor. Calls are cheap — JSON across a boundary in the same
 /// process — and none of them do I/O.
+///
+/// The actor runs on a thread of its own (`EngineThread`): the context is made
+/// there, every call runs there, and JavaScriptCore's own timers fire there —
+/// never on Swift's 512 KB pool threads, and never on the main thread.
 public actor KhaytEngine {
     private let runtime: JSRuntime
+    private let thread: EngineThread
+
+    public nonisolated var unownedExecutor: UnownedSerialExecutor {
+        thread.asUnownedSerialExecutor()
+    }
 
     /// The filament catalogue is 0.9 MB of JSON and a search runs on every
     /// keystroke. It is read into the context once and kept — immutable data
@@ -1015,7 +1024,29 @@ public actor KhaytEngine {
     static let locales = ["en", "ar"]
 
     public init(bundle: Bundle? = nil) throws {
-        runtime = try JSRuntime(modules: Self.modules, locales: Self.locales, bundle: bundle)
+        let thread = EngineThread()
+        self.thread = thread
+        // Made ON the engine's thread, so the VM's timers are scheduled on
+        // that thread's run loop and not on the caller's (the main one).
+        nonisolated(unsafe) let bundle = bundle
+        do {
+            runtime = try thread.sync {
+                try JSRuntime(modules: Self.modules, locales: Self.locales, bundle: bundle)
+            }
+        } catch {
+            thread.stop()
+            throw error
+        }
+    }
+
+    deinit {
+        thread.stop()
+    }
+
+    /// Where engine calls run: on its own thread, never the main one, and with
+    /// the stack it was given. For the test that holds it to that.
+    public func whereItRuns() -> (onItsThread: Bool, isMain: Bool, stackBytes: Int) {
+        (thread.isCurrent, Thread.isMainThread, pthread_get_stacksize_np(pthread_self()))
     }
 
     // MARK: - Telemetry (#1789)
