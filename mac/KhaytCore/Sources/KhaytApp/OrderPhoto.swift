@@ -111,4 +111,20 @@ enum OrderPhoto {
         try write { record in append(Self.record(thumb: made.thumb, filename: name), to: &record) }
         return name
     }
+
+    /// The same, for a write that runs on the write chain without holding
+    /// the main thread (`StoreWriter.updateRecordOffMain`). On the main actor,
+    /// where its caller is: only the write leaves it.
+    @MainActor
+    static func attach(_ made: (thumb: String, full: Data), jobId: String, job: JSONValue?,
+                       folder: URL,
+                       write: (_ change: @escaping @Sendable (inout [String: JSONValue]) -> Void) async throws -> Void,
+                       at: Date = Date()) async throws -> String {
+        let name = filename(orderId: jobId, index: nextIndex(job), at: at)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try made.full.write(to: folder.appending(path: name))
+        let photo = Self.record(thumb: made.thumb, filename: name)
+        try await write { record in append(photo, to: &record) }
+        return name
+    }
 }

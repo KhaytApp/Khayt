@@ -273,7 +273,58 @@ public enum StoreWriter {
     public static func serialised<T>(_ work: () throws -> T) rethrows -> T {
         _ = chainKeyed
         if DispatchQueue.getSpecific(key: onChainKey) == true { return try work() }
+        guard Thread.isMainThread, let watch = MainHold.watch else { return try chain.sync(execute: work) }
+        // The main thread waiting here is a frozen window: the wait for the
+        // chain (a scan's write ahead of it) and the whole read-modify-write.
+        let start = DispatchTime.now().uptimeNanoseconds
+        defer { watch.note(since: start) }
         return try chain.sync(execute: work)
+    }
+
+    /// How long the MAIN THREAD spent inside the writer — waiting for the
+    /// chain and doing a whole-book read-modify-write — while a watch is on.
+    ///
+    /// Timed by the writer, on its own clock, rather than by asking the main
+    /// thread how soon it answers: on CI the main actor is a queue of
+    /// hundreds of tests, so "how late was main" measures them, not this.
+    /// What it measures is exactly the stall a synchronous `update` from the
+    /// main actor causes, so a guard can say "this action held the window
+    /// for no whole-book write" and be right on any machine.
+    ///
+    /// A task-local, so only the work started under `watching` is counted —
+    /// never another test's write on the same main thread — and tasks it
+    /// starts (`Task { … }`) inherit it. Off, it costs one task-local read.
+    public final class MainHold: @unchecked Sendable {
+        public struct Reading: Sendable, Equatable {
+            /// Times the main thread entered the writer.
+            public var count = 0
+            /// The longest of them, and all of them, in milliseconds.
+            public var worstMs = 0.0
+            public var totalMs = 0.0
+        }
+        @TaskLocal static var watch: MainHold?
+
+        private let lock = NSLock()
+        private var held = Reading()
+        public init() {}
+
+        func note(since start: UInt64) {
+            let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
+            lock.withLock {
+                held.count += 1
+                held.worstMs = max(held.worstMs, ms)
+                held.totalMs += ms
+            }
+        }
+
+        /// What has been held so far.
+        public var reading: Reading { lock.withLock { held } }
+
+        /// Run `body` with this watch on.
+        public func watching<T>(_ body: () async throws -> T,
+                                isolation: isolated (any Actor)? = #isolation) async rethrows -> T {
+            try await Self.$watch.withValue(self, operation: body, isolation: isolation)
+        }
     }
 
     /// Run `work` on the write chain and wait for it WITHOUT holding the

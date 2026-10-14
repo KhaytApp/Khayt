@@ -414,7 +414,9 @@ extension Shop {
               !fields.isEmpty else { return }
         do {
             // lock: system — background: a finished print's energy, measured by the meter or camera.
-            try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
+            // On the write chain: a print ending is not a click, and the
+            // window must not stop while the book is written.
+            try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: jobId) { record in
                 for (key, value) in fields { record[key] = value }
             }
             await load(source)
@@ -869,7 +871,7 @@ extension Shop {
         }
 
         await judge(analysis, for: file, engine: engine)
-        store(analysis, for: file.id, hash: file.contentHash)
+        await store(analysis, for: file.id, hash: file.contentHash)
     }
 
     /// Turn a stored or fresh summary into findings, using this shop's numbers.
@@ -925,11 +927,11 @@ extension Shop {
     }
 
     /// Keep the summary on the record so the mesh is walked once, not once a look.
-    private func store(_ analysis: [String: JSONValue], for id: String, hash: String?) {
+    private func store(_ analysis: [String: JSONValue], for id: String, hash: String?) async {
         guard let build = source.build else { return }
         do {
             // lock: system — a file's measured analysis cached on its record; nothing a person typed.
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 Self.edit(&root, ids: [id]) { record in
                     var held: [String: JSONValue] = ["analysis": .object(analysis)]
                     // The hash it was measured from. A record whose file has
@@ -951,7 +953,7 @@ extension Shop {
     }
 
     /// Change some print-file records in place, stamping each.
-    private static func edit(_ root: inout [String: JSONValue], ids: Set<LibraryFile.ID>,
+    nonisolated private static func edit(_ root: inout [String: JSONValue], ids: Set<LibraryFile.ID>,
                              change: (inout [String: JSONValue]) -> Void) {
         guard case .array(var rows)? = root["printFiles"] else { return }
         for i in rows.indices {

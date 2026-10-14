@@ -2534,11 +2534,10 @@ extension Shop {
     func recordIntake(_ entry: JSONValue) async throws {
         guard let build = source.build else { throw CocoaError(.fileWriteNoPermission) }
         // lock: system — a customer's request through the LAN intake form; the intake has its own session and rate limits.
-        try await StoreWriter.update(
-            storeURL: build.storeURL,
-            owns: { StoreLock.weOwnIt(build) },
-            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-        ) { root in
+        // On the write chain. `try await StoreWriter.update(storeURL:…)` with
+        // no `await` inside the closure compiles to the SYNCHRONOUS update,
+        // so a customer on the shop's Wi-Fi froze the window for a whole-book write.
+        try await StoreWriter.updateOffMain(build) { root in
             var list: [JSONValue] = []
             if case .array(let had)? = root["waitingList"] { list = had }
             list.append(entry)
@@ -2652,16 +2651,14 @@ extension Shop {
         // true — the inspector asked only whether the book was writable.
         guard permitted("orders", "edit") else { return nil }
         guard let base = lanURL, let build = source.build else { return nil }
-        var token = ""
+        let token: String
         do {
-            try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
-                if case .string(let had)? = record["quoteApprovalToken"], !had.isEmpty {
-                    token = had
-                } else {
-                    token = LanServer.randomToken(bytes: 16)
-                    record["quoteApprovalToken"] = .string(token)
-                }
-            }
+            token = try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: jobId) { record in
+                if case .string(let had)? = record["quoteApprovalToken"], !had.isEmpty { return had }
+                let minted = LanServer.randomToken(bytes: 16)
+                record["quoteApprovalToken"] = .string(minted)
+                return minted
+            } ?? ""
         } catch { return nil }
         await load(source)
         let id = jobId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? jobId
@@ -2757,16 +2754,14 @@ extension Shop {
         // true — the inspector asked only whether the book was writable.
         guard permitted("orders", "edit") else { return nil }
         guard let base = lanURL, let build = source.build else { return nil }
-        var token = ""
+        let token: String
         do {
-            try StoreWriter.updateRecord(build, collection: "printLog", id: jobId) { record in
-                if case .string(let had)? = record["trackingToken"], !had.isEmpty {
-                    token = had
-                } else {
-                    token = LanServer.randomToken(bytes: 16)
-                    record["trackingToken"] = .string(token)
-                }
-            }
+            token = try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: jobId) { record in
+                if case .string(let had)? = record["trackingToken"], !had.isEmpty { return had }
+                let minted = LanServer.randomToken(bytes: 16)
+                record["trackingToken"] = .string(minted)
+                return minted
+            } ?? ""
         } catch { return nil }
         await load(source)
         let id = jobId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? jobId
@@ -2813,11 +2808,7 @@ extension Shop {
         guard let sealed = try? await Secrets.seal(minted, for: build) else { return "" }
         do {
             // lock: system — the calendar feed's token, minted when the LAN server starts.
-            try await StoreWriter.update(
-                storeURL: build.storeURL,
-                owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-            ) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var settings: [String: JSONValue] = [:]
                 if case .object(let s)? = root["settings"] { settings = s }
                 var lanApi: [String: JSONValue] = [:]
