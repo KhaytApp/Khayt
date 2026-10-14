@@ -14,10 +14,13 @@ extension Shop {
     /// Work the ranking out and put the rate on each catalogue row.
     func readProfitPerHour() async {
         guard let engine else { stampPerHour(nil); return }
+        let ticket = loadGeneration
         let report = try? await engine.profitPerHour(
             products: productRows, orders: orderRows, expenses: expenseRows,
             inventory: inventoryRows, consumables: consumableRows,
             settings: settingsDict, clients: clientRows, language: words.language)
+        // Not over a newer load's answer (`Shop.load`).
+        guard ticket == loadGeneration else { return }
         stampPerHour(report)
     }
 }

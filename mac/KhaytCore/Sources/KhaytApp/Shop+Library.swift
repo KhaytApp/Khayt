@@ -847,31 +847,29 @@ extension Shop {
                             orders: [JSONValue], engine: KhaytEngine?) async
         -> [String: KhaytEngine.MeshEstimate] {
         guard let engine else { return [:] }
+        // THE SURFACE AREA, WHERE THE SHOP HAS ALREADY PAID FOR IT.
+        //
+        // The shell fraction is `area x wallThickness / volume`, and with no
+        // area the estimator keeps a flat assumed constant — honest, and
+        // weaker. The geometry key holds triangles, volume and dimensions
+        // but no area, and measuring every file on every load would mean
+        // reading the whole library.
+        //
+        // But a model the shop has checked for print risks ALREADY has its
+        // area measured and stored. So a mesh that has been walked gets a
+        // real shell fraction, and one that has not keeps the assumption —
+        // and `shellSource` says which, because "a number nobody can
+        // attribute is a number nobody can check". (`LoadFigures.meshInputs`.)
+        //
+        // ONE crossing for all of them, not one per model: each per-model
+        // call carried the whole settings (a megabyte, with the logo) and the
+        // print log across, and learned the rate again (`estimateMeshes`).
+        let meshes = LoadFigures.meshInputs(files)
+        guard !meshes.isEmpty else { return [:] }
+        let answers = (try? await engine.estimateMeshes(meshes.map(\.input), settings: settings,
+                                                       orders: orders)) ?? []
         var out: [String: KhaytEngine.MeshEstimate] = [:]
-        for file in files {
-            guard let mesh = file.mesh, mesh.volumeMm3 > 0 else { continue }
-            // THE SURFACE AREA, WHERE THE SHOP HAS ALREADY PAID FOR IT.
-            //
-            // The shell fraction is `area x wallThickness / volume`, and with no
-            // area the estimator keeps a flat assumed constant — honest, and
-            // weaker. The geometry key holds triangles, volume and dimensions
-            // but no area, and measuring every file on every load would mean
-            // reading the whole library.
-            //
-            // But a model the shop has checked for print risks ALREADY has its
-            // area measured and stored. So a mesh that has been walked gets a
-            // real shell fraction, and one that has not keeps the assumption —
-            // and `shellSource` says which, because "a number nobody can
-            // attribute is a number nobody can check".
-            var area = 0.0
-            if case .number(let a)? = file.riskAnalysis?["totalAreaMm2"], a > 0 { area = a }
-            if let e = try? await engine.estimateMesh(
-                volumeMm3: mesh.volumeMm3, areaMm2: area,
-                bbox: (x: mesh.x, y: mesh.y, z: mesh.z),
-                settings: settings, orders: orders) {
-                out[file.id] = e
-            }
-        }
+        for (k, answer) in answers.enumerated() { if let answer { out[meshes[k].id] = answer } }
         return out
     }
 
@@ -1144,14 +1142,13 @@ extension Shop {
     /// nobody has.
     static func measureFit(_ files: [LibraryFile], machines: [JSONValue],
                            engine: KhaytEngine?) async -> [String: KhaytEngine.Fit] {
-        guard let engine, !machines.isEmpty else { return [:] }
+        guard engine != nil, !machines.isEmpty else { return [:] }
+        // The rule is Swift (`PrintFit`): asked directly, not one engine hop
+        // per model.
         var out: [String: KhaytEngine.Fit] = [:]
         for file in files {
             guard let mesh = file.mesh else { continue }
-            if let fit = try? await engine.bestFit((x: mesh.x, y: mesh.y, z: mesh.z),
-                                                   among: machines) {
-                out[file.id] = fit
-            }
+            out[file.id] = KhaytEngine.fit((x: mesh.x, y: mesh.y, z: mesh.z), among: machines)
         }
         return out
     }

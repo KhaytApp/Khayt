@@ -478,8 +478,13 @@ extension Shop {
     /// model in a context menu that is built while a grid of four hundred draws.
     func readSlicers() async {
         guard let engine else { slicers = []; defaultSlicer = nil; return }
-        slicers = (try? await engine.slicers(settings: settingsDict)) ?? []
-        defaultSlicer = try? await engine.defaultSlicer(settings: settingsDict)
+        let ticket = loadGeneration
+        let listed = (try? await engine.slicers(settings: settingsDict)) ?? []
+        let chosen = try? await engine.defaultSlicer(settings: settingsDict)
+        // Not over a newer load's answer (`Shop.load`).
+        guard ticket == loadGeneration else { return }
+        slicers = listed
+        defaultSlicer = chosen
     }
 
     /// Every slicer this Mac has installed, whether or not the shop has added it.
@@ -869,10 +874,17 @@ extension Shop {
     func readSettingsTables(_ root: [String: JSONValue]) async {
         guard let engine else { return }
         let settings = Self.settings(root)
-        currencies = (try? await engine.currencies()) ?? [:]
-        taxPresets = (try? await engine.taxPresets()) ?? [:]
-        taxProfile = try? await engine.taxProfile(settings: settings)
-        contentLanguages = (try? await engine.contentLanguages(settings: settings)) ?? ["en", "ar"]
+        let ticket = loadGeneration
+        let table = (try? await engine.currencies()) ?? [:]
+        let presets = (try? await engine.taxPresets()) ?? [:]
+        let profile = try? await engine.taxProfile(settings: settings)
+        let languages = (try? await engine.contentLanguages(settings: settings)) ?? ["en", "ar"]
+        // Together, and not over a newer load's answer (`Shop.load`).
+        guard ticket == loadGeneration else { return }
+        currencies = table
+        taxPresets = presets
+        taxProfile = profile
+        contentLanguages = languages
     }
 
     /// What the shared product-pricing rule is handed on a save: the parts,

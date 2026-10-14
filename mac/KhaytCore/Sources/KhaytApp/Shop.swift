@@ -552,7 +552,7 @@ final class Shop {
     /// Which `load` is the latest. A real book is read off the main thread
     /// now, so two loads can be in flight at once — and the one that started
     /// first must not finish last and put the older book on screen.
-    private var loadGeneration = 0
+    private(set) var loadGeneration = 0
 
     /// TESTS ONLY: run between a load's read of the book and its use of it,
     /// so a test can land a library write in exactly that gap. Nothing in
@@ -599,6 +599,18 @@ final class Shop {
         skipped = []
         loadGeneration += 1
         let generation = loadGeneration
+        // ── OVERTAKEN, IT STOPS — AND PUTS NOTHING MORE ON SCREEN ─────────
+        //
+        // A load that a newer one has overtaken used to carry on through
+        // every await below and set what it found there — orders, customers,
+        // fits, licences — from the OLDER book, over what the newer load had
+        // already put up, whichever finished last. So after every await this
+        // asks whether it is still the newest, and an older load stops there:
+        // the newer one is putting up everything, and it read the newer book.
+        // Each figure worked out across an await is held in a local and
+        // assigned only after that check, never assigned and then checked.
+        // (`OvertakenLoadTests`.)
+        func overtaken() -> Bool { generation != loadGeneration }
         do {
             let root: [String: JSONValue]
             var library: (items: [LibraryFile], skipped: [String])?
@@ -688,6 +700,7 @@ final class Shop {
             libraryGroupKinds = GroupKinds.read(Self.settings(root))
             libraryGroupCovers = GroupKinds.covers(Self.settings(root))
             if let hook = Self.whileLoadingForTests { await hook() }
+            if overtaken() { return }
             libraryRoots = next.build.map { build in
                 LibraryLocation.resolveRoots(settings: Self.librarySettings(root),
                                              defaultRoot: LibraryLocation.defaultRoot(for: build))
@@ -728,10 +741,12 @@ final class Shop {
             // right-to-left screen that is wrong.
             if let forced = ProcessInfo.processInfo.environment["KHAYT_LANG"] { wanted = forced }
             await words.load(wanted, engine: engine)
+            if overtaken() { return }
             // A library write that landed during the await above has put the
             // newer settings (group kinds, covers) on screen already.
             if libraryEpoch == readMark { settingsValue = root["settings"] ?? .object([:]) }
             await readFeatures()
+            if overtaken() { return }
             // A shop that has just switched to Simple must not be left looking
             // at a screen that is no longer theirs.
             if shelf == .reports, !has("analytics") { shelf = .dashboard }
@@ -740,13 +755,16 @@ final class Shop {
             lanBook = Self.lanBook(from: root)
             pricingBook = Self.pricingBook(from: root)
             await syncLanServer()
+            if overtaken() { return }
             // AFTER the words, because the name is read in the shop's language.
             // It is `bizEn`/`bizAr`, the fields Khayt's own Settings page
             // writes and every document prints — not `shopName`, which nothing
             // in Khayt writes. Read as `shopName` for six weeks, this shop's
             // invoice would have been issued by "Khayt".
-            shopName = await Self.shopName(from: Self.settings(root), engine: engine,
-                                           language: words.language) ?? next.title(words)
+            let named = await Self.shopName(from: Self.settings(root), engine: engine,
+                                            language: words.language)
+            if overtaken() { return }
+            shopName = named ?? next.title(words)
             if case .array(let shelf)? = root["inventory"] { inventoryRows = shelf } else { inventoryRows = [] }
             // The other shelf: glue, IPA, bags, nozzles. Read raw — the reorder
             // rule reads fields this app has no model for, and picking which of
@@ -772,6 +790,7 @@ final class Shop {
             operatorRows = Self.rows(root, "operators")
             timeEntryRows = Self.rows(root, "timeEntries")
             await refreshLock()
+            if overtaken() { return }
             // What has been ordered and not yet arrived. Read raw for the same
             // reason the consumables are: the rule reads fields this app has no
             // model for, and deciding which of them matter belongs in the rule.
@@ -783,8 +802,10 @@ final class Shop {
             // Orders priced per SPOOL where a per-gram rate was expected — a
             // thousand times the real amount. Report only, and this app could
             // not even say so until now.
-            suspectOrders = (try? await engine?.suspectOrders(purchaseOrderRows,
-                                                             inventory: inventoryRows)) ?? []
+            let suspect = (try? await engine?.suspectOrders(purchaseOrderRows,
+                                                           inventory: inventoryRows)) ?? []
+            if overtaken() { return }
+            suspectOrders = suspect
             if case .array(let saved)? = root["printers"] { presetRows = saved } else { presetRows = [] }
             // The print files as written. `files` above is the decoded model;
             // this is what the setups and versions rules read, which is a wider
@@ -807,15 +828,20 @@ final class Shop {
             // same book forgets nothing (see `webStoreBookRead`).
             let anotherStore = webStoreBookRead(next.build?.storeURL)
             webStoreFollow(products: productRows, settings: Self.settings(root))
-            catalogueRows = (try? await engine?.catalogue(
+            let catalogued = (try? await engine?.catalogue(
                 productRows, language: words.language, settings: Self.settings(root))) ?? []
+            if overtaken() { return }
+            catalogueRows = catalogued
             productCategories = Dictionary(uniqueKeysWithValues: productRows.compactMap { row in
                 guard case .object(let p) = row, case .string(let id)? = p["id"] else { return nil }
                 if case .string(let c)? = p["category"] { return (id, c) }
                 return (id, "")
             })
             await readCatalogueFacets()
-            catalogueLanguages = await Self.catalogueLanguages(Self.settings(root), engine: engine)
+            if overtaken() { return }
+            let languages = await Self.catalogueLanguages(Self.settings(root), engine: engine)
+            if overtaken() { return }
+            catalogueLanguages = languages
             if case .array(let fleet)? = root["machines"] { machineRows = fleet } else { machineRows = [] }
             // Recurring maintenance tasks, written by the Electron app's
             // machine editor. Read here, and written back only when someone
@@ -852,49 +878,69 @@ final class Shop {
                 messageTemplates = MessageTemplate.from(saved)
             } else { messageTemplates = [] }
             clients = Self.decodeClients(root)
-            clientNames = (try? await engine?.customerNames(
+            let names = (try? await engine?.customerNames(
                 clientRows, language: words.language, settings: Self.settings(root))) ?? [:]
+            if overtaken() { return }
+            clientNames = names
             await keepTheDaysBackup()
+            if overtaken() { return }
             expenses = Self.decode(root, "expenses", as: Expense.self)
             giftCards = Self.decode(root, "giftCards", as: GiftCard.self)
-            fits = await Self.measureFit(files, machines: machineRows, engine: engine)
-            // The setting first, then the summaries it governs. Re-judged on
-            // every load rather than cached with the verdict, because the
-            // nozzle and the plate come from the machines and those change.
-            estimates = await Self.priceMeshes(files, settings: Self.settings(root),
-                                               orders: orderRows, engine: engine)
-            riskWhen = try? await engine?.riskWhen(settings: Self.settings(root))
-            await rejudgeStoredRisks()
-            lowSpools = Set(((try? await engine?.lowStock(inventoryRows, settings: settingsDict)) ?? [:])
+            // EVERY MODEL'S FIGURES — which machine it fits, what it would
+            // weigh and take, what its licence permits, what its stored
+            // overhang summary says — in batches, not one engine call per
+            // model (`LoadFigures`), and put up together, once, only if this
+            // is still the newest load. Re-judged on every load rather than
+            // cached with the verdict, because the nozzle and the plate come
+            // from the machines and those change.
+            let figures = await LoadFigures.work(
+                .init(files: files, machines: machineRows, settings: Self.settings(root),
+                      orders: orderRows, nozzle: nozzleForRisk),
+                engine: engine, wanted: { generation == self.loadGeneration })
+            guard let figures, !overtaken() else { return }
+            fits = figures.fits
+            estimates = figures.estimates
+            licences = figures.licences
+            // Merged, as `judge` always did one model at a time: a summary
+            // the rule could not judge keeps the report it had.
+            risks.merge(figures.risks) { _, new in new }
+            let when = try? await engine?.riskWhen(settings: Self.settings(root))
+            if overtaken() { return }
+            riskWhen = when
+            let low = Set(((try? await engine?.lowStock(inventoryRows, settings: settingsDict)) ?? [:])
                 .filter(\.value).keys)
+            if overtaken() { return }
+            lowSpools = low
             await warnAboutLowStock(inventoryRows, settings: Self.settings(root))
-            spoolRunway = (try? await engine?.runway(spools: inventoryRows, orders: orderRows,
-                                                     now: Date())) ?? [:]
-            spoolDryness = (try? await engine?.dryness(spools: inventoryRows, now: Date())) ?? [:]
-            timeline = await Self.project(orders: orders, engine: engine,
-                                          settings: settingsDict, on: day)
+            if overtaken() { return }
+            let runway = (try? await engine?.runway(spools: inventoryRows, orders: orderRows,
+                                                    now: Date())) ?? [:]
+            if overtaken() { return }
+            spoolRunway = runway
+            let dryness = (try? await engine?.dryness(spools: inventoryRows, now: Date())) ?? [:]
+            if overtaken() { return }
+            spoolDryness = dryness
+            let projected = await Self.project(orders: orders, engine: engine,
+                                               settings: settingsDict, on: day)
+            if overtaken() { return }
+            timeline = projected
             // Once per book rather than per right-click: the list is twenty-two
             // fixed entries and a context menu is built while a grid draws.
-            printerProfiles = (try? await engine?.printerProfiles()) ?? []
+            let profiles = (try? await engine?.printerProfiles()) ?? []
+            if overtaken() { return }
+            printerProfiles = profiles
             // What kind each machine is, resolved once per book. Read in view
             // bodies, so a hop into JavaScript per machine per redraw would be
             // a hop for a constant.
-            machineKinds = (try? await engine?.machineKinds(machineRows)) ?? [:]
+            let kinds = (try? await engine?.machineKinds(machineRows)) ?? [:]
+            if overtaken() { return }
+            machineKinds = kinds
             // And what each shelf row is counted in. Same reason: read in view
             // bodies, and a constant per item per redraw is a hop for nothing.
-            inventoryUnits = (try? await engine?.inventoryUnits(
+            let units = (try? await engine?.inventoryUnits(
                 inventoryRows, settings: settingsDict)) ?? [:]
-            // What each model's licence permits, asked once for the library:
-            // the inspector shows it for the selected model and the grid does
-            // not, so a hop per row would be a hop for nothing.
-            var standings: [String: KhaytEngine.Standing] = [:]
-            for file in files where !(file.licence ?? "").isEmpty || !(file.source ?? "").isEmpty {
-                if let standing = try? await engine?.licenceStanding(source: file.source,
-                                                                     licence: file.licence) {
-                    standings[file.id] = standing
-                }
-            }
-            licences = standings
+            if overtaken() { return }
+            inventoryUnits = units
             // The library's own chips, counted once per book for the same
             // reason as everything above it: the grid redraws on every
             // keystroke in the search box, and a hop into JavaScript per chip
@@ -911,9 +957,11 @@ final class Shop {
             libraryShownRows = libraryRows
             reapplyPendingLibraryChanges()
             await readLibraryFacets()
+            if overtaken() { return }
             // And the names those chips can be filed under, which is the whole
             // book rather than what the chips are currently counting.
             await readLibraryNames()
+            if overtaken() { return }
             // The status of each, from the shared rule rather than a Swift
             // comparison of two date strings — asked once for all of them,
             // because the table redraws on every keystroke in the search box.
@@ -925,7 +973,9 @@ final class Shop {
             // Money an old defect took off the book. Asked once per load: the
             // answer changes only when the book does, and the list is walked
             // by a banner that draws on every screen.
-            erasedDeposits = (try? await engine?.erasedDeposits(orders: orderRows)) ?? []
+            let erased = (try? await engine?.erasedDeposits(orders: orderRows)) ?? []
+            if overtaken() { return }
+            erasedDeposits = erased
 
             // AFTER `orderRows`, and that is not tidiness. The rate a
             // reorder figure is built from comes from the jobs, so asking
@@ -937,19 +987,27 @@ final class Shop {
             // three low things may already be on their way, and offering to
             // order them again is how a shelf ends up with four kilos of
             // something a shop uses twice a year.
-            unsettledRows = (try? await engine?.billsOwing(purchaseOrderRows)) ?? []
-            needsOrdering = (try? await engine?.needsOrdering(
+            let owing = (try? await engine?.billsOwing(purchaseOrderRows)) ?? []
+            if overtaken() { return }
+            unsettledRows = owing
+            let toOrder = (try? await engine?.needsOrdering(
                 spools: inventoryRows, consumables: consumableRows, orders: orderRows,
                 purchaseOrders: purchaseOrderRows, settings: settingsDict,
                 now: Date())) ?? []
+            if overtaken() { return }
+            needsOrdering = toOrder
             // What one plate holds, from the packer rather than from a number
             // typed twice in Swift.
-            if let limits = try? await engine?.plateDefaults() {
+            let plate = try? await engine?.plateDefaults()
+            if overtaken() { return }
+            if let limits = plate {
                 batchMaxHours = limits.maxHours
                 batchMaxGrams = limits.maxGrams
             }
-            giftCardStatuses = (try? await engine?.giftCardStatuses(
+            let cardStatuses = (try? await engine?.giftCardStatuses(
                 giftCardRows, today: Self.today())) ?? [:]
+            if overtaken() { return }
+            giftCardStatuses = cardStatuses
             wasteLog = Self.decode(root, "wasteLog", as: WasteEntry.self)
             if case .array(let rows)? = root["expenses"] { expenseRows = rows } else { expenseRows = [] }
             if case .array(let rows)? = root["wasteLog"] { wasteRows = rows } else { wasteRows = [] }
@@ -959,20 +1017,25 @@ final class Shop {
             // is asked for here rather than in the view so that a table
             // redrawing on every keystroke does not cross into JavaScript.
             await readKits(root)
+            if overtaken() { return }
             // Whether the shop has agreed to the assistant drafting a quote.
             // Asked of the shared rule — it reads the master switch, the
             // per-feature answer AND the consent migration, and a Swift copy
             // would be a fourth place for those three to disagree on the one
             // question that decides whether data leaves the building.
             let aiFeatures = (try? await engine?.aiFeatures(settings: Self.settings(root))) ?? []
+            if overtaken() { return }
             aiQuoteAllowed = aiFeatures.first { $0.id == "quote" }?.enabled ?? false
             aiAssistantAllowed = aiFeatures.first { $0.id == "assistant" }?.enabled ?? false
             aiReplyAllowed = aiFeatures.first { $0.id == "reply" }?.enabled ?? false
             aiPriceAllowed = aiFeatures.first { $0.id == "price" }?.enabled ?? false
             aiLibraryAllowed = aiFeatures.first { $0.id == "library" }?.enabled ?? false
             aiPicturesAllowed = aiFeatures.first { $0.id == "pictures" }?.enabled ?? false
-            taxSummary = await describeTax(root["settings"])
+            let tax = await describeTax(root["settings"])
+            if overtaken() { return }
+            taxSummary = tax
             await readSettingsTables(root)
+            if overtaken() { return }
             // What each job still owes is `order-money`'s answer, not a
             // subtraction — a credit note and a gift card both pay an order
             // down, and the title bar, the customers table and the card all
@@ -980,10 +1043,13 @@ final class Shop {
             // order's currency against them, and a book whose rows had not been
             // read yet would price a foreign job against the previous shop's.
             await resolveOwed(root)
+            if overtaken() { return }
             // AFTER the catalogue, the jobs, the expenses and the settings
             // tables: it ranks the first by what the rest say they earned.
             await readProfitPerHour()
+            if overtaken() { return }
             await computeDashboard(root)
+            if overtaken() { return }
             // Ask the machines what they are doing — but never for the sample
             // shop, whose printers are somebody else's addresses on somebody
             // else's network.
@@ -1007,6 +1073,7 @@ final class Shop {
             // Not for the sample, whose cloud belongs to nobody.
             if next.build != nil { startWatchingWebStoreOrders() } else { stopWatchingWebStoreOrders() }
             if next.build != nil { await restoreCloudKey() }
+            if overtaken() { return }
             // After the key: the launch check seals with it. Never for the
             // sample shop, which is not a book anybody wants back.
             if next.build != nil { startOffsiteBackups() } else { stopOffsiteBackups() }
@@ -1034,6 +1101,7 @@ final class Shop {
             // disk — a relaunch does not count as having looked.
             reloadSyncLosses(for: next.build)
             await readSlicers()
+            if overtaken() { return }
             remeasureIfDue()
             createRecurringIfDue()
             readProvenanceIfDue()
@@ -1044,6 +1112,7 @@ final class Shop {
             // write the shop asked to have made for it. After the book has
             // loaded, because it reads what is already on order to decide.
             await autoDraftIfAsked()
+            if overtaken() { return }
             // The library, in this Mac's own search. Compares before it works,
             // so a book that reloads unchanged costs one string comparison —
             // and takes the library back OUT when the sample is opened.
@@ -1054,6 +1123,10 @@ final class Shop {
             // gained a job, moved a machine, or lost the site itself.
             await refreshSiteScope()
         } catch {
+            // An older load's failure is not the newer book's: the newer load
+            // is putting that up, and blanking the screen over it would show
+            // an open book as one that would not open.
+            if overtaken() { return }
             siteScope = nil
             orders = []
             files = []
@@ -1098,13 +1171,16 @@ final class Shop {
     /// for it on every redraw otherwise.
     private func resolveOwed(_ root: [String: JSONValue]) async {
         guard let engine else { return }
+        // Only `load` asks, and an answer about a book a newer load has
+        // replaced is dropped rather than painted onto the newer rows.
+        let ticket = loadGeneration
         let rows: [JSONValue]
         if case .array(let jobs)? = root["printLog"] { rows = jobs } else { rows = [] }
         let clients: [JSONValue]
         if case .array(let people)? = root["clients"] { clients = people } else { clients = [] }
         guard let owed = try? await engine.owedByOrder(
             rows, settings: Self.settings(root), clients: clients,
-            currencies: Invoice.currencyTable(self)) else { return }
+            currencies: Invoice.currencyTable(self)), ticket == loadGeneration else { return }
         for i in orders.indices {
             if let amount = owed[orders[i].id] { orders[i].owedResolved = amount }
         }
@@ -1114,8 +1190,9 @@ final class Shop {
         // And each job's figures in its OWN currency, for the rows that print
         // money beside the job's currency mark — owed, billed, and the price
         // net of tax a margin is worked on. Same crossing pattern: once a load.
-        if let figures = try? await engine.orderFigures(
-            rows, settings: Self.settings(root), clients: clients) {
+        let figures = try? await engine.orderFigures(rows, settings: Self.settings(root), clients: clients)
+        guard ticket == loadGeneration else { return }
+        if let figures {
             for i in orders.indices { orders[i].figures = figures[orders[i].id] }
         }
         await resolveLate(root)
@@ -1127,12 +1204,13 @@ final class Shop {
     /// and the count stop being two numbers about one book.
     private func resolveLate(_ root: [String: JSONValue]) async {
         guard let engine else { return }
+        let ticket = loadGeneration
         let rows: [JSONValue]
         if case .array(let jobs)? = root["printLog"] { rows = jobs } else { rows = [] }
         let fleet: [JSONValue]
         if case .array(let m)? = root["machines"] { fleet = m } else { fleet = [] }
         guard let late = try? await engine.lateOrders(
-            rows, machines: fleet, settings: Self.settings(root)) else { return }
+            rows, machines: fleet, settings: Self.settings(root)), ticket == loadGeneration else { return }
         for i in orders.indices { orders[i].isLateResolved = late.contains(orders[i].id) }
     }
 
@@ -1159,9 +1237,15 @@ final class Shop {
         // orders rather than being left out and the figure quietly overstated.
         var expenses: [JSONValue] = []
         if case .array(let rows)? = root["expenses"] { expenses = rows }
-        facts = try? await engine.dashboardFacts(orders: orders, machines: machines, settings: settings,
-                                                 statusCache: printers.statusCache,
-                                                 inventory: shelf)
+        // Only `load` asks: an answer about a book a newer load has replaced
+        // is dropped, never put over the newer book's (see `load`).
+        let ticket = loadGeneration
+        let dashboard = try? await engine.dashboardFacts(orders: orders, machines: machines,
+                                                         settings: settings,
+                                                         statusCache: printers.statusCache,
+                                                         inventory: shelf)
+        guard ticket == loadGeneration else { return }
+        facts = dashboard
         // ── THE MONTH'S NET, FROM THE RULE REPORTS USES ───────────────────
         //
         // Through `pnlByPeriod` at month granularity rather than a sum taken
@@ -1177,14 +1261,17 @@ final class Shop {
         // per redraw.
         // What each machine is worth, BEFORE the month's row: a straight-line
         // machine's share of the month leans on its recent hours.
-        machineValue = (try? await engine.machineValues(machines: machines, orders: orders,
-                                                        today: Self.today(now))) ?? [:]
+        let values = (try? await engine.machineValues(machines: machines, orders: orders,
+                                                      today: Self.today(now))) ?? [:]
+        guard ticket == loadGeneration else { return }
+        machineValue = values
         let month = await Self.thisMonthsRow(
             engine: engine, orders: orders, expenses: expenses,
             settings: settings, clients: clients, currencies: Invoice.currencyTable(self),
             wasteLog: Self.rows(root, "wasteLog"), inventory: Self.rows(root, "inventory"),
             machines: machines, recentMonthlyHours: recentMonthlyHours,
             timeEntries: Self.rows(root, "timeEntries"), now: now)
+        guard ticket == loadGeneration else { return }
         monthNetRevenue = month?.revenue
         // The masthead's NET is the P&L's net income for the month — revenue
         // less cost of goods, expenses and overhead, filament bought counted
@@ -1205,30 +1292,39 @@ final class Shop {
                 perMachine[id] = w
             }
         }
+        guard ticket == loadGeneration else { return }
         wear = perMachine
         // What to chase. Both selectors are off unless the shop has switched
         // them on, and both return nothing on a book with no due dates — so
         // the section they feed simply does not appear.
-        invoicesToChase = (try? await engine.invoicesToChase(
+        let invoices = (try? await engine.invoicesToChase(
             orders: orders, settings: settings, owed: owedByOrderId)) ?? []
-        quotesToChase = (try? await engine.quotesToChase(
-            orders: orders, settings: settings)) ?? []
-        thisMonthRevenue = (try? await engine.kpis(orders: orders, clients: clients,
-                                                   settings: settings, range: "month",
-                                                   language: words.language,
-                                                   inventory: Self.rows(root, "inventory"),
-                                                   consumables: Self.rows(root, "consumables")))?.revenue ?? 0
+        guard ticket == loadGeneration else { return }
+        invoicesToChase = invoices
+        let quotes = (try? await engine.quotesToChase(orders: orders, settings: settings)) ?? []
+        guard ticket == loadGeneration else { return }
+        quotesToChase = quotes
+        let monthKpis = try? await engine.kpis(orders: orders, clients: clients,
+                                               settings: settings, range: "month",
+                                               language: words.language,
+                                               inventory: Self.rows(root, "inventory"),
+                                               consumables: Self.rows(root, "consumables"))
+        guard ticket == loadGeneration else { return }
+        thisMonthRevenue = monthKpis?.revenue ?? 0
         kpiOrders = orders
         kpiClients = clients
         kpiSettings = settings
         await recomputeKpis()
+        guard ticket == loadGeneration else { return }
         // Six whole months and what the next one looks like. Not part of
         // `recomputeKpis`: that one changes with the period buttons, and the
         // trend deliberately does not — it is the same six months whichever
         // period the tiles above are showing.
-        outlook = try? await engine.revenueOutlook(orders: orders, clients: clients,
-                                                   settings: settings,
-                                                   now: Date().timeIntervalSince1970 * 1000)
+        let ahead = try? await engine.revenueOutlook(orders: orders, clients: clients,
+                                                     settings: settings,
+                                                     now: Date().timeIntervalSince1970 * 1000)
+        guard ticket == loadGeneration else { return }
+        outlook = ahead
     }
 
     /// The shop's last six months of takings, and next month on that evidence.
@@ -1242,10 +1338,14 @@ final class Shop {
     /// book — the orders are already here; only the arithmetic changes.
     private func recomputeKpis() async {
         guard let engine, !kpiOrders.isEmpty else { kpis = nil; return }
-        kpis = try? await engine.kpis(orders: kpiOrders, clients: kpiClients,
-                                      settings: kpiSettings, range: kpiRange,
-                                      language: words.language, inventory: inventoryRows,
-                                      consumables: consumableRows)
+        // A load that began meanwhile works these out again from its own book.
+        let ticket = loadGeneration
+        let answer = try? await engine.kpis(orders: kpiOrders, clients: kpiClients,
+                                            settings: kpiSettings, range: kpiRange,
+                                            language: words.language, inventory: inventoryRows,
+                                            consumables: consumableRows)
+        guard ticket == loadGeneration else { return }
+        kpis = answer
     }
 
     enum Failure: Error { case missingSample }
