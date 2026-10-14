@@ -7057,6 +7057,19 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.72] - 2026-10-14
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Changed and fixed
+
+- **Opening and saving the book is several times faster.** Khayt reads a
+  large book in about a tenth of the time it took, and writes it in about a
+  sixth, so everything that opens or saves it is quicker.
+- **A malformed request on the shop's Wi-Fi can no longer crash the app.**
+  A request nested deeper than any real one is refused without being read.
+
 ## [4.0.0-alpha.71] - 2026-10-14
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
