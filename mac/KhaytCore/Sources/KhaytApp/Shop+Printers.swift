@@ -873,7 +873,7 @@ extension Shop {
     }
 
     /// Turn a stored or fresh summary into findings, using this shop's numbers.
-    private func judge(_ analysis: [String: JSONValue], for file: LibraryFile,
+    func judge(_ analysis: [String: JSONValue], for file: LibraryFile,
                        engine: KhaytEngine) async {
         let mesh = file.mesh
         // NO BED, deliberately, and it is not an omission.
@@ -990,7 +990,7 @@ extension Shop {
         return (items, skipped)
     }
 
-    static func decodeFiles(_ root: [String: JSONValue]) -> (items: [LibraryFile], skipped: [String]) {
+    nonisolated static func decodeFiles(_ root: [String: JSONValue]) -> (items: [LibraryFile], skipped: [String]) {
         guard case .array(let rows)? = root["printFiles"] else { return ([], []) }
         let encoder = JSONEncoder(), decoder = JSONDecoder()
         var items: [LibraryFile] = [], skipped: [String] = []

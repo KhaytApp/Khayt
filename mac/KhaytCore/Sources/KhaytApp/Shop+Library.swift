@@ -164,8 +164,15 @@ extension Shop {
         guard case .store(let build) = source, let engine,
               !slicerFiguresReadBooks.contains(build.rawValue) else { return }
         slicerFiguresReadBooks.insert(build.rawValue)
+        // Indexed once. `row(for:)` walks every record, and asking it once per
+        // model was 10,000 × 10,000 comparisons on the main thread at launch —
+        // eighteen seconds frozen on a book that size (`LibraryEditPerfTests`).
+        var byId: [String: [String: JSONValue]] = [:]
+        for case .object(let rec) in fileRows {
+            if case .string(let id)? = rec["id"], byId[id] == nil { byId[id] = rec }
+        }
         let due: [(id: String, url: URL, ext: String)] = files.compactMap { file in
-            guard case .object(let rec)? = row(for: file.id), let url = modelFile(for: file) else { return nil }
+            guard let rec = byId[file.id], let url = modelFile(for: file) else { return nil }
             // Not a file the cloud would have to download to be read: a
             // linked Drive's online models are read when they are here.
             if file.isLinked, LinkedCloud.isOnlineOnly(url) { return nil }
@@ -365,9 +372,9 @@ extension Shop {
         var written = name
         if case .string(let g)? = patch["group"], !g.isEmpty { written = g }
         let kinds = Self.kindForFiling(kind, into: written, existing: files.map(\.groupName))
-        let wrote = editFiles(ids, named: named, alsoRoot: kinds.isEmpty ? nil : { root in
-            GroupKinds.write(kinds, into: &root)
-        }) { record in
+        var alsoRoot: (@Sendable (inout [String: JSONValue]) -> Void)?
+        if !kinds.isEmpty { alsoRoot = { root in GroupKinds.write(kinds, into: &root) } }
+        let wrote = editFiles(ids, named: named, alsoRoot: alsoRoot) { record in
             for (key, value) in patch { record[key] = value }
         }
         // SAY WHERE THEY WENT, with the way there. From "All models" a
@@ -581,7 +588,7 @@ extension Shop {
 
     /// The store write `editFiles` makes, on a book in memory: change those
     /// records, then `alsoRoot`. Returns what Undo needs.
-    static func applyFileEdit(_ root: inout [String: JSONValue], ids: Set<String>,
+    nonisolated static func applyFileEdit(_ root: inout [String: JSONValue], ids: Set<String>,
                               alsoRoot: ((inout [String: JSONValue]) -> Void)?,
                               change: (inout [String: JSONValue]) -> Void) -> LibraryUndo {
         var undo = LibraryUndo()
@@ -608,7 +615,7 @@ extension Shop {
     /// edit changed put back on each record, and the kind entries it changed
     /// — each only where it still holds what the edit wrote. Returns what
     /// Redo needs, with `notUndone` naming what had changed since.
-    static func applyRestore(_ root: inout [String: JSONValue], _ snapshot: LibraryUndo) -> LibraryUndo {
+    nonisolated static func applyRestore(_ root: inout [String: JSONValue], _ snapshot: LibraryUndo) -> LibraryUndo {
         var redo = LibraryUndo()
         guard case .array(var rows)? = root["printFiles"] else { return redo }
         let kindsBefore = GroupKinds.entries(root)
@@ -654,7 +661,9 @@ extension Shop {
         return redo
     }
 
-    /// True when the change was written.
+    /// True when the change was accepted: it is on screen at once and written
+    /// on the write chain (`Shop+LibraryWrites.swift`). A write that then
+    /// fails says so in `writeProblem` and puts the screen back.
     ///
     /// `alsoRoot` is a change to the rest of the book made in the SAME write —
     /// a group's kind, which lives in settings and must not land a write apart
@@ -662,27 +671,42 @@ extension Shop {
     /// with the files (`LibraryUndo`).
     @discardableResult
     func editFiles(_ ids: Set<LibraryFile.ID>, named actionName: String,
-                           alsoRoot: ((inout [String: JSONValue]) -> Void)? = nil,
-                           change: @escaping (inout [String: JSONValue]) -> Void) -> Bool {
+                           alsoRoot: (@Sendable (inout [String: JSONValue]) -> Void)? = nil,
+                           change: @escaping @Sendable (inout [String: JSONValue]) -> Void) -> Bool {
         guard permitted("inventory", "edit") else { return false }
         guard let build = source.build, !ids.isEmpty else { return false }
-        var undo = LibraryUndo()
-        var covers = GroupCoverChange()
-        do {
-            try StoreWriter.update(build) { root in
-                covers.before = GroupKinds.covers(Self.settings(root))
-                undo = Self.applyFileEdit(&root, ids: ids, alsoRoot: alsoRoot, change: change)
-                covers.after = GroupKinds.covers(Self.settings(root))
+        writeProblem = nil
+        let base = libraryRows
+        let pending = beginLibraryChange(ids, change: change)
+        // The write, and what Undo needs from it. Started now and registered
+        // now, so the undo stack holds this edit in the order it was made —
+        // a ⌘Z pressed before the write lands waits for it.
+        let written = Task { () -> LibraryUndo? in
+            defer { self.libraryWrites[pending] = nil }
+            do {
+                let (undo, covers, library) = try await StoreWriter.updateOffMain(build) { root in
+                    let before = Self.rows(root, "printFiles")
+                    var covers = GroupCoverChange()
+                    covers.before = GroupKinds.covers(Self.settings(root))
+                    let undo = Self.applyFileEdit(&root, ids: ids, alsoRoot: alsoRoot, change: change)
+                    covers.after = GroupKinds.covers(Self.settings(root))
+                    return (undo, covers, Self.libraryWritten(root, touched: ids, before: before, base: base))
+                }
+                self.endLibraryChange(pending)
+                self.settleGroupPictures(covers)
+                await self.showLibraryWritten(library, touched: ids)
+                return undo
+            } catch {
+                self.writeProblem = String(describing: error)
+                self.endLibraryChange(pending)
+                // Nothing was written: the screen goes back to the book.
+                await self.load(self.source)
+                return nil
             }
-            writeProblem = nil
-            settleGroupPictures(covers)
-            registerUndo(of: undo, named: actionName)
-            Task { await load(source) }
-            return true
-        } catch {
-            writeProblem = String(describing: error)
-            return false
         }
+        registerUndo(after: written, named: actionName)
+        libraryWrites[pending] = written
+        return true
     }
 
     /// Put those records back exactly as they were, and make THAT undoable too.
@@ -690,32 +714,69 @@ extension Shop {
         guard let undoManager, !before.isEmpty else { return }
         undoManager.setActionName(actionName)
         undoManager.registerUndo(withTarget: self) { shop in
-            shop.restore(before, named: actionName)
+            shop.restore(after: Task { () -> LibraryUndo? in before }, named: actionName)
         }
     }
 
-    private func restore(_ snapshot: LibraryUndo, named actionName: String) {
+    /// The same, for an edit whose write is still running: the undo waits for
+    /// it. Registered at once rather than when the write lands, because an
+    /// undo registered later goes on the stack after whatever the shop did
+    /// next — and a redo registered later than its undo goes on the UNDO
+    /// stack instead.
+    func registerUndo(after write: Task<LibraryUndo?, Never>, named actionName: String) {
+        guard let undoManager else { return }
+        undoManager.setActionName(actionName)
+        undoManager.registerUndo(withTarget: self) { shop in
+            shop.restore(after: write, named: actionName)
+        }
+    }
+
+    private func restore(after write: Task<LibraryUndo?, Never>, named actionName: String) {
         guard permitted("inventory", "edit") else { return }
         guard let build = source.build else { return }
-        var redo = LibraryUndo()
-        var covers = GroupCoverChange()
+        pendingLibraryToken += 1
+        let token = pendingLibraryToken
+        let undone = Task { () -> LibraryUndo? in
+            defer { self.libraryWrites[token] = nil }
+            guard let snapshot = await write.value, !snapshot.isEmpty else { return nil }
+            return await self.restoreWritten(snapshot, build: build)
+        }
+        // Now, inside the undo, so it is the REDO.
+        registerUndo(after: undone, named: actionName)
+        libraryWrites[token] = undone
+    }
+
+    /// An Undo's write, on the write chain. Returns what Redo needs.
+    private func restoreWritten(_ snapshot: LibraryUndo, build: StoreReader.Build) async -> LibraryUndo? {
+        let ids = Set(snapshot.files.keys)
+        let base = libraryRows
         do {
-            try StoreWriter.update(build) { root in
+            let (redo, covers, library) = try await StoreWriter.updateOffMain(build) { root in
+                let before = Self.rows(root, "printFiles")
+                var covers = GroupCoverChange()
                 covers.before = GroupKinds.covers(Self.settings(root))
-                redo = Self.applyRestore(&root, snapshot)
+                let redo = Self.applyRestore(&root, snapshot)
                 covers.after = GroupKinds.covers(Self.settings(root))
+                return (redo, covers, Self.libraryWritten(root, touched: ids, before: before, base: base))
             }
             // A picture an undone change had sent to the Trash comes back
             // with the entry that names it.
             settleGroupPictures(covers)
             writeProblem = Self.partialUndoSentence(redo.notUndone, words: words)
-            registerUndo(of: redo, named: actionName)
-            Task { await load(source) }
+            await showLibraryWritten(library, touched: ids)
+            return redo
         } catch {
             // An undo that cannot be applied — the book changed hands while the
             // menu was open — must say so rather than fail quietly.
             writeProblem = String(describing: error)
+            return nil
         }
+    }
+
+    /// Wait for every library write started so far — for a test, and for
+    /// anything that must read the book after an edit has landed.
+    func settleLibraryWrites() async {
+        while let write = libraryWrites.values.first { _ = await write.value }
     }
 
     /// The QC failure's write, on a book in memory: the order, the waste row

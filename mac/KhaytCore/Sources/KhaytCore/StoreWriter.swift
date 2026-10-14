@@ -77,6 +77,18 @@ public enum StoreWriter {
                        whoHasIt: () -> String?,
                        recordingDeletes: Bool = true,
                        mutate: (inout [String: JSONValue]) throws -> Void) throws {
+        try serialised {
+            try readModifyWrite(storeURL: url, owns: owns, whoHasIt: whoHasIt,
+                                recordingDeletes: recordingDeletes, mutate: mutate)
+        }
+    }
+
+    /// The read-modify-write itself. Only ever run inside `serialised`.
+    private static func readModifyWrite(storeURL url: URL,
+                                        owns: () -> Bool,
+                                        whoHasIt: () -> String?,
+                                        recordingDeletes: Bool,
+                                        mutate: (inout [String: JSONValue]) throws -> Void) throws {
         guard owns() else {
             throw Refusal.notOurs(whoHasIt() ?? "Another app owns this book")
         }
@@ -149,32 +161,122 @@ public enum StoreWriter {
         // suspends, so no other write on this actor can land in between, and
         // an ownership check covers the other app.
         for _ in 0..<5 {
-            let data: Data
-            do { data = try Data(contentsOf: url) }
-            catch { throw Refusal.unreadable(error.localizedDescription) }
-            guard var root = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
-                throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
+            // The read and decode, and below the bookkeeping and encode, OFF
+            // the main thread: on a 15 MB book each is a second or more, and
+            // `mutate` is the only part that has to be here.
+            let (data, decoded) = try await offMain { () throws -> (Data, [String: JSONValue]) in
+                let data: Data
+                do { data = try Data(contentsOf: url) }
+                catch { throw Refusal.unreadable(error.localizedDescription) }
+                guard let root = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
+                    throw Refusal.unreadable("\(url.lastPathComponent) is not JSON")
+                }
+                return (data, root)
             }
 
-            let before = root
+            var root = decoded
             try await mutate(&root)
-            if recordingDeletes {
-                reviveUnderNewIds(before: before, after: &root)
-                recordDeletions(before: before, after: &root)
-                stampChanged(before: before, after: &root)
+            let changed = root
+            let next = try await offMain { () throws -> Data in
+                var root = changed
+                if recordingDeletes {
+                    reviveUnderNewIds(before: decoded, after: &root)
+                    recordDeletions(before: decoded, after: &root)
+                    stampChanged(before: decoded, after: &root)
+                }
+                let next = try JSONEncoder().encode(root)
+                guard next.count <= maxStoreBytes else { throw Refusal.tooLarge(next.count) }
+                return next
             }
-
-            let next = try JSONEncoder().encode(root)
-            guard next.count <= maxStoreBytes else { throw Refusal.tooLarge(next.count) }
             // Moved while we were away: start again from what is there now.
-            if (try? Data(contentsOf: url)) != data { continue }
-            guard owns() else {
-                throw Refusal.notOurs(whoHasIt() ?? "Another app took the book")
+            // The compare and the swap inside the chain, so a write running
+            // off the main thread (`updateOffMain`) cannot land between them.
+            let swapped: Bool = try serialised {
+                if (try? Data(contentsOf: url)) != data { return false }
+                guard owns() else {
+                    throw Refusal.notOurs(whoHasIt() ?? "Another app took the book")
+                }
+                try atomicWrite(next, to: url)
+                return true
             }
-            try atomicWrite(next, to: url)
+            if !swapped { continue }
             return
         }
         throw Refusal.unreadable("the book kept changing while this change was being made; try again")
+    }
+
+    // MARK: - The write chain
+
+    /// Every read-modify-write of a book, one at a time, on any thread.
+    ///
+    /// ── WHY A QUEUE AND NOT "IT RUNS ON THE MAIN ACTOR" ────────────────────
+    ///
+    /// The rule that kept two writes from interleaving was that they all ran
+    /// on the main thread, so one finished before the next began. That is
+    /// also why deleting a model froze the window: a 15 MB book is decoded,
+    /// changed, encoded and fsynced inside the click, and at 10,000 models
+    /// that is seconds (`LibraryEditPerfTests`). Moving a write off the main
+    /// thread loses the old guarantee unless something else gives it, and
+    /// this is that something: the synchronous `update`, the async one's
+    /// compare-and-swap, `updateOffMain` and a restore's swap all pass
+    /// through this one serial queue, so a read inside one can never be
+    /// overtaken by another's swap.
+    ///
+    /// Re-entrant: a write already running on the chain that writes again
+    /// runs inline rather than waiting on itself.
+    static let chain = DispatchQueue(label: "khayt.store-write-chain", qos: .userInitiated)
+    private static let onChain = DispatchSpecificKey<Bool>()
+    private static let chainKeyed: Void = { chain.setSpecific(key: onChain, value: true) }()
+
+    /// Blocking work off the caller's thread — a dispatch queue and a
+    /// continuation, never the cooperative pool (see `updateOffMain`).
+    private static func offMain<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { done in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do { done.resume(returning: try work()) } catch { done.resume(throwing: error) }
+            }
+        }
+    }
+
+    /// Run `work` on the write chain and wait for it. Re-entrant.
+    public static func serialised<T>(_ work: () throws -> T) rethrows -> T {
+        _ = chainKeyed
+        if DispatchQueue.getSpecific(key: onChain) == true { return try work() }
+        return try chain.sync(execute: work)
+    }
+
+    /// The same read-modify-write as `update`, done on the write chain WITHOUT
+    /// holding the caller's thread — so a caller on the main actor keeps
+    /// drawing while a whole book is decoded and written.
+    ///
+    /// `mutate` returns what the caller needs from inside the write (the undo
+    /// snapshot, the records as written), computed from the book as read
+    /// inside the chain, never from a copy the caller was holding. A dispatch
+    /// queue and a continuation rather than `Task.detached`: blocking file
+    /// work on the cooperative pool starves it (see `PinWork`).
+    public static func updateOffMain<T: Sendable>(
+        storeURL url: URL,
+        owns: @escaping @Sendable () -> Bool,
+        whoHasIt: @escaping @Sendable () -> String?,
+        recordingDeletes: Bool = true,
+        mutate: @escaping @Sendable (inout [String: JSONValue]) throws -> T
+    ) async throws -> T {
+        _ = chainKeyed
+        return try await withCheckedThrowingContinuation { done in
+            chain.async {
+                do {
+                    var out: T?
+                    try readModifyWrite(storeURL: url, owns: owns, whoHasIt: whoHasIt,
+                                        recordingDeletes: recordingDeletes) { root in
+                        out = try mutate(&root)
+                    }
+                    // `mutate` ran (the write would have thrown otherwise).
+                    done.resume(returning: out!)
+                } catch {
+                    done.resume(throwing: error)
+                }
+            }
+        }
     }
 
     /// Temp file, fsync, then swap — the same shape as `atomicWriteStoreUnsafe`.

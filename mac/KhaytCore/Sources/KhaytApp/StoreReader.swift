@@ -53,9 +53,22 @@ public struct StoreReader: Sendable {
         case shipped = "Khayt"
 
         public var storeURL: URL {
-            FileManager.default.homeDirectoryForCurrentUser
-                .appending(path: "Library/Application Support/\(rawValue)/khayt-store.json")
+            Self.supportFolder.appending(path: "\(rawValue)/khayt-store.json")
         }
+
+        /// `~/Library/Application Support`, unless a test moved it.
+        public static var supportFolder: URL {
+            supportFolderForTests ?? FileManager.default.homeDirectoryForCurrentUser
+                .appending(path: "Library/Application Support")
+        }
+
+        /// TESTS ONLY: open a book from a temp folder instead of the shop's.
+        ///
+        /// Nothing could load a real-sized book through `Shop.load(.store)`
+        /// without pointing it at the live one, so the library's write paths
+        /// were never timed at the size a shop keeps (`LibraryEditPerfTests`).
+        /// Set and cleared by one serialised suite; nothing in the app sets it.
+        nonisolated(unsafe) public static var supportFolderForTests: URL?
         public var keychainService: String { "\(rawValue) Safe Storage" }
 
         /// The other build, whose Keychain item may hold the key to a field in

@@ -796,22 +796,35 @@ extension Shop {
         guard let build = source.build else {
             importProblem = words.callIt("mac.move_sample"); return
         }
-        var allGone = true
-        for file in files {
-            guard let dir = directory(for: file) else { continue }
-            var thisGone = true
-            let contents = (try? FileManager.default.contentsOfDirectory(at: dir,
-                includingPropertiesForKeys: nil)) ?? []
-            for url in contents {
-                do { try Self.trash(url) } catch { thisGone = false }
-            }
-            if thisGone { try? Self.trash(dir) } else { allGone = false }
-        }
         let ids = Set(files.map(\.id))
         let roots = libraryRoots?.roots ?? []
+        let base = libraryRows
+        // Off the screen NOW — see `Shop+LibraryWrites.swift`. Everything
+        // below is off the main thread until the book is written.
+        let pending = beginLibraryChange(ids, change: nil)
+
+        // The folders to the Trash, off the main thread too: a model on a
+        // network share or an online-only cloud folder can hold `trashItem`
+        // for seconds, and that was the window frozen.
+        let chosen = files
+        let allGone = await BookWork.run { () -> Bool in
+            var allGone = true
+            for file in chosen {
+                guard let dir = LibraryLocation.directory(for: file.id, roots: roots) else { continue }
+                var thisGone = true
+                let contents = (try? FileManager.default.contentsOfDirectory(at: dir,
+                    includingPropertiesForKeys: nil)) ?? []
+                for url in contents {
+                    do { try Self.trash(url) } catch { thisGone = false }
+                }
+                if thisGone { try? Self.trash(dir) } else { allGone = false }
+            }
+            return allGone
+        }
         do {
-            try StoreWriter.update(build) { root in
-                var rows = Self.rows(root, "printFiles")
+            let written = try await StoreWriter.updateOffMain(build) { root -> LibraryWritten in
+                let before = Self.rows(root, "printFiles")
+                var rows = before
                 rows.removeAll { Self.recordId($0).map(ids.contains) ?? false }
                 root["printFiles"] = .array(rows)
                 // A model ADOPTED from the library's own folder keeps its file
@@ -822,28 +835,31 @@ extension Shop {
                 if case .object(let l)? = settings["printLibrary"] { library = l }
                 var already: [JSONValue] = []
                 if case .array(let a)? = library["notAdopted"] { already = a }
-                let next = Self.notAdoptedAfterDeleting(files, roots: roots, already: already)
+                let next = Self.notAdoptedAfterDeleting(chosen, roots: roots, already: already)
                 if next.count != already.count || next != already {
                     library["notAdopted"] = .array(next)
                     settings["printLibrary"] = .object(library)
                     root["settings"] = .object(settings)
                 }
+                return Self.libraryWritten(root, touched: ids, before: before, base: base)
             }
-            // Out of the selection too, or the inspector keeps describing a
-            // model that is gone.
-            fileSelection.subtract(ids)
+            endLibraryChange(pending)
             // One delete, however many models it took.
             Telemetry.feature(.libraryDelete, in: self)
-            await load(source)
+            await showLibraryWritten(written, touched: ids)
             if !allGone {
                 importProblem = words.callIt("plib.delete_partial")
-            } else if files.count == 1 {
+            } else if chosen.count == 1 {
                 importNote = words.callIt("plib.deleted")
             } else {
-                importNote = words.counting(files.count, "mac.deleted_n_models")
+                importNote = words.counting(chosen.count, "mac.deleted_n_models")
             }
         } catch {
+            endLibraryChange(pending)
             importProblem = String(describing: error)
+            // Nothing was written: the book still holds them, so the screen
+            // must too.
+            await load(source)
         }
     }
 

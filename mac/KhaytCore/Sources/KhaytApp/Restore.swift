@@ -250,7 +250,9 @@ enum Restore {
         // later edits to records the restore never touched.
         try RestoreGuard.markPending(RestoreGuard.changedKeys(restored: snapshot, replaced: current),
                                      for: storeURL)
-        do { try StoreWriter.atomicWrite(next, to: storeURL) }
+        // On the write chain, so a write already running off the main
+        // thread cannot read the old book and swap it back over this one.
+        do { try StoreWriter.serialised { try StoreWriter.atomicWrite(next, to: storeURL) } }
         catch { RestoreGuard.clear(for: storeURL); throw error }
 
         forgetCloudView()

@@ -160,7 +160,7 @@ extension Shop {
     /// store write as the files: the kinds go with their groups, and a NEW
     /// parent gets the kind the shop chose for it.
     static func groupMoveRoot(_ plan: GroupMovePlan,
-                              newKinds: [String: GroupKind]) -> (inout [String: JSONValue]) -> Void {
+                              newKinds: [String: GroupKind]) -> @Sendable (inout [String: JSONValue]) -> Void {
         let moves = plan.moves.map { (from: $0.from, to: $0.to) }
         let ids = plan.ids
         return { root in

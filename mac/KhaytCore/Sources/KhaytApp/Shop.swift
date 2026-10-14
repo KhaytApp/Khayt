@@ -45,7 +45,9 @@ final class Shop {
 
     private(set) var source: Source
     private(set) var orders: [Order] = []
-    private(set) var files: [LibraryFile] = []
+    // Settable from `Shop+LibraryWrites.swift`, which patches a library edit
+    // in place rather than reloading the whole book.
+    internal(set) var files: [LibraryFile] = []
 
     /// Show the models that have been put aside. Off: they are still there.
     var libraryShowArchived = false {
@@ -543,6 +545,17 @@ final class Shop {
     /// month the rebased sample has nothing in "this month" otherwise, and
     /// every test that looks at this month failed on the calendar, not code.
     private(set) var clock: Date?
+
+    /// Which `load` is the latest. A real book is read off the main thread
+    /// now, so two loads can be in flight at once — and the one that started
+    /// first must not finish last and put the older book on screen.
+    private var loadGeneration = 0
+
+    /// Library edits on screen and not yet written (`Shop+LibraryWrites`).
+    @ObservationIgnored var pendingLibraryChanges: [PendingLibraryChange] = []
+    @ObservationIgnored var pendingLibraryToken = 0
+    /// Library writes started and not yet waited for (`settleLibraryWrites`).
+    @ObservationIgnored var libraryWrites: [Int: Task<LibraryUndo?, Never>] = [:]
     var now: Date { clock ?? Date() }
 
     init(source: Source = .sample) {
@@ -566,8 +579,11 @@ final class Shop {
         source = next
         problem = nil
         skipped = []
+        loadGeneration += 1
+        let generation = loadGeneration
         do {
             let root: [String: JSONValue]
+            var library: (items: [LibraryFile], skipped: [String])?
             switch next {
             case .sample:
                 guard let url = AppResources.bundle.url(forResource: "sample-shop", withExtension: "json"),
@@ -582,7 +598,22 @@ final class Shop {
                     try JSONDecoder().decode([String: JSONValue].self, from: data),
                     to: day)
             case .store(let build):
-                root = try StoreReader(build: build).raw
+                // ── OFF THE MAIN THREAD ──────────────────────────────────
+                //
+                // A shop's book of 9,802 models is 15 MB; decoding it, and
+                // then its library into `LibraryFile`s, held the main thread
+                // for seconds on every reload — and every write reloads, so
+                // deleting one model froze the window (`LibraryEditPerfTests`).
+                let read = try await BookWork.run { () throws -> ([String: JSONValue], ([LibraryFile], [String])) in
+                    let raw = try StoreReader(build: build).raw
+                    let files = Self.decodeFiles(raw)
+                    return (raw, (files.items, files.skipped))
+                }
+                // A later load started while this one was reading: it has
+                // the newer book, and it will put everything on screen.
+                guard generation == loadGeneration else { return }
+                root = read.0
+                library = (items: read.1.0, skipped: read.1.1)
             }
             let decoded = try Self.decodeOrders(root)
             orders = decoded.items
@@ -590,9 +621,9 @@ final class Shop {
             machines = Self.decode(root, "machines", as: Machine.self)
             spools = Self.decode(root, "inventory", as: Spool.self)
             consumables = Self.decode(root, "consumables", as: Consumable.self)
-            let library = Self.decodeFiles(root)
-            files = library.items
-            skipped += library.skipped
+            let decodedFiles = library ?? Self.decodeFiles(root)
+            files = decodedFiles.items
+            skipped += decodedFiles.skipped
             libraryGroupKinds = GroupKinds.read(Self.settings(root))
             libraryGroupCovers = GroupKinds.covers(Self.settings(root))
             libraryRoots = next.build.map { build in
@@ -801,6 +832,9 @@ final class Shop {
             // keystroke in the search box, and a hop into JavaScript per chip
             // per redraw is a hop for a constant.
             if case .array(let rows)? = root["printFiles"] { libraryRows = rows } else { libraryRows = [] }
+            // A library edit still being written stays on screen as asked,
+            // not as the book held it a moment before (`Shop+LibraryWrites`).
+            reapplyPendingLibraryChanges()
             await readLibraryFacets()
             // And the names those chips can be filed under, which is the whole
             // book rather than what the chips are currently counting.
@@ -1232,9 +1266,9 @@ final class Shop {
 
     /// The library's group kinds, by path, as the book's settings hold them.
     /// See `GroupKind`.
-    private(set) var libraryGroupKinds: [String: GroupKind] = [:]
+    internal(set) var libraryGroupKinds: [String: GroupKind] = [:]
     /// The pictures the shop chose for its groups, by path. See `GroupCover`.
-    private(set) var libraryGroupCovers: [String: GroupCover] = [:]
+    internal(set) var libraryGroupCovers: [String: GroupCover] = [:]
 
     /// The Mac's undo stack, handed over by the window.
     ///
@@ -1300,7 +1334,7 @@ final class Shop {
     /// Not per redraw: the calibration reads the whole print log, and a grid of
     /// four hundred models asking for that on every frame is four hundred trips
     /// through the runtime for one number that cannot have changed.
-    private(set) var estimates: [String: KhaytEngine.MeshEstimate] = [:]
+    internal(set) var estimates: [String: KhaytEngine.MeshEstimate] = [:]
 
     // Stored for "A printer that changed address" (Shop+Printers.swift).
     /// Machines whose address appears to have moved, and where to.
@@ -1443,7 +1477,7 @@ final class Shop {
     private(set) var presetRows: [JSONValue] = []
 
     /// `printFiles` as written. See `setups(for:)` and `versions(for:)`.
-    private(set) var fileRows: [JSONValue] = []
+    internal(set) var fileRows: [JSONValue] = []
 
     /// The book as the LAN server's shared pages read it — `printLog`,
     /// `waitingList`, `settings` and `machines`, raw. See `LanServer`.
@@ -2327,7 +2361,7 @@ final class Shop {
     /// What each model's licence permits, by model id. Absent for a model
     /// nobody has recorded one for, which is NOT the same as one that may not
     /// be sold — the screen says nothing rather than something wrong.
-    private(set) var licences: [String: KhaytEngine.Standing] = [:]
+    internal(set) var licences: [String: KhaytEngine.Standing] = [:]
 
     /// The printers a model can be converted for, from the shared rule.
     private(set) var printerProfiles: [KhaytEngine.PrinterProfile] = []
@@ -2405,7 +2439,7 @@ final class Shop {
     /// Which machine each model fits, keyed by the model's id. Worked out once
     /// when the book loads rather than per row: a grid of four hundred models
     /// asking the runtime on every redraw is four hundred context hops.
-    private(set) var fits: [String: KhaytEngine.Fit] = [:]
+    internal(set) var fits: [String: KhaytEngine.Fit] = [:]
     /// The cards the shop has issued, and what each one is today.
     private(set) var giftCards: [GiftCard] = []
     private(set) var giftCardRows: [JSONValue] = []

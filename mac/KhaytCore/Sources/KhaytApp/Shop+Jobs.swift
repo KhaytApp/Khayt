@@ -1584,7 +1584,7 @@ extension Shop {
         return "SAR"
     }
 
-    static func settings(_ root: [String: JSONValue]) -> [String: JSONValue] {
+    nonisolated static func settings(_ root: [String: JSONValue]) -> [String: JSONValue] {
         if case .object(let s)? = root["settings"] { return s }
         return [:]
     }
@@ -2311,7 +2311,7 @@ extension Shop {
 
     // MARK: - Reading and writing rows
 
-    static func rows(_ root: [String: JSONValue], _ collection: String) -> [JSONValue] {
+    nonisolated static func rows(_ root: [String: JSONValue], _ collection: String) -> [JSONValue] {
         if case .array(let r)? = root[collection] { return r }
         return []
     }
@@ -2321,7 +2321,7 @@ extension Shop {
         return nil
     }
 
-    static func recordId(_ value: JSONValue) -> String? {
+    nonisolated static func recordId(_ value: JSONValue) -> String? {
         guard case .object(let o) = value, case .string(let id)? = o["id"] else { return nil }
         return id
     }
