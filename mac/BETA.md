@@ -15,6 +15,8 @@ When every box is ticked, the next cut is `4.0.0-beta.1` instead of
    what came in has been read, and no crash in it is unexplained. Before this
    exists, a crash in the field is a crash nobody hears about. That is the
    reason it comes first.
+   **Live since alpha.64 (11 October 2026).** The week of reports can be read
+   from 18 October.
 2. **A week on the real book.** The shop runs its own orders, spools and money
    on the Mac for seven days in a row: not the sample shop, and not the empty
    book. Nothing is lost, and no figure is wrong. A bug found here resets the
@@ -27,14 +29,29 @@ When every box is ticked, the next cut is `4.0.0-beta.1` instead of
      a second receipt from the same seller is matched to that supplier.
    - Settings ▸ Integrations, seen in English and Arabic, light and dark.
 
+   - **Sorting a real linked drive** (alpha.66 to alpha.68): "Sort linked
+     folders…" on the shop's Google Drive, with the assistant on and off,
+     ending with Apply. Then: the prints look right, pictures sit on the right
+     prints, and a group the shop made by hand has not moved.
+   - **Check pictures** (alpha.68) with the shop's own AI provider: a "yes"
+     puts the picture on, a "no" is not offered again.
+   - **Shortcuts and Siri** (alpha.69): "What is printing" and "What is
+     waiting to print" appear in the Shortcuts app and answer.
+   - **The iPhone over the shop's Wi-Fi** (alpha.68 and alpha.69): a WhatsApp
+     update logged on the customer, and a large model sent while the Mac is
+     busy.
+
    Add to this list whatever later alphas ship without being tried, and strike
    each item when it is done.
 4. **The not-yet-built list in `mac/README.md` is empty or deliberately
    deferred.** Its one item, moving a job on when its print starts or ends,
    is either built or written down as "after beta".
+   **Done, 14 October 2026:** deferred until after beta.1, and written so in
+   the list.
 5. **Big refactors land before the week in (2), not during it.** The split of
    `Shop.swift` is the one planned. A soak week that ends with a refactor
    has not soaked the build that ships.
+   **Done, 11 October 2026:** the split landed in #1822, after alpha.64.
 6. **The usual pre-release review is clean** (bugs, security, and the UI in
    English and Arabic, light and dark) over everything since the last alpha.
 
