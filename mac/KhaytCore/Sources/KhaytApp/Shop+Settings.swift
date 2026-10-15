@@ -34,13 +34,13 @@ extension Shop {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let address = address.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { moveProblem = words.callIt("mach.need_name"); return }
-        var undo: [ChangedRecord] = []
-        var there = true
         do {
-            try StoreWriter.update(build) { root in
-                there = Self.writeLocation(into: &root, id: id, name: name, address: address,
-                                           newId: Self.uid("LOC"), undo: &undo)
+            let (there, undo) = try await StoreWriter.updateOffMain(build) { root in
+                var undo: [ChangedRecord] = []
+                let there = Self.writeLocation(into: &root, id: id, name: name, address: address,
+                                               newId: Self.uid("LOC"), undo: &undo)
                 Self.sealUndo(&undo, in: root)
+                return (there, undo)
             }
             if !there { moveProblem = words.callIt("mac.record_gone") }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("set.locations")) }
@@ -58,7 +58,7 @@ extension Shop {
     /// sheet was open. Saving it as new would bring it back under another id,
     /// with none of what pointed at it.
     @discardableResult
-    static func writeLocation(into root: inout [String: JSONValue], id: String?, name: String,
+    nonisolated static func writeLocation(into root: inout [String: JSONValue], id: String?, name: String,
                               address: String, newId: String, undo: inout [ChangedRecord]) -> Bool {
         var rows = Self.rows(root, "locations")
         if let id, !rows.contains(where: { Self.recordId($0) == id }) { return false }
@@ -93,19 +93,23 @@ extension Shop {
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
-        var removed: [String: JSONValue]?
-        var unlinked: [ChangedRecord] = []
+        // On the stack at the click, against the write below (`PendingUndo`).
+        let pending: PendingUndo<([String: JSONValue], [ChangedRecord])> =
+            pendingUndo(named: words.callIt("set.locations")) { shop, gone in
+                shop.putBackLocation(gone.0, relinking: gone.1, in: build)
+            }
+        defer { pending.drop() }
         do {
-            try StoreWriter.update(build) { root in
+            let (removed, unlinked) = try await StoreWriter.updateOffMain(build) { root
+                -> ([String: JSONValue]?, [ChangedRecord]) in
                 var rows = Self.rows(root, "locations")
                 guard let at = rows.firstIndex(where: { Self.recordId($0) == id }),
-                      case .object(let was) = rows[at] else { return }
-                removed = was
+                      case .object(let was) = rows[at] else { return (nil, []) }
                 rows.remove(at: at)
                 root["locations"] = .array(rows)
-                unlinked = Self.unpointingLocation(&root, from: id)
+                return (was, Self.unpointingLocation(&root, from: id))
             }
-            if let removed { registerLocationUndo(removed, relinking: unlinked) }
+            if let removed { pending.keep((removed, unlinked)) }
             await load(source)
         } catch {
             moveProblem = String(describing: error)
@@ -116,10 +120,10 @@ extension Shop {
     /// is the same list, and `LocationsTests` holds the two together — a third
     /// collection growing the field on one side is how a delete quietly starts
     /// leaving ids behind again.
-    static let pointAtLocations = ["machines", "inventory", "expenses", "printLog"]
+    nonisolated static let pointAtLocations = ["machines", "inventory", "expenses", "printLog"]
 
     /// Clear every `locationId` that names this location; say what changed.
-    static func unpointingLocation(_ root: inout [String: JSONValue],
+    nonisolated static func unpointingLocation(_ root: inout [String: JSONValue],
                                    from id: String) -> [ChangedRecord] {
         var changed: [ChangedRecord] = []
         for collection in pointAtLocations {
@@ -143,7 +147,7 @@ extension Shop {
     /// Put a deleted location back, and point back at it what pointed at it.
     /// Only a record still unassigned is relinked: one moved to another site
     /// since is the shop's newer word.
-    static func relinkingLocation(_ root: inout [String: JSONValue], record: [String: JSONValue],
+    nonisolated static func relinkingLocation(_ root: inout [String: JSONValue], record: [String: JSONValue],
                                   id: String, unlinked: [ChangedRecord]) {
         var rows = Self.rows(root, "locations")
         guard !rows.contains(where: { Self.recordId($0) == id }) else { return }
@@ -166,17 +170,19 @@ extension Shop {
         }
     }
 
-    private func registerLocationUndo(_ record: [String: JSONValue],
-                                      relinking unlinked: [ChangedRecord]) {
-        guard let undoManager, let build = source.build,
+    private func putBackLocation(_ record: [String: JSONValue],
+                                      relinking unlinked: [ChangedRecord], in build: StoreReader.Build) {
+        guard permitted("settings", "edit"),
               case .string(let id)? = record["id"] else { return }
-        undoManager.setActionName(words.callIt("set.locations"))
-        undoManager.registerUndo(withTarget: self) { shop in guard shop.permitted("settings", "edit") else { return }
+
+        let shop = self
+        // Written on the chain; the undo itself returns at once.
+        Task {
             do {
-                try StoreWriter.update(build) { root in
+                try await StoreWriter.updateOffMain(build) { root in
                     Self.relinkingLocation(&root, record: record, id: id, unlinked: unlinked)
                 }
-                Task { await shop.load(shop.source) }
+                await shop.load(shop.source)
             } catch {
                 shop.moveProblem = String(describing: error)
             }
@@ -249,13 +255,13 @@ extension Shop {
         guard !fields.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             moveProblem = words.callIt("mach.need_name"); return
         }
-        var undo: [ChangedRecord] = []
-        var there = true
         do {
-            try StoreWriter.update(build) { root in
-                there = Self.writeOperator(into: &root, id: id, fields, opened: opened,
-                                           newId: Self.uid("OP"), undo: &undo)
+            let (there, undo) = try await StoreWriter.updateOffMain(build) { root in
+                var undo: [ChangedRecord] = []
+                let there = Self.writeOperator(into: &root, id: id, fields, opened: opened,
+                                               newId: Self.uid("OP"), undo: &undo)
                 Self.sealUndo(&undo, in: root)
+                return (there, undo)
             }
             if !there { moveProblem = words.callIt("mac.record_gone") }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("op.title")) }
@@ -272,7 +278,7 @@ extension Shop {
     /// in the book; see `writeLocation`. Re-created under a new id, their jobs
     /// and logged time would point at the old one.
     @discardableResult
-    static func writeOperator(into root: inout [String: JSONValue], id: String?,
+    nonisolated static func writeOperator(into root: inout [String: JSONValue], id: String?,
                               _ fields: ShopOperator.Fields, opened: ShopOperator.Fields?,
                               newId: String, undo: inout [ChangedRecord]) -> Bool {
         var rows = Self.rows(root, "operators")
@@ -402,13 +408,14 @@ extension Shop {
         guard hours.isFinite, hours > 0 else {
             moveProblem = words.callIt("shift.hours_positive"); return
         }
-        var undo: [ChangedRecord] = []
         do {
-            try StoreWriter.update(build) { root in
+            let undo = try await StoreWriter.updateOffMain(build) { root in
+                var undo: [ChangedRecord] = []
                 Self.writeTimeEntry(into: &root, id: Self.uid("TE"), jobId: jobId,
                                     operatorId: operatorId, hours: hours, day: day, notes: notes,
                                     at: StoreWriter.iso(Date()), undo: &undo)
                 Self.sealUndo(&undo, in: root)
+                return undo
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("time.log_title")) }
             await load(source)
@@ -417,7 +424,7 @@ extension Shop {
         }
     }
 
-    static func writeTimeEntry(into root: inout [String: JSONValue], id: String, jobId: String,
+    nonisolated static func writeTimeEntry(into root: inout [String: JSONValue], id: String, jobId: String,
                                operatorId: String, hours: Double, day: String, notes: String,
                                at: String, undo: inout [ChangedRecord]) {
         let op = rows(root, "operators").first { recordId($0) == operatorId }
@@ -449,16 +456,14 @@ extension Shop {
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }
-        var undo: [ChangedRecord] = []
         do {
-            try StoreWriter.update(build) { root in
+            let undo = try await StoreWriter.updateOffMain(build) { root -> [ChangedRecord] in
                 var entries = Self.rows(root, "timeEntries")
                 guard let at = entries.firstIndex(where: { Self.recordId($0) == id }),
-                      case .object(let was) = entries[at] else { return }
+                      case .object(let was) = entries[at] else { return [] }
                 entries.remove(at: at)
                 root["timeEntries"] = .array(entries)
-                undo.append(ChangedRecord(collection: "timeEntries", id: id, was: was,
-                                          kind: .deleted, at: at))
+                return [ChangedRecord(collection: "timeEntries", id: id, was: was, kind: .deleted, at: at)]
             }
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("time.log_title")) }
             await load(source)
@@ -981,7 +986,7 @@ extension Shop {
     /// Written straight onto `settings.bizLogo` rather than through a form:
     /// `settings-edit.js` keeps `out.bizLogo = s.bizLogo || ''`, so it
     /// preserves what it finds and takes none from a form.
-    func setLogo(from url: URL) {
+    func setLogo(from url: URL) async {
         writeProblem = nil
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
         let uri: String
@@ -995,7 +1000,7 @@ extension Shop {
             writeProblem = String(describing: error)
             return
         }
-        write(as: .person("settings", "edit")) { root in
+        await write(as: .person("settings", "edit")) { root in
             var settings = Self.settings(root)
             settings["bizLogo"] = .string(uri)
             root["settings"] = .object(settings)
@@ -1003,10 +1008,10 @@ extension Shop {
     }
 
     /// Take it off again, back to Khayt's own mark on the document.
-    func clearLogo() {
+    func clearLogo() async {
         writeProblem = nil
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
-        write(as: .person("settings", "edit")) { root in
+        await write(as: .person("settings", "edit")) { root in
             var settings = Self.settings(root)
             // The EMPTY STRING, which is what `settings-edit` writes for an
             // absent one — not a removed key, which a merge could resurrect
@@ -1025,7 +1030,7 @@ extension Shop {
         panel.message = words.callIt("set.logo")
         panel.prompt = words.callIt("set.logo_upload")
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        setLogo(from: url)
+        Task { await setLogo(from: url) }
     }
 
     // MARK: - How much of the app the shop wants
@@ -1072,7 +1077,7 @@ extension Shop {
         }
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
         guard wanted != mode else { return }
-        write(as: .person("settings", "edit")) { root in
+        await write(as: .person("settings", "edit")) { root in
             var settings = Self.settings(root)
             settings["mode"] = .string(wanted)
             root["settings"] = .object(settings)

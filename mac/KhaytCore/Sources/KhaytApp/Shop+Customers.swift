@@ -67,10 +67,11 @@ extension Shop {
             moveProblem = words.callIt("mac.move_sample"); return
         }
         do {
-            try StoreWriter.updateRecord(build, collection: "clients", id: clientId) { record in
+            let raw = entry.raw
+            try await StoreWriter.updateRecordOffMain(build, collection: "clients", id: clientId) { record in
                 var log: [JSONValue] = []
                 if case .array(let had)? = record["commLog"] { log = had }
-                log.append(.object(entry.raw))
+                log.append(.object(raw))
                 // Khayt keeps two hundred. The NEWEST two hundred: the other
                 // app's editor appended and then cut the tail, which threw
                 // away the note just written the moment the log was full.
@@ -92,9 +93,10 @@ extension Shop {
             moveProblem = words.callIt("mac.move_sample"); return
         }
         do {
-            try StoreWriter.updateRecord(build, collection: "clients", id: clientId) { record in
+            let raw = entry.raw
+            try await StoreWriter.updateRecordOffMain(build, collection: "clients", id: clientId) { record in
                 guard case .array(var log)? = record["commLog"],
-                      let at = log.firstIndex(of: .object(entry.raw)) else { return }
+                      let at = log.firstIndex(of: .object(raw)) else { return }
                 log.remove(at: at)
                 record["commLog"] = .array(log)
             }
@@ -560,7 +562,7 @@ extension Shop {
         guard let build = source.build else { return }
         do {
             // lock: callers — sendCampaign
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var settings: [String: JSONValue] = [:]
                 if case .object(let s)? = root["settings"] { settings = s }
                 var log: [JSONValue] = []
@@ -623,9 +625,7 @@ extension Shop {
         }
 
         do {
-            try StoreWriter.update(storeURL: build.storeURL,
-                                   owns: { StoreLock.weOwnIt(build) },
-                                   whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var cards: [JSONValue] = []
                 if case .array(let existing)? = root["giftCards"] { cards = existing }
                 cards.append(card)

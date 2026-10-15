@@ -160,6 +160,10 @@ struct SupplierSheet: View {
     @State private var draft: Supplier
     @State private var lead: String
     @State private var problem: String?
+    /// A save is on its way to the book. The write no longer holds the
+    /// window, so a second click would start a second save — for a new
+    /// record, a second record under another id.
+    @State private var saving = false
     /// Delete pressed beside Save, not yet answered.
     @State private var deleting: Supplier?
     @FocusState private var focused: Bool
@@ -295,7 +299,7 @@ struct SupplierSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save"), action: commit)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(saving || draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
         .onAppear { focused = true }
@@ -339,9 +343,12 @@ struct SupplierSheet: View {
         guard draft.vat == stored || Supplier.vatIsValid(draft.vat) else {
             problem = shop.words.callIt("mac.sup_vat_invalid"); return
         }
+        guard !saving else { return }
         let wanted = Self.saving(draft, lead: lead)
+        saving = true
         Task {
             await shop.saveSupplier(wanted)
+            saving = false
             if let said = shop.moveProblem { problem = said }
         }
     }

@@ -657,7 +657,7 @@ extension Shop {
         guard permitted("settings", "edit") else { return }
         guard let build = source.build else { return }
         do {
-            try StoreWriter.updateRecord(build, collection: "products", id: id) { record in
+            try await StoreWriter.updateRecordOffMain(build, collection: "products", id: id) { record in
                 if on { record.removeValue(forKey: "storefrontHidden") } else { record["storefrontHidden"] = .bool(true) }
             }
             await load(source)
@@ -688,7 +688,8 @@ extension Shop {
         guard permitted("settings", "edit") else { return }
         guard let build = source.build else { return }
         do {
-            try StoreWriter.update(build) { root in
+            // The async update: only this closure runs on the main actor.
+            try await StoreWriter.updateAsync(build) { root in
                 var settings = Self.settings(root)
                 var sf: [String: JSONValue] = [:]
                 if case .object(let had)? = settings["storefront"] { sf = had }

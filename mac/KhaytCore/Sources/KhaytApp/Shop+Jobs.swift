@@ -257,7 +257,10 @@ extension Shop {
 
         var undo: [ChangedRecord] = []
         do {
-            try StoreWriter.update(build) { root in
+            // The async update: `customerRecord` asks the sheet's own rules, which
+            // live on the main actor. Only this closure runs here.
+            try await StoreWriter.updateAsync(build) { root in
+                undo = []
                 var rows = Self.rows(root, "clients")
                 var record = client.record
                 if let at = rows.firstIndex(where: { Self.recordId($0) == client.id }) {
@@ -1487,17 +1490,17 @@ extension Shop {
             guard case .object = row else { return .failed }
             // The before- and after-copies read INSIDE the write, off the book
             // on disk, so the undo puts back only the picture fields.
-            var undo: [ChangedRecord] = []
-            try StoreWriter.update(build) { root in
+            let undo = try await StoreWriter.updateOffMain(build) { root -> [ChangedRecord] in
                 var rows = Self.rows(root, "products")
                 guard let at = rows.firstIndex(where: { Self.recordId($0) == productId }),
-                      case .object(var record) = rows[at] else { return }
-                undo.append(ChangedRecord(collection: "products", id: productId, was: record))
+                      case .object(var record) = rows[at] else { return [] }
+                var undo = [ChangedRecord(collection: "products", id: productId, was: record)]
                 for (key, value) in fields { record[key] = value }
                 StoreWriter.stamp(&record)
                 rows[at] = .object(record)
                 root["products"] = .array(rows)
                 Self.sealUndo(&undo, in: root)
+                return undo
             }
             registerMoveUndo(undo, named: words.callIt("mac.edit_product"))
             writeProblem = nil
@@ -1832,6 +1835,10 @@ extension Shop {
             return
         }
 
+        // On the stack NOW, at the click: the write below suspends, and an
+        // undo registered after it went on after whatever came next.
+        let pending = pendingMoveUndo(named: words.callIt("mac.move_action"))
+        defer { pending.drop() }
         var undoSnapshot: [ChangedRecord] = []
         var said: [String] = []
         var telegram: TelegramMessage?
@@ -1856,7 +1863,7 @@ extension Shop {
             // and a shop told which spools were emptied by a move that was
             // refused would be worse than being told nothing.
             moveNotices = said
-            registerMoveUndo(undoSnapshot, named: words.callIt("mac.move_action"))
+            pending.keepUnlessEmpty(undoSnapshot)
             Telemetry.feature(.orderMoved, in: self)
             await load(source)
             // AFTER the write, and only if it succeeded. A message about a job
@@ -2385,7 +2392,7 @@ extension Shop {
     /// renderer/util.js writes it. A spool's usage history records the local
     /// DAY a job drew from it, not an instant, so UTC would put a Riyadh
     /// evening on the wrong date.
-    static func localDay(_ date: Date = Date()) -> String {
+    nonisolated static func localDay(_ date: Date = Date()) -> String {
         let c = Calendar.book.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
@@ -2393,7 +2400,7 @@ extension Shop {
     /// `uid()` from renderer/util.js: prefix, base-36 milliseconds, three random
     /// base-36 characters upper-cased. Matched so an entry written here is
     /// indistinguishable from one Khayt wrote.
-    static func uid(_ prefix: String) -> String {
+    nonisolated static func uid(_ prefix: String) -> String {
         let ms = Int(Date().timeIntervalSince1970 * 1000)
         let stamp = String(ms, radix: 36)
         let alphabet = Array("0123456789abcdefghijklmnopqrstuvwxyz")
@@ -2428,40 +2435,71 @@ extension Shop {
     /// deduction — all of that stays, and a field someone else wrote since is
     /// left and named rather than overwritten with a stale copy.
     private func restoreMove(_ snapshot: [ChangedRecord], named actionName: String) {
-        // An undo is a write, and it answers to the lock like the edit it
-        // reverses: whoever is here must be allowed to edit every kind of
-        // record it puts back (the stack is also dropped on every change of
-        // who is signed in — see `lockSessionId`).
-        guard permittedRestoring(snapshot.map(\.collection)) else { return }
+        restoreMove(after: Task { snapshot }, named: actionName)
+    }
+
+    /// The undo's write, ON THE WRITE CHAIN — and its redo registered now.
+    ///
+    /// Written synchronously, an undo held the window for a whole-book write.
+    /// Written later, its redo must still be registered INSIDE the undo, or
+    /// it lands on the undo stack instead of the redo stack: so the redo is
+    /// registered at once against the write still in flight, the way the
+    /// library's undo is (`registerUndo(after:named:)`), and taken off again
+    /// if the write turns out to have put nothing back.
+    func restoreMove(after earlier: Task<[ChangedRecord]?, Never>, named actionName: String) {
         guard let build = source.build else { return }
-        var outcome = UndoOutcome()
-        do {
-            try StoreWriter.update(build) { root in
-                outcome = Self.undoing(snapshot, in: &root)
+        let write = Task { () -> [ChangedRecord]? in
+            guard let snapshot = await earlier.value, !snapshot.isEmpty else { return nil }
+            // An undo is a write, and it answers to the lock like the edit it
+            // reverses: whoever is here must be allowed to edit every kind of
+            // record it puts back (the stack is also dropped on every change of
+            // who is signed in — see `lockSessionId`).
+            guard self.permittedRestoring(snapshot.map(\.collection)) else { return nil }
+            do {
+                let outcome = try await StoreWriter.updateOffMain(build) { root in
+                    Self.undoing(snapshot, in: &root)
+                }
+                self.moveProblem = nil
+                if let partial = Self.partialUndoSentence(outcome.notUndone, words: self.words) {
+                    self.moveNotices = [partial]
+                }
+                await self.load(self.source)
+                return outcome.redo
+            } catch {
+                self.moveProblem = String(describing: error)
+                return nil
             }
-            moveProblem = nil
-            if let partial = Self.partialUndoSentence(outcome.notUndone, words: words) {
-                moveNotices = [partial]
+        }
+        guard let undoManager else { return }
+        let ticket = UndoTicket()
+        undoManager.setActionName(actionName)
+        undoManager.registerUndo(withTarget: ticket) { [weak self] _ in
+            // The entry holds the ticket alive for as long as it exists.
+            _ = ticket
+            self?.restoreMove(after: write, named: actionName)
+        }
+        Task { [weak undoManager] in
+            let landed = await write.value
+            if landed == nil || landed?.isEmpty == true {
+                undoManager?.removeAllActions(withTarget: ticket)
             }
-            registerMoveUndo(outcome.redo, named: actionName)
-            Task { await load(source) }
-        } catch {
-            moveProblem = String(describing: error)
         }
     }
 
     /// The shared shape of every edit: check we may write, do it, re-read.
     /// `gate` is what the edit is to the staff lock, and it is required.
-    func write(as gate: LockGate, _ change: (inout [String: JSONValue]) -> Void) {
+    /// Written on the write chain, never on the main thread: the window keeps
+    /// drawing while the whole book is read and saved.
+    func write(as gate: LockGate, _ change: @escaping @Sendable (inout [String: JSONValue]) -> Void) async {
         guard permitted(gate) else { writeProblem = moveProblem; return }
         guard let build = source.build else { return }
         do {
-            try StoreWriter.update(build) { root in change(&root) }
+            try await StoreWriter.updateOffMain(build) { root in change(&root) }
             writeProblem = nil
             // Read the whole book back rather than patching what is on screen.
             // The screen must show what is on disk, not what this app believes
             // it just put there.
-            Task { await load(source) }
+            await load(source)
         } catch {
             writeProblem = String(describing: error)
         }
@@ -2497,14 +2535,14 @@ extension Shop {
         return Shop.plainString(s["pausedAt"]) ?? ""
     }
 
-    func pauseProduction(reason: String) {
+    func pauseProduction(reason: String) async {
         writeProblem = nil
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
         let reason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
         // All three fields, the other app's own shape — `productionPaused`,
         // `pauseReason`, `pausedAt`. A pause that set only the flag would leave
         // a stale reason from the last one on the banner.
-        write(as: .person("orders", "edit")) { root in
+        await write(as: .person("orders", "edit")) { root in
             var settings = Self.settings(root)
             settings["productionPaused"] = .bool(true)
             settings["pauseReason"] = .string(reason)
@@ -2513,10 +2551,10 @@ extension Shop {
         }
     }
 
-    func resumeProduction() {
+    func resumeProduction() async {
         writeProblem = nil
         guard source.build != nil else { writeProblem = words.callIt("mac.move_sample"); return }
-        write(as: .person("orders", "edit")) { root in
+        await write(as: .person("orders", "edit")) { root in
             var settings = Self.settings(root)
             settings["productionPaused"] = .bool(false)
             settings["pauseReason"] = .string("")

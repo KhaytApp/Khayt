@@ -2432,7 +2432,7 @@ extension Shop {
 
     /// Write the reviewed changes into a book. A product is written only if it
     /// is still exactly as the preview read it. Returns the ids written.
-    static func applySpoolRepair(_ changes: [SpoolRepairChange], to root: inout [String: JSONValue]) -> [String] {
+    nonisolated static func applySpoolRepair(_ changes: [SpoolRepairChange], to root: inout [String: JSONValue]) -> [String] {
         let byId = Dictionary(changes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var rows = rows(root, "products")
         var done: [String] = []
@@ -2452,10 +2452,10 @@ extension Shop {
     func applySpoolRepair(_ changes: [SpoolRepairChange]) async {
         guard permitted("inventory", "edit") else { return }
         guard let build = source.build, canMoveJobs, !changes.isEmpty else { return }
-        var done: [String] = []
+        let done: [String]
         do {
-            try StoreWriter.update(build) { root in
-                done = Self.applySpoolRepair(changes, to: &root)
+            done = try await StoreWriter.updateOffMain(build) { root in
+                Self.applySpoolRepair(changes, to: &root)
             }
         } catch {
             moveProblem = String(describing: error)
@@ -2508,8 +2508,9 @@ extension Shop {
         var taskName = ""
         if case .object(let o) = task, case .string(let n)? = o["name"] { taskName = n }
 
+        let machineId = machine.id, noted = taskName
         do {
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 guard case .array(var rows)? = root["machMaintTasks"] else { return }
                 for i in rows.indices {
                     guard case .object(var record) = rows[i],
@@ -2537,8 +2538,8 @@ extension Shop {
                 // does it.
                 var log: [JSONValue] = []
                 if case .array(let had)? = root[ServiceLogEdit.collection] { log = had }
-                var entry = ServiceLogEdit.entry(machineId: machine.id, day: Self.localDay(),
-                                                 note: taskName, cost: 0,
+                var entry = ServiceLogEdit.entry(machineId: machineId, day: Self.localDay(),
+                                                 note: noted, cost: 0,
                                                  id: Self.uid("MAINT"))
                 StoreWriter.stamp(&entry)
                 root[ServiceLogEdit.collection] = .array(ServiceLogEdit.appending(entry, to: log))
@@ -2584,7 +2585,7 @@ extension Shop {
             intervalDays: intervalDays, hours: hours,
             nowIso: StoreWriter.iso(Date()), id: Self.uid("MTASK"))
         do {
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var rows: [JSONValue] = []
                 if case .array(let had)? = root[MaintenanceTaskEdit.collection] { rows = had }
                 var stamped = record
@@ -2617,7 +2618,7 @@ extension Shop {
             writeProblem = words.callIt(problem); return
         }
         do {
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 guard case .array(var rows)? = root[MaintenanceTaskEdit.collection] else { return }
                 for i in rows.indices {
                     guard case .object(let task) = rows[i],
@@ -2648,7 +2649,7 @@ extension Shop {
             writeProblem = words.callIt("mac.move_sample"); return
         }
         do {
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 guard case .array(let rows)? = root[MaintenanceTaskEdit.collection] else { return }
                 root[MaintenanceTaskEdit.collection] =
                     .array(MaintenanceTaskEdit.removing(taskId, from: rows))
@@ -2680,7 +2681,7 @@ extension Shop {
         let paid = max(0, cost)
         let name = machines.first { $0.id == machineId }?.name ?? machineId
         do {
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var log: [JSONValue] = []
                 if case .array(let had)? = root[ServiceLogEdit.collection] { log = had }
                 var entry = ServiceLogEdit.entry(machineId: machineId, day: day,
@@ -2730,7 +2731,7 @@ extension Shop {
             writeProblem = words.callIt("mac.move_sample"); return
         }
         do {
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 guard case .array(let log)? = root[ServiceLogEdit.collection] else { return }
                 root[ServiceLogEdit.collection] = .array(ServiceLogEdit.removing(entryId, from: log))
             }

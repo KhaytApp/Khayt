@@ -11,6 +11,9 @@ import KhaytCore
 struct PauseSheet: View {
     @Bindable var shop: Shop
     @State private var reason = ""
+    /// The pause is on its way to the book: the write no longer holds the
+    /// window, so a second Return would write the pause again.
+    @State private var saving = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -31,6 +34,7 @@ struct PauseSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("prod.pause")) { pause() }
                     .keyboardShortcut(.defaultAction)
+                    .disabled(saving)
             }
         }
         .padding(18)
@@ -38,7 +42,12 @@ struct PauseSheet: View {
     }
 
     private func pause() {
-        shop.pauseProduction(reason: reason)
-        if shop.writeProblem == nil { shop.pausingProduction = false }
+        guard !saving else { return }
+        saving = true
+        Task {
+            await shop.pauseProduction(reason: reason)
+            saving = false
+            if shop.writeProblem == nil { shop.pausingProduction = false }
+        }
     }
 }

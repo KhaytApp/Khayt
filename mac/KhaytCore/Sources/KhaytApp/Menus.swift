@@ -458,7 +458,7 @@ private struct JobMenu: View {
         // the better item: the same key stops the floor and starts it again.
         Button(Words.upfront(shop.productionPaused ? "prod.resume" : "prod.pause")
                + (shop.productionPaused ? "" : "\u{2026}")) {
-            if shop.productionPaused { shop.resumeProduction() }
+            if shop.productionPaused { Task { await shop.resumeProduction() } }
             else { shop.pausingProduction = true }
         }
         // ⌘⇧P is Record payment and ⌘P is Print. ⌘⇧. reads as "stop" on a Mac,

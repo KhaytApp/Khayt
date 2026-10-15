@@ -180,7 +180,9 @@ extension Shop {
         var covers = GroupCoverChange()
         var undo = LibraryUndo()
         do {
-            try StoreWriter.update(build) { root in
+            // The async update: only this closure runs on the main actor.
+            try await StoreWriter.updateAsync(build) { root in
+                covers = GroupCoverChange(); undo = LibraryUndo()
                 let entriesBefore = GroupKinds.entries(root)
                 covers.before = GroupKinds.covers(Self.settings(root))
                 GroupKinds.setCover(cover, for: path, into: &root)

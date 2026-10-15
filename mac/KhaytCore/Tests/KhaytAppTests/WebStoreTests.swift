@@ -217,7 +217,10 @@ struct WebStoreTests {
         for name in ["deleteSupplier", "deleteProduct", "deleteSpool"] {
             #expect(!shop.contains("Task { await shop.\(name)(id) }"), "\(name)'s undo deletes the record again")
         }
-        #expect(shop.contains("registerConsumableUndo(gone.was)"), "a consumable's undo cannot bring back a deleted row")
+        // Its own put-back, not `registerMoveUndo` (which restores fields onto
+        // rows still there), registered at the click (`PendingUndo`).
+        #expect(shop.contains("shop.putBackConsumable(gone, in: build)") && shop.contains("pending.keep(gone.was)"),
+                "a consumable's undo cannot bring back a deleted row")
     }
 
 

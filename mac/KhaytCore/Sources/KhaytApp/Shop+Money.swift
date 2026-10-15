@@ -238,8 +238,10 @@ extension Shop {
             return nil
         }
         do {
+            // The async update: a preset is read through `Preset.from`, which
+            // lives on the main actor. Only this closure runs here.
             var id = ""
-            try StoreWriter.update(build) { root in
+            try await StoreWriter.updateAsync(build) { root in
                 id = Self.writePreset(into: &root, name: wanted, rates: rates)
             }
             await load(source)
@@ -1444,9 +1446,7 @@ extension Shop {
         }
 
         do {
-            try StoreWriter.update(storeURL: build.storeURL,
-                                   owns: { StoreLock.weOwnIt(build) },
-                                   whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 var rows: [JSONValue] = []
                 if case .array(let existing)? = root["giftCards"] { rows = existing }
                 rows.append(card)

@@ -735,7 +735,8 @@ extension Shop {
         var was = telemetryConsent
         var chosen = was
         do {
-            try StoreWriter.update(build) { root in
+            // The async update: only this closure runs on the main actor.
+            try await StoreWriter.updateAsync(build) { root in
                 var settings = Self.settings(root)
                 let stored = TelemetryConsent(settings: settings)
                 was = stored
