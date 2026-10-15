@@ -316,7 +316,7 @@ extension Shop {
         // next correct one tries again.
         // lock: system — the PIN was just verified; this re-hashes that same
         // PIN, guarded on the stored hash not having changed meanwhile.
-        try? StoreWriter.update(build) { root in
+        _ = try? await StoreWriter.updateOffMain(build) { root in
             Self.writePinHash(into: &root, id: id, hash: fresh, onlyIf: stored)
         }
         await load(source)
@@ -372,7 +372,7 @@ extension Shop {
         return (4...8).contains(digits.count) && digits.allSatisfy { $0.isASCII && $0.isNumber }
     }
 
-    static func writePinHash(into root: inout [String: JSONValue], id: String, hash: String,
+    nonisolated static func writePinHash(into root: inout [String: JSONValue], id: String, hash: String,
                              onlyIf previous: String? = nil) {
         var rows = Self.rows(root, "operators")
         guard let at = rows.firstIndex(where: { Self.recordId($0) == id }),

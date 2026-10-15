@@ -26,22 +26,16 @@ extension Shop {
     /// dropped with a notice instead of overriding other devices for ever.
     @discardableResult
     func holdRestore(build: StoreReader.Build, cloud: [String: JSONValue]) async throws -> Bool {
-        guard var pending = liveRestoreMarker(build) else { return false }
+        guard let marker = liveRestoreMarker(build) else { return false }
         let keepAt = SyncLosses.fileURL(for: build.storeURL)
-        var losses: [SyncLoss] = []
         // lock: system — cloud sync's safety net, keeping what a merge would have dropped.
-        try await StoreWriter.update(
-            storeURL: build.storeURL,
-            owns: { StoreLock.weOwnIt(build) },
-            whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
-            recordingDeletes: false
-        ) { root in
-            var held = pending
+        // On the write chain: this runs inside an automatic sync.
+        let (losses, pending) = try await StoreWriter.updateOffMain(build, recordingDeletes: false) { root in
+            var held = marker
             let out = RestoreGuard.hold(root, over: cloud, pending: &held)
             try SyncLosses.keep(out.overridden, at: keepAt)
-            losses = out.overridden
-            pending = held
             root = out.book
+            return (out.overridden, held)
         }
         try? RestoreGuard.save(pending, for: build.storeURL)
         announceSyncLosses(losses, file: keepAt)
@@ -110,11 +104,7 @@ extension Shop {
         guard permittedRestoring([loss.collection]) else { return }
         guard let build = source.build else { moveProblem = words.callIt("mac.move_sample"); return }
         do {
-            try await StoreWriter.update(
-                storeURL: build.storeURL,
-                owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-            ) { root in
+            try await StoreWriter.updateOffMain(build) { root in
                 SyncLosses.putBack(loss, into: &root)
             }
             syncLossesPutBack.insert(loss.id)

@@ -234,11 +234,9 @@ extension Shop {
         guard let reader = try? await engine.geometryReader() else { return }
         do {
             // lock: system — background: files re-measured because the measuring rule changed.
-            try StoreWriter.update(
-                storeURL: build.storeURL,
-                owns: { StoreLock.weOwnIt(build) },
-                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-            ) { root in
+            // On the write chain: nobody asked for this, so nobody should
+            // wait for it.
+            try await StoreWriter.updateOffMain(build) { root in
                 Remeasure.apply(report, reader: reader, to: &root)
             }
         } catch {

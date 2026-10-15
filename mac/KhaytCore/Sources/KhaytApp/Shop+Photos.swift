@@ -103,7 +103,7 @@ extension Shop {
             writeProblem = words.callIt("pe.upload_failed"); return
         }
         guard let folder = photoFolder else { return }
-        if let problem = attachJobPhoto(made, jobId: job.id, build: build, folder: folder) {
+        if let problem = await attachJobPhoto(made, jobId: job.id, build: build, folder: folder) {
             writeProblem = problem; return
         }
         writeProblem = nil
@@ -118,14 +118,17 @@ extension Shop {
     /// without the stamp the other machine's older copy wins the next merge
     /// and the photograph disappears again. Nil when it worked, else why not.
     private func attachJobPhoto(_ made: (thumb: String, full: Data), jobId: String,
-                                build: StoreReader.Build, folder: URL) -> String? {
+                                build: StoreReader.Build, folder: URL) async -> String? {
         guard permitted("orders", "edit") else { return moveProblem }
         do {
             // The index the other app uses is the position in the job's own
             // list, so it is read from the record rather than counted from the
             // screen.
-            _ = try OrderPhoto.attach(made, jobId: jobId, job: orderRow(jobId), folder: folder) { change in
-                try StoreWriter.updateRecord(build, collection: "printLog", id: jobId, change: change)
+            // On the write chain, never on the main thread: at the end of a
+            // print this runs with nobody at the keyboard, and a whole-book
+            // write here froze whatever the shop was doing (StoreWritePerfTests).
+            _ = try await OrderPhoto.attach(made, jobId: jobId, job: orderRow(jobId), folder: folder) { change in
+                try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: jobId, change: change)
             }
             return nil
         } catch {
@@ -237,7 +240,7 @@ extension Shop {
     func attachFinishPhoto(jobId: String, data: Data) async -> Bool {
         guard let build = source.build, canWrite, let folder = photoFolder,
               data.count <= OrderPhoto.maxBytes, let made = OrderPhoto.encode(data) else { return false }
-        guard attachJobPhoto(made, jobId: jobId, build: build, folder: folder) == nil else { return false }
+        guard await attachJobPhoto(made, jobId: jobId, build: build, folder: folder) == nil else { return false }
         await load(source)
         return true
     }
