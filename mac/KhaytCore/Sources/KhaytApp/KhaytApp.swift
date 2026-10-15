@@ -1044,6 +1044,24 @@ final class Activator: NSObject, NSApplicationDelegate {
                 await settle()
                 break
             }
+            // And as "Quote this model…" opens it, on two models at once: one
+            // sliced, one only the mesh has measured — so both labels are in
+            // one picture. Seeded directly: the sample book refuses
+            // `startJob`, as it refuses every write.
+            var toQuote = shop.files.filter { $0.id == "PF-sample-dallah" }
+            for file in shop.files where shop.estimates[file.id] != nil {
+                if let made = await shop.modelPart(from: file), !made.estimated.isEmpty {
+                    toQuote.append(file); break
+                }
+            }
+            if let seed = await shop.jobFromModels(toQuote, asQuote: true) {
+                shop.takeJob(seed)
+                await settle()
+                await settle()
+                captureSheet(named: "14c-quote-from-model", into: dir)
+                shop.takingAJob = false
+                await settle()
+            }
 
             // The menu bar's panel, which no window shot can reach.
             doing("27-menu-bar")

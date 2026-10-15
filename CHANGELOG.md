@@ -8,6 +8,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   desktop kept its own copy of the numbering (prefix, format, counter, the
   January reset). It now uses the shared one, so the two apps cannot number an
   invoice differently. Numbers themselves are unchanged.
+- **Mac: quote a model without typing its weight and time again.** The
+  calculator has Make quote and Make job buttons under its price, and the
+  library has Quote this model and New job from model (in the model's details
+  and its right-click menu; several selected models make one job with a line
+  each). The job sheet opens with the model's grams, hours, spool, colours and
+  consumables filled in and linked to the file, at the calculator's price —
+  the same rule prices both, so the quote matches. Each line says whether its
+  figures came from the sliced file or were estimated from the model's shape,
+  and the calculator says the same under From a model. A job taken from a
+  product now keeps the file its parts were made from, too.
+
+- **Mac: Paid in full.** The payment sheet has a Paid in full button that
+  fills in what the job owes (less any credit note or gift card), so the
+  usual payment no longer means reading the total and typing it.
 
 - **Mac: the engine's JavaScript shares a few threads instead of one per
   engine.** Each engine had a thread of its own, so a busy moment could run

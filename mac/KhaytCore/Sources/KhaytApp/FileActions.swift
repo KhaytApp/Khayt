@@ -207,6 +207,19 @@ struct ModelActions: View {
                 Task { await shop.editingProduct = shop.productFromFile(file) }
             }
         }
+        // A quote or a job on the model's own figures — or, from several
+        // selected, one job with a line for each. The job sheet holds many
+        // parts, so a selection is one job, not one each.
+        let forJob = chosen.count > 1 ? chosen : [file]
+        let many: [String: JSONValue] = ["n": .number(Double(forJob.count))]
+        Button(shop.words.callIt(forJob.count > 1 ? "mac.quote_n_models" : "mac.quote_model", many) + "\u{2026}") {
+            Task { await shop.startJob(fromModels: forJob, asQuote: true) }
+        }
+        .disabled(!shop.canMoveJobs)
+        Button(shop.words.callIt(forJob.count > 1 ? "mac.job_from_n_models" : "mac.job_from_model", many) + "\u{2026}") {
+            Task { await shop.startJob(fromModels: forJob, asQuote: false) }
+        }
+        .disabled(!shop.canMoveJobs)
         Divider()
         Button(shop.words.callIt("mac.copy_name")) { FileActions.copy(file.title) }
         if let original = file.sourceFile?.originalName ?? file.originalName {

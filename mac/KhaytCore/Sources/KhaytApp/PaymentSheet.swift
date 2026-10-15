@@ -62,6 +62,15 @@ struct PaymentSheet: View {
                             .focused($focused)
                             .onSubmit(commit)
                         Text(Money.mark(currency)).foregroundStyle(.secondary)
+                        // The commonest payment there is: all of it. The box
+                        // is a running total, so without this "they paid" was
+                        // reading the bill off the row above and typing it.
+                        Button(shop.words.callIt("mac.paid_in_full")) {
+                            amount = Self.paidInFull(due: due, price: job?.price ?? 0)
+                        }
+                        .controlSize(.small)
+                        .fixedSize()
+                        .disabled(job == nil || abs(amount - Self.paidInFull(due: due, price: job?.price ?? 0)) < 0.005)
                     }
                 }
                 GridRow {
@@ -134,6 +143,21 @@ struct PaymentSheet: View {
             if let m = job?.paymentMethod, Shop.paymentMethods.contains(m) { method = m }
             focused = true
         }
+    }
+
+    /// What "Paid in full" puts in the box: the figure the Owed line below
+    /// measures against — the bill (price + tax on an exclusive shop) less
+    /// what a credit note or gift card has already taken off it, by
+    /// `KhaytOrderPayment.cashDue`. So pressing it always reads "Owed 0",
+    /// and a job a gift card half paid is not recorded as paid twice over.
+    ///
+    /// The box is the TOTAL paid, not this payment, so this is the whole
+    /// figure and not what is left after earlier payments. Before the engine
+    /// has answered it is the job's price, as `cashDue` and `price` fall back.
+    static func paidInFull(due: KhaytEngine.CashDue?, price: Double) -> Double {
+        let figure = due?.cash ?? price
+        guard figure.isFinite else { return 0 }
+        return (max(0, figure) * 100).rounded() / 100
     }
 
     private func commit() {

@@ -120,6 +120,11 @@ struct NewJobSheet: View {
         /// The product part this came from, whole — so it is costed at the
         /// rates the catalogue priced it with, not the machine's defaults.
         var raw: [String: JSONValue] = [:]
+        /// Whether the grams and hours came off a slice or the mesh, for a
+        /// line made from a library model. Nil for a line typed here.
+        var source: ModelFigureSource?
+        /// `Shop.modelPart`'s sentence about it, for the hover.
+        var sourceNote: String?
 
         var isComplete: Bool { (Double(grams) ?? 0) > 0 || (Double(hours) ?? 0) > 0 }
 
@@ -165,7 +170,13 @@ struct NewJobSheet: View {
         var product: Product?
         var componentsCost: Double = 0
         var assemblyQty = 1
+        var preferQuote = false
     }
+
+    /// Opened to make a QUOTE ("Quote this model…", the calculator's "Make
+    /// quote"): Save as quote is the default button and the title says so.
+    /// Both buttons stay — a quote asked for can still be taken as a job.
+    @State private var preferQuote = false
 
     init(shop: Shop, seed: Seed? = nil) {
         self.shop = shop
@@ -175,6 +186,7 @@ struct NewJobSheet: View {
             _product = State(initialValue: seed.product)
             _componentsCost = State(initialValue: seed.componentsCost)
             _assemblyQty = State(initialValue: seed.assemblyQty)
+            _preferQuote = State(initialValue: seed.preferQuote)
         }
     }
 
@@ -229,6 +241,22 @@ struct NewJobSheet: View {
                 assemblyQty = Shop.assemblyQty(of: taken)
                 Task { componentsCost = await shop.jobComponentsCost(of: taken, assemblyQty: Double(assemblyQty)) }
             }
+            // ── FROM A MODEL, OR FROM THE CALCULATOR ──────────────────────
+            //
+            // The lines arrive COSTED — the calculator's own costing of the
+            // same part — with the margin, discount and rush it was priced
+            // at, so `reprice` asks the shared rule what the calculator asked
+            // and the total that opens is the one the shop was looking at.
+            if let seed = shop.jobFromModel {
+                shop.jobFromModel = nil
+                project = seed.project
+                parts = seed.parts
+                margin = seed.margin
+                discountPct = seed.discountPct
+                rush = seed.rush
+                preferQuote = seed.asQuote
+                Task { await readComparables() }
+            }
             focused = true
         }
         .task(id: signature) { await reprice() }
@@ -245,7 +273,7 @@ struct NewJobSheet: View {
 
     private var header: some View {
         HStack {
-            Text(shop.words.callIt("mac.new_job")).font(.headline)
+            Text(shop.words.callIt(preferQuote ? "mac.new_quote" : "mac.new_job")).font(.headline)
             Spacer()
         }
         .padding(18)
@@ -307,8 +335,21 @@ struct NewJobSheet: View {
 
             ForEach(parts) { part in
                 HStack(spacing: 8) {
-                    Text(part.name.isEmpty ? shop.words.callIt("mac.a_part") : part.name)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(part.name.isEmpty ? shop.words.callIt("mac.a_part") : part.name)
+                            .lineLimit(1)
+                        // A line from a model says where its grams and hours
+                        // came from: a slice, or the mesh.
+                        if let source = part.source {
+                            HStack(spacing: 8) {
+                                Text(Money.grams(Double(part.grams) ?? 0) + " " + shop.words.callIt("common.grams")
+                                     + " · " + Money.quantity(Double(part.hours) ?? 0) + " " + shop.words.callIt("common.hours"))
+                                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                FigureSourceLabel(shop: shop, source: source, note: part.sourceNote)
+                            }
+                        }
+                    }
                     Text("×\(part.qty)").foregroundStyle(.secondary).monospacedDigit()
                     Spacer()
                     if let agreed = part.agreedPrice {
@@ -808,10 +849,13 @@ struct NewJobSheet: View {
             Spacer()
             Button(shop.words.callIt("common.cancel")) { shop.takingAJob = false }
                 .keyboardShortcut(.cancelAction)
+            // Return presses whichever was asked for: Take the job, unless the
+            // sheet was opened to make a quote.
             Button(shop.words.callIt("mac.save_quote")) { Task { await save(asQuote: true) } }
+                .keyboardShortcut(preferQuote ? .defaultAction : nil)
                 .disabled(parts.isEmpty)
             Button(shop.words.callIt("mac.take_the_job")) { Task { await save(asQuote: false) } }
-                .keyboardShortcut(.defaultAction)
+                .keyboardShortcut(preferQuote ? nil : .defaultAction)
                 .disabled(parts.isEmpty)
         }
         .padding(18)

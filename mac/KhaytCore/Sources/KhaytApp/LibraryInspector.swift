@@ -135,7 +135,28 @@ struct LibraryInspector: View {
             }
             .controlSize(.small)
             .frame(maxWidth: .infinity, alignment: .leading)
+            quoteOrJob(file)
         }
+    }
+
+    /// Quote this model — or take the job — on its own figures, without
+    /// retyping them. ONE control: the click is the quote, the arrow holds
+    /// the job, so the row above does not grow a sixth button. On its own row
+    /// because that one is already as wide as the inspector.
+    private func quoteOrJob(_ file: LibraryFile) -> some View {
+        Menu {
+            Button(shop.words.callIt("mac.job_from_model") + "\u{2026}") {
+                Task { await shop.startJob(fromModels: [file], asQuote: false) }
+            }
+        } label: {
+            Label(shop.words.callIt("mac.quote_model") + "\u{2026}", systemImage: "doc.text")
+        } primaryAction: {
+            Task { await shop.startJob(fromModels: [file], asQuote: true) }
+        }
+        .fixedSize()
+        .controlSize(.small)
+        .disabled(!shop.canMoveJobs)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Who made it, as a way to the rest of their models; and the copies of
