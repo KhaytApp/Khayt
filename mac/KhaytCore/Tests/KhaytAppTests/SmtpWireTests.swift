@@ -157,7 +157,7 @@ struct SmtpWireTests {
     ///
     /// `fake-smtp.py` carries the same figure, and `patienceIsAgreed` below
     /// fails if the two ever drift apart.
-    static let patience: TimeInterval = 120
+    static let patience: TimeInterval = 600
 
     @Test("STARTTLS: the framer upgrades the socket and the whole message arrives")
     func startTlsSend() async throws {

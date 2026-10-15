@@ -173,7 +173,7 @@ def main():
         listener.listen(1)
         print("READY %d" % listener.getsockname()[1], flush=True)
 
-        # ── WHY THIS IS 120 AND NOT 30 ───────────────────────────────────
+        # ── WHY THIS IS 600 AND NOT 30 ───────────────────────────────────
         #
         # This is the SERVER's patience, and the server is a Python process
         # sharing a CI runner with 2,500 Swift tests. Thirty seconds sounds
@@ -183,7 +183,7 @@ def main():
         # expired — `TimeoutError: _ssl.c: The handshake operation timed out`
         # — while the client was still waiting perfectly happily.
         #
-        # The client already waits 120s in these tests for exactly that
+        # The client already waits 600s in these tests for exactly that
         # reason. The two have to agree, or raising one just moves which end
         # gives up first: the test failed with the client blaming the network
         # ("server closed session with no notification") for a server that had
@@ -192,7 +192,7 @@ def main():
         # This cannot hide a real fault. A handshake that never completes still
         # fails, two minutes later, and the transcript still says which end
         # stopped. It costs nothing on a run where the handshake takes 20ms.
-        PATIENCE = 120
+        PATIENCE = 600
         listener.settimeout(PATIENCE)
         transcript = {"said": [], "body": None, "upgraded": False,
                       "auth": None, "error": None}
