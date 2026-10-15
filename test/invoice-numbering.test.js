@@ -122,3 +122,17 @@ test('a new year restarts the quote sequence too', () => {
   globalThis.settings.quoteNumNext = 99;
   assert.equal(Number(nextQuoteSeq()), 1);
 });
+
+test('the desktop numbers with the shared rule, not a copy of it', () => {
+  // lib/order-new.js allocateInvoiceNumber is what the Mac and the recurring
+  // orders use. Same settings in, same number out — and the same counter left.
+  const N = require('../lib/order-new.js');
+  for (const fmt of ['{prefix}-{year}-{seq4}', '{year}/{seq4}', '{prefix}{seq4}']) {
+    const a = { invNumPrefix: 'F', invNumNext: 41, invNumYear: YEAR - 1, invNumFormat: fmt };
+    const b = { ...a };
+    globalThis.settings = a;
+    const desk = nextInvoiceNumber();
+    assert.equal(desk, N.allocateInvoiceNumber(b, YEAR), fmt);
+    assert.deepEqual(a, b, `${fmt}: the counter is left the same`);
+  }
+});

@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: invoice numbers come from the same rule as the Mac's.** The
+  desktop kept its own copy of the numbering (prefix, format, counter, the
+  January reset). It now uses the shared one, so the two apps cannot number an
+  invoice differently. Numbers themselves are unchanged.
+
 - **Mac: the engine's JavaScript shares a few threads instead of one per
   engine.** Each engine had a thread of its own, so a busy moment could run
   hundreds at once and keep the window, and the shop's Wi-Fi server, waiting.
