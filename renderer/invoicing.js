@@ -3,22 +3,15 @@
  */
 (function (global) {
 
-/* Feature 7: Configurable invoice number sequence */
+/* Feature 7: Configurable invoice number sequence.
+   The format, the counter and the January reset are lib/order-new.js
+   `allocateInvoiceNumber`, the rule the Mac and the recurring orders number
+   with, so a desktop invoice cannot be numbered differently.
+   This only adds the save. */
+const OrderNew = () => global.KhaytOrderNew
+  || (typeof require === 'function' ? require('../lib/order-new.js') : null);
 function nextInvoiceNumber() {
-  const currentYear = new Date().getFullYear();
-  if ((settings.invNumYear || currentYear) !== currentYear) {
-    settings.invNumYear = currentYear;
-    settings.invNumNext = 1;
-  }
-  const prefix = settings.invNumPrefix || 'INV';
-  const seq4 = String(settings.invNumNext || 1).padStart(4, '0');
-  const fmt = settings.invNumFormat || '{prefix}-{year}-{seq4}';
-  const result = fmt
-    .replace('{prefix}', prefix)
-    .replace('{year}', currentYear)
-    .replace('{seq4}', seq4);
-  settings.invNumNext = (settings.invNumNext || 1) + 1;
-  settings.invNumYear = currentYear;
+  const result = OrderNew().allocateInvoiceNumber(settings, new Date().getFullYear());
   saveAll();
   return result;
 }
