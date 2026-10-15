@@ -257,6 +257,15 @@ private struct BookMenu: View {
             }
         }
         .disabled(shop.orders.isEmpty && shop.expenses.isEmpty)
+        // The profit and loss over the period chosen on the Reports page — the
+        // figures that page draws, as a spreadsheet or a page to send. Here as
+        // well as on the page, because "get my numbers out" is asked from this
+        // menu; the period is the page's, and the file's name says which.
+        Menu(Words.upfront("pnl.export")) {
+            Button(Words.upfront("pnl.export_csv")) { Task { await shop.exportPnl(.csv) } }
+            Button(Words.upfront("pnl.export_pdf")) { Task { await shop.exportPnl(.pdf) } }
+        }
+        .disabled(shop.engine == nil)
 
         Divider()
         Picker(Words.upfront("mac.open_book"), selection: Binding(get: { shop.source }, set: { shop.open($0) })) {

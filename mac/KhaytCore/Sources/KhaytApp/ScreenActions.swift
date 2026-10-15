@@ -202,6 +202,16 @@ struct ScreenActions: View {
             } else if shop.showingReports, shop.reportPage == .best {
                 period
             } else if shop.showingReports, shop.reportPage == .profit {
+                // Which period the P&L covers, and the file it is exported as.
+                PnlPeriodMenu(shop: shop)
+                    .font(TypeScale.body(11.5))
+                    .foregroundStyle(Role.onNavy2)
+                    .fixedSize()
+                    .navyMenu()
+                PnlExportMenu(shop: shop)
+                    .foregroundStyle(Role.onNavy2)
+                    .fixedSize()
+                    .navyMenu()
                 // The P&L's grain: by quarter, the table's word, or by month.
                 Picker("", selection: $shop.pnlByMonth) {
                     Text(shop.words.callIt("mac.by_quarter")).tag(false)

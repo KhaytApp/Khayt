@@ -305,7 +305,10 @@
    *   it is not charged a full quarter's rent on day three.
    *
    * `ctx`: `{ settings, clients, currencies, now, granularity, wasteLog,
-   * machines, recentMonthlyHours, timeEntries, jobs }`. `timeEntries` is the
+   * machines, recentMonthlyHours, timeEntries, jobs, range }`. `range` is
+   * `{ from, to }`, book days (`YYYY-MM-DD`, either end optional) — see A
+   * CHOSEN SPAN below; absent, every period in the book is reported exactly
+   * as before. `timeEntries` is the
    * labour line (see LABOUR above); `jobs`, the whole book's orders, lets a
    * caller that passes a SLICE of the book as `orders` still leave out the
    * labour on a voided job. `machines` is what the depreciation line
@@ -350,6 +353,27 @@
         : `${d.getFullYear()}-Q${Math.ceil((d.getMonth() + 1) / 3)}`;
     };
 
+    /* ── A CHOSEN SPAN ─────────────────────────────────────────────────────
+     *
+     * "This month", "last quarter", a custom pair of days: the shop picks the
+     * stretch it is asking about and every figure follows it. Records are kept
+     * when their own day falls inside it — compared as `YYYY-MM-DD` strings,
+     * the book's local days, as lib/date-range.js does — and each period row
+     * is charged only the share of the overhead (and of a straight-line
+     * machine's depreciation) that lies inside the span. A span shorter than
+     * the grain — this month under the quarter view — is one row holding only
+     * the span's days, and says so with its `from`/`to`. */
+    const span = (c.range && (c.range.from || c.range.to))
+      ? { from: String(c.range.from || '').slice(0, 10), to: String(c.range.to || '').slice(0, 10) }
+      : null;
+    const inSpan = (dateStr) => {
+      if (!span) return true;
+      const ds = String(dateStr || '').slice(0, 10);
+      if (span.from && ds < span.from) return false;
+      if (span.to && ds > span.to) return false;
+      return true;
+    };
+
     const byQuarter = {};
     const at = (key) => {
       if (!byQuarter[key]) {
@@ -376,7 +400,7 @@
       const scope = (typeof global !== 'undefined' && global.KhaytBusinessScope) || null;
       if (scope && !scope.countsForBusiness(o)) continue;
       const key = quarterOf(o.date);
-      if (!key) continue;
+      if (!key || !inSpan(o.date)) continue;
       const row = at(key);
       // WHAT THE CUSTOMER PAID, which is not what the shop earned.
       const charged = money ? money.orderNetRevenueBase(o, moneyCtx, known) : (+o.price || 0);
@@ -417,7 +441,7 @@
     for (const e of expenses || []) {
       if (!e) continue;
       const key = quarterOf(e.date);
-      if (!key) continue;
+      if (!key || !inSpan(e.date)) continue;
       const paid = +e.amount || 0;
       // THE TAX ON A PURCHASE IS NOT A COST — for a registered shop. It is
       // reclaimed from the authority, so it belongs against the tax collected
@@ -447,7 +471,7 @@
     for (const w of (Array.isArray(c.wasteLog) ? c.wasteLog : [])) {
       if (!w) continue;
       const key = quarterOf(w.date);
-      if (!key) continue;
+      if (!key || !inSpan(w.date)) continue;
       const cost = wasteCostOf(w);
       if (cost > 0) at(key).waste += cost;
     }
@@ -464,7 +488,7 @@
       for (const e of labourEntries) {
         if (!e || !labourCounts(e, orderById)) continue;
         const key = quarterOf(e.date);
-        if (!key) continue;
+        if (!key || !inSpan(e.date)) continue;
         const cost = labourCostOf(e);
         if (cost > 0) at(key).labour += cost;
       }
@@ -500,12 +524,41 @@
         : null);
     const pad = (n) => String(n).padStart(2, '0');
     const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const boundsOf = (key) => {
+    /** The whole period's first and last day, and its end Date. */
+    const wholeOf = (key) => {
       const y = +key.slice(0, 4);
       const first = monthly ? +key.slice(5, 7) - 1 : (+key.slice(6) - 1) * 3;
       const from = new Date(y, first, 1);
       const end = new Date(y, first + (monthly ? 1 : 3), 0);
-      return { key, from: iso(from), to: iso(key === nowQuarter && now < end ? now : end) };
+      return { from: iso(from), to: iso(end), end };
+    };
+    /** A period's days cut to the chosen span; the period itself without one. */
+    const clipped = (key) => {
+      const w = wholeOf(key);
+      let from = w.from, to = w.to;
+      if (span && span.from && span.from > from) from = span.from;
+      if (span && span.to && span.to < to) to = span.to;
+      return { from, to };
+    };
+    const boundsOf = (key) => {
+      const w = wholeOf(key);
+      const cut = clipped(key);
+      let to = iso(key === nowQuarter && now < w.end ? now : w.end);
+      if (cut.to < to) to = cut.to;
+      return { key, from: cut.from, to };
+    };
+    // Days between two book days, counted on the calendar (UTC arithmetic on
+    // the three numbers, so a clock change inside the span cannot cost a day).
+    const dayNo = (s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 86400000;
+    const today = iso(now);
+    /** The share of a period's overhead inside the span, and up to today. */
+    const spanShare = (key) => {
+      const w = wholeOf(key);
+      const cut = clipped(key);
+      let to = cut.to;
+      if (key === nowQuarter && today < to) to = today;
+      if (to < cut.from) return 0;
+      return Math.max(0, Math.min(1, (dayNo(to) - dayNo(cut.from) + 1) / (dayNo(w.to) - dayNo(w.from) + 1)));
     };
     const machines = Array.isArray(c.machines) ? c.machines : [];
     const depreciationBy = (D && machines.length)
@@ -515,10 +568,16 @@
 
     return Object.keys(byQuarter).sort().reverse().map((key) => {
       const row = byQuarter[key];
-      const fixed = key === nowQuarter ? fixedPerQuarter * elapsed : fixedPerQuarter;
+      const fixed = span
+        ? fixedPerQuarter * spanShare(key)
+        : (key === nowQuarter ? fixedPerQuarter * elapsed : fixedPerQuarter);
       const depreciation = (depreciationBy[key] && depreciationBy[key].total) || 0;
+      // Only under a span: which of the period's days the row holds. Without
+      // one the row is the whole period and the output is as it always was.
+      const days = span ? clipped(key) : null;
       return {
         period: key,
+        ...(days ? { from: days.from, to: days.to } : {}),
         orders: row.orders,
         revenue: round2(row.revenue),
         shipping: round2(row.shipping),
@@ -556,8 +615,207 @@
     });
   }
 
+  /* ── THE P&L AS A FILE ────────────────────────────────────────────────────
+   *
+   * `pnlByPeriod`'s rows, over the span the shop chose, written out for an
+   * accountant: a CSV a spreadsheet opens and the HTML a PDF is printed from.
+   * Both from ONE set of totals (`periodTotals`), so the file and the screen —
+   * which sums the same rows — cannot disagree about a figure.
+   *
+   * MONEY IS A PLAIN NUMBER in the CSV: no currency mark, no thousands
+   * separator, a point for the decimal, unquoted — so a spreadsheet reads a
+   * number and can add it up. The currency is said once, in the header. Text
+   * is quoted and formula-guarded like every other export here. A BOM leads,
+   * because Excel on Windows reads a UTF-8 file without one in the system code
+   * page and turns Arabic labels into mojibake.
+   *
+   * The words are the caller's (`opts.labels`, keyed like the defaults below),
+   * so the file reads in the shop's language; the English defaults keep a
+   * caller that passes none readable. */
+  const STATEMENT_LABELS = {
+    title: 'Profit & Loss', period: 'Period', from: 'From', to: 'To', currency: 'Currency',
+    orders: 'Orders', revenue: 'Revenue', cogs: 'Cost of goods sold',
+    waste: 'Filament wasted (failed prints)', depreciation: 'Machine depreciation',
+    labour: 'Labour (logged hours)', expenses: 'Expenses', fixed: 'Fixed overhead',
+    costs: 'Costs', net: 'Net income', margin: 'Gross margin %',
+    vatCollected: 'VAT collected', vatReclaimable: 'VAT reclaimed', vatDue: 'VAT to remit',
+    total: 'Total', inventory: 'Filament bought (stock, counted when used)',
+    vatTitle: 'VAT for the period', vatOutput: 'Output VAT on sales',
+    vatInput: 'Input VAT on expenses', vatNet: 'Net VAT payable', vatSales: 'Sales, net of VAT',
+    vatMode: '', vatMissing: '',
+  };
+
+  /** Every money column of the rows added up, the margin blended once. */
+  function periodTotals(rows) {
+    const t = { orders: 0, revenue: 0, cogs: 0, waste: 0, depreciation: 0, labour: 0, expenses: 0,
+      fixed: 0, net: 0, vatCollected: 0, vatReclaimable: 0, vatDue: 0, inventory: 0 };
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (!r) continue;
+      for (const k of Object.keys(t)) t[k] += +r[k] || 0;
+    }
+    const out = {};
+    for (const k of Object.keys(t)) out[k] = k === 'orders' ? t[k] : round2(t[k]);
+    out.marginPct = t.revenue > 0 ? Math.round(((t.revenue - t.cogs) / t.revenue) * 1000) / 10 : null;
+    return out;
+  }
+
+  /** A number as a spreadsheet reads one: plain, two places at most. */
+  const plainNumber = (n) => (n == null || !Number.isFinite(+n) ? '' : String(round2(+n)));
+  const csvText = (v) => {
+    const t = v == null ? '' : String(v);
+    const safe = /^[=+\-@\t\r]/.test(t) ? "'" + t : t;
+    return '"' + safe.replace(/"/g, '""') + '"';
+  };
+  const csvCell = (v) => (typeof v === 'number' ? plainNumber(v) : csvText(v));
+  /** Oldest first, which is how a statement reads down the page. */
+  const chronological = (rows) => (Array.isArray(rows) ? rows.filter(Boolean) : [])
+    .slice().sort((a, b) => String(a.period).localeCompare(String(b.period)));
+  /** The whole days a period key names: "2026-Q3", "2026-09". */
+  function periodDays(key) {
+    const m = /^(\d{4})-(?:Q([1-4])|(0[1-9]|1[0-2]))$/.exec(String(key || ''));
+    if (!m) return null;
+    const y = +m[1];
+    const first = m[2] ? (+m[2] - 1) * 3 : +m[3] - 1;
+    const count = m[2] ? 3 : 1;
+    const p2 = (n) => String(n).padStart(2, '0');
+    const last = new Date(Date.UTC(y, first + count, 0)).getUTCDate();
+    return { from: `${y}-${p2(first + 1)}-01`, to: `${y}-${p2(first + count)}-${p2(last)}` };
+  }
+  /** Does the span hold only some of this row's period? */
+  const isPartial = (r) => {
+    if (!r || !r.from || !r.to) return false;
+    const w = periodDays(r.period);
+    return !w || r.from !== w.from || r.to !== w.to;
+  };
+  /** A row cut short by the span says which of its days it holds. */
+  const rowName = (r) => (isPartial(r) ? `${r.period} (${r.from} – ${r.to})` : String(r.period));
+
+  /**
+   * @param {Array} rows    pnlByPeriod's rows
+   * @param {object|null} vat   lib/vat-summary.js `summarize`, or null
+   * @param {object} [opts] `{ labels, currency, periodLabel, from, to }`
+   */
+  function periodsToCsv(rows, vat, opts) {
+    const o = opts || {};
+    const L = Object.assign({}, STATEMENT_LABELS, o.labels || {});
+    const list = chronological(rows);
+    const t = periodTotals(list);
+    const out = [];
+    out.push([L.title, o.periodLabel || '']);
+    if (o.from) out.push([L.from, o.from]);
+    if (o.to) out.push([L.to, o.to]);
+    if (o.currency) out.push([L.currency, o.currency]);
+    out.push([]);
+    const cols = ['period', 'orders', 'revenue', 'cogs', 'waste', 'depreciation', 'labour', 'expenses',
+      'fixed', 'net', 'margin', 'vatCollected', 'vatReclaimable', 'vatDue'];
+    out.push(cols.map((k) => L[k]));
+    const line = (name, r) => cols.map((k) => {
+      if (k === 'period') return name;
+      if (k === 'margin') return r.marginPct == null ? '' : +r.marginPct;
+      return +r[k] || 0;
+    });
+    for (const r of list) out.push(line(rowName(r), r));
+    out.push(line(L.total, t));
+    if (t.inventory) { out.push([]); out.push([L.inventory, t.inventory]); }
+    if (vat && vat.applies) {
+      out.push([]);
+      out.push([L.vatTitle]);
+      out.push([L.vatSales, +vat.sales || 0]);
+      out.push([L.vatOutput, +vat.output || 0]);
+      out.push([L.vatInput, +vat.input || 0]);
+      out.push([L.vatNet, +vat.net || 0]);
+      if (L.vatMode) out.push([L.vatMode]);
+      if (L.vatMissing) out.push([L.vatMissing]);
+    }
+    return '﻿' + out.map((r) => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
+  }
+
+  const escapeHtml = (v) => String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  /** Money on paper: grouped, two places, Western digits, a real minus. */
+  const paperMoney = (n) => {
+    const v = round2(+n || 0);
+    const parts = Math.abs(v).toFixed(2).split('.');
+    return (v < 0 ? '−' : '') + parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + parts[1];
+  };
+
+  /**
+   * The same statement as a page to print: the span's totals as a list of
+   * lines, the periods inside it as a short table, and the VAT summary. A4
+   * portrait holds six columns legibly; the CSV carries every one.
+   *
+   * @param {object} [opts] `{ labels, currency, periodLabel, from, to, dir, lang, shopName }`
+   */
+  function periodsToHtml(rows, vat, opts) {
+    const o = opts || {};
+    const L = Object.assign({}, STATEMENT_LABELS, o.labels || {});
+    const list = chronological(rows);
+    const t = periodTotals(list);
+    const dir = o.dir === 'rtl' ? 'rtl' : 'ltr';
+    const lineRow = (label, value, cls) =>
+      `<tr${cls ? ` class="${cls}"` : ''}><th scope="row">${escapeHtml(label)}</th><td>${paperMoney(value)}</td></tr>`;
+    const lines = [lineRow(L.revenue, t.revenue)];
+    lines.push(lineRow(L.cogs, -t.cogs));
+    if (t.waste) lines.push(lineRow(L.waste, -t.waste));
+    if (t.depreciation) lines.push(lineRow(L.depreciation, -t.depreciation));
+    if (t.labour) lines.push(lineRow(L.labour, -t.labour));
+    lines.push(lineRow(L.expenses, -t.expenses));
+    if (t.fixed) lines.push(lineRow(L.fixed, -t.fixed));
+    lines.push(lineRow(L.net, t.net, t.net < 0 ? 'net neg' : 'net'));
+    if (t.inventory) lines.push(lineRow(L.inventory, t.inventory, 'aside'));
+
+    const head = ['period', 'orders', 'revenue', 'costs', 'net', 'margin']
+      .map((k) => `<th scope="col">${escapeHtml(L[k])}</th>`).join('');
+    const costsOf = (r) => (+r.cogs || 0) + (+r.waste || 0) + (+r.depreciation || 0)
+      + (+r.labour || 0) + (+r.expenses || 0) + (+r.fixed || 0);
+    const pct = (m) => (m == null ? '—' : `${m}%`);
+    const periodRow = (name, r) => `<tr><th scope="row">${escapeHtml(name)}</th>`
+      + `<td>${+r.orders || 0}</td><td>${paperMoney(r.revenue)}</td><td>${paperMoney(-costsOf(r))}</td>`
+      + `<td>${paperMoney(r.net)}</td><td>${pct(r.marginPct)}</td></tr>`;
+    const body = list.map((r) => periodRow(rowName(r), r)).join('');
+
+    let vatBlock = '';
+    if (vat && vat.applies) {
+      const notes = [L.vatMode, L.vatMissing].filter(Boolean)
+        .map((n) => `<p class="note">${escapeHtml(n)}</p>`).join('');
+      vatBlock = `<h2>${escapeHtml(L.vatTitle)}</h2><table class="lines">`
+        + lineRow(L.vatSales, vat.sales, 'aside')
+        + lineRow(L.vatOutput, vat.output)
+        + lineRow(L.vatInput, -(+vat.input || 0))
+        + lineRow(L.vatNet, vat.net, 'net')
+        + `</table>${notes}`;
+    }
+    const sub = [o.periodLabel, o.from && o.to ? `${o.from} – ${o.to}` : '', o.currency || '']
+      .filter(Boolean).map(escapeHtml).join(' · ');
+    return `<div class="pnl-doc" dir="${dir}"${o.lang ? ` lang="${escapeHtml(o.lang)}"` : ''}>`
+      + '<style>'
+      + '.pnl-doc{font:11px/1.5 -apple-system,"SF Pro Text","Segoe UI",Tahoma,sans-serif;color:#1a1a1a}'
+      + '.pnl-doc h1{font-size:18px;margin:0 0 2px}.pnl-doc h2{font-size:13px;margin:18px 0 6px}'
+      + '.pnl-doc .sub{color:#555;margin:0 0 14px}'
+      + '.pnl-doc table{width:100%;border-collapse:collapse;margin:0 0 6px}'
+      + '.pnl-doc th,.pnl-doc td{padding:4px 6px;border-bottom:1px solid #e3e0da;text-align:start;font-weight:400}'
+      + '.pnl-doc td{text-align:end;font-variant-numeric:tabular-nums;white-space:nowrap}'
+      + '.pnl-doc thead th{text-align:end;font-size:10px;color:#555;border-bottom:1px solid #999}'
+      + '.pnl-doc thead th:first-child{text-align:start}'
+      + '.pnl-doc tr.net th,.pnl-doc tr.net td{font-weight:700;border-top:1px solid #999}'
+      + '.pnl-doc tr.neg td{color:#b3261e}.pnl-doc tr.aside th,.pnl-doc tr.aside td{color:#666}'
+      + '.pnl-doc tfoot th,.pnl-doc tfoot td{font-weight:700;border-top:1px solid #999}'
+      + '.pnl-doc .note{color:#555;margin:4px 0}'
+      + '</style>'
+      + `<h1>${escapeHtml(L.title)}${o.shopName ? ' · ' + escapeHtml(o.shopName) : ''}</h1>`
+      + `<p class="sub">${sub}</p>`
+      + `<table class="lines">${lines.join('')}</table>`
+      + `<h2>${escapeHtml(L.period)}</h2>`
+      + `<table class="periods"><thead><tr>${head}</tr></thead><tbody>${body}</tbody>`
+      + `<tfoot>${periodRow(L.total, t)}</tfoot></table>`
+      + vatBlock
+      + '</div>';
+  }
+
   const api = { computePnl, pnlToCsv, pnlByPeriod, isInventoryPurchase, INVENTORY_CATEGORIES, stockShare,
-    labourCostOf, labourCounts, looksLikePayroll, payrollFixedCosts };
+    labourCostOf, labourCounts, looksLikePayroll, payrollFixedCosts,
+    periodTotals, periodsToCsv, periodsToHtml, STATEMENT_LABELS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') globalThis.KhaytPnl = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

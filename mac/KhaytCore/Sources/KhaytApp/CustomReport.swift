@@ -358,7 +358,7 @@ struct FlowChips: View {
 /// A day, typed. `DatePicker` would be the obvious control and is the wrong
 /// one: both ends are OPTIONAL here — an empty box means "no bound" — and a
 /// date picker has no way to be empty.
-private struct DayField: View {
+struct DayField: View {
     let title: String
     let hint: String
     @Binding var text: String

@@ -626,6 +626,12 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// fixed cost — possibly the same money twice. The rule cannot know, so it
     /// says so and the screen passes it on; nothing is subtracted.
     public let labourOverlap: Bool?
+    /// The first and last book day the row holds, present only when the P&L
+    /// was asked for a span (`PnlRange`): a span shorter than the grain — this
+    /// month under the quarter view — is one row holding just the span's days,
+    /// and these say which. Nil for a whole period.
+    public let from: String?
+    public let to: String?
     public var id: String { period }
 }
 

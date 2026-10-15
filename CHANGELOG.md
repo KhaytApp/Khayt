@@ -11,6 +11,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   used another (INV-2026-0012), so a payment could not be matched to its
   invoice. They all use the number the invoice prints now. Invoices already
   sent keep their number.
+- **Mac: choose the period of your profit and loss, export it, and see the VAT
+  for it.** Reports ▸ Profit & Loss has a period menu: this month, last
+  month, this quarter, last quarter, this year, last year, a custom pair of
+  days, or all time, remembered per window. The table, the waterfall, the
+  totals, the expenses breakdown and their headings all follow it, and a
+  period's fixed costs are charged only for the days it covers. The P&L
+  exports as CSV (opens in Excel with Arabic intact, money as plain numbers)
+  or PDF, from the page or Book ▸ Export Profit & Loss, with the period's
+  days in the file name. A shop with a tax set also sees VAT for the period:
+  the VAT on its sales, the VAT on expenses that recorded it, and the net
+  owed or refundable. Expenses saved without their VAT are counted and named,
+  since nothing can be reclaimed on them. Words added in all nine languages.
 
 - **iPhone: the calculator charges the shop's overhead too.** When a shop turns
   on "overhead per print hour" in the Mac's Settings, the iPhone calculator now
