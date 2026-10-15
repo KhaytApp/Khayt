@@ -870,7 +870,7 @@ struct OperationsPane: View {
              // `settings-edit` rebuilds `expBudgets` from ITS category list
              // whenever this field is present, so every category has to be in
              // here — a partial map would silently zero the ones left out.
-             // `Shop.expenseCategories` is the same six.
+             // `Shop.expenseCategories` is the same seven.
              "budgets": .object(budgets.mapValues(JSONValue.number)),
              "paymentReminder": .object(["enabled": .bool(payReminderEnabled),
                                          "graceDays": .number(payReminderGrace)]),

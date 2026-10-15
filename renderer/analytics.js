@@ -1759,6 +1759,15 @@ function renderPnLSection() {
           ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:6px;">${escapeHtml(t('pnl.inventory_note', { amount: fmtMoney(bought) }))}</div>`
           : '';
       })()}
+      ${(() => {
+        // A machine bought that depreciation already spreads out is not in
+        // these expenses either (lib/pnl-report.js, A MACHINE IS PAID FOR
+        // ONCE). Said here, or the purchase looks missing.
+        const kit = rows.reduce((s, r) => s + (r.capital || 0), 0);
+        return kit > 0
+          ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:6px;">${escapeHtml(t('pnl.capital_note', { amount: fmtMoney(kit) }))}</div>`
+          : '';
+      })()}
       ${rows.some((r) => r.labourOverlap)
         // Logged labour beside pay booked as an expense or a fixed cost: the
         // rule cannot know whether they are the same money, so it says so.
@@ -2842,16 +2851,22 @@ function pnlInputsForRange() {
     });
   const expenseRows = (expenses || [])
     .filter(e => inRange(e.date, analyticsRange, 'analytics'))
-    .map(e => ({ amount: +e.amount || 0, category: e.category || '' }));
+    // Date and receipt tax travel too: lib/pnl-report.js recognises a machine
+    // bought that depreciation already carries by its day and price.
+    .map(e => ({ amount: +e.amount || 0, category: e.category || '', date: e.date || '',
+                 vatAmount: +e.vatAmount || 0 }));
   // Filament lost to failed prints — its own P&L line (lib/pnl-report.js).
   const wasteRows = (typeof wasteLog !== 'undefined' ? wasteLog : [])
     .filter(w => w && inRange(w.date, analyticsRange, 'analytics'))
     .map(w => ({ cost: +w.cost || 0 }));
   // Machines losing value over the range — the one place wear enters the P&L.
   const span = analyticsRangeSpan((printLog || []).map(o => o.date));
+  // Once, for the depreciation line and for the rule that recognises a
+  // machine's purchase among the expenses (lib/pnl-report.js).
+  const recentMonthlyHours = (typeof machineRecentHours === 'function' ? machineRecentHours() : {});
   const dep = (typeof KhaytDepreciation !== 'undefined' && span)
     ? KhaytDepreciation.periodCharges(machines || [], printLog || [], [{ key: 'range', from: span.from, to: span.to }],
-        { recentMonthlyHours: (typeof machineRecentHours === 'function' ? machineRecentHours() : {}) })
+        { recentMonthlyHours })
     : {};
   const depreciation = (dep.range && dep.range.total) || 0;
   // Logged labour in the range, with its job's scope (lib/pnl-report.js
@@ -2860,7 +2875,8 @@ function pnlInputsForRange() {
   const labourRows = (typeof timeEntries !== 'undefined' ? timeEntries : [])
     .filter(e => e && inRange(e.date, analyticsRange, 'analytics') && KhaytPnl.labourCounts(e, byId));
   return { orders, expenses: expenseRows, waste: wasteRows, depreciation,
-           labour: labourRows, fixedCosts: (settings && settings.fixedCosts) || [] };
+           labour: labourRows, fixedCosts: (settings && settings.fixedCosts) || [],
+           machines: machines || [], recentMonthlyHours };
 }
 
 function exportPnlCsv() {
@@ -2870,17 +2886,18 @@ function exportPnlCsv() {
     const f = customRangeFrom.analytics || '', tt = customRangeTo.analytics || '';
     if (f || tt) label = `${f || '…'} → ${tt || '…'}`;
   }
-  const { orders, expenses: exps, waste, depreciation, labour, fixedCosts } = pnlInputsForRange();
+  const { orders, expenses: exps, waste, depreciation, labour, fixedCosts, machines: kit, recentMonthlyHours } = pnlInputsForRange();
 
   if (!orders.length && !exps.length) { toast(t('an.pnl_empty') || 'No data for this period', 'error'); return; }
 
-  const summary = KhaytPnl.computePnl({ orders, expenses: exps, waste, depreciation, labour, fixedCosts, label });
+  const summary = KhaytPnl.computePnl({ orders, expenses: exps, waste, depreciation, labour, fixedCosts, label,
+    machines: kit, recentMonthlyHours });
   const labels = {
     title: t('pnl.title'), item: t('pnl.item'), amount: t('pnl.amount'), orders: t('an.pnl_orders'),
     revenue: t('an.revenue'), cogs: t('pnl.cogs'), gross: t('pnl.gross'), gross_margin: t('pnl.gross_margin'),
     opex: t('pnl.opex'), vat: t('an.pnl_vat'), net: t('an.pnl_net'),
     inventory: t('pnl.inventory'), waste: t('pnl.waste'), depreciation: t('pnl.depreciation'),
-    labour: t('pnl.labour'),
+    labour: t('pnl.labour'), capital: t('pnl.capital'),
   };
   const csv = KhaytPnl.pnlToCsv(summary, { currency: currencySymbol(), labels });
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }),

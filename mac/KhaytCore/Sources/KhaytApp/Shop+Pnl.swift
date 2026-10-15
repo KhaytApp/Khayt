@@ -74,6 +74,7 @@ extension Shop {
             "vatDue": words.callIt("exp.vat_due"),
             "total": words.callIt("common.total"),
             "inventory": words.callIt("pnl.inventory"),
+            "capital": words.callIt("pnl.capital"),
             "vatTitle": words.callIt("pnl.vat_title"),
             "vatSales": words.callIt("pnl.vat_sales"),
             "vatOutput": words.callIt("pnl.vat_output"),

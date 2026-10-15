@@ -1456,6 +1456,14 @@ struct Reports: View {
                                 DetailLine(shop.words.callIt("pnl.inventory"),
                                            Money.text(bought, shop.currency), dim: true)
                             }
+                            // EQUIPMENT BOUGHT, the same way: a machine the
+                            // depreciation line already spreads out, so it is
+                            // not an expense as well. Paid for once.
+                            let kit = rows.reduce(0) { $0 + ($1.capital ?? 0) }
+                            if kit > 0 {
+                                DetailLine(shop.words.callIt("pnl.capital"),
+                                           Money.text(kit, shop.currency), dim: true)
+                            }
                         }
                         .card()
                     }
