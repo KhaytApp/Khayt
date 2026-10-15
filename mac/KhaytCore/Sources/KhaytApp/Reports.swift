@@ -424,7 +424,8 @@ struct Reports: View {
                     Text("—").foregroundStyle(.tertiary)
                 }
             }
-            .width(min: 54, ideal: 54, max: 120)
+            // The table's last 10pt of slack, so the header is never cut.
+            .width(min: 64, ideal: 64, max: 120)
             TableColumn(shop.words.callIt("mac.pnl_col_vat"), value: \.vatCollected) { r in
                 Text(Money.figure(r.vatCollected))
                     .monospacedDigit().foregroundStyle(.secondary)

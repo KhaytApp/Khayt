@@ -8,7 +8,8 @@
  * and the document printed `order.id` under "No." — so a tax invoice went out
  * numbered `QUO-2026-0007`. Electron numbered it in `approveQuote`; the rule
  * the Mac now runs is `KhaytOrderNew.ensureInvoiceNumber`, and the document
- * prints `invoiceNumber || invoiceNum || id`.
+ * prints `KhaytInvoiceDocument.documentNumber`: the invoice number for a job that
+ * began as a quote, the id for anything else (a plain job's id IS its number).
  *
  * Also here: the shop's own second-language line is not printed when it says
  * exactly what the first line says (a shop with only an English name printed
@@ -149,4 +150,84 @@ test('a real translation is still printed beside the original', () => {
   const html = render(ORDER, { settings, language: 'en' });
   assert.ok(html.includes('Tuwaiq Additive'));
   assert.ok(html.includes('تويق أدتف'));
+});
+
+/* ── which number a document prints: documentNumber ───────────────────── */
+//
+// alpha.74 review, B1. #1868 printed `invoiceNumber || invoiceNum || id` for
+// EVERY non-quote, and a plain job's id is built from `settings.invPrefix`
+// while its invoiceNumber comes off the counter's `invNumPrefix`. A shop with
+// the prefix ATH saw ATH-2026-0012 become INV-2026-0012 on a reprint of an
+// invoice it had already sent. Only a job that began as a quote prints the
+// invoice counter's number.
+
+const D = require('../lib/invoice-document.js');
+
+test('documentNumber: a plain job with a custom invPrefix prints its id, not the counter', () => {
+  const order = { id: 'ATH-2026-0012', status: 'pending',
+                  invoiceNum: 'INV-2026-0012', invoiceNumber: 'INV-2026-0012' };
+  assert.equal(D.documentNumber(order, { invPrefix: 'ATH', quotePrefix: 'QUO' }), 'ATH-2026-0012');
+});
+
+test('documentNumber: an accepted quote prints its invoice number', () => {
+  const order = { id: 'QUO-2026-0007', status: 'pending', quoteAcceptedAt: '2026-10-01',
+                  invoiceNumber: 'INV-2026-0031' };
+  assert.equal(D.documentNumber(order, {}), 'INV-2026-0031');
+  const online = { id: 'ATH-2026-0008', status: 'completed', clientApprovedAt: '2026-10-01T09:00:00Z',
+                   invoiceNum: 'INV-2026-0030' };
+  assert.equal(D.documentNumber(online, {}), 'INV-2026-0030', 'the older spelling, approved online');
+  const custom = { id: 'Q-2026-0004', status: 'printing', invoiceNumber: 'INV-2026-0041' };
+  assert.equal(D.documentNumber(custom, { quotePrefix: 'Q' }), 'INV-2026-0041', "the shop's own quote prefix");
+});
+
+test('documentNumber: a quote prints its quote id', () => {
+  const order = { id: 'QUO-2026-0007', status: 'quote', invoiceNumber: 'INV-2026-0099' };
+  assert.equal(D.documentNumber(order, {}), 'QUO-2026-0007');
+});
+
+test('documentNumber: missing settings reads the default quote prefix, and nothing throws', () => {
+  const accepted = { id: 'QUO-2026-0007', status: 'pending', invoiceNumber: 'INV-2026-0031' };
+  assert.equal(D.documentNumber(accepted), 'INV-2026-0031');
+  assert.equal(D.documentNumber(accepted, null), 'INV-2026-0031');
+  const plain = { id: 'ATH-2026-0012', status: 'pending', invoiceNumber: 'INV-2026-0012' };
+  assert.equal(D.documentNumber(plain), 'ATH-2026-0012');
+  assert.equal(D.documentNumber(null), '');
+  assert.equal(D.documentNumber(undefined, {}), '');
+});
+
+test('documentNumber: hasQuote alone is not a quote, and an accepted quote with no number prints its id', () => {
+  const held = { id: 'ATH-2026-0013', status: 'pending', hasQuote: true, invoiceNumber: 'INV-2026-0013' };
+  assert.equal(D.documentNumber(held, {}), 'ATH-2026-0013');
+  const unnumbered = { id: 'QUO-2026-0002', status: 'pending', quoteAcceptedAt: '2026-10-01' };
+  assert.equal(D.documentNumber(unnumbered, {}), 'QUO-2026-0002');
+});
+
+test('the printed invoice of a plain job with a custom invPrefix keeps its id', () => {
+  const order = Object.assign({}, ORDER, { id: 'ATH-2026-0012', status: 'pending',
+                                           invoiceNum: 'INV-2026-0012', invoiceNumber: 'INV-2026-0012' });
+  const settings = Object.assign({}, SHOP, { invPrefix: 'ATH' });
+  assert.equal(printedNumber(render(order, { settings })), 'ATH-2026-0012');
+});
+
+/* ── an unapproved quote On hold is owed nothing (review S3a) ─────────── */
+
+test('On hold with a quote attached and no yes is not owed a number', () => {
+  const settings = { invNumNext: 7 };
+  for (const id of ['ATH-2026-0014', 'QUO-2026-0014']) {
+    const order = { id, status: 'on_hold', hasQuote: true };
+    assert.equal(N.invoiceNumberOwed(order, settings), false, id);
+    assert.equal(N.ensureInvoiceNumber(order, settings, 2026), null, id);
+  }
+  assert.equal(settings.invNumNext, 7, 'the counter did not move');
+});
+
+test('On hold after the customer said yes is owed one', () => {
+  const settings = { invNumNext: 7, invNumYear: 2026 };
+  const order = { id: 'ATH-2026-0015', status: 'on_hold', hasQuote: true, clientApprovedAt: '2026-10-02T08:00:00Z' };
+  assert.equal(N.invoiceNumberOwed(order, settings), true);
+});
+
+test('hasQuote alone, off hold, does not make a plain job owed', () => {
+  const order = { id: 'ATH-2026-0016', status: 'pending', hasQuote: true };
+  assert.equal(N.invoiceNumberOwed(order, {}), false);
 });

@@ -1678,6 +1678,29 @@ extension Shop {
         }
     }
 
+    /// What an invoice may print under "No.".
+    enum InvoiceNumbering: Equatable, Sendable {
+        /// The number to print — `KhaytInvoiceDocument.documentNumber`.
+        case number(String)
+        /// The job began as a quote and has not been given its invoice number:
+        /// printing now would put the quote's id on a tax invoice.
+        case notIssued
+    }
+
+    /// The number this job's invoice prints, or that it may not be printed yet.
+    ///
+    /// Asked AFTER `issueInvoiceNumberIfOwed`: a job still owed a number then
+    /// is one this viewer could not number (the sample shop, a read-only book,
+    /// no orders.edit) or whose write failed. Nil without a runtime.
+    func invoiceNumbering(of row: JSONValue) async -> InvoiceNumbering? {
+        guard let engine else { return nil }
+        if (try? await engine.invoiceNumberOwed(order: row, settings: settingsDict)) == true {
+            return .notIssued
+        }
+        guard let n = try? await engine.documentNumber(order: row, settings: settingsDict) else { return nil }
+        return .number(n)
+    }
+
     /// Build a printable sheet of shelf labels, for the spools given or for the
     /// whole shelf when none are.
     ///

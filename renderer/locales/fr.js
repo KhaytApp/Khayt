@@ -4600,7 +4600,7 @@
   "calc.bd.overhead": "Frais généraux",
   "set.overhead_title": "Frais généraux par heure d’impression",
   "set.overhead_on": "Ajouter mes coûts fixes aux devis, par heure d’impression",
-  "set.overhead_hint": "Désactivé par défaut. Une fois activé, chaque devis reçoit une ligne Frais généraux (ce taux × les heures d’impression du travail), majorée comme vos autres coûts. Les salaires sont exclus, car la main-d’œuvre est déjà une ligne à part. La marge affichée par le calculateur est mesurée après les frais généraux : l’alerte de marge minimale peut donc apparaître plus souvent.",
+  "set.overhead_hint": "Désactivé par défaut. Une fois activé, chaque devis reçoit une ligne Frais généraux (ce taux × les heures d’impression du travail), majorée comme vos autres coûts. Les salaires sont exclus, car la main-d’œuvre est déjà une ligne à part. Les prix les incluent, et votre marge s’ajoute par-dessus.",
   "set.overhead_hours": "Heures d’impression par mois",
   "set.overhead_hours_ph": "Auto",
   "set.overhead_hours_hint": "Laissez vide pour le calculer à partir de vos machines : leurs heures mensuelles, ce qu’elles ont imprimé récemment ou leur objectif quotidien.",

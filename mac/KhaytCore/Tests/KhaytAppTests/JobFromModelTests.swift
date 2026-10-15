@@ -193,21 +193,33 @@ struct JobFromModelTests {
     func paidInFull() throws {
         let json = #"{"gross": 500, "credited": 0, "giftCard": 100, "cash": 400}"#
         let due = try JSONDecoder().decode(KhaytEngine.CashDue.self, from: Data(json.utf8))
-        #expect(PaymentSheet.paidInFull(due: due, price: 500) == 400)
-        // Before the engine answers, the price.
-        #expect(PaymentSheet.paidInFull(due: nil, price: 123.456) == 123.46)
-        #expect(PaymentSheet.paidInFull(due: nil, price: -5) == 0)
-        #expect(PaymentSheet.paidInFull(due: nil, price: .nan) == 0)
+        #expect(PaymentSheet.paidInFull(due: due, recorded: 0) == 400)
+        #expect(PaymentSheet.paidInFull(due: due, recorded: 150) == 400, "a part payment is raised to the whole")
+        // Before the engine answers there is no figure: the fallback was the
+        // NET price, short by the tax on an exclusive shop (alpha.74 review).
+        #expect(PaymentSheet.paidInFull(due: nil, recorded: 0) == nil)
+    }
+
+    @Test("Paid in full never lowers a recorded payment: 100 paid, then a 30 credit note")
+    func paidInFullNeverLowers() throws {
+        let json = #"{"gross": 100, "credited": 30, "giftCard": 0, "cash": 70}"#
+        let due = try JSONDecoder().decode(KhaytEngine.CashDue.self, from: Data(json.utf8))
+        let afterCredit = PaymentSheet.paidInFull(due: due, recorded: 100)
+        #expect(afterCredit == nil, "the button wrote 70 over the 100 the customer paid")
+        let settled = PaymentSheet.paidInFull(due: due, recorded: 70)
+        #expect(settled == nil, "already settled: nothing to raise")
+        let odd = #"{"gross": 100, "credited": 0, "giftCard": 0, "cash": 100.004}"#
+        let rounded = try JSONDecoder().decode(KhaytEngine.CashDue.self, from: Data(odd.utf8))
+        #expect(PaymentSheet.paidInFull(due: rounded, recorded: 100) == nil)
     }
 
     @Test("Paid in full on a real job reads Owed nothing, by the same rule the sheet shows")
     func paidInFullOnAJob() async throws {
         let shop = await Self.shop()
-        let job = try #require(shop.orders.first { $0.price > 0 })
-        let due = await shop.cashDue(job.id)
-        let full = PaymentSheet.paidInFull(due: due, price: job.price)
-        let cash = due?.cash ?? job.price
-        #expect(abs(cash - full) < 0.005)
+        let job = try #require(shop.orders.first { $0.price > 0 && $0.paidAmount <= 0 })
+        let due = try #require(await shop.cashDue(job.id))
+        let full = try #require(PaymentSheet.paidInFull(due: due, recorded: job.paidAmount))
+        #expect(abs(due.cash - full) < 0.005)
         #expect(full > 0)
     }
 

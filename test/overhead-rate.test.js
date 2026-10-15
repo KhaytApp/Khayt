@@ -206,6 +206,28 @@ test('newOrder: ON, the price carries it, the record says so, the parts\' cost d
   assert.equal(agreed.price, 30 * 2 + 10 + 5);
 });
 
+test('newOrder: a job taken from a catalogue product carries no overhead (alpha.74 review S4)', () => {
+  // The product has one price: product-pricing, the storefront feed and a
+  // shelf sale price it without the line, so the job taken from it must too.
+  const fromProduct = job({ overheadPerHour: 4.2, productId: 'PRD-1' });
+  const plain = job({ productId: 'PRD-1' });
+  assert.equal(fromProduct.price, plain.price);
+  assert.equal('overheadCost' in fromProduct, false);
+  assert.equal(N.overheadHours([PART()], { productId: 'PRD-1' }), 0);
+  assert.equal(N.overheadHours([PART()], {}), 6, 'no product: 3 h × 2 pieces');
+  assert.equal(N.overheadHours([PART()]), 6, 'the one-argument call is unchanged');
+});
+
+test('newOrder: a typed price records no overhead it was never priced to carry (N1)', () => {
+  const typed = job({ overheadPerHour: 4.2, priceOverride: 99 });
+  assert.equal(typed.price, 99);
+  assert.equal(typed.priceSource, 'override');
+  assert.equal('overheadCost' in typed, false);
+  // A rounded price still carries it: rounding moves the figure, not its makeup.
+  const rounded = job({ overheadPerHour: 4.2, priceRound: { step: 5, mode: 'up' } });
+  assert.equal(rounded.overheadCost, 25.2);
+});
+
 const PRESET = { id: 'P1', wearRate: 0.75, powerDraw: 150, elecRate: 0.18, laborRate: 90, failureRate: 10, prepTime: 0.25, postTime: 0.5 };
 const SLICED = { exact: true, source: 'slicer', printTimeMins: 180, filamentGrams: 40 };
 const book = (settingsOver = {}, more = {}) => ({
@@ -314,6 +336,15 @@ test('the Electron calculator\'s real updateGrandTotal: OFF unchanged, ON charge
   assert.equal(on.els.partLivePrice.textContent, (((3.6 + 12.6) * 1.5) * 2).toFixed(2));
   // The margin shown is measured after the overhead: 1 − 32.4 ÷ 48.6.
   assert.match(on.els.marginWarning.innerHTML, /33% margin/);
+});
+
+test('the Electron calculator charges no overhead on a job taken from a catalogue product (S4)', () => {
+  const r2 = (n) => Math.round(n * 100) / 100;
+  const fromProduct = calculatorContext(SHOP({ mode: 'professional' }), FORM, { currentBuildFromProductId: 'PRD-1' });
+  fromProduct.ctx.updateGrandTotal();
+  assert.equal(fromProduct.ctx.lastQuote.overhead, 0);
+  assert.equal(r2(fromProduct.ctx.lastQuote.total), 10.8, 'the price the product has everywhere else');
+  assert.doesNotMatch(fromProduct.els.costBreakdown.innerHTML, /calc\.bd\.overhead/);
 });
 
 test('the Electron calculator\'s real logPrint hands the job the rate the screen showed', () => {

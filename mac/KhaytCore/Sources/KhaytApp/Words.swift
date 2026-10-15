@@ -1658,7 +1658,13 @@ final class Words {
         // GROSS: `marginPct` is (revenue − cost of goods) / revenue — nothing
         // else is taken off it — so "Margin" beside a net income read as the
         // net margin it is not.
-        "mac.pnl_col_margin": ["en": "Gross margin", "ar": "الهامش الإجمالي"],
+        //
+        // SHORT, because the table has 10pt to spare at 1,320 × 760 (its ideals
+        // must fit beside the totals — `ColumnWidthsTests.pnlIdealsFit`), and
+        // "Gross margin" / «الهامش الإجمالي» came out "Gross…" / «الهامش الإ…»
+        // (alpha.74 review). Every figure under it carries its own "%", and
+        // «مجمل الربح» is the accountant's word for gross profit.
+        "mac.pnl_col_margin": ["en": "Gross %", "ar": "مجمل الربح"],
         // The table's cost column: expenses, the monthly overhead, machine
         // depreciation and labour. NOT "Expenses", which the waterfall uses for
         // expenses alone; and not "All costs", because cost of goods and waste
@@ -3859,6 +3865,8 @@ final class Words {
         "mac.saved_to":      ["en": "Saved as",     "ar": "حُفظ باسم"],
         "mac.no_document":   ["en": "This job's invoice could not be built.",
                               "ar": "تعذّر إنشاء فاتورة هذا العمل."],
+        "mac.invoice_not_issued": ["en": "Invoice number not issued yet",
+                                   "ar": "لم يُصدَر رقم الفاتورة بعد"],
         // ── The LAN server ───────────────────────────────────────────────
         // The TAB name, as with Integrations and Slicers: Khayt's own heading
         // for this block is `lan.settings_intro`, a sentence. The words inside

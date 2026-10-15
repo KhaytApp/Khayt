@@ -432,7 +432,16 @@ struct Calculator: View {
         }
         .controlSize(.small)
         .disabled(!shop.canMoveJobs || model.costed == nil)
-        .help(shop.words.callIt("mac.make_quote_help"))
+        .help(Self.makeHelp(shop))
+    }
+
+    /// What hovering "Make quote…/Make job…" says. Off on the sample shop, and
+    /// a button that is off with a hover describing what it WOULD do left the
+    /// shop guessing why it would not (alpha.74 review): so it says why.
+    static func makeHelp(_ shop: Shop) -> String {
+        if !shop.source.isReal { return shop.words.callIt("mac.move_sample") }
+        if !shop.canMoveJobs { return shop.lockedReason }
+        return shop.words.callIt("mac.make_quote_help")
     }
 
     private func make(asQuote: Bool) {

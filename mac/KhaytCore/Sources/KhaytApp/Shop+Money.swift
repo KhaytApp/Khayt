@@ -88,11 +88,12 @@ extension Shop {
 
     /// The print hours a cart's overhead is charged on, counted by the rule
     /// the saved job is priced with (`KhaytOrderNew.overheadHours`: print time
-    /// × quantity, agreed parts left out) so the preview and the record agree.
-    func overheadHours(of parts: [NewJobSheet.Draft]) async -> Double {
+    /// × quantity, agreed parts left out, none at all on a job taken from a
+    /// catalogue product) so the preview and the record agree.
+    func overheadHours(of parts: [NewJobSheet.Draft], productId: String? = nil) async -> Double {
         guard overheadPerHour > 0, let engine else { return 0 }
         let rows = Self.partRows(parts, spools: spools, unnamed: "")
-        return (try? await engine.overheadHours(rows)) ?? 0
+        return (try? await engine.overheadHours(rows, productId: productId)) ?? 0
     }
 
     /// The cart and the money, in the shape `lib/order-new.js` takes.

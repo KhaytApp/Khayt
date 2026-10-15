@@ -36,6 +36,9 @@ struct InvoiceTests {
         var order: [String: JSONValue] = [
             "id": .string("J1"),
             "invoiceNumber": .string("INV-0007"),
+            // A quote the customer accepted: only a job that began as one
+            // prints the invoice counter's number (`documentNumber`).
+            "quoteAcceptedAt": .string("2026-07-01"),
             "date": .string("2026-07-02T14:32:00.000Z"),
             "status": .string("completed"),
             "project": .string("Turbine bracket"),
@@ -99,11 +102,12 @@ struct InvoiceTests {
     func theDocument() async throws {
         let doc = try await Self.build(Self.paper())
 
-        // The number an INVOICE states is its `invoiceNumber` — the counter the
-        // tax authority reads — and the id only when it has none. It printed
-        // the id, so an accepted quote was invoiced as "QUO-…" (Oct 2026). The
-        // sheet's header and saved filename follow the same rule
-        // (`InvoiceSheet.documentNumber`).
+        // The number an accepted quote's INVOICE states is its `invoiceNumber`
+        // — the counter the tax authority reads — and the id only when it has
+        // none. It printed the id, so an accepted quote was invoiced as "QUO-…"
+        // (Oct 2026). A job that was never a quote prints its id. The sheet's
+        // header and saved filename ask the same rule
+        // (`KhaytInvoiceDocument.documentNumber`, via `Shop.invoiceNumbering`).
         let numbered = doc.html.contains("<span class=\"v\">INV-0007</span>")
         #expect(numbered, "the invoice number, as the shared document states it")
         #expect(doc.html.contains("Turbine bracket"), "what was made")
