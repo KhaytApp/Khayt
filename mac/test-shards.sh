@@ -34,6 +34,12 @@
 # `--ignore-lock`: three `swift test`s on one `.build` would otherwise wait for
 # each other's lock on it, and run one after another. `--skip-build` means
 # none of them writes there.
+#
+# `a` and `b` run under `nice`. Three processes keep CI's three cores busy,
+# and `perf` is the one whose assertions are about time: a main-thread stall
+# budget measured while two other processes take the CPU from it measures
+# them. The first CI run without this took the 9,800-model scan from 197 s
+# alone to 799 s beside the other two, and `perf` finished last by 216 s.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -44,16 +50,16 @@ OUT="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/khayt-test-shards"
 rm -rf "$OUT" && mkdir -p "$OUT"
 
 shard() {
-  local name=$1; shift
+  local name=$1 niceness=$2; shift 2
   local start=$SECONDS
-  swift test --package-path "$PKG" --skip-build --ignore-lock "$@" >"$OUT/$name.log" 2>&1
+  nice -n "$niceness" swift test --package-path "$PKG" --skip-build --ignore-lock "$@" >"$OUT/$name.log" 2>&1
   echo $? >"$OUT/$name.status"
   echo "$((SECONDS - start))" >"$OUT/$name.seconds"
 }
 
-shard perf --filter "$PERF" "$@" &
-shard a --filter "$SPLIT" --skip "$PERF" "$@" &
-shard b --skip "$SPLIT" --skip "$PERF" "$@" &
+shard perf 0 --filter "$PERF" "$@" &
+shard a 10 --filter "$SPLIT" --skip "$PERF" "$@" &
+shard b 10 --skip "$SPLIT" --skip "$PERF" "$@" &
 wait
 
 failed=0
