@@ -247,3 +247,24 @@ test('a price tier overrides the margin here exactly as it does on the desktop',
   const body = await (await quote(part)).json();
   assert.equal(body.price.beforeDiscount, 250, 'tier price x qty, margin ignored');
 });
+
+test('the shop\'s overhead per print hour is in the phone\'s price when it is on, and only then', async () => {
+  const previous = store.settings;
+  const costs = [{ id: 'r', name: 'Rent', amount: 2100 }];
+  store.settings = { ...previous, fixedCosts: costs };
+  const off = await (await quote({ ...FULL_PART, margin: 50 })).json();
+  store.settings = { ...previous, fixedCosts: costs, overheadPerHour: { enabled: true, monthlyHours: 500 } };
+  const on = await (await quote({ ...FULL_PART, margin: 50 })).json();
+  const tiered = await (await quote({ ...FULL_PART, qty: 10, margin: 50,
+    priceTiers: [{ minQty: 10, pricePerUnit: 25 }] })).json();
+  store.settings = previous;
+
+  assert.equal(off.price.overhead, 0, 'off: the price it always was');
+  // 2 h × 2 pieces × 4.20 an hour, marked up 50% with the rest of the cost.
+  assert.equal(on.price.overhead, 16.8);
+  const expectedTotal = Math.round((on.totalCost + 16.8) * 1.5 * 10000) / 10000;
+  assert.ok(Math.abs(on.price.total - expectedTotal) < 0.001, `${on.price.total} vs ${expectedTotal}`);
+  assert.equal(on.totalCost, off.totalCost, 'the part\'s cost is the cost; the overhead is its own line');
+  assert.equal(tiered.price.overhead, 0, 'a price tier replaces cost-plus, overhead and all');
+  assert.equal(tiered.price.total, 250);
+});

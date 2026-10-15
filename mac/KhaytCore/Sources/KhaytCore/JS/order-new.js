@@ -174,6 +174,27 @@
   }
 
   /**
+   * The print hours the overhead line is charged on: each part's print time ×
+   * its quantity (a part's `printTime` is per piece, exactly as its wear is),
+   * over the parts priced at cost plus margin. A part the customer has agreed
+   * a price for is charged that price and nothing else — its hours carry no
+   * overhead, as they carry no margin. Nor does a part whose own price tier
+   * applies at its quantity: the calculator stores it at the tier price backed
+   * out to a cost, so the margin puts it back at exactly the tier price, and
+   * overhead on top would sell it above the price the tier promised.
+   */
+  function overheadHours(parts) {
+    const P = pricing();
+    let total = 0;
+    for (const p of arrayOf(parts)) {
+      if (!p || isAgreed(p)) continue;
+      if (P && typeof P.activePriceTier === 'function' && P.activePriceTier(p.priceTiers, p.qty)) continue;
+      total += positive(p.printTime) * Math.max(1, num(p.qty, 1));
+    }
+    return total;
+  }
+
+  /**
    * What a job's bought-in components cost: the catalogue's own figure for one
    * assembly (`computeComponentsCost`, the helper `lib/product-pricing.js`
    * prices a product with) times how many assemblies the job makes.
@@ -219,6 +240,9 @@
    *   `asQuote`      a quote rather than an order
    *   `fromStock`    this piece came off the shelf; it was printed in a batch
    *                  weeks ago and is being SOLD now, not made now
+   *   `overheadPerHour` the shop's fixed costs per print hour, as the screen
+   *                  that took the job showed them (`lib/overhead-rate.js`
+   *                  `perHour`) — absent or 0 unless the shop turned it on
    *
    * A part carrying `agreedPrice` (set by `lib/price-agreements.js` from the
    * customer's record) is priced at that figure per unit and NOT marked up;
@@ -277,6 +301,8 @@
       extraLines,
       priceRound: i.priceRound || null,
       priceOverride: i.priceOverride,
+      overheadPerHour: positive(i.overheadPerHour),
+      printHours: overheadHours(parts),
       business: true,
     });
 
@@ -386,6 +412,12 @@
       // `baseCost` — the price above includes them, so the cost beside it has
       // to. ABSENT on a job with none, so every other record keeps its shape.
       ...(compCost > 0 ? { componentsCost: +compCost.toFixed(2) } : {}),
+      // The share of the shop's fixed costs this job was priced to carry
+      // (lib/overhead-rate.js). Beside the parts' cost, NEVER inside it: the
+      // P&L and the break-even target count the fixed costs themselves, and a
+      // part cost holding a slice of them would count them twice. Absent when
+      // the line is off, so every other record keeps its shape.
+      ...(quote.overhead > 0 ? { overheadCost: +quote.overhead.toFixed(2) } : {}),
       actualPrintTime: null,
       actualWeight: null,
       quoteSentAt: asQuote ? localDateStr(now) : null,
@@ -408,7 +440,7 @@
   const api = {
     TOKEN_BYTES,
     allocateInvoiceNumber, allocateQuoteSeq, avgDailyWorkingHours,
-    estimateDueDate, newOrder, componentsCost,
+    estimateDueDate, newOrder, componentsCost, overheadHours, isAgreed,
     invoiceNumberOwed, ensureInvoiceNumber,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

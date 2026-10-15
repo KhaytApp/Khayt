@@ -33,6 +33,31 @@ struct FixedCostsSettings: View {
 
     @State private var lines: [Line] = []
     @State private var original: [Line] = []
+    /// The overhead-per-print-hour line, as the pane edits it and as it opened.
+    @State private var overhead = OverheadForm()
+    @State private var overheadOpened = OverheadForm()
+
+    /// `settings.overheadPerHour` as a form: on or off, and the shop's own
+    /// monthly print hours (0: work them out from the machines).
+    struct OverheadForm: Equatable {
+        var enabled = false
+        var monthlyHours: Double = 0
+
+        static func read(_ settings: [String: JSONValue]) -> OverheadForm {
+            guard case .object(let o)? = settings["overheadPerHour"] else { return OverheadForm() }
+            var f = OverheadForm()
+            if case .bool(true)? = o["enabled"] { f.enabled = true }
+            f.monthlyHours = max(0, Shop.plainNumber(o["monthlyHours"]) ?? 0)
+            return f
+        }
+
+        /// As the pane sends it. `lib/settings-edit.js` cleans it with the
+        /// rule that reads it (`KhaytOverheadRate.clean`).
+        var value: JSONValue {
+            .object(["enabled": .bool(enabled),
+                     "monthlyHours": .number(monthlyHours.isFinite ? max(0, monthlyHours) : 0)])
+        }
+    }
 
     private var total: Double { lines.reduce(0) { $0 + $1.amount } }
 
@@ -100,11 +125,90 @@ struct FixedCostsSettings: View {
             }
         }
         .task(id: shop.settingsValue) { reload() }
+
+        overheadSection
+    }
+
+    // MARK: - Overhead per print hour
+
+    /// Whether quotes carry these costs by the print hour, and the figure
+    /// they would carry. The rate is shown whether the line is on or off, so a
+    /// shop can see what turning it on does before it does.
+    @ViewBuilder private var overheadSection: some View {
+        Section(shop.words.callIt("set.overhead_title")) {
+            Toggle(shop.words.callIt("set.overhead_on"), isOn: $overhead.enabled)
+            Text(shop.words.callIt("set.overhead_hint"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Text(shop.words.callIt("set.overhead_hours"))
+                Spacer()
+                TextField("", value: $overhead.monthlyHours,
+                          format: .number.precision(.fractionLength(0)),
+                          prompt: Text(shop.words.callIt("set.overhead_hours_ph")))
+                    .frame(width: 90)
+                    .multilineTextAlignment(.trailing)
+            }
+            Text(shop.words.callIt("set.overhead_hours_hint"))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            // Where the figure comes from, worked out from the book as it was
+            // last opened — saving re-opens it, so this follows a save.
+            Text(Self.explanation(shop.overhead, words: shop.words, currency: shop.currency))
+                .font(.callout.weight(.medium)).monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
+            if let left = shop.overhead?.left, !left.isEmpty {
+                Text(shop.words.callIt("set.overhead_left",
+                                       ["names": .string(left.map(\.name).joined(separator: ", "))]))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Button(shop.words.callIt("common.save")) { Task { await saveOverhead() } }
+                    .disabled(overhead == overheadOpened)
+                if overhead != overheadOpened {
+                    Button(shop.words.callIt("common.cancel")) { overhead = overheadOpened }
+                }
+                Spacer()
+            }
+        }
+    }
+
+    /// "≈ 4.20 SAR per print hour from 2,100 SAR a month over ~500 h · your
+    /// figure", or why there is no rate. Static so a test can hold it to what
+    /// the rule resolved.
+    static func explanation(_ o: KhaytEngine.Overhead?, words: Words, currency: String) -> String {
+        guard let o else { return "" }
+        guard let rate = o.rate, let hours = o.hours else {
+            switch o.reason {
+            case "no_costs": return words.callIt("set.overhead_no_costs")
+            case "few_hours":
+                return words.callIt("set.overhead_few_hours",
+                                    ["min": .number(o.minHours),
+                                     "hours": .number(((o.hours ?? 0)).rounded())])
+            default: return words.callIt("set.overhead_no_hours")
+            }
+        }
+        let said = words.callIt("set.overhead_rate", [
+            "rate": .string(Money.text(rate, currency)),
+            "cost": .string(Money.text(o.monthlyCost, currency)),
+            "hours": .string(Words.plain(.number(hours.rounded()))),
+        ])
+        let from = words.callIt(o.source == "shop" ? "set.overhead_src_shop" : "set.overhead_src_machines")
+        return said + " · " + from
+    }
+
+    private func saveOverhead() async {
+        await shop.saveSettings(["overheadPerHour": overhead.value],
+                                opened: ["overheadPerHour": overheadOpened.value])
+        reload()
     }
 
     private func reload() {
         original = Self.read(shop.settingsDict)
         lines = original
+        overheadOpened = OverheadForm.read(shop.settingsDict)
+        overhead = overheadOpened
     }
 
     static func read(_ settings: [String: JSONValue]) -> [Line] {

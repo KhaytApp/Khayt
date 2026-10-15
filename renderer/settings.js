@@ -3853,13 +3853,16 @@ function renderFixedCostSettings() {
       <input type="text"   id="fcName"   placeholder="e.g. Rent"   style="flex:2;min-width:120px;">
       <input type="number" id="fcAmount" placeholder="Amount/month" style="flex:1;min-width:100px;" min="0" step="0.01">
       <button class="btn primary" id="btnAddFixedCost">+ Add</button>
-    </div>`;
+    </div>
+    ${overheadSettingsHtml()}`;
+  wireOverheadSettings(el);
 
   el.querySelectorAll('[data-del-fc]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const ok = await confirmModal(t('common.delete') + '?', { danger: true });
       if (!ok) return;
       settings.fixedCosts.splice(parseInt(btn.dataset.delFc), 1);
+      if (typeof clearOverheadCache === 'function') clearOverheadCache();
       saveAll(); renderFixedCostSettings(); renderBreakEvenCard();
     });
   });
@@ -3868,10 +3871,86 @@ function renderFixedCostSettings() {
     const amount = parseFloat(el.querySelector('#fcAmount').value) || 0;
     if (!name || amount <= 0) { toast(t('set.fixed_cost_name_amt'), 'warning'); return; }
     settings.fixedCosts = [...(settings.fixedCosts || []), { id: Date.now().toString(36), name, amount }];
+    if (typeof clearOverheadCache === 'function') clearOverheadCache();
     saveAll(); renderFixedCostSettings(); renderBreakEvenCard();
     el.querySelector('#fcName').value = '';
     el.querySelector('#fcAmount').value = '';
   });
+}
+
+/**
+ * The shop's fixed costs, resolved per print hour over this book — what the
+ * settings card below shows, and (when on) what every quote is charged.
+ * `lib/overhead-rate.js` is the rule; this only supplies the book.
+ */
+function overheadResolved() {
+  if (typeof KhaytOverheadRate === 'undefined') return null;
+  return KhaytOverheadRate.resolve({
+    settings,
+    machines: (typeof machines !== 'undefined' && Array.isArray(machines)) ? machines : [],
+    orders: (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [],
+    today: (typeof localDateStr === 'function') ? localDateStr(new Date()) : '',
+  });
+}
+
+/**
+ * Where the rate comes from, in a sentence — "≈ 4.20 per print hour from
+ * 2,100 a month over ~500 h" — or why there is none. Shown whether the line is
+ * on or off, so a shop can see what turning it on would do before it does.
+ */
+function overheadExplanation(r) {
+  if (!r) return '';
+  if (r.rate === null) {
+    if (r.reason === 'no_costs') return t('set.overhead_no_costs');
+    if (r.reason === 'few_hours') return t('set.overhead_few_hours', { min: r.minHours, hours: fmtCount(Math.round(r.hours || 0)) });
+    return t('set.overhead_no_hours');
+  }
+  const said = t('set.overhead_rate', {
+    rate: fmtPrice(r.rate), cost: fmtPrice(r.monthlyCost), hours: fmtCount(Math.round(r.hours)),
+  });
+  const from = t(r.source === 'shop' ? 'set.overhead_src_shop' : 'set.overhead_src_machines');
+  return `${said} · ${from}`;
+}
+
+function overheadSettingsHtml() {
+  const oh = (typeof KhaytOverheadRate !== 'undefined')
+    ? KhaytOverheadRate.clean(settings.overheadPerHour) : { enabled: false, monthlyHours: 0 };
+  const r = overheadResolved();
+  const left = r && r.left.length
+    ? `<p style="color:var(--text-muted);font-size:12px;margin:4px 0 0;">${escapeHtml(t('set.overhead_left', { names: r.left.map((x) => x.name).join(', ') }))}</p>` : '';
+  return `
+    <div id="overheadSettings" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">
+      <div class="settings-section-head" style="font-size:13px;">${escapeHtml(t('set.overhead_title'))}</div>
+      <label style="display:flex;gap:8px;align-items:center;margin:6px 0;">
+        <input type="checkbox" id="ohEnabled" ${oh.enabled ? 'checked' : ''}>
+        <span>${escapeHtml(t('set.overhead_on'))}</span>
+      </label>
+      <p style="color:var(--text-muted);font-size:12px;margin:0 0 8px;">${escapeHtml(t('set.overhead_hint'))}</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <label for="ohHours" style="font-size:12.5px;">${escapeHtml(t('set.overhead_hours'))}</label>
+        <input type="number" id="ohHours" min="0" step="1" style="width:110px;"
+          placeholder="${escapeHtml(t('set.overhead_hours_ph'))}" value="${oh.monthlyHours > 0 ? oh.monthlyHours : ''}">
+      </div>
+      <p style="color:var(--text-muted);font-size:12px;margin:4px 0 0;">${escapeHtml(t('set.overhead_hours_hint'))}</p>
+      <p id="ohRateLine" style="font-size:12.5px;margin:8px 0 0;font-weight:600;">${escapeHtml(overheadExplanation(r))}</p>
+      ${left}
+    </div>`;
+}
+
+function wireOverheadSettings(el) {
+  const save = () => {
+    const enabled = !!el.querySelector('#ohEnabled')?.checked;
+    const monthlyHours = Math.max(0, num(el.querySelector('#ohHours')?.value, 0));
+    const raw = { enabled, monthlyHours };
+    settings.overheadPerHour = (typeof KhaytOverheadRate !== 'undefined') ? KhaytOverheadRate.clean(raw) : raw;
+    if (typeof clearOverheadCache === 'function') clearOverheadCache();
+    saveAll();
+    renderFixedCostSettings();
+    // The calculator's price moves with it, now rather than on the next keystroke.
+    if (typeof updateGrandTotal === 'function') { try { updateGrandTotal(); } catch (e) { /* calculator not drawn */ } }
+  };
+  el.querySelector('#ohEnabled')?.addEventListener('change', save);
+  el.querySelector('#ohHours')?.addEventListener('change', save);
 }
 
 /* Carrier tracking URLs — renderer/integrations.js (getCarrierTrackingUrl) */

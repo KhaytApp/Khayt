@@ -59,20 +59,40 @@ extension Shop {
         lines.compactMap(\.platformId).first
     }
 
+    /// `overheadHours` are the print hours the cost-plus part of the job takes
+    /// (`overheadHours(of:)` for a cart); they are charged the shop's fixed
+    /// costs at `overheadPerHour`, which is 0 — and so changes nothing — unless
+    /// the shop turned that line on in Settings.
     func previewQuote(baseCost: Double, margin: Double, discountPct: Double,
                       shippingCost: Double, rush: Bool,
                       agreedAmount: Double = 0, rule: PriceRule = PriceRule(),
-                      extraLines: [ExtraLine] = []) async -> QuoteTotal? {
+                      extraLines: [ExtraLine] = [],
+                      overheadHours: Double = 0) async -> QuoteTotal? {
         guard let engine else { return nil }
         var input = CalculatorPart.quoteInput(baseCost: baseCost, margin: margin, discountPct: discountPct,
                                               shippingCost: shippingCost, rush: rush,
                                               agreedAmount: agreedAmount, settings: settingsDict)
+        // Sent only when there is something to charge, so with the line off
+        // the input — and the price — is exactly what it always was.
+        if overheadPerHour > 0, overheadHours > 0 {
+            input["overheadPerHour"] = .number(overheadPerHour)
+            input["printHours"] = .number(overheadHours)
+        }
         // Half-written rows are dropped rather than sent as zeroes: a zero
         // amount is a line on the customer's invoice reading "Design fee 0.00".
         let charges = extraLines.filter(\.isWorthKeeping)
         if !charges.isEmpty { input["extraLines"] = .array(charges.map(\.row)) }
         for (key, value) in rule.fields { input[key] = value }
         return try? await engine.quoteTotal(input)
+    }
+
+    /// The print hours a cart's overhead is charged on, counted by the rule
+    /// the saved job is priced with (`KhaytOrderNew.overheadHours`: print time
+    /// × quantity, agreed parts left out) so the preview and the record agree.
+    func overheadHours(of parts: [NewJobSheet.Draft]) async -> Double {
+        guard overheadPerHour > 0, let engine else { return 0 }
+        let rows = Self.partRows(parts, spools: spools, unnamed: "")
+        return (try? await engine.overheadHours(rows)) ?? 0
     }
 
     /// The cart and the money, in the shape `lib/order-new.js` takes.
@@ -171,7 +191,8 @@ extension Shop {
                      fromProduct product: Product? = nil,
                      assemblyQty: Double? = nil,
                      rule: PriceRule = PriceRule(),
-                     extraLines: [ExtraLine] = []) -> [String: JSONValue] {
+                     extraLines: [ExtraLine] = [],
+                     overheadPerHour: Double = 0) -> [String: JSONValue] {
         var input: [String: JSONValue] = [
             "parts": .array(Self.partRows(parts, spools: spools,
                                           unnamed: words.callIt("mac.a_part"))),
@@ -191,6 +212,11 @@ extension Shop {
         // The last word on the total — rounded to a step, or typed — travels
         // to the rule, which writes how the price was reached on the record.
         for (key, value) in rule.fields { input[key] = value }
+        // The shop's fixed costs per print hour, as the sheet showed them. A
+        // parameter rather than read off `self`, because only a screen that
+        // SHOWED the price with them in may charge them: a shelf sale or an
+        // online order is priced at what the catalogue published.
+        if overheadPerHour > 0 { input["overheadPerHour"] = .number(overheadPerHour) }
         // ── WHAT THE PRODUCT BRINGS WITH IT ───────────────────────────────
         //
         // The components (magnets, screws, a box) and the assembly count are
@@ -437,7 +463,10 @@ extension Shop {
         ["settings": root["settings"] ?? .object([:]),
          "printers": root["printers"] ?? .array([]),
          "inventory": root["inventory"] ?? .array([]),
-         "printLog": root["printLog"] ?? .array([])]
+         "printLog": root["printLog"] ?? .array([]),
+         // For the overhead per print hour: how many hours a month each
+         // machine prints is part of the rate a public quote carries.
+         "machines": root["machines"] ?? .array([])]
     }
 
     /// Every key the tier registry knows. Asked for by name so a feature this

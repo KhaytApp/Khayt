@@ -849,6 +849,16 @@ final class Shop {
             if overtaken() { return }
             catalogueLanguages = languages
             if case .array(let fleet)? = root["machines"] { machineRows = fleet } else { machineRows = [] }
+            // THE SHOP'S FIXED COSTS BY THE PRINT HOUR (`lib/overhead-rate.js`),
+            // resolved once per load over the same settings, machines and log
+            // the other app resolves it over. The calculator and the job sheet
+            // charge `overhead.perHour` — 0 unless the shop turned it on — and
+            // Settings shows where the figure came from.
+            let resolvedOverhead = try? await engine?.overhead(
+                settings: root["settings"] ?? .object([:]), machines: machineRows,
+                orders: Self.rows(root, "printLog"), today: DateRange.localDay(Date()))
+            if overtaken() { return }
+            overhead = resolvedOverhead
             // Recurring maintenance tasks, written by the Electron app's
             // machine editor. Read here, and written back only when someone
             // marks one done — the intervals themselves are still edited there.
@@ -1696,6 +1706,15 @@ final class Shop {
     /// every upload came back "not configured". The tests never saw it: their
     /// bench put `printers` straight into the server's book.
     private(set) var pricingBook: [String: JSONValue] = [:]
+
+    /// The shop's fixed costs per print hour, and where the figure comes from
+    /// (`lib/overhead-rate.js`). Nil until a book is open or when the engine
+    /// could not say; `overheadPerHour` reads it as 0.
+    var overhead: KhaytEngine.Overhead?
+
+    /// What a quote here is charged per print hour for the shop's fixed costs:
+    /// 0 unless the shop turned the line on and a rate could be worked out.
+    var overheadPerHour: Double { overhead?.perHour ?? 0 }
 
     /// The phone's way in, while the settings say it should be running.
     var lanServer: LanServer?

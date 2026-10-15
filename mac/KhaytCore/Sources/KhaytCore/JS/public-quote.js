@@ -116,12 +116,48 @@ function materialBasis(cfg, inventory, reclaimsTax) {
   return null;
 }
 
+/** `YYYY-MM-DD` in local time — the day the machines' recent hours are measured to. */
+function localDay(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * What a public quote carries of the shop's fixed costs, per print hour.
+ *
+ * A STRANGER'S PRICE INCLUDES IT WHEN THE SHOP TURNED IT ON, because it is a
+ * cost: a shop that prices its own jobs with its rent in them and quotes the
+ * public without would be quoting strangers below what it charges its own
+ * customers — and the public number is the one it is least able to take back.
+ * Off (every book today) is 0, and the price is what it always was.
+ *
+ * `store.overheadPerHour`, when it is a number, is the figure ALREADY RESOLVED:
+ * that is how a store rebuilt from a quote sheet (`lib/quote-sheet.js`
+ * `toStore`) carries it, since a storefront vendors this file without
+ * `overhead-rate.js` and has no book to work it out from. Otherwise the shared
+ * rule (`lib/overhead-rate.js`) over the book's settings, machines and log.
+ */
+function overheadPerHourFor(store, today) {
+  if (store && typeof store.overheadPerHour === 'number') return Math.max(0, num(store.overheadPerHour, 0));
+  let OH = typeof globalThis !== 'undefined' ? globalThis.KhaytOverheadRate : null;
+  if (!OH && typeof require === 'function') {
+    try { OH = require('./overhead-rate.js'); } catch (e) { OH = null; }
+  }
+  if (!OH || typeof OH.perHour !== 'function') return 0;
+  return Math.max(0, num(OH.perHour({
+    settings: (store && store.settings) || {},
+    machines: (store && store.machines) || [],
+    orders: (store && store.printLog) || [],
+    today,
+  }), 0));
+}
+
 /**
  * @param {object} input
  * @param {object} input.intake     a lib/model-intake.js result
  * @param {object} input.store      the shop's store ({ settings, inventory, printers })
  * @param {object} input.deps       { computePartBaseCost, quoteTotal, estimate }
  * @param {number} [input.qty=1]
+ * @param {string} [input.today]  `YYYY-MM-DD`; the local date when absent
  * @returns {{
  *   ok: boolean, reason?: string,
  *   price: number|null, currency: string|null,
@@ -214,12 +250,19 @@ function publicQuote(input) {
   // where the problem was.
   if (!Number.isFinite(unitCost) || unitCost <= 0) return refuse('no-price');
 
+  // The shop's fixed costs by the print hour, when it turned that on — see
+  // `overheadPerHourFor`. Charged on every piece's hours, as wear is.
+  const overheadPerHour = overheadPerHourFor(store,
+    typeof (input && input.today) === 'string' && input.today ? input.today : localDay(new Date()));
+
   let total;
   try {
     total = deps.quoteTotal({
       baseCost: unitCost * qty,
       qty,
       margin: num(cfg.marginPct, 0),
+      overheadPerHour,
+      printHours: hours * qty,
       // No discount, no rush, no shipping: a public estimate quotes the part,
       // and anything else is a conversation the shop has not had yet.
       discountPct: 0,
@@ -267,7 +310,7 @@ function publicQuote(input) {
 // quote here would use, so the web price and the LAN price cannot differ.
 // `elecRateFor` for the same reason: the sheet carries the tariff a quote here
 // would charge, shop tariff included.
-const api = { publicQuote, DEFAULT_CONFIG, materialBasis, elecRateFor, ELEC_RATE_BOUND };
+const api = { publicQuote, DEFAULT_CONFIG, materialBasis, elecRateFor, ELEC_RATE_BOUND, overheadPerHourFor };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 global.KhaytPublicQuote = api;
 
