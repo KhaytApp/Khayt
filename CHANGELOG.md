@@ -25,6 +25,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saved — and for longer if a library scan was saving at the same moment. They
   are now saved in the background. So are marking a bed clear, accepting the
   suggested printer, applying a schedule and saving slicers or reports.
+- **Mac: a big library's model details are ready seconds after opening, not
+  minutes.** With ten thousand models, which printer each model fits, its
+  estimated weight and time, what its licence allows and its print risks used
+  to arrive a minute or more after every launch, scan or reload, because each
+  model was worked out on its own. They are now worked out together, in well
+  under a second on a release build, with exactly the same results. And when
+  one reload overtakes another, the older one now stops instead of putting
+  older jobs, customers or model details back on screen.
 
 - **Mac: opening and saving a big book is much faster.** Reading the shop's
   book (and every change to it) now takes about a tenth of the time it did on

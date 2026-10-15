@@ -192,8 +192,13 @@ extension Shop {
         guard let engine, !libraryRows.isEmpty else {
             categoriesInUse = []; tagsInUse = []; return
         }
-        categoriesInUse = ((try? await engine.categoryCounts(libraryRows)) ?? []).map(\.name)
-        tagsInUse = ((try? await engine.tagCounts(libraryRows)) ?? []).map(\.name)
+        let ticket = loadGeneration
+        let categories = ((try? await engine.categoryCounts(libraryRows)) ?? []).map(\.name)
+        let tags = ((try? await engine.tagCounts(libraryRows)) ?? []).map(\.name)
+        // Not over a newer load's answer (`Shop.load`).
+        guard ticket == loadGeneration else { return }
+        categoriesInUse = categories
+        tagsInUse = tags
     }
 
     /// File the selected models under a category, or clear it with "".

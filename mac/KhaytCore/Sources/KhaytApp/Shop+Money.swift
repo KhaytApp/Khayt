@@ -545,10 +545,13 @@ extension Shop {
     func readFeatures() async {
         guard let engine else { features = Set(Self.gatedFeatures); return }
         let mode = Self.plainString(settingsDict["mode"])
+        let ticket = loadGeneration
         var on: Set<String> = []
         for key in Self.gatedFeatures {
             if (try? await engine.featureEnabled(key, mode: mode)) ?? true { on.insert(key) }
         }
+        // Not over a newer load's answer (`Shop.load`).
+        guard ticket == loadGeneration else { return }
         features = on
     }
 
