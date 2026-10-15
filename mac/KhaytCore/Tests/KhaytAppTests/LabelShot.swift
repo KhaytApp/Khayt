@@ -21,7 +21,7 @@ struct LabelShot {
         let req = try #require(shop.pendingLabels)
         let paper = LabelPaper(html: req.html)
         // WebKit lays out asynchronously; the paper says when it is done.
-        for _ in 0..<200 where !paper.drawn {
+        for _ in 0..<6_000 where !paper.drawn {  // a hang guard (10 min), not a speed limit: the main actor is shared with every other test
             try await Task.sleep(for: .milliseconds(50))
         }
         paper.webView.frame = NSRect(x: 0, y: 0, width: 794, height: 1123)   // A4 at 96dpi

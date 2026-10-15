@@ -84,10 +84,12 @@ struct LanStallTests {
     /// simply had not been scheduled by the time the probe gave up. The server
     /// was right and the probe was impatient.
     ///
-    /// Sixty keeps the property exactly — a server that never closes still
+    /// Six hundred since the tests run as three shards on a 3-core runner
+    /// (#1871): sixty ran out under that load, with the server still due to
+    /// close the socket. It keeps the property exactly — a server that never closes still
     /// fails — and costs nothing on a run where the close happens in a second,
     /// because the probe returns as soon as it does.
-    nonisolated static let patience: TimeInterval = 60
+    nonisolated static let patience: TimeInterval = 600
 
     @Test("a connection that sends nothing is let go, not held for ever")
     func silentConnection() async throws {
