@@ -251,7 +251,7 @@ struct InvoiceTests {
                 "a document carries no script of its own")
 
         let paper = InvoicePaper(document: doc)
-        for _ in 0..<100 where !paper.drawn {
+        for _ in 0..<6_000 where !paper.drawn {  // a hang guard (10 min), not a speed limit: the main actor is shared with every other test
             try? await Task.sleep(nanoseconds: 100_000_000)
         }
         #expect(paper.drawn, "the document never finished laying out")
@@ -290,7 +290,7 @@ struct InvoiceTests {
         let doc = InvoiceDocument(html: "<span class=\"v\">575.00</span>",
                                   arabicNumerals: false, selector: ".v, .amount")
         let paper = InvoicePaper(document: doc)
-        for _ in 0..<100 where !paper.drawn {
+        for _ in 0..<6_000 where !paper.drawn {  // a hang guard (10 min), not a speed limit: the main actor is shared with every other test
             try? await Task.sleep(nanoseconds: 100_000_000)
         }
         let text = (try await paper.webView
@@ -336,7 +336,7 @@ struct InvoiceTests {
         // WebKit lays out on the run loop; the sheet's button waits for the
         // same signal. Asking before it is drawn returns a blank page, which is
         // the whole reason `drawn` exists.
-        for _ in 0..<200 where !paper.drawn {
+        for _ in 0..<6_000 where !paper.drawn {  // a hang guard (10 min), not a speed limit: the main actor is shared with every other test
             try await Task.sleep(for: .milliseconds(50))
         }
         #expect(paper.drawn, "WebKit never finished laying the document out")
