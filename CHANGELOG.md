@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: the calculator charges the shop's overhead too.** When a shop turns
+  on "overhead per print hour" in the Mac's Settings, the iPhone calculator now
+  adds the same line, worked out by the same rule, so a quote on the phone
+  matches the Mac's. It shows as its own row, and "You keep" leaves it out.
+  With the line off, nothing changes.
 - **Desktop: invoice numbers come from the same rule as the Mac's.** The
   desktop kept its own copy of the numbering (prefix, format, counter, the
   January reset). It now uses the shared one, so the two apps cannot number an

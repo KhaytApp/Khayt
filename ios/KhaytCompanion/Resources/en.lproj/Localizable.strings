@@ -712,6 +712,7 @@
 "calc.nothing" = "Put in a weight or a print time and this works out what the job costs you and what to charge for it.";
 "calc.cost" = "Costs you";
 "calc.keeps" = "You keep";
+"calc.overhead" = "Overhead (fixed costs)";
 "calc.per_piece" = "Where one piece's cost goes";
 "calc.add_colour" = "Add filament / colour";
 "calc.remove_colour" = "Remove this colour";
