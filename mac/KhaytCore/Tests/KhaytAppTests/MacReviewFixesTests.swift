@@ -56,6 +56,39 @@ struct MacReviewFixesTests {
         #expect(next == .number(year == 2026 ? 13 : 2), "the counter that issued it moved in the same write")
     }
 
+    @Test("undoing the approval keeps the number; approving again reuses it")
+    func undoKeepsTheNumber() async throws {
+        let engine = try KhaytEngine()
+        let words = Words()
+        await words.load("en", engine: engine)
+        var root = Self.quoteBook()
+        if case .object(var s)? = root["settings"] {
+            s["invNumNext"] = .number(1)
+            s["invNumYear"] = .number(Double(Calendar.book.component(.year, from: Date())))
+            root["settings"] = .object(s)
+        }
+        let out = try await Shop.applyMove(to: &root, id: "QUO-2026-0007", stage: .pending,
+                                           engine: engine, words: words)
+        let moved = try #require(Self.job(root))
+        let number = moved["invoiceNumber"]
+        let year = Calendar.book.component(.year, from: Date())
+        #expect(number == .string("INV-\(year)-0001"))
+        #expect(Self.counter(root) == .number(2))
+
+        _ = Shop.undoing(out.undo, in: &root)
+        let undone = try #require(Self.job(root))
+        #expect(undone["status"] == .string("quote"), "the undo put the status back")
+        #expect(undone["invoiceNumber"] == number, "and left the number on the job")
+        #expect(undone["invoiceNum"] == number)
+        #expect(Self.counter(root) == .number(2), "the counter has no gap and no rewind")
+
+        _ = try await Shop.applyMove(to: &root, id: "QUO-2026-0007", stage: .pending,
+                                     engine: engine, words: words)
+        let again = try #require(Self.job(root))
+        #expect(again["invoiceNumber"] == number, "approving again spends no second number")
+        #expect(Self.counter(root) == .number(2))
+    }
+
     @Test("a quote cancelled is not given a number")
     func cancelledQuoteIsNotNumbered() async throws {
         let engine = try KhaytEngine()

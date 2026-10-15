@@ -27,7 +27,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   accepted, as the Khayt desktop app already did. A quote accepted before this
   update gets its number the first time its invoice is opened, not all at
   once. Invoices in both apps print the invoice number; a quote still prints
-  its quote number.
+  its quote number. Undoing the approval keeps the number on the job, so
+  approving it again does not use up a second one.
 - **Invoices: the shop's name, address, tagline, terms or footer no longer
   print twice.** A shop that filled in a field in only one language got the
   same text again as the "second language" line, most visibly on Arabic

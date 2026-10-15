@@ -2161,7 +2161,7 @@ extension Shop {
         // The book as found, for the undo: the actuals below are written onto
         // `orders` first, and an undo whose before-copy already carried them
         // would leave a job undone from done still holding what it "took".
-        let ordersAsFound = orders
+        var ordersAsFound = orders
         let inventory = rows(root, "inventory")
         let consumables = rows(root, "consumables")
         let machines = rows(root, "machines")
@@ -2288,6 +2288,18 @@ extension Shop {
                case .object(let s) = numbered.settings {
                 changedOrder = o
                 root["settings"] = .object(s)
+                // AND THE UNDO KEEPS IT. Electron numbers the job before its
+                // Undo snapshot, so undoing the approval puts the status back
+                // and leaves the number on the job — the counter has no gap,
+                // and approving again (`invoiceNumberOwed` is false now) takes
+                // no second number. Written into the before-copy here, so the
+                // field-by-field undo sees no change on these two fields.
+                if let at = ordersAsFound.firstIndex(where: { recordId($0) == id }),
+                   case .object(var before) = ordersAsFound[at] {
+                    before["invoiceNum"] = o["invoiceNum"]
+                    before["invoiceNumber"] = o["invoiceNumber"]
+                    ordersAsFound[at] = .object(before)
+                }
             }
         }
 
