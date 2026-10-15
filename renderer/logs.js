@@ -481,6 +481,7 @@ async function batchMoveStatus() {
   for (const id of ids) {
     const o = printLog.find(x => x.id === id);
     if (!o) continue;
+    ensureOrderInvoiceNumber(o, status);
     o.status = status;
     if (!o.statusHistory) o.statusHistory = [];
     o.statusHistory.push({ status, at: now });
