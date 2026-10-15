@@ -3862,6 +3862,7 @@ function renderFixedCostSettings() {
       const ok = await confirmModal(t('common.delete') + '?', { danger: true });
       if (!ok) return;
       settings.fixedCosts.splice(parseInt(btn.dataset.delFc), 1);
+      if (typeof clearOverheadCache === 'function') clearOverheadCache();
       saveAll(); renderFixedCostSettings(); renderBreakEvenCard();
     });
   });
@@ -3870,6 +3871,7 @@ function renderFixedCostSettings() {
     const amount = parseFloat(el.querySelector('#fcAmount').value) || 0;
     if (!name || amount <= 0) { toast(t('set.fixed_cost_name_amt'), 'warning'); return; }
     settings.fixedCosts = [...(settings.fixedCosts || []), { id: Date.now().toString(36), name, amount }];
+    if (typeof clearOverheadCache === 'function') clearOverheadCache();
     saveAll(); renderFixedCostSettings(); renderBreakEvenCard();
     el.querySelector('#fcName').value = '';
     el.querySelector('#fcAmount').value = '';
@@ -3941,6 +3943,7 @@ function wireOverheadSettings(el) {
     const monthlyHours = Math.max(0, num(el.querySelector('#ohHours')?.value, 0));
     const raw = { enabled, monthlyHours };
     settings.overheadPerHour = (typeof KhaytOverheadRate !== 'undefined') ? KhaytOverheadRate.clean(raw) : raw;
+    if (typeof clearOverheadCache === 'function') clearOverheadCache();
     saveAll();
     renderFixedCostSettings();
     // The calculator's price moves with it, now rather than on the next keystroke.

@@ -456,17 +456,31 @@ function populateCalcCurrency() {
  * The SAME figure goes to the price on screen (`updateGrandTotal`) and to the
  * job it is saved as (`logPrint` → `lib/order-new.js`), so the two agree.
  */
+//
+// CACHED. The rule measures every machine's recent hours over the whole log,
+// and this runs on every keystroke in the calculator. The answer changes only
+// when the day, the setting, the fixed costs, the machines or the log do, so
+// it is kept under a key made of those (cheap: a few small fields and the
+// log's length) and is also dropped explicitly by `clearOverheadCache` when
+// Settings, a machine or a new job is saved.
+let overheadCache = null;
+
+function clearOverheadCache() { overheadCache = null; }
+
 function shopOverheadPerHour() {
   const o = (typeof settings !== 'undefined' && settings) ? settings.overheadPerHour : null;
   // Not resolved at all while off: the rule walks the log, and an opt-in that
   // nobody opted into should cost the calculator nothing per keystroke.
   if (!o || o.enabled !== true || typeof KhaytOverheadRate === 'undefined') return 0;
-  return KhaytOverheadRate.perHour({
-    settings,
-    machines: (typeof machines !== 'undefined' && Array.isArray(machines)) ? machines : [],
-    orders: (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [],
-    today: (typeof localDateStr === 'function') ? localDateStr(new Date()) : '',
-  });
+  const fleet = (typeof machines !== 'undefined' && Array.isArray(machines)) ? machines : [];
+  const log = (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [];
+  const today = (typeof localDateStr === 'function') ? localDateStr(new Date()) : '';
+  const key = JSON.stringify([today, o, settings.fixedCosts || [], log.length,
+    fleet.map((m) => m && [m.id, m.status, m.targetHoursPerDay, m.depreciation && m.depreciation.monthlyHours])]);
+  if (overheadCache && overheadCache.key === key) return overheadCache.value;
+  const value = KhaytOverheadRate.perHour({ settings, machines: fleet, orders: log, today });
+  overheadCache = { key, value };
+  return value;
 }
 
 function updateGrandTotal() {
@@ -498,8 +512,10 @@ function updateGrandTotal() {
   const activeTier = KhaytPricing.activePriceTier(currentPriceTiers, qty);
   // The shop's fixed costs by the print hour (0 while off). A cost, so it is
   // marked up with the rest; a price tier replaces cost-plus and so ignores it.
+  // Not under a price tier: a tier IS the price, and the saved job charges a
+  // tiered part no overhead either (KhaytOrderNew.overheadHours).
   const overheadRate = shopOverheadPerHour();
-  const liveOverhead = overheadRate * clampPositive(snap.printTime);
+  const liveOverhead = activeTier ? 0 : overheadRate * clampPositive(snap.printTime);
   const liveUnitPrice = activeTier
     ? activeTier.pricePerUnit
     : (liveBase + liveOverhead) * (1 + margin / 100);
@@ -595,7 +611,7 @@ function updateGrandTotal() {
   // The hours the overhead is charged on: the cart's cost-plus parts (an
   // agreed part carries its agreed price and nothing else — the same rule
   // lib/order-new.js prices the saved job by), plus the part still in the form.
-  const liveHours = clampPositive(snap.printTime) * qty;
+  const liveHours = activeTier ? 0 : clampPositive(snap.printTime) * qty;
   let overheadHours = 0;
   if (overheadRate > 0) {
     if (currentBuild.length > 0) {
@@ -1868,6 +1884,7 @@ function updateResinFieldsVisibility() {
     // The overhead the calculator charges, so the job it saves charges the same
     // (renderer/order-flows.js logPrint).
     shopOverheadPerHour,
+    clearOverheadCache,
     snapshotPartFromForm,
     addPart,
     removePart,

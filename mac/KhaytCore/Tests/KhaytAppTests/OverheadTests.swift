@@ -164,4 +164,61 @@ struct OverheadTests {
         let book = Shop.pricingBook(from: root)
         #expect(book["machines"] == root["machines"])
     }
+
+    /// A book whose public pricing is on: a flat spool, one preset, a machine
+    /// with a daily target, and the fixed costs — with or without the line.
+    private static func lanRoot(overheadOn: Bool) -> [String: JSONValue] {
+        var settings: [String: JSONValue] = [
+            "currency": .string("SAR"),
+            "fixedCosts": .array([.object(["id": .string("r"), "name": .string("Rent"),
+                                           "amount": .number(2100)])]),
+            "lanApi": .object(["intakeQuote": .object([
+                "enabled": .bool(true), "presetId": .string("P1"),
+                "spoolCost": .number(90), "spoolWeight": .number(1000), "marginPct": .number(40),
+            ])]),
+        ]
+        if overheadOn {
+            settings["overheadPerHour"] = .object(["enabled": .bool(true), "monthlyHours": .number(500)])
+        }
+        return [
+            "settings": .object(settings),
+            "printers": .array([.object(["id": .string("P1"), "wearRate": .number(0.75)])]),
+            "inventory": .array([]), "printLog": .array([]),
+            "machines": .array([.object(["id": .string("m1"), "targetHoursPerDay": .number(8)])]),
+        ]
+    }
+
+    @Test("the Mac's price on its Wi-Fi server (the estimate) carries the overhead only when it is on")
+    func lanEstimateCarriesIt() async throws {
+        // The Mac's LAN server has no `/api/quote`: the only price it hands out
+        // is the estimate (`/api/intake/estimate`), which runs `publicQuote` over
+        // `pricingBook` — exactly as `LanServer` does with `host.pricing()`.
+        let engine = try KhaytEngine()
+        let sliced: JSONValue = .object(["exact": .bool(true), "source": .string("slicer"),
+                                         "printTimeMins": .number(180), "filamentGrams": .number(40)])
+        let offBook = Shop.pricingBook(from: Self.lanRoot(overheadOn: false))
+        let onBook = Shop.pricingBook(from: Self.lanRoot(overheadOn: true))
+        let off = try await engine.publicQuote(intake: sliced, store: .object(offBook), qty: 2)
+        let on = try await engine.publicQuote(intake: sliced, store: .object(onBook), qty: 2)
+        guard case .object(let o) = off, case .number(let offPrice)? = o["price"],
+              case .object(let n) = on, case .number(let onPrice)? = n["price"] else {
+            Issue.record("no price: \(off) / \(on)"); return
+        }
+        // 3 h × 2 pieces × 4.20 an hour, marked up 40%.
+        let expected = ((offPrice + 25.2 * 1.4) * 100).rounded() / 100
+        #expect(abs(onPrice - expected) < 0.011)
+    }
+
+    @Test("a part with a fixed price tier at its quantity carries no overhead hours")
+    func tieredPartHasNoHours() async throws {
+        let engine = try KhaytEngine()
+        let tiers: JSONValue = .array([.object(["minQty": .number(2), "pricePerUnit": .number(30)])])
+        let tiered: JSONValue = .object(["printTime": .number(3), "qty": .number(2), "priceTiers": tiers])
+        let plain: JSONValue = .object(["printTime": .number(1), "qty": .number(1)])
+        let notReached: JSONValue = .object(["printTime": .number(3), "qty": .number(1), "priceTiers": tiers])
+        let both = try await engine.overheadHours([tiered, plain])
+        let below = try await engine.overheadHours([notReached])
+        #expect(both == 1)
+        #expect(below == 3)
+    }
 }

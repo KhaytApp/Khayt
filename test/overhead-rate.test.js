@@ -262,7 +262,7 @@ function fnSource(file, name) {
 }
 
 /** The calculator screen, stubbed: every control a value, every output a sink. */
-function calculatorContext(settings, form) {
+function calculatorContext(settings, form, extra = {}) {
   const els = {};
   const el = (id) => (els[id] = els[id] || {
     value: form[id] !== undefined ? String(form[id]) : '', checked: false, textContent: '', innerHTML: '',
@@ -270,7 +270,7 @@ function calculatorContext(settings, form) {
   });
   const ctx = {
     settings, machines: [], printLog: [], currentBuild: [], currentPriceTiers: [], currentExtraLines: [],
-    currentExtraMaterials: [], currentComponents: [], currentAssemblyQty: 1, consumables: [], lastQuote: null,
+    currentExtraMaterials: [], currentComponents: [], currentAssemblyQty: 1, consumables: [], lastQuote: null, overheadCache: null,
     $: (sel) => el(sel.replace(/^#/, '')),
     document: { querySelector: () => null, querySelectorAll: () => [] },
     window: {},
@@ -281,8 +281,10 @@ function calculatorContext(settings, form) {
     fmtMoney: (n) => (+n).toFixed(2), escapeHtml: (s) => String(s), t: (k) => k,
     localDateStr: () => '2026-10-15',
     KhaytPricing: P, KhaytOrderNew: N, KhaytOverheadRate: OH,
+    ...extra,
   };
   vm.createContext(ctx);
+  vm.runInContext(fnSource('renderer/build.js', 'clearOverheadCache'), ctx);
   vm.runInContext(fnSource('renderer/build.js', 'shopOverheadPerHour'), ctx);
   vm.runInContext(fnSource('renderer/build.js', 'updateGrandTotal'), ctx);
   return { ctx, els };
@@ -367,4 +369,65 @@ test('the Electron settings card shows the rate and where it comes from, from th
   assert.match(few, /set\.overhead_few_hours\{"min":20,"hours":"5"\}/);
   // And the card is drawn by the fixed-costs section, which Settings renders.
   assert.match(fnSource('renderer/settings.js', 'renderFixedCostSettings'), /\$\{overheadSettingsHtml\(\)\}`;\n\s+wireOverheadSettings\(el\);/);
+});
+
+test('a price-tier part carries no overhead — on screen, in the cart, and in the saved job', () => {
+  const tiers = [{ minQty: 2, pricePerUnit: 30 }];
+  // The live part, alone: the tier is the price, and no overhead line is drawn.
+  const live = calculatorContext(SHOP({ mode: 'professional' }), FORM, { currentPriceTiers: tiers });
+  live.ctx.updateGrandTotal();
+  assert.equal(live.ctx.lastQuote.total, 60);
+  assert.equal(live.ctx.lastQuote.overhead, 0);
+  assert.doesNotMatch(live.els.costBreakdown.innerHTML, /calc\.bd\.overhead/);
+
+  // The same part PENDING beside a cart: its hours are not added.
+  const cartPart = PART({ printTime: 1, qty: 1, baseCost: 10 });
+  const pending = calculatorContext(SHOP({ mode: 'professional' }), FORM, {
+    currentPriceTiers: tiers, currentBuild: [cartPart], formHasPendingPart: () => true,
+  });
+  pending.ctx.updateGrandTotal();
+  assert.equal(Math.round(pending.ctx.lastQuote.overhead * 100) / 100, 4.2, 'only the cart part\'s one hour');
+
+  // And once it is IN the cart (stored with its tiers, at the tier price
+  // backed out to a cost), the job counts the same hours the screen did.
+  const tiered = PART({ printTime: 3, qty: 2, baseCost: 40, priceTiers: tiers });
+  assert.equal(N.overheadHours([tiered, cartPart]), 1);
+  const saved = N.newOrder({ parts: [tiered, cartPart], margin: 50, overheadPerHour: 4.2 },
+    { settings: {}, orders: [], now: NOW, tokens: TOKENS });
+  assert.equal(saved.overheadCost, 4.2);
+  assert.equal(saved.price, +((40 + 10 + 4.2) * 1.5).toFixed(2));
+  // A tier the quantity has not reached is not a price, so the hours count.
+  assert.equal(N.overheadHours([PART({ printTime: 3, qty: 1, priceTiers: tiers })]), 3);
+});
+
+test('the calculator works the rate out once, not per keystroke, and again when the book changes', () => {
+  let calls = 0;
+  const counting = { ...OH, perHour: (c) => { calls++; return OH.perHour(c); } };
+  const { ctx } = calculatorContext(SHOP({ mode: 'professional' }), FORM, { KhaytOverheadRate: counting });
+  for (let i = 0; i < 25; i++) ctx.updateGrandTotal();
+  assert.equal(calls, 1, 'twenty-five keystrokes, one walk of the log');
+  ctx.clearOverheadCache();
+  ctx.updateGrandTotal();
+  assert.equal(calls, 2, 'cleared on a save, worked out again');
+  // A machine added, a job logged, a fixed cost changed: each moves the key.
+  ctx.machines.push({ id: 'm9', targetHoursPerDay: 8 });
+  ctx.updateGrandTotal();
+  ctx.printLog.push({ status: 'completed' });
+  ctx.updateGrandTotal();
+  ctx.settings.fixedCosts = [...COSTS, { name: 'Insurance', amount: 100 }];
+  ctx.updateGrandTotal();
+  assert.equal(calls, 5);
+  // Off: not worked out at all.
+  ctx.settings.overheadPerHour = { enabled: false, monthlyHours: 500 };
+  ctx.updateGrandTotal();
+  assert.equal(calls, 5);
+});
+
+test('every save that changes the rate clears the calculator\'s copy', () => {
+  assert.match(fnSource('renderer/settings.js', 'wireOverheadSettings'), /clearOverheadCache\(\);\n\s+saveAll\(\);/);
+  assert.match(fnSource('renderer/order-flows.js', 'logPrint'),
+    /printLog\.unshift\(entry\);\n[^\n]*\n\s+if \(typeof clearOverheadCache === 'function'\) clearOverheadCache\(\);/);
+  assert.match(fnSource('renderer/machines.js', 'deleteMachine'), /clearOverheadCache\(\)/);
+  assert.match(read('renderer/machines.js'),
+    /else machines\.push\(draft\);\n(?:\s+\/\/[^\n]*\n)+\s+if \(typeof clearOverheadCache === 'function'\) clearOverheadCache\(\);\n\s+saveAll\(\);/);
 });

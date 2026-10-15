@@ -33,7 +33,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   from your machines (their monthly hours, recent prints or daily target).
   Below 20 hours a month there is no rate, and Settings says why. Salaries
   are left out, because labour is already its own line. The calculator, a new
-  job on the Mac and a customer's online quote all use the same rate. The
+  job on the Mac, a quote from the phone and a customer's online quote all use
+  the same rate. A part with a fixed price tier stays at its tier price. The
+  margin the calculator shows is measured after the overhead. The
   overhead is saved on the job beside the parts' cost, not inside it, so the
   P&L and the break-even target still count your fixed costs once. With the
   switch off, every price is exactly what it was.

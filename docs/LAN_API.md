@@ -446,8 +446,13 @@ which is honest rather than a guess at what this shop charges.
 
 ```json
 "price": { "beforeDiscount": 73.08, "discount": 7.31, "subtotal": 65.77,
-           "rushFee": 16.44, "shipping": 25, "extras": 12.5, "total": 119.71 }
+           "rushFee": 16.44, "shipping": 25, "extras": 12.5, "overhead": 0, "total": 119.71 }
 ```
+
+`overhead` is the shop's fixed costs per print hour × the part's print hours ×
+`qty`, a cost under the margin like the calculator screen's Overhead line
+(`lib/overhead-rate.js`). It is 0 unless the shop turned that on in Settings, and
+0 when a price tier applies, because a tier replaces cost-plus-margin.
 
 **VAT is not included** — it is applied at invoicing, not in the calculator, so a
 quote total is pre-VAT exactly as the desktop's is.

@@ -155,6 +155,8 @@ function logPrint(asQuote = false) {
   // down hands the same invoice number to the next job.
   saveAll();
   printLog.unshift(entry);
+  // A new job is new hours in the log the overhead rate is measured from.
+  if (typeof clearOverheadCache === 'function') clearOverheadCache();
   // Names the rest of this function still reads.
   const finalPrice = entry.price;
   const id = entry.id;

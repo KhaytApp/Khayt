@@ -4600,7 +4600,7 @@
   "calc.bd.overhead": "Genel giderler",
   "set.overhead_title": "Baskı saati başına genel gider",
   "set.overhead_on": "Sabit maliyetlerimi tekliflere baskı saati başına ekle",
-  "set.overhead_hint": "Varsayılan olarak kapalı. Açıldığında her teklife bir Genel giderler satırı eklenir (bu oran × işin baskı saatleri) ve diğer maliyetler gibi kâr eklenir. İşçilik zaten ayrı bir satır olduğu için maaşlar dahil edilmez.",
+  "set.overhead_hint": "Varsayılan olarak kapalı. Açıldığında her teklife bir Genel giderler satırı eklenir (bu oran × işin baskı saatleri) ve diğer maliyetler gibi kâr eklenir. İşçilik zaten ayrı bir satır olduğu için maaşlar dahil edilmez. Hesaplayıcının gösterdiği marj genel giderlerden sonra ölçülür, bu yüzden minimum marj uyarısı daha sık görünebilir.",
   "set.overhead_hours": "Aylık baskı saati",
   "set.overhead_hours_ph": "Otomatik",
   "set.overhead_hours_hint": "Makinelerinizden hesaplanması için boş bırakın: aylık saatleri, son zamanlarda bastıkları veya günlük hedefleri.",

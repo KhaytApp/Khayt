@@ -1010,6 +1010,9 @@ function openMachineEditor(machineId = null) {
       const idx = machines.findIndex(m => m.id === draft.id);
       if (idx >= 0) machines[idx] = draft;
       else machines.push(draft);
+      // The overhead rate sums every machine's monthly hours: an added,
+      // changed or retired printer moves it now.
+      if (typeof clearOverheadCache === 'function') clearOverheadCache();
       saveAll();
       renderMachines();
       renderMachineDropdown();
@@ -1116,6 +1119,7 @@ async function deleteMachine(machineId) {
   const ok = await confirmModal(msg, { danger: true });
   if (!ok) return;
   machines = machines.filter(m => m.id !== machineId);
+  if (typeof clearOverheadCache === 'function') clearOverheadCache();
   saveAll();
   renderMachines();
   renderMachineDropdown();

@@ -4601,7 +4601,7 @@
   "calc.bd.overhead": "Overhead",
   "set.overhead_title": "Overhead per print hour",
   "set.overhead_on": "Add my fixed costs to quotes, per print hour",
-  "set.overhead_hint": "Off by default. When on, every quote gets an Overhead line (this rate × the job’s print hours), marked up like your other costs. Salaries are left out, because labour is already its own line.",
+  "set.overhead_hint": "Off by default. When on, every quote gets an Overhead line (this rate × the job’s print hours), marked up like your other costs. Salaries are left out, because labour is already its own line. The margin the calculator shows is measured after the overhead, so your minimum-margin warning may appear more often.",
   "set.overhead_hours": "Print hours a month",
   "set.overhead_hours_ph": "Auto",
   "set.overhead_hours_hint": "Leave empty to work it out from your machines: their monthly hours, what they printed lately, or their daily target.",
