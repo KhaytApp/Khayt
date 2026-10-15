@@ -89,6 +89,60 @@ final class CalculatorAndReceiptTests: XCTestCase {
         XCTAssertFalse(calc.ratesEdited)
     }
 
+    /// The shop's fixed costs by the print hour (#1875): off, the price is
+    /// what it always was; on, the phone charges what the Mac's calculator
+    /// charges — `lib/overhead-rate.js` through the engine, on every piece's
+    /// hours — and "You keep" leaves the rent out.
+    func testOverheadPerPrintHourIsTheMacsWhenOnAndNothingWhenOff() async throws {
+        func price() async throws -> CalculatorAnswer {
+            let calc = PhoneCalculator()
+            await calc.load(reader)
+            calc.lines[0].spoolId = "SP-203"
+            calc.lines[0].grams = "120"
+            calc.hours = "4"
+            calc.qty = 3
+            await calc.recompute(reader)
+            return try XCTUnwrap(calc.answer)
+        }
+        func shop(enabled: Bool) throws {
+            var store = SampleShop.book()
+            guard case .object(var settings)? = store["settings"] else { return XCTFail("sample shape") }
+            settings["fixedCosts"] = .array([
+                .object(["id": .string("fc1"), "name": .string("Rent"), "amount": .number(2000)]),
+                .object(["id": .string("fc2"), "name": .string("Internet"), "amount": .number(400)]),
+                .object(["id": .string("fc3"), "name": .string("Salaries"), "amount": .number(9000)]),
+            ])
+            settings["overheadPerHour"] = .object(["enabled": .bool(enabled), "monthlyHours": .number(200)])
+            store["settings"] = .object(settings)
+            try book.replace(with: store, scope: SampleShop.scope())
+        }
+
+        let plain = try await price()
+        try shop(enabled: false)
+        let off = try await price()
+        XCTAssertEqual(off.overhead, 0)
+        XCTAssertEqual(off.quoted.total, plain.quoted.total, "off changes nothing, to the digit")
+
+        try shop(enabled: true)
+        let on = try await price()
+        // Rent + internet over 200 h (pay is labour's line, left out) = 12/h,
+        // on 4 h × 3 pieces.
+        XCTAssertEqual(on.overhead, 144, accuracy: 0.0001)
+        XCTAssertEqual(on.cost, off.cost, accuracy: 0.0001, "the part's own cost is untouched")
+        XCTAssertGreaterThan(on.quoted.total, off.quoted.total)
+        XCTAssertEqual(on.keeps, on.quoted.subtotal - on.cost - 144, accuracy: 0.0001)
+
+        // What the Mac's preview sends for the same cart.
+        guard case .object(let settings)? = try book.read()["settings"] else { return XCTFail("settings") }
+        let engine = try KhaytEngine()
+        var input = CalculatorPart.quoteInput(baseCost: on.cost, margin: 30, discountPct: 0,
+                                              rush: false, settings: settings)
+        input["overheadPerHour"] = .number(12)
+        input["printHours"] = .number(12)
+        let mac = try await engine.quoteTotal(input)
+        XCTAssertEqual(on.quoted.total, mac.total, accuracy: 0.0001)
+    }
+
     func testASecondColourSplitsTheWeightRatherThanAddingToIt() async throws {
         let calc = PhoneCalculator()
         await calc.load(reader)

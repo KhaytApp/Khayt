@@ -124,7 +124,8 @@ struct CalculatorView: View {
             if let a = model.answer {
                 VStack(spacing: 0) {
                     row(L10n.tr("calc.cost"), Money.text(a.cost, currency))
-                    row(L10n.tr("calc.keeps"), Money.text(a.quoted.subtotal - a.cost, currency))
+                    if a.overhead > 0 { row(L10n.tr("calc.overhead"), Money.text(a.overhead, currency)) }
+                    row(L10n.tr("calc.keeps"), Money.text(a.keeps, currency))
                     if a.quoted.discountAmount > 0 {
                         row(L10n.tr("quote.discount"), "−" + Money.text(a.quoted.discountAmount, currency))
                     }

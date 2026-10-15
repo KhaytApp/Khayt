@@ -118,6 +118,12 @@ struct CalculatorAnswer: Sendable, Equatable {
 
     /// What the whole order costs the shop to make.
     var cost: Double { costed.cost * Double(qty) }
+    /// The shop's fixed costs this order's print hours carry: 0 unless the
+    /// shop turned that line on (`lib/overhead-rate.js`). A cost, so it is
+    /// not part of what the shop keeps.
+    var overhead: Double { quoted.overhead ?? 0 }
+    /// What the shop keeps once the job and its share of the rent are paid.
+    var keeps: Double { quoted.subtotal - cost - overhead }
     /// What the customer pays for each piece.
     var perPiece: Double { quoted.total / Double(max(1, qty)) }
 }
@@ -136,7 +142,9 @@ extension BookReader {
                                                    settings: Self.settings(store))
     }
 
-    func calculate(_ q: CalculatorQuestion) async throws -> CalculatorAnswer {
+    /// `now` is the day each machine's recent print hours are measured to,
+    /// for the overhead rate; a parameter so a test can pin it.
+    func calculate(_ q: CalculatorQuestion, now: Date = Date()) async throws -> CalculatorAnswer {
         let store = try wholeBook()
         let shelf = CalculatorShelf.from(store)
         let settings = Self.settings(store)
@@ -153,9 +161,23 @@ extension BookReader {
                                                preset: Self.row(store, "printers", q.presetId),
                                                consumables: list("consumables"))
         let qty = max(1, q.qty)
-        let quoted = try await engine.quoteTotal(CalculatorPart.quoteInput(
+        var input = CalculatorPart.quoteInput(
             baseCost: costed.cost * Double(qty), margin: q.margin, discountPct: q.discount,
-            rush: q.rush, settings: settings))
+            rush: q.rush, settings: settings)
+        // The shop's fixed costs by the print hour, when it turned that on in
+        // the Mac's Settings: `lib/overhead-rate.js` through the engine, at the
+        // rate the Mac charges, on every piece's print hours (the Mac's
+        // `CalculatorModel`). Sent only when there is something to charge, so
+        // with the line off the input — and the price — is what it always was.
+        let printHours = q.hours * Double(qty)
+        if printHours > 0,
+           let rate = try? await engine.overhead(settings: .object(settings), machines: list("machines"),
+                                                 orders: list("printLog"), today: BookWriter.localDay(now)),
+           rate.perHour > 0 {
+            input["overheadPerHour"] = .number(rate.perHour)
+            input["printHours"] = .number(printHours)
+        }
+        let quoted = try await engine.quoteTotal(input)
         return CalculatorAnswer(costed: costed, quoted: quoted, qty: qty)
     }
 
