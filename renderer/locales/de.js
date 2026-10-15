@@ -4600,7 +4600,7 @@
   "calc.bd.overhead": "Gemeinkosten",
   "set.overhead_title": "Gemeinkosten pro Druckstunde",
   "set.overhead_on": "Meine Fixkosten pro Druckstunde in Angebote einrechnen",
-  "set.overhead_hint": "Standardmäßig aus. Wenn aktiv, erhält jedes Angebot eine Zeile „Gemeinkosten“ (dieser Satz × Druckstunden des Auftrags), mit Aufschlag wie deine anderen Kosten. Gehälter bleiben außen vor, weil Arbeit schon eine eigene Zeile ist. Die im Rechner angezeigte Marge wird nach den Gemeinkosten gemessen, daher kann die Warnung zur Mindestmarge öfter erscheinen.",
+  "set.overhead_hint": "Standardmäßig aus. Wenn aktiv, erhält jedes Angebot eine Zeile „Gemeinkosten“ (dieser Satz × Druckstunden des Auftrags), mit Aufschlag wie deine anderen Kosten. Gehälter bleiben außen vor, weil Arbeit schon eine eigene Zeile ist. Die Preise enthalten sie, und deine Marge kommt obendrauf.",
   "set.overhead_hours": "Druckstunden pro Monat",
   "set.overhead_hours_ph": "Automatisch",
   "set.overhead_hours_hint": "Leer lassen, um es aus deinen Maschinen zu ermitteln: ihre Monatsstunden, was sie zuletzt gedruckt haben, oder ihr Tagesziel.",

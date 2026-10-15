@@ -158,6 +158,33 @@ struct OverheadTests {
         #expect(read.value == stored["overheadPerHour"])
     }
 
+    @Test("an empty Print hours field is Auto: read as empty, sent absent, saved as auto (alpha.74 review)")
+    func emptyHoursIsAuto() async throws {
+        // What the rule stores for "auto" reads back as an EMPTY field.
+        let auto: [String: JSONValue] = [
+            "overheadPerHour": .object(["enabled": .bool(true), "monthlyHours": .number(0)]),
+        ]
+        let opened = FixedCostsSettings.OverheadForm.read(auto)
+        #expect(opened.monthlyHours == nil)
+        // A typed figure, then cleared: sent with no hours at all.
+        var form = FixedCostsSettings.OverheadForm(enabled: true, monthlyHours: 320)
+        form.monthlyHours = nil
+        let sent = form.value
+        #expect(sent == .object(["enabled": .bool(true)]))
+        // And saved through the real settings write.
+        let engine = try KhaytEngine()
+        var root: [String: JSONValue] = [
+            "settings": .object(["overheadPerHour": .object(["enabled": .bool(true),
+                                                              "monthlyHours": .number(320)])]),
+        ]
+        try await Shop.applySettings(to: &root, form: ["overheadPerHour": sent],
+                                     opened: nil, country: nil, engine: engine)
+        guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
+        let reread = FixedCostsSettings.OverheadForm.read(settings)
+        #expect(reread.enabled)
+        #expect(reread.monthlyHours == nil, "the 320 is gone: the hours are worked out again")
+    }
+
     @Test("a public quote is priced from a book that carries the machines")
     func pricingBookHasMachines() {
         let root: [String: JSONValue] = ["machines": .array([.object(["id": .string("m1")])])]

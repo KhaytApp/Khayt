@@ -19,6 +19,9 @@ struct InvoiceSheet: View {
     @State private var paper: InvoicePaper?
     @State private var problem: String?
     @State private var saved: String?
+    /// The number the document prints, as `KhaytInvoiceDocument.documentNumber`
+    /// answered it once the job was numbered (if it was owed one).
+    @State private var number: String?
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
 
@@ -34,9 +37,10 @@ struct InvoiceSheet: View {
                 Spacer()
                 // The number the DOCUMENT states under "No." — a header saying
                 // one thing over a paper saying another is a header nobody can
-                // use. The invoice number for an invoice, the id for a quote.
-                if let number = Self.documentNumber(job, row: job.flatMap { shop.orderRow($0.id) }),
-                   !number.isEmpty {
+                // use. Asked of the shared rule (`documentNumber`), not kept
+                // here: the invoice number for a job that began as a quote,
+                // the id for a quote and for every other job.
+                if let number, !number.isEmpty {
                     Text(number).font(.callout.monospaced()).foregroundStyle(.secondary)
                 }
             }
@@ -83,6 +87,19 @@ struct InvoiceSheet: View {
         // on open — see `issueInvoiceNumberIfOwed`).
         await shop.issueInvoiceNumberIfOwed(subject.id)
         guard let job else { problem = shop.words.callIt("mac.move_gone"); return }
+        // Still owed one after that means it could not be given: this viewer
+        // may not change jobs (the sample shop, a read-only book, a staff
+        // level without orders.edit) or the write failed. An invoice drawn
+        // now would carry the quote's id as a tax invoice's number, so it is
+        // not drawn, and the sheet says why.
+        switch await shop.invoiceNumbering(of: shop.orderRow(job.id) ?? .null) {
+        case .notIssued:
+            problem = shop.words.callIt("mac.invoice_not_issued"); return
+        case .number(let n):
+            number = n
+        case nil:
+            number = job.id
+        }
         guard let doc = await Invoice.html(for: job, shop: shop) else {
             problem = shop.words.callIt("mac.no_document"); return
         }
@@ -98,8 +115,7 @@ struct InvoiceSheet: View {
         guard let paper else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = Self.filename(job, words: shop.words,
-                                                   row: job.flatMap { shop.orderRow($0.id) })
+        panel.nameFieldStringValue = Self.filename(job, words: shop.words, number: number)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task {
             do {
@@ -112,28 +128,15 @@ struct InvoiceSheet: View {
         }
     }
 
-    /// The number the document prints under "No.", by the same rule as
-    /// `lib/invoice-document.js`: a quote is its id; an invoice is its
-    /// `invoiceNumber`, else the older `invoiceNum`, else the id.
-    static func documentNumber(_ job: Order?, row: JSONValue?) -> String? {
-        guard let job else { return nil }
-        if Stage.of(job) == .quote { return job.id }
-        if case .object(let fields)? = row {
-            for key in ["invoiceNumber", "invoiceNum"] {
-                if let n = Shop.plainString(fields[key]), !n.isEmpty { return n }
-            }
-        }
-        return job.id
-    }
-
     /// What the file is called.
     ///
-    /// The number the document prints (`documentNumber`). Falling back to the
+    /// The number the document prints (`number`, from `documentNumber`; the
+    /// job's id when none was given). Falling back to the
     /// project's name when there is somehow none, and slashes taken out either
     /// way — a job called "lids 2/3" would otherwise be saved into a folder
     /// that is not there.
-    static func filename(_ job: Order?, words: Words, row: JSONValue? = nil) -> String {
-        let number = documentNumber(job, row: row) ?? ""
+    static func filename(_ job: Order?, words: Words, number: String? = nil) -> String {
+        let number = number ?? job?.id ?? ""
         let base = number.isEmpty ? (job?.project ?? words.callIt("doc.invoice")) : number
         let cleaned = base.replacingOccurrences(of: "/", with: "-")
                           .replacingOccurrences(of: ":", with: "-")

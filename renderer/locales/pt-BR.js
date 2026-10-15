@@ -4601,7 +4601,7 @@
   "calc.bd.overhead": "Custos indiretos",
   "set.overhead_title": "Custos indiretos por hora de impressão",
   "set.overhead_on": "Somar meus custos fixos aos orçamentos, por hora de impressão",
-  "set.overhead_hint": "Desligado por padrão. Quando ligado, todo orçamento ganha uma linha de custos indiretos (esta taxa × as horas de impressão do trabalho), com margem como seus outros custos. Salários ficam de fora, porque a mão de obra já é uma linha própria. A margem que a calculadora mostra é medida depois dos custos indiretos, então o aviso de margem mínima pode aparecer com mais frequência.",
+  "set.overhead_hint": "Desligado por padrão. Quando ligado, todo orçamento ganha uma linha de custos indiretos (esta taxa × as horas de impressão do trabalho), com margem como seus outros custos. Salários ficam de fora, porque a mão de obra já é uma linha própria. Os preços os incluem, e sua margem é somada por cima.",
   "set.overhead_hours": "Horas de impressão por mês",
   "set.overhead_hours_ph": "Automático",
   "set.overhead_hours_hint": "Deixe vazio para calcular a partir das suas máquinas: horas mensais, o que imprimiram recentemente ou a meta diária.",

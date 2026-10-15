@@ -118,7 +118,7 @@ function context({ settings = {}, clients = [], language = 'en' } = {}) {
   vm.createContext(ctx);
   // print-date before invoice-document: the document's date formatter reaches
   // it through the global, exactly as it does in a window and on the Mac.
-  for (const f of ['lib/tax.js', 'lib/invoice-language.js', 'lib/content-languages.js',
+  for (const f of ['lib/tax.js', 'lib/order-new.js', 'lib/invoice-language.js', 'lib/content-languages.js',
                    'lib/print-date.js', 'lib/invoice-document.js']) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx);
   }

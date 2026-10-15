@@ -4600,7 +4600,7 @@
   "calc.bd.overhead": "Gastos generales",
   "set.overhead_title": "Gastos generales por hora de impresión",
   "set.overhead_on": "Añadir mis costes fijos a los presupuestos, por hora de impresión",
-  "set.overhead_hint": "Desactivado por defecto. Al activarlo, cada presupuesto lleva una línea de gastos generales (esta tarifa × las horas de impresión del trabajo), con margen como tus demás costes. Los salarios se excluyen, porque la mano de obra ya es una línea propia. El margen que muestra la calculadora se mide después de los gastos generales, así que el aviso de margen mínimo puede aparecer más a menudo.",
+  "set.overhead_hint": "Desactivado por defecto. Al activarlo, cada presupuesto lleva una línea de gastos generales (esta tarifa × las horas de impresión del trabajo), con margen como tus demás costes. Los salarios se excluyen, porque la mano de obra ya es una línea propia. Los precios los incluyen, y tu margen se suma encima.",
   "set.overhead_hours": "Horas de impresión al mes",
   "set.overhead_hours_ph": "Automático",
   "set.overhead_hours_hint": "Déjalo vacío para calcularlo a partir de tus máquinas: sus horas mensuales, lo que imprimieron últimamente o su objetivo diario.",

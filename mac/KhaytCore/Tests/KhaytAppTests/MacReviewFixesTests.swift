@@ -143,16 +143,70 @@ struct MacReviewFixesTests {
         #expect(again.number == nil, "a second issue spends no second number")
     }
 
-    @Test("the sheet's number is the document's: invoice number for an invoice, id for a quote")
-    func sheetNumberFollowsTheDocument() throws {
-        let row = JSONValue.object(["invoiceNumber": .string("INV-2026-0031")])
-        let accepted = try Self.order(id: "QUO-2026-0007", status: "pending")
-        let quote = try Self.order(id: "QUO-2026-0008", status: "quote")
-        #expect(InvoiceSheet.documentNumber(accepted, row: row) == "INV-2026-0031")
-        #expect(InvoiceSheet.documentNumber(quote, row: row) == "QUO-2026-0008")
-        #expect(InvoiceSheet.documentNumber(accepted, row: .object([:])) == "QUO-2026-0007")
-        let older = JSONValue.object(["invoiceNum": .string("INV-2026-0030")])
-        #expect(InvoiceSheet.documentNumber(accepted, row: older) == "INV-2026-0030")
+    @Test("the sheet's number is the document's: invoice number for an accepted quote, id for a quote")
+    func sheetNumberFollowsTheDocument() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let accepted = JSONValue.object(["id": .string("QUO-2026-0007"), "status": .string("pending"),
+                                         "quoteAcceptedAt": .string("2026-10-01"),
+                                         "invoiceNumber": .string("INV-2026-0031")])
+        let quote = JSONValue.object(["id": .string("QUO-2026-0008"), "status": .string("quote"),
+                                      "invoiceNumber": .string("INV-2026-0031")])
+        let older = JSONValue.object(["id": .string("QUO-2026-0007"), "status": .string("completed"),
+                                      "invoiceNum": .string("INV-2026-0030")])
+        let acceptedNumber = await shop.invoiceNumbering(of: accepted)
+        let quoteNumber = await shop.invoiceNumbering(of: quote)
+        let olderNumber = await shop.invoiceNumbering(of: older)
+        #expect(acceptedNumber == .number("INV-2026-0031"))
+        #expect(quoteNumber == .number("QUO-2026-0008"))
+        #expect(olderNumber == .number("INV-2026-0030"))
+        let name = InvoiceSheet.filename(nil, words: shop.words, number: "INV-2026-0031")
+        #expect(name == "INV-2026-0031.pdf")
+    }
+
+    @Test("a plain job keeps printing its id when the shop's invoice prefix is its own (review B1)")
+    func customPrefixKeepsTheId() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let plain = JSONValue.object(["id": .string("ATH-2026-0012"), "status": .string("pending"),
+                                      "invoiceNum": .string("INV-2026-0012"),
+                                      "invoiceNumber": .string("INV-2026-0012")])
+        let printed = await shop.invoiceNumbering(of: plain)
+        #expect(printed == .number("ATH-2026-0012"))
+    }
+
+    @Test("a viewer who cannot number an accepted quote is told so, and no QUO-numbered invoice is drawn")
+    func notIssuedWhenTheViewerCannotWrite() async throws {
+        // The sample shop cannot be changed, so `issueInvoiceNumberIfOwed`
+        // gives nothing; the job is still owed its number afterwards.
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(!shop.canMoveJobs)
+        let owed = JSONValue.object(["id": .string("QUO-2026-0007"), "status": .string("pending"),
+                                     "quoteAcceptedAt": .string("2026-10-01")])
+        let numbering = await shop.invoiceNumbering(of: owed)
+        #expect(numbering == .notIssued)
+        // An unapproved quote On hold is not owed one: it prints as itself.
+        let held = JSONValue.object(["id": .string("ATH-2026-0014"), "status": .string("on_hold"),
+                                     "hasQuote": .bool(true)])
+        let heldNumber = await shop.invoiceNumbering(of: held)
+        #expect(heldNumber == .number("ATH-2026-0014"))
+        let en = shop.words.callIt("mac.invoice_not_issued")
+        #expect(en == "Invoice number not issued yet")
+    }
+
+    @Test("invoiceNumberOwed: On hold with a quote and no yes is owed nothing; hasQuote alone decides nothing")
+    func unapprovedHeldQuoteIsNotOwed() async throws {
+        let engine = try KhaytEngine()
+        let settings: [String: JSONValue] = ["invNumNext": .number(7), "invNumYear": .number(2026)]
+        let held = JSONValue.object(["id": .string("QUO-2026-0014"), "status": .string("on_hold"),
+                                     "hasQuote": .bool(true)])
+        let approved = JSONValue.object(["id": .string("ATH-2026-0015"), "status": .string("on_hold"),
+                                         "hasQuote": .bool(true), "clientApprovedAt": .string("2026-10-02T08:00:00Z")])
+        let heldOwed = try await engine.invoiceNumberOwed(order: held, settings: settings)
+        let approvedOwed = try await engine.invoiceNumberOwed(order: approved, settings: settings)
+        #expect(!heldOwed)
+        #expect(approvedOwed)
     }
 
     static func order(id: String, status: String) throws -> Order {
@@ -225,8 +279,8 @@ struct MacReviewFixesTests {
         await en.load("en", engine: engine)
         let ar = Words()
         await ar.load("ar", engine: engine)
-        #expect(en.callIt("mac.pnl_col_margin") == "Gross margin")
-        #expect(ar.callIt("mac.pnl_col_margin") == "الهامش الإجمالي")
+        #expect(en.callIt("mac.pnl_col_margin") == "Gross %")
+        #expect(ar.callIt("mac.pnl_col_margin") == "مجمل الربح")
         #expect(en.callIt("mac.pnl_col_operating") == "Operating costs")
         #expect(ar.callIt("mac.pnl_col_operating") == "تكاليف التشغيل")
         let heading = Reports.Totals.netHeading(en)

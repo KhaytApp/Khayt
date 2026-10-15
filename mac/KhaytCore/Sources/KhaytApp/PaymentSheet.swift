@@ -65,12 +65,16 @@ struct PaymentSheet: View {
                         // The commonest payment there is: all of it. The box
                         // is a running total, so without this "they paid" was
                         // reading the bill off the row above and typing it.
+                        //
+                        // Offered only when it can RAISE what is recorded and
+                        // the bill is known (`paidInFull`): see there.
+                        let full = Self.paidInFull(due: due, recorded: job?.paidAmount ?? 0)
                         Button(shop.words.callIt("mac.paid_in_full")) {
-                            amount = Self.paidInFull(due: due, price: job?.price ?? 0)
+                            if let full { amount = full }
                         }
                         .controlSize(.small)
                         .fixedSize()
-                        .disabled(job == nil || abs(amount - Self.paidInFull(due: due, price: job?.price ?? 0)) < 0.005)
+                        .disabled(job == nil || full == nil || abs(amount - (full ?? amount)) < 0.005)
                     }
                 }
                 GridRow {
@@ -152,12 +156,20 @@ struct PaymentSheet: View {
     /// and a job a gift card half paid is not recorded as paid twice over.
     ///
     /// The box is the TOTAL paid, not this payment, so this is the whole
-    /// figure and not what is left after earlier payments. Before the engine
-    /// has answered it is the job's price, as `cashDue` and `price` fall back.
-    static func paidInFull(due: KhaytEngine.CashDue?, price: Double) -> Double {
-        let figure = due?.cash ?? price
-        guard figure.isFinite else { return 0 }
-        return (max(0, figure) * 100).rounded() / 100
+    /// figure and not what is left after earlier payments.
+    ///
+    /// NIL — the button is off — in two cases (alpha.74 review):
+    ///   - before the engine has answered. The fallback is the job's `price`,
+    ///     which on a tax-exclusive shop is the NET figure, so pressing early
+    ///     recorded a payment short by the tax;
+    ///   - when what is `recorded` already covers the cash due. A 100 job paid
+    ///     100 and then given a 30 credit note has a cash due of 70, and the
+    ///     button wrote 70 over the 100 the customer actually handed over.
+    static func paidInFull(due: KhaytEngine.CashDue?, recorded: Double) -> Double? {
+        guard let figure = due?.cash, figure.isFinite else { return nil }
+        let full = (max(0, figure) * 100).rounded() / 100
+        guard !(recorded >= full - 0.005) else { return nil }
+        return full
     }
 
     private func commit() {

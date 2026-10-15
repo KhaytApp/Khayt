@@ -38,24 +38,34 @@ struct FixedCostsSettings: View {
     @State private var overheadOpened = OverheadForm()
 
     /// `settings.overheadPerHour` as a form: on or off, and the shop's own
-    /// monthly print hours (0: work them out from the machines).
+    /// monthly print hours — nil (an EMPTY field) to work them out from the
+    /// machines.
+    ///
+    /// Optional because the hint under the field says "leave it empty", and a
+    /// non-optional Double could not be left empty: it showed 0, never the
+    /// "Auto" prompt, and clearing it put the 0 back (alpha.74 review). The
+    /// stored 0 the rule writes for "auto" reads back as nil, so a book saved
+    /// by either app opens on the prompt.
     struct OverheadForm: Equatable {
         var enabled = false
-        var monthlyHours: Double = 0
+        var monthlyHours: Double?
 
         static func read(_ settings: [String: JSONValue]) -> OverheadForm {
             guard case .object(let o)? = settings["overheadPerHour"] else { return OverheadForm() }
             var f = OverheadForm()
             if case .bool(true)? = o["enabled"] { f.enabled = true }
-            f.monthlyHours = max(0, Shop.plainNumber(o["monthlyHours"]) ?? 0)
+            if let n = Shop.plainNumber(o["monthlyHours"]), n.isFinite, n > 0 { f.monthlyHours = n }
             return f
         }
 
-        /// As the pane sends it. `lib/settings-edit.js` cleans it with the
-        /// rule that reads it (`KhaytOverheadRate.clean`).
+        /// As the pane sends it: the hours only when there is a figure — an
+        /// empty field is sent ABSENT, never as a 0 somebody typed.
+        /// `lib/settings-edit.js` cleans it with the rule that reads it
+        /// (`KhaytOverheadRate.clean`), which keeps "auto" as it always has.
         var value: JSONValue {
-            .object(["enabled": .bool(enabled),
-                     "monthlyHours": .number(monthlyHours.isFinite ? max(0, monthlyHours) : 0)])
+            var o: [String: JSONValue] = ["enabled": .bool(enabled)]
+            if let h = monthlyHours, h.isFinite, h > 0 { o["monthlyHours"] = .number(h) }
+            return .object(o)
         }
     }
 
@@ -143,9 +153,14 @@ struct FixedCostsSettings: View {
             HStack {
                 Text(shop.words.callIt("set.overhead_hours"))
                 Spacer()
+                // A Double? so an empty field IS empty — the "Auto" prompt
+                // shows, and that is what is saved — and bordered like the
+                // other figures a shop types in Settings.
                 TextField("", value: $overhead.monthlyHours,
                           format: .number.precision(.fractionLength(0)),
                           prompt: Text(shop.words.callIt("set.overhead_hours_ph")))
+                    .textFieldStyle(.roundedBorder)
+                    .monospacedDigit()
                     .frame(width: 90)
                     .multilineTextAlignment(.trailing)
             }

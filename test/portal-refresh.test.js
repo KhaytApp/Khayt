@@ -46,7 +46,8 @@ function original(order, settings, clients, shopField, payStatusFn, currencySymb
     statusLabel: isQuote ? 'Quote' : (CLOUD_PORTAL_STATUS_LABELS[order.status] || order.status),
     eta: order.dueDate || '',
     issueDate: order.date || '',
-    invoiceNo: order.invoiceNumber || order.invoiceNum || order.id,
+    // Since alpha.74 the paper's number (documentNumber), not invoiceNumber || id.
+    invoiceNo: require('../lib/invoice-document.js').documentNumber(order, settings),
     seller: {
       name: shopField('biz') || 'Khayt',
       vat: settings.vat || '',
@@ -277,4 +278,16 @@ test('without a clock the answer is the one outboundFor gave before', () => {
   } finally {
     globalThis.KhaytCloudPlans.isBetaFree = realIsBetaFree;
   }
+});
+
+// alpha.74 review: the portal's invoice number is the paper's
+// (`KhaytInvoiceDocument.documentNumber`), not `invoiceNumber || id`.
+test('portal invoiceNo: a plain job with its own invPrefix shows its id; an accepted quote its invoice number', () => {
+  const settings = { invPrefix: 'ATH', quotePrefix: 'QUO' };
+  const plain = { id: 'ATH-2026-0012', status: 'pending', price: 100,
+                  invoiceNum: 'INV-2026-0012', invoiceNumber: 'INV-2026-0012' };
+  assert.equal(Portal.payloadFor(plain, { settings }).payload.invoiceNo, 'ATH-2026-0012');
+  const accepted = { id: 'QUO-2026-0007', status: 'pending', price: 100, quoteAcceptedAt: '2026-10-01',
+                     invoiceNumber: 'INV-2026-0031' };
+  assert.equal(Portal.payloadFor(accepted, { settings }).payload.invoiceNo, 'INV-2026-0031');
 });

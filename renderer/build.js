@@ -514,7 +514,9 @@ function updateGrandTotal() {
   // marked up with the rest; a price tier replaces cost-plus and so ignores it.
   // Not under a price tier: a tier IS the price, and the saved job charges a
   // tiered part no overhead either (KhaytOrderNew.overheadHours).
-  const overheadRate = shopOverheadPerHour();
+  // None on a catalogue product's job: one product, one price (overheadHours).
+  const fromProduct = typeof currentBuildFromProductId !== 'undefined' && !!currentBuildFromProductId;
+  const overheadRate = fromProduct ? 0 : shopOverheadPerHour();
   const liveOverhead = activeTier ? 0 : overheadRate * clampPositive(snap.printTime);
   const liveUnitPrice = activeTier
     ? activeTier.pricePerUnit

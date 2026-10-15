@@ -9,6 +9,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   adds the same line, worked out by the same rule, so a quote on the phone
   matches the Mac's. It shows as its own row, and "You keep" leaves it out.
   With the line off, nothing changes.
+
+- **Invoices keep their own number again.** Since the last alpha an invoice
+  printed the invoice counter's number (INV-…) for every job, so a shop with
+  its own invoice prefix saw a job numbered ATH-2026-0012 reprint as
+  INV-2026-0012. Only a job that began as a quote now prints the invoice
+  counter's number; every other job prints its own number, as before, and the
+  customer's tracking page shows the same number as the paper. A quote
+  still waiting for its answer on hold is no longer given an invoice number.
+  On the Mac, someone who cannot change jobs (the sample shop, a read-only
+  book) sees "Invoice number not issued yet" for an accepted quote with no
+  number yet, rather than an invoice with the quote's number on it.
+- **Mac: Paid in full cannot lower a payment.** After a credit note, the
+  button wrote the smaller amount over what the customer had paid. It is now
+  off when the recorded payment already covers what is due, and until the
+  total has loaded.
+- **Overhead is not added to catalogue products.** A job taken from a product
+  got the overhead line, while the product's own price, the online store and
+  shelf sales did not, so one product had two prices. A typed price no longer
+  records overhead it was never priced with. The Settings hint now says what
+  the overhead does on both apps ("Prices include it, and your margin is added
+  on top of it").
+- **Mac: smaller fixes.** Settings › Overhead's "Print hours a month" can be
+  left empty for Auto. The Reports margin column fits its header. On the
+  sample shop, Make quote and Make job say why they are off.
+
 - **Desktop: invoice numbers come from the same rule as the Mac's.** The
   desktop kept its own copy of the numbering (prefix, format, counter, the
   January reset). It now uses the shared one, so the two apps cannot number an

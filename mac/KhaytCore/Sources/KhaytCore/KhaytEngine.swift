@@ -1776,9 +1776,12 @@ public actor KhaytEngine {
 
     /// The print hours a cart's overhead is charged on — `lib/order-new.js`
     /// `overheadHours`, the same count the saved job is priced with (an agreed
-    /// part carries none), so a preview cannot disagree with the record.
-    public func overheadHours(_ parts: [JSONValue]) throws -> Double {
-        try runtime.call("KhaytOrderNew", "overheadHours", [JSONValue.array(parts)], as: Double.self)
+    /// part carries none, nor a job taken from a catalogue product), so a
+    /// preview cannot disagree with the record.
+    public func overheadHours(_ parts: [JSONValue], productId: String? = nil) throws -> Double {
+        let opts: JSONValue = productId.map { .object(["productId": .string($0)]) } ?? .object([:])
+        return try runtime.call("KhaytOrderNew", "overheadHours", [JSONValue.array(parts), opts],
+                                as: Double.self)
     }
 
     // MARK: - The dashboard
@@ -6922,6 +6925,15 @@ public actor KhaytEngine {
     public func invoiceNumberOwed(order: JSONValue, settings: [String: JSONValue]) throws -> Bool {
         try runtime.call2("KhaytOrderNew.invoiceNumberOwed(ARG0, ARG1)",
                           [order, .object(settings)], as: Bool.self)
+    }
+
+    /// `lib/invoice-document.js`'s `documentNumber`: the number a document
+    /// prints under "No." — a quote's id; a job that began as a quote, its
+    /// invoice number; anything else, its id. The sheet's header and the PDF's
+    /// name ask this rather than keep a Swift copy of the rule.
+    public func documentNumber(order: JSONValue, settings: [String: JSONValue]) throws -> String {
+        try runtime.call2("KhaytInvoiceDocument.documentNumber(ARG0, ARG1)",
+                          [order, .object(settings)], as: String.self)
     }
 
     // MARK: - Storefront order webhooks

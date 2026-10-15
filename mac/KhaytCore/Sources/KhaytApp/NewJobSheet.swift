@@ -846,7 +846,7 @@ struct NewJobSheet: View {
         }
     }
 
-    private var footer: some View {
+    var footer: some View {
         HStack {
             if let problem {
                 Label(problem, systemImage: "exclamationmark.triangle")
@@ -893,7 +893,7 @@ struct NewJobSheet: View {
     /// Everything the price depends on, so the preview re-runs when any of it
     /// moves and not on every keystroke in the job's name.
     private var signature: String {
-        "\(parts.map { "\($0.cost)x\($0.qty)@\($0.agreedPrice ?? -1)h\($0.hours)" }.joined())|\(shop.overheadPerHour)|\(margin)|\(discountPct)|\(shippingCost)|\(rush)|\(rule.step)|\(rule.mode)|\(rule.override ?? -1)|\(componentsCost)"
+        "\(parts.map { "\($0.cost)x\($0.qty)@\($0.agreedPrice ?? -1)h\($0.hours)" }.joined())|\(shop.overheadPerHour)|\(product?.id ?? "")|\(margin)|\(discountPct)|\(shippingCost)|\(rush)|\(rule.step)|\(rule.mode)|\(rule.override ?? -1)|\(componentsCost)"
     }
 
     /// The cart in two halves, the way the rule takes it: what is priced at
@@ -1000,7 +1000,9 @@ struct NewJobSheet: View {
         guard !parts.isEmpty else { quoted = nil; return }
         // The cart's print hours, for the overhead line — counted by the rule
         // the saved job is priced with, so this preview is the saved price.
-        let hours = await shop.overheadHours(of: parts)
+        // None on a job taken from a product: the catalogue, the storefront
+        // and a shelf sale price it without the line, and so does this.
+        let hours = await shop.overheadHours(of: parts, productId: product?.id)
         quoted = await shop.previewQuote(
             baseCost: costedBase,
             margin: margin, discountPct: discountPct,

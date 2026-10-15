@@ -436,6 +436,16 @@ import KhaytCore
                                                        parts: [sliced, estimated],
                                                        preferQuote: true)).paper,
                    "23b-quote-from-model-words", size: CGSize(width: NewJobSheet.width, height: 470))
+        // The footer, opened for a quote and for a job, so its default button
+        // can be checked in each language (alpha.74 review N8): Save as quote
+        // is the default only when a quote was asked for. (The whole sheet
+        // draws nothing here — see above.)
+        for (asQuote, name) in [(true, "23c-quote-sheet-footer"), (false, "23d-job-sheet-footer")] {
+            try render(NewJobSheet(shop: shop, seed: .init(project: "Dallah + Vase",
+                                                           parts: [sliced, estimated],
+                                                           preferQuote: asQuote)).footer,
+                       name, size: CGSize(width: NewJobSheet.width, height: 70))
+        }
         try render(CustomerSheet(shop: shop, existing: Shop.newCustomer()),
                    "24-new-customer-words", size: CGSize(width: CustomerSheet.width, height: 640))
         try render(ExpenseSheet(shop: shop),
