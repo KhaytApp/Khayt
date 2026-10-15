@@ -7189,6 +7189,54 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.74] - 2026-10-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+A quote straight from a model, an approved quote that gets its own invoice
+number, and an optional overhead line for rent and other monthly costs.
+
+### Added
+
+- **Quote a model without typing its figures again.** The calculator has
+  "Make quote…" and "Make job…", and the library has "Quote this model…" and
+  "New job from model…" (also on right-click; several models make one job).
+  The job sheet opens with the grams, hours, colours and purge already in,
+  priced exactly as the calculator priced it, and each line says whether its
+  figures come from the sliced file or are estimated from the model's shape.
+- **Paid in full.** One button on the payment sheet fills in what the job
+  still owes after any credit note or gift card. It is off when the job is
+  already paid, so it can never lower a payment you recorded.
+- **Overhead per print hour, if you want it.** Settings › Fixed costs can add
+  a share of rent, internet and other monthly costs to every quote: the
+  month's costs over the hours you print in a month. It is off unless you turn
+  it on, leaves wages out (labour is already its own line), shows how the rate
+  is worked out, and gives no rate on too few hours. Catalogue products and
+  agreed prices keep their price.
+
+### Fixed
+
+- **An approved quote gets its own invoice number.** A quote approved on this
+  Mac — from the board, the menu, the customer portal or the iPhone over
+  Wi-Fi — was invoiced under its quote number. It now takes the next invoice
+  number when it is approved, and an older approved quote takes one the first
+  time its invoice is opened. Undoing the approval keeps the number, so the
+  sequence has no gap. Ordinary jobs print the same number as before, and the
+  customer portal shows the number on the paper.
+- The spool sheet's price per kilo is worked out from the full spool, not the
+  weight left on it.
+- An Arabic invoice no longer prints the shop's name and address twice when
+  the shop has no Arabic name.
+- Reports: the cost column is "Operating costs", the margin column "Gross %",
+  and the net income card says which period it covers.
+- Job rows drop their colour pills when the column is narrow instead of
+  squeezing them to empty capsules.
+- Library search also finds a model by its file name, and treats أ/إ/آ and
+  ا, ة and ه, and ى and ي as the same letter.
+- The search field in the title bar that did nothing is gone.
+- The job inspector names the tax in Arabic.
+
 ## [4.0.0-alpha.73] - 2026-10-15
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
