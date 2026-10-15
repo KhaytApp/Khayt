@@ -249,6 +249,9 @@ private struct Detail: View {
                 // "VAT" on an Arabic screen, and fell back to a literal "Tax".
                 DetailLine(shop.taxName ?? shop.words.callIt("mac.pnl_col_vat"),
                      Money.text(split.taxTotal, job.currency), dim: true)
+                    // The whole rule — rate and whether it is in the price —
+                    // on hover, in the app's words.
+                    .help(shop.taxSummary ?? "")
             }
             DetailLine(shop.words.callIt("mac.paid"), Money.text(job.paidAmount, job.currency))
             // In the job's OWN currency, beside its total and what was paid —

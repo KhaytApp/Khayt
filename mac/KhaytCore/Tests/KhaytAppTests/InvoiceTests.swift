@@ -99,11 +99,13 @@ struct InvoiceTests {
     func theDocument() async throws {
         let doc = try await Self.build(Self.paper())
 
-        // The number a Khayt invoice states is the ORDER'S id, not the
-        // `invoiceNumber` field beside it. Asserted rather than assumed: this
-        // app's sheet header and its saved filename have to say the same thing
-        // the paper says, and they used to say the other one.
-        #expect(doc.html.contains("J1"), "its own number, as the shared document states it")
+        // The number an INVOICE states is its `invoiceNumber` — the counter the
+        // tax authority reads — and the id only when it has none. It printed
+        // the id, so an accepted quote was invoiced as "QUO-…" (Oct 2026). The
+        // sheet's header and saved filename follow the same rule
+        // (`InvoiceSheet.documentNumber`).
+        let numbered = doc.html.contains("<span class=\"v\">INV-0007</span>")
+        #expect(numbered, "the invoice number, as the shared document states it")
         #expect(doc.html.contains("Turbine bracket"), "what was made")
         #expect(doc.html.contains("PETG-CF"), "and what it was made of")
 
