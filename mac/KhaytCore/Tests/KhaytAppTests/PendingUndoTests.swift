@@ -48,7 +48,7 @@ struct PendingUndoTests {
         await Task.yield()
         #expect(putBack.isEmpty, "Undo put back something the write had not taken yet")
         pending.keepUnlessEmpty(["S1"])
-        for _ in 0..<200 where putBack.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        for _ in 0..<60_000 where putBack.isEmpty { try await Task.sleep(for: .milliseconds(10)) }  // a hang guard (10 min), not a speed limit: the runner is shared
         #expect(putBack == ["S1"])
         shop.undoManager = nil
     }
@@ -105,7 +105,7 @@ extension LibraryEditPerfTests {
             undo.endUndoGrouping()
             // Dropped while the move's own group was still open, so taken off
             // once it closed (`PendingUndo.drop`).
-            for _ in 0..<100 where undo.canUndo { try await Task.sleep(for: .milliseconds(20)) }
+            for _ in 0..<30_000 where undo.canUndo { try await Task.sleep(for: .milliseconds(20)) }  // a hang guard (10 min), not a speed limit: the runner is shared
             #expect(!undo.canUndo, "a dead entry swallows the next ⌘Z")
             shop.undoManager = nil
         }

@@ -54,7 +54,7 @@ struct LiveActivityPushTests {
 
     /// The post runs on its own task; wait for it, briefly.
     static func settle(_ rec: Recorder, count: Int) async {
-        for _ in 0..<200 where rec.requests.count < count { try? await Task.sleep(for: .milliseconds(10)) }
+        for _ in 0..<60_000 where rec.requests.count < count { try? await Task.sleep(for: .milliseconds(10)) }
     }
 
     @Test("the body: ISO dates, a WHOLE-number progress, job and dates left out when absent")

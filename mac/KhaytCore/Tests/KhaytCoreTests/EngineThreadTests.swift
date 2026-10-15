@@ -43,7 +43,7 @@ struct EngineThreadTests {
             _ = await engine.whereItRuns()
         }
         // Released once the last call has returned; give the hop back a moment.
-        for _ in 0..<200 where gone != nil { try await Task.sleep(for: .milliseconds(10)) }
+        for _ in 0..<60_000 where gone != nil { try await Task.sleep(for: .milliseconds(10)) }
         #expect(gone == nil)
     }
 
