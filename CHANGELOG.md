@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a quote moved to the board now gets an invoice number.** Only
+  the Approve button gave one. A quote dragged out of the Quote column, or
+  moved from the Job menu or the batch bar, had no number, so its invoice
+  printed the quote's id. It now takes the next invoice number when it leaves
+  the Quote column for anything but Cancelled. A number it already has is
+  kept, and an Undo keeps it too, so the sequence has no gaps.
+
 - **Mac: a malformed request on the shop's Wi-Fi can no longer crash the
   app.** The Mac's own server read a request nested a few hundred levels deep
   in a way that ran out of memory and closed Khayt, and the order form and the

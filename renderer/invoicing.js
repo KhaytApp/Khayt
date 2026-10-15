@@ -22,6 +22,24 @@ function nextInvoiceNumber() {
   saveAll();
   return result;
 }
+/* A quote that leaves the quote column for anything but cancelled is an order,
+   and an order's invoice carries a number. Only the Approve button and the LAN
+   path used to give it one: a quote dragged to Pending, or moved from the Job
+   menu or the batch bar, kept no number and its invoice printed the quote's id.
+   A number already there (either spelling) is kept, so calling it again never
+   uses up a second one. Returns true when it took a new number. */
+function ensureOrderInvoiceNumber(order, newStatus) {
+  if (!order || order.status !== 'quote' || newStatus === 'quote' || newStatus === 'cancelled') return false;
+  const had = order.invoiceNum || order.invoiceNumber;
+  if (had) {
+    order.invoiceNum = had;
+    order.invoiceNumber = had;
+    return false;
+  }
+  order.invoiceNum = nextInvoiceNumber();
+  order.invoiceNumber = order.invoiceNum;
+  return true;
+}
 /* Separate quote sequence so two quotes never collide on id (Bug A).
    Quotes intentionally do NOT advance the invoice counter, but they still
    need their own monotonic number or back-to-back quotes share an id. */
@@ -1514,6 +1532,7 @@ const BRAND_MARK_SVG = `<svg viewBox="0 0 192 192" xmlns="http://www.w3.org/2000
 
   const api = {
     nextInvoiceNumber,
+    ensureOrderInvoiceNumber,
     nextQuoteSeq,
     generateClientStatement,
     exportClientInvoices,

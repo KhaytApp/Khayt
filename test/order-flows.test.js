@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 // index.html; under node the test has to establish the same contract.
 require('../renderer/util.js');
 require('../lib/stock-undo.js');   // sets global.KhaytStockUndo, as the page's script tag does
+require('../renderer/invoicing.js'); // ensureOrderInvoiceNumber, as index.html loads it
 const flows = require('../renderer/order-flows.js');
 
 test('KhaytOrderFlows exports order lifecycle functions', () => {

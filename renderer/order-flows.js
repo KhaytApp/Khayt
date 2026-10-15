@@ -504,6 +504,7 @@ function updateStatus(id, newStatus) {
   // is also the moment worth asking for the actual time and grams.
   if (decision.needsActuals) {
     promptActuals(order, () => {
+      ensureOrderInvoiceNumber(order, newStatus);
       // The OLD tier has to be read before the job is finished — afterwards
       // there is nothing to compare the new one against.
       const prevTier = order.clientId ? getClientTier(order.clientId) : null;
@@ -514,6 +515,9 @@ function updateStatus(id, newStatus) {
     return;
   }
 
+  // Before the Undo snapshot: an Undo keeps the number on the quote, so moving
+  // it out again reuses it instead of leaving a gap in the sequence.
+  ensureOrderInvoiceNumber(order, newStatus);
   const _undoIdx = printLog.indexOf(order);
   const _undoSnap = structuredClone(order);
   // The move may write the shelf (reopening a finished job gives its filament
