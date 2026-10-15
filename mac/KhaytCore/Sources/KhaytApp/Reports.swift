@@ -380,7 +380,11 @@ struct Reports: View {
                 }
                 .width(min: 56, ideal: 56, max: 200)
             }
-            TableColumn(shop.words.callIt("an.pnl_expenses"), value: \.expenses) { r in
+            // "OPERATING COSTS", not "Expenses": this column is expenses AND
+            // the monthly overhead AND depreciation AND labour, while the
+            // waterfall above names expenses alone "Expenses" — one word, two
+            // figures, on one screen.
+            TableColumn(shop.words.callIt("mac.pnl_col_operating"), value: \.expenses) { r in
                 // What was spent AND the overhead charged to the period, which
                 // is the figure the net is worked out from. Two numbers in one
                 // column, because the shop is owed the one it can check.
@@ -1280,6 +1284,12 @@ struct Reports: View {
             return terms.joined(separator: " − ")
         }
 
+        /// "Net income · all time": the card's heading, with the period it
+        /// adds up.
+        static func netHeading(_ words: Words) -> String {
+            words.callIt("an.pnl_net") + " · " + words.callIt("mac.pnl_all_time")
+        }
+
         /// The panel without its scroll view — what a photograph can see
         /// (`ImageRenderer` draws nothing inside a `ScrollView`).
         @ViewBuilder var statement: some View {
@@ -1300,7 +1310,10 @@ struct Reports: View {
                     // neither would be news. The table beside this already
                     // colours a negative quarter the same red.
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(shop.words.callIt("an.pnl_net"))
+                        // OVER WHAT. Every period in the book, summed — the
+                        // card said "Net income" beside a table of quarters and
+                        // a waterfall of one, and nothing said which.
+                        Text(Self.netHeading(shop.words))
                             .font(.system(size: 10, weight: .semibold))
                             .textCase(.uppercase).tracking(0.6)
                             .foregroundStyle(Khayt.brand)

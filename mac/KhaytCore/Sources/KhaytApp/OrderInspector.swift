@@ -244,8 +244,14 @@ private struct Detail: View {
                 // Only shown for a registered shop: an unregistered one has no
                 // split, and inventing a zero-rate line would imply otherwise.
                 DetailLine(shop.words.callIt("mac.shop_keeps"), Money.text(split.subtotal, job.currency), dim: true)
-                DetailLine(shop.taxSummary.map { String($0.prefix(while: { !$0.isNumber })).trimmingCharacters(in: .whitespaces) } ?? "Tax",
+                // The tax's name in the app's language (`Shop.nameTax`). This
+                // cut `taxSummary` at its first digit, which left the English
+                // "VAT" on an Arabic screen, and fell back to a literal "Tax".
+                DetailLine(shop.taxName ?? shop.words.callIt("mac.pnl_col_vat"),
                      Money.text(split.taxTotal, job.currency), dim: true)
+                    // The whole rule — rate and whether it is in the price —
+                    // on hover, in the app's words.
+                    .help(shop.taxSummary ?? "")
             }
             DetailLine(shop.words.callIt("mac.paid"), Money.text(job.paidAmount, job.currency))
             // In the job's OWN currency, beside its total and what was paid —

@@ -68,6 +68,49 @@
   }
 
   /**
+   * Whether this job is owed an invoice number it does not have.
+   *
+   * A quote is created WITHOUT one (`newOrder` leaves `invoiceNum` null so a
+   * quote never consumes a number the tax authority will ask about), and the
+   * number is meant to arrive when the customer says yes. On the Mac nothing
+   * gave it one — the approve paths stamped `quoteAcceptedAt` and moved on —
+   * so an accepted quote was invoiced under its quote id, `QUO-…`.
+   *
+   * Owed when the job is no longer a quote, was not cancelled, has neither
+   * spelling of the number, and began as a quote: it was accepted, approved by
+   * the customer, carries a quote, or still wears the quote prefix. A job that
+   * was never a quote is left alone — its id IS its invoice number.
+   */
+  function invoiceNumberOwed(order, settings) {
+    if (!order || typeof order !== 'object') return false;
+    if (order.status === 'quote' || order.status === 'cancelled') return false;
+    if (order.invoiceNumber || order.invoiceNum) return false;
+    const prefix = ((settings && settings.quotePrefix) || 'QUO') + '-';
+    return !!(order.quoteAcceptedAt || order.clientApprovedAt || order.hasQuote
+              || (typeof order.id === 'string' && order.id.startsWith(prefix)));
+  }
+
+  /**
+   * Give an accepted quote its invoice number, once.
+   *
+   * Writes both spellings (`invoiceNum` and `invoiceNumber`, as `newOrder`
+   * does) onto `order` and advances `settings`' counter, in place. Returns the
+   * number given, or null when none was owed — so a second call, or a call on
+   * a job that already has one, changes nothing.
+   *
+   * The caller must run this INSIDE the store's write, on the newest book: the
+   * counter is a read-modify-write, and two approvals that each read the same
+   * `invNumNext` would print one number on two invoices.
+   */
+  function ensureInvoiceNumber(order, settings, year) {
+    if (!invoiceNumberOwed(order, settings)) return null;
+    const n = allocateInvoiceNumber(settings, year);
+    order.invoiceNum = n;
+    order.invoiceNumber = n;
+    return n;
+  }
+
+  /**
    * The next quote sequence.
    *
    * A separate counter, because the id is the primary key and two quotes
@@ -366,6 +409,7 @@
     TOKEN_BYTES,
     allocateInvoiceNumber, allocateQuoteSeq, avgDailyWorkingHours,
     estimateDueDate, newOrder, componentsCost,
+    invoiceNumberOwed, ensureInvoiceNumber,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderNew = api;

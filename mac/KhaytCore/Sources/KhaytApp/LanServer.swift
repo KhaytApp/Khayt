@@ -2682,6 +2682,10 @@ extension Shop {
             let result = try await engine.lanQuoteApply(store: .object(root), orderId: jobId, nowIso: nowIso)
             guard result.found, result.error == nil, let printLog = result.printLog else { return }
             root["printLog"] = printLog
+            // The invoice counter, advanced when the approval gave the job its
+            // number. Same write as the job, so the number on the job and the
+            // counter that issued it cannot land apart.
+            if let settings = result.settings { root["settings"] = settings }
             approved = result.order
         }
         await load(source)

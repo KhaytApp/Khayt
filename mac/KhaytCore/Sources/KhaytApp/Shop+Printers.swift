@@ -1039,6 +1039,24 @@ extension Shop {
                                   "pct": .string(Money.figure(profile.totalPercent))])
     }
 
+    /// The registered tax's name as a LABEL, in the app's language.
+    ///
+    /// The job inspector labelled its tax line by cutting `taxSummary` at the
+    /// first digit — "VAT 15% شامل السعر" → "VAT" — so an Arabic shop read
+    /// English in the middle of its own money. VAT is the name nearly every
+    /// country in `lib/tax.js` carries, and the shared catalogue already says
+    /// it in Arabic (`an.pnl_vat`, «ضريبة القيمة المضافة»); any other name is
+    /// the shop's own word and stays as written.
+    func nameTax(_ settings: JSONValue?) async -> String? {
+        guard case .object(let dict)? = settings, let engine else { return nil }
+        guard let profile = try? await engine.taxProfile(settings: dict), profile.isRegistered else { return nil }
+        return Self.taxLabel(profile.name, words: words)
+    }
+
+    static func taxLabel(_ name: String, words: Words) -> String {
+        name.uppercased() == "VAT" ? words.callIt("an.pnl_vat") : name
+    }
+
     /// A price split into what the shop keeps and what it is only holding for
     /// the tax authority. Computed by `lib/tax.js`, not here.
     func taxSplit(_ amount: Double) async -> TaxSplit? {

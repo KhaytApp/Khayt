@@ -300,6 +300,14 @@ function invoiceHtml(order, ctx) {
 
   // Label pairs — (primary, secondary). Primary = working language.
   const isQuoteDoc = order.status === 'quote';
+  /* The number under "No.".
+   *
+   * A quote is numbered by its id, `QUO-…`, and keeps it. An invoice is
+   * numbered by the INVOICE counter — `invoiceNumber`, or the older
+   * `invoiceNum` — because the id of a job that began as a quote is still
+   * `QUO-…`, and that printed as the tax invoice's number. The id is the
+   * fallback for a record from before either field existed. */
+  const docNumber = isQuoteDoc ? order.id : (order.invoiceNumber || order.invoiceNum || order.id);
   // Every printed label, as [primary, secondary].
   //
   // These used to be hardcoded English/Arabic literal pairs, which is why the
@@ -453,13 +461,25 @@ function invoiceHtml(order, ctx) {
    */
   const _p = docLang.lang;
   const _s = docLang.secondary;
+  /* The second-language line, or nothing when it says what the first does.
+   *
+   * `shopField` falls back across languages: a shop that filled in only its
+   * Arabic name gets that name as the English "primary" too. The secondary
+   * line read the Arabic field directly, so the same name printed twice, one
+   * under the other — and the same for the tagline, the address, the terms
+   * and the footer. A line that repeats the one above it is not a translation. */
+  const secondaryOf = (base, primary) => {
+    if (!bi) return '';
+    const text = settings[KhaytContentLanguages.fieldKey(base, _s)] || '';
+    return String(text).trim() && String(text).trim() === String(primary || '').trim() ? '' : text;
+  };
   const bizPrimary    = shopField('biz', _p);
-  const bizSecondary  = bi ? (settings[KhaytContentLanguages.fieldKey('biz', _s)] || '') : '';
+  const bizSecondary  = secondaryOf('biz', bizPrimary);
   const addrPrimary   = shopField('addr', _p);
-  const addrSecondary = bi ? (settings[KhaytContentLanguages.fieldKey('addr', _s)] || '') : '';
+  const addrSecondary = secondaryOf('addr', addrPrimary);
 
   const taglinePrimary   = shopField('tagline', _p);
-  const taglineSecondary = bi ? (settings[KhaytContentLanguages.fieldKey('tagline', _s)] || '') : '';
+  const taglineSecondary = secondaryOf('tagline', taglinePrimary);
 
   // Brand color: amber for quotes, user-chosen (or default) for invoices
   const invBrand     = isQuoteDoc ? '#92400e' : (safeCssColor(settings.invAccentColor, '#5E2E14'));
@@ -468,7 +488,9 @@ function invoiceHtml(order, ctx) {
 
   // Terms / conditions section
   const termsPrimary   = shopField('invTerms', _p);
-  const termsSecondary = bi ? (settings[KhaytContentLanguages.fieldKey('invTerms', _s)] || '') : '';
+  const termsSecondary = secondaryOf('invTerms', termsPrimary);
+  const footerPrimary   = shopField('footer', _p);
+  const footerSecondary = secondaryOf('footer', footerPrimary);
   const termsSectionHtml = termsPrimary.trim() ? `
     <div class="inv-terms">
       <div class="label-strip">
@@ -553,7 +575,7 @@ function invoiceHtml(order, ctx) {
           <div class="meta">
             <div class="meta-row">
               <span class="k">${escapeHtml(L.no[0])}</span>
-              <span class="v">${escapeHtml(num(order.id))}</span>
+              <span class="v">${escapeHtml(num(docNumber))}</span>
             </div>
             <div class="meta-row">
               <span class="k">${escapeHtml(L.date[0])}</span>
@@ -708,8 +730,8 @@ function invoiceHtml(order, ctx) {
       ${termsSectionHtml}
 
       <div class="footer">
-        <div class="thanks">${escapeHtml(shopField('footer', _p) || t('inv.thank_you'))}</div>
-        ${biContent && settings[KhaytContentLanguages.fieldKey('footer', _s)] ? `<div class="thanks-ar ${isAr ? 'ltr' : 'ar'}">${escapeHtml(settings[KhaytContentLanguages.fieldKey('footer', _s)])}</div>` : ''}
+        <div class="thanks">${escapeHtml(footerPrimary || t('inv.thank_you'))}</div>
+        ${biContent && footerSecondary ? `<div class="thanks-ar ${isAr ? 'ltr' : 'ar'}">${escapeHtml(footerSecondary)}</div>` : ''}
         <div class="legal">${escapeHtml(L.legal)}</div>
       </div>
 

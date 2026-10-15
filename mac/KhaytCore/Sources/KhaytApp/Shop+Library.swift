@@ -1941,14 +1941,11 @@ extension Shop {
         }
         if libraryPrintNextOnly { rows = rows.filter(\.isPrintNext) }
         if libraryDuplicatesOnly { rows = rows.filter { duplicateOf[$0.id] != nil } }
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        let q = search.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty {
-            rows = rows.filter {
-                $0.title.lowercased().contains(q)
-                    || ($0.material ?? "").lowercased().contains(q)
-                    || ($0.tags ?? []).contains { $0.lowercased().contains(q) }
-                    || ($0.creator ?? "").lowercased().contains(q)
-            }
+            // The file's name too, and folded — see `LibraryFile.matches`.
+            let folded = SearchText.fold(q)
+            rows = rows.filter { $0.matches(folded: folded) }
         }
         // Side by side: the copies of one model together, oldest first.
         if libraryDuplicatesOnly {
