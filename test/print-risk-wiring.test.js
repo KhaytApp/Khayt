@@ -116,7 +116,9 @@ test('the summary is written onto the record', () => {
 
 test('the app reads the schedule through the shared rule, not off the dictionary', () => {
   const src = read(SHOP);
-  assert.match(src, /riskWhen = try\? await engine\?\.riskWhen\(settings:/,
+  // Assigned directly or through a local, so a load overtaken while it waits
+  // can drop the answer rather than show it.
+  assert.match(src, /(riskWhen|let when) = try\? await engine\?\.riskWhen\(settings:/,
     'Shop works out the schedule itself instead of asking lib/print-risk.js');
   assert.match(src, /analysesRiskAtImport: Bool \{ riskWhen == "import" \}/,
     'the at-import test has been rewritten and may no longer fail safe');
