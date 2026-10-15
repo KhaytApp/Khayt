@@ -82,14 +82,20 @@ public struct QuoteTotal: Codable, Sendable, Equatable {
     public let priceSource: String?
     /// What the customer had already agreed, inside `total` and never marked up.
     public let agreedAmount: Double?
+    /// The shop's fixed costs by the print hour, as a cost line under the
+    /// margin (`lib/overhead-rate.js`). 0 while the shop has it off; optional
+    /// because a bundle from before October 2026 has no such field.
+    public let overhead: Double?
 
     public init(priceBeforeDiscount: Double, discountAmount: Double, subtotal: Double,
                 rushFee: Double, total: Double, computedTotal: Double? = nil,
-                priceSource: String? = nil, agreedAmount: Double? = nil) {
+                priceSource: String? = nil, agreedAmount: Double? = nil,
+                overhead: Double? = nil) {
         self.priceBeforeDiscount = priceBeforeDiscount; self.discountAmount = discountAmount
         self.subtotal = subtotal; self.rushFee = rushFee; self.total = total
         self.computedTotal = computedTotal; self.priceSource = priceSource
         self.agreedAmount = agreedAmount
+        self.overhead = overhead
     }
 
     /// The figure to say beside the total when the total is not the arithmetic.

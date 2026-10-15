@@ -141,6 +141,9 @@ function logPrint(asQuote = false) {
     components: (typeof currentComponents !== 'undefined' && Array.isArray(currentComponents))
       ? currentComponents : [],
     assemblyQty: (typeof currentAssemblyQty !== 'undefined') ? currentAssemblyQty : 1,
+    // The shop's fixed costs per print hour — the figure the calculator just
+    // showed (renderer/build.js). 0 unless the shop turned the line on.
+    overheadPerHour: (typeof shopOverheadPerHour === 'function') ? shopOverheadPerHour() : 0,
     asQuote,
   }, {
     settings,

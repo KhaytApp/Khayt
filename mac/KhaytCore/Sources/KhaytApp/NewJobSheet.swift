@@ -837,6 +837,12 @@ struct NewJobSheet: View {
                 Text("+" + Money.figure(quoted.rushFee) + " " + shop.words.callIt("calc.rush_fee"))
                     .font(.callout).foregroundStyle(.secondary).monospacedDigit()
             }
+            // The shop's fixed costs by the print hour — in the total, marked
+            // up, and said here so the shop sees why the price moved.
+            if let quoted, let overhead = quoted.overhead, overhead > 0 {
+                Text(shop.words.callIt("calc.bd.overhead") + " " + Money.figure(overhead))
+                    .font(.callout).foregroundStyle(.secondary).monospacedDigit()
+            }
         }
     }
 
@@ -887,7 +893,7 @@ struct NewJobSheet: View {
     /// Everything the price depends on, so the preview re-runs when any of it
     /// moves and not on every keystroke in the job's name.
     private var signature: String {
-        "\(parts.map { "\($0.cost)x\($0.qty)@\($0.agreedPrice ?? -1)" }.joined())|\(margin)|\(discountPct)|\(shippingCost)|\(rush)|\(rule.step)|\(rule.mode)|\(rule.override ?? -1)|\(componentsCost)"
+        "\(parts.map { "\($0.cost)x\($0.qty)@\($0.agreedPrice ?? -1)h\($0.hours)" }.joined())|\(shop.overheadPerHour)|\(margin)|\(discountPct)|\(shippingCost)|\(rush)|\(rule.step)|\(rule.mode)|\(rule.override ?? -1)|\(componentsCost)"
     }
 
     /// The cart in two halves, the way the rule takes it: what is priced at
@@ -992,11 +998,15 @@ struct NewJobSheet: View {
 
     private func reprice() async {
         guard !parts.isEmpty else { quoted = nil; return }
+        // The cart's print hours, for the overhead line — counted by the rule
+        // the saved job is priced with, so this preview is the saved price.
+        let hours = await shop.overheadHours(of: parts)
         quoted = await shop.previewQuote(
             baseCost: costedBase,
             margin: margin, discountPct: discountPct,
             shippingCost: shippingCost, rush: rush,
-            agreedAmount: agreedAmount, rule: rule, extraLines: extraLines)
+            agreedAmount: agreedAmount, rule: rule, extraLines: extraLines,
+            overheadHours: hours)
     }
 
     private func save(asQuote: Bool) async {
@@ -1005,7 +1015,10 @@ struct NewJobSheet: View {
             margin: margin, discountPct: discountPct, shippingCost: shippingCost,
             deposit: deposit, rush: rush, asQuote: asQuote, fromProduct: product,
             assemblyQty: hasComponents ? Double(assemblyQty) : nil,
-            rule: rule, extraLines: extraLines))
+            rule: rule, extraLines: extraLines,
+            // The rate the preview above was priced at, so the job is saved at
+            // the price the sheet showed.
+            overheadPerHour: shop.overheadPerHour))
         if shop.moveProblem == nil { shop.takingAJob = false } else { problem = shop.moveProblem }
     }
 }

@@ -22,6 +22,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **Mac: Paid in full.** The payment sheet has a Paid in full button that
   fills in what the job owes (less any credit note or gift card), so the
   usual payment no longer means reading the total and typing it.
+- **Desktop and Mac: quotes can carry your rent, per print hour (off by
+  default).** The monthly fixed costs in Settings (rent, internet, software
+  subscriptions) only fed the break-even target and the P&L, never a price.
+  Settings → Fixed Costs now has a switch that adds an Overhead line to every
+  quote: your fixed costs ÷ the print hours you expect a month × the job's
+  print hours, marked up like the other costs. Settings shows where the figure
+  comes from ("≈ 4.20 SAR per print hour from 2,100 SAR a month over ~500 h").
+  You can type the hours yourself, or leave it empty and Khayt works them out
+  from your machines (their monthly hours, recent prints or daily target).
+  Below 20 hours a month there is no rate, and Settings says why. Salaries
+  are left out, because labour is already its own line. The calculator, a new
+  job on the Mac and a customer's online quote all use the same rate. The
+  overhead is saved on the job beside the parts' cost, not inside it, so the
+  P&L and the break-even target still count your fixed costs once. With the
+  switch off, every price is exactly what it was.
 
 - **Mac: the engine's JavaScript shares a few threads instead of one per
   engine.** Each engine had a thread of its own, so a busy moment could run

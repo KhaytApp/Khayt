@@ -72,6 +72,12 @@
     // tariff (settings.elecRate) — resolved here by the same rule
     // `publicQuote` uses, so the storefront needs no settings to agree.
     if (PQ.elecRateFor) printer.elecRate = PQ.elecRateFor(preset, s);
+    // The shop's fixed costs per print hour, RESOLVED here, because the
+    // storefront has no book to resolve them from — and only when the shop
+    // turned the line on, so a sheet from any other book is the sheet it was.
+    const now = c.now instanceof Date ? c.now : new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const overheadPerHour = PQ.overheadPerHourFor ? PQ.overheadPerHourFor(store, today) : 0;
     const estimator = {};
     for (const [k, v] of Object.entries(c.estimatorOpts || {})) {
       if (typeof v === 'number' && Number.isFinite(v)) estimator[k] = v;
@@ -88,6 +94,7 @@
       material: { spoolCost: basis.spoolCost, spoolWeight: basis.spoolWeight, name, materialType },
       printer,
       estimator,
+      ...(overheadPerHour > 0 ? { overheadPerHour } : {}),
     };
   }
 
@@ -112,6 +119,9 @@
       printers: [Object.assign({ id: 'sheet' }, q.printer || {})],
       inventory: [],
       printLog: [],
+      // Already resolved by `build` — see `overheadPerHourFor` in public-quote.
+      // 0 for a sheet without one, which is every sheet published before it.
+      overheadPerHour: num(q.overheadPerHour),
     };
   }
 

@@ -447,6 +447,28 @@ function populateCalcCurrency() {
   sel.innerHTML = opts.join('');
 }
 
+/**
+ * The shop's fixed costs per print hour, as a quote here is charged them —
+ * `lib/overhead-rate.js` over this book's settings, machines and log. 0 unless
+ * the shop turned the line on in Settings, which is every shop until it does:
+ * the price of a job is then exactly what it always was.
+ *
+ * The SAME figure goes to the price on screen (`updateGrandTotal`) and to the
+ * job it is saved as (`logPrint` → `lib/order-new.js`), so the two agree.
+ */
+function shopOverheadPerHour() {
+  const o = (typeof settings !== 'undefined' && settings) ? settings.overheadPerHour : null;
+  // Not resolved at all while off: the rule walks the log, and an opt-in that
+  // nobody opted into should cost the calculator nothing per keystroke.
+  if (!o || o.enabled !== true || typeof KhaytOverheadRate === 'undefined') return 0;
+  return KhaytOverheadRate.perHour({
+    settings,
+    machines: (typeof machines !== 'undefined' && Array.isArray(machines)) ? machines : [],
+    orders: (typeof printLog !== 'undefined' && Array.isArray(printLog)) ? printLog : [],
+    today: (typeof localDateStr === 'function') ? localDateStr(new Date()) : '',
+  });
+}
+
 function updateGrandTotal() {
   populateCalcCurrency();
   const snap = {
@@ -474,9 +496,13 @@ function updateGrandTotal() {
   // Apply price tier if one matches current qty. Selection lives in lib/pricing.js
   // so the LAN quote endpoint resolves tiers the same way this screen does.
   const activeTier = KhaytPricing.activePriceTier(currentPriceTiers, qty);
+  // The shop's fixed costs by the print hour (0 while off). A cost, so it is
+  // marked up with the rest; a price tier replaces cost-plus and so ignores it.
+  const overheadRate = shopOverheadPerHour();
+  const liveOverhead = overheadRate * clampPositive(snap.printTime);
   const liveUnitPrice = activeTier
     ? activeTier.pricePerUnit
-    : liveBase * (1 + margin / 100);
+    : (liveBase + liveOverhead) * (1 + margin / 100);
   $('#partLivePrice').textContent = fmtMoney(liveUnitPrice * qty);
 
   // Cost breakdown chips
@@ -487,6 +513,7 @@ function updateGrandTotal() {
       { key: 'calc.bd.machine',  val: bd.machine  },
       { key: 'calc.bd.labor',    val: bd.labor    },
       { key: 'calc.bd.buffer',   val: bd.buffer   },
+      { key: 'calc.bd.overhead', val: liveOverhead },
     ].filter(x => x.val >= 0.01);
     if (items.length > 0) {
       bdEl.innerHTML = items.map(x =>
@@ -565,8 +592,24 @@ function updateGrandTotal() {
   //
   // A price tier applies only to a single live part, never to a multi-line cart:
   // that rule stays here, with the code that knows what a cart is.
+  // The hours the overhead is charged on: the cart's cost-plus parts (an
+  // agreed part carries its agreed price and nothing else — the same rule
+  // lib/order-new.js prices the saved job by), plus the part still in the form.
+  const liveHours = clampPositive(snap.printTime) * qty;
+  let overheadHours = 0;
+  if (overheadRate > 0) {
+    if (currentBuild.length > 0) {
+      overheadHours = (typeof KhaytOrderNew !== 'undefined' && KhaytOrderNew.overheadHours)
+        ? KhaytOrderNew.overheadHours(currentBuild) : 0;
+      if (pendingBase > 0) overheadHours += liveHours;
+    } else {
+      overheadHours = liveHours;
+    }
+  }
   const _q = KhaytPricing.quoteTotal({
     baseCost: totalBase,
+    overheadPerHour: overheadRate,
+    printHours: overheadHours,
     agreedAmount,
     qty,
     margin,
@@ -671,7 +714,9 @@ function updateGrandTotal() {
   // cost, so adding a 100 fee to a 30%-margin job dropped the displayed margin to 17.6%
   // when it should rise to 58.8%. Shipping is deliberately still counted on both sides:
   // the shop bills it and pays the carrier, so it should not inflate margin.
-  const actualMarginPct = finalPrice > 0 ? ((finalPrice - (totalCost + shippingCost)) / finalPrice) * 100 : margin;
+  // The overhead line is a cost the price has to cover, so the margin is
+  // measured after it (0 while it is off).
+  const actualMarginPct = finalPrice > 0 ? ((finalPrice - (totalCost + (_q.overhead || 0) + shippingCost)) / finalPrice) * 100 : margin;
   if (marginWarn) {
     const minPct = num(settings.minMarginPct, 0);
     const marginColor = actualMarginPct >= 40 ? 'var(--success)' : actualMarginPct >= 20 ? 'var(--warning)' : 'var(--danger)';
@@ -1820,6 +1865,9 @@ function updateResinFieldsVisibility() {
     updateFailureRateHint,
     calculateLivePartCost,
     updateGrandTotal,
+    // The overhead the calculator charges, so the job it saves charges the same
+    // (renderer/order-flows.js logPrint).
+    shopOverheadPerHour,
     snapshotPartFromForm,
     addPart,
     removePart,

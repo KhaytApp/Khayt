@@ -150,7 +150,9 @@ struct Calculator: View {
     var body: some View {
         ScrollView { content }
         .background(Khayt.ground)
-        .task(id: model.key) { await model.recompute(shop) }
+        // The overhead rate is in the id: turning the line on in Settings moves
+        // the price on screen now, not at the next keystroke.
+        .task(id: "\(model.key)|\(shop.overheadPerHour)") { await model.recompute(shop) }
         // The rule's own answer for this preset and machine. Re-asked when
         // either moves, and the fields follow UNLESS the shop has typed over
         // them — overwriting a typed labour rate because a machine was picked
@@ -335,6 +337,15 @@ struct Calculator: View {
                         Text("·").foregroundStyle(.tertiary)
                         Text("+" + Money.short(q.rushFee, shop.currency))
                             .monospacedDigit().foregroundStyle(Khayt.hot)
+                    }
+                    // The shop's fixed costs by the print hour, a cost line of
+                    // its own beside the cost (only while the shop has it on).
+                    if let q = quoted, let overhead = q.overhead, overhead > 0 {
+                        Text("·").foregroundStyle(.tertiary)
+                        Text("+" + Money.short(overhead, shop.currency))
+                            .monospacedDigit()
+                        Text(shop.words.callIt("calc.bd.overhead").lowercased())
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .font(.callout).lineLimit(1)

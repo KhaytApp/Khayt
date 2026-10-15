@@ -299,9 +299,12 @@ final class CalculatorModel {
         guard hasInput else { costed = nil; quoted = nil; return }
         let part = partInput(shop)
         let costedPart = await shop.costedPart(part, machineId: machineId, presetId: presetId)
+        // Every piece's print hours carry the shop's fixed costs when it has
+        // turned that on (0 otherwise): print time is per piece, as wear is.
         let quote = await shop.previewQuote(baseCost: (costedPart?.cost ?? 0) * Double(qty),
                                             margin: margin, discountPct: discount,
-                                            shippingCost: 0, rush: rush)
+                                            shippingCost: 0, rush: rush,
+                                            overheadHours: hoursValue * Double(qty))
         costed = costedPart
         quoted = quote
     }

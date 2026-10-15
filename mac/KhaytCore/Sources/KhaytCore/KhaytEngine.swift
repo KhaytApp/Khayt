@@ -539,6 +539,11 @@ public actor KhaytEngine {
         // it does not raise — it reports every order at its gross price and no
         // tax collected at all.
         "pnl-report",
+        // The shop's fixed costs by the print hour, for a quote that carries
+        // them (opt-in). AFTER PNL-REPORT AND DEPRECIATION, both of which it
+        // asks through their globals: the P&L for which costs are pay, and
+        // depreciation for how many hours a month each machine prints.
+        "overhead-rate",
         // The same P&L, once per site. PNL-REPORT AND ORDER-DEDUCTION ARE
         // ALREADY ABOVE and must be: it runs the one and reads which site a
         // job belongs to from the other.
@@ -1734,6 +1739,46 @@ public actor KhaytEngine {
 
     public func quoteTotal(_ input: [String: JSONValue]) throws -> QuoteTotal {
         try runtime.call("KhaytPricing", "quoteTotal", [input], as: QuoteTotal.self)
+    }
+
+    /// The shop's fixed costs per print hour, and where that figure comes
+    /// from: `lib/overhead-rate.js` `resolve`. `rate` is there whether or not
+    /// the shop has turned the line on, so Settings can show what turning it
+    /// on would do; `perHour` is what a quote is charged (0 while off).
+    public struct Overhead: Decodable, Sendable, Equatable {
+        public struct Row: Decodable, Sendable, Equatable {
+            public let name: String
+            public let amount: Double
+        }
+        public let enabled: Bool
+        public let rate: Double?
+        public let perHour: Double
+        public let monthlyCost: Double
+        public let hours: Double?
+        /// `shop` (typed) or `machines` (worked out), or nil.
+        public let source: String?
+        /// Nil when there is a rate; else `no_costs`, `no_hours` or `few_hours`.
+        public let reason: String?
+        public let included: [Row]
+        /// Fixed costs left out because they read as pay — labour is its own line.
+        public let left: [Row]
+        public let minHours: Double
+    }
+
+    /// `today` is the shop's local `YYYY-MM-DD`, the day each machine's recent
+    /// hours are measured to.
+    public func overhead(settings: JSONValue, machines: [JSONValue], orders: [JSONValue],
+                         today: String) throws -> Overhead {
+        try runtime.call2(
+            "KhaytOverheadRate.resolve({ settings: ARG0, machines: ARG1, orders: ARG2, today: ARG3 })",
+            [settings, .array(machines), .array(orders), .string(today)], as: Overhead.self)
+    }
+
+    /// The print hours a cart's overhead is charged on — `lib/order-new.js`
+    /// `overheadHours`, the same count the saved job is priced with (an agreed
+    /// part carries none), so a preview cannot disagree with the record.
+    public func overheadHours(_ parts: [JSONValue]) throws -> Double {
+        try runtime.call("KhaytOrderNew", "overheadHours", [JSONValue.array(parts)], as: Double.self)
     }
 
     // MARK: - The dashboard

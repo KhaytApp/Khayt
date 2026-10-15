@@ -705,6 +705,8 @@ struct RoundTripTests {
         "savePreset": "presetUntouched",
         "saveSettings": "settingsUntouched",
         "saveLanSettings": "settingsUntouched",
+        // Fixed Costs → overhead per print hour: `saveSettings` with `opened`.
+        "saveOverhead": "settingsUntouched",
         "saveSlicers": "settingsListsUntouched",
         "saveReports": "settingsListsUntouched",
         "saveStorefront": "settingsListsUntouched",
