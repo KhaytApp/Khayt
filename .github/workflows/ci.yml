@@ -373,21 +373,64 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The bundled JavaScript is a COPY of lib/, and a copy drifts. The Node
+      # suite guards it too; this says so on the platform that runs it. First,
+      # because it takes three seconds and the tests take minutes: a drifted
+      # copy is reported before them, not after.
+      - name: The bundled rules are not a fork of lib/
+        run: |
+          bash mac/sync-js.sh >/dev/null
+          git diff --exit-code -- mac/KhaytCore/Sources/KhaytCore/JS \
+            || { echo "mac/KhaytCore/Sources/KhaytCore/JS is out of date — run mac/sync-js.sh"; exit 1; }
+
+      # ── THE LAST BUILD OF main, AS A STARTING POINT ───────────────────────
+      #
+      # The build was ~8 minutes of every run, from nothing. `.build` from the
+      # last push to main is restored, and the compiler rebuilds what differs.
+      #
+      # `-enable-incremental-file-hashing` is what makes that true. A checkout
+      # gives every file a new modification time, and by default the Swift
+      # driver trusts the time: with a restored `.build` and no flag it
+      # recompiled 787 of 790 files, exactly as if nothing were cached (measured
+      # Oct 2026, `--build-system native` as CI builds). With the flag it
+      # compares content when the time differs: no change rebuilt nothing (3 s),
+      # a new member on `Shop` rebuilt 676 (98 s against 130 cold). A cache that
+      # is wrong is a cache the compiler ignores, never a stale binary.
+      #
+      # The key carries the toolchain and the runner image (a new Xcode must
+      # not reuse another compiler's modules) and Package.resolved. SAVED ONLY
+      # FROM main: every PR reads main's, and none of them spends the repo's
+      # 10 GB of cache on a branch nobody else will build.
+      - name: Which toolchain
+        id: toolchain
+        run: echo "id=${ImageOS}-${ImageVersion}-$(xcrun swift --version 2>&1 | shasum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the last build of main
+        uses: actions/cache/restore@v6
+        with:
+          path: mac/KhaytCore/.build
+          key: mac-tests-build-${{ steps.toolchain.outputs.id }}-${{ hashFiles('mac/KhaytCore/Package.resolved') }}-${{ github.sha }}
+          restore-keys: |
+            mac-tests-build-${{ steps.toolchain.outputs.id }}-${{ hashFiles('mac/KhaytCore/Package.resolved') }}-
+
       # The products first, and both extensions with them: the check that the
       # Quick Look extensions carry no Swift entry point READS THE BUILT BINARY,
       # and skips when there is nothing to read. Without this step it would sit
       # green having opened nothing — which is how it behaved for its whole
       # first day, for a different reason.
       - name: Build the app and its extensions
-        run: swift build --package-path mac/KhaytCore --build-tests
+        id: build
+        run: swift build --package-path mac/KhaytCore --build-tests -Xswiftc -enable-incremental-file-hashing
 
+      - name: Keep this build for the next run
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: mac/KhaytCore/.build
+          key: mac-tests-build-${{ steps.toolchain.outputs.id }}-${{ hashFiles('mac/KhaytCore/Package.resolved') }}-${{ github.sha }}
+
+      # Three processes, not one: nearly every app test is @MainActor, a
+      # process has one main thread, and in one process the whole suite queued
+      # on it while the runner's other cores idled. See mac/test-shards.sh.
       - name: Mac app tests
-        run: swift test --package-path mac/KhaytCore --skip-build
-
-      # The bundled JavaScript is a COPY of lib/, and a copy drifts. The Node
-      # suite guards it too; this says so on the platform that runs it.
-      - name: The bundled rules are not a fork of lib/
-        run: |
-          bash mac/sync-js.sh >/dev/null
-          git diff --exit-code -- mac/KhaytCore/Sources/KhaytCore/JS \
-            || { echo "mac/KhaytCore/Sources/KhaytCore/JS is out of date — run mac/sync-js.sh"; exit 1; }
+        run: bash mac/test-shards.sh
