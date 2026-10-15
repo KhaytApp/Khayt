@@ -539,6 +539,9 @@ public actor KhaytEngine {
         // it does not raise — it reports every order at its gross price and no
         // tax collected at all.
         "pnl-report",
+        // The VAT owed for the span the P&L covers: it sums the P&L's own
+        // rows, and asks TAX (above) only for the shop's mode and rates.
+        "vat-summary",
         // The shop's fixed costs by the print hour, for a quote that carries
         // them (opt-in). AFTER PNL-REPORT AND DEPRECIATION, both of which it
         // asks through their globals: the P&L for which costs are pay, and
@@ -7839,6 +7842,36 @@ public actor KhaytEngine {
              .array(wasteLog), .array(inventory), .array(machines),
              .object(recentMonthlyHours.mapValues { .number($0) }), .array(timeEntries)],
             as: [PnlPeriod].self)
+    }
+
+    /// The P&L over the span the shop chose, and the VAT owed for it.
+    ///
+    /// ONE call, so the summary sums exactly the rows the table draws:
+    /// `lib/vat-summary.js` adds up `pnlByPeriod`'s own `vatCollected` and
+    /// `vatReclaimable` rather than working the tax out a second time.
+    public func pnlStatement(_ input: PnlInputs) throws -> PnlStatement {
+        try runtime.call2(
+            "(function(){var rows = KhaytPnl.pnlByPeriod(ARG0, ARG1, \(PnlInputs.context));"
+          + " return {rows: rows, vat: KhaytVatSummary.summarize(rows, {settings: ARG2, expenses: ARG1, range: ARG12})};})()",
+            input.arguments, as: PnlStatement.self)
+    }
+
+    /// The same statement as files: a CSV and the HTML a PDF is printed from
+    /// (`lib/pnl-report.js` `periodsToCsv` / `periodsToHtml`). `labels` are
+    /// the shop's words, keyed like `STATEMENT_LABELS`; `periodLabel` is the
+    /// chosen period's name.
+    public func pnlDocuments(_ input: PnlInputs, labels: [String: String], periodLabel: String,
+                             currency: String, rightToLeft: Bool, language: String,
+                             shopName: String) throws -> PnlDocuments {
+        try runtime.call2(
+            "(function(){var rows = KhaytPnl.pnlByPeriod(ARG0, ARG1, \(PnlInputs.context));"
+          + " var vat = KhaytVatSummary.summarize(rows, {settings: ARG2, expenses: ARG1, range: ARG12});"
+          + " var o = {labels: ARG13, periodLabel: ARG14, currency: ARG15, from: ARG12 && ARG12.from,"
+          + " to: ARG12 && ARG12.to, dir: ARG16 ? 'rtl' : 'ltr', lang: ARG17, shopName: ARG18};"
+          + " return {csv: KhaytPnl.periodsToCsv(rows, vat, o), html: KhaytPnl.periodsToHtml(rows, vat, o)};})()",
+            input.arguments + [.object(labels.mapValues { .string($0) }), .string(periodLabel),
+                               .string(currency), .bool(rightToLeft), .string(language), .string(shopName)],
+            as: PnlDocuments.self)
     }
 
     /// What one site shows: `lib/site-filter.js`, the desktop's board and

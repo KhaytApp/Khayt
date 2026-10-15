@@ -2338,6 +2338,11 @@ final class Shop {
     /// The P&L by quarter (the table's word for it) or by month. A view
     /// preference, not the book's.
     var pnlByMonth = false
+    /// Which stretch of the book the P&L covers. On the shop, beside the
+    /// grain, because the strip, the page and the menu's export all read it;
+    /// remembered per window by `Reports` (`@SceneStorage`). Every period by
+    /// default — the page as it always was.
+    var pnlRange = PnlRange()
 
     /// The tables a Settings window is built from, read once per load.
     var currencies: [String: Currency] = [:]

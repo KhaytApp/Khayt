@@ -88,6 +88,14 @@ struct Reports: View {
     @State private var advice: [String: KhaytEngine.VarianceAdvice] = [:]
     @State private var order: [KeyPathComparator<PnlPeriod>] = [.init(\.period, order: .reverse)]
     @SceneStorage("reports.columns") private var columns: TableColumnCustomization<PnlPeriod>
+    /// The VAT for the chosen period — `lib/vat-summary.js` over the same rows
+    /// the table draws. Nil until worked out; `applies` false for a shop with
+    /// no tax set, and then nothing is drawn.
+    @State private var vat: VatSummary?
+    /// The period the P&L covers, remembered per window like the columns
+    /// beside it (`PnlRange.stored`). Restored into the shop when the page
+    /// opens, written back whenever the shop picks another.
+    @SceneStorage("reports.pnlRange") private var storedRange = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -98,6 +106,13 @@ struct Reports: View {
             .labelsHidden()
             .fixedSize()
             .padding(.vertical, 8)
+
+            // The custom range's two days, above everything the page draws —
+            // including the empty state, or a range that matched nothing
+            // would leave no way to change it.
+            if shop.reportPage == .profit && shop.pnlRange.kind == .custom {
+                PnlCustomRange(shop: shop)
+            }
 
             if shop.reportPage == .owing {
                 Owing(shop: shop, owed: owed)
@@ -118,7 +133,9 @@ struct Reports: View {
             } else if shop.reportPage == .custom {
                 CustomReportPage(shop: shop)
             } else if rows.isEmpty {
-                EmptyHere(title: shop.words.callIt("an.pnl_empty"), mark: .reports)
+                // Three different empties: dates that cannot be read, a period
+                // with nothing in it, and a book with nothing finished at all.
+                EmptyHere(title: shop.words.callIt(emptyKey), mark: .reports)
                     .frame(maxHeight: .infinity)
             } else {
                 HSplitView {
@@ -200,11 +217,13 @@ struct Reports: View {
                         // And where the money went. Under the two charts of
                         // what came in, because that is the order the table
                         // above reads in — revenue, then what it cost.
-                        ExpenseCategoriesCard(shop: shop, report: spending)
+                        ExpenseCategoriesCard(shop: shop, report: spending,
+                                              period: shop.pnlPeriodTitle())
                             .padding(Metric.screen)
                     }
                     }
-                    Totals(shop: shop, rows: rows, floor: floor)
+                    Totals(shop: shop, rows: rows, floor: floor, vat: vat,
+                           period: shop.pnlRange.kind == .all ? nil : shop.pnlPeriodTitle())
                         // At most 300: at the default window the split gave
                         // the totals ~345pt of a 360 maximum and the table
                         // lost its last column. The totals wrap; a Table
@@ -223,6 +242,8 @@ struct Reports: View {
             }
             // Quarter or month, on the one page that has a grain to choose.
             if shop.reportPage == .profit {
+                ToolbarItem { PnlPeriodMenu(shop: shop) }
+                ToolbarItem { PnlExportMenu(shop: shop) }
                 ToolbarItem {
                     Picker("", selection: $shop.pnlByMonth) {
                         Text(shop.words.callIt("mac.by_quarter")).tag(false)
@@ -242,6 +263,14 @@ struct Reports: View {
                             entries: shop.timeEntryRows)) { await recompute() }
         // The P&L's grain is a view preference; only the rows it draws move.
         .task(id: shop.pnlByMonth) { await recompute() }
+        // And the period: every figure on the page follows it.
+        .task(id: shop.pnlRange) { await recomputePnl() }
+        .onAppear {
+            if let remembered = PnlRange(stored: storedRange), remembered != shop.pnlRange {
+                shop.pnlRange = remembered
+            }
+        }
+        .onChange(of: shop.pnlRange) { _, range in storedRange = range.stored }
         // The period is the Best page's alone — the P&L reports every quarter
         // at once and the receivables age themselves — so recomputing all three
         // when it changes would be three answers to a question one asked.
@@ -311,6 +340,18 @@ struct Reports: View {
         return max(2, tallest)
     }
 
+    /// What the page says when the P&L has no rows.
+    private var emptyKey: String {
+        if shop.pnlRange.resolve() == .invalid { return "pnl.custom_invalid" }
+        return shop.pnlRange.kind == .all ? "an.pnl_empty" : "pnl.no_data_period"
+    }
+
+    /// "2026-10-01 – 2026-10-31": the days a row cut short by the span holds.
+    static func days(_ row: PnlPeriod) -> String {
+        guard let from = row.from, let to = row.to else { return row.period }
+        return Figure.isolated(from) + " – " + Figure.isolated(to)
+    }
+
     /// The sentence under the table when some finished work was charged
     /// nothing, or nil when none was.
     private var unpricedNote: String? {
@@ -345,7 +386,11 @@ struct Reports: View {
     private var table: some View {
         Table(rows.sorted(using: order), sortOrder: $order, columnCustomization: $columns) {
             TableColumn(shop.words.callIt("an.pnl_period"), value: \.period) { r in
-                Text(r.period).font(.body.weight(.semibold)).monospacedDigit()
+                // A row the chosen span cuts short — this month under the
+                // quarter view — is marked, and says which days it holds.
+                Text(r.isPartial ? r.period + "*" : r.period)
+                    .font(.body.weight(.semibold)).monospacedDigit()
+                    .help(r.isPartial ? Self.days(r) : "")
             }
             .width(min: 64, ideal: 64, max: 160)
             TableColumn(shop.words.callIt("an.pnl_orders"), value: \.orders) { r in
@@ -497,16 +542,8 @@ struct Reports: View {
     }
 
     private func recompute() async {
-        guard let engine = shop.engine else { rows = []; owed = nil; return }
-        rows = (try? await engine.pnlByPeriod(
-            orders: shop.orderRows, expenses: shop.expenseRows,
-            settings: shop.settingsDict, clients: shop.clientRows,
-            currencies: Invoice.currencyTable(shop), now: Date(),
-            granularity: shop.pnlByMonth ? "month" : "quarter",
-            wasteLog: shop.wasteRows, inventory: shop.inventoryRows,
-            machines: shop.machineRows,
-            recentMonthlyHours: shop.recentMonthlyHours,
-            timeEntries: shop.timeEntryRows)) ?? []
+        guard let engine = shop.engine else { rows = []; vat = nil; owed = nil; return }
+        await recomputePnl()
         await recomputeBreakEven()
         await recomputeCashFlow()
         await recomputeTrends()
@@ -520,13 +557,25 @@ struct Reports: View {
         await recomputeRatings()
         await recomputeSources()
         await recomputeRetention()
-        await recomputeSpending()
         await recomputeMaintenance()
         await recomputeDowntime()
         owed = try? await engine.receivables(
             orders: shop.orderRows, settings: shop.settingsDict, clients: shop.clientRows,
             currencies: Invoice.currencyTable(shop), language: shop.words.language, now: Date())
         await recomputeBest()
+    }
+
+    /// Only what the chosen period moves: the rows, the VAT and the expense
+    /// breakdown. Apart from `recompute` so a custom day typed a key at a
+    /// time does not redraw cash flow, trends and the rest on every key.
+    ///
+    /// Over the chosen period, through the same `pnlInputs` the export asks
+    /// with — so the file a shop sends is the page it is reading.
+    private func recomputePnl() async {
+        let statement = await shop.pnlStatement()
+        rows = statement?.rows ?? []
+        vat = statement?.vat
+        await recomputeSpending()
     }
 
     private func recomputeBreakEven() async {
@@ -754,11 +803,15 @@ struct Reports: View {
 
     private func recomputeSpending() async {
         guard let engine = shop.engine else { spending = nil; return }
-        // Every expense in the book, matching the P&L table beside it, which
-        // reports every period at once. A breakdown narrowed to one quarter
-        // under a table covering all of them is two questions on one screen.
-        spending = try? await engine.expenseCategories(shop.expenseRows,
-                                                       reclaimsTax: shop.reclaimsTax)
+        // The expenses of the chosen period, matching the P&L table beside it.
+        // A breakdown of every period under a table covering one of them, or
+        // the other way round, is two questions on one screen.
+        let span = shop.pnlRange.resolve()
+        let spent = shop.expenseRows.filter { row in
+            guard case .object(let e) = row, case .string(let d)? = e["date"] else { return span == .everything }
+            return span.contains(d)
+        }
+        spending = try? await engine.expenseCategories(spent, reclaimsTax: shop.reclaimsTax)
     }
 
     private func recomputeMaintenance() async {
@@ -1244,7 +1297,12 @@ struct Reports: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Drawn(mark: .reports, size: 13).foregroundStyle(.tertiary)
-                    Text(shop.words.callIt("mac.quarter_drawn", ["q": .string(Figure.isolated(row.period))]))
+                    // The days it holds as well, when the chosen period cuts
+                    // the row short: "2026-Q4" over this month's figures
+                    // would name a quarter they do not cover.
+                    Text(shop.words.callIt("mac.quarter_drawn", ["q": .string(
+                        row.isPartial ? Figure.isolated(row.period) + " · " + Reports.days(row)
+                                      : Figure.isolated(row.period))]))
                         .font(.system(size: 11, weight: .semibold))
                         .textCase(.uppercase).tracking(0.5)
                         .foregroundStyle(.secondary)
@@ -1265,6 +1323,10 @@ struct Reports: View {
         let shop: Shop
         let rows: [PnlPeriod]
         let floor: KhaytEngine.BreakEven?
+        /// The VAT for the same rows; drawn only when the shop has a tax set.
+        var vat: VatSummary? = nil
+        /// The chosen period's name, or nil for every period ("all time").
+        var period: String? = nil
 
         var body: some View {
             ScrollView { statement }
@@ -1286,9 +1348,9 @@ struct Reports: View {
         }
 
         /// "Net income · all time": the card's heading, with the period it
-        /// adds up.
-        static func netHeading(_ words: Words) -> String {
-            words.callIt("an.pnl_net") + " · " + words.callIt("mac.pnl_all_time")
+        /// adds up — the one the shop chose, or every period in the book.
+        static func netHeading(_ words: Words, period: String? = nil) -> String {
+            words.callIt("an.pnl_net") + " · " + (period ?? words.callIt("mac.pnl_all_time"))
         }
 
         /// The panel without its scroll view — what a photograph can see
@@ -1314,7 +1376,7 @@ struct Reports: View {
                         // OVER WHAT. Every period in the book, summed — the
                         // card said "Net income" beside a table of quarters and
                         // a waterfall of one, and nothing said which.
-                        Text(Self.netHeading(shop.words))
+                        Text(Self.netHeading(shop.words, period: period))
                             .font(.system(size: 10, weight: .semibold))
                             .textCase(.uppercase).tracking(0.6)
                             .foregroundStyle(Khayt.brand)
@@ -1398,8 +1460,18 @@ struct Reports: View {
                         .card()
                     }
 
+                    // ── WHAT IS OWED FOR THE PERIOD ───────────────────────
+                    //
+                    // Output VAT, input VAT and the difference, over exactly
+                    // the rows above. Hidden for a shop with no tax set.
+                    if let vat, vat.applies {
+                        VatSummaryCard(shop: shop, vat: vat,
+                                       period: period ?? shop.words.callIt("mac.pnl_all_time"))
+                    }
+
                     if let latest = rows.first {
-                        DetailSection(latest.period) {
+                        DetailSection(latest.isPartial ? latest.period + " · " + Reports.days(latest)
+                                                       : latest.period) {
                             VStack(spacing: 6) {
                                 DetailLine(shop.words.callIt("an.pnl_orders"), "\(latest.orders)")
                                 DetailLine(shop.words.callIt("an.revenue"),

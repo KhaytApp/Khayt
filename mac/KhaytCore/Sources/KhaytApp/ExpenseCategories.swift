@@ -23,12 +23,15 @@ import KhaytCore
 struct ExpenseCategoriesCard: View {
     let shop: Shop
     let report: KhaytEngine.Spending?
+    /// The period the expenses were narrowed to, said beside the heading so
+    /// the card cannot be read as the whole book's; nil says nothing.
+    var period: String? = nil
 
     var body: some View {
         let words = shop.words
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text(words.callIt("an.exp_by_cat"))
+                Text(words.callIt("an.exp_by_cat") + (period.map { " · " + $0 } ?? ""))
                     .font(.system(size: 10, weight: .semibold))
                     .textCase(.uppercase).tracking(0.6)
                     .foregroundStyle(Khayt.brand)

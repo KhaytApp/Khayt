@@ -39,9 +39,12 @@ struct Review51Tests {
     func wasteIsWired() throws {
         let shop = try QuoteSheetStatusTests.source("Shop.swift")
         let reports = try QuoteSheetStatusTests.source("Reports.swift")
+        // Reports asks through `pnlInputs`, which the P&L export shares.
+        let pnl = try QuoteSheetStatusTests.source("Shop+Pnl.swift")
         #expect(shop.contains("wasteLog: Self.rows(root, \"wasteLog\")"),
                 "the dashboard's net leaves failed prints out")
-        #expect(reports.contains("wasteLog: shop.wasteRows"), "Reports leaves failed prints out")
+        #expect(pnl.contains("wasteLog: wasteRows"), "Reports leaves failed prints out")
+        #expect(reports.contains("shop.pnlStatement()"), "Reports no longer asks through pnlInputs")
         #expect(reports.contains("\"pnl.waste\""), "no waste line in Reports")
     }
 
