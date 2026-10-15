@@ -1638,6 +1638,46 @@ extension Shop {
         pendingInvoice = PendingHold(id: id, project: job.project)
     }
 
+    /// Give a job that began as a quote the invoice number it is owed, the
+    /// first time its invoice is drawn.
+    ///
+    /// For the books that already exist: until this build, a quote accepted on
+    /// this Mac was never numbered, so a shop has jobs sitting at Pending or
+    /// Completed with no `invoiceNumber`. Renumbering them all on open would
+    /// hand out numbers in an order nobody issued them; numbering each when
+    /// its invoice is ISSUED is the order a paper book would have. The rule is
+    /// `KhaytOrderNew.invoiceNumberOwed` — not a quote, not cancelled, no
+    /// number, and began as one — so a second look changes nothing.
+    ///
+    /// Asked on the book as loaded, then done again inside the write on the
+    /// book as it is on disk: the counter is a read-modify-write.
+    func issueInvoiceNumberIfOwed(_ id: Order.ID) async {
+        guard canMoveJobs, permitted("orders", "edit"),
+              let build = source.build, let engine, let row = orderRow(id) else { return }
+        guard (try? await engine.invoiceNumberOwed(order: row, settings: settingsDict)) == true else { return }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                var orders = Self.rows(root, "printLog")
+                guard let at = orders.firstIndex(where: { Self.recordId($0) == id }) else { return }
+                let numbered = try await engine.ensureInvoiceNumber(
+                    order: orders[at], settings: Self.settings(root),
+                    year: Calendar.book.component(.year, from: Date()))
+                guard numbered.number != nil, case .object(var o) = numbered.order else { return }
+                StoreWriter.stamp(&o)
+                orders[at] = .object(o)
+                root["printLog"] = .array(orders)
+                root["settings"] = numbered.settings
+            }
+            await load(source)
+        } catch {
+            // The document still draws, under the job's id, as it always has.
+        }
+    }
+
     /// Build a printable sheet of shelf labels, for the spools given or for the
     /// whole shelf when none are.
     ///
@@ -2229,6 +2269,26 @@ extension Shop {
         // this app mints is the token Khayt would have minted.
         if move.performed?.contains("ensure_survey_token") == true, changedOrder["surveyToken"] == nil {
             changedOrder["surveyToken"] = .string(surveyToken())
+        }
+
+        // ── A QUOTE ACCEPTED IS AN INVOICE, AND AN INVOICE HAS A NUMBER ───
+        //
+        // A quote is made with no invoice number, so it never spends one the
+        // tax authority will ask about. Khayt gives it one when it is approved
+        // (`approveQuote`, `nextInvoiceNumber`); this app never did, so a quote
+        // moved to Pending here — from the board, the menu, or the portal's
+        // "Check response" — was invoiced as `QUO-…`. The shared counter, in
+        // this write, on the settings as they are on disk.
+        if case .object(let was) = target, plainString(was["status"]) == "quote",
+           stage != .quote, stage != .cancelled {
+            let numbered = try await engine.ensureInvoiceNumber(
+                order: .object(changedOrder), settings: settings,
+                year: Calendar.book.component(.year, from: Date()))
+            if numbered.number != nil, case .object(let o) = numbered.order,
+               case .object(let s) = numbered.settings {
+                changedOrder = o
+                root["settings"] = .object(s)
+            }
         }
 
         // ── WHAT THE MOVE OWES OUTWARD, BUILT FROM THE MOVED JOB ──────────

@@ -170,6 +170,24 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
         }
         return s
     }
+    /// Whether the library's search finds this model: its title, its FILE's
+    /// name (a shop that renamed "Benchy_v3_0.4mm.3mf" to "Boat" still
+    /// remembers the file), material, tags and creator — folded by
+    /// `SearchText`, so case, width, Latin accents and the Arabic letters a
+    /// shop types either way do not decide what is found.
+    func matches(search query: String) -> Bool {
+        matches(folded: SearchText.fold(query.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
+
+    /// `matches(search:)` for a query `SearchText.fold` has already folded.
+    func matches(folded q: String) -> Bool {
+        var fields = [title, material ?? "", creator ?? "", originalName ?? "",
+                      sourceFile?.filename ?? "", sourceFile?.originalName ?? ""]
+        if let path = externalPath, !path.isEmpty { fields.append((path as NSString).lastPathComponent) }
+        fields.append(contentsOf: tags ?? [])
+        return fields.contains { !$0.isEmpty && SearchText.containsFolded($0, q) }
+    }
+
     var printCount: Int { timesPrinted ?? 0 }
     var swaps: Int { swapCount ?? 0 }
     var palette: [Colour] { colors ?? [] }

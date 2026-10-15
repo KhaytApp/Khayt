@@ -1639,7 +1639,17 @@ final class Words {
         "mac.pnl_col_waste": ["en": "Waste", "ar": "الهدر"],
         "mac.pnl_col_labour": ["en": "Labour", "ar": "العمالة"],
         "mac.pnl_col_vat": ["en": "VAT", "ar": "الضريبة"],
-        "mac.pnl_col_margin": ["en": "Margin", "ar": "الهامش"],
+        // GROSS: `marginPct` is (revenue − cost of goods) / revenue — nothing
+        // else is taken off it — so "Margin" beside a net income read as the
+        // net margin it is not.
+        "mac.pnl_col_margin": ["en": "Gross margin", "ar": "الهامش الإجمالي"],
+        // The table's cost column: expenses, the monthly overhead, machine
+        // depreciation and labour. NOT "Expenses", which the waterfall uses for
+        // expenses alone; and not "All costs", because cost of goods and waste
+        // sit in their own columns beside it.
+        "mac.pnl_col_operating": ["en": "Operating costs", "ar": "تكاليف التشغيل"],
+        // The net income card adds up every period in the book.
+        "mac.pnl_all_time": ["en": "all time", "ar": "منذ البداية"],
         // A failure allowance learned from the shop's own history —
         // lib/failure-rate.js. Offered beside the field, never applied alone.
         "mac.fail_suggest": [
@@ -1667,8 +1677,6 @@ final class Words {
         "mac.group_floor":   ["en": "Floor",        "ar": "الورشة"],
         "mac.group_money":   ["en": "Money",        "ar": "المال"],
         "mac.book":          ["en": "Book",         "ar": "الدفتر"],
-        "mac.search_the_book": ["en": "Search jobs, models, spools, people",
-                                "ar": "ابحث في الأعمال والنماذج والبكرات والعملاء"],
         "mac.synced":        ["en": "synced",       "ar": "متزامن"],
         "mac.offline":       ["en": "offline",      "ar": "غير متصل"],
         "mac.saved_at":      ["en": "saved {t}",    "ar": "حُفظ {t}"],

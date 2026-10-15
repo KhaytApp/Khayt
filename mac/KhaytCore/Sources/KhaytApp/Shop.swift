@@ -168,6 +168,9 @@ final class Shop {
     /// told rather than shown a screen of keys.
     private(set) var engineProblem: String?
     private(set) var taxSummary: String?
+    /// The tax's name in the app's language — "VAT", «ضريبة القيمة المضافة» —
+    /// for a line that labels a figure with it. Nil for an unregistered shop.
+    private(set) var taxName: String?
     var settingsValue: JSONValue = .object([:])
 
     /// Give a shop a mail provider, for a test. The book on disk is not
@@ -1044,8 +1047,10 @@ final class Shop {
             aiLibraryAllowed = aiFeatures.first { $0.id == "library" }?.enabled ?? false
             aiPicturesAllowed = aiFeatures.first { $0.id == "pictures" }?.enabled ?? false
             let tax = await describeTax(root["settings"])
+            let taxWord = await nameTax(root["settings"])
             if overtaken() { return }
             taxSummary = tax
+            taxName = taxWord
             await readSettingsTables(root)
             if overtaken() { return }
             // What each job still owes is `order-money`'s answer, not a

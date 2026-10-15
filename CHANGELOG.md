@@ -19,6 +19,32 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   printed the quote's id. It now takes the next invoice number when it leaves
   the Quote column for anything but Cancelled. A number it already has is
   kept, and an Undo keeps it too, so the sequence has no gaps.
+- **Mac: an accepted quote gets a real invoice number.** Approving a quote on
+  the Mac (moving it out of Quote, the customer's approval link, or the
+  portal's "Check response") never gave the job an invoice number, and the
+  invoice printed the quote's own number, `QUO-…`, under "No.". The job now
+  takes the next number from the shop's invoice counter when the quote is
+  accepted, as the Khayt desktop app already did. A quote accepted before this
+  update gets its number the first time its invoice is opened, not all at
+  once. Invoices in both apps print the invoice number; a quote still prints
+  its quote number.
+- **Invoices: the shop's name, address, tagline, terms or footer no longer
+  print twice.** A shop that filled in a field in only one language got the
+  same text again as the "second language" line, most visibly on Arabic
+  invoices.
+- **Mac: smaller fixes from the October review.** The price per kilo on a
+  spool is worked out from what the roll held when bought, not from what is
+  left on it, so a half-used roll no longer looks twice as expensive. The
+  search box that could not be typed into ("Search jobs, models, spools,
+  people ⌘K") is gone from screens with nothing to search. Reports: the
+  table's cost column is now "Operating costs" (it includes the monthly
+  overhead, depreciation and labour, unlike the chart's "Expenses"), the margin
+  is "Gross margin", and the net income card says it covers all time. Colour
+  tags in the Jobs list are dropped whole instead of being squeezed into empty
+  pills. The library search also finds a model by its file name, and ignores
+  case, accents, full-width letters and the different ways Arabic letters are
+  typed (أ/إ/آ/ا, ة/ه, ى/ي, and vowel marks). The job inspector names the tax
+  in Arabic on an Arabic Mac.
 
 - **Mac: a malformed request on the shop's Wi-Fi can no longer crash the
   app.** The Mac's own server read a request nested a few hundred levels deep

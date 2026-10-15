@@ -188,9 +188,10 @@ struct SpoolSheet: View {
                         // What a kilo costs is the figure that compares two
                         // suppliers; a price per roll says nothing until you
                         // know what is on the roll.
-                        if weight > 0 {
+                        if let perKilo = Self.perKilo(cost: cost, isNew: isNew,
+                                                      weight: weight, fullWeight: fullWeight) {
                             Text(shop.words.callIt("mac.per_kilo") + " "
-                                 + Money.text(cost / weight * 1000, shop.currency))
+                                 + Money.text(perKilo, shop.currency))
                                 .font(.callout).foregroundStyle(.tertiary).monospacedDigit()
                                 .fixedSize()
                         }
@@ -366,6 +367,20 @@ struct SpoolSheet: View {
     /// and a `g` written here would be an English letter in an Arabic form.
     private var unitKey: String {
         units.first { $0.unit == unit }?.unitKey ?? "common.grams"
+    }
+
+    /// What a kilo of this spool cost: the price over what the roll HELD WHEN
+    /// BOUGHT, never over what is left (`lib/material-cost.js` documents the
+    /// trap). This divided by `weight`, which goes down as the shop prints, so
+    /// a half-used roll read as twice the price of the same roll new.
+    ///
+    /// A new spool is a full one, so its weight is what it held. An existing
+    /// spool needs its full-spool weight; without one there is no honest
+    /// figure, and none is shown.
+    static func perKilo(cost: Double, isNew: Bool, weight: Double, fullWeight: Double) -> Double? {
+        let held = isNew ? weight : fullWeight
+        guard held > 0 else { return nil }
+        return cost / held * 1000
     }
 
     /// The form's fields, as one value — so opening a spool and saving it

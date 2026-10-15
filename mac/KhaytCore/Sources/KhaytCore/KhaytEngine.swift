@@ -6579,6 +6579,9 @@ public actor KhaytEngine {
         public let error: String?
         public let order: JSONValue?
         public let printLog: JSONValue?
+        /// The shop's settings with the invoice counter advanced, when the
+        /// approval gave the job its invoice number; nil when it did not.
+        public let settings: JSONValue?
     }
     /// A sliced file's own figures, in the shape `publicQuote` takes.
     ///
@@ -6832,11 +6835,48 @@ public actor KhaytEngine {
             (function (s, id, now) {
               var data = Object.assign({}, s, { printLog: (s.printLog || []).slice() });
               var r = globalThis.KhaytLanQuotePage.applyQuoteApprovalToStore(data, id, now);
-              if (!r) return { found: false, error: null, order: null, printLog: null };
-              return { found: true, error: r.error || null, order: r.order || null,
-                       printLog: r.error ? null : data.printLog };
+              if (!r) return { found: false, error: null, order: null, printLog: null, settings: null };
+              if (r.error) return { found: true, error: r.error, order: r.order || null, printLog: null, settings: null };
+              // An accepted quote is an invoice now, and an invoice has a
+              // number: `KhaytOrderNew.ensureInvoiceNumber`, the counter a new
+              // order takes from. Electron gives it one in the renderer when
+              // the LAN server tells it; this app has no renderer, so it is
+              // given here — inside the write, on the newest settings.
+              var settings = Object.assign({}, s.settings || {});
+              var given = globalThis.KhaytOrderNew.ensureInvoiceNumber(
+                r.order, settings, new Date(now).getFullYear());
+              return { found: true, error: null, order: r.order, printLog: data.printLog,
+                       settings: given ? settings : null };
             })(ARG0, ARG1, ARG2)
             """, [store, .string(orderId), .string(nowIso)], as: LanQuoteApproval.self)
+    }
+
+    /// What `ensureInvoiceNumber` did: the job and settings as they now are,
+    /// and the number given — nil when none was owed and nothing changed.
+    public struct InvoiceNumbered: Decodable, Sendable {
+        public let order: JSONValue
+        public let settings: JSONValue
+        public let number: String?
+    }
+
+    /// `lib/order-new.js`'s `ensureInvoiceNumber`: give a job that began as a
+    /// quote the invoice number it is owed, advancing the shop's counter.
+    /// Pure — the caller runs it INSIDE the store write and writes both back.
+    public func ensureInvoiceNumber(order: JSONValue, settings: [String: JSONValue],
+                                    year: Int) throws -> InvoiceNumbered {
+        try runtime.call2("""
+            (function (o, s, y) {
+              var order = Object.assign({}, o), settings = Object.assign({}, s);
+              var n = KhaytOrderNew.ensureInvoiceNumber(order, settings, y);
+              return { order: order, settings: settings, number: n };
+            })(ARG0, ARG1, ARG2)
+            """, [order, .object(settings), .number(Double(year))], as: InvoiceNumbered.self)
+    }
+
+    /// `lib/order-new.js`'s `invoiceNumberOwed`, asked before a write is opened.
+    public func invoiceNumberOwed(order: JSONValue, settings: [String: JSONValue]) throws -> Bool {
+        try runtime.call2("KhaytOrderNew.invoiceNumberOwed(ARG0, ARG1)",
+                          [order, .object(settings)], as: Bool.self)
     }
 
     // MARK: - Storefront order webhooks

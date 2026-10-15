@@ -32,10 +32,11 @@ struct InvoiceSheet: View {
                         .font(.callout).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer()
-                // The job's id, because that is the number the DOCUMENT states
-                // under "No." — a header saying one thing over a paper saying
-                // another is a header nobody can use.
-                if let number = job?.id, !number.isEmpty {
+                // The number the DOCUMENT states under "No." — a header saying
+                // one thing over a paper saying another is a header nobody can
+                // use. The invoice number for an invoice, the id for a quote.
+                if let number = Self.documentNumber(job, row: job.flatMap { shop.orderRow($0.id) }),
+                   !number.isEmpty {
                     Text(number).font(.callout.monospaced()).foregroundStyle(.secondary)
                 }
             }
@@ -76,6 +77,11 @@ struct InvoiceSheet: View {
     }
 
     private func build() async {
+        guard job != nil else { problem = shop.words.callIt("mac.move_gone"); return }
+        // An accepted quote from before this build has no invoice number; it
+        // is given one now, as its invoice is first issued (not all at once
+        // on open — see `issueInvoiceNumberIfOwed`).
+        await shop.issueInvoiceNumberIfOwed(subject.id)
         guard let job else { problem = shop.words.callIt("mac.move_gone"); return }
         guard let doc = await Invoice.html(for: job, shop: shop) else {
             problem = shop.words.callIt("mac.no_document"); return
@@ -92,7 +98,8 @@ struct InvoiceSheet: View {
         guard let paper else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = Self.filename(job, words: shop.words)
+        panel.nameFieldStringValue = Self.filename(job, words: shop.words,
+                                                   row: job.flatMap { shop.orderRow($0.id) })
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task {
             do {
@@ -105,14 +112,28 @@ struct InvoiceSheet: View {
         }
     }
 
+    /// The number the document prints under "No.", by the same rule as
+    /// `lib/invoice-document.js`: a quote is its id; an invoice is its
+    /// `invoiceNumber`, else the older `invoiceNum`, else the id.
+    static func documentNumber(_ job: Order?, row: JSONValue?) -> String? {
+        guard let job else { return nil }
+        if Stage.of(job) == .quote { return job.id }
+        if case .object(let fields)? = row {
+            for key in ["invoiceNumber", "invoiceNum"] {
+                if let n = Shop.plainString(fields[key]), !n.isEmpty { return n }
+            }
+        }
+        return job.id
+    }
+
     /// What the file is called.
     ///
-    /// The job's id, which is what Khayt's own PDF export uses and what the
-    /// document prints as its number. Falling back to the project's name when
-    /// there is somehow no id, and slashes taken out either way — a job called
-    /// "lids 2/3" would otherwise be saved into a folder that is not there.
-    static func filename(_ job: Order?, words: Words) -> String {
-        let number = job?.id ?? ""
+    /// The number the document prints (`documentNumber`). Falling back to the
+    /// project's name when there is somehow none, and slashes taken out either
+    /// way — a job called "lids 2/3" would otherwise be saved into a folder
+    /// that is not there.
+    static func filename(_ job: Order?, words: Words, row: JSONValue? = nil) -> String {
+        let number = documentNumber(job, row: row) ?? ""
         let base = number.isEmpty ? (job?.project ?? words.callIt("doc.invoice")) : number
         let cleaned = base.replacingOccurrences(of: "/", with: "-")
                           .replacingOccurrences(of: ":", with: "-")

@@ -265,20 +265,48 @@ struct JobTitleCell: View {
             // which is how it would be asked for over the counter. Not
             // swatches: nothing here maps "sand" to a colour, and a
             // guess would be this app's opinion of a physical thing.
-            ForEach(shop.partColours(of: job).prefix(2), id: \.self) { colour in
-                Text(colour)
-                    .font(.caption2)
-                    .padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(Khayt.recessed, in: Capsule())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1).layoutPriority(-1)
+            //
+            // WHOLE OR NOT AT ALL, like the id. Each pill had `layoutPriority(-1)`
+            // and no fixed size, so a narrow column squeezed them to empty
+            // capsules — a grey lozenge that is nobody's colour. Two pills, then
+            // one, then none: the first arrangement that fits is drawn.
+            ViewThatFits(in: .horizontal) {
+                ForEach(Self.pillChoices(shop.partColours(of: job)), id: \.self) { shown in
+                    HStack(spacing: 4) {
+                        ForEach(shown, id: \.self) { colour in ColourPill(text: colour) }
+                    }
+                }
             }
+            .layoutPriority(-1)
         }
         // ONE ROW HEIGHT. The thumbnail is 20pt and a line of text is
         // less, so a job with a picture stood about 6pt taller than
         // one without and the table read ragged. Every row is at least
         // the picture's height, with or without one.
         .frame(minHeight: OrdersTable.jobRowHeight)
+    }
+
+    /// The arrangements `ViewThatFits` tries, widest first: the first two
+    /// colours, then the first, then none — never a pill cut short.
+    static func pillChoices(_ colours: [String]) -> [[String]] {
+        let firstTwo = Array(colours.prefix(2))
+        var out: [[String]] = []
+        for n in stride(from: firstTwo.count, through: 0, by: -1) { out.append(Array(firstTwo.prefix(n))) }
+        return out
+    }
+}
+
+/// One colour, as the shop wrote it, at its full width.
+private struct ColourPill: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption2)
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .background(Khayt.recessed, in: Capsule())
+            .foregroundStyle(.secondary)
+            .lineLimit(1).fixedSize()
     }
 }
 

@@ -113,8 +113,16 @@ struct ShellTitleBar: View {
             // Gives way before any word does: at 290 fixed, a library with
             // several models selected (wider actions) squeezed the wordmark
             // and the status into breaking mid-word.
-            CommandField(shop: shop, wanted: $searchWanted)
-                .frame(minWidth: 160, maxWidth: 290)
+            //
+            // ONLY WHERE THERE IS SOMETHING TO SEARCH. A screen with nothing to
+            // narrow drew a field-shaped "Search jobs, models, spools, people
+            // ⌘K" that could not be typed into, over a ⌘K nothing was bound
+            // to — a search box that was a picture of one. Until the palette
+            // exists, no field is the honest answer.
+            if shop.canSearch {
+                CommandField(shop: shop, wanted: $searchWanted)
+                    .frame(minWidth: 160, maxWidth: 290)
+            }
 
             Spacer(minLength: Space.md)
 
@@ -173,6 +181,13 @@ struct ShellTitleBar: View {
         .frame(maxWidth: .infinity)
         .background(Role.navy)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        // ⌘F on a screen with no field: nothing to put the caret in, so the
+        // request is dropped here. Left standing it would still be `true` when
+        // a searchable screen opened, and the next ⌘F — setting it to `true`
+        // again — would change nothing and focus nothing.
+        .onChange(of: searchWanted) { _, asked in
+            if asked, !shop.canSearch { searchWanted = false }
+        }
     }
 }
 
@@ -230,7 +245,7 @@ struct CommandField: View {
             Spacer(minLength: Space.xs)
             // Not a shortcut this field owns — the menu bar's Find item is what
             // ⌘F reaches, and it asks for the caret through `wanted`.
-            Text(shop.canSearch ? "⌘F" : "⌘K")
+            Text("⌘F")
                 .font(TypeScale.figure(10.5))
         }
         .foregroundStyle(Role.onNavy2)
@@ -245,43 +260,32 @@ struct CommandField: View {
         }
     }
 
-    @ViewBuilder private var field: some View {
-        if shop.canSearch {
-            // THE PLACEHOLDER IS DRAWN HERE, not handed to the field as a
-            // prompt. A styled `prompt:` is honoured in light appearance and
-            // IGNORED in dark — measured, not guessed: the same red prompt drew
-            // red on aqua and system grey on darkAqua — and on this navy strip
-            // the system's dark placeholder came out near-white, so "Job,
-            // customer or number" read as something already typed. An overlay
-            // in the strip's own secondary ink says the same in both.
-            ZStack(alignment: .leading) {
-                if shop.search.isEmpty {
-                    Text(shop.searchPrompt)
-                        .font(TypeScale.body(11.5))
-                        .foregroundStyle(Role.onNavy3)
-                        .lineLimit(1)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-                TextField("", text: $shop.search)
-                    .textFieldStyle(.plain)
+    /// Only drawn on a screen that can be searched (`ShellTitleBar` asks
+    /// `canSearch` first), so the field is always a real one.
+    private var field: some View {
+        // THE PLACEHOLDER IS DRAWN HERE, not handed to the field as a
+        // prompt. A styled `prompt:` is honoured in light appearance and
+        // IGNORED in dark — measured, not guessed: the same red prompt drew
+        // red on aqua and system grey on darkAqua — and on this navy strip
+        // the system's dark placeholder came out near-white, so "Job,
+        // customer or number" read as something already typed. An overlay
+        // in the strip's own secondary ink says the same in both.
+        ZStack(alignment: .leading) {
+            if shop.search.isEmpty {
+                Text(shop.searchPrompt)
                     .font(TypeScale.body(11.5))
-                    .foregroundStyle(Role.onNavy)
-                    .focused($focused)
+                    .foregroundStyle(Role.onNavy3)
                     .lineLimit(1)
-                    .accessibilityLabel(shop.searchPrompt)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
-        } else {
-            // A screen with nothing to narrow says so by not offering to. The
-            // words stay because the strip is the same width either way.
-            //
-            // In the placeholder's ink, not the strip's: it inherited
-            // `onNavy2` from the row and read near-white in dark mode, as if
-            // something had been typed (alpha.51 review).
-            Text(shop.words.callIt("mac.search_the_book"))
+            TextField("", text: $shop.search)
+                .textFieldStyle(.plain)
                 .font(TypeScale.body(11.5))
-                .foregroundStyle(Role.onNavy3)
+                .foregroundStyle(Role.onNavy)
+                .focused($focused)
                 .lineLimit(1)
+                .accessibilityLabel(shop.searchPrompt)
         }
     }
 }

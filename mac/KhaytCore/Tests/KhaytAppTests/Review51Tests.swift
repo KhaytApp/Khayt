@@ -116,18 +116,23 @@ struct Review51Tests {
         #expect(WellButtonStyle.ink(onNavy: false, enabled: false) == Role.text3)
     }
 
-    @Test("Spoolman import, Add supplier and the idle search words use the app's own ink")
+    @Test("Spoolman import and Add supplier use the app's own ink")
     func darkModeInkIsOurs() throws {
         let actions = try QuoteSheetStatusTests.source("ScreenActions.swift")
         let suppliers = try QuoteSheetStatusTests.source("SupplierSheet.swift")
-        let shell = try QuoteSheetStatusTests.source("Shell.swift")
         #expect(actions.contains(".buttonStyle(WellButtonStyle(onNavy: true))"))
         #expect(suppliers.contains(".buttonStyle(WellButtonStyle())"))
-        guard let idle = shell.range(of: "Text(shop.words.callIt(\"mac.search_the_book\"))") else {
-            Issue.record("the idle search words moved"); return
-        }
-        let after = shell[idle.upperBound...].prefix(200)
-        #expect(after.contains(".foregroundStyle(Role.onNavy3)"),
-                "the idle search words inherit the strip's near-white ink")
+    }
+
+    /// The idle "Search jobs, models, spools, people ⌘K" was a picture of a
+    /// search box: it could not be typed into and no ⌘K was bound. Gone until
+    /// the palette is built — the strip draws a field only where one works.
+    @Test("no field-shaped search words where nothing can be searched")
+    func noFakeSearchField() throws {
+        let shell = try QuoteSheetStatusTests.source("Shell.swift")
+        #expect(!shell.contains("mac.search_the_book"))
+        #expect(!shell.contains("\"⌘K\""))
+        let gated = shell.contains("if shop.canSearch {\n                CommandField(")
+        #expect(gated, "the strip draws the field only on a screen that can be searched")
     }
 }
