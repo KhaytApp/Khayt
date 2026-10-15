@@ -14,7 +14,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   printed the invoice counter's number (INV-…) for every job, so a shop with
   its own invoice prefix saw a job numbered ATH-2026-0012 reprint as
   INV-2026-0012. Only a job that began as a quote now prints the invoice
-  counter's number; every other job prints its own number, as before. A quote
+  counter's number; every other job prints its own number, as before, and the
+  customer's tracking page shows the same number as the paper. A quote
   still waiting for its answer on hold is no longer given an invoice number.
   On the Mac, someone who cannot change jobs (the sample shop, a read-only
   book) sees "Invoice number not issued yet" for an accepted quote with no
