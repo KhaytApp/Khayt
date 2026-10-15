@@ -81,6 +81,10 @@ extension Shop {
     /// Pulled out of `newJobInput` so a test can call THIS rather than restate
     /// it: what a saved part carries is the whole question, and the answer has
     /// to be checkable without standing up a window.
+    /// Fields a part keeps from where it came from, as they were.
+    static let carriedPartKeys = ["printFileId", "plate", "fileRef", "setupId",
+                                  "purgeGrams", "supportWeight"]
+
     static func partRows(_ parts: [NewJobSheet.Draft], spools: [Spool],
                          unnamed: String) -> [JSONValue] {
         var rows: [JSONValue] = []
@@ -122,6 +126,23 @@ extension Shop {
                 row["material"] = .string(spool.material)
                 row["spoolCost"] = .number(spool.cost ?? 0)
                 row["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
+            }
+            // ── WHAT A PART FROM A MODEL OR THE CALCULATOR BRINGS ─────────
+            //
+            // The file it prints (`printFileId`, the plate), so the job joins
+            // the model for actuals and estimate calibration
+            // (`lib/order-file-link.js`); and the purge it was costed with.
+            for key in Self.carriedPartKeys { if let v = p.raw[key] { row[key] = v } }
+            // A multicolour part is costed on its COLOURS, each drawn off its
+            // own spool when the job completes (`lib/order-deduction.js`), and
+            // its spool cost is the pre-summed blend `CalculatorPart.input`
+            // wrote. The dominant spool's own price written above would
+            // re-cost it as one colour the next time anybody saves it.
+            if case .array(let colours)? = p.raw["colours"], !colours.isEmpty {
+                row["colours"] = .array(colours)
+                for key in ["spoolCost", "spoolWeight", "material"] {
+                    if let v = p.raw[key] { row[key] = v }
+                }
             }
             rows.append(.object(row))
         }

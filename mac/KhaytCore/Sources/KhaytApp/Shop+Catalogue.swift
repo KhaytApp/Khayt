@@ -364,6 +364,25 @@ extension Shop {
     }
 
     func partFields(from file: LibraryFile, plate: Int? = nil) async -> (part: [String: JSONValue], note: String?)? {
+        await modelPart(from: file, plate: plate).map { ($0.part, $0.note) }
+    }
+
+    /// A library model as a part, and which of its two figures were measured
+    /// from the mesh rather than read off a slice.
+    ///
+    /// `partFields`' own answer, with the one thing it knew and did not say in
+    /// a form a screen can act on: `estimated` holds the part's FIELD names
+    /// (`printWeight`, `printTime`), so a quote taken from the model can be
+    /// marked as sliced or estimated by `ModelFigureSource`, not by parsing the
+    /// sentence written for the catalogue.
+    struct ModelPart {
+        var part: [String: JSONValue]
+        var note: String?
+        var estimated: Set<String>
+        var calibrated: Bool
+    }
+
+    func modelPart(from file: LibraryFile, plate: Int? = nil) async -> ModelPart? {
         productProblem = nil
         guard let engine, var rec = row(for: file.id) else {
             productProblem = words.callIt("mac.not_found"); return nil
@@ -417,14 +436,17 @@ extension Shop {
         // answer, the geometry does — and the answer is LABELLED, because an
         // estimate that looks typed is the same bug as a zero that looks typed.
         var estimated: [String] = []
+        var estimatedFields: Set<String> = []
         if let e = estimates[file.id] {
             if Self.plainNumber(part["printWeight"]) ?? 0 <= 0, e.grams > 0 {
                 part["printWeight"] = .number(e.grams)
                 estimated.append(words.callIt("mac.weight"))
+                estimatedFields.insert("printWeight")
             }
             if Self.plainNumber(part["printTime"]) ?? 0 <= 0, e.hours > 0 {
                 part["printTime"] = .number(e.hours)
                 estimated.append(words.callIt("common.hours"))
+                estimatedFields.insert("printTime")
             }
         }
 
@@ -481,7 +503,8 @@ extension Shop {
             let said = words.callIt("mac.product_costed_with", ["spool": .string(costedWith)])
             note = note.map { $0 + " " + said } ?? said
         }
-        return (part, note)
+        return ModelPart(part: part, note: note, estimated: estimatedFields,
+                         calibrated: estimates[file.id]?.isCalibrated == true)
     }
 
     /// The spool a library part is costed with: the shop's spool of the

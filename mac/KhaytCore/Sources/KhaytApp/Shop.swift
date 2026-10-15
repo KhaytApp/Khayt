@@ -1608,6 +1608,10 @@ final class Shop {
     /// match a product is none of those.
     var jobFromProduct: Product?
 
+    /// A quote or job asked for from a library model or the calculator —
+    /// its lines already costed. See `JobFromModel.swift`.
+    var jobFromModel: JobFromModel?
+
     // Stored for "Selling a piece off the shelf" (Shop+Catalogue.swift).
     /// Whether the shop has agreed to price advice, on this book.
     private(set) var aiPriceAllowed = false

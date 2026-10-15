@@ -66,6 +66,8 @@ final class CalculatorModel {
     var consumableLines: [ConsumableLine] = []
     /// The library model the figures were filled from, if any.
     var modelId: String?
+    /// What "From a model…" took from it — see `ModelFill`.
+    var filled: ModelFill?
 
     private(set) var costed: KhaytEngine.CostedPart?
     private(set) var quoted: QuoteTotal?
@@ -278,17 +280,24 @@ final class CalculatorModel {
 
     // MARK: - The answer
 
-    func recompute(_ shop: Shop) async {
-        guard hasInput else { costed = nil; quoted = nil; return }
+    /// The part as the cost model is handed it. One function for the price
+    /// and for the job made from it (`jobDraft`), so the job's part is the
+    /// part that was priced.
+    func partInput(_ shop: Shop) -> JSONValue {
         // Only the figures actually typed travel with the part — see
         // `Calculator.ratesSection` for why sending all seven is wrong.
         var extra: [String: JSONValue] = [:]
         for key in Shop.Preset.rateKeys where !(rates[key] ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
             extra[key] = .number(typed(key))
         }
-        let part = Self.costInput(lines: lines, purge: purgeValue, hours: hoursValue, qty: qty,
-                                  spools: shop.spools, consumables: consumableLines,
-                                  shelf: shop.consumables, extra: extra)
+        return Self.costInput(lines: lines, purge: purgeValue, hours: hoursValue, qty: qty,
+                              spools: shop.spools, consumables: consumableLines,
+                              shelf: shop.consumables, extra: extra)
+    }
+
+    func recompute(_ shop: Shop) async {
+        guard hasInput else { costed = nil; quoted = nil; return }
+        let part = partInput(shop)
         let costedPart = await shop.costedPart(part, machineId: machineId, presetId: presetId)
         let quote = await shop.previewQuote(baseCost: (costedPart?.cost ?? 0) * Double(qty),
                                             margin: margin, discountPct: discount,
@@ -310,6 +319,7 @@ final class CalculatorModel {
     @discardableResult
     func fill(from file: LibraryFile, plate: Int?, grams: Double, hours: Double, shop: Shop) -> Int {
         modelId = file.id
+        filled = nil
         let spools = shop.spools
         let plan = shop.colourPlan(of: file.id)
         let weighed: [(hex: String?, grams: Double)] = {

@@ -35,6 +35,18 @@ struct CalculatorFromModel: View {
     @State private var problem: String?
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            row
+            // Where the figures above came from, while they still are the
+            // model's: a slice, or the mesh. Gone once the shop types over
+            // them — the label must not claim a file for typed numbers.
+            if let source = calc.figureSource {
+                FigureSourceLabel(shop: shop, source: source, note: calc.filled?.note)
+            }
+        }
+    }
+
+    private var row: some View {
         HStack(spacing: 8) {
             Button(shop.words.callIt("mac.calc_from_model")) { picking = true }
                 .controlSize(.small)
@@ -73,15 +85,12 @@ struct CalculatorFromModel: View {
     }
 
     /// The chosen model's (or plate's) figures into the two fields.
+    ///
+    /// Through `CalculatorModel.fillFromModel`, the one way a model's figures
+    /// reach a calculator — the library's "Quote this model…" uses it too, so
+    /// the two cannot start from different figures.
     private func fill() async {
         guard let model else { return }
-        problem = nil
-        guard let made = await shop.partFields(from: model, plate: plate) else {
-            problem = shop.productProblem; return
-        }
-        let g = Shop.plainNumber(made.part["printWeight"]) ?? 0
-        let h = Shop.plainNumber(made.part["printTime"]) ?? 0
-        guard g > 0 || h > 0 else { problem = shop.words.callIt("mac.calc_model_none"); return }
-        calc.fill(from: model, plate: plate, grams: g, hours: h, shop: shop)
+        problem = await calc.fillFromModel(model, plate: plate, shop: shop)
     }
 }

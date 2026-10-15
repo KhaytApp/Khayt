@@ -349,6 +349,7 @@ struct Calculator: View {
                         .foregroundStyle(Khayt.attention)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                makeIt
             }
             .card(rail: Khayt.brand, padding: 14)
         }
@@ -398,6 +399,34 @@ struct Calculator: View {
                 }
             }
         }
+    }
+
+    /// The answer, as a quote or a job — without typing it again.
+    ///
+    /// The job sheet opens on THIS part, costed as it is costed here, with
+    /// this margin, discount and rush (`CalculatorModel.jobSeed`), so the
+    /// total it opens on is the one above. The model the figures came from
+    /// travels with the line, and so does whether they were sliced or
+    /// estimated.
+    private var makeIt: some View {
+        HStack(spacing: 8) {
+            Button { make(asQuote: true) } label: {
+                Label(shop.words.callIt("mac.make_quote") + "\u{2026}", systemImage: "doc.text")
+            }
+            .buttonStyle(.borderedProminent)
+            Button { make(asQuote: false) } label: {
+                Label(shop.words.callIt("mac.make_job") + "\u{2026}", systemImage: "plus.square.on.square")
+            }
+            Spacer(minLength: 0)
+        }
+        .controlSize(.small)
+        .disabled(!shop.canMoveJobs || model.costed == nil)
+        .help(shop.words.callIt("mac.make_quote_help"))
+    }
+
+    private func make(asQuote: Bool) {
+        guard let seed = model.jobSeed(shop, asQuote: asQuote) else { return }
+        shop.takeJob(seed)
     }
 
     private var nothingYet: some View {

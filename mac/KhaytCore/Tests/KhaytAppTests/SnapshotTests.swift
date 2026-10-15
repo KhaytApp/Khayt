@@ -424,6 +424,18 @@ import KhaytCore
         // chrome around it is in the app's own capture, `14-new-job`.
         try render(NewJobSheet(shop: shop).paper,
                    "23-new-job-words", size: CGSize(width: NewJobSheet.width, height: 420))
+        // As "Quote this model…" opens it: a sliced line and an estimated one,
+        // each saying which it is.
+        var sliced = NewJobSheet.Draft()
+        sliced.name = "Dallah"; sliced.grams = "146.3"; sliced.hours = "5.25"; sliced.qty = 2
+        sliced.cost = 38.4; sliced.source = .sliced
+        var estimated = NewJobSheet.Draft()
+        estimated.name = "Vase"; estimated.grams = "62"; estimated.hours = "3.1"
+        estimated.cost = 14.2; estimated.source = .estimated
+        try render(NewJobSheet(shop: shop, seed: .init(project: "Dallah + Vase",
+                                                       parts: [sliced, estimated],
+                                                       preferQuote: true)).paper,
+                   "23b-quote-from-model-words", size: CGSize(width: NewJobSheet.width, height: 470))
         try render(CustomerSheet(shop: shop, existing: Shop.newCustomer()),
                    "24-new-customer-words", size: CGSize(width: CustomerSheet.width, height: 640))
         try render(ExpenseSheet(shop: shop),
