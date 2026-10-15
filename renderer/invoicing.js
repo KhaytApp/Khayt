@@ -589,7 +589,7 @@ async function prepareZatcaPhase2Payload(order) {
   const uuid = ensureZatcaUuid(order);
   const issueDt = ts.split('T');
   const xml = buildZatcaInvoiceXml({
-    invoiceNumber: order.invoiceNumber || order.id,
+    invoiceNumber: invoiceDocNumber(order),
     uuid,
     issueDate: issueDt[0],
     issueTime: (issueDt[1] || '00:00:00').split('.')[0],
@@ -616,7 +616,7 @@ async function prepareZatcaPhase2Payload(order) {
     xmlBase64: zatcaUtf8ToBase64(xml),
     invoiceHash: signResult.hashBase64,
     uuid,
-    invoiceNumber: order.invoiceNumber || order.id,
+    invoiceNumber: invoiceDocNumber(order),
     invoiceCounter: icv,
     invoiceType: 'simplified',
     environment: z2.environment || 'sandbox',
@@ -784,7 +784,7 @@ async function renderInvoiceForOrder(order) {
         const _z2profile = KhaytTax.profileFromSettings(settings);
         const _z2tax = KhaytTax.computeTax(+price || 0, _z2profile);
         const xml = buildZatcaInvoiceXml({
-          invoiceNumber: order.invoiceNumber || order.id,
+          invoiceNumber: invoiceDocNumber(order),
           uuid:          order.zatcaUuid || order.id,
           issueDate:     issueDt[0],
           issueTime:     (issueDt[1] || '00:00:00').split('.')[0],
@@ -840,7 +840,7 @@ async function renderInvoiceForOrder(order) {
     const iban = settings.iban.replace(/\s+/g, '');
     const beneName = shopName() || '';
     const payAmt = price.toFixed(2);
-    const payRef = order.invoiceNumber || order.id;
+    const payRef = invoiceDocNumber(order);
     // Structured format: BeneficiaryName\nIBAN\nAmount\nRef
     const payText = `${beneName}\n${iban}\n${payAmt}\n${payRef}`;
     try { payQrSvg = await window.hubAPI.generateQR(payText, { width: 120, margin: 1 }); }
@@ -1247,7 +1247,7 @@ function generateCreditNote(order, creditAmount, reason) {
   const clientName = (order.project || '').trim() || t('inv.walk_in');
   const clientSub  = linkedClient ? [linkedClient.phone, linkedClient.email].filter(Boolean).join(' · ') : '';
   // Feature 3: Build reversal reference line
-  const invoiceNumber = order.invoiceNumber || order.id;
+  const invoiceNumber = invoiceDocNumber(order);
   const originalDate  = order.date || '';
 
   area.innerHTML = `
@@ -1495,6 +1495,16 @@ function renderInvoice(order, money) {
   }
 }
 
+/* The number a document names this job by: the one its paper prints
+   (lib/invoice-document.js documentNumber). The payment QR's reference, a
+   credit note's "reversal of", the ZATCA XML, a payment link and the invoice
+   export all name it this way. Before, they read `invoiceNumber || id` while
+   the paper printed the id, so for a shop whose invoice prefix differs from
+   its numbering prefix the customer paid with INV-… against an ATH-… invoice. */
+function invoiceDocNumber(order) {
+  return InvoiceDocument().documentNumber(order, settings);
+}
+
 /** The document, however this file happens to be loaded. */
 function InvoiceDocument() {
   if (InvoiceDocument.cached) return InvoiceDocument.cached;
@@ -1526,6 +1536,7 @@ const BRAND_MARK_SVG = `<svg viewBox="0 0 192 192" xmlns="http://www.w3.org/2000
   const api = {
     nextInvoiceNumber,
     ensureOrderInvoiceNumber,
+    invoiceDocNumber,
     nextQuoteSeq,
     generateClientStatement,
     exportClientInvoices,
