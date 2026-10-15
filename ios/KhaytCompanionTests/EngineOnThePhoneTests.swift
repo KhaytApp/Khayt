@@ -1,5 +1,6 @@
 import XCTest
 import KhaytCore
+@testable import KhaytCompanion
 
 /**
  * The shop's arithmetic, running on the phone.
@@ -52,5 +53,19 @@ final class EngineOnThePhoneTests: XCTestCase {
         // And the property that makes it money rather than two numbers.
         XCTAssertEqual(split.subtotal + split.taxTotal, 1000, accuracy: 0.0001,
                        "inclusive tax must add back up to the price on the label")
+    }
+
+    /// Every reader shares one engine. A cloud sync, a Siri lookup and a widget
+    /// each open a reader, and each used to start the rules again and, since
+    /// #1867, a thread with them.
+    @MainActor
+    func testEveryReaderSharesOneEngine() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "eng-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let book = CompanionBook(directory: dir)
+        let first = try await BookReader(book: book).sharedEngine()
+        let second = try await BookReader(book: book).sharedEngine()
+        XCTAssertTrue(first === second, "a new reader started a new engine")
     }
 }
