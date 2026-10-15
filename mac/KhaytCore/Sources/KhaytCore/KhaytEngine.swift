@@ -1024,24 +1024,22 @@ public actor KhaytEngine {
     static let locales = ["en", "ar"]
 
     public init(bundle: Bundle? = nil) throws {
-        let thread = EngineThread()
+        // One of a few threads every engine shares (see `EngineThread` for
+        // why not one each).
+        let thread = EngineThread.forNewEngine()
         self.thread = thread
         // Made ON the engine's thread, so the VM's timers are scheduled on
         // that thread's run loop and not on the caller's (the main one).
         nonisolated(unsafe) let bundle = bundle
-        do {
-            runtime = try thread.sync {
-                try JSRuntime(modules: Self.modules, locales: Self.locales, bundle: bundle)
-            }
-        } catch {
-            thread.stop()
-            throw error
+        runtime = try thread.sync {
+            try JSRuntime(modules: Self.modules, locales: Self.locales, bundle: bundle)
         }
     }
 
-    deinit {
-        thread.stop()
-    }
+    /// Isolated, so it runs on the engine's thread like every call: the
+    /// context is let go there, never on whichever thread happened to drop
+    /// the last reference.
+    isolated deinit {}
 
     /// Where engine calls run: on its own thread, never the main one, and with
     /// the stack it was given. For the test that holds it to that.

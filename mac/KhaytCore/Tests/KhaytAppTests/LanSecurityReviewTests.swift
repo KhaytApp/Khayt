@@ -214,10 +214,14 @@ struct LanSecurityReviewTests {
                 return status
             }
         }
-        // Wait for the five that should be turned away — shorter than the
-        // gate's own ten minutes, so the test lets go before the gate does.
-        let deadline = Date().addingTimeInterval(300)
-        while answered.n < 8 - LanServer.maxMeasuring, Date() < deadline {
+        // Wait until every upload has either been answered or is being held
+        // at the gate: then all eight have passed the cap's check, and none
+        // can slip in once the gate opens. No clock of our own: a deadline
+        // here (it was five minutes) ran out on a busy main actor before the
+        // eight had all reached the check, the gate opened, and a late one
+        // took a freed slot — 4 measured, 4 turned away (Oct 15 2026). The
+        // gate's own ten minutes is what stops a hang.
+        while answered.n + gate.inside < 8, gate.timedOut == 0 {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         let inside = gate.inside
@@ -296,7 +300,11 @@ struct LanSecurityReviewTests {
             + "Content-Length: \(length)\r\n\r\n"
         let data = Data(head.utf8)
         _ = data.withUnsafeBytes { write(fd, $0.baseAddress, data.count) }
-        var tv = timeval(tv_sec: 60, tv_usec: 0)
+        // A guard against a hang, not a deadline on the answer: the refusal
+        // is written after a visit to the main actor, and in a full run the
+        // main actor's queue alone has outlasted a minute (Oct 15 2026: "no
+        // answer" at 60 s while the server was fine).
+        var tv = timeval(tv_sec: 900, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         var buf = [UInt8](repeating: 0, count: 512)
         let n = read(fd, &buf, 512)

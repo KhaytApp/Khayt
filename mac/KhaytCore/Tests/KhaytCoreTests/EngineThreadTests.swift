@@ -34,8 +34,8 @@ struct EngineThreadTests {
         #expect(answers == Array(repeating: 37, count: 16))
     }
 
-    @Test("an engine that goes away takes its thread with it")
-    func engineReleasesItsThread() async throws {
+    @Test("an engine that goes away is let go")
+    func engineIsReleased() async throws {
         weak var gone: KhaytEngine?
         do {
             let engine = try KhaytEngine()
@@ -45,5 +45,39 @@ struct EngineThreadTests {
         // Released once the last call has returned; give the hop back a moment.
         for _ in 0..<200 where gone != nil { try await Task.sleep(for: .milliseconds(10)) }
         #expect(gone == nil)
+    }
+
+    /// #1867 gave every engine a thread of its own, and the test bundle keeps
+    /// hundreds of engines alive at once: 1,100 engine threads at the peak of a
+    /// full run, and the LAN tests starved of the main thread. However many
+    /// engines there are, the threads are a fixed few.
+    @Test("many engines at once share a few threads")
+    func manyEnginesFewThreads() async throws {
+        let count = EngineThread.poolSize * 6
+        var engines: [KhaytEngine] = []
+        for _ in 0..<count { engines.append(try KhaytEngine()) }
+        let places = await withTaskGroup(of: Bool.self) { group in
+            for engine in engines {
+                group.addTask { await engine.whereItRuns().onItsThread }
+            }
+            var all: [Bool] = []
+            for await onIt in group { all.append(onIt) }
+            return all
+        }
+        let made = EngineThread.made
+        #expect(places == Array(repeating: true, count: count))
+        #expect(made <= EngineThread.poolSize, "\(made) engine threads for \(count) engines")
+    }
+
+    @Test("an engine made from an engine thread is built there, in place, without waiting")
+    func madeOnAnEngineThread() throws {
+        let outer = EngineThread.forNewEngine()
+        let answer = try outer.sync { () -> (same: Bool, inner: Int) in
+            let inner = EngineThread.forNewEngine()
+            let n = try inner.sync { 7 }
+            return (inner === outer, n)
+        }
+        #expect(answer.same)
+        #expect(answer.inner == 7)
     }
 }

@@ -4,6 +4,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the engine's JavaScript shares a few threads instead of one per
+  engine.** Each engine had a thread of its own, so a busy moment could run
+  hundreds at once and keep the window, and the shop's Wi-Fi server, waiting.
+
 - **Desktop: a quote moved to the board now gets an invoice number.** Only
   the Approve button gave one. A quote dragged out of the Quote column, or
   moved from the Job menu or the batch bar, had no number, so its invoice
