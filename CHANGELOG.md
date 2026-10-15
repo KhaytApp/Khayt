@@ -7096,6 +7096,32 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.73] - 2026-10-15
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Saving no longer freezes the window, and a large library's figures appear in
+seconds after it opens.
+
+### Changed and fixed
+
+- **Saving never freezes the window.** Settings, stock, spools, customers,
+  products, money, printers, maintenance, the portal and the web store are
+  saved in the background. On a library of about 10,000 models each save
+  used to hold the window for one to two seconds.
+- **A library's figures appear in seconds.** After the book opens, prices,
+  fits, licences and print risks are worked out together instead of one model
+  at a time: on about 10,000 models, about 4 seconds instead of a minute.
+- **Save can't be pressed twice.** While a template, pause, location, staff
+  member or supplier is being saved, its button waits, so a quick double
+  click no longer makes two.
+- **Undo follows the order you worked in,** even when you press it while a
+  save is still finishing, and undoing a deleted spool or supplier shows it
+  again at once.
+- A change you make while the library's figures are still being worked out
+  is no longer replaced by an older figure.
+
 ## [4.0.0-alpha.72] - 2026-10-14
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
