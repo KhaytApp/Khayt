@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: the bank transfer reference matches the invoice.** For a shop
+  whose invoice prefix differs from its invoice-numbering prefix, the invoice
+  printed one number (ATH-2026-0012) while its bank-transfer QR, a credit
+  note's "reversal of", a Tabby or Tamara payment link and the invoice export
+  used another (INV-2026-0012), so a payment could not be matched to its
+  invoice. They all use the number the invoice prints now. Invoices already
+  sent keep their number.
+
 - **iPhone: the calculator charges the shop's overhead too.** When a shop turns
   on "overhead per print hour" in the Mac's Settings, the iPhone calculator now
   adds the same line, worked out by the same rule, so a quote on the phone

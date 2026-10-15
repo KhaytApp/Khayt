@@ -621,7 +621,8 @@ function orderToInvoiceRow(o) {
   const cur = (typeof clientCurrency === 'function') ? orderCurrency(o) : baseCurrency;
   const client = clients.find(c => c.id === o.clientId);
   return {
-    id: o.invoiceNumber || o.id,
+    // The number the invoice itself prints (lib/invoice-document.js).
+    id: KhaytInvoiceDocument.documentNumber(o, settings),
     date: o.paidAt || o.date || '',
     clientName: (client && client.name) || o.clientName || o.client || '',
     price: +o.price || 0,
