@@ -49,10 +49,18 @@ actor BookReader {
 
     private func engine() throws -> KhaytEngine {
         if let engineHandle { return engineHandle }
-        let made = try KhaytEngine()
+        let made = try Self.appEngine.get()
         engineHandle = made
         return made
     }
+
+    /// One engine for the whole app, not one per reader. A cloud sync, a Siri
+    /// or Shortcuts lookup and a widget each open a reader of their own, and
+    /// each used to start the rules again (about a fifth of a second), plus,
+    /// since the engine runs on a thread of its own (#1867), a thread. The
+    /// engine keeps nothing about a shop between calls, so sharing it is safe.
+    /// `static let` is made once, on first use, under the runtime's lock.
+    private static let appEngine = Result<KhaytEngine, any Error> { try KhaytEngine() }
 
     /// A roll, as the shop's own rule would book it in — built here, written
     /// by `BookWriter.addSpool`. See `BookWriter.spoolRecord` for the rule.

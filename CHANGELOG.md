@@ -8,6 +8,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   engine.** Each engine had a thread of its own, so a busy moment could run
   hundreds at once and keep the window, and the shop's Wi-Fi server, waiting.
 
+- **iPhone: one copy of the shop's rules for the whole app.** A Khayt Cloud
+  sync, a Siri or Shortcuts lookup and a widget each loaded the rules again,
+  which took about a fifth of a second each time. Since the Mac change that gives
+  the rules a thread of their own, each one also started a thread. They now share
+  one.
 - **Desktop: a quote moved to the board now gets an invoice number.** Only
   the Approve button gave one. A quote dragged out of the Quote column, or
   moved from the Job menu or the batch bar, had no number, so its invoice
