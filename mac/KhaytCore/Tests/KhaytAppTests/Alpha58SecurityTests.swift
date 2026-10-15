@@ -128,7 +128,11 @@ struct Alpha58SecurityTests {
             + extra + "Content-Length: \(length)\r\n\r\n"
         let data = Data(head.utf8)
         _ = data.withUnsafeBytes { write(fd, $0.baseAddress, data.count) }
-        var tv = timeval(tv_sec: 60, tv_usec: 0)
+        // A guard against a hang, not a deadline on the answer: the refusal
+        // is written after a visit to the main actor, and in a full run the
+        // main actor's queue alone has outlasted a minute (Oct 15 2026: "no
+        // answer" at 60 s while the server was fine).
+        var tv = timeval(tv_sec: 900, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         var buf = [UInt8](repeating: 0, count: 512)
         let n = read(fd, &buf, 512)
