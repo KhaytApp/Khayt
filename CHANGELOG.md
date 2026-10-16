@@ -32,8 +32,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   book, off the main thread, and a longer query searches only what the shorter
   one matched — a test on a synthetic 10,000-job book counts the rows each key
   touches. ⌃⌘K stays the kiosk and ⇧⌘K the calculator; the Help shortcuts page
-  lists ⌘K in English and Arabic.
-
   lists ⌘K in English and Arabic. While the book is still being indexed the
   palette says "Loading the book…" rather than "Nothing matches", and answers
   what was typed as soon as the index is ready; typing fast can no longer leave
@@ -7390,6 +7388,55 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-alpha.76] - 2026-10-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Before you update
+
+- **Quotes with a marketplace fee now come out slightly higher.** A marketplace
+  takes its fee out of what the buyer pays, fee included, so a 10% fee on 100
+  used to leave you 99. Khayt now raises the price so you keep the full 100
+  after the fee (111.11, not 110), about 1% more on a 10% fee. Only lines from
+  the Marketplace fees picker, or a percentage line you tick as a Platform fee,
+  work this way. Quotes with no marketplace fee are unchanged, and jobs already
+  saved keep their price.
+- **A job with an invoice or a payment can no longer be deleted.** Delete
+  offers Cancel Job instead, so your invoice numbers stay in sequence. Quotes,
+  and jobs never invoiced or paid, can still be deleted, and their expenses and
+  filament use stay in your books.
+
+Go to anything with ⌘K, delete jobs and customers safely, and use the Mac's
+own commands — Print, Share, Duplicate — where you expect them.
+
+### Added
+
+- **⌘K, Go to anything.** Type a job or invoice number, a customer, a part, a
+  model, a product, a machine, a screen or a command, and press Return to
+  open it. Arabic-Indic digits find the numbers the book stores.
+- **Delete jobs and customers.** From the jobs list, the board and the
+  customers list, or with ⌫. It always asks first, and Edit ▸ Undo brings the
+  job or customer back. You can select several rows at once. A customer can
+  be deleted only when they have no jobs and no gift cards.
+- **The standard Mac commands.** File ▸ Print (⌘P) prints the selected job's
+  invoice or the P&L, and the Invoice command moves to ⌥⌘P. File ▸ Share sends
+  an invoice PDF or model files. File ▸ Duplicate (⌘D) copies a job or a
+  product into a new sheet, and Favourite moves to ⇧⌘D. In the library, ⌫
+  deletes the models you can see. Drop a .3mf, .stl, .obj or .gcode file on
+  the jobs list or the Dock icon to start a job from it.
+- **A job records the printer it was sent to.** Its machine costs are charged
+  to that printer, and the inspector says "Printed on X (planned Y)" when you
+  had planned a different one.
+- **Platform fee checkbox.** A percentage extra charge can be marked as a
+  platform fee, so it is added on top the same way.
+
+### Fixed
+
+- **Expenses from the iPhone count in the right category.** Power, parts, rent
+  and resin used to fall outside the categories the Mac uses. They are now
+  counted as electricity, maintenance and other.
 
 ## [4.0.0-alpha.75] - 2026-10-16
 
