@@ -52,8 +52,13 @@ struct KhaytCommands: Commands {
         // `Shop+Conventions.swift`, where each one is a door onto a path the
         // app already had. Greyed, not hidden, when there is nothing in front
         // for them to act on.
-        CommandGroup(replacing: .saveItem) { EditCommands().environment(shop).disabled(shop.needsSignIn) }
-        CommandGroup(replacing: .printItem) { PrintCommands().environment(shop).disabled(shop.needsSignIn) }
+        // In a Group: a `Commands` body takes at most ten children, and these
+        // two made it twelve (fine in a debug build here, "extra argument in
+        // call" in CI's app build).
+        Group {
+            CommandGroup(replacing: .saveItem) { EditCommands().environment(shop).disabled(shop.needsSignIn) }
+            CommandGroup(replacing: .printItem) { PrintCommands().environment(shop).disabled(shop.needsSignIn) }
+        }
 
         CommandGroup(replacing: .appInfo) {
             Button(shop.words.callIt("mac.about_khayt")) { About.show() }
