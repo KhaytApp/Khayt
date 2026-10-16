@@ -23,6 +23,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   still get what you priced, and the margin is shown after it. Leave it
   unticked for your own charge, like a design fee, which works exactly as
   before. Lines added from the Marketplace fees picker are always fees.
+- **Desktop: erasing a customer no longer changes invoices you already
+  issued.** "Full erase" used to blank the customer's name on every one of
+  their orders, including invoices already sent or reported to ZATCA. Now
+  orders with an invoice or a payment keep the name, because invoices must be
+  kept as issued. Only orders never billed are blanked, and the delete window
+  says how many keep the name.
 
 - **Mac: ⌘K, Go to anything.** Go ▸ Go to… (⌘K) opens a small panel over the
   window: type a job's number or invoice number, a customer's name, phone or
@@ -57,6 +63,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   fees totalling 95% or more are not grossed up, and the calculator and the
   Mac's new job sheet say so. The desktop calculator's margin is now measured
   after the marketplace fee lines, which the platform keeps.
+
 - **Delete a job or a customer on the Mac — never an invoiced or paid job.**
   - **Mac:** the jobs list, the board card's right-click menu and the customers
     list gain **Delete…**, and **⌫ / ⌘⌫** (File ▸ Delete…) now acts on the chosen
