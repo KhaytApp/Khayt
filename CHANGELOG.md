@@ -4,6 +4,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: the expense categories come from the shared code.** The phone's
+  expense form now takes its list from the code the Mac uses (KhaytCore)
+  instead of keeping its own copy, so the two cannot drift apart. What it
+  offers is unchanged.
 - **iPhone: expenses use the shop's categories.** The phone offered resin,
   parts, rent and power, and none of those exist anywhere else in Khayt. A
   power bill typed on the phone never counted toward the electricity budget,

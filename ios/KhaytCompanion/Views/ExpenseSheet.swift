@@ -35,12 +35,12 @@ struct ExpenseSheet: View {
     @State private var readCode: String?
     @State private var addingSupplier = false
 
-    // `lib/expense-book.js` CATEGORIES, so the phone cannot file under one
-    // that no report, budget or Mac picker knows. This list once said it was
-    // the desktop's and was not: resin, parts, rent and power appear in none
-    // of them, so a power bill typed here never reached the electricity
-    // budget. `ExpenseCategoriesTests` holds the two lists together.
-    static let categories = ["filament", "electricity", "maintenance", "tools", "equipment", "shipping", "other"]
+    // The book's own categories (`ExpenseCategory.known`, KhaytCore, held to
+    // `lib/expense-book.js` by its parity tests), so the phone cannot file
+    // under one that no report, budget or Mac picker knows. It once kept a
+    // list of its own that said it was the desktop's and was not: resin,
+    // parts, rent and power, which KhaytCore now reads as what they meant.
+    static let categories = ExpenseCategory.known
 
     /// An amount and a category: a receipt fills the first and never the
     /// second, because it does not say what the money was for.
