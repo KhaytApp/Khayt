@@ -870,8 +870,21 @@ extension Shop {
         /// notice on the finished invoice. Nil for a line the shop wrote, and
         /// those are never touched by the picker.
         var platformId: String?
+        /// The shop said this percentage is a platform's cut, not its own
+        /// surcharge — `fee: true` on the record.
+        ///
+        /// `lib/pricing.js` grosses up only FEE lines: the platform takes its
+        /// share of the final price, so the rule adds it on top and the shop
+        /// keeps its price. Any other percentage is the shop's own surcharge,
+        /// taken of the price before extras. A line with a `platformId` is a
+        /// fee already and needs no flag; see `isFeeLine`.
+        var fee = false
 
         var isPercent: Bool { pct != nil }
+
+        /// What `isFeeLine` in `lib/pricing.js` answers for this line: a
+        /// percentage that a marketplace wrote, or the shop marked as a fee.
+        var isFeeLine: Bool { isPercent && (platformId != nil || fee) }
 
         /// The record, as `lib/pricing.js` and `lib/order-new.js` read it.
         ///
@@ -886,6 +899,11 @@ extension Shop {
             // Carried onto the saved job the way the other app carries it, so
             // a quote reopened there still knows which lines are Etsy's.
             if let platformId { o["platformId"] = .string(platformId) }
+            // Written only when it is ON, and only on a percentage: a line
+            // that is not a fee carries no `fee` key at all, so every line
+            // saved before the toggle existed stays byte-identical. A
+            // marketplace line says so with its `platformId` and is not given one.
+            if fee, pct != nil { o["fee"] = .bool(true) }
             return .object(o)
         }
 
@@ -897,7 +915,7 @@ extension Shop {
 
         static func == (a: ExtraLine, b: ExtraLine) -> Bool {
             a.id == b.id && a.label == b.label && a.pct == b.pct && a.amount == b.amount
-                && a.platformId == b.platformId
+                && a.platformId == b.platformId && a.fee == b.fee
         }
     }
 

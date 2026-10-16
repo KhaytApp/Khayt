@@ -2851,6 +2851,13 @@ final class Words {
         "mac.export_redacted": ["en": "API keys, passwords and access codes are removed from this copy.",
                                 "ar": "تُحذف مفاتيح الواجهات وكلمات المرور ورموز الوصول من هذه النسخة."],
         "mac.exported_to":   ["en": "Exported as", "ar": "صُدّرت باسم"],
+        // A percentage extra line is either a platform's cut (grossed up, so
+        // the shop keeps its price) or the shop's own surcharge. The toggle
+        // writes `fee: true`; a marketplace line is a fee by its platformId.
+        "mac.extra_fee":      ["en": "Platform fee", "ar": "رسوم منصة"],
+        "mac.extra_fee_from": ["en": "Set by {platform}", "ar": "تحدّدها {platform}"],
+        "mac.extra_fee_hint": ["en": "The platform takes this share of the final price, so Khayt adds it on top: you keep your price.",
+                               "ar": "تأخذ المنصة هذه النسبة من السعر النهائي، فيضيفها خيط فوقه: يبقى لك سعرك."],
         // The calculator. The shared `calc.*` strings are the Electron form's
         // and carry its step numbers — "1. Part & Material", "4. Build Cart &
         // Quote" — which are a lie on a screen with two sections. Its field
