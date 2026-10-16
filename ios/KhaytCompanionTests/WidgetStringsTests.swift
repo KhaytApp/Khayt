@@ -18,7 +18,7 @@ final class WidgetStringsTests: XCTestCase {
     /// Every plain `Text("…")` and `metric("…", …)` literal in the widget is a key.
     /// Interpolated ones are listed in the table by hand in their `%lld` form.
     func testEveryLiteralTheWidgetShowsIsTranslated() throws {
-        let source = try ["KhaytQueueWidget.swift", "PrintActivityWidget.swift"].map {
+        let source = try ["KhaytQueueWidget.swift", "PrintActivityWidget.swift", "PrintActivityViews.swift"].map {
             try String(contentsOf: root.appending(path: "KhaytWidget/\($0)"), encoding: .utf8)
         }.joined(separator: "\n")
         let ar = try table("ar")
@@ -33,5 +33,7 @@ final class WidgetStringsTests: XCTestCase {
         XCTAssertNotNil(ar["LAN connected"])
         XCTAssertNotNil(ar["%lld queued · %lld printing"])
         XCTAssertNotNil(ar["ETA %@"])
+        XCTAssertNotNil(ar["Paused at %@"])
+        XCTAssertNotNil(ar["Ends %@"])
     }
 }

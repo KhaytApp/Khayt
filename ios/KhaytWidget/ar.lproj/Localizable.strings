@@ -14,6 +14,11 @@
 "Paused" = "متوقفة مؤقتًا";
 "Failed" = "فشلت";
 "Cancelled" = "أُلغيت";
+"Paused at %@" = "متوقفة عند %@";
+"Ready to collect" = "جاهزة للاستلام";
+"Print failed" = "فشلت الطباعة";
+"Print stopped" = "أُوقفت الطباعة";
+"Ends %@" = "تنتهي %@";
 "Log a failed print" = "تسجيل طباعة فاشلة";
 "Scan a spool" = "مسح بكرة";
 "Opens Khayt on the failed-print form." = "يفتح خيط على نموذج الطباعة الفاشلة.";

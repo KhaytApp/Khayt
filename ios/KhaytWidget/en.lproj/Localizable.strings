@@ -16,6 +16,11 @@
 "Paused" = "Paused";
 "Failed" = "Failed";
 "Cancelled" = "Cancelled";
+"Paused at %@" = "Paused at %@";
+"Ready to collect" = "Ready to collect";
+"Print failed" = "Print failed";
+"Print stopped" = "Print stopped";
+"Ends %@" = "Ends %@";
 "Log a failed print" = "Log a failed print";
 "Scan a spool" = "Scan a spool";
 "Opens Khayt on the failed-print form." = "Opens Khayt on the failed-print form.";
