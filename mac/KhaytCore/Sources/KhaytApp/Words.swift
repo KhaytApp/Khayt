@@ -1077,6 +1077,12 @@ final class Words {
         "mac.shelf_labels":  ["en": "Shelf labels",   "ar": "ملصقات الرف"],
         "mac.print_labels":  ["en": "Print shelf labels…", "ar": "طباعة ملصقات الرف…"],
         "mac.print":         ["en": "Print",          "ar": "طباعة"],
+        // The File menu's Mac commands — see `Shop+Conventions.swift`.
+        "mac.share":         ["en": "Share",          "ar": "مشاركة"],
+        "mac.duplicate":     ["en": "Duplicate",      "ar": "تكرار"],
+        // Appended to a duplicated product's name, so the copy is never read
+        // as the original in a list.
+        "mac.copy_suffix":   ["en": "copy",           "ar": "(نسخة)"],
         "mac.labels_count":  ["en": "labels",         "ar": "ملصقات"],
         "mac.labels_count_one": ["en": "label",       "ar": "ملصق"],
         "mac.labels_count_two": ["en": "labels", "ar": "ملصقان"],

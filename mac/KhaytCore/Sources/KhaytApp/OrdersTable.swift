@@ -195,6 +195,15 @@ struct OrdersTable: View {
         .overlay {
             if rows.isEmpty { EmptyBook(shop: shop) }
         }
+        // A MODEL DROPPED ON THE JOBS IS A NEW JOB FOR IT — "New job from
+        // model", after the file is in the library. See `Shop.newJob(fromDropped:)`.
+        // Refused (the drop springs back) for anything that is not a model
+        // file, and on a book this Mac may only read.
+        .dropDestination(for: URL.self) { urls, _ in
+            guard shop.canMoveJobs, !shop.importing, !Shop.droppableModels(urls).isEmpty else { return false }
+            Task { await shop.newJob(fromDropped: urls) }
+            return true
+        }
         .background(Khayt.ground)
         .screenToolbar { NewJobButton(shop: shop) }
     }

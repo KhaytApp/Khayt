@@ -119,20 +119,13 @@ extension Shop {
         panel.nameFieldStringValue = pnlFilename(format, now: now)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            let vat = (try? await engine.pnlStatement(input))?.vat
-            let docs = try await engine.pnlDocuments(
-                input, labels: pnlLabels(vat), periodLabel: pnlPeriodTitle(now: now)
-                    .replacingOccurrences(of: "\u{2068}", with: "")
-                    .replacingOccurrences(of: "\u{2069}", with: ""),
-                currency: currency, rightToLeft: words.isRTL, language: words.language,
-                shopName: shopName)
+            let docs = try await pnlDocuments(engine: engine, input: input, now: now)
             switch format {
             case .csv:
                 // The rule puts the BOM on; written as UTF-8 so it survives.
                 try Data(docs.csv.utf8).write(to: url, options: .atomic)
             case .pdf:
-                let paper = InvoicePaper(document: InvoiceDocument(html: docs.html, arabicNumerals: false,
-                                                                   selector: ""))
+                let paper = Self.pnlPaper(docs.html)
                 // A hang guard, not a speed limit: WebKit lays the page out in
                 // its own process, and a PDF asked for before it has is blank.
                 for _ in 0..<600 where !paper.drawn { try await Task.sleep(for: .milliseconds(100)) }
@@ -142,5 +135,23 @@ extension Shop {
         } catch {
             spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
         }
+    }
+
+    /// The statement as the shared rule writes it — the CSV and the page the
+    /// PDF and File ▸ Print… are drawn from. One call, so the printed page and
+    /// the exported file cannot be two different statements.
+    func pnlDocuments(engine: KhaytEngine, input: PnlInputs, now: Date) async throws -> PnlDocuments {
+        let vat = (try? await engine.pnlStatement(input))?.vat
+        return try await engine.pnlDocuments(
+            input, labels: pnlLabels(vat), periodLabel: pnlPeriodTitle(now: now)
+                .replacingOccurrences(of: "\u{2068}", with: "")
+                .replacingOccurrences(of: "\u{2069}", with: ""),
+            currency: currency, rightToLeft: words.isRTL, language: words.language,
+            shopName: shopName)
+    }
+
+    /// The statement's page, on the invoice's paper: the same A4 the PDF uses.
+    static func pnlPaper(_ html: String) -> InvoicePaper {
+        InvoicePaper(document: InvoiceDocument(html: html, arabicNumerals: false, selector: ""))
     }
 }

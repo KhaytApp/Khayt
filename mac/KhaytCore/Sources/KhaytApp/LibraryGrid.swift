@@ -162,6 +162,10 @@ struct LibraryGrid: View {
             // reads as an error state. Focus with nothing selected is not
             // invisible either: the first arrow press picks an end.
             .focusEffectDisabled()
+            // ⌫ — the Finder's Delete key — asks to delete the VISIBLE
+            // selection, through the right-click menu's own question. See
+            // `Shop.askToDeleteLibrarySelection`: never a model inside a folder tile.
+            .onDeleteCommand { shop.askToDeleteLibrarySelection() }
             .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
                 let step = Self.step(for: press.key, columns: count, layout: layout)
                 // Unhandled at the ends, so the system beep still means "there

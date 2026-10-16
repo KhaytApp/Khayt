@@ -1622,6 +1622,11 @@ final class Shop {
     /// its lines already costed. See `JobFromModel.swift`.
     var jobFromModel: JobFromModel?
 
+    /// The product selected on the catalogue screen. On the shop rather than
+    /// in the screen's own state so File ▸ Duplicate (⌘D) can see it — a menu
+    /// item cannot read a view's `@State`.
+    var catalogueSelection: String?
+
     // Stored for "Selling a piece off the shelf" (Shop+Catalogue.swift).
     /// Whether the shop has agreed to price advice, on this book.
     private(set) var aiPriceAllowed = false

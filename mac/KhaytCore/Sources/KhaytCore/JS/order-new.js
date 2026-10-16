@@ -437,9 +437,11 @@
       paidAmount: deposit,
       paymentMethod: null,
       paidAt: null,
-      notes: '',
-      internalNotes: '',
-      invoiceNotes: '',
+      // Empty for a job taken fresh. A COPY of a job (`lib/record-duplicate.js`)
+      // carries what was written about the work; nothing else passes notes.
+      notes: typeof i.notes === 'string' ? i.notes : '',
+      internalNotes: typeof i.internalNotes === 'string' ? i.internalNotes : '',
+      invoiceNotes: typeof i.invoiceNotes === 'string' ? i.invoiceNotes : '',
       clientRef: i.clientRef || null,
       tags: [],
       dueDate: asQuote ? null : estimateDueDate(orders, totalPrintTime, settings, now),

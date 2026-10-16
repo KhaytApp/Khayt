@@ -126,6 +126,9 @@ struct KhaytApp: App {
                     // A new shop — an empty book, or no book on this Mac at
                     // all — is offered the setup, once. See `ShopSetup.offers`.
                     shop.offerSetupIfNew()
+                    // A model dropped on the Dock icon before the book was
+                    // open — the drop that launched the app.
+                    await shop.takeOpenedFiles()
                     // Opt-in crash reports and usage counts (#1789). Sends
                     // nothing unless the book says so; see `Telemetry`.
                     Telemetry.shared.start(shop: shop)
@@ -150,6 +153,10 @@ struct KhaytApp: App {
                 // LAUNCHES the app — so the request is held and retried once
                 // the library has rows. Without that, the very first thing a
                 // person ever does with this feature does nothing.
+                // A model dropped on the Dock icon while the app is open.
+                .onReceive(NotificationCenter.default.publisher(for: .khaytOpenedFiles)) { _ in
+                    Task { await shop.takeOpenedFiles() }
+                }
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     guard let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
                           let record = Spotlight.recordId(forItem: id) else { return }
@@ -186,6 +193,18 @@ final class Activator: NSObject, NSApplicationDelegate {
             FloorStatus.shared.remove()
             Snapshot.subject?.relinquish()
         }
+    }
+
+    /// A model file dropped on the Dock icon, or opened with Khayt from the
+    /// Finder: New Job, seeded from it — see `Shop.newJob(fromDropped:)`.
+    /// Held on `Shop.openedFiles` because a drop can be what LAUNCHES the app,
+    /// before the window or its book exists; the window takes them once the
+    /// book is open. Only model files are kept — this app declares no URL
+    /// scheme, and anything else has nothing here to open it.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        let models = Shop.droppableModels(urls)
+        guard !models.isEmpty else { return }
+        MainActor.assumeIsolated { Shop.openedFiles += models }
     }
 
     func applicationDidFinishLaunching(_ note: Notification) {

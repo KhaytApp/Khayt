@@ -289,18 +289,7 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
     /// for paper: `@page { size: A4 }`, the margins, and the black-on-white the
     /// shop's colours give way to.
     func pdf() async throws -> Data {
-        let info = NSPrintInfo()
-        info.paperSize = Self.a4
-        info.orientation = .portrait
-        // Zero margins here, because the document sets its own in `@page`.
-        // Adding AppKit's on top of the stylesheet's would indent every invoice
-        // by two margins and lose the last line off the foot of the page.
-        info.topMargin = 0; info.bottomMargin = 0
-        info.leftMargin = 0; info.rightMargin = 0
-        info.horizontalPagination = .fit
-        info.verticalPagination = .automatic
-        info.isHorizontallyCentered = false
-        info.isVerticallyCentered = false
+        let info = Self.a4Info()
         info.jobDisposition = .save
 
         let file = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -310,11 +299,58 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         let operation = webView.printOperation(with: info)
         operation.showsPrintPanel = false
         operation.showsProgressPanel = false
+        guard await run(operation, over: nil) else { throw Failure.printFailed }
+
+        defer { try? FileManager.default.removeItem(at: file) }
+        return try Data(contentsOf: file)
+    }
+
+    /// File ▸ Print… — the document, on the shop's printer, through the
+    /// system's print panel. The same A4 page `pdf()` draws, so what comes out
+    /// of the printer is what the saved PDF holds.
+    ///
+    /// Waits for WebKit to lay the document out first: a print asked for
+    /// before that is a blank page. The wait is a hang guard, not a speed
+    /// limit. Returns false when the shop cancelled the panel.
+    @discardableResult
+    func printWithPanel(title: String, over window: NSWindow?) async -> Bool {
+        for _ in 0..<6000 where !drawn { try? await Task.sleep(for: .milliseconds(100)) }
+        guard drawn else { return false }
+        let operation = webView.printOperation(with: Self.a4Info())
+        operation.showsPrintPanel = true
+        operation.showsProgressPanel = true
+        operation.jobTitle = title
+        return await run(operation, over: window)
+    }
+
+    /// A4, portrait, with no margins of AppKit's own.
+    ///
+    /// Zero margins because the document sets its own in `@page`. Adding
+    /// AppKit's on top of the stylesheet's would indent every invoice by two
+    /// margins and lose the last line off the foot of the page.
+    static func a4Info() -> NSPrintInfo {
+        let info = NSPrintInfo()
+        info.paperSize = Self.a4
+        info.orientation = .portrait
+        info.topMargin = 0; info.bottomMargin = 0
+        info.leftMargin = 0; info.rightMargin = 0
+        info.horizontalPagination = .fit
+        info.verticalPagination = .automatic
+        info.isHorizontallyCentered = false
+        info.isVerticallyCentered = false
+        return info
+    }
+
+    /// Run a print operation of this paper's web view to the end.
+    ///
+    /// `over` is the window a print panel hangs from; nil runs it on the
+    /// paper's own window.
+    private func run(_ operation: NSPrintOperation, over window: NSWindow?) async -> Bool {
         // The view has to be in a window to print. A sheet's web view already
         // is; one built to export without ever being shown is not, and prints
         // an empty page in silence.
         if webView.window == nil { Self.offscreen.contentView = webView }
-        let host = webView.window ?? Self.offscreen
+        let host = window ?? webView.window ?? Self.offscreen
 
         // `runModal(for:…)`, NOT `run()`. WebKit's print operation is
         // asynchronous — the pages are laid out in the web process — and
@@ -322,24 +358,21 @@ final class InvoicePaper: NSObject, ObservableObject, WKNavigationDelegate {
         // documentation for `printOperation(with:)` says so in as many words;
         // it was read after the first attempt hung a test for ten minutes.
         let printed = Printed()
-        try await withCheckedThrowingContinuation { (done: CheckedContinuation<Void, Error>) in
+        return await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
             printed.done = done
             operation.runModal(for: host, delegate: printed,
                                didRun: #selector(Printed.printOperationDidRun(_:success:contextInfo:)),
                                contextInfo: nil)
         }
-
-        defer { try? FileManager.default.removeItem(at: file) }
-        return try Data(contentsOf: file)
     }
 
     /// The print operation's way of saying it finished: an Objective-C
     /// selector, on an object that holds the continuation waiting for it.
     private final class Printed: NSObject {
-        var done: CheckedContinuation<Void, Error>?
+        var done: CheckedContinuation<Bool, Never>?
         @objc func printOperationDidRun(_ op: NSPrintOperation, success: Bool,
                                         contextInfo: UnsafeMutableRawPointer?) {
-            if success { done?.resume() } else { done?.resume(throwing: Failure.printFailed) }
+            done?.resume(returning: success)
             done = nil
         }
     }

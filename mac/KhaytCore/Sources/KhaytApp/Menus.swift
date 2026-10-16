@@ -45,6 +45,21 @@ struct KhaytCommands: Commands {
         // looks for "new".
         CommandGroup(replacing: .newItem) { NewJobCommand().environment(shop).disabled(shop.needsSignIn) }
 
+        // ── THE MAC'S OWN FILE COMMANDS ────────────────────────────────────
+        //
+        // Duplicate (⌘D), Delete (⌘⌫), Share and Print (⌘P), where every Mac
+        // app keeps them, acting on what is in front — see
+        // `Shop+Conventions.swift`, where each one is a door onto a path the
+        // app already had. Greyed, not hidden, when there is nothing in front
+        // for them to act on.
+        // In a Group: a `Commands` body takes at most ten children, and these
+        // two made it twelve (fine in a debug build here, "extra argument in
+        // call" in CI's app build).
+        Group {
+            CommandGroup(replacing: .saveItem) { EditCommands().environment(shop).disabled(shop.needsSignIn) }
+            CommandGroup(replacing: .printItem) { PrintCommands().environment(shop).disabled(shop.needsSignIn) }
+        }
+
         CommandGroup(replacing: .appInfo) {
             Button(shop.words.callIt("mac.about_khayt")) { About.show() }
             // Under About, above Settings — where macOS puts it in every app
@@ -371,6 +386,42 @@ private struct NewJobCommand: View {
     }
 }
 
+/// File ▸ Duplicate and Delete.
+///
+/// ⌘D copies the selected job — into the new-job sheet, nothing written until
+/// Save — or the selected catalogue product, into the product sheet. ⌘⌫ asks to
+/// delete the library's VISIBLE selection through the right-click menu's own
+/// question; the jobs and the customers have no delete in this app to reach.
+private struct EditCommands: View {
+    @Environment(Shop.self) private var shop
+
+    var body: some View {
+        Button(Words.upfront("mac.duplicate")) { Task { await shop.duplicateFrontmost() } }
+            .keyboardShortcut("d")
+            .disabled(shop.duplicateTarget == nil)
+        Button(Words.upfront("common.delete") + "\u{2026}") { shop.askToDeleteLibrarySelection() }
+            .keyboardShortcut(.delete, modifiers: .command)
+            .disabled(shop.librarySelectionToDelete.isEmpty)
+    }
+}
+
+/// File ▸ Share… and Print….
+///
+/// Print is the DOCUMENT in front — a job's invoice or quotation, the P&L on
+/// Reports — never a picture of the window. Not a write, so it does not wait on
+/// `canMoveJobs`: the sample's invoice prints like any other.
+private struct PrintCommands: View {
+    @Environment(Shop.self) private var shop
+
+    var body: some View {
+        Button(Words.upfront("mac.share") + "\u{2026}") { Task { await shop.shareFrontmost() } }
+            .disabled(shop.shareTarget == nil)
+        Button(Words.upfront("mac.print") + "\u{2026}") { Task { await shop.printFrontmost() } }
+            .keyboardShortcut("p")
+            .disabled(shop.printTarget == nil)
+    }
+}
+
 /// Moving the job that is selected, from wherever it is selected.
 ///
 /// The board can drag; a table cannot, and the table is where somebody reads
@@ -470,7 +521,7 @@ private struct JobMenu: View {
             if shop.productionPaused { Task { await shop.resumeProduction() } }
             else { shop.pausingProduction = true }
         }
-        // ⌘⇧P is Record payment and ⌘P is Print. ⌘⇧. reads as "stop" on a Mac,
+        // ⌘⇧P is Record payment and ⌘P is File ▸ Print. ⌘⇧. reads as "stop" on a Mac,
         // which is what this is.
         .keyboardShortcut(".", modifiers: [.command, .shift])
         .disabled(!shop.canMoveJobs)
@@ -530,10 +581,12 @@ private struct JobMenu: View {
         // The one item here that does not need the book to be ours: showing a
         // shop what it would hand a customer changes nothing, and refusing to
         // draw the sample's invoice would hide the thing this app is for.
+        // ⌥⌘P: ⌘P is File ▸ Print…, which prints this same document. This
+        // item SHOWS it, with Save as PDF beside it.
         Button(Words.upfront("doc.invoice")) {
             if let one = job { shop.showInvoice(one.id) }
         }
-        .keyboardShortcut("p")
+        .keyboardShortcut("p", modifiers: [.option, .command])
         .disabled(job == nil)
     }
 
@@ -595,8 +648,10 @@ private struct ModelMenu: View {
         //
         // The item toggles, and now it says so. Enablement is evaluated when the
         // menu is shown and does keep up; only the words are frozen.
+        // ⇧⌘D. It was ⌘D, which every Mac app spends on Duplicate — and
+        // File ▸ Duplicate has it now.
         Button(Words.upfront("mac.favourite")) { shop.toggleFavouriteOnSelection() }
-            .keyboardShortcut("d")
+            .keyboardShortcut("d", modifiers: [.command, .shift])
             .disabled(!canEdit)
         Divider()
         // ⌘Y, and Space in the grid — the two gestures Finder uses, because a
