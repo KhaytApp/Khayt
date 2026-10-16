@@ -63,8 +63,11 @@ public enum ExpenseCategories {
                 ? Swift.min(paid, Swift.max(0, number(e["vatAmount"])))
                 : 0
             // `other` is the bucket the editor itself falls back to — and it is
-            // `e.category || 'other'`, so an empty string lands there too.
-            let key = JSSemantics.truthy(e["category"]) ? JSSemantics.text(e["category"]) : "other"
+            // `categoryOf(e) || 'other'`, so an empty string lands there too.
+            // Through `ExpenseCategory`, as the JavaScript reads it through
+            // lib/expense-book.js: a phone's old `power` row is electricity.
+            let category = ExpenseCategory.normalise(e["category"])
+            let key = JSSemantics.truthy(category) ? JSSemantics.text(category) : "other"
             if totals[key] == nil {
                 order.append(key)
                 totals[key] = Row(category: key, amount: 0, reclaimed: 0, share: 0)

@@ -12,7 +12,11 @@ import Testing
 @MainActor
 struct ExpenseCategoriesParityTests {
 
-    private func js() throws -> JSModule { try JSModule(["expense-categories"]) }
+    /// With the book loaded, because the module reads a category through
+    /// lib/expense-book.js `categoryOf` — without it the JavaScript reads the
+    /// stored word as it is, and `rent` and `parts` below would be compared
+    /// against a port that knows what they mean.
+    private func js() throws -> JSModule { try JSModule(["expense-book", "expense-categories"]) }
 
     private func theirs(_ js: JSModule, _ expenses: [JSONValue],
                         _ reclaims: Bool) throws -> ExpenseCategories.Spending {
@@ -176,6 +180,26 @@ struct ExpenseCategoriesParityTests {
         // The totals still agree, which is why nobody noticed it was the
         // DECODE that failed rather than the arithmetic.
         #expect(mine.total == 30)
+    }
+
+    @Test("a category the phone saved before it was fixed lands in the bucket it meant")
+    func phoneAliasesMatch() throws {
+        try check([
+            expense(.string("power"), .number(100), vat: .number(15)),
+            expense(.string("electricity"), .number(50)),
+            expense(.string(" Resin "), .number(80)),
+            expense(.string("PARTS"), .number(30)),
+            expense(.string("rent"), .number(1_000)),
+            expense(.string("Filament"), .number(70)),
+            expense(.string("courier"), .number(5)),
+        ], "phone aliases")
+        let mine = ExpenseCategories.byCategory([
+            expense(.string("power"), .number(100)),
+            expense(.string("electricity"), .number(50)),
+            expense(.string("resin"), .number(80)),
+        ], reclaimsTax: false)
+        #expect(mine.rows.map(\.category) == ["electricity", "other"])
+        #expect(mine.rows.first?.amount == 150)
     }
 
     @Test("rows that are not expenses at all")

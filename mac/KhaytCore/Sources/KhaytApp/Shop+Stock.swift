@@ -1026,7 +1026,7 @@ extension Shop {
     static func hasNotTraded(orders: [Order]) -> Bool { orders.isEmpty }
 
     /// Khayt's own categories, in its own order.
-    static let expenseCategories = ["filament", "electricity", "maintenance", "tools", "equipment", "shipping", "other"]
+    static let expenseCategories = ExpenseCategory.known
 
     /// Record an expense.
     ///

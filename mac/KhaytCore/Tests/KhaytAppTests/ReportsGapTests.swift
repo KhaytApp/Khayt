@@ -209,13 +209,16 @@ struct ReportsGapTests {
         ]
         let gross = try await engine.expenseCategories(expenses, reclaimsTax: false)
         let net = try await engine.expenseCategories(expenses, reclaimsTax: true)
-        let filamentGross = try #require(gross.rows.first { $0.category == "Filament" })
-        let filamentNet = try #require(net.rows.first { $0.category == "Filament" })
+        // Read as what they mean (lib/expense-book.js `categoryOf`): any case
+        // of a known category is that category, and `rent` — which the phone
+        // used to save — is `other`.
+        let filamentGross = try #require(gross.rows.first { $0.category == "filament" })
+        let filamentNet = try #require(net.rows.first { $0.category == "filament" })
         #expect(filamentGross.amount == 115)
         #expect(filamentNet.amount == 100, "a registered shop bore 100, not 115")
         #expect(filamentNet.reclaimed == 15)
         // Rent carried no tax either way.
-        #expect(net.rows.first { $0.category == "Rent" }?.amount == 1000)
+        #expect(net.rows.first { $0.category == "other" }?.amount == 1000)
         // The total is the rule's, not the screen's: 1100 borne, 15 claimed back.
         #expect(net.total == 1100)
         #expect(net.reclaimed == 15)

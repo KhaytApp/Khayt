@@ -26,7 +26,11 @@ struct Expense: Identifiable, Decodable, Hashable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         date = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
-        category = try c.decodeIfPresent(String.self, forKey: .category) ?? "other"
+        // What the stored word MEANS (`ExpenseCategory`, lib/expense-book.js
+        // `categoryOf`): a row the phone saved as `power` is electricity in
+        // the table, the totals, the budgets and the search. The book on disk
+        // keeps what it was saved with.
+        category = ExpenseCategory.normalise(try c.decodeIfPresent(String.self, forKey: .category) ?? "other")
         amount = try c.decodeIfPresent(Double.self, forKey: .amount) ?? 0
         note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
         orderId = try c.decodeIfPresent(String.self, forKey: .orderId)

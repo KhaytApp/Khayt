@@ -230,7 +230,10 @@ test('both apps can record the category', () => {
   const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
   assert.match(read('renderer/expenses.js'), /'tools','equipment','shipping'/);
   assert.match(read('renderer/index.html'), /<option value="equipment"/);
-  assert.match(read('mac/KhaytCore/Sources/KhaytApp/Shop+Stock.swift'), /"tools", "equipment", "shipping"/);
+  // The Mac's list is ExpenseCategory.known (KhaytCore), which
+  // ExpenseCategoryParityTests holds to lib/expense-book.js CATEGORIES.
+  assert.match(read('mac/KhaytCore/Sources/KhaytApp/Shop+Stock.swift'), /static let expenseCategories = ExpenseCategory\.known/);
+  assert.match(read('mac/KhaytCore/Sources/KhaytCore/ExpenseCategory.swift'), /"tools", "equipment", "shipping"/);
 });
 
 test('wired: the desktop P&L and CSV, and the Mac card and export, show the memo line', () => {

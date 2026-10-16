@@ -27,7 +27,9 @@ test('computePnl totals revenue, cogs, gross, expenses-by-category, net', () => 
   assert.equal(s.inventoryPurchases, 40);
   assert.equal(s.netProfit, 75); // 100 gross - 25 opex
   assert.equal(s.vatCollected, 20.87);
-  assert.deepEqual(s.expensesByCategory, [{ category: 'Rent', amount: 25 }]);
+  // `Rent` is not a category the book has — the phone used to save it — so
+  // it reads as `other` (lib/expense-book.js `categoryOf`).
+  assert.deepEqual(s.expensesByCategory, [{ category: 'other', amount: 25 }]);
 });
 
 test('computePnl handles empties + blank category', () => {

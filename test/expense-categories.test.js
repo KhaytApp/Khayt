@@ -13,10 +13,19 @@
  * chart summed the gross, so the two disagreed by the whole of the reclaimable
  * tax — 15% of every category with a receipt, at the Saudi rate — and a shop
  * reading one and then the other saw two totals for the same money.
+ *
+ * A SECOND ONE, also outside it: a category is read through lib/expense-book.js
+ * `categoryOf`, so the phone's old `power`/`rent` rows land in the bucket they
+ * meant. The comparison hands the original loop the same reading, so the
+ * arithmetic is still proved verbatim; test/expense-category-aliases.test.js
+ * covers the reading itself.
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { byCategory } = require('../lib/expense-categories.js');
+const { categoryOf } = require('../lib/expense-book.js');
+/** The book as every reader now reads it: each category as it means. */
+const asRead = (book) => book.map((e) => ({ ...e, category: categoryOf(e) }));
 
 /** The chart's own loop, as it stood. */
 function original(filtered) {
@@ -53,7 +62,7 @@ test('with nothing reclaimable it is the chart\'s own arithmetic, exactly', () =
   let nonEmpty = 0;
   for (let i = 0; i < 500; i++) {
     const book = genBook(r);
-    const was = original(book.filter(Boolean));
+    const was = original(asRead(book.filter(Boolean)));
     const now = byCategory(book, { reclaimsTax: false });
 
     assert.deepEqual(now.rows.map((x) => [x.category, x.amount]), was.sorted,
@@ -86,7 +95,7 @@ test('a registered shop does not count the tax it reclaims as a cost', () => {
   const registered = byCategory(book, { reclaimsTax: true });
   assert.equal(registered.total, 250);
   assert.equal(registered.reclaimed, 15);
-  assert.deepEqual(registered.rows.map((r) => [r.category, r.amount]), [['filament', 200], ['rent', 50]]);
+  assert.deepEqual(registered.rows.map((r) => [r.category, r.amount]), [['filament', 200], ['other', 50]]);
 
   // The same book for a shop that is not registered: every riyal is a cost.
   const not = byCategory(book, { reclaimsTax: false });
