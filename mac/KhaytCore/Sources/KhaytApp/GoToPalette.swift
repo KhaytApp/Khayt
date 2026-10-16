@@ -26,24 +26,19 @@ import KhaytCore
 /// its own saying so.
 struct GoToPalette: View {
     @Bindable var shop: Shop
-
-    @State private var query = ""
-    /// The book's index, once it is ready. Until then the screens alone answer.
-    @State private var book: GoToIndex?
-    @State private var screens = GoToIndex([])
-    /// The book's last answer — what a longer query narrows from.
-    @State private var last: GoToIndex.Result?
-    @State private var groups: [GoToIndex.Group] = []
-    @State private var cursor = 0
+    /// The query, the answer and the cursor — see `GoToModel`, which the
+    /// tests drive without this view.
+    @State private var model: GoToModel
     @FocusState private var fieldFocused: Bool
 
-    /// How many rows a group shows.
-    nonisolated static let perGroup = 8
+    init(shop: Shop) {
+        self.shop = shop
+        _model = State(initialValue: GoToModel(shop: shop))
+    }
+
     /// The pause before a search — long enough to fold a burst of keys into
     /// one, short enough that nobody waits for it.
     static let debounce: Duration = .milliseconds(60)
-
-    private var rows: [GoToIndex.Entry] { groups.flatMap { $0.hits.map(\.entry) } }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -57,18 +52,13 @@ struct GoToPalette: View {
                 .padding(.top, 72)
                 .padding(.horizontal, Space.xl)
         }
-        .task {
-            screens = shop.goToScreens()
-            refresh()
-            let index = await shop.goToIndex()
-            book = index
-            last = nil
-            await search(query)
-        }
-        .task(id: query) {
+        // The index, once; then whatever is in the field by the time it is
+        // ready is answered again (`GoToModel.load`).
+        .task { await model.load() }
+        .task(id: model.query) {
             try? await Task.sleep(for: Self.debounce)
             guard !Task.isCancelled else { return }
-            await search(query)
+            await model.search()
         }
     }
 
@@ -77,14 +67,14 @@ struct GoToPalette: View {
             HStack(spacing: Space.md) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(Role.text3)
-                TextField(shop.words.callIt("mac.goto_prompt"), text: $query)
+                TextField(shop.words.callIt("mac.goto_prompt"), text: $model.query)
                     .textFieldStyle(.plain)
                     .font(TypeScale.title(15, weight: .regular))
                     .foregroundStyle(Role.text)
                     .focused($fieldFocused)
-                    .onSubmit { open(at: cursor) }
-                    .onKeyPress(.upArrow) { move(-1); return .handled }
-                    .onKeyPress(.downArrow) { move(1); return .handled }
+                    .onSubmit { model.open() }
+                    .onKeyPress(.upArrow) { model.move(-1); return .handled }
+                    .onKeyPress(.downArrow) { model.move(1); return .handled }
                     .onKeyPress(.escape) { shop.goingTo = false; return .handled }
                     .accessibilityLabel(shop.words.callIt("mac.goto"))
             }
@@ -115,36 +105,49 @@ struct GoToPalette: View {
         .onExitCommand { shop.goingTo = false }
     }
 
+    /// The answer, drawn from one value: each section's heading with its own
+    /// rows, every row identified by what it is. A plain `VStack` — at most
+    /// six groups of eight, nothing a lazy stack would save, and no cache of
+    /// rows for a new answer to be drawn under (see `GoToModel`).
     @ViewBuilder private var results: some View {
-        if rows.isEmpty {
-            Text(query.trimmingCharacters(in: .whitespaces).isEmpty ? "" : shop.words.callIt("mac.goto_none"))
+        let answer = model.answer
+        if answer.sections.isEmpty {
+            Text(answer.loading ? shop.words.callIt("mac.goto_loading")
+                 : answer.query.trimmingCharacters(in: .whitespaces).isEmpty ? "" : shop.words.callIt("mac.goto_none"))
                 .font(TypeScale.body(12))
                 .foregroundStyle(Role.text3)
                 .frame(maxWidth: .infinity, minHeight: 44)
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        let starts = Self.starts(of: groups)
-                        ForEach(Array(groups.enumerated()), id: \.element.kind) { g, group in
-                            Text(shop.words.callIt("mac.goto_group_" + group.kind.rawValue))
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(answer.sections) { section in
+                            Text(section.title)
                                 .font(TypeScale.label(9.5))
                                 .foregroundStyle(Role.text3)
                                 .padding(.horizontal, Space.lg)
                                 .padding(.top, Space.md)
                                 .padding(.bottom, Space.xs)
-                            ForEach(Array(group.hits.enumerated()), id: \.element.entry.id) { i, hit in
-                                let at = starts[g] + i
-                                row(hit.entry, selected: at == cursor)
-                                    .id(at)
+                            ForEach(section.rows) { item in
+                                row(item.entry, selected: item.index == model.cursor)
+                                    .id(item.id)
                                     .contentShape(Rectangle())
-                                    .onTapGesture { open(at: at) }
+                                    .onTapGesture { model.open(item) }
                             }
+                        }
+                        if answer.loading {
+                            Text(shop.words.callIt("mac.goto_loading"))
+                                .font(TypeScale.body(11))
+                                .foregroundStyle(Role.text3)
+                                .padding(.horizontal, Space.lg)
+                                .padding(.vertical, Space.sm)
                         }
                     }
                     .padding(.bottom, Space.sm)
                 }
-                .onChange(of: cursor) { _, now in proxy.scrollTo(now) }
+                .onChange(of: model.cursor) { _, _ in
+                    if let id = model.selected?.id { proxy.scrollTo(id) }
+                }
             }
         }
     }
@@ -173,63 +176,6 @@ struct GoToPalette: View {
         .background(selected ? Role.accSoft : Color.clear)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-    }
-
-    // MARK: - Searching
-
-    /// The screens alone, while the book's index is still being built — the
-    /// palette answers at once, then fills in.
-    private func refresh() {
-        groups = Self.answer(query, screens: screens, book: nil, kinds: shop.goToKinds, perGroup: Self.perGroup)
-        cursor = 0
-    }
-
-    private func search(_ q: String) async {
-        let kinds = shop.goToKinds
-        var bookResult: GoToIndex.Result?
-        if let book {
-            let previous = last
-            let found = await Task.detached(priority: .userInitiated) {
-                book.search(q, kinds: kinds, perGroup: Self.perGroup, narrowing: previous)
-            }.value
-            guard !Task.isCancelled, q == query else { return }
-            last = found
-            bookResult = found
-        }
-        groups = Self.answer(q, screens: screens, book: bookResult, kinds: kinds, perGroup: Self.perGroup)
-        cursor = 0
-    }
-
-    /// What the palette lists for a query: with nothing typed, every screen
-    /// and command; otherwise the screens' matches and the book's together.
-    static func answer(_ q: String, screens: GoToIndex, book: GoToIndex.Result?,
-                       kinds: Set<GoToIndex.Kind>, perGroup: Int) -> [GoToIndex.Group] {
-        guard !kinds.isEmpty else { return [] }
-        if q.trimmingCharacters(in: .whitespaces).isEmpty {
-            guard kinds.contains(.screen), !screens.entries.isEmpty else { return [] }
-            let hits = screens.entries.enumerated().map { GoToIndex.Hit(entry: $1, score: 0, position: $0) }
-            return [GoToIndex.Group(kind: .screen, hits: hits)]
-        }
-        let mine = screens.search(q, kinds: kinds, perGroup: perGroup)
-        return GoToIndex.merged([mine] + (book.map { [$0] } ?? []))
-    }
-
-    /// Where each group's first row sits in the flat list the cursor walks.
-    static func starts(of groups: [GoToIndex.Group]) -> [Int] {
-        var at = 0
-        return groups.map { group in defer { at += group.hits.count }; return at }
-    }
-
-    private func move(_ by: Int) {
-        let count = rows.count
-        guard count > 0 else { return }
-        cursor = min(max(0, cursor + by), count - 1)
-    }
-
-    private func open(at index: Int) {
-        let all = rows
-        guard all.indices.contains(index) else { return }
-        shop.goTo(all[index])
     }
 
     static func symbol(for entry: GoToIndex.Entry) -> String {

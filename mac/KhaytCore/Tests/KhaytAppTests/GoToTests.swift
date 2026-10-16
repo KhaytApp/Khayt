@@ -192,7 +192,7 @@ struct GoToTests {
     func wordsExist() {
         var keys = GoToCommand.allCases.map(\.titleKey)
         keys += GoToIndex.Kind.allCases.map { "mac.goto_group_" + $0.rawValue }
-        keys += ["mac.goto", "mac.goto_prompt", "mac.goto_screen", "mac.goto_command", "mac.goto_none", "mac.goto_hint"]
+        keys += ["mac.goto", "mac.goto_prompt", "mac.goto_screen", "mac.goto_command", "mac.goto_none", "mac.goto_hint", "mac.goto_loading"]
         keys += Shop.goToShelves.map(Shop.titleKey(of:))
         for key in keys where key.hasPrefix("mac.goto") {
             #expect(Words.own[key]?["en"]?.isEmpty == false, "\(key) has no English")

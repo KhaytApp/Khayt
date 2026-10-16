@@ -105,6 +105,56 @@ struct GoToIndexTests {
         #expect(merged.first?.kind == .screen)
     }
 
+    // MARK: - Typing a word, one key at a time
+
+    /// The screens' index and a book, as the palette holds them (two indexes).
+    static let screens = GoToIndex(["Dashboard", "Jobs", "Board", "Library", "Catalogue", "Customers",
+                                    "Machines", "Inventory", "Gift cards"].map {
+        Entry(kind: .screen, id: "screen:" + $0.lowercased(), title: $0, fields: [$0])
+    })
+    static let book = GoToIndex([
+        Entry(kind: .job, id: "ORD-01001", title: "Dental model set", fields: ["ORD-01001", "1001", "Riyadh Dental Studio", "Dental model set"]),
+        Entry(kind: .job, id: "ORD-01002", title: "Drone arm v4", fields: ["ORD-01002", "1002", "Drone arm v4"]),
+        Entry(kind: .model, id: "m1", title: "Dental model set — upper", fields: ["Dental model set — upper"]),
+        Entry(kind: .product, id: "p1", title: "Dental model set", fields: ["Dental model set", "Medical"]),
+        Entry(kind: .customer, id: "c1", title: "Riyadh Dental Studio", fields: ["Riyadh Dental Studio"]),
+    ])
+
+    @Test("d, de, den, dent — narrowed or not — finds Dental model set and never Dashboard; dash finds Dashboard")
+    func typingDent() throws {
+        var previous: GoToIndex.Result?
+        for q in ["d", "de", "den", "dent"] {
+            let narrowed = Self.book.search(q, narrowing: previous)
+            let fresh = Self.book.search(q)
+            #expect(narrowed.groups.map(\.kind) == fresh.groups.map(\.kind), "\(q): narrowing changed the answer")
+            #expect(narrowed.groups.map { $0.hits.map(\.entry.id) } == fresh.groups.map { $0.hits.map(\.entry.id) })
+            #expect(narrowed.query == q)
+            previous = narrowed
+        }
+        let dent = try #require(previous)
+        #expect(Self.titles(dent, .job) == ["Dental model set"])
+        #expect(dent.matched.count == 4, "the four records holding \"dent\"")
+
+        // The screens are searched by the same matcher: "dent" is in none.
+        let screensDent = Self.screens.search("dent")
+        #expect(screensDent.groups.isEmpty)
+        #expect(screensDent.matched.isEmpty)
+        let merged = GoToIndex.merged([screensDent, dent])
+        #expect(!merged.contains { $0.kind == .screen })
+        #expect(merged.contains { $0.kind == .job && $0.hits.contains { $0.entry.title == "Dental model set" } })
+        // Every group holds only its own kind.
+        #expect(merged.allSatisfy { g in g.hits.allSatisfy { $0.entry.kind == g.kind } })
+
+        // Narrowing from the nothing-typed answer starts again.
+        let fromEmpty = Self.book.search("dent", narrowing: Self.book.search(""))
+        #expect(fromEmpty.touched == Self.book.count)
+        #expect(Self.titles(fromEmpty, .job) == ["Dental model set"])
+
+        let dash = Self.screens.search("dash")
+        #expect(Self.titles(dash, .screen) == ["Dashboard"])
+        #expect(Self.book.search("dash").groups.isEmpty)
+    }
+
     // MARK: - Permissions
 
     @Test("a kind not allowed is never looked at, let alone shown")
