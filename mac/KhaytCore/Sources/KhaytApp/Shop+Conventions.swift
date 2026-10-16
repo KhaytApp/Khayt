@@ -300,6 +300,7 @@ extension Shop {
         line.label = plainString(o["label"]) ?? ""
         if let pct = plainNumber(o["pct"]) { line.pct = pct } else { line.amount = plainNumber(o["amount"]) ?? 0 }
         line.platformId = plainString(o["platformId"])
+        line.fee = o["fee"] == .bool(true)
         return line.isWorthKeeping ? line : nil
     }
 

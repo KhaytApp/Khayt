@@ -709,7 +709,7 @@ struct NewJobSheet: View {
                                     // charges, and carrying the number across
                                     // would quietly turn one into the other.
                                     if wantsPercent { line.pct = 0; line.amount = 0 }
-                                    else { line.pct = nil }
+                                    else { line.pct = nil; line.fee = false }
                                 })) {
                                     Text(Money.mark(shop.currency)).tag(false)
                                     Text("%").tag(true)
@@ -734,6 +734,37 @@ struct NewJobSheet: View {
                             .buttonStyle(.borderless)
                             .accessibilityLabel(shop.words.callIt("common.delete"))
                         }
+                        // ── A PLATFORM'S CUT, OR THE SHOP'S OWN SURCHARGE ──
+                        //
+                        // Only a percentage can be either. A fee line is
+                        // grossed up by `lib/pricing.js` — the platform takes
+                        // its share of the final price, so it goes on top and
+                        // the shop keeps its price; a surcharge is taken of the
+                        // price before extras. A line the marketplace picker
+                        // wrote is a fee by its `platformId`: shown on, and
+                        // locked, with the platform named as the reason.
+                        if line.isPercent {
+                            HStack(spacing: 8) {
+                                Toggle(shop.words.callIt("mac.extra_fee"), isOn: Binding(
+                                    get: { line.isFeeLine },
+                                    set: { line.fee = $0 }))
+                                    .toggleStyle(.checkbox)
+                                    .disabled(line.platformId != nil)
+                                if let from = line.platformId {
+                                    Text(shop.words.callIt("mac.extra_fee_from", [
+                                        "platform": .string(platforms.first(where: { $0.id == from })?.name ?? from),
+                                    ]))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.leading, 4)
+                        }
+                    }
+                    if extraLines.contains(where: \.isPercent) {
+                        Text(shop.words.callIt("mac.extra_fee_hint"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: 420, alignment: .leading)
                     }
                     Button(shop.words.callIt("calc.add_extra_line")) {
                         extraLines.append(Shop.ExtraLine())

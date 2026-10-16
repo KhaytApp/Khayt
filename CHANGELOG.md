@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: mark a percentage charge as a platform fee.** In New Job's extra
+  charges, a percentage line now has a "Platform fee" checkbox. On, the line is
+  saved with `fee: true` and Khayt grosses it up like a marketplace's own fee:
+  the platform takes its share of the final price, so it is added on top and
+  you keep your price (10% on 100 comes to 111.11, not 110). Off, nothing is
+  written, so existing lines are unchanged. Lines from the Marketplace fees
+  picker show it on and locked, naming the platform. A job reopened with a fee
+  line shows it on. English and Arabic.
+
 - **Mac: ⌘K, Go to anything.** Go ▸ Go to… (⌘K) opens a small panel over the
   window: type a job's number or invoice number, a customer's name, phone or
   email, a part, a library model or its file name, a catalogue product, a
