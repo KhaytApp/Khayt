@@ -172,11 +172,10 @@
 "exp.save" = "Save";
 "exp.no_camera" = "No camera on this device — the expense will be saved without a receipt.";
 "exp.cat.filament" = "Filament";
-"exp.cat.resin" = "Resin";
-"exp.cat.parts" = "Parts";
-"exp.cat.tools" = "Tools";
-"exp.cat.rent" = "Rent";
-"exp.cat.power" = "Power";
+"exp.cat.electricity" = "Electricity";
+"exp.cat.maintenance" = "Maintenance";
+"exp.cat.tools" = "Tools & Supplies";
+"exp.cat.equipment" = "Equipment (machines)";
 "exp.cat.shipping" = "Shipping";
 "exp.cat.other" = "Other";
 
