@@ -1,3 +1,4 @@
+import ActivityKit
 import SwiftUI
 
 /// For the one thing SwiftUI has no hook for: the APNs device token.
@@ -86,6 +87,23 @@ struct KhaytCompanionApp: App {
         if defaults.bool(forKey: "KhaytSampleShop") { try? api.openSampleShop() }
         if let tab = defaults.string(forKey: "KhaytTab") {
             defaults.set(tab, forKey: "khayt.pending.tab")
+        }
+        if let phase = defaults.string(forKey: "KhaytLiveDemo") { startDemoActivity(phase) }
+    }
+
+    /// `-KhaytLiveDemo printing|paused|finished|failed`: one sample print on
+    /// the Lock Screen and in the Dynamic Island, so the Live Activity can be
+    /// photographed in the simulator without a printer. Debug builds only.
+    private static func startDemoActivity(_ phase: String) {
+        let now = Date()
+        let state = PrintActivityAttributes.ContentState(
+            phase: PrintActivityAttributes.ContentState.Phase(rawValue: phase) ?? .printing,
+            job: "Dragon_0.2mm_PLA_3h12m.gcode", progress: 62,
+            startedAt: now.addingTimeInterval(-2 * 3600), endsAt: now.addingTimeInterval(72 * 60))
+        Task { @MainActor in
+            for a in Activity<PrintActivityAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }
+            _ = try? Activity.request(attributes: PrintActivityAttributes(machineId: "demo", machineName: "Snapmaker U1"),
+                                      content: ActivityContent(state: state, staleDate: nil))
         }
     }
     #endif

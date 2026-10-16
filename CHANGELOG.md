@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: print progress on the Lock Screen looks finished.** It used the
+  system's plain defaults and an old brand colour. Now:
+  - the time left is the largest thing on it, with the clock time it ends
+    beside it;
+  - the phase (printing, paused, done, failed) shows as a pill in the app's
+    own colours, which match its order stages;
+  - the printer's file name reads as a title, so `Dragon_0.2mm_PLA.gcode`
+    shows as "Dragon 0.2mm PLA";
+  - a finished print shows a full bar.
+
+  The Dynamic Island matches it, and it is all in English and Arabic.
 - **Mac: mark a percentage charge as a platform fee.** In New Job's extra
   charges, a percentage line now has a "Platform fee" checkbox. On, the line is
   saved with `fee: true` and Khayt grosses it up like a marketplace's own fee:
