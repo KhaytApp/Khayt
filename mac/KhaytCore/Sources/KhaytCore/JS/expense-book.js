@@ -18,7 +18,11 @@
  */
 (function (global) {
 
-  const CATEGORIES = ['filament', 'electricity', 'maintenance', 'tools', 'shipping', 'other'];
+  // `equipment` is something BOUGHT to keep — a printer, a laser, a dryer.
+  // lib/pnl-report.js leaves one out of operating expenses only when it
+  // matches a machine whose depreciation already carries it (A MACHINE IS
+  // PAID FOR ONCE); any other equipment purchase is an ordinary expense.
+  const CATEGORIES = ['filament', 'electricity', 'maintenance', 'tools', 'equipment', 'shipping', 'other'];
   const RECURRING = ['monthly', 'quarterly', 'annually'];
 
   const pad = (n) => String(n).padStart(2, '0');

@@ -4,6 +4,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Profit and loss: a machine you bought is no longer counted twice.** A
+  printer recorded as an expense, and also given a purchase price and
+  depreciation on its machine sheet, was charged in full as an expense and
+  again, spread out, as depreciation — a 6,000 printer took 6,000 plus the
+  quarter's depreciation off that quarter's net. An expense that matches a
+  depreciated machine is now left out of the expenses and shown beside the
+  P&L as "Equipment bought (depreciated)" on both apps, in the CSV and on the
+  printed statement. Each machine matches at most one expense: one in the new
+  **Equipment** category within 1% of the machine's price and 31 days of its
+  purchase date, or, for purchases already recorded under another category,
+  one for exactly its price on its purchase date — no change to your book is
+  needed. Any other equipment you buy (a dryer, an enclosure, a printer you
+  do not depreciate) stays an expense, and a shop that does not use
+  depreciation sees every purchase as an expense. Cash flow is unchanged, and
+  the tax on the purchase is still reclaimed. The branch (location) and
+  machine P&Ls follow the same rule.
 - **Desktop: the bank transfer reference matches the invoice.** For a shop
   whose invoice prefix differs from its invoice-numbering prefix, the invoice
   printed one number (ATH-2026-0012) while its bank-transfer QR, a credit

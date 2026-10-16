@@ -113,6 +113,7 @@ struct Expenses: View {
         case "electricity": "bolt"
         case "maintenance": "wrench.and.screwdriver"
         case "tools": "hammer"
+        case "equipment": "printer"
         case "shipping": "shippingbox"
         default: "square.grid.2x2"
         }

@@ -90,7 +90,7 @@
 
   const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const WIP_COLUMNS = ['pending', 'printing', 'post', 'qc'];
-  const DEFAULT_EXPENSE_CATEGORIES = ['filament', 'electricity', 'maintenance', 'tools', 'shipping', 'other'];
+  const DEFAULT_EXPENSE_CATEGORIES = ['filament', 'electricity', 'maintenance', 'tools', 'equipment', 'shipping', 'other'];
 
   /** The renderer's `num`: parseFloat with a fallback for anything that is not a number. */
   function num(v, fallback) {

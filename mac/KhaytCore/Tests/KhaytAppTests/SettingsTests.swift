@@ -107,7 +107,7 @@ struct SettingsTests {
         draft.qcWarrantyDays = 45
         draft.monthlyGoal = 9000
         draft.budgets = ["filament": 1500, "electricity": 500, "maintenance": 300,
-                         "tools": 250, "shipping": 200, "other": 300]
+                         "tools": 250, "equipment": 400, "shipping": 200, "other": 300]
         draft.payReminderEnabled = true; draft.payReminderGrace = 7
         draft.quoteFollowUpEnabled = true; draft.quoteFollowUpWindow = 5
         let out = try await Self.engine(shop).applySettings(shop.settingsDict, form: draft.form(), year: 2026)
@@ -149,7 +149,7 @@ struct SettingsTests {
     /// it REBUILDS `expBudgets` from its own category list rather than merging.
     /// A pane that sent only the categories a shop had touched would silently
     /// zero the rest, so the form sends all six every time.
-    @Test("saving one budget does not zero the other five")
+    @Test("saving one budget does not zero the other six")
     func budgetsAreNotPartial() async throws {
         let shop = try await Self.sample()
         var first = OperationsPane.Draft.read(shop.settingsDict, shop: shop)

@@ -3,7 +3,7 @@
  */
 let expRangeFilter = 'all';
 let _expReceiptPath = null;
-const EXP_CATEGORIES = ['filament','electricity','maintenance','tools','shipping','other'];
+const EXP_CATEGORIES = ['filament','electricity','maintenance','tools','equipment','shipping','other'];
 
 (function (global) {
 /** The rule, however this file happens to be loaded — a script tag in the
