@@ -91,7 +91,10 @@ extension Shop {
         }
     }
 
-    var shelfTitleKey: String {
+    var shelfTitleKey: String { Self.titleKey(of: shelf) }
+
+    /// The word for a screen — the sidebar's, and ⌘K's for the same row.
+    static func titleKey(of shelf: Shelf) -> String {
         switch shelf {
         case .dashboard:  "mac.dashboard"
         case .jobs:       "mac.all_jobs"

@@ -177,7 +177,7 @@ extension Shop {
         reviewingSyncLosses = false; scanning = false; schedulingWork = false
         sendingFeedback = false; settingUpShop = false; showingOnlineOrders = false
         showingSpoolRepair = false; showingWebStore = false; signingIntoCloud = false
-        takingAJob = false
+        takingAJob = false; goingTo = false
         billingOrder = nil; confirmingCancel = nil; draftingFor = nil; droppingFrom = nil
         editingConsumable = nil; editingCustomer = nil; editingMachine = nil
         editingProduct = nil; editingSpool = nil; editingSupplier = nil; editingTemplate = nil

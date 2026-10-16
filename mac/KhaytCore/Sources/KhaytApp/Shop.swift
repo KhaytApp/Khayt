@@ -44,8 +44,10 @@ final class Shop {
     }
 
     private(set) var source: Source
-    private(set) var orders: [Order] = []
-    private(set) var files: [LibraryFile] = []
+    // Each one bumps `bookRevision`, which is how ⌘K knows its index is stale
+    // (`Shop+GoTo.swift`) without being rebuilt on every keystroke.
+    private(set) var orders: [Order] = [] { didSet { bookRevision &+= 1 } }
+    private(set) var files: [LibraryFile] = [] { didSet { bookRevision &+= 1 } }
 
     /// The library on screen, patched in place by a library edit
     /// (`Shop+LibraryWrites.swift`) rather than by reloading the whole book.
@@ -60,7 +62,7 @@ final class Shop {
     /// How many are hidden right now, so the library can offer to show them
     /// rather than leave a shop wondering where a model went.
     var archivedCount: Int { files.count { $0.isArchived } }
-    var machines: [Machine] = []
+    var machines: [Machine] = [] { didSet { bookRevision &+= 1 } }
     private(set) var spools: [Spool] = []
     /// The other shelf, decoded for drawing. `consumableRows` stays the raw
     /// truth the rules are handed; this is what the screen lists.
@@ -68,7 +70,7 @@ final class Shop {
     /// The shop's own record of its customers. Read from the `clients`
     /// collection, which this app did not open until it needed to point a new
     /// job at one.
-    private(set) var clients: [Client] = []
+    private(set) var clients: [Client] = [] { didSet { bookRevision &+= 1 } }
     /// Wear per machine, keyed by id. `nozzleWear` answers for one machine at
     /// a time, so this is one call each — a handful of printers, not a table.
     private(set) var wear: [String: NozzleWear] = [:]
@@ -567,6 +569,17 @@ final class Shop {
     /// TESTS ONLY: run after a load has worked out every model's figures and
     /// before it puts them up, so a test can land a library edit in that gap.
     static var whileFiguringForTests: (@MainActor () async -> Void)?
+
+    /// ⌘K's palette is open. See `GoToPalette`.
+    var goingTo = false
+    /// Moved by every change to the collections ⌘K searches. Not observed:
+    /// nothing draws it, and a redraw per write would be for nobody.
+    @ObservationIgnored private(set) var bookRevision = 0
+    /// ⌘K's index and the revision it was built from (`Shop+GoTo.swift`).
+    @ObservationIgnored var goToCache: (revision: Int, index: GoToIndex)?
+    /// How many times that index has been built — for the test that proves
+    /// typing does not rebuild it.
+    @ObservationIgnored var goToBuilds = 0
 
     /// Library edits on screen and not yet written (`Shop+LibraryWrites`).
     @ObservationIgnored var pendingLibraryChanges: [PendingLibraryChange] = []
@@ -2041,7 +2054,7 @@ final class Shop {
     ///
     /// Resolved once per load. Three crossings per row — the name, the price
     /// and the specs — would be three hundred for a hundred products.
-    var catalogueRows: [KhaytEngine.CatalogueRow] = []
+    var catalogueRows: [KhaytEngine.CatalogueRow] = [] { didSet { bookRevision &+= 1 } }
 
     /// The catalogue ranked by profit per printer hour — see
     /// `ProfitPerHour.swift`. Read once per load, after the rows it ranks.
@@ -2586,7 +2599,7 @@ final class Shop {
     ///
     /// Resolved once when the book loads — thirty-one rows asking the engine
     /// one at a time would be thirty-one bridge crossings for one screen.
-    private(set) var clientNames: [String: KhaytEngine.Named] = [:]
+    private(set) var clientNames: [String: KhaytEngine.Named] = [:] { didSet { bookRevision &+= 1 } }
     /// What each model's licence permits, by model id. Absent for a model
     /// nobody has recorded one for, which is NOT the same as one that may not
     /// be sold — the screen says nothing rather than something wrong.

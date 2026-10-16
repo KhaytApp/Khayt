@@ -4,6 +4,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: ⌘K, Go to anything.** Go ▸ Go to… (⌘K) opens a small panel over the
+  window: type a job's number or invoice number, a customer's name, phone or
+  email, a part, a library model or its file name, a catalogue product, a
+  machine, a screen, or a command such as New Job or Record Payment. Results are
+  grouped, at most eight a group, prefixes before matches inside a word; ↑/↓
+  move, ↩ opens the item on its own screen and selects it, Esc closes. Arabic
+  letter variants, Latin case and accents fold as the library search does, and
+  Arabic-Indic digits typed find the Western digits the book stores (the library
+  search gains that too). Jobs and customers are shown only to someone allowed
+  to see them, screens only where the sidebar would show them, and commands only
+  when their menu item is enabled. The index is built once per change to the
+  book, off the main thread, and a longer query searches only what the shorter
+  one matched — a test on a synthetic 10,000-job book counts the rows each key
+  touches. ⌃⌘K stays the kiosk and ⇧⌘K the calculator; the Help shortcuts page
+  lists ⌘K in English and Arabic.
+
 - **Mac: the standard Mac commands, where a Mac user looks for them.**
   - **File ▸ Print… (⌘P)** prints what is in front: the selected job's invoice
     (or quotation) on the jobs list or the board, or the P&L on Reports, through
