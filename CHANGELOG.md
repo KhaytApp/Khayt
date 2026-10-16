@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: expenses use the shop's categories.** The phone offered resin,
+  parts, rent and power, and none of those exist anywhere else in Khayt. A
+  power bill typed on the phone never counted toward the electricity budget,
+  and none of those four showed in the Mac's category picker. The phone now
+  offers the same seven categories as the Mac and desktop, including the new
+  equipment one, with the same wording in English and Arabic.
 - **Profit and loss: a machine you bought is no longer counted twice.** A
   printer recorded as an expense, and also given a purchase price and
   depreciation on its machine sheet, was charged in full as an expense and

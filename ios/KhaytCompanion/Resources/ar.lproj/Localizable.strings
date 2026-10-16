@@ -171,12 +171,11 @@
 "exp.retake" = "إزالة الصورة";
 "exp.save" = "حفظ";
 "exp.no_camera" = "لا توجد كاميرا في هذا الجهاز — سيُحفظ المصروف بدون إيصال.";
-"exp.cat.filament" = "الخيط";
-"exp.cat.resin" = "راتنج";
-"exp.cat.parts" = "قطع";
-"exp.cat.tools" = "أدوات";
-"exp.cat.rent" = "إيجار";
-"exp.cat.power" = "كهرباء";
+"exp.cat.filament" = "خيوط";
+"exp.cat.electricity" = "كهرباء";
+"exp.cat.maintenance" = "صيانة";
+"exp.cat.tools" = "أدوات ومستلزمات";
+"exp.cat.equipment" = "معدات (آلات)";
 "exp.cat.shipping" = "شحن";
 "exp.cat.other" = "أخرى";
 

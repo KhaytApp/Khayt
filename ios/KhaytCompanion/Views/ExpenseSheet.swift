@@ -35,9 +35,12 @@ struct ExpenseSheet: View {
     @State private var readCode: String?
     @State private var addingSupplier = false
 
-    // The desktop's own categories, so the phone cannot invent one that never
-    // appears in a report.
-    private let categories = ["filament", "resin", "parts", "tools", "rent", "power", "shipping", "other"]
+    // `lib/expense-book.js` CATEGORIES, so the phone cannot file under one
+    // that no report, budget or Mac picker knows. This list once said it was
+    // the desktop's and was not: resin, parts, rent and power appear in none
+    // of them, so a power bill typed here never reached the electricity
+    // budget. `ExpenseCategoriesTests` holds the two lists together.
+    static let categories = ["filament", "electricity", "maintenance", "tools", "equipment", "shipping", "other"]
 
     /// An amount and a category: a receipt fills the first and never the
     /// second, because it does not say what the money was for.
@@ -67,7 +70,7 @@ struct ExpenseSheet: View {
                             }
                         }
                         V2Field(label: L10n.tr("exp.category")) {
-                            V2Chips(options: categories, selection: $category) { L10n.tr("exp.cat.\($0)") }
+                            V2Chips(options: Self.categories, selection: $category) { L10n.tr("exp.cat.\($0)") }
                                 .padding(.vertical, 4)
                         }
                         V2Field(label: L10n.tr("exp.note"), last: true) {
