@@ -10,6 +10,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and none of those four showed in the Mac's category picker. The phone now
   offers the same seven categories as the Mac and desktop, including the new
   equipment one, with the same wording in English and Arabic.
+
+- **Expenses the iPhone filed under its old categories now count where they
+  belong.** Before its expense sheet was fixed, the iPhone saved some expenses
+  as "power", "parts", "rent" or "resin", which are not Khayt categories. They
+  counted in the total but matched no budget, chart bar or picker. They are now
+  read as electricity, maintenance, other and other, on both apps: in the
+  expense list and totals, budgets, the category chart, the P&L and the
+  accounting export. Resin is read as an ordinary expense and not as filament,
+  so it stays in the P&L's operating expenses. Your book is not rewritten, and
+  any other unknown category behaves as before. Any case and surrounding spaces
+  are ignored, so "Filament" counts as filament.
 - **Profit and loss: a machine you bought is no longer counted twice.** A
   printer recorded as an expense, and also given a purchase price and
   depreciation on its machine sheet, was charged in full as an expense and

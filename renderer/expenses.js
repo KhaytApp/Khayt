@@ -63,8 +63,16 @@ function checkRecurringExpenses() {
 // own, so the range filter never narrowed the page and an attached receipt
 // was never saved with its expense.
 
+/** What an expense's category means (lib/expense-book.js `categoryOf`): a
+ *  row the phone saved as `power` reads as electricity, in every list, total
+ *  and budget on this page. */
+function expCategory(e) {
+  return ExpenseBook ? ExpenseBook.categoryOf(e) : (e && e.category);
+}
+
 function expCatLabel(cat) {
-  return t('exp.cat.' + cat) || cat;
+  const c = ExpenseBook ? ExpenseBook.normaliseCategory(cat) : cat;
+  return t('exp.cat.' + c) || c;
 }
 
 /** The receipt file the next expense is filed with, and its name beside the button. */
@@ -271,7 +279,7 @@ function showLinkedExpenses(orderId) {
         </tr></thead>
         <tbody>${linked.map(e => `<tr>
           <td style="font-size:12px; color:var(--text-dim);">${escapeHtml(e.date || '')}</td>
-          <td><span class="exp-cat-badge cat-${escapeHtml(e.category)}">${escapeHtml(expCatLabel(e.category))}</span></td>
+          <td><span class="exp-cat-badge cat-${escapeHtml(expCategory(e))}">${escapeHtml(expCatLabel(e.category))}</span></td>
           <td style="color:var(--danger); font-variant-numeric:tabular-nums;">${fmtPrice(e.amount)}</td>
           <td style="color:var(--text-muted); font-size:12.5px;">${escapeHtml(e.note || '')}</td>
         </tr>`).join('')}</tbody>
@@ -400,7 +408,7 @@ function renderExpenses() {
     tbody.innerHTML = filtered.map(e => `
       <tr data-expense-id="${escapeHtml(e.id)}">
         <td style="font-family:var(--font-num); font-size:12px; color:var(--text-dim); white-space:nowrap;">${escapeHtml(e.date)}</td>
-        <td><span class="exp-cat-badge cat-${escapeHtml(e.category)}">${escapeHtml(expCatLabel(e.category))}</span></td>
+        <td><span class="exp-cat-badge cat-${escapeHtml(expCategory(e))}">${escapeHtml(expCatLabel(e.category))}</span></td>
         <td style="font-weight:600; font-variant-numeric:tabular-nums; color:var(--danger);">${fmtPrice(e.amount)}</td>
         <td style="color:var(--text-muted); font-size:12.5px;">
           ${escapeHtml(e.note)}
@@ -422,7 +430,7 @@ function renderExpenses() {
 
   const byCategory = {};
   EXP_CATEGORIES.forEach(c => { byCategory[c] = 0; });
-  filtered.forEach(e => { byCategory[e.category] = (byCategory[e.category] || 0) + e.amount; });
+  filtered.forEach(e => { const c = expCategory(e); byCategory[c] = (byCategory[c] || 0) + e.amount; });
 
   const summaryEl = $('#expenseSummary');
   if (summaryEl) {
@@ -472,7 +480,7 @@ function renderExpenseBudgets() {
   const filteredExpenses = expenses.filter(e => inRange(e.date, budgetFilter, 'expenses'));
   const byCategory = {};
   EXP_CATEGORIES.forEach(c => { byCategory[c] = 0; });
-  filteredExpenses.forEach(e => { byCategory[e.category] = (byCategory[e.category] || 0) + e.amount; });
+  filteredExpenses.forEach(e => { const c = expCategory(e); byCategory[c] = (byCategory[c] || 0) + e.amount; });
 
   const rows = EXP_CATEGORIES.filter(c => (budgets[c] || 0) > 0).map(c => {
     const budget = budgets[c];

@@ -318,11 +318,26 @@ const SAUDI_EXPENSE_LAYOUTS = {
 const INVOICE_FORMATS = Object.keys(INVOICE_HEADER_MAP).concat(Object.keys(SAUDI_INVOICE_LAYOUTS));
 const EXPENSE_FORMATS = Object.keys(EXPENSE_HEADER_MAP).concat(Object.keys(SAUDI_EXPENSE_LAYOUTS));
 
-/** Map a raw category to an account name, falling back to the raw string. */
+/**
+ * Map a raw category to an account name, falling back to the raw string.
+ *
+ * The stored word is tried first, then what it means (lib/expense-book.js
+ * `normaliseCategory`): an old phone row saved as `power` books to Utilities
+ * like electricity does, while `rent` — which the book reads as `other` —
+ * keeps the Rent account it has always exported to, the more specific of the
+ * two. Without the book loaded, the stored word alone, as before.
+ */
 function mapCategoryAccount(category) {
   if (!category) return '';
   const key = String(category).trim().toLowerCase();
-  return CATEGORY_ACCOUNT_MAP[key] || String(category);
+  if (CATEGORY_ACCOUNT_MAP[key]) return CATEGORY_ACCOUNT_MAP[key];
+  const book = (typeof globalThis !== 'undefined' && globalThis.KhaytExpenseBook)
+    || (typeof require === 'function'
+      ? (() => { try { return require('./expense-book.js'); } catch (e) { return null; } })()
+      : null);
+  const meant = book && typeof book.normaliseCategory === 'function'
+    ? String(book.normaliseCategory(key)) : key;
+  return CATEGORY_ACCOUNT_MAP[meant] || String(category);
 }
 
 /** Normalise a date value to a YYYY-MM-DD prefix for range comparison. */

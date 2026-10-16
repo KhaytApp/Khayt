@@ -807,8 +807,11 @@ function exportAccountingCSV() {
   });
 
   // Expense entries
+  // The account is what the category MEANS (lib/expense-book.js
+  // `categoryOf`): a phone's old `power` row posts to Expense: electricity.
+  const catOf = (e) => (typeof KhaytExpenseBook !== 'undefined' ? KhaytExpenseBook.categoryOf(e) : e.category);
   expenses.forEach(e => {
-    rows.push([e.date||'', e.id||'', 'Expense', escapeHtml(e.note||e.category||'Expense'), `Expense: ${escapeHtml(e.category||'Other')}`, (+e.amount||0).toFixed(2), '', '', cur]);
+    rows.push([e.date||'', e.id||'', 'Expense', escapeHtml(e.note||e.category||'Expense'), `Expense: ${escapeHtml(catOf(e)||'Other')}`, (+e.amount||0).toFixed(2), '', '', cur]);
     rows.push([e.date||'', e.id||'', 'Expense', escapeHtml(e.note||e.category||'Expense'), 'Cash / Bank', '', (+e.amount||0).toFixed(2), '', cur]);
   });
 
