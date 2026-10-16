@@ -869,7 +869,7 @@ struct NewJobSheet: View {
             // cap): the shop keeps less than this total reads as, so say so.
             if let quoted, quoted.feeWarning == "fees-too-high" {
                 Text(shop.words.callIt("calc.fee_pct_too_high", ["pct": .number(quoted.feePct ?? 0)]))
-                    .font(.callout).foregroundStyle(.red)
+                    .font(.callout).foregroundStyle(Khayt.late)
             }
         }
     }
