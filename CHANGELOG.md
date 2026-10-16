@@ -11,39 +11,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   offers the same seven categories as the Mac and desktop, including the new
   equipment one, with the same wording in English and Arabic.
 
-- **Expenses the iPhone filed under its old categories now count where they
-  belong.** Before its expense sheet was fixed, the iPhone saved some expenses
-  as "power", "parts", "rent" or "resin", which are not Khayt categories. They
-  counted in the total but matched no budget, chart bar or picker. They are now
-  read as electricity, maintenance, other and other, on both apps: in the
-  expense list and totals, budgets, the category chart, the P&L and the
-  accounting export. Resin is read as an ordinary expense and not as filament,
-  so it stays in the P&L's operating expenses. Your book is not rewritten, and
-  any other unknown category behaves as before. Any case and surrounding spaces
-  are ignored, so "Filament" counts as filament.
-- **Profit and loss: a machine you bought is no longer counted twice.** A
-  printer recorded as an expense, and also given a purchase price and
-  depreciation on its machine sheet, was charged in full as an expense and
-  again, spread out, as depreciation — a 6,000 printer took 6,000 plus the
-  quarter's depreciation off that quarter's net. An expense that matches a
-  depreciated machine is now left out of the expenses and shown beside the
-  P&L as "Equipment bought (depreciated)" on both apps, in the CSV and on the
-  printed statement. Each machine matches at most one expense: one in the new
-  **Equipment** category within 1% of the machine's price and 31 days of its
-  purchase date, or, for purchases already recorded under another category,
-  one for exactly its price on its purchase date — no change to your book is
-  needed. Any other equipment you buy (a dryer, an enclosure, a printer you
-  do not depreciate) stays an expense, and a shop that does not use
-  depreciation sees every purchase as an expense. Cash flow is unchanged, and
-  the tax on the purchase is still reclaimed. The branch (location) and
-  machine P&Ls follow the same rule.
-- **Desktop: the bank transfer reference matches the invoice.** For a shop
-  whose invoice prefix differs from its invoice-numbering prefix, the invoice
-  printed one number (ATH-2026-0012) while its bank-transfer QR, a credit
-  note's "reversal of", a Tabby or Tamara payment link and the invoice export
-  used another (INV-2026-0012), so a payment could not be matched to its
-  invoice. They all use the number the invoice prints now. Invoices already
-  sent keep their number.
 - **Mac: choose the period of your profit and loss, export it, and see the VAT
   for it.** Reports ▸ Profit & Loss has a period menu: this month, last
   month, this quarter, last quarter, this year, last year, a custom pair of
@@ -63,34 +30,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   matches the Mac's. It shows as its own row, and "You keep" leaves it out.
   With the line off, nothing changes.
 
-- **Invoices keep their own number again.** Since the last alpha an invoice
-  printed the invoice counter's number (INV-…) for every job, so a shop with
-  its own invoice prefix saw a job numbered ATH-2026-0012 reprint as
-  INV-2026-0012. Only a job that began as a quote now prints the invoice
-  counter's number; every other job prints its own number, as before, and the
-  customer's tracking page shows the same number as the paper. A quote
-  still waiting for its answer on hold is no longer given an invoice number.
-  On the Mac, someone who cannot change jobs (the sample shop, a read-only
-  book) sees "Invoice number not issued yet" for an accepted quote with no
-  number yet, rather than an invoice with the quote's number on it.
 - **Mac: Paid in full cannot lower a payment.** After a credit note, the
   button wrote the smaller amount over what the customer had paid. It is now
   off when the recorded payment already covers what is due, and until the
   total has loaded.
-- **Overhead is not added to catalogue products.** A job taken from a product
-  got the overhead line, while the product's own price, the online store and
-  shelf sales did not, so one product had two prices. A typed price no longer
-  records overhead it was never priced with. The Settings hint now says what
-  the overhead does on both apps ("Prices include it, and your margin is added
-  on top of it").
+
 - **Mac: smaller fixes.** Settings › Overhead's "Print hours a month" can be
   left empty for Auto. The Reports margin column fits its header. On the
   sample shop, Make quote and Make job say why they are off.
 
-- **Desktop: invoice numbers come from the same rule as the Mac's.** The
-  desktop kept its own copy of the numbering (prefix, format, counter, the
-  January reset). It now uses the shared one, so the two apps cannot number an
-  invoice differently. Numbers themselves are unchanged.
 - **Mac: quote a model without typing its weight and time again.** The
   calculator has Make quote and Make job buttons under its price, and the
   library has Quote this model and New job from model (in the model's details
@@ -105,23 +53,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **Mac: Paid in full.** The payment sheet has a Paid in full button that
   fills in what the job owes (less any credit note or gift card), so the
   usual payment no longer means reading the total and typing it.
-- **Desktop and Mac: quotes can carry your rent, per print hour (off by
-  default).** The monthly fixed costs in Settings (rent, internet, software
-  subscriptions) only fed the break-even target and the P&L, never a price.
-  Settings → Fixed Costs now has a switch that adds an Overhead line to every
-  quote: your fixed costs ÷ the print hours you expect a month × the job's
-  print hours, marked up like the other costs. Settings shows where the figure
-  comes from ("≈ 4.20 SAR per print hour from 2,100 SAR a month over ~500 h").
-  You can type the hours yourself, or leave it empty and Khayt works them out
-  from your machines (their monthly hours, recent prints or daily target).
-  Below 20 hours a month there is no rate, and Settings says why. Salaries
-  are left out, because labour is already its own line. The calculator, a new
-  job on the Mac, a quote from the phone and a customer's online quote all use
-  the same rate. A part with a fixed price tier stays at its tier price. The
-  margin the calculator shows is measured after the overhead. The
-  overhead is saved on the job beside the parts' cost, not inside it, so the
-  P&L and the break-even target still count your fixed costs once. With the
-  switch off, every price is exactly what it was.
 
 - **Mac: the engine's JavaScript shares a few threads instead of one per
   engine.** Each engine had a thread of its own, so a busy moment could run
@@ -132,12 +63,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   which took about a fifth of a second each time. Since the Mac change that gives
   the rules a thread of their own, each one also started a thread. They now share
   one.
-- **Desktop: a quote moved to the board now gets an invoice number.** Only
-  the Approve button gave one. A quote dragged out of the Quote column, or
-  moved from the Job menu or the batch bar, had no number, so its invoice
-  printed the quote's id. It now takes the next invoice number when it leaves
-  the Quote column for anything but Cancelled. A number it already has is
-  kept, and an Undo keeps it too, so the sequence has no gaps.
+
 - **Mac: an accepted quote gets a real invoice number.** Approving a quote on
   the Mac (moving it out of Quote, the customer's approval link, or the
   portal's "Check response") never gave the job an invoice number, and the
@@ -148,10 +74,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   once. Invoices in both apps print the invoice number; a quote still prints
   its quote number. Undoing the approval keeps the number on the job, so
   approving it again does not use up a second one.
-- **Invoices: the shop's name, address, tagline, terms or footer no longer
-  print twice.** A shop that filled in a field in only one language got the
-  same text again as the "second language" line, most visibly on Arabic
-  invoices.
+
 - **Mac: smaller fixes from the October review.** The price per kilo on a
   spool is worked out from what the roll held when bought, not from what is
   left on it, so a half-used roll no longer looks twice as expensive. The
@@ -187,6 +110,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saved — and for longer if a library scan was saving at the same moment. They
   are now saved in the background. So are marking a bed clear, accepting the
   suggested printer, applying a schedule and saving slicers or reports.
+
 - **Mac: a big library's model details are ready seconds after opening, not
   minutes.** With ten thousand models, which printer each model fits, its
   estimated weight and time, what its licence allows and its print risks used
@@ -228,45 +152,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   fix keeps a photo inside its frame everywhere else a thumbnail is shown,
   such as the portfolio.
 
-- **(Maintainers) A hung desktop smoke test no longer blocks every merge.**
-  The required "E2E smoke (Electron)" check had no time limit, so a step that
-  hung (the 3MF worker step, for an hour on 12 Oct) held every lane's merges
-  until someone cancelled it. The job now stops after 20 minutes (it takes 4-5)
-  and the 3MF worker step after 5.
-- **Tamara is told when a job ships, so the shop is paid sooner.** Khayt
-  authorised a Tamara payment once the customer completed it, but never
-  confirmed the order shipped, so Tamara held the money until it captured the
-  order by itself 21 days later. Now, once the job is marked shipped (or
-  handed over, for a pickup), Khayt captures the Tamara order with the
-  shipping date, the carrier and the tracking number. It uses Tamara's own
-  order total, and never captures an order that is already captured or
-  refunded. If it fails, Khayt says so once and tries again.
-- **Tabby links for Saudi shops use Tabby's Saudi server.** Tabby runs a
-  separate API for Saudi merchants (`api.tabby.sa`), and a Saudi key can be
-  refused by the one Khayt used (`api.tabby.ai`). A link in riyals now uses
-  the Saudi server for the checkout and every check after it; links in other
-  currencies are unchanged.
-- **Deleting a model on the desktop can keep its online copy.** When your
-  library is backed up to a storage bucket or Google Drive, deleting a model
-  now asks where it should go. **Remove from this computer** is the default:
-  once Khayt has checked that the online copy is the same file, the copy on
-  this computer goes to the Trash and the model stays in your library, ready
-  to open again from the cloud. **Delete completely** removes the online copy
-  first, then the model; if the online copy cannot be removed, the model is
-  kept as it was and Khayt says which one. Models that exist only on this
-  computer are deleted only if you tick the box for them, and files of your
-  own that the library points to are never deleted. Without an online copy,
-  delete works as before. The Mac asks the same question.
 - **Mac: a model sent to the shop's Mac over Wi-Fi is no longer cut off
   when the app is busy.** The Mac counted its own delay in reading an
   upload against the phone, so a large model sent while the window was
   busy could fail with "the network connection was lost". Only time spent
   waiting for the phone counts now.
+
 - **Mac: "Sort linked folders…" can always be closed.** With a large drive
   (hundreds of prints and pictures to check), the sheet grew taller than the
   Settings window, so its Cancel and Apply buttons were cut off below it, and
   only Escape closed it. The title and buttons now stay in place and the
   list scrolls between them.
+
 - **Mac: Shortcuts, Siri and Spotlight see Khayt's actions again.** Every
   release from 4.0.0-alpha.40 shipped without its App Intents metadata, so
   "What is printing" and "What is waiting to print" were missing from Shortcuts and
@@ -322,6 +219,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   adds the seller to your suppliers with its VAT number, the same as the Mac and
   desktop do, so the next receipt from them is matched. A seller already there
   is not added twice.
+
 - **Mac: fixes from the 4.0.0-alpha.67 review of sorting linked folders.**
   - **A print keeps the kind and picture you gave it.** When the automatic
     sort took a collection out of a print's path ("Aug26 Giga Tier/Life
@@ -612,6 +510,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   what's waiting to go. Reports are cleaned by the same rule the Electron
   desktop app uses: emails, phone numbers, long numbers and file paths are
   taken out, and orders, customers, prices and files are never sent. Turning a switch off deletes anything queued at once. (#1789)
+
 - **(Mac) Export for the Accountant now offers Wafeq and Daftra.** These are two
   Saudi accounting products, and their import formats were taken from their own
   help centres. Wafeq gets invoices with the price before VAT, marked "exc. tax",
@@ -683,6 +582,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   followed like one the app started. The activity state now reads a
   fractional percent (rounded) instead of failing the pushed update, and
   the `LA_PRINT_STARTED` alert ships in English and Arabic.
+
 - **(Mac) Add an expense from a supplier's receipt.** Expenses ▸ *Add from
   receipt…* (also in the File menu) reads the ZATCA QR on a Saudi tax invoice —
   from a photo, a screenshot, a scanned PDF, or the code's text pasted — and
@@ -732,6 +632,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   owner's own estimates do not use up the hourly limit set for customers. And the
   shop's own WhatsApp templates now reach the phone, so its job updates use
   the shop's wording instead of Khayt's defaults.
+
 - **Mac tests:** the web-store follow test loads the sample book on one fixed
   day. The sample is rebased to the day it is read, and on a slow CI run the
   test's two loads straddled midnight, so "the same book" had changed — the
@@ -913,6 +814,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   view-only cloud member sees the link and the messages but not the buttons that
   would change them. The portal trial's days left show in Settings →
   Integrations.
+
 - **(Mac) A customer's bare STL slices with OrcaSlicer or Bambu Studio.** A mesh
   carries no printer settings, and these slicers' built-in defaults fail their
   own checks, so no upload could be sliced with them. The Mac now hands the
@@ -5587,6 +5489,94 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.12] - 2026-10-16
+
+Invoice numbers agree everywhere, and a machine bought is counted once, since 3.11.11.
+Individual entries are kept below; this is what changed for you.
+
+A quote moved out of the Quote column gets an invoice number, however it is moved. The bank-transfer QR reference, a credit note's "reversal of", Tabby and Tamara links and the invoice export now use the number the invoice prints, so a shop with its own invoice prefix can match a payment to its invoice. A machine recorded as an expense and also depreciated is counted once in the profit and loss, and quotes can carry your fixed costs per print hour (off by default).
+
+- **Desktop: a quote moved to the board now gets an invoice number.** Only
+  the Approve button gave one. A quote dragged out of the Quote column, or
+  moved from the Job menu or the batch bar, had no number, so its invoice
+  printed the quote's id. It now takes the next invoice number when it leaves
+  the Quote column for anything but Cancelled. A number it already has is
+  kept, and an Undo keeps it too, so the sequence has no gaps.
+- **Desktop: the bank transfer reference matches the invoice.** For a shop
+  whose invoice prefix differs from its invoice-numbering prefix, the invoice
+  printed one number (ATH-2026-0012) while its bank-transfer QR, a credit
+  note's "reversal of", a Tabby or Tamara payment link and the invoice export
+  used another (INV-2026-0012), so a payment could not be matched to its
+  invoice. They all use the number the invoice prints now. Invoices already
+  sent keep their number.
+- **Desktop: invoice numbers come from the same rule as the Mac's.** The
+  desktop kept its own copy of the numbering (prefix, format, counter, the
+  January reset). It now uses the shared one, so the two apps cannot number an
+  invoice differently. Numbers themselves are unchanged.
+- **Invoices keep their own number again.** Since the last alpha an invoice
+  printed the invoice counter's number (INV-…) for every job, so a shop with
+  its own invoice prefix saw a job numbered ATH-2026-0012 reprint as
+  INV-2026-0012. Only a job that began as a quote now prints the invoice
+  counter's number; every other job prints its own number, as before, and the
+  customer's tracking page shows the same number as the paper. A quote
+  still waiting for its answer on hold is no longer given an invoice number.
+  On the Mac, someone who cannot change jobs (the sample shop, a read-only
+  book) sees "Invoice number not issued yet" for an accepted quote with no
+  number yet, rather than an invoice with the quote's number on it.
+- **Invoices: the shop's name, address, tagline, terms or footer no longer
+  print twice.** A shop that filled in a field in only one language got the
+  same text again as the "second language" line, most visibly on Arabic
+  invoices.
+- **Profit and loss: a machine you bought is no longer counted twice.** A
+  printer recorded as an expense, and also given a purchase price and
+  depreciation on its machine sheet, was charged in full as an expense and
+  again, spread out, as depreciation — a 6,000 printer took 6,000 plus the
+  quarter's depreciation off that quarter's net. An expense that matches a
+  depreciated machine is now left out of the expenses and shown beside the
+  P&L as "Equipment bought (depreciated)" on both apps, in the CSV and on the
+  printed statement. Each machine matches at most one expense: one in the new
+  **Equipment** category within 1% of the machine's price and 31 days of its
+  purchase date, or, for purchases already recorded under another category,
+  one for exactly its price on its purchase date — no change to your book is
+  needed. Any other equipment you buy (a dryer, an enclosure, a printer you
+  do not depreciate) stays an expense, and a shop that does not use
+  depreciation sees every purchase as an expense. Cash flow is unchanged, and
+  the tax on the purchase is still reclaimed. The branch (location) and
+  machine P&Ls follow the same rule.
+- **Desktop and Mac: quotes can carry your rent, per print hour (off by
+  default).** The monthly fixed costs in Settings (rent, internet, software
+  subscriptions) only fed the break-even target and the P&L, never a price.
+  Settings → Fixed Costs now has a switch that adds an Overhead line to every
+  quote: your fixed costs ÷ the print hours you expect a month × the job's
+  print hours, marked up like the other costs. Settings shows where the figure
+  comes from ("≈ 4.20 SAR per print hour from 2,100 SAR a month over ~500 h").
+  You can type the hours yourself, or leave it empty and Khayt works them out
+  from your machines (their monthly hours, recent prints or daily target).
+  Below 20 hours a month there is no rate, and Settings says why. Salaries
+  are left out, because labour is already its own line. The calculator, a new
+  job on the Mac, a quote from the phone and a customer's online quote all use
+  the same rate. A part with a fixed price tier stays at its tier price. The
+  margin the calculator shows is measured after the overhead. The
+  overhead is saved on the job beside the parts' cost, not inside it, so the
+  P&L and the break-even target still count your fixed costs once. With the
+  switch off, every price is exactly what it was.
+- **Overhead is not added to catalogue products.** A job taken from a product
+  got the overhead line, while the product's own price, the online store and
+  shelf sales did not, so one product had two prices. A typed price no longer
+  records overhead it was never priced with. The Settings hint now says what
+  the overhead does on both apps ("Prices include it, and your margin is added
+  on top of it").
+- **Expenses the iPhone filed under its old categories now count where they
+  belong.** Before its expense sheet was fixed, the iPhone saved some expenses
+  as "power", "parts", "rent" or "resin", which are not Khayt categories. They
+  counted in the total but matched no budget, chart bar or picker. They are now
+  read as electricity, maintenance, other and other, on both apps: in the
+  expense list and totals, budgets, the category chart, the P&L and the
+  accounting export. Resin is read as an ordinary expense and not as filament,
+  so it stays in the P&L's operating expenses. Your book is not rewritten, and
+  any other unknown category behaves as before. Any case and surrounding spaces
+  are ignored, so "Filament" counts as filament.
 
 ## [3.11.11] - 2026-10-13
 
