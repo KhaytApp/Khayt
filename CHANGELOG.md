@@ -4,6 +4,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: widgets for the desktop and Notification Centre.** Two widgets, each
+  small or medium:
+  - **Printing now** shows each printer that is printing or paused, how far
+    it has got, and the time left, counting down on its own. The medium size
+    shows four.
+  - **Today** shows jobs due today, jobs running late, and what the shop is
+    owed.
+  They use the app's own figures and words, in the book's language (Arabic
+  right to left), and say when they were last updated. A widget sits where
+  anyone at the Mac can see it, so it never shows a customer's name, the
+  sample book never appears in it, and nothing is shown while the staff lock
+  is on. Until the app has opened a real book, a widget says "Open Khayt".
+
 - **iPhone: print progress on the Lock Screen looks finished.** It used the
   system's plain defaults and an old brand colour. Now:
   - the time left is the largest thing on it, with the clock time it ends

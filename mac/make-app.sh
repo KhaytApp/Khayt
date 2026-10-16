@@ -184,6 +184,7 @@ AIP
 
 swift build -c release --product KhaytThumbnail --package-path "$PKG"
 swift build -c release --product KhaytPreview --package-path "$PKG"
+swift build -c release --product KhaytWidgets --package-path "$PKG"
 echo "Building Khayt $VERSION (release)…"
 swift build -c release --product Khayt --package-path "$PKG" \
   -Xswiftc -emit-const-values \
@@ -349,6 +350,95 @@ cat > "$PRV/Contents/Info.plist" <<PRVPLIST
 </dict>
 </plist>
 PRVPLIST
+
+# ── THE DESKTOP WIDGETS ───────────────────────────────────────────────────
+#
+# Printing now, and Today. A third .appex, on `com.apple.widgetkit-extension`,
+# and shaped differently from the two Quick Look ones in the two ways that
+# matter:
+#
+# * It HAS a Swift entry point. Its extension point prohibits a principal
+#   class; the `WidgetBundle`'s `@main` is what WidgetKit starts (Apple's own
+#   Calculator widget: LC_MAIN, `__swift5_entry`, NSExtension holding nothing
+#   but the point's identifier).
+# * It reads what the APP writes, from a container both may open: an App
+#   Group. On macOS a group named `<team id>.<name>` needs no registration and
+#   no provisioning profile (Apple's documentation for
+#   com.apple.security.application-groups), and a non-sandboxed app signed by
+#   that team opens it without the "access data from other apps" prompt. So
+#   the group is the TEAM of whoever signs this build — read off the signing
+#   certificate — plus `app.khayt.mac`, and it is written into both
+#   Info.plists for the code to find. An ad-hoc build has no team: it gets no
+#   group, the app writes nothing, and the widget says "Open Khayt".
+#
+# Sandboxed, as every widget extension must be; the app around it is not.
+WIDGET_TEAM=""
+WIDGET_IDENTITY="$(pick_identity)"
+if [ "$WIDGET_IDENTITY" != "-" ]; then
+  WIDGET_CERT="$(security find-identity -v 2>/dev/null | grep -F "$WIDGET_IDENTITY" | head -1 | sed 's/.*"\(.*\)"/\1/')"
+  if [ -n "$WIDGET_CERT" ]; then
+    WIDGET_TEAM="$(security find-certificate -c "$WIDGET_CERT" -p 2>/dev/null \
+      | openssl x509 -noout -subject -nameopt multiline 2>/dev/null \
+      | awk -F'= ' '/organizationalUnitName/ {print $2; exit}' | tr -d ' ')"
+  fi
+fi
+APP_GROUP=""
+[ -n "$WIDGET_TEAM" ] && APP_GROUP="$WIDGET_TEAM.app.khayt.mac"
+GROUP_KEY=""
+[ -n "$APP_GROUP" ] && GROUP_KEY="  <key>KhaytAppGroup</key><string>$APP_GROUP</string>"
+if [ -n "$APP_GROUP" ]; then echo "  widgets: app group $APP_GROUP"
+else echo "  widgets: no team to name an app group after — the widgets will say Open Khayt"; fi
+
+WID="$APP/Contents/PlugIns/KhaytWidgets.appex"
+mkdir -p "$WID/Contents/MacOS" "$WID/Contents/Resources"
+cp "$PKG/.build/release/KhaytWidgets" "$WID/Contents/MacOS/KhaytWidgets"
+# The words an EMPTY widget and the gallery need, in the Mac's own language.
+# Everything about a shop arrives already in the book's language from the app.
+cp -R "$PKG/Sources/KhaytWidgets/Localization/"*.lproj "$WID/Contents/Resources/"
+cat > "$WID/Contents/Info.plist" <<WIDPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>KhaytWidgets</string>
+  <key>CFBundleDisplayName</key><string>Khayt</string>
+  <key>CFBundleExecutable</key><string>KhaytWidgets</string>
+  <key>CFBundleIdentifier</key><string>app.khayt.mac.widgets</string>
+  <key>CFBundlePackageType</key><string>XPC!</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>ar</string></array>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
+$GROUP_KEY
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key><string>com.apple.widgetkit-extension</string>
+  </dict>
+</dict>
+</plist>
+WIDPLIST
+WID_ENTS="$PKG/.build/widgets.entitlements"
+GROUP_ENT=""
+[ -n "$APP_GROUP" ] && GROUP_ENT="  <key>com.apple.security.application-groups</key>
+  <array><string>$APP_GROUP</string></array>"
+cat > "$WID_ENTS" <<WIDENTS
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+$GROUP_ENT
+</dict>
+</plist>
+WIDENTS
+# And the APP joins the same group, or macOS asks the shop whether Khayt may
+# "access data from other apps" the first time it writes the snapshot.
+# PlistBuddy, not plutil: plutil reads the dots in the key as a key PATH.
+if [ -n "$APP_GROUP" ]; then
+  /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" \
+    -c "Add :com.apple.security.application-groups:0 string $APP_GROUP" "$APP_ENTS"
+fi
 
 cat > "$EXT_ENTS" <<'EXTENTS'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -551,6 +641,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
        the Keychain's idea of who is asking. -->
   <key>CFBundleIdentifier</key><string>app.khayt.mac</string>
 $GOOGLE_KEYS
+$GROUP_KEY
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
@@ -725,6 +816,13 @@ for BUNDLE in "$EXT" "$PRV"; do
     exit 1
   fi
 done
+# The widgets with their OWN entitlements: the sandbox, and the group.
+if ! WID_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+      --entitlements "$WID_ENTS" "$WID" 2>&1)"; then
+  echo "codesign failed for KhaytWidgets.appex:"
+  echo "$WID_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
 
 # The app LAST and with its own entitlements — `--entitlements` was missing
 # here entirely, so whatever the app needed it did not get.
