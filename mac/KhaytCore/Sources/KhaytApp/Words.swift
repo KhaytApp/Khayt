@@ -2079,6 +2079,7 @@ final class Words {
         "mac.goto_screen":   ["en": "Screen",               "ar": "شاشة"],
         "mac.goto_command":  ["en": "Command",              "ar": "أمر"],
         "mac.goto_none":     ["en": "Nothing in the book matches", "ar": "لا شيء في الدفتر يطابق"],
+        "mac.goto_loading":  ["en": "Loading the book\u{2026}",  "ar": "جارٍ تحميل الدفتر\u{2026}"],
         "mac.goto_hint":     ["en": "\u{2191}\u{2193} to move · \u{21A9} to open · esc to close",
                               "ar": "\u{2191}\u{2193} للتنقّل · \u{21A9} للفتح · esc للإغلاق"],
         "mac.quick_look":    ["en": "Quick Look",     "ar": "نظرة سريعة"],

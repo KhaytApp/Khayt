@@ -50,6 +50,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   touches. ⌃⌘K stays the kiosk and ⇧⌘K the calculator; the Help shortcuts page
   lists ⌘K in English and Arabic.
 
+  lists ⌘K in English and Arabic. While the book is still being indexed the
+  palette says "Loading the book…" rather than "Nothing matches", and answers
+  what was typed as soon as the index is ready; typing fast can no longer leave
+  the screens' rows drawn under another answer's headings.
 - **Quotes with a marketplace fee line now go up slightly, so you keep your
   price after the fee.** Marketplace fee lines — the ones the Marketplace fees
   picker adds (Etsy, Shopify, eBay, Amazon, WooCommerce, Salla, Zid) — are
