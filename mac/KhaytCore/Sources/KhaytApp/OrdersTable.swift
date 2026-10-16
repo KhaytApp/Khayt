@@ -69,7 +69,11 @@ struct OrdersTable: View {
     static let jobRowHeight: CGFloat = 20
 
     private var table: some View {
-        Table(rows, selection: $shop.selection, sortOrder: $order,
+        // SEVERAL ROWS AT ONCE (⌘/⇧-click), for Delete…: `selectJobs` keeps
+        // `selection` — the job the details pane and the Job menu act on —
+        // one of them.
+        Table(rows, selection: Binding(get: { shop.jobSelection }, set: { shop.selectJobs($0) }),
+              sortOrder: $order,
               columnCustomization: $columns) {
             TableColumn(shop.words.callIt("mac.job"), value: \.project) { job in
                 JobTitleCell(shop: shop, job: job, thumbnail: shop.modelThumbnail(for: job))
@@ -184,7 +188,10 @@ struct OrdersTable: View {
         // the one holding the shop's jobs did not. Same actions as the Job
         // menu, reached where the hand already is.
         .contextMenu(forSelectionType: Order.ID.self) { ids in
-            if let id = ids.first, let job = shop.orders.first(where: { $0.id == id }) {
+            if ids.count > 1 {
+                // Several chosen: the one thing that acts on all of them.
+                JobDeleteItems(shop: shop, ids: shop.orders.map(\.id).filter { ids.contains($0) })
+            } else if let id = ids.first, let job = shop.orders.first(where: { $0.id == id }) {
                 JobActions(shop: shop, job: job)
             }
         } primaryAction: { ids in
@@ -192,6 +199,8 @@ struct OrdersTable: View {
             // here: the thing itself.
             if let id = ids.first { shop.showInvoice(id) }
         }
+        // ⌫ asks to delete the chosen jobs — and says why when it may not.
+        .onDeleteCommand { shop.askToDeleteFrontmost() }
         .overlay {
             if rows.isEmpty { EmptyBook(shop: shop) }
         }
@@ -516,6 +525,40 @@ struct JobActions: View {
         // customer changes nothing, and refusing to draw the sample's invoice
         // would hide the thing this app is for.
         Button(shop.words.callIt("doc.invoice")) { shop.showInvoice(job.id) }
+        Divider()
+        JobDeleteItems(shop: shop, ids: [job.id])
+    }
+}
+
+/// "Delete…", for one job or several — and, where the rule refuses, why, with
+/// "Cancel Job" in its place for a single job (`Shop+Delete.swift`).
+///
+/// Greyed with the reason beside it rather than hidden: an item that is
+/// simply missing on an invoiced job reads as a bug, and the reason is what
+/// tells the shop the way out is cancelling.
+struct JobDeleteItems: View {
+    let shop: Shop
+    let ids: [Order.ID]
+
+    var body: some View {
+        let refusals = ids.compactMap { shop.jobDeleteRefusal($0) }
+        let free = ids.count - refusals.count
+        // The question names how many, and how many were left out.
+        Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+            shop.askToDeleteJobs(ids)
+        }
+        .disabled(!shop.mayDeleteJobs || free == 0)
+        if free == 0, let why = refusals.first {
+            // A line of its own, greyed: the reason Delete is off.
+            Text(why)
+            if ids.count == 1, let id = ids.first,
+               shop.orders.first(where: { $0.id == id })?.status != "cancelled" {
+                Button(shop.words.callIt("mac.cancel_job")) {
+                    Task { await shop.cancelInstead(id) }
+                }
+                .disabled(!shop.canMoveJobs)
+            }
+        }
     }
 }
 

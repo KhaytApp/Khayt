@@ -791,6 +791,20 @@ struct WindowSheets: ViewModifier {
             .task(id: shop.pendingLibraryDeletes.map(\.id)) {
                 if !shop.pendingLibraryDeletes.isEmpty { await shop.planDeletes(shop.pendingLibraryDeletes) }
             }
+            // Jobs and customers: one question naming what goes and what was
+            // left out (`Shop+Delete.swift`). Undo brings them back.
+            .askFirst($shop.pendingJobDelete,
+                      title: { $0.title }, message: { $0.message },
+                      confirm: shop.words.callIt("common.delete"),
+                      cancel: shop.words.callIt("common.cancel")) { asked in
+                Task { await shop.deleteJobs(asked.ids) }
+            }
+            .askFirst($shop.pendingCustomerDelete,
+                      title: { $0.title }, message: { $0.message },
+                      confirm: shop.words.callIt("common.delete"),
+                      cancel: shop.words.callIt("common.cancel")) { asked in
+                Task { await shop.deleteCustomers(asked.ids) }
+            }
             .sheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
             .sheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
             .sheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }

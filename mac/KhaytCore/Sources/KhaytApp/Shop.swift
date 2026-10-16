@@ -316,7 +316,20 @@ final class Shop {
         settingsValue = .object(held)
     }
 
-    var selection: Order.ID?
+    /// The job in front: the one the details pane, ⌘P, ⌘D and the Job menu
+    /// act on. With several rows chosen in the jobs list it is one of them.
+    var selection: Order.ID? {
+        // The chosen rows follow it: a job selected anywhere — the board, a
+        // menu, a link — is the whole selection, unless it is already one of
+        // several chosen in the list.
+        didSet {
+            guard let selection else { if !jobSelection.isEmpty { jobSelection = [] }; return }
+            if !jobSelection.contains(selection) { jobSelection = [selection] }
+        }
+    }
+    /// Every row chosen in the jobs list (⌘/⇧-click) — what Delete… acts on.
+    /// Set through `selectJobs`, which keeps `selection` one of them.
+    var jobSelection: Set<Order.ID> = []
     var fileSelection: Set<LibraryFile.ID> = [] {
         // One kind of selection at a time: choosing a model — click, ⌘A, an
         // arrow — lets go of any chosen group tiles, so no action is ever
@@ -344,7 +357,25 @@ final class Shop {
     /// What deleting the models in the open question would do — what stays
     /// online, what goes for good (`LibraryDelete`). Nil while it is worked out.
     var deletePlan: LibraryDeletePlan?
-    var customerSelection: Customer.ID?
+    /// The customer in front, whose details the pane shows. Like `selection`,
+    /// one of `customerSelections` when several are chosen.
+    var customerSelection: Customer.ID? {
+        didSet {
+            guard let customerSelection else {
+                if !customerSelections.isEmpty { customerSelections = [] }; return
+            }
+            if !customerSelections.contains(customerSelection) { customerSelections = [customerSelection] }
+        }
+    }
+    /// Every row chosen in the customers list — what Delete… acts on.
+    var customerSelections: Set<Customer.ID> = []
+    /// The jobs the shop asked to delete, until it confirms (`askToDeleteJobs`).
+    var pendingJobDelete: RecordDeleteRequest?
+    /// The customers the shop asked to delete, until it confirms.
+    var pendingCustomerDelete: RecordDeleteRequest?
+    /// What `lib/record-delete.js` refuses in this book, read with it. Nil
+    /// until it has been asked — and then nothing is offered for deletion.
+    var deleteVerdicts: KhaytEngine.DeleteVerdicts?
     /// Which screen, and for the library which folder.
     ///
     /// Moving between them recounts the filter chips, because both bars count
@@ -1008,6 +1039,14 @@ final class Shop {
             // here, and a card issued without its ledger row is points spent
             // twice.
             loyaltyRows = (root["loyaltyLedger"].flatMap { if case .array(let r) = $0 { r } else { nil } }) ?? []
+            // Which jobs and customers Delete is offered for, from the shared
+            // rule (`lib/record-delete.js`), asked once for the whole book so a
+            // menu can grey itself without a crossing per row. Nil when the
+            // engine could not answer: then nothing is offered for deletion.
+            let verdicts = try? await engine?.deleteVerdicts(
+                orders: orderRows, clients: clientRows, giftCards: giftCardRows)
+            if overtaken() { return }
+            deleteVerdicts = verdicts
             // Money an old defect took off the book. Asked once per load: the
             // answer changes only when the book does, and the list is walked
             // by a banner that draws on every screen.

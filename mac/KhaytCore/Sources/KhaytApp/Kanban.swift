@@ -120,6 +120,8 @@ struct Kanban: View {
                 shop.shelf = .jobs(nil)
                 return .handled
             }
+            // ⌫ asks to delete the selected card's job, as in the jobs list.
+            .onDeleteCommand { shop.askToDeleteFrontmost() }
             // Said out loud rather than filtered away. A job whose status has no
             // column is not on this board, and the board saying so is the
             // difference between a gap and a lie.
