@@ -155,3 +155,50 @@ test('a row linked to THIS client matches even if its contact details differ', (
   const ids = P.buildClientDataExport('A', c).intakeSubmissions.map(r => r.id);
   assert.deepEqual(ids, ['linked'], 'explicit link wins over stale contact details');
 });
+
+// ── Full erase never rewrites an issued invoice ─────────────────────────────
+// Full erase used to blank the buyer on EVERY one of the customer's jobs, so an
+// invoice already issued (and ZATCA-submitted) changed its buyer after the fact.
+// Now a job lib/record-delete.js would refuse to delete keeps its name.
+const ERASE_BOOK = () => ({
+  clients: [{ id: 'C1', nameEn: 'Sara Noor' }],
+  printLog: [
+    { id: 'Q1', clientId: 'C1', status: 'quote', client: 'Sara Noor' },
+    { id: 'J1', clientId: 'C1', status: 'completed', client: 'Sara Noor', invoiceNum: 'INV-2026-0007' },
+    { id: 'J2', clientId: 'C1', status: 'completed', client: 'Sara Noor', zatcaUuid: 'u-1' },
+    { id: 'J3', clientId: 'C1', status: 'pending', client: 'Sara Noor', paidAmount: 50 },
+  ],
+  waitingList: [], waitingListHistory: [],
+});
+
+test('full erase blanks the name only where no invoice or payment exists', () => {
+  const p = P.planClientErasure('C1', ERASE_BOOK(), 'full');
+  assert.deepEqual(p.blankNameOrderIds, ['Q1']);
+  assert.deepEqual(p.keepNameOrderIds, ['J1', 'J2', 'J3'], 'an issued invoice would change its buyer');
+  assert.equal(p.counts.keptNames, 3);
+});
+
+test('unlink blanks nothing', () => {
+  const p = P.planClientErasure('C1', ERASE_BOOK(), 'unlink');
+  assert.deepEqual(p.blankNameOrderIds, []);
+  assert.equal(p.counts.keptNames, 0);
+});
+
+test('without lib/record-delete.js every job keeps its name', () => {
+  // A host that did not load the rule must not fall back to blanking everything.
+  const vm = require('node:vm');
+  const src = require('node:fs').readFileSync(require.resolve('../lib/privacy.js'), 'utf8');
+  const ctx = vm.createContext({});
+  vm.runInContext(src, ctx);
+  const p = ctx.KhaytPrivacy.planClientErasure('C1', ERASE_BOOK(), 'full');
+  assert.deepEqual(Array.from(p.blankNameOrderIds), []);
+  assert.equal(p.keepNameOrderIds.length, 4);
+});
+
+test('the desktop blanks only the jobs the plan names', () => {
+  const src = require('node:fs').readFileSync(require.resolve('../renderer/clients.js'), 'utf8');
+  const at = src.indexOf('async function deleteClient(');
+  const body = src.slice(at, src.indexOf('\n}', at));
+  assert.match(body, /plan\.blankNameOrderIds/, 'deleteClient decides for itself which names to blank');
+  assert.doesNotMatch(body, /if \(fullErase\) \{ priorNames\.set/, 'every job is blanked on a full erase again');
+});

@@ -98,10 +98,28 @@
    *    the customer's intake rows + communication log.
    * Returns the affected ids/counts so the UI can state the consequences before confirming.
    */
+  /**
+   * An issued invoice keeps its buyer. Saudi VAT law has the shop keep every tax
+   * invoice as issued, and PDPL lets data be kept where a law requires it, so
+   * Full erase blanks the name only on a job lib/record-delete.js would let the
+   * shop delete outright (no invoice, no money). Without that module every job
+   * keeps its name: an erase that leaves a name behind can be run again, an
+   * invoice rewritten cannot be un-rewritten.
+   */
+  function mustKeepBuyer(order) {
+    const R = (typeof globalThis !== 'undefined' && globalThis.KhaytRecordDelete)
+      || (typeof require === 'function' ? (() => { try { return require('./record-delete.js'); } catch (_) { return null; } })() : null);
+    if (!R || typeof R.canDeleteOrder !== 'function') return true;
+    return !R.canDeleteOrder(order).ok;
+  }
+
   function planClientErasure(clientId, collections, mode) {
     const c = collections || {};
     const full = mode === 'full';
     const orders = (c.printLog || []).filter(o => o && o.clientId === clientId);
+    const keepNameOrderIds = full ? orders.filter(mustKeepBuyer).map(o => o.id) : orders.map(o => o.id);
+    const keep = new Set(keepNameOrderIds);
+    const blankNameOrderIds = full ? orders.filter(o => !keep.has(o.id)).map(o => o.id) : [];
     const exp = buildClientDataExport(clientId, c);
     const intakeIds = full ? exp.intakeSubmissions.map(r => r.id).filter(Boolean) : [];
     const intakeHistoryIds = full ? exp.intakeHistory.map(r => r.id).filter(Boolean) : [];
@@ -110,11 +128,16 @@
       clientId,
       orderIds: orders.map(o => o.id),
       blankOrderNames: full,
+      // Which of `orderIds` lose the name on a full erase, and which keep it
+      // because an invoice or a payment was recorded (mustKeepBuyer).
+      blankNameOrderIds,
+      keepNameOrderIds,
       purgeIntakeIds: intakeIds,
       purgeIntakeHistoryIds: intakeHistoryIds,
       purgeCommLog: full,
       counts: {
         orders: orders.length,
+        keptNames: full ? keepNameOrderIds.length : 0,
         intake: intakeIds.length + intakeHistoryIds.length,
         communications: full ? exp.counts.communications : 0,
       },

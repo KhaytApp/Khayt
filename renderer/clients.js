@@ -479,6 +479,7 @@ async function deleteClient(clientId) {
           <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">${escapeHtml(
             t('priv.erase_summary', { orders: plan.counts.orders, intake: plan.counts.intake, comms: plan.counts.communications })
             || `This customer has ${plan.counts.orders} order(s), ${plan.counts.intake} intake submission(s) and ${plan.counts.communications} logged communication(s).`)}</p>
+          ${plan.counts.keptNames ? `<p style="font-size:12.5px;color:var(--text-muted);margin:-4px 0 12px;">${escapeHtml(t('priv.erase_keeps_invoiced', { n: plan.counts.keptNames }))}</p>` : ''}
           <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;cursor:pointer;margin-bottom:8px;">
             <input type="radio" name="eraseMode" value="unlink" checked style="width:auto;margin-top:3px;">
             <span><b>${escapeHtml(t('priv.mode_unlink') || 'Unlink (recommended)')}</b><br>
@@ -487,7 +488,7 @@ async function deleteClient(clientId) {
           <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;cursor:pointer;">
             <input type="radio" name="eraseMode" value="full" style="width:auto;margin-top:3px;">
             <span><b>${escapeHtml(t('priv.mode_full') || 'Full erase')}</b><br>
-            <span style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('priv.mode_full_hint') || 'Also blank the customer name on those orders and purge their intake submissions and communication log. Invoices may legally need to retain some data.')}</span></span>
+            <span style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('priv.mode_full_hint') || 'Also blank the customer name on their unbilled orders and purge their intake submissions and communication log. Orders with an invoice or a payment keep the name.')}</span></span>
           </label>`,
         onSave(modal) {
           resolve(modal.querySelector('input[name="eraseMode"]:checked')?.value === 'full');
@@ -514,11 +515,14 @@ async function deleteClient(clientId) {
   // Null-out orders that reference the deleted client (tracked so undo can relink)
   const unlinked = [];
   const priorNames = new Map();
+  // Only the jobs the plan says may lose the name: an invoiced or paid job keeps
+  // its buyer (lib/privacy.js mustKeepBuyer). No plan, no blanking.
+  const blank = new Set(fullErase && plan ? plan.blankNameOrderIds || [] : []);
   for (const o of printLog) {
     if (o.clientId === clientId) {
       unlinked.push(o);
       o.clientId = null;
-      if (fullErase) { priorNames.set(o.id, o.client); o.client = ''; }
+      if (blank.has(o.id)) { priorNames.set(o.id, o.client); o.client = ''; }
     }
   }
   // Full erase additionally purges the subject's self-submitted intake rows.

@@ -226,3 +226,21 @@ test('verdicts lists only the refused', () => {
   assert.equal(w.clients.C2.jobs, 1);
   assert.equal(w.clients.C4, undefined);
 });
+
+test('the desktop\'s two delete paths both go through deleteOrders', () => {
+  // Rejecting a quote deletes it. It used to splice printLog by hand, leaving
+  // anything booked to the quote pointing at a job that no longer exists.
+  const fs = require('fs');
+  const path = require('path');
+  const bodyOf = (file, fn) => {
+    const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    const at = src.indexOf(`async function ${fn}(`);
+    return src.slice(at, src.indexOf('\n}', at));
+  };
+  for (const [file, fn] of [['renderer/order-flows.js', 'deleteLog'], ['renderer/invoicing.js', 'rejectQuote']]) {
+    const body = bodyOf(file, fn);
+    assert.match(body, /R\.deleteOrders\(/, `${fn} deletes the job itself`);
+    assert.match(body, /R\.restoreOrders\(/, `${fn}'s Undo does not relink what it unlinked`);
+    assert.doesNotMatch(body, /printLog\.splice\(/, `${fn} splices printLog by hand`);
+  }
+});
