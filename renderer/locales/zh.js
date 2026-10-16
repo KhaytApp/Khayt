@@ -1805,6 +1805,7 @@
   "set.inv_bilingual_zatca": "ZATCA 发票必须包含阿拉伯语，因此启用期间单据将保持双语。",
   "calc.platform_none": "— 无平台 —",
   "calc.platform_fees": "平台费用",
+  "calc.fee_pct_too_high": "百分比费用合计 {pct}%，过高而无法计入价格，您实际到手的金额将少于此报价显示的金额。",
   "set.low_stock_color": "低库存颜色",
   "set.low_stock_color_reset": "重置",
   "set.low_stock_color_hint": "高亮显示即将耗尽的耗材和线材。",

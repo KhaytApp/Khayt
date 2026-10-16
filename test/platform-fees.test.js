@@ -33,22 +33,28 @@ test('the lines are the shape the calculator already appends', () => {
   }
 });
 
-test('percentages resolve against the pre-extras subtotal, as marketplaces charge', () => {
-  // 100 subtotal: 6.5% + 3% + 0.20 flat = 9.70
+test('percentages are grossed up, so the shop keeps its subtotal after the platform', () => {
+  // 100 subtotal: (100 + 0.20) ÷ (1 − 9.5%) = 110.72, of which 6.5% is 7.20 and
+  // 3% is 3.32 — fees of 10.72, not the 9.70 a pre-fee percentage gave.
   const est = F.estimateFor('etsy', {}, 100);
-  assert.equal(est.total, 9.70);
+  assert.equal(est.total, 10.72);
+  const price = 100 + est.total;
+  assert.ok(Math.abs(price - price * 0.095 - 0.20 - 100) < 0.01, 'Etsy takes its cut and 100 is left');
 });
 
 test('the estimate agrees with what lib/pricing will actually compute', () => {
   // The figure shown before adding must be the figure charged after adding,
   // otherwise the preview is a second implementation that can drift.
   const lines = F.feeLinesFor('etsy', {});
-  const viaPricing = P.resolveExtraLines(lines, 100).reduce((s, r) => s + r.amount, 0);
+  const q = P.quoteTotal({ baseCost: 100, extraLines: lines });
+  const viaPricing = P.resolveExtraLines(lines, q.extrasBase, q.feeBase).reduce((s, r) => s + r.amount, 0);
   assert.equal(Math.round(viaPricing * 100) / 100, F.estimateFor('etsy', {}, 100).total);
 });
 
-test('a zero subtotal charges only the flat fees', () => {
-  assert.equal(F.estimateFor('etsy', {}, 0).total, 0.20);
+test('a zero subtotal charges the flat fees, and the percentages on those alone', () => {
+  // 0.20 ÷ 0.905 = 0.22: the listing fee, plus 6.5% and 3% of what the buyer pays.
+  assert.equal(F.estimateFor('etsy', {}, 0).total, 0.22);
+  assert.equal(F.estimateFor('amazon', {}, 0).total, 0, 'no flat fee, nothing to charge');
 });
 
 /* ── the shop's own numbers win ─────────────────────────────────────────────── */

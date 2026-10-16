@@ -88,6 +88,52 @@ struct ExtraLinesTests {
         #expect(abs(tenth.total - (plain.total + 10)) > 0.005)
     }
 
+    static func marketplace(_ label: String, _ pct: Double) -> Shop.ExtraLine {
+        var line = percent(label, pct); line.platformId = "etsy"; return line
+    }
+
+    @Test("a marketplace fee line is grossed up, so the shop keeps its price after the fee")
+    func marketplaceFeeIsGrossedUp() async throws {
+        // A line the marketplace picker wrote carries its platformId, and the
+        // rule takes that fee of the price the buyer pays, fee included: the
+        // price is plain ÷ 0.9 and 90% of it is what the shop keeps. A plain %
+        // line (above) is the shop's own surcharge and is not grossed up.
+        let shop = Shop()
+        await shop.load(.sample)
+        let plain = try #require(await shop.previewQuote(
+            baseCost: 100, margin: 40, discountPct: 0, shippingCost: 0, rush: false))
+        let fee = try #require(await shop.previewQuote(
+            baseCost: 100, margin: 40, discountPct: 0, shippingCost: 0, rush: false,
+            extraLines: [Self.marketplace("Etsy transaction fee", 10)]))
+        #expect(abs(fee.total - plain.total / 0.9) < 0.01, "a marketplace fee line was not grossed up")
+        #expect(abs(fee.total * 0.9 - plain.total) < 0.01,
+                "after the platform's 10% the shop does not keep its price")
+        #expect(fee.feePct == 10)
+        #expect(fee.feeWarning == nil)
+        #expect(plain.feePct == nil, "a quote with no fee line grew a field")
+        let surcharge = try #require(await shop.previewQuote(
+            baseCost: 100, margin: 40, discountPct: 0, shippingCost: 0, rush: false,
+            extraLines: [Self.percent("Design", 10)]))
+        #expect(surcharge.feePct == nil, "the shop's own surcharge was counted as a fee")
+    }
+
+    @Test("fees too high to gross up come back as a warning the sheet shows")
+    func feesTooHighWarn() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let q = try #require(await shop.previewQuote(
+            baseCost: 100, margin: 0, discountPct: 0, shippingCost: 0, rush: false,
+            extraLines: [Self.marketplace("A", 60), Self.marketplace("B", 40)]))
+        #expect(q.feeWarning == "fees-too-high")
+        #expect(q.feePct == 100)
+        #expect(q.total.isFinite && abs(q.total - 200) < 0.01, "not grossed up: each fee on the pre-fee price")
+        let sheet = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Sources/KhaytApp/NewJobSheet.swift"), encoding: .utf8)
+        #expect(sheet.contains("calc.fee_pct_too_high"), "the sheet never says the fees are too high")
+    }
+
     @Test("the job written down carries the lines, and not the half-written ones")
     func theRecordCarriesThem() async throws {
         let shop = Shop()

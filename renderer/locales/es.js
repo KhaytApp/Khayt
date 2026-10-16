@@ -1805,6 +1805,7 @@
   "set.inv_bilingual_zatca": "Las facturas ZATCA deben incluir árabe, así que los documentos siguen siendo bilingües mientras esté activo.",
   "calc.platform_none": "— sin marketplace —",
   "calc.platform_fees": "Comisiones del marketplace",
+  "calc.fee_pct_too_high": "Las comisiones porcentuales suman {pct} %: demasiado para incluirlas en el precio, así que te quedará menos de lo que muestra este presupuesto.",
   "set.low_stock_color": "Color de stock bajo",
   "set.low_stock_color_reset": "Restablecer",
   "set.low_stock_color_hint": "Resalta el filamento y los consumibles que se están agotando.",

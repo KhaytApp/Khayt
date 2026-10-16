@@ -1806,6 +1806,7 @@
   "set.inv_bilingual_zatca": "ZATCA invoices must carry Arabic, so documents stay bilingual while it is on.",
   "calc.platform_none": "— no marketplace —",
   "calc.platform_fees": "Marketplace fees",
+  "calc.fee_pct_too_high": "Percentage fees add up to {pct}% — too high to build into the price, so you keep less than this quote shows.",
   "set.low_stock_color": "Low stock colour",
   "set.low_stock_color_reset": "Reset",
   "set.low_stock_color_hint": "Highlights filament and consumables that are running out.",

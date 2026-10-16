@@ -1805,6 +1805,7 @@
   "set.inv_bilingual_zatca": "ZATCA 請求書にはアラビア語が必須のため、有効な間は書類がバイリンガルのままになります。",
   "calc.platform_none": "— マーケットプレイスなし —",
   "calc.platform_fees": "マーケットプレイス手数料",
+  "calc.fee_pct_too_high": "割合手数料の合計が{pct}%です。価格に組み込むには高すぎるため、手元に残る額はこの見積もりより少なくなります。",
   "set.low_stock_color": "在庫僅少の色",
   "set.low_stock_color_reset": "リセット",
   "set.low_stock_color_hint": "残り少ないフィラメントと消耗品を強調表示します。",

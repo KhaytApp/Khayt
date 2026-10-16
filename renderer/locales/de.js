@@ -1805,6 +1805,7 @@
   "set.inv_bilingual_zatca": "ZATCA-Rechnungen müssen Arabisch enthalten; Dokumente bleiben daher zweisprachig, solange dies aktiv ist.",
   "calc.platform_none": "— kein Marktplatz —",
   "calc.platform_fees": "Marktplatzgebühren",
+  "calc.fee_pct_too_high": "Prozentuale Gebühren ergeben zusammen {pct} % — zu hoch, um sie in den Preis einzurechnen; Ihnen bleibt weniger, als dieses Angebot zeigt.",
   "set.low_stock_color": "Farbe für geringen Bestand",
   "set.low_stock_color_reset": "Zurücksetzen",
   "set.low_stock_color_hint": "Hebt Filament und Verbrauchsmaterial hervor, das zur Neige geht.",

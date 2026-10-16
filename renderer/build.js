@@ -650,7 +650,7 @@ function updateGrandTotal() {
   // Update the resolved money on percentage rows without touching the inputs:
   // renderExtraLines() rebuilds them, which would steal focus mid-keystroke.
   if (typeof KhaytPricing !== 'undefined' && KhaytPricing.resolveExtraLines) {
-    const resolved = KhaytPricing.resolveExtraLines(currentExtraLines, _q.extrasBase || 0);
+    const resolved = KhaytPricing.resolveExtraLines(currentExtraLines, _q.extrasBase || 0, _q.feeBase);
     document.querySelectorAll('#extraLinesList .extra-line-row').forEach((row, i) => {
       const span = row.querySelector('.el-resolved');
       if (span && resolved[i]) span.textContent = fmtMoney(resolved[i].amount);
@@ -734,15 +734,25 @@ function updateGrandTotal() {
   // the shop bills it and pays the carrier, so it should not inflate margin.
   // The overhead line is a cost the price has to cover, so the margin is
   // measured after it (0 while it is off).
-  const actualMarginPct = finalPrice > 0 ? ((finalPrice - (totalCost + (_q.overhead || 0) + shippingCost)) / finalPrice) * 100 : margin;
+  // A marketplace FEE line (a % line carrying a platformId, or `fee: true`) is
+  // the exception to "pure revenue": the platform keeps it, taken of whatever
+  // the customer finally pays — so the margin is measured after it, at its
+  // share of the final price. `feePct` counts fee lines only (lib/pricing.js);
+  // the shop's own % surcharge is its money and stays in the margin.
+  const pctFeesKept = finalPrice * (_q.feePct || 0) / 100;
+  const actualMarginPct = finalPrice > 0 ? ((finalPrice - (totalCost + (_q.overhead || 0) + shippingCost + pctFeesKept)) / finalPrice) * 100 : margin;
   if (marginWarn) {
     const minPct = num(settings.minMarginPct, 0);
     const marginColor = actualMarginPct >= 40 ? 'var(--success)' : actualMarginPct >= 20 ? 'var(--warning)' : 'var(--danger)';
-    const marginDisplay = `<span style="color:${marginColor}; font-weight:600;">${actualMarginPct.toFixed(0)}% margin</span>`;
+    // Fees too high to build into the price: said beside the margin, because
+    // the shop keeps less than the quote reads as.
+    const feeTooHigh = _q.feeWarning === 'fees-too-high'
+      ? ` — <span style="color:var(--danger);">${escapeHtml(t('calc.fee_pct_too_high', { pct: +(_q.feePct || 0).toFixed(2) }))}</span>` : '';
+    const marginDisplay = `<span style="color:${marginColor}; font-weight:600;">${actualMarginPct.toFixed(0)}% margin</span>${feeTooHigh}`;
     if (minPct > 0 && actualMarginPct < minPct) {
       marginWarn.innerHTML = `${marginDisplay} — ${escapeHtml(t('calc.margin_warn', { min: minPct.toFixed(0), actual: actualMarginPct.toFixed(0) }))}`;
       marginWarn.style.display = 'block';
-    } else if (totalBase > 0) {
+    } else if (totalBase > 0 || feeTooHigh) {
       marginWarn.innerHTML = marginDisplay;
       marginWarn.style.display = 'block';
     } else {
@@ -1044,7 +1054,7 @@ function renderExtraLines() {
   // up disagreeing with the total printed above it.
   const q = lastQuote || {};
   const rows = (typeof KhaytPricing !== 'undefined' && KhaytPricing.resolveExtraLines)
-    ? KhaytPricing.resolveExtraLines(currentExtraLines, q.extrasBase || 0)
+    ? KhaytPricing.resolveExtraLines(currentExtraLines, q.extrasBase || 0, q.feeBase)
     : currentExtraLines.map((l) => ({ pct: null, amount: +l.amount || 0 }));
   el.innerHTML = currentExtraLines.map((line, i) => {
     const isPct = (typeof KhaytPricing !== 'undefined' && KhaytPricing.isPercentLine)
