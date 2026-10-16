@@ -157,6 +157,16 @@ extension Shop {
         var rush = false
         /// Which of the sheet's two buttons is the default one.
         var asQuote: Bool
+        /// Who it is for — set by a COPY of a job (File ▸ Duplicate), which
+        /// is the same work for the same customer. Nil from a model.
+        var clientId: String? = nil
+        var shippingCost: Double = 0
+        var extraLines: [ExtraLine] = []
+        /// Record fields a copy carries as they were — its notes, the product
+        /// it was taken from, the components and how many assemblies — handed
+        /// to `newJobInput` beside what the sheet itself collects. Which fields
+        /// those are is `lib/record-duplicate.js`'s to say, not this sheet's.
+        var carried: [String: JSONValue] = [:]
     }
 
     /// Open the job sheet on `seed`.

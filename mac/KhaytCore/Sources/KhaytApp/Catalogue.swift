@@ -29,7 +29,12 @@ struct Catalogue: View {
     /// The table stays and stays the default: it is the only view that shows
     /// margin and weight side by side, which is what pricing work needs.
     @SceneStorage("catalogue.layout") private var layout: Layout = .table
-    @State private var selection: KhaytEngine.CatalogueRow.ID?
+    /// The selected product — `Shop.catalogueSelection`, so File ▸ Duplicate
+    /// acts on the row the shop is looking at.
+    private var selection: KhaytEngine.CatalogueRow.ID? {
+        get { shop.catalogueSelection }
+        nonmutating set { shop.catalogueSelection = newValue }
+    }
     @State private var order: [KeyPathComparator<KhaytEngine.CatalogueRow>] =
         [.init(\.final, order: .reverse)]
 
@@ -247,7 +252,7 @@ struct Catalogue: View {
     // MARK: - The table
 
     private var table: some View {
-        Table(shop.shownProducts.sorted(using: order), selection: $selection,
+        Table(shop.shownProducts.sorted(using: order), selection: $shop.catalogueSelection,
               sortOrder: $order, columnCustomization: $columns) {
             // `pe.name`. This column holds a product's name; `cat.title` is
             // what the whole screen is called, and "Product Catalog" as the

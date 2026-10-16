@@ -161,6 +161,9 @@ struct NewJobSheet: View {
     /// by (`lib/order-new.js`, `qtyPerUnit × assemblyQty`). Starts at the
     /// product's own, and the paper's Components line can change it.
     @State private var assemblyQty: Int = 1
+    /// What a COPY of a job carries beyond the cart — see
+    /// `Shop.JobFromModel.carried`. Empty for every other way in.
+    @State private var carried: [String: JSONValue] = [:]
 
     /// A filled-in sheet without the async fill — for the snapshot harness,
     /// which cannot wait for `onAppear`'s engine calls.
@@ -192,9 +195,12 @@ struct NewJobSheet: View {
 
     /// The product's components, when it has any.
     private var hasComponents: Bool {
-        guard let product, case .array(let list)? = product.rest["components"] else { return false }
+        guard case .array(let list)? = components else { return false }
         return list.contains { if case .object(let o) = $0, o["consumableId"] != nil { return true }; return false }
     }
+
+    /// The components this job carries: the product's, or a copied job's.
+    private var components: JSONValue? { product?.rest["components"] ?? carried["components"] }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -255,6 +261,19 @@ struct NewJobSheet: View {
                 discountPct = seed.discountPct
                 rush = seed.rush
                 preferQuote = seed.asQuote
+                // A COPY of a job: the same customer, the same charges, and
+                // what it carries as it was — see `Shop.duplicateJob`.
+                if let who = seed.clientId { clientId = who }
+                shippingCost = seed.shippingCost
+                if !seed.extraLines.isEmpty { extraLines = seed.extraLines }
+                carried = seed.carried
+                if let n = Shop.plainNumber(seed.carried["assemblyQty"]), n >= 1 {
+                    assemblyQty = min(999, Int(saturating: n.rounded()))
+                }
+                if let copied = seed.carried["components"] {
+                    let qty = Double(assemblyQty)
+                    Task { componentsCost = await shop.jobComponentsCost(copied, assemblyQty: qty) }
+                }
                 Task { await readComparables() }
             }
             focused = true
@@ -263,8 +282,11 @@ struct NewJobSheet: View {
         // Recounted when the number of assemblies moves — the components are
         // counted by it, so the line and the total follow.
         .onChange(of: assemblyQty) { _, qty in
-            guard let product else { return }
-            Task { componentsCost = await shop.jobComponentsCost(of: product, assemblyQty: Double(qty)) }
+            if let product {
+                Task { componentsCost = await shop.jobComponentsCost(of: product, assemblyQty: Double(qty)) }
+            } else if let copied = carried["components"] {
+                Task { componentsCost = await shop.jobComponentsCost(copied, assemblyQty: Double(qty)) }
+            }
         }
         .onChange(of: clientId) { _, chosen in Task { await customerChosen(chosen) } }
     }
@@ -1020,7 +1042,8 @@ struct NewJobSheet: View {
             rule: rule, extraLines: extraLines,
             // The rate the preview above was priced at, so the job is saved at
             // the price the sheet showed.
-            overheadPerHour: shop.overheadPerHour))
+            overheadPerHour: shop.overheadPerHour,
+            carried: carried))
         if shop.moveProblem == nil { shop.takingAJob = false } else { problem = shop.moveProblem }
     }
 }

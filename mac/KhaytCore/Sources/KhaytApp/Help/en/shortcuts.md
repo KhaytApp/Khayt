@@ -13,6 +13,18 @@
 - **⇧⌘I** — add models to the library.
 - **Space** — Quick Look the selected model, as in the Finder.
 - **⌘Z** — undo the last change to the book.
+- **⌘P** — print what is in front: the selected job's invoice (or quote), or
+  the P&L on Reports. **⌥⌘P** shows the invoice instead.
+- **⌘D** — duplicate the selected job (it opens in New Job, with the same
+  customer, parts and notes) or the selected catalogue product.
+- **⌫** or **⌘⌫** — delete the selected models in the library, after asking.
+  Only the models you can see go — never ones folded inside a group.
+- **⇧⌘D** — mark the selected model a favourite.
+- **File → Share…** — send the selected job's invoice, or the selected
+  models' files, through the Mac's share menu.
+
+Drop a .3mf, .stl, .obj or .gcode file on the jobs list or on Khayt's Dock
+icon to start a new job from it. It is added to the library first.
 
 ## In the library
 

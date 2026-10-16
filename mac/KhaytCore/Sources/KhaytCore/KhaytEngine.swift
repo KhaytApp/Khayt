@@ -451,6 +451,9 @@ public actor KhaytEngine {
         // order here is only that all three are present.
         "subscriptions",
         "recurring-orders",
+        // What a copy of a job or a product carries (⌘D). The job copy is
+        // `order-new`'s input, so it is created by the same rule as any job.
+        "record-duplicate",
         // Which language a shop writes its customers' names in, and which of
         // them to show. Not the interface language: a shop that writes only
         // Arabic must not be shown the stale English name left over from setup.
@@ -11280,6 +11283,23 @@ public actor KhaytEngine {
                                            "quoteApproval": bytes(tokens.quoteApproval)]),
                                   .array(consumables)],
                                  as: NewOrder.self)
+    }
+
+    /// `lib/record-duplicate.js`'s `job`: the new-job input for another of
+    /// `order` — the customer, the parts without their run, the notes — which
+    /// `newOrder` turns into a job with a fresh id and number.
+    public func duplicateJobInput(_ order: JSONValue) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytRecordDuplicate.job(ARG0)", [order], as: [String: JSONValue].self)
+    }
+
+    /// `lib/record-duplicate.js`'s `product`: another of `product` under `id`,
+    /// without the original's pictures, papers, SKU or stamps.
+    public func duplicateProduct(_ product: JSONValue, id: String, today: String,
+                                 suffix: String) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytRecordDuplicate.product(ARG0, ARG1)",
+                          [product, .object(["id": .string(id), "today": .string(today),
+                                             "suffix": .string(suffix)])],
+                          as: [String: JSONValue].self)
     }
 
     /// What a job's components cost — `lib/order-new.js componentsCost`, the

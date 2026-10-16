@@ -80,30 +80,17 @@ struct InvoiceSheet: View {
         .task(id: subject.id) { await build() }
     }
 
+    /// The paper, through `Shop.invoiceDocument` — the one path File ▸ Print…
+    /// and File ▸ Share… take as well, so the three cannot disagree about
+    /// which number a document carries or when it may not be drawn.
     private func build() async {
-        guard job != nil else { problem = shop.words.callIt("mac.move_gone"); return }
-        // An accepted quote from before this build has no invoice number; it
-        // is given one now, as its invoice is first issued (not all at once
-        // on open — see `issueInvoiceNumberIfOwed`).
-        await shop.issueInvoiceNumberIfOwed(subject.id)
-        guard let job else { problem = shop.words.callIt("mac.move_gone"); return }
-        // Still owed one after that means it could not be given: this viewer
-        // may not change jobs (the sample shop, a read-only book, a staff
-        // level without orders.edit) or the write failed. An invoice drawn
-        // now would carry the quote's id as a tax invoice's number, so it is
-        // not drawn, and the sheet says why.
-        switch await shop.invoiceNumbering(of: shop.orderRow(job.id) ?? .null) {
-        case .notIssued:
-            problem = shop.words.callIt("mac.invoice_not_issued"); return
-        case .number(let n):
+        switch await shop.invoiceDocument(for: subject.id) {
+        case .refused(let why):
+            problem = why
+        case .paper(let doc, let n):
             number = n
-        case nil:
-            number = job.id
+            paper = InvoicePaper(document: doc)
         }
-        guard let doc = await Invoice.html(for: job, shop: shop) else {
-            problem = shop.words.callIt("mac.no_document"); return
-        }
-        paper = InvoicePaper(document: doc)
     }
 
     /// Keep it, where the shop says.

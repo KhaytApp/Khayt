@@ -4,6 +4,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the standard Mac commands, where a Mac user looks for them.**
+  - **File ▸ Print… (⌘P)** prints what is in front: the selected job's invoice
+    (or quotation) on the jobs list or the board, or the P&L on Reports, through
+    the same page the PDF export draws. It is greyed everywhere else; it never
+    prints the window. Job ▸ Invoice, which shows the invoice, moves to ⌥⌘P.
+  - **File ▸ Share…** sends the selected job's invoice as a PDF, or the selected
+    library models' files, through the Mac's share menu.
+  - **⌫ / ⌘⌫ in the library** asks to delete the selected models through the
+    right-click menu's own question, which names how many. Only the models you
+    can see go — never ones folded inside a group tile. The jobs list and the
+    customers have no delete on the Mac, so the keys do nothing there.
+  - **File ▸ Duplicate (⌘D)** copies the selected job into New Job — the same
+    customer, parts and notes; a fresh id and number, no payments, dates or
+    print runs, and nothing saved until you press Save — or the selected
+    catalogue product into the product sheet, without its pictures, papers or
+    SKU. What a copy carries is a shared rule (`lib/record-duplicate.js`).
+    Model ▸ Favourite moves from ⌘D to ⇧⌘D.
+  - **Drop a .3mf, .stl, .obj or .gcode** on the jobs list or on Khayt's Dock
+    icon to start a new job from it. The file is added to the library first
+    (the original stays where it was), exactly as "New job from model" works.
+
 - **iPhone: the expense categories come from the shared code.** The phone's
   expense form now takes its list from the code the Mac uses (KhaytCore)
   instead of keeping its own copy, so the two cannot drift apart. What it

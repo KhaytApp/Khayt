@@ -174,9 +174,15 @@ extension Shop {
     /// `lib/order-new.js` folds into the saved price, so the sheet's preview
     /// shows the price the job is saved at. Zero for a product with none.
     func jobComponentsCost(of product: Product, assemblyQty: Double? = nil) async -> Double {
-        guard let engine, let components = product.rest["components"] else { return 0 }
+        guard let components = product.rest["components"] else { return 0 }
         let qty = assemblyQty ?? Double(Self.assemblyQty(of: product))
-        return (try? await engine.jobComponentsCost(components, assemblyQty: max(1, qty),
+        return await jobComponentsCost(components, assemblyQty: qty)
+    }
+
+    /// The same figure for components handed in directly — a copied job's.
+    func jobComponentsCost(_ components: JSONValue, assemblyQty: Double) async -> Double {
+        guard let engine else { return 0 }
+        return (try? await engine.jobComponentsCost(components, assemblyQty: max(1, assemblyQty),
                                                     consumables: consumableRows)) ?? 0
     }
 
@@ -193,7 +199,8 @@ extension Shop {
                      assemblyQty: Double? = nil,
                      rule: PriceRule = PriceRule(),
                      extraLines: [ExtraLine] = [],
-                     overheadPerHour: Double = 0) -> [String: JSONValue] {
+                     overheadPerHour: Double = 0,
+                     carried: [String: JSONValue] = [:]) -> [String: JSONValue] {
         var input: [String: JSONValue] = [
             "parts": .array(Self.partRows(parts, spools: spools,
                                           unnamed: words.callIt("mac.a_part"))),
@@ -232,6 +239,16 @@ extension Shop {
             if let qty = product.rest["assemblyQty"] { input["assemblyQty"] = qty }
             // The sheet's own count wins: it is what the shop saw priced.
             if let assemblyQty { input["assemblyQty"] = .number(assemblyQty) }
+        }
+        // ── WHAT A COPY OF A JOB CARRIES ──────────────────────────────────
+        //
+        // The fields `lib/record-duplicate.js` says another of a job keeps
+        // that the sheet does not collect itself — the notes, the product
+        // it came from, its components. Never over anything the sheet set:
+        // what the shop saw on the sheet is what is saved.
+        for (key, value) in carried where input[key] == nil { input[key] = value }
+        if product == nil, carried["components"] != nil, let assemblyQty {
+            input["assemblyQty"] = .number(assemblyQty)
         }
         return input
     }

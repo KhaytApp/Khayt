@@ -671,6 +671,11 @@ extension Shop {
     /// the sheet says so.
     func jobParts(from product: Product) async -> [NewJobSheet.Draft] {
         guard case .array(let rows)? = product.rest["parts"] else { return [] }
+        return await jobParts(fromRows: rows)
+    }
+
+    /// Part records — a product's, or a copied job's — costed the same way.
+    func jobParts(fromRows rows: [JSONValue]) async -> [NewJobSheet.Draft] {
         var out: [NewJobSheet.Draft] = []
         for row in rows {
             guard var draft = NewJobSheet.Draft.from(row) else { continue }

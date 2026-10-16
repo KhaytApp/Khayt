@@ -596,6 +596,28 @@ $GOOGLE_KEYS
     <string>_khayt._tcp</string>
   </array>
 $SPARKLE_KEYS
+  <!-- ── A MODEL DROPPED ON THE DOCK ICON OPENS NEW JOB ON IT ─────────────
+       The Dock only accepts a drop on an app that says it can open the file,
+       so the four kinds Shop.droppableModelKinds takes are declared here.
+       ALTERNATE, never Owner or Default: Khayt opens these for a job, it is
+       not the shop's slicer, and a double-click on a model in the Finder must
+       still go to whatever opened it before. Extensions rather than types:
+       nobody declares a type for gcode, and 3mf's is this app's own (below). -->
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>3D print file</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>CFBundleTypeExtensions</key>
+      <array>
+        <string>3mf</string>
+        <string>stl</string>
+        <string>obj</string>
+        <string>gcode</string>
+      </array>
+    </dict>
+  </array>
   <!-- A job being dragged across the board. Declared so the drag is this app's
        own: a board that accepted any dragged text would move a job because
        someone dropped a word on it. -->
