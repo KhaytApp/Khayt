@@ -1064,6 +1064,16 @@ function renderExtraLines() {
     // the rush chip already uses ("+25% (SAR 12.50)").
     const resolved = isPct && rows[i] && rows[i].amount > 0
       ? `<span class="el-resolved" style="font-size:11.5px;color:var(--text-muted);white-space:nowrap;">${escapeHtml(fmtMoney(rows[i].amount))}</span>` : '';
+    // A % row is the shop's own surcharge unless it says it is a platform's fee
+    // (lib/pricing.js isFeeLine): only a fee is grossed up into the price and
+    // taken off the margin. A line added from a platform's schedule carries a
+    // platformId and is a fee by definition, so its box is ticked and fixed.
+    const isPlatform = isPct && !!line.platformId;
+    const feeBox = isPct ? `
+      <label class="el-fee-wrap" title="${escapeHtml(t('calc.extra_is_fee_hint'))}" style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;white-space:nowrap;">
+        <input type="checkbox" class="el-fee" data-eli="${i}" ${isPlatform || line.fee === true ? 'checked' : ''} ${isPlatform ? 'disabled' : ''}>
+        ${escapeHtml(t('calc.extra_is_fee'))}
+      </label>` : '';
     return `
     <div class="extra-line-row">
       <input type="text" class="el-label" value="${escapeHtml(line.label)}" placeholder="${escapeHtml(t('calc.extra_label_ph'))}" style="flex:1; min-width:0;">
@@ -1072,6 +1082,7 @@ function renderExtraLines() {
         <option value="amt" ${isPct ? '' : 'selected'}>${escapeHtml(currencySymbol())}</option>
         <option value="pct" ${isPct ? 'selected' : ''}>%</option>
       </select>
+      ${feeBox}
       ${resolved}
       <button class="btn danger small el-rm" data-eli="${i}" aria-label="Remove" title="Remove">×</button>
     </div>`; }).join('');
@@ -1099,6 +1110,15 @@ function renderExtraLines() {
       if (sel.value === 'pct') { line.pct = v; delete line.amount; }
       else { line.amount = v; delete line.pct; }
       renderExtraLines();
+    });
+  });
+  el.querySelectorAll('.el-fee').forEach((box) => {
+    box.addEventListener('change', () => {
+      const line = currentExtraLines[+box.dataset.eli];
+      // Absent rather than false when off, so an untouched surcharge stays the
+      // record it always was.
+      if (box.checked) line.fee = true; else delete line.fee;
+      updateGrandTotal();
     });
   });
   el.querySelectorAll('.el-rm').forEach(btn => {

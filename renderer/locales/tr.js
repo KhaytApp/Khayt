@@ -1009,6 +1009,8 @@
   "calc.add_extra_line": "+ Ücret ekle",
   "calc.add_pp_preset": "+ Son işlem",
   "calc.extra_label_ph": "örn. Tasarım ücreti, Boyama…",
+  "calc.extra_is_fee": "Platform ücreti",
+  "calc.extra_is_fee_hint": "Pazar yeri, müşterinin ödediği tutarın bu yüzdesini alır; bu yüzden fiyat bunu karşılayacak şekilde artırılır ve belirlediğiniz tutar size kalır.",
   "calc.resin.layers": "Katman Sayısı",
   "calc.resin.layer_height": "Katman Yüksekliği (mm)",
   "calc.resin.exposure": "Pozlama (sn/katman)",

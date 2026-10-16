@@ -1009,6 +1009,8 @@
   "calc.add_extra_line": "+ 添加费用",
   "calc.add_pp_preset": "+ 后处理",
   "calc.extra_label_ph": "例如：设计费、喷涂费…",
+  "calc.extra_is_fee": "平台费用",
+  "calc.extra_is_fee_hint": "平台会从客户支付的金额中抽取这一比例，因此价格会相应提高，确保您拿到所定的金额。",
   "calc.resin.layers": "Layer Count",
   "calc.resin.layer_height": "层高 (mm)",
   "calc.resin.exposure": "Exposure (s/layer)",

@@ -1009,6 +1009,8 @@
   "calc.add_extra_line": "+ Gebühr hinzufügen",
   "calc.add_pp_preset": "+ Nachbearbeitung",
   "calc.extra_label_ph": "z.B. Designgebühr, Lackierung…",
+  "calc.extra_is_fee": "Plattformgebühr",
+  "calc.extra_is_fee_hint": "Der Marktplatz behält diesen Prozentsatz dessen ein, was der Kunde zahlt. Der Preis wird daher angehoben, damit Ihnen bleibt, was Sie kalkuliert haben.",
   "calc.resin.layers": "Layer Count",
   "calc.resin.layer_height": "Schichthöhe (mm)",
   "calc.resin.exposure": "Exposure (s/layer)",

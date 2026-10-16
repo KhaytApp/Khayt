@@ -1010,6 +1010,8 @@
   "calc.add_extra_line": "+ Adicionar taxa",
   "calc.add_pp_preset": "+ Pós-processamento",
   "calc.extra_label_ph": "ex.: Taxa de projeto, Pintura…",
+  "calc.extra_is_fee": "Taxa da plataforma",
+  "calc.extra_is_fee_hint": "O marketplace fica com esta porcentagem do que o cliente paga, então o preço sobe para cobri-la e você recebe o que definiu.",
   "calc.resin.layers": "Número de camadas",
   "calc.resin.layer_height": "Altura de camada (mm)",
   "calc.resin.exposure": "Exposição (s/camada)",

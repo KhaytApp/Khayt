@@ -1009,6 +1009,8 @@
   "calc.add_extra_line": "+ Ajouter un frais",
   "calc.add_pp_preset": "+ Post-traitement",
   "calc.extra_label_ph": "ex. Frais de design, Peinture…",
+  "calc.extra_is_fee": "Frais de plateforme",
+  "calc.extra_is_fee_hint": "La plateforme garde ce pourcentage de ce que paie le client : le prix est relevé pour le couvrir et vous touchez ce que vous avez fixé.",
   "calc.resin.layers": "Layer Count",
   "calc.resin.layer_height": "Hauteur de couche (mm)",
   "calc.resin.exposure": "Exposure (s/layer)",

@@ -133,3 +133,22 @@ test('the fee-type label is translated everywhere', () => {
     assert.ok(read(`renderer/locales/${code}.js`).includes('"calc.extra_unit":'), `${code} is missing calc.extra_unit`);
   }
 });
+
+test('a % row can be marked a platform fee, and only a fee is grossed up', () => {
+  // lib/pricing.js grosses up a % line only when it is a FEE (a platformId, or
+  // `fee: true`). A fee typed by hand has no platformId, so without a way to
+  // say `fee: true` the desktop could never reach the gross-up for it.
+  const at = build.indexOf('function renderExtraLines(');
+  const body = build.slice(at, build.indexOf('\n}', at));
+  assert.match(body, /class="el-fee"/, 'there is no platform-fee box on a % row');
+  assert.match(body, /const feeBox = isPct \?/, 'the box shows on fixed rows too, where it means nothing');
+  assert.match(body, /if \(box\.checked\) line\.fee = true; else delete line\.fee;/,
+    'the box does not write fee: true, or leaves fee: false behind on an untouched surcharge');
+  // A platform's own line is a fee by definition; unticking it would change nothing.
+  assert.match(body, /isPlatform \? 'disabled' : ''/, 'a platform line can be unticked to no effect');
+
+  const surcharge = quoteTotal({ baseCost: 100, qty: 1, margin: 0, extraLines: [{ label: 'Etsy', pct: 10 }] });
+  const fee = quoteTotal({ baseCost: 100, qty: 1, margin: 0, extraLines: [{ label: 'Etsy', pct: 10, fee: true }] });
+  assert.equal(surcharge.total, 110, 'an unmarked % row is the shop\'s own surcharge, as before');
+  assert.equal(fee.total, 111.11, 'a row marked as a fee is not grossed up');
+});

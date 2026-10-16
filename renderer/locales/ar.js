@@ -1132,6 +1132,8 @@
   "calc.add_extra_line": "+ إضافة رسم",
   "calc.add_pp_preset": "+ معالجة لاحقة",
   "calc.extra_label_ph": "مثل: رسوم التصميم، طلاء…",
+  "calc.extra_is_fee": "رسوم المنصة",
+  "calc.extra_is_fee_hint": "تحتفظ المنصة بهذه النسبة مما يدفعه العميل، لذا يُرفع السعر لتغطيتها وتحصل على ما سعّرته كاملًا.",
   "calc.resin.layers": "عدد الطبقات",
   "calc.resin.layer_height": "سُمك الطبقة (mm)",
   "calc.resin.exposure": "وقت التعريض (ث/طبقة)",
