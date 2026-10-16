@@ -30,6 +30,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   kept as issued. Only orders never billed are blanked, and the delete window
   says how many keep the name.
 
+- **Desktop: rejecting a quote keeps what was booked to it.** An expense or
+  time entry recorded against a rejected quote now stays, unlinked, the same
+  way it does when you delete a job, and Undo puts it back.
+
 - **Mac: ⌘K, Go to anything.** Go ▸ Go to… (⌘K) opens a small panel over the
   window: type a job's number or invoice number, a customer's name, phone or
   email, a part, a library model or its file name, a catalogue product, a

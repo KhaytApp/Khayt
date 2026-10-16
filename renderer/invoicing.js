@@ -258,14 +258,19 @@ async function rejectQuote(orderId) {
   }
   const ok = await confirmModal(t('quote.reject_q'), { danger: true });
   if (!ok) return;
-  const idx = printLog.findIndex(o => o.id === orderId);
-  if (idx < 0) return;
-  const removed = printLog[idx];
-  printLog.splice(idx, 1);
+  // The same delete as deleteLog: the quote goes, and anything booked to it
+  // (an expense, time, waste) stays with its link cleared; Undo relinks it.
+  const out = R.deleteOrders({ printLog, inventory, expenses, wasteLog, timeEntries, loyaltyLedger }, [orderId]);
+  if (!out.deleted.length) return;
+  ({ printLog, inventory, expenses, wasteLog, timeEntries, loyaltyLedger } = out.book);
   saveAll();
   renderKanban(); renderLogs();
   toast(t('quote.rejected'), 'success', 5000, {
-    undo: () => { printLog.splice(idx, 0, removed); saveAll(); renderKanban(); renderLogs(); }
+    undo: () => {
+      const back = R.restoreOrders({ printLog, inventory, expenses, wasteLog, timeEntries, loyaltyLedger }, out.deleted);
+      ({ printLog, inventory, expenses, wasteLog, timeEntries, loyaltyLedger } = back);
+      saveAll(); renderKanban(); renderLogs();
+    },
   });
 }
 
