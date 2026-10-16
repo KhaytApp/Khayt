@@ -17,22 +17,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   was cut off in one particular place made the app read past the end of what
   it had scanned and quit. Now it says the tag could not be read, like any
   other unreadable tag.
-- **Desktop: a fee you type in yourself can count as a marketplace fee.** A
-  percentage line in Extra charges now has a "Platform fee" box. Tick it for a
-  fee the marketplace or card processor keeps, and the price is raised so you
-  still get what you priced, and the margin is shown after it. Leave it
-  unticked for your own charge, like a design fee, which works exactly as
-  before. Lines added from the Marketplace fees picker are always fees.
-- **Desktop: erasing a customer no longer changes invoices you already
-  issued.** "Full erase" used to blank the customer's name on every one of
-  their orders, including invoices already sent or reported to ZATCA. Now
-  orders with an invoice or a payment keep the name, because invoices must be
-  kept as issued. Only orders never billed are blanked, and the delete window
-  says how many keep the name.
-
-- **Desktop: rejecting a quote keeps what was booked to it.** An expense or
-  time entry recorded against a rejected quote now stays, unlinked, the same
-  way it does when you delete a job, and Undo puts it back.
 
 - **Mac: ⌘K, Go to anything.** Go ▸ Go to… (⌘K) opens a small panel over the
   window: type a job's number or invoice number, a customer's name, phone or
@@ -54,53 +38,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   palette says "Loading the book…" rather than "Nothing matches", and answers
   what was typed as soon as the index is ready; typing fast can no longer leave
   the screens' rows drawn under another answer's headings.
-- **Quotes with a marketplace fee line now go up slightly, so you keep your
-  price after the fee.** Marketplace fee lines — the ones the Marketplace fees
-  picker adds (Etsy, Shopify, eBay, Amazon, WooCommerce, Salla, Zid) — are
-  taken by the platform out of what the buyer pays, fee included, but Khayt
-  worked them out on the price before the fee: 10% on 100 added 10, the
-  platform took 11, and you kept 99. Marketplace fee lines are now grossed up —
-  price = (price before fees, your own % surcharges and fixed extras included)
-  ÷ (1 − total marketplace fee %) — so a quote with one rises by roughly the fee
-  times the fee (about 1% more on a 10% fee, about 0.9% on Etsy's 9.5%). Each
-  fee line shows its real share of the final price, to the cent, and the lines
-  still add up to the total. A percentage line you add yourself (e.g. "Design
-  10%") is your own surcharge: it is worked out exactly as before and is not
-  grossed up. Quotes with no marketplace fee line are unchanged to the last
-  digit, and jobs already saved keep the price they were quoted at. Marketplace
-  fees totalling 95% or more are not grossed up, and the calculator and the
-  Mac's new job sheet say so. The desktop calculator's margin is now measured
-  after the marketplace fee lines, which the platform keeps.
-
-- **Delete a job or a customer on the Mac — never an invoiced or paid job.**
-  - **Mac:** the jobs list, the board card's right-click menu and the customers
-    list gain **Delete…**, and **⌫ / ⌘⌫** (File ▸ Delete…) now acts on the chosen
-    jobs or customers as well as the library. It always asks first, naming what
-    goes, and **Edit ▸ Undo** brings it back. The jobs and customers lists now
-    take several rows at once (⌘/⇧-click); a delete of several takes only the
-    ones that may go and says how many it left. Off on the sample book and for
-    staff roles without delete rights.
-  - **Which jobs may be deleted:** a quote nobody accepted, or a job that never
-    got an invoice number and has no payment of any kind. Anything invoiced or
-    paid is refused with the reason ("Invoiced: cancel instead") and offered
-    **Cancel Job**, so the invoice sequence keeps every number it handed out.
-    Because a job taken as a job is numbered when it is created, in practice
-    that means quotes and old unnumbered records.
-  - **Nothing goes but the job** (with its print runs and photos, which are on
-    the job). Its expenses, spool usage rows, waste, time and loyalty entries
-    stay in the books with their figures, only unlinked — so the P&L's expenses
-    and a spool's remaining filament do not move. Payments are never touched.
-    A job whose customer link is published has the link taken down.
-  - **Customers** may be deleted only with no job in any status and no gift card;
-    otherwise Delete is greyed with how many jobs they have.
-  - **Desktop (behaviour change):** deleting a job used to remove any job,
-    invoiced and paid ones included. It now follows the same rule — an invoiced
-    or paid job is refused and offered "Cancel job" — and rejecting a quote that
-    took a deposit does the same. A desktop delete no longer removes the job's
-    expenses and spool usage rows (which raised the P&L's net by costs really
-    paid); they stay, unlinked, and Undo relinks them.
-  - The rule and the tidy-up are one shared module, `lib/record-delete.js`, used
-    by both apps, with node tests.
 
 - **Mac: the standard Mac commands, where a Mac user looks for them.**
   - **File ▸ Print… (⌘P)** prints what is in front: the selected job's invoice
@@ -127,19 +64,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   expense form now takes its list from the code the Mac uses (KhaytCore)
   instead of keeping its own copy, so the two cannot drift apart. What it
   offers is unchanged.
-
-- **Mac: a job sent to a printer records which machine printed it.** Sending a
-  job's file from the Mac used to write nothing on the job, so a job planned
-  for one printer and sent to another kept charging its hours, nozzle wear and
-  depreciation to the planned one, and a job nobody assigned stayed
-  "Unassigned" in the machine P&L. Now, once the printer accepts the file, the
-  job's machine is set to the printer that received it, and the send is kept
-  in the job's history with its time. If the shop had picked a different
-  machine, that choice is kept and the job inspector says "Printed on X
-  (planned Y)". A reprint on another machine replaces the machine rather than
-  adding a second one, so hours and wear are counted once. A send from the
-  desktop board is recorded the same way. Jobs already in the book read
-  exactly as before.
 
 - **iPhone: expenses use the shop's categories.** The phone offered resin,
   parts, rent and power, and none of those exist anywhere else in Khayt. A
@@ -5626,6 +5550,104 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.13] - 2026-10-16
+
+### Before you update
+
+- **Quotes with a marketplace fee now come out slightly higher.** A marketplace
+  takes its fee out of what the buyer pays, fee included, so a 10% fee on 100
+  used to leave you 99. Khayt now raises the price so you keep the full 100
+  after the fee, which adds about 1% on a 10% fee. Only lines from the
+  Marketplace fees picker, or a percentage line you tick as a Platform fee,
+  work this way. Your own percentage charges and quotes with no marketplace
+  fee are unchanged, and jobs already saved keep their price.
+- **A job with an invoice or a payment can no longer be deleted.** Delete
+  offers Cancel job instead, so your invoice numbers stay in sequence and the
+  record of the money stays. Deleting a job that is allowed (an unaccepted
+  quote, for example) now keeps its expenses and spool usage in your books,
+  unlinked, instead of removing them.
+
+### Changed
+
+Marketplace fees are built into the price, and invoiced or paid jobs are kept, since 3.11.12.
+Individual entries are kept below; this is what changed for you.
+
+Full erase of a customer keeps their name on invoices already issued, and a job sent to a printer from the board records the machine that printed it.
+
+- **Quotes with a marketplace fee line now go up slightly, so you keep your
+  price after the fee.** Marketplace fee lines — the ones the Marketplace fees
+  picker adds (Etsy, Shopify, eBay, Amazon, WooCommerce, Salla, Zid) — are
+  taken by the platform out of what the buyer pays, fee included, but Khayt
+  worked them out on the price before the fee: 10% on 100 added 10, the
+  platform took 11, and you kept 99. Marketplace fee lines are now grossed up —
+  price = (price before fees, your own % surcharges and fixed extras included)
+  ÷ (1 − total marketplace fee %) — so a quote with one rises by roughly the fee
+  times the fee (about 1% more on a 10% fee, about 0.9% on Etsy's 9.5%). Each
+  fee line shows its real share of the final price, to the cent, and the lines
+  still add up to the total. A percentage line you add yourself (e.g. "Design
+  10%") is your own surcharge: it is worked out exactly as before and is not
+  grossed up. Quotes with no marketplace fee line are unchanged to the last
+  digit, and jobs already saved keep the price they were quoted at. Marketplace
+  fees totalling 95% or more are not grossed up, and the calculator and the
+  Mac's new job sheet say so. The desktop calculator's margin is now measured
+  after the marketplace fee lines, which the platform keeps.
+- **Desktop: a fee you type in yourself can count as a marketplace fee.** A
+  percentage line in Extra charges now has a "Platform fee" box. Tick it for a
+  fee the marketplace or card processor keeps, and the price is raised so you
+  still get what you priced, and the margin is shown after it. Leave it
+  unticked for your own charge, like a design fee, which works exactly as
+  before. Lines added from the Marketplace fees picker are always fees.
+- **Delete a job or a customer on the Mac — never an invoiced or paid job.**
+  - **Mac:** the jobs list, the board card's right-click menu and the customers
+    list gain **Delete…**, and **⌫ / ⌘⌫** (File ▸ Delete…) now acts on the chosen
+    jobs or customers as well as the library. It always asks first, naming what
+    goes, and **Edit ▸ Undo** brings it back. The jobs and customers lists now
+    take several rows at once (⌘/⇧-click); a delete of several takes only the
+    ones that may go and says how many it left. Off on the sample book and for
+    staff roles without delete rights.
+  - **Which jobs may be deleted:** a quote nobody accepted, or a job that never
+    got an invoice number and has no payment of any kind. Anything invoiced or
+    paid is refused with the reason ("Invoiced: cancel instead") and offered
+    **Cancel Job**, so the invoice sequence keeps every number it handed out.
+    Because a job taken as a job is numbered when it is created, in practice
+    that means quotes and old unnumbered records.
+  - **Nothing goes but the job** (with its print runs and photos, which are on
+    the job). Its expenses, spool usage rows, waste, time and loyalty entries
+    stay in the books with their figures, only unlinked — so the P&L's expenses
+    and a spool's remaining filament do not move. Payments are never touched.
+    A job whose customer link is published has the link taken down.
+  - **Customers** may be deleted only with no job in any status and no gift card;
+    otherwise Delete is greyed with how many jobs they have.
+  - **Desktop (behaviour change):** deleting a job used to remove any job,
+    invoiced and paid ones included. It now follows the same rule — an invoiced
+    or paid job is refused and offered "Cancel job" — and rejecting a quote that
+    took a deposit does the same. A desktop delete no longer removes the job's
+    expenses and spool usage rows (which raised the P&L's net by costs really
+    paid); they stay, unlinked, and Undo relinks them.
+  - The rule and the tidy-up are one shared module, `lib/record-delete.js`, used
+    by both apps, with node tests.
+- **Desktop: rejecting a quote keeps what was booked to it.** An expense or
+  time entry recorded against a rejected quote now stays, unlinked, the same
+  way it does when you delete a job, and Undo puts it back.
+- **Desktop: erasing a customer no longer changes invoices you already
+  issued.** "Full erase" used to blank the customer's name on every one of
+  their orders, including invoices already sent or reported to ZATCA. Now
+  orders with an invoice or a payment keep the name, because invoices must be
+  kept as issued. Only orders never billed are blanked, and the delete window
+  says how many keep the name.
+- **Mac: a job sent to a printer records which machine printed it.** Sending a
+  job's file from the Mac used to write nothing on the job, so a job planned
+  for one printer and sent to another kept charging its hours, nozzle wear and
+  depreciation to the planned one, and a job nobody assigned stayed
+  "Unassigned" in the machine P&L. Now, once the printer accepts the file, the
+  job's machine is set to the printer that received it, and the send is kept
+  in the job's history with its time. If the shop had picked a different
+  machine, that choice is kept and the job inspector says "Printed on X
+  (planned Y)". A reprint on another machine replaces the machine rather than
+  adding a second one, so hours and wear are counted once. A send from the
+  desktop board is recorded the same way. Jobs already in the book read
+  exactly as before.
 
 ## [3.11.12] - 2026-10-16
 
