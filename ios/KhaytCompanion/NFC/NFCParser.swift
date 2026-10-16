@@ -186,6 +186,10 @@ enum NFCParser {
             let len: Int
             let dataStart: Int
             if bytes[pos + 1] == 0xFF {
+                // The three-byte length needs pos + 3, one past what the loop
+                // guarantees: a tag ending `03 FF xx` read off the end and
+                // trapped (found by `testRandomBytesFailCleanly`, Oct 2026).
+                guard pos + 3 < bytes.count else { break }
                 len = (Int(bytes[pos + 2]) << 8) | Int(bytes[pos + 3])
                 dataStart = pos + 4
             } else {
