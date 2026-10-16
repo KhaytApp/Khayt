@@ -106,6 +106,22 @@ final class NFCParserTests: XCTestCase {
         }
     }
 
+    func testALongLengthCutOffAtTheEndDoesNotOverread() {
+        // A TLV whose length says "three bytes follow" (0xFF) with only one
+        // left. The random-bytes test above hit this only now and then
+        // and trapped the app; this is that tag, every time, at each length
+        // where the cut can land.
+        for count in 10...20 {
+            var bytes = [UInt8](repeating: 0x00, count: count)
+            bytes[count - 3] = 0x03
+            bytes[count - 2] = 0xFF
+            bytes[count - 1] = 0x01
+            guard case .failure = NFCParser.parse(bytes: bytes) else {
+                return XCTFail("\(count) bytes: a cut-off TLV cannot be a tag")
+            }
+        }
+    }
+
     func testAnNDEFLengthPointingPastTheBufferDoesNotOverread() {
         // TLV type 0x03, declared length 0xFE, but only a few bytes follow. The
         // walker must clamp instead of slicing past the end.

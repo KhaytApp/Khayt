@@ -13,6 +13,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   picker show it on and locked, naming the platform. A job reopened with a fee
   line shows it on. English and Arabic.
 
+- **iPhone: a damaged NFC tag can no longer crash the app.** A tag whose data
+  was cut off in one particular place made the app read past the end of what
+  it had scanned and quit. Now it says the tag could not be read, like any
+  other unreadable tag.
 - **Mac: ⌘K, Go to anything.** Go ▸ Go to… (⌘K) opens a small panel over the
   window: type a job's number or invoice number, a customer's name, phone or
   email, a part, a library model or its file name, a catalogue product, a
