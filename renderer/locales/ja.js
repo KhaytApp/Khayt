@@ -1009,6 +1009,8 @@
   "calc.add_extra_line": "+ 料金を追加",
   "calc.add_pp_preset": "+ 後処理",
   "calc.extra_label_ph": "例：デザイン料、塗装…",
+  "calc.extra_is_fee": "プラットフォーム手数料",
+  "calc.extra_is_fee_hint": "マーケットプレイスは顧客の支払額からこの割合を差し引きます。そのため価格を引き上げ、設定した金額が手元に残るようにします。",
   "calc.resin.layers": "レイヤー数",
   "calc.resin.layer_height": "レイヤー高さ（mm）",
   "calc.resin.exposure": "露光時間（秒/レイヤー）",

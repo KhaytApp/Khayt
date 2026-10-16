@@ -17,6 +17,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   was cut off in one particular place made the app read past the end of what
   it had scanned and quit. Now it says the tag could not be read, like any
   other unreadable tag.
+- **Desktop: a fee you type in yourself can count as a marketplace fee.** A
+  percentage line in Extra charges now has a "Platform fee" box. Tick it for a
+  fee the marketplace or card processor keeps, and the price is raised so you
+  still get what you priced, and the margin is shown after it. Leave it
+  unticked for your own charge, like a design fee, which works exactly as
+  before. Lines added from the Marketplace fees picker are always fees.
+
 - **Mac: ⌘K, Go to anything.** Go ▸ Go to… (⌘K) opens a small panel over the
   window: type a job's number or invoice number, a customer's name, phone or
   email, a part, a library model or its file name, a catalogue product, a
@@ -32,6 +39,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   one matched — a test on a synthetic 10,000-job book counts the rows each key
   touches. ⌃⌘K stays the kiosk and ⇧⌘K the calculator; the Help shortcuts page
   lists ⌘K in English and Arabic.
+
 - **Quotes with a marketplace fee line now go up slightly, so you keep your
   price after the fee.** Marketplace fee lines — the ones the Marketplace fees
   picker adds (Etsy, Shopify, eBay, Amazon, WooCommerce, Salla, Zid) — are

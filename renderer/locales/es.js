@@ -1009,6 +1009,8 @@
   "calc.add_extra_line": "+ Agregar cargo",
   "calc.add_pp_preset": "+ Post-proceso",
   "calc.extra_label_ph": "p.ej. Honorario de diseño, Pintura…",
+  "calc.extra_is_fee": "Comisión de plataforma",
+  "calc.extra_is_fee_hint": "El marketplace se queda con este porcentaje de lo que paga el cliente, así que el precio sube para cubrirlo y recibes lo que fijaste.",
   "calc.resin.layers": "Layer Count",
   "calc.resin.layer_height": "Altura de capa (mm)",
   "calc.resin.exposure": "Exposure (s/layer)",

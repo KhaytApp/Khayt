@@ -1009,6 +1009,8 @@
   "calc.add_extra_line": "+ Add fee",
   "calc.add_pp_preset": "+ Post-process",
   "calc.extra_label_ph": "e.g. Design fee, Painting…",
+  "calc.extra_is_fee": "Platform fee",
+  "calc.extra_is_fee_hint": "The marketplace keeps this percentage of what the customer pays, so the price is raised to cover it and you still get what you priced.",
   "calc.resin.layers": "Layer Count",
   "calc.resin.layer_height": "Layer Height (mm)",
   "calc.resin.exposure": "Exposure (s/layer)",
