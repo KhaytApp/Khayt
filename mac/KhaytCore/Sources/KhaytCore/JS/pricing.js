@@ -39,6 +39,39 @@
  *   THE TOTAL. A quote whose total depends on the order rows were typed in is
  *   indefensible when a customer asks why.
  *
+ * MARKETPLACE FEE LINES ARE GROSSED UP (changed 2026-10-16). A percentage line
+ * is either the shop's OWN surcharge ("design 10%") or a FEE some platform
+ * takes out of the price. The two are told apart by the line, never guessed:
+ *
+ *   A FEE LINE is a percentage line that carries a `platformId` (what
+ *   lib/platform-fees.js `feeLinesFor` writes) or an explicit `fee: true`.
+ *   Every other percentage line is a surcharge — the shop's money.
+ *
+ * A platform takes its percentage of what the buyer pays INCLUDING the fee:
+ * 10% on 100 added 10, the platform took 10% of 110 = 11, and the shop kept
+ * 99. So the price is built in this order:
+ *
+ *   1. surcharge % lines: taken of `subtotal + rushFee + shipping`, exactly as
+ *      they always were (`extrasBase`), unrounded;
+ *   2. fixed lines are added;
+ *   3. fee % lines gross up the whole of that:
+ *        final         = (subtotal + rushFee + shipping + surcharges + fixed)
+ *                          ÷ (1 − Σfee pct)
+ *        each fee line = final × pct, to the cent         ← `feeBase` is `final`
+ *
+ * After the platform takes Σfee pct of `final`, the shop keeps everything
+ * else, surcharges included. Fee lines share one base, so they neither
+ * compound nor depend on their order.
+ *
+ * At Σfee pct ≥ FEE_PCT_CAP nothing is grossed up (the division runs away,
+ * then divides by zero): each fee falls back to `extrasBase` and the result
+ * carries `feeWarning: 'fees-too-high'`. `feePct`, `feeBase` and `feeWarning`
+ * are present only on a quote that has a fee line, so a quote without one —
+ * surcharges and fixed lines included — is untouched to the byte
+ * (test/pricing-fee-gross-up.test.js pins it). Jobs already saved froze each
+ * line's money when they were made (lib/order-new.js), so nothing already
+ * quoted moves.
+ *
  * A line is a percentage if and only if it carries a positive `pct`; otherwise
  * it is `amount`, exactly as before. Existing quotes have no `pct` and are
  * arithmetically untouched — test/pricing.test.js pins that against the original
@@ -118,7 +151,8 @@ const clampPositive = (v) => Math.max(0, num(v, 0));
  *        so the "total" is pure cost. Zeroing here rather than at each call site
  *        is what stops a business surface leaking into that build.
  * @returns {{priceBeforeDiscount:number, discountAmount:number, subtotal:number,
- *            rushFee:number, shipping:number, extras:number, total:number}}
+ *            rushFee:number, shipping:number, extras:number, total:number,
+ *            feePct?:number, feeWarning?:string|null}}
  */
 /**
  * A line is a percentage only when it says so with a positive `pct`.
@@ -129,6 +163,15 @@ const clampPositive = (v) => Math.max(0, num(v, 0));
  */
 function isPercentLine(l) {
   return !!l && num(l.pct) > 0;
+}
+
+/**
+ * A percentage line a PLATFORM takes, as opposed to the shop's own surcharge:
+ * it carries the `platformId` lib/platform-fees.js writes, or says `fee: true`.
+ * Only these are grossed up; a "design 10%" line is the shop's money.
+ */
+function isFeeLine(l) {
+  return isPercentLine(l) && (!!l.platformId || l.fee === true);
 }
 
 function quoteTotal(input) {
@@ -162,12 +205,25 @@ function quoteTotal(input) {
   const subtotal = priceBeforeDiscount - discountAmount + agreed;
   const rushFee = subtotal * rushPct / 100;
 
-  // What the buyer pays before extras — the base every percentage line uses.
-  // Fixed extras are NOT in it, or a percentage would depend on how many fixed
-  // lines happened to be above it.
+  // What the buyer pays before extras — the base every SURCHARGE percentage
+  // uses. Fixed extras are NOT in it, or a percentage would depend on how
+  // many fixed lines happened to be above it.
   const extrasBase = subtotal + rushFee + shipping;
-  const extrasPercent = lines.reduce(
-    (s, l) => s + (isPercentLine(l) ? extrasBase * clampPositive(l.pct) / 100 : 0), 0);
+  // 1. The shop's own percentage lines, exactly as they have always been.
+  const surcharges = lines.reduce(
+    (s, l) => s + (isPercentLine(l) && !isFeeLine(l) ? extrasBase * clampPositive(l.pct) / 100 : 0), 0);
+  // 2 + 3. Marketplace fee lines gross up everything else the buyer pays —
+  // see MARKETPLACE FEE LINES ARE GROSSED UP above.
+  const feePct = lines.reduce((s, l) => s + (isFeeLine(l) ? clampPositive(l.pct) : 0), 0);
+  let feeBase = extrasBase;
+  let feeWarning = null;
+  if (feePct > 0) {
+    if (feePct < FEE_PCT_CAP) feeBase = (extrasBase + surcharges + extrasFixed) / (1 - feePct / 100);
+    else feeWarning = 'fees-too-high';
+  }
+  const fees = feePct > 0
+    ? lines.reduce((s, l) => s + (isFeeLine(l) ? percentFee(feeBase, l.pct) : 0), 0) : 0;
+  const extrasPercent = feePct > 0 ? surcharges + fees : surcharges;
   const extras = extrasFixed + extrasPercent;
   const computedTotal = subtotal + rushFee + shipping + extras;
 
@@ -204,7 +260,35 @@ function quoteTotal(input) {
     computedTotal,
     priceSource,
     total,
+    // Only on a quote that HAS a fee line, so a quote without one is the same
+    // object it always was. `feePct` is the fee lines' points (a surcharge is
+    // the shop's and is not in it); `feeBase` is the price they are taken of,
+    // to hand to resolveExtraLines; `feeWarning` is 'fees-too-high' when they
+    // reach FEE_PCT_CAP and were left un-grossed — a screen should say so,
+    // because the shop then keeps less than it priced.
+    ...(feePct > 0 ? { feePct, feeBase, feeWarning } : {}),
   };
+}
+
+/**
+ * Percentages at or above this many points are not grossed up. At 100% the
+ * gross-up divides by zero, and well before it the multiplier runs away (95%
+ * is already ×20) — a figure like that is a typo, not a fee schedule.
+ */
+const FEE_PCT_CAP = 95;
+
+/** Round to the cent, the way lib/tax.js does. */
+function round2(n) {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * One fee line's money: its share of the price it is charged on, to the cent.
+ * A platform bills each fee to the cent, and a line that is to the cent is one
+ * whose rows add up to the total printed under them.
+ */
+function percentFee(base, pct) {
+  return round2(clampPositive(base) * clampPositive(pct) / 100);
 }
 
 /** null, undefined and '' are ABSENT, not zero — a cleared box is not a free job. */
@@ -238,12 +322,16 @@ function roundToStep(value, step, mode) {
  * Resolve each line to money, for rendering.
  *
  * Returns the SAME numbers quoteTotal used — a second computation in the view is
- * how a breakdown ends up not adding up to the total above it.
+ * how a breakdown ends up not adding up to the total above it. Hand it the
+ * quote's `extrasBase` and `feeBase`: a surcharge is taken of the first, a fee
+ * line of the second (or of the first, when there is no `feeBase`).
  */
-function resolveExtraLines(lines, extrasBase) {
+function resolveExtraLines(lines, extrasBase, feeBase) {
   const base = clampPositive(extrasBase);
+  const fBase = feeBase === undefined || feeBase === null ? base : clampPositive(feeBase);
   return (Array.isArray(lines) ? lines : []).map((l) => (isPercentLine(l)
-    ? { label: (l && l.label) || '', pct: clampPositive(l.pct), amount: base * clampPositive(l.pct) / 100 }
+    ? { label: (l && l.label) || '', pct: clampPositive(l.pct),
+      amount: isFeeLine(l) ? percentFee(fBase, l.pct) : base * clampPositive(l.pct) / 100 }
     : { label: (l && l.label) || '', pct: null, amount: clampPositive(l && l.amount) }));
 }
 
@@ -262,7 +350,7 @@ function activePriceTier(tiers, qty) {
     .find((t) => q >= num(t.minQty)) || null;
 }
 
-const pricingApi = { quoteTotal, activePriceTier, resolveExtraLines, isPercentLine, roundToStep };
+const pricingApi = { quoteTotal, activePriceTier, resolveExtraLines, isPercentLine, roundToStep, FEE_PCT_CAP, isFeeLine };
 if (typeof module !== 'undefined' && module.exports) module.exports = pricingApi;
 if (typeof globalThis !== 'undefined') globalThis.KhaytPricing = pricingApi;
 

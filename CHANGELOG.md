@@ -19,6 +19,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   one matched — a test on a synthetic 10,000-job book counts the rows each key
   touches. ⌃⌘K stays the kiosk and ⇧⌘K the calculator; the Help shortcuts page
   lists ⌘K in English and Arabic.
+- **Quotes with a marketplace fee line now go up slightly, so you keep your
+  price after the fee.** Marketplace fee lines — the ones the Marketplace fees
+  picker adds (Etsy, Shopify, eBay, Amazon, WooCommerce, Salla, Zid) — are
+  taken by the platform out of what the buyer pays, fee included, but Khayt
+  worked them out on the price before the fee: 10% on 100 added 10, the
+  platform took 11, and you kept 99. Marketplace fee lines are now grossed up —
+  price = (price before fees, your own % surcharges and fixed extras included)
+  ÷ (1 − total marketplace fee %) — so a quote with one rises by roughly the fee
+  times the fee (about 1% more on a 10% fee, about 0.9% on Etsy's 9.5%). Each
+  fee line shows its real share of the final price, to the cent, and the lines
+  still add up to the total. A percentage line you add yourself (e.g. "Design
+  10%") is your own surcharge: it is worked out exactly as before and is not
+  grossed up. Quotes with no marketplace fee line are unchanged to the last
+  digit, and jobs already saved keep the price they were quoted at. Marketplace
+  fees totalling 95% or more are not grossed up, and the calculator and the
+  Mac's new job sheet say so. The desktop calculator's margin is now measured
+  after the marketplace fee lines, which the platform keeps.
 
 - **Mac: the standard Mac commands, where a Mac user looks for them.**
   - **File ▸ Print… (⌘P)** prints what is in front: the selected job's invoice

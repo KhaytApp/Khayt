@@ -86,16 +86,25 @@ public struct QuoteTotal: Codable, Sendable, Equatable {
     /// margin (`lib/overhead-rate.js`). 0 while the shop has it off; optional
     /// because a bundle from before October 2026 has no such field.
     public let overhead: Double?
+    /// The quote's marketplace FEE lines (a % line with a platformId, or
+    /// `fee: true`), in points, summed — present only when it has one. The
+    /// rule grosses them up: each is taken of the final price. The shop's own
+    /// % surcharges are not in it.
+    public let feePct: Double?
+    /// `fees-too-high` when those percentages reach the rule's cap and were
+    /// NOT grossed up, so the shop keeps less than it priced. Say so.
+    public let feeWarning: String?
 
     public init(priceBeforeDiscount: Double, discountAmount: Double, subtotal: Double,
                 rushFee: Double, total: Double, computedTotal: Double? = nil,
                 priceSource: String? = nil, agreedAmount: Double? = nil,
-                overhead: Double? = nil) {
+                overhead: Double? = nil, feePct: Double? = nil, feeWarning: String? = nil) {
         self.priceBeforeDiscount = priceBeforeDiscount; self.discountAmount = discountAmount
         self.subtotal = subtotal; self.rushFee = rushFee; self.total = total
         self.computedTotal = computedTotal; self.priceSource = priceSource
         self.agreedAmount = agreedAmount
         self.overhead = overhead
+        self.feePct = feePct; self.feeWarning = feeWarning
     }
 
     /// The figure to say beside the total when the total is not the arithmetic.

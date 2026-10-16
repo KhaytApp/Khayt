@@ -1805,6 +1805,7 @@
   "set.inv_bilingual_zatca": "Les factures ZATCA doivent comporter l’arabe : les documents restent donc bilingues tant que l’option est active.",
   "calc.platform_none": "— aucune marketplace —",
   "calc.platform_fees": "Frais de marketplace",
+  "calc.fee_pct_too_high": "Les frais en pourcentage totalisent {pct} % — trop élevés pour être intégrés au prix : il vous restera moins que ce qu’affiche ce devis.",
   "set.low_stock_color": "Couleur de stock faible",
   "set.low_stock_color_reset": "Réinitialiser",
   "set.low_stock_color_hint": "Met en évidence le filament et les consommables bientôt épuisés.",

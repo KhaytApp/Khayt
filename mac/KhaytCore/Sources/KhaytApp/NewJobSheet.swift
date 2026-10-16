@@ -865,6 +865,12 @@ struct NewJobSheet: View {
                 Text(shop.words.callIt("calc.bd.overhead") + " " + Money.figure(overhead))
                     .font(.callout).foregroundStyle(.secondary).monospacedDigit()
             }
+            // Percentage fees too high to build into the price (the rule's
+            // cap): the shop keeps less than this total reads as, so say so.
+            if let quoted, quoted.feeWarning == "fees-too-high" {
+                Text(shop.words.callIt("calc.fee_pct_too_high", ["pct": .number(quoted.feePct ?? 0)]))
+                    .font(.callout).foregroundStyle(Khayt.late)
+            }
         }
     }
 

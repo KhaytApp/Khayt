@@ -82,6 +82,9 @@ struct MoneyParityTests {
         // The quote engine, order of operations intact.
         "KhaytPricing.quoteTotal({baseCost:100,qty:2,margin:40,discountPct:10,rushEnabled:true,rushPct:25,shippingCost:30,business:true})",
         "KhaytPricing.quoteTotal({baseCost:0,qty:1,margin:0,business:false})",
+        // Percentage fees, grossed up and rounded to the cent — and the cap.
+        "KhaytPricing.quoteTotal({baseCost:87.3,margin:35,shippingCost:12.5,extraLines:[{pct:6.5,platformId:'etsy'},{pct:10},{pct:3,fee:true},{amount:0.2}],business:true})",
+        "KhaytPricing.quoteTotal({baseCost:100,extraLines:[{pct:60,platformId:'etsy'},{pct:40,fee:true}],business:true})",
         // The customer tracker moved to Swift — `OrderProgress` — so the check
         // that it agrees moved with it, to `OrderProgressParityTests`, which
         // asks about more statuses than this line did and about the names that

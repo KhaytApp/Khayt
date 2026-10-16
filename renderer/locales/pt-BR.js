@@ -1806,6 +1806,7 @@
   "set.inv_bilingual_zatca": "Faturas ZATCA precisam conter árabe, então os documentos permanecem bilíngues enquanto estiver ativo.",
   "calc.platform_none": "— sem marketplace —",
   "calc.platform_fees": "Taxas do marketplace",
+  "calc.fee_pct_too_high": "As taxas percentuais somam {pct}% — altas demais para embutir no preço, então você recebe menos do que este orçamento mostra.",
   "set.low_stock_color": "Cor de estoque baixo",
   "set.low_stock_color_reset": "Redefinir",
   "set.low_stock_color_hint": "Destaca filamento e consumíveis que estão acabando.",

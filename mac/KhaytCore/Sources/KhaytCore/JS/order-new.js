@@ -405,7 +405,7 @@
       // it so the row still reads as "6.5%" — pricing ignores `amount` on a
       // percentage line, so carrying both cannot double-charge.
       extraLines: extraLines.length > 0
-        ? P.resolveExtraLines(extraLines, quote.extrasBase)
+        ? P.resolveExtraLines(extraLines, quote.extrasBase, quote.feeBase)
            .map((r, n) => Object.assign({}, extraLines[n], { label: r.label, amount: r.amount }))
         : undefined,
       // ── SOLD OFF THE SHELF, NOT MADE TO ORDER ────────────────────────

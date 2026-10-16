@@ -1805,6 +1805,7 @@
   "set.inv_bilingual_zatca": "ZATCA faturalarında Arapça zorunludur; bu nedenle açıkken belgeler iki dilli kalır.",
   "calc.platform_none": "— pazaryeri yok —",
   "calc.platform_fees": "Pazaryeri ücretleri",
+  "calc.fee_pct_too_high": "Yüzdelik ücretlerin toplamı %{pct} — fiyata yansıtılamayacak kadar yüksek, bu yüzden size bu tekliften daha azı kalır.",
   "set.low_stock_color": "Düşük stok rengi",
   "set.low_stock_color_reset": "Sıfırla",
   "set.low_stock_color_hint": "Azalan filament ve sarf malzemelerini vurgular.",

@@ -49,7 +49,7 @@ test('the logged line freezes the money a percentage resolved to', () => {
   // An invoice reports what was charged. Recomputing a percentage months later,
   // against a base that has since changed, is a different number on a document
   // the customer already has.
-  assert.match(read('lib/order-new.js'), /P\.resolveExtraLines\(extraLines, quote\.extrasBase\)/,
+  assert.match(read('lib/order-new.js'), /P\.resolveExtraLines\(extraLines, quote\.extrasBase, quote\.feeBase\)/,
     'the logged lines keep a percentage with no resolved amount');
 });
 
