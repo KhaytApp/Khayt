@@ -932,29 +932,53 @@ function resinCompletePost(orderId) {
   updateStatus(orderId, 'qc');
 }
 
+/**
+ * Delete a job — only one that was never invoiced and never paid.
+ *
+ * ── AN INVOICED JOB IS CANCELLED, NOT DELETED ─────────────────────────────
+ *
+ * This deleted any job, including one with an invoice number and payments:
+ * a hole in the invoice sequence and the only record of the money, gone in
+ * two clicks. The rule is `KhaytRecordDelete.canDeleteOrder` now, the same
+ * one the Mac app asks, and a refused job is offered "Cancel job" instead —
+ * the status path, which keeps its number in the sequence.
+ *
+ * The delete takes the job and nothing else (`deleteOrders`): its expenses,
+ * spool usage rows, waste, time and loyalty entries STAY, unlinked. This used
+ * to remove the expenses and usage rows too — raising the P&L's net by costs
+ * really paid and erasing a record of filament really used. Undo puts the job
+ * back and relinks those rows (`restoreOrders`).
+ */
 async function deleteLog(id) {
+  const R = (typeof KhaytRecordDelete !== 'undefined') ? KhaytRecordDelete : null;
+  const order = printLog.find(o => o.id === id);
+  if (!order || !R) return;   // index.html loads the rule; without it nothing is deleted
+  const verdict = R.canDeleteOrder(order);
+  if (!verdict.ok) {
+    if (order.status === 'cancelled') {
+      toast(t('oe.delete_refused_cancelled', { id }), 'info', 7000);
+      return;
+    }
+    const cancel = await confirmModal(
+      t(verdict.reason === 'paid' ? 'oe.delete_refused_paid' : 'oe.delete_refused_invoiced', { id }),
+      { okText: t('oe.cancel_job') },
+    );
+    if (cancel) updateStatus(id, 'cancelled');
+    return;
+  }
   const ok = await confirmModal(`${id} — ${t('common.delete')}?`, { danger: true });
   if (!ok) return;
-  const idx = printLog.findIndex(o => o.id === id);
-  if (idx < 0) return;
-  const removed = printLog[idx];
-  printLog.splice(idx, 1);
-  // Sweep orphaned spool usage-history entries for this order
-  for (const spool of inventory) {
-    if (spool.usageHistory && spool.usageHistory.some(h => h.orderId === id)) {
-      spool.usageHistory = spool.usageHistory.filter(h => h.orderId !== id);
-    }
-  }
-  // Clean up expenses linked to this order
-  if (typeof expenses !== 'undefined' && expenses.some(e => e.orderId === id)) {
-    expenses = expenses.filter(e => e.orderId !== id);
-  }
+  const book = { printLog, inventory, expenses, wasteLog, timeEntries, loyaltyLedger };
+  const out = R.deleteOrders(book, [id]);
+  if (!out.deleted.length) return;
+  ({ printLog, inventory, expenses, wasteLog, timeEntries, loyaltyLedger } = out.book);
   saveAll();
   renderKanban(); renderLogs(); renderAnalytics(); renderPortfolio();
-  // Toast with Undo — restores at the same position
+  // Toast with Undo — the job back at the same position, and what went with it.
   toast(t('oe.deleted'), 'success', 5000, {
     undo: () => {
-      printLog.splice(idx, 0, removed);
+      const back = R.restoreOrders({ printLog, inventory, expenses, wasteLog, timeEntries, loyaltyLedger }, out.deleted);
+      ({ printLog, inventory, expenses, wasteLog, timeEntries, loyaltyLedger } = back);
       saveAll();
       renderKanban(); renderLogs(); renderAnalytics(); renderPortfolio();
     }

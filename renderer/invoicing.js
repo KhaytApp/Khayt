@@ -242,6 +242,20 @@ function approveQuote(orderId) {
 }
 
 async function rejectQuote(orderId) {
+  // Rejecting a quote deletes it, so it answers to the delete rule: a quote
+  // that already took a deposit (or was numbered) is cancelled instead.
+  const order = printLog.find(o => o.id === orderId);
+  const R = (typeof KhaytRecordDelete !== 'undefined') ? KhaytRecordDelete : null;
+  if (!order || !R) return;
+  const verdict = R.canDeleteOrder(order);
+  if (!verdict.ok) {
+    const cancel = await confirmModal(
+      t(verdict.reason === 'paid' ? 'oe.delete_refused_paid' : 'oe.delete_refused_invoiced', { id: orderId }),
+      { okText: t('oe.cancel_job') },
+    );
+    if (cancel) updateStatus(orderId, 'cancelled');
+    return;
+  }
   const ok = await confirmModal(t('quote.reject_q'), { danger: true });
   if (!ok) return;
   const idx = printLog.findIndex(o => o.id === orderId);

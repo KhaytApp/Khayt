@@ -397,8 +397,9 @@ private struct NewJobCommand: View {
 ///
 /// ⌘D copies the selected job — into the new-job sheet, nothing written until
 /// Save — or the selected catalogue product, into the product sheet. ⌘⌫ asks to
-/// delete the library's VISIBLE selection through the right-click menu's own
-/// question; the jobs and the customers have no delete in this app to reach.
+/// delete what is in front through the right-click menu's own question: the
+/// library's VISIBLE selection, or the chosen jobs or customers — only those
+/// the rule allows (`Shop+Delete.swift`).
 private struct EditCommands: View {
     @Environment(Shop.self) private var shop
 
@@ -406,9 +407,12 @@ private struct EditCommands: View {
         Button(Words.upfront("mac.duplicate")) { Task { await shop.duplicateFrontmost() } }
             .keyboardShortcut("d")
             .disabled(shop.duplicateTarget == nil)
-        Button(Words.upfront("common.delete") + "\u{2026}") { shop.askToDeleteLibrarySelection() }
+        // Whatever is in front: the library's visible models, the chosen jobs
+        // or the chosen customers (`Shop.deleteTarget`). Greyed when none of
+        // them may go; ⌫ on the list itself says why.
+        Button(Words.upfront("common.delete") + "\u{2026}") { shop.askToDeleteFrontmost() }
             .keyboardShortcut(.delete, modifiers: .command)
-            .disabled(shop.librarySelectionToDelete.isEmpty)
+            .disabled(shop.deleteTarget == nil)
     }
 }
 

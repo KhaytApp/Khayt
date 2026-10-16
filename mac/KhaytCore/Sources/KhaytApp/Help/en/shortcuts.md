@@ -23,6 +23,9 @@
   customer, parts and notes) or the selected catalogue product.
 - **⌫** or **⌘⌫** — delete the selected models in the library, after asking.
   Only the models you can see go — never ones folded inside a group.
+  On the jobs list, the board or the customers list it deletes the chosen jobs
+  or customers instead. A job with an invoice number or a payment is never
+  deleted — cancel it instead — and a customer with any job or gift card stays.
 - **⇧⌘D** — mark the selected model a favourite.
 - **File → Share…** — send the selected job's invoice, or the selected
   models' files, through the Mac's share menu.

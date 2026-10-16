@@ -12,7 +12,10 @@ struct CustomersTable: View {
     private var rows: [Customer] { shop.shownCustomers.sorted(using: order) }
 
     var body: some View {
-        Table(rows, selection: $shop.customerSelection, sortOrder: $order,
+        // Several rows at once, for Delete… — `selectCustomers` keeps the one
+        // the details pane shows among them.
+        Table(rows, selection: Binding(get: { shop.customerSelections }, set: { shop.selectCustomers($0) }),
+              sortOrder: $order,
               columnCustomization: $columns) {
             TableColumn(shop.words.callIt("doc.client"), value: \.name) { person in
                 HStack(spacing: 6) {
@@ -106,14 +109,17 @@ struct CustomersTable: View {
         // Right-click. The two things there are to do to a customer: write them
         // down properly, and take a job for them.
         .contextMenu(forSelectionType: Customer.ID.self) { ids in
-            if let id = ids.first, let person = shop.shownCustomers.first(where: { $0.id == id }),
+            if ids.count == 1, let id = ids.first,
+               let person = shop.shownCustomers.first(where: { $0.id == id }),
                shop.canMoveJobs {
                 Button(shop.words.callIt(person.record == nil
                                          ? "mac.write_them_down" : "mac.edit_customer")) {
                     shop.editingCustomer = person.record
                         ?? Shop.newCustomer().with(\.nameEn, person.name)
                 }
+                Divider()
             }
+            CustomerDeleteItems(shop: shop, ids: shop.shownCustomers.map(\.id).filter { ids.contains($0) })
         } primaryAction: { ids in
             // Double-click edits them, which is what a double-click does to a
             // row everywhere else in this app.
@@ -121,6 +127,8 @@ struct CustomersTable: View {
                   let person = shop.shownCustomers.first(where: { $0.id == id }) else { return }
             shop.editingCustomer = person.record ?? Shop.newCustomer().with(\.nameEn, person.name)
         }
+        // ⌫ asks to delete the chosen customers — or says why it may not.
+        .onDeleteCommand { shop.askToDeleteFrontmost() }
         .overlay {
             if rows.isEmpty {
                 if !shop.search.isEmpty {
@@ -144,6 +152,26 @@ struct CustomersTable: View {
             }
         }
         .background(Khayt.ground)
+    }
+}
+
+/// "Delete…" for the chosen customers, greyed with the reason when none of
+/// them may go — "Has 3 jobs" (`Shop.customerDeleteRefusal`).
+struct CustomerDeleteItems: View {
+    let shop: Shop
+    let ids: [Customer.ID]
+
+    var body: some View {
+        let people = shop.shownCustomers.filter { ids.contains($0.id) }
+        let refusals = people.compactMap { shop.customerDeleteRefusal($0) }
+        let free = people.count - refusals.count
+        if !people.isEmpty {
+            Button(shop.words.callIt("common.delete") + "\u{2026}", role: .destructive) {
+                shop.askToDeleteCustomers(ids)
+            }
+            .disabled(!shop.mayDeleteCustomers || free == 0)
+            if free == 0, let why = refusals.first { Text(why) }
+        }
     }
 }
 

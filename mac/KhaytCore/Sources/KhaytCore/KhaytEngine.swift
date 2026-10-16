@@ -454,6 +454,10 @@ public actor KhaytEngine {
         // What a copy of a job or a product carries (⌘D). The job copy is
         // `order-new`'s input, so it is created by the same rule as any job.
         "record-duplicate",
+        // Which jobs and customers may be deleted (never an invoiced or a paid
+        // job — those are cancelled), and what a delete tidies. The desktop's
+        // `deleteLog` asks the same rule.
+        "record-delete",
         // Which language a shop writes its customers' names in, and which of
         // them to show. Not the interface language: a shop that writes only
         // Arabic must not be shown the stale English name left over from setup.
@@ -11300,6 +11304,77 @@ public actor KhaytEngine {
                           [product, .object(["id": .string(id), "today": .string(today),
                                              "suffix": .string(suffix)])],
                           as: [String: JSONValue].self)
+    }
+
+    // MARK: - Deleting a job or a customer
+
+    /// Every refusal in the book — `lib/record-delete.js verdicts`: job id →
+    /// `invoiced` | `paid`, customer id → why and how many. Only the refused
+    /// are listed; anything absent may be deleted.
+    public struct DeleteVerdicts: Decodable, Sendable, Equatable {
+        public struct ClientVerdict: Decodable, Sendable, Equatable {
+            public let reason: String
+            public let jobs: Int
+            public let giftCards: Int
+            public let creditNotes: Int
+        }
+        public let orders: [String: String]
+        public let clients: [String: ClientVerdict]
+        public init(orders: [String: String] = [:], clients: [String: ClientVerdict] = [:]) {
+            self.orders = orders; self.clients = clients
+        }
+    }
+
+    public func deleteVerdicts(orders: [JSONValue], clients: [JSONValue],
+                               giftCards: [JSONValue]) throws -> DeleteVerdicts {
+        try runtime.call2("KhaytRecordDelete.verdicts({ printLog: ARG0, clients: ARG1, giftCards: ARG2 })",
+                          [.array(orders), .array(clients), .array(giftCards)], as: DeleteVerdicts.self)
+    }
+
+    /// One refusal, as `deleteOrders` / `deleteClients` report it.
+    public struct DeleteSkip: Decodable, Sendable, Equatable {
+        public let id: String
+        public let reason: String
+        public let jobs: Int?
+        public let giftCards: Int?
+    }
+
+    /// What a delete changed: the collections to write back, what Undo needs
+    /// to put it all back (`deleted`, opaque to Swift), and what was refused.
+    public struct Deleted: Decodable, Sendable {
+        public let book: [String: JSONValue]
+        public let deleted: [JSONValue]
+        public let skipped: [DeleteSkip]
+        public var deletedIds: [String] {
+            deleted.compactMap { if case .object(let o) = $0, case .string(let id)? = o["id"] { id } else { nil } }
+        }
+    }
+
+    /// `lib/record-delete.js deleteOrders`: delete the jobs the rule allows out
+    /// of `book` (`printLog`, `inventory`, `expenses`, `wasteLog`,
+    /// `timeEntries`, `loyaltyLedger`), tidying what pointed at them.
+    public func deleteOrders(book: [String: JSONValue], ids: [String]) throws -> Deleted {
+        try runtime.call2("KhaytRecordDelete.deleteOrders(ARG0, ARG1)",
+                          [.object(book), .array(ids.map { .string($0) })], as: Deleted.self)
+    }
+
+    /// `restoreOrders`: put back what `deleteOrders` took. Returns the book.
+    public func restoreOrders(book: [String: JSONValue], deleted: [JSONValue]) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytRecordDelete.restoreOrders(ARG0, ARG1)",
+                          [.object(book), .array(deleted)], as: [String: JSONValue].self)
+    }
+
+    /// `deleteClients`: delete the customers the rule allows out of `book`
+    /// (`clients`, `printLog`, `giftCards`).
+    public func deleteClients(book: [String: JSONValue], ids: [String]) throws -> Deleted {
+        try runtime.call2("KhaytRecordDelete.deleteClients(ARG0, ARG1)",
+                          [.object(book), .array(ids.map { .string($0) })], as: Deleted.self)
+    }
+
+    /// `restoreClients`: put back what `deleteClients` took. Returns the book.
+    public func restoreClients(book: [String: JSONValue], deleted: [JSONValue]) throws -> [String: JSONValue] {
+        try runtime.call2("KhaytRecordDelete.restoreClients(ARG0, ARG1)",
+                          [.object(book), .array(deleted)], as: [String: JSONValue].self)
     }
 
     /// What a job's components cost — `lib/order-new.js componentsCost`, the

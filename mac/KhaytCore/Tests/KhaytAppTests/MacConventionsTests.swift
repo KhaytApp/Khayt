@@ -151,18 +151,25 @@ struct MacConventionsTests {
         #expect(shop.librarySelectionToDelete.isEmpty, "a read-only book offers Delete")
         shop.askToDeleteLibrarySelection()
         #expect(shop.pendingLibraryDelete == nil && shop.pendingLibraryDeletes.isEmpty)
+        #expect(shop.deleteTarget == nil)
         shop.shelf = .jobs(nil)
         #expect(shop.librarySelectionToDelete.isEmpty)
+        #expect(shop.deleteTarget == nil, "a read-only book offers Delete on its jobs")
     }
 
     @Test("⌫ in the grid and ⌘⌫ in the menu both reach the same door")
     func deleteIsWired() throws {
         let grid = try QuoteSheetStatusTests.source("LibraryGrid.swift")
         #expect(grid.contains(".onDeleteCommand { shop.askToDeleteLibrarySelection() }"))
+        // The menu asks about whatever is in front; on the library that is
+        // the same door, and greyed by the same visible selection.
         let menus = try QuoteSheetStatusTests.source("Menus.swift")
-        #expect(menus.contains("shop.askToDeleteLibrarySelection()"))
+        #expect(menus.contains("shop.askToDeleteFrontmost()"))
         #expect(menus.contains(".keyboardShortcut(.delete, modifiers: .command)"))
-        #expect(menus.contains(".disabled(shop.librarySelectionToDelete.isEmpty)"))
+        #expect(menus.contains(".disabled(shop.deleteTarget == nil)"))
+        let doors = try QuoteSheetStatusTests.source("Shop+Delete.swift")
+        #expect(doors.contains("if showingLibrary { askToDeleteLibrarySelection(); return }"))
+        #expect(doors.contains("if showingLibrary { return librarySelectionToDelete.isEmpty ? nil : .library }"))
     }
 
     // MARK: - Duplicate

@@ -36,6 +36,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   fees totalling 95% or more are not grossed up, and the calculator and the
   Mac's new job sheet say so. The desktop calculator's margin is now measured
   after the marketplace fee lines, which the platform keeps.
+- **Delete a job or a customer on the Mac — never an invoiced or paid job.**
+  - **Mac:** the jobs list, the board card's right-click menu and the customers
+    list gain **Delete…**, and **⌫ / ⌘⌫** (File ▸ Delete…) now acts on the chosen
+    jobs or customers as well as the library. It always asks first, naming what
+    goes, and **Edit ▸ Undo** brings it back. The jobs and customers lists now
+    take several rows at once (⌘/⇧-click); a delete of several takes only the
+    ones that may go and says how many it left. Off on the sample book and for
+    staff roles without delete rights.
+  - **Which jobs may be deleted:** a quote nobody accepted, or a job that never
+    got an invoice number and has no payment of any kind. Anything invoiced or
+    paid is refused with the reason ("Invoiced: cancel instead") and offered
+    **Cancel Job**, so the invoice sequence keeps every number it handed out.
+    Because a job taken as a job is numbered when it is created, in practice
+    that means quotes and old unnumbered records.
+  - **Nothing goes but the job** (with its print runs and photos, which are on
+    the job). Its expenses, spool usage rows, waste, time and loyalty entries
+    stay in the books with their figures, only unlinked — so the P&L's expenses
+    and a spool's remaining filament do not move. Payments are never touched.
+    A job whose customer link is published has the link taken down.
+  - **Customers** may be deleted only with no job in any status and no gift card;
+    otherwise Delete is greyed with how many jobs they have.
+  - **Desktop (behaviour change):** deleting a job used to remove any job,
+    invoiced and paid ones included. It now follows the same rule — an invoiced
+    or paid job is refused and offered "Cancel job" — and rejecting a quote that
+    took a deposit does the same. A desktop delete no longer removes the job's
+    expenses and spool usage rows (which raised the P&L's net by costs really
+    paid); they stay, unlinked, and Undo relinks them.
+  - The rule and the tidy-up are one shared module, `lib/record-delete.js`, used
+    by both apps, with node tests.
 
 - **Mac: the standard Mac commands, where a Mac user looks for them.**
   - **File ▸ Print… (⌘P)** prints what is in front: the selected job's invoice
@@ -46,8 +75,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     library models' files, through the Mac's share menu.
   - **⌫ / ⌘⌫ in the library** asks to delete the selected models through the
     right-click menu's own question, which names how many. Only the models you
-    can see go — never ones folded inside a group tile. The jobs list and the
-    customers have no delete on the Mac, so the keys do nothing there.
+    can see go — never ones folded inside a group tile. (On the jobs and
+    customers lists the same keys now delete jobs and customers — see above.)
   - **File ▸ Duplicate (⌘D)** copies the selected job into New Job — the same
     customer, parts and notes; a fresh id and number, no payments, dates or
     print runs, and nothing saved until you press Save — or the selected

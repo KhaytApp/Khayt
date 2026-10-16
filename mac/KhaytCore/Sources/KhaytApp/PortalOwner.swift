@@ -157,6 +157,23 @@ extension Shop {
         }
     }
 
+    /// Take down the customer links of jobs that no longer exist. Best effort:
+    /// the job is gone either way, and a link left up is said, not swallowed.
+    func takeDownLinks(_ tokens: [String], engine: KhaytEngine) async {
+        guard !tokens.isEmpty else { return }
+        guard cloudRoleCanWrite, let creds = try? await portalCredentials() else {
+            moveProblem = words.callIt("mac.delete_portal_kept"); return
+        }
+        for tok in tokens {
+            do {
+                try await PortalClient.unpublish(pubToken: tok, baseUrl: creds.url, shopId: creds.shopId,
+                                                 token: creds.token, engine: engine)
+            } catch {
+                moveProblem = words.callIt("mac.delete_portal_kept")
+            }
+        }
+    }
+
     /// Take a job's link down; the job stops refreshing it.
     func unpublishPortal(_ id: Order.ID) async {
         moveProblem = nil
