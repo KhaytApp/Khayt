@@ -991,7 +991,10 @@ function renderMachineQueues() {
       const r = await window.hubAPI.printOrderFile({ orderFile: file.filename, machine, slicerPath: sl.path, args: sl.args, startPrint: true });
       if (!r || !r.ok) throw new Error((r && r.error) || 'failed');
       toast(t('slicer.sent', { name: machine.name }), 'success');
-      recordPrintRun(order.id, machine.id, !!r.started, file.originalName || file.filename);
+      // The print has started: a failure to note it must not read as a failed
+      // send, or the shop sends it a second time.
+      try { recordPrintRun(order.id, machine.id, !!r.started, file.originalName || file.filename); }
+      catch (e) { console.warn('[kanban] could not record the print run', e); }
     } catch (e) { toast(`${t('slicer.fail')} ${e.message}`, 'error'); }
   }
 
