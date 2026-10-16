@@ -330,6 +330,11 @@ public actor KhaytEngine {
         // finished (not cancelled, not failed — a photo of a failure is not a
         // photo of the work), once per print, and which job it belongs to.
         "print-finish-photo",
+        // Which machine a job was really printed on, and when: a send from
+        // this app writes the job's `machineId` — the one field the machine
+        // P&L, nozzle wear and depreciation read — keeping a plan it departed
+        // from and a history of every send.
+        "print-runs",
         // What each machine earned, and what it cost to keep earning it —
         // lifted out of `renderer/analytics.js`, where it was one screen's
         // arithmetic. This is the figure an owner retires a machine on, so two
@@ -4504,6 +4509,39 @@ public actor KhaytEngine {
         try runtime.call2("globalThis.KhaytPrintFinishPhoto.jobFor(ARG0, ARG1, ARG2)",
                           [.array(printLog), .string(machineId), .string(filename)],
                           as: String?.self)
+    }
+
+    // MARK: - Which machine printed a job (`lib/print-runs.js`)
+
+    /// The fields a send writes onto a job, or nil when it writes none (a
+    /// finished job, no machine). A `plannedMachineId` of `.null` means the
+    /// key comes OFF the record.
+    public func printRunFields(order: JSONValue, machineId: String, at: String,
+                               started: Bool, file: String) throws -> [String: JSONValue]? {
+        try runtime.call2("globalThis.KhaytPrintRuns.fields(ARG0, ARG1)",
+                          [order, .object(["machineId": .string(machineId), "at": .string(at),
+                                           "started": .bool(started), "file": .string(file)])],
+                          as: [String: JSONValue]?.self)
+    }
+
+    /// Where a job last went, the plan it departed from, and the sends before.
+    public struct PrintedOn: Decodable, Sendable, Equatable {
+        public struct Run: Decodable, Sendable, Equatable {
+            public let machineId: String
+            public let at: String
+            public let started: Bool
+        }
+        public let machineId: String
+        public let at: String
+        public let started: Bool
+        public let file: String?
+        public let planned: String?
+        public let earlier: [Run]
+    }
+
+    /// Nil for a job this app never sent anywhere — every book on disk today.
+    public func printedOn(order: JSONValue) throws -> PrintedOn? {
+        try runtime.call2("globalThis.KhaytPrintRuns.printedOn(ARG0)", [order], as: PrintedOn?.self)
     }
 
     // MARK: - What a print drew from the wall (`lib/print-energy.js`)

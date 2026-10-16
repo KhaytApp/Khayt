@@ -124,6 +124,8 @@ struct SendToPrinterSheet: View {
         let id = machineId
         let go = start
         shop.clearQuestion()
-        Task { await shop.sendToPrinter(file, machineId: id, startPrint: go) }
+        // The job goes with it, so the job records the machine that ran it.
+        let jobId = subject.id
+        Task { await shop.sendToPrinter(file, machineId: id, startPrint: go, jobId: jobId) }
     }
 }

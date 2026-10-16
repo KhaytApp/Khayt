@@ -257,7 +257,12 @@ extension Shop {
 
     /// Send a sliced file to a machine, and start it if asked. The key is
     /// opened now and dropped when this returns.
-    func sendToPrinter(_ file: URL, machineId: String, startPrint: Bool) async {
+    ///
+    /// `jobId` is the job the file is FOR. Once the printer has taken it, the
+    /// job records the machine (`recordPrintRun`) — so its hours, wear and
+    /// depreciation go to the printer that ran it, with nobody picking it by
+    /// hand. A send that failed records nothing.
+    func sendToPrinter(_ file: URL, machineId: String, startPrint: Bool, jobId: String? = nil) async {
         guard let engine, let machine = machines.first(where: { $0.id == machineId }) else { return }
         guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
         sendNote = nil
@@ -270,12 +275,72 @@ extension Shop {
             sendNote = words.callIt(sent.started ? "mac.send_started" : "mac.send_uploaded",
                                     ["name": .string(machine.name)])
             Telemetry.feature(.printSent, in: self)
+            if let jobId, !jobId.isEmpty {
+                await recordPrintRun(jobId: jobId, machineId: machine.id, started: sent.started,
+                                     file: file.lastPathComponent)
+            }
             await printers.refresh(machine, shop: self)
         } catch {
             let said = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
             printerProblem[machine.id] = said
             sendNote = said
         }
+    }
+
+    /// Write onto a job that it went to `machineId` — `lib/print-runs.js`
+    /// decides the fields, against the record AS IT IS ON DISK, inside the
+    /// write chain: a machine the shop picked since the sheet opened is read,
+    /// kept as the plan, and never silently overwritten.
+    func recordPrintRun(jobId: String, machineId: String, started: Bool, file: String,
+                        now: Date = Date()) async {
+        guard let engine, let build = source.build else { return }
+        do {
+            // lock: callers — sendToPrinter
+            try await StoreWriter.updateAsync(build) { root in
+                _ = try await Self.applyPrintRun(to: &root, jobId: jobId, machineId: machineId,
+                                                 started: started, file: file,
+                                                 at: StoreWriter.iso(now), engine: engine)
+            }
+            await load(source)
+        } catch {
+            // The print went; the record of it did not. Said, not swallowed:
+            // a shop told nothing would trust a P&L that never heard of it.
+            moveProblem = String(describing: error)
+        }
+    }
+
+    /// The same, on a book handed in — pure, for the tests. Returns whether
+    /// the job was changed (false: no such job, or one already finished).
+    static func applyPrintRun(to root: inout [String: JSONValue], jobId: String, machineId: String,
+                              started: Bool, file: String, at: String,
+                              engine: KhaytEngine) async throws -> Bool {
+        guard case .array(var rows)? = root["printLog"],
+              let index = rows.firstIndex(where: { recordId($0) == jobId }),
+              case .object(var record) = rows[index],
+              let fields = try await engine.printRunFields(order: .object(record), machineId: machineId,
+                                                           at: at, started: started, file: file)
+        else { return false }
+        for (key, value) in fields {
+            if value == .null { record.removeValue(forKey: key) } else { record[key] = value }
+        }
+        rows[index] = .object(record)
+        root["printLog"] = .array(rows)
+        return true
+    }
+
+    /// Where a job was printed, for the inspector — nil for a job this app
+    /// never sent anywhere.
+    func printedOn(_ jobId: String) async -> KhaytEngine.PrintedOn? {
+        guard let engine, let row = orderRows.first(where: { Self.recordId($0) == jobId }) else { return nil }
+        return (try? await engine.printedOn(order: row)) ?? nil
+    }
+
+    /// What changes when a job's record does, so a view asking `printedOn`
+    /// asks again after a send.
+    func printRunsStamp(_ jobId: String) -> String {
+        guard case .object(let o)? = orderRows.first(where: { Self.recordId($0) == jobId }) else { return jobId }
+        let runs: Int = if case .array(let a)? = o["printRuns"] { a.count } else { 0 }
+        return "\(jobId)|\(Self.plainString(o["machineId"]) ?? "")|\(Self.plainString(o["plannedMachineId"]) ?? "")|\(runs)"
     }
 
     /// What is on a machine's plate, for the sheet that offers to drop one.

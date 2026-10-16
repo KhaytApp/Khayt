@@ -991,7 +991,23 @@ function renderMachineQueues() {
       const r = await window.hubAPI.printOrderFile({ orderFile: file.filename, machine, slicerPath: sl.path, args: sl.args, startPrint: true });
       if (!r || !r.ok) throw new Error((r && r.error) || 'failed');
       toast(t('slicer.sent', { name: machine.name }), 'success');
+      recordPrintRun(order.id, machine.id, !!r.started, file.originalName || file.filename);
     } catch (e) { toast(`${t('slicer.fail')} ${e.message}`, 'error'); }
+  }
+
+  // The job records the machine it was sent to (lib/print-runs.js), the same
+  // fields the Mac writes, so either app can say where a job printed. Re-found
+  // by id after the await: the order may have moved in the log meanwhile.
+  function recordPrintRun(orderId, machineId, started, fileName) {
+    if (typeof KhaytPrintRuns === 'undefined') return;
+    const order = printLog.find(o => o && o.id === orderId);
+    const f = order && KhaytPrintRuns.fields(order, { machineId, at: new Date().toISOString(), started, file: fileName });
+    if (!f) return;
+    order.machineId = f.machineId;
+    order.printRuns = f.printRuns;
+    if (f.plannedMachineId) order.plannedMachineId = f.plannedMachineId;
+    else delete order.plannedMachineId;
+    saveAll();
   }
 
   const api = {
