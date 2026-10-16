@@ -3973,6 +3973,15 @@ final class Words {
         "mac.send_started":  ["en": "Sent to {name}, and printing.", "ar": "أُرسل إلى {name} وبدأت الطباعة."],
         "mac.send_uploaded": ["en": "Sent to {name}. Start it from the printer when ready.",
                               "ar": "أُرسل إلى {name}. ابدأ الطباعة من الطابعة عند الاستعداد."],
+        // The job inspector: which machine a job was sent to from this app
+        // (`lib/print-runs.js`), and the one it was planned for when that differs.
+        "mac.job_printed_on": ["en": "Printed on {machine}", "ar": "طُبع على {machine}"],
+        "mac.job_printed_on_planned": ["en": "Printed on {machine} (planned {planned})",
+                                       "ar": "طُبع على {machine} (المخطّط: {planned})"],
+        "mac.job_sent_to":   ["en": "Sent to {machine}", "ar": "أُرسل إلى {machine}"],
+        "mac.job_sent_to_planned": ["en": "Sent to {machine} (planned {planned})",
+                                    "ar": "أُرسل إلى {machine} (المخطّط: {planned})"],
+        "mac.job_runs_earlier": ["en": "Earlier: {list}", "ar": "قبل ذلك: {list}"],
         "mac.carriers_hint": ["en": "Optional — shipping works fully by hand. A carrier turned on here is offered "
                                     + "when a job is shipped, and with a webhook secret it updates a parcel's status "
                                     + "by itself. Labels are created from the Windows and Linux app.",

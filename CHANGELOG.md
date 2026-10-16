@@ -8,6 +8,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   expense form now takes its list from the code the Mac uses (KhaytCore)
   instead of keeping its own copy, so the two cannot drift apart. What it
   offers is unchanged.
+
+- **Mac: a job sent to a printer records which machine printed it.** Sending a
+  job's file from the Mac used to write nothing on the job, so a job planned
+  for one printer and sent to another kept charging its hours, nozzle wear and
+  depreciation to the planned one, and a job nobody assigned stayed
+  "Unassigned" in the machine P&L. Now, once the printer accepts the file, the
+  job's machine is set to the printer that received it, and the send is kept
+  in the job's history with its time. If the shop had picked a different
+  machine, that choice is kept and the job inspector says "Printed on X
+  (planned Y)". A reprint on another machine replaces the machine rather than
+  adding a second one, so hours and wear are counted once. A send from the
+  desktop board is recorded the same way. Jobs already in the book read
+  exactly as before.
+
 - **iPhone: expenses use the shop's categories.** The phone offered resin,
   parts, rent and power, and none of those exist anywhere else in Khayt. A
   power bill typed on the phone never counted toward the electricity budget,

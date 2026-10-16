@@ -36,6 +36,8 @@ private struct Detail: View {
     @State private var carriers: [KhaytEngine.CarrierChoice] = []
     /// The papers this job's product carries. Empty for a job typed by hand.
     @State private var papers: [KhaytEngine.OrderDocument] = []
+    /// Where this app last sent the job — nil for one it never sent.
+    @State private var printed: KhaytEngine.PrintedOn?
 
     var body: some View {
         ScrollView {
@@ -66,6 +68,9 @@ private struct Detail: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                }
+                if job.machineId?.isEmpty == false || printed != nil {
+                    JobMachineLine(shop: shop, job: job, printed: printed)
                 }
                 Divider()
                 money
@@ -172,6 +177,10 @@ private struct Detail: View {
         .task(id: job.id) {
             zatca = await shop.zatcaReporting()?.invoices.first { $0.id == job.id }
             papers = await shop.documents(for: job)
+        }
+        // Asked again when a send lands, not only when another job is picked.
+        .task(id: shop.printRunsStamp(job.id)) {
+            printed = await shop.printedOn(job.id)
         }
         .sheet(item: $editing) { part in
             EditPartSheet(shop: shop, orderId: job.id, part: part)
@@ -445,6 +454,69 @@ struct ZatcaLine: View {
         case "rejected", "error": "exclamationmark.triangle.fill"
         default: "clock.badge.exclamationmark"
         }
+    }
+}
+
+/// Which machine the job is on — and, once this app has sent it, which one
+/// actually printed it and when (`lib/print-runs.js`).
+///
+/// A send writes the job's `machineId`, so the plan a shop picked by hand is
+/// never replaced without this line saying so: "Printed on X (planned Y)".
+struct JobMachineLine: View {
+    let shop: Shop
+    let job: Order
+    let printed: KhaytEngine.PrintedOn?
+
+    var body: some View {
+        let name: (String) -> String = { id in shop.machines.first { $0.id == id }?.name ?? id }
+        if let printed {
+            VStack(alignment: .leading, spacing: 2) {
+                Label(Self.sentence(printed, name: name, words: shop.words), systemImage: "printer")
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let at = Self.date(printed.at) {
+                    Text(shop.words.say(at, Date.FormatStyle(date: .abbreviated, time: .shortened)))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if !printed.earlier.isEmpty {
+                    Text(Self.earlier(printed.earlier, name: name, words: shop.words))
+                        .font(.caption2).foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        } else if let id = job.machineId, !id.isEmpty {
+            DetailLine(shop.words.callIt("doc.machine"), name(id))
+        }
+    }
+
+    /// The headline: printed (or only sent) on what, and the plan when it differs.
+    static func sentence(_ p: KhaytEngine.PrintedOn, name: (String) -> String, words: Words) -> String {
+        let base = p.started ? "mac.job_printed_on" : "mac.job_sent_to"
+        var params: [String: JSONValue] = ["machine": .string(name(p.machineId))]
+        if let planned = p.planned, !planned.isEmpty {
+            params["planned"] = .string(name(planned))
+            return words.callIt(base + "_planned", params)
+        }
+        return words.callIt(base, params)
+    }
+
+    /// The sends before the last, newest first: "Earlier: Ender · 16 Oct".
+    static func earlier(_ runs: [KhaytEngine.PrintedOn.Run], name: (String) -> String, words: Words) -> String {
+        let list = runs.prefix(5).map { r -> String in
+            guard let at = date(r.at) else { return name(r.machineId) }
+            return name(r.machineId) + " · " + words.say(at, Date.FormatStyle(date: .abbreviated, time: .omitted))
+        }
+        return words.callIt("mac.job_runs_earlier",
+                            ["list": .string(list.joined(separator: words.isRTL ? "، " : ", "))])
+    }
+
+    /// `toISOString()`, with or without milliseconds.
+    static func date(_ iso: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: iso) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: iso)
     }
 }
 
