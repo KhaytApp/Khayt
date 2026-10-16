@@ -7231,6 +7231,41 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.75] - 2026-10-16
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Choose the period your profit and loss covers, take it out as a file, and see
+the VAT for it — and a printer you bought is no longer charged twice.
+
+### Added
+
+- **Profit and loss for the period you choose.** Reports ▸ Profit & Loss has
+  a period menu: this month, last month, this quarter, last quarter, this
+  year, last year, your own pair of days, or all time (the default, so the
+  page looks as before until you pick). The table, the chart, the totals and
+  the expenses breakdown all follow it, and fixed costs are charged only for
+  the days the period covers. Each window remembers its choice.
+- **Export the P&L.** As a CSV that opens in Excel with Arabic intact and
+  money as plain numbers, or as a PDF, from the page or from Book ▸ Export
+  Profit & Loss. The file name carries the period's dates.
+- **VAT for the period.** A shop with tax set sees the VAT on its sales, the
+  VAT on expenses that recorded it, and the net owed or refundable. Expenses
+  saved without their VAT are counted, since nothing can be reclaimed on them.
+- **An Equipment expense category.**
+
+### Fixed
+
+- **A machine you bought is no longer counted twice.** A printer recorded as
+  an expense and also depreciated on its machine sheet was charged in full and
+  again as depreciation. The matching expense is now shown beside the P&L as
+  "Equipment bought (depreciated)" and left out of expenses: one in Equipment
+  within 1% of the machine's price and 31 days of its purchase date, or one
+  already recorded for exactly its price on that day. Anything else you buy
+  stays an expense, and cash flow is unchanged. The branch and machine P&Ls
+  follow the same rule.
+
 ## [4.0.0-alpha.74] - 2026-10-16
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
