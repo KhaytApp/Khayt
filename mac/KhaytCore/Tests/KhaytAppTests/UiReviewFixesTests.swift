@@ -96,7 +96,11 @@ struct UiReviewFixesTests {
             currencies: Invoice.currencyTable(shop), now: Date(),
             granularity: "month", wasteLog: shop.wasteRows,
             inventory: shop.inventoryRows, machines: shop.machineRows,
-            recentMonthlyHours: shop.recentMonthlyHours)
+            recentMonthlyHours: shop.recentMonthlyHours,
+            // The masthead's row carries the time log, so this one must too:
+            // in a month whose only record is a logged hour, a row without
+            // it does not exist and the two figures compare 0 with nil.
+            timeEntries: shop.timeEntryRows)
         let key = DateRange.localMonth(Date())
         let reports = rows.first { $0.period == key }?.cogsValue
         #expect(shop.monthCostOfGoods == reports)
