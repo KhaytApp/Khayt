@@ -2,6 +2,10 @@
 
 ## Getting around
 
+- **⌘K** — go to anything: type a job's number or invoice number, a
+  customer's name or phone, a model, a product, a machine or a screen, then
+  **↑**/**↓** to choose, **↩** to open it and **Esc** to close. Arabic digits
+  work too.
 - **⌘F** — the search box.
 - **⌘R** — reload the book from disk.
 - **⌘,** — settings.

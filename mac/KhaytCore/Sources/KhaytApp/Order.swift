@@ -107,6 +107,11 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// row either destroys the deposit or leaves it outstanding forever.
     /// Absent on a hand-built plan, and on every plan made before Sep 2026.
     let instalmentBase: Double?
+    /// The invoice's number, once the job has one. `lib/order-new.js` writes
+    /// it under both spellings (`invoiceNumber` and `invoiceNum`) and older
+    /// books carry one or the other — and sometimes a NUMBER. Read for ⌘K,
+    /// which finds a job by the number on the paper the customer is holding.
+    let invoiceNumber: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
@@ -116,6 +121,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         case fromStock
         case nonBusiness
         case instalments, instalmentBase
+        case invoiceNumber, invoiceNum
     }
 
     /// THREE FIELDS A NEW JOB HAS NOT GOT YET.
@@ -236,6 +242,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         parts = try c.decodeIfPresent([Part].self, forKey: .parts) ?? []
         instalments = try c.decodeIfPresent([PlanRow].self, forKey: .instalments) ?? []
         instalmentBase = try c.decodeIfPresent(Double.self, forKey: .instalmentBase)
+        invoiceNumber = Self.lenientText(c, .invoiceNumber) ?? Self.lenientText(c, .invoiceNum)
     }
 
     /// One payment of a plan, as Khayt writes it.

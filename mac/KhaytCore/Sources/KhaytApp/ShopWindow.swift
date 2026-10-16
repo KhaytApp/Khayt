@@ -96,11 +96,22 @@ struct ShopWindow: View {
                 // `ScreenActions`.
                 .environment(\.classicShell, false)
                 .modifier(WindowSheets(shop: shop))
+                .overlay { goTo }
         } else {
             classic
                 .environment(\.classicShell, true)
                 .windowTitleBar(hidden: false)
                 .modifier(WindowSheets(shop: shop))
+                .overlay { goTo }
+        }
+    }
+
+    /// ⌘K's palette, over either shell. Never over the sign-in screen: the
+    /// Go menu is disabled then, and a palette left open when the lock came
+    /// down is closed by `dismissEverySheet`.
+    @ViewBuilder private var goTo: some View {
+        if shop.goingTo && shop.canGoToAnything {
+            GoToPalette(shop: shop)
         }
     }
 

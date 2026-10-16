@@ -13,6 +13,11 @@ import Foundation
 /// So both sides are folded first: case, diacritics and width by Foundation;
 /// then the Arabic short vowels and the tatweel dropped, أ إ آ ٱ read as ا,
 /// ة as ه and ى as ي. Pure and portable, so the phone can search the same way.
+///
+/// DIGITS TOO. The book stores Western digits — an invoice number, a phone, a
+/// job's number — and an Arabic keyboard types ٠١٢٣ (or the Persian ۰۱۲۳). A
+/// search for "١٠٠٢" that cannot find ORD-01002 is the same half-a-shelf bug,
+/// so both Arabic-Indic sets fold to 0–9.
 public enum SearchText {
     public static func fold(_ text: String) -> String {
         let folded = text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
@@ -24,6 +29,10 @@ public enum SearchText {
             case 0x0622, 0x0623, 0x0625, 0x0671: out.append("\u{0627}") // آ أ إ ٱ → ا
             case 0x0629: out.append("\u{0647}")                       // ة → ه
             case 0x0649: out.append("\u{064A}")                       // ى → ي
+            case 0x0660...0x0669:                                     // ٠–٩ → 0–9
+                out.append(Unicode.Scalar(scalar.value - 0x0660 + 0x30)!)
+            case 0x06F0...0x06F9:                                     // ۰–۹ → 0–9
+                out.append(Unicode.Scalar(scalar.value - 0x06F0 + 0x30)!)
             default: out.append(scalar)
             }
         }

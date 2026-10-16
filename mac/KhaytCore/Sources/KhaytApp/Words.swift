@@ -2066,6 +2066,21 @@ final class Words {
         // The window itself.
         "mac.details":       ["en": "Details",         "ar": "التفاصيل"],
         "mac.find":          ["en": "Find\u{2026}",        "ar": "بحث\u{2026}"],
+        // ⌘K, "Go to…" — the palette over the whole book (`GoToPalette`).
+        "mac.goto":          ["en": "Go to",                "ar": "انتقال إلى"],
+        "mac.goto_prompt":   ["en": "Jobs, customers, models, screens\u{2026}",
+                              "ar": "الأعمال، العملاء، النماذج، الشاشات\u{2026}"],
+        "mac.goto_group_screen":   ["en": "Screens and commands", "ar": "الشاشات والأوامر"],
+        "mac.goto_group_job":      ["en": "Jobs",                 "ar": "الأعمال"],
+        "mac.goto_group_customer": ["en": "Customers",            "ar": "العملاء"],
+        "mac.goto_group_model":    ["en": "Library",              "ar": "المكتبة"],
+        "mac.goto_group_product":  ["en": "Catalogue",            "ar": "الكتالوج"],
+        "mac.goto_group_machine":  ["en": "Machines",             "ar": "الطابعات"],
+        "mac.goto_screen":   ["en": "Screen",               "ar": "شاشة"],
+        "mac.goto_command":  ["en": "Command",              "ar": "أمر"],
+        "mac.goto_none":     ["en": "Nothing in the book matches", "ar": "لا شيء في الدفتر يطابق"],
+        "mac.goto_hint":     ["en": "\u{2191}\u{2193} to move · \u{21A9} to open · esc to close",
+                              "ar": "\u{2191}\u{2193} للتنقّل · \u{21A9} للفتح · esc للإغلاق"],
         "mac.quick_look":    ["en": "Quick Look",     "ar": "نظرة سريعة"],
         // ── The sidebar's own names for three screens ────────────────────────
         //

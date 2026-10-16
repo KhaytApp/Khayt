@@ -293,6 +293,13 @@ private struct GoMenu: View {
     @Environment(Shop.self) private var shop
 
     var body: some View {
+        // ⌘K, "Go to…": anything in the book by name or number, and every
+        // screen below — see `GoToPalette`. Plain ⌘K: ⌃⌘K is the kiosk and
+        // ⇧⌘K the calculator, and `MenuCoverageTests` holds all three apart.
+        Button(Words.upfront("mac.goto") + "\u{2026}") { shop.goingTo = true }
+            .keyboardShortcut("k")
+            .disabled(!shop.canGoToAnything)
+        Divider()
         Button(Words.upfront("mac.dashboard")) { shop.shelf = .dashboard }
             .keyboardShortcut("1", modifiers: .command)
         Button(Words.upfront("mac.all_jobs")) { shop.shelf = .jobs(nil) }
