@@ -729,10 +729,10 @@ struct SetupsSection: View {
             // in English. There is no short unit word for either in the
             // locales, and inventing two would mean nine translations.
             if let mm = setup.layerHeightMm {
-                bits.append("\(shop.words.callIt("conv.src_layer")) \(mm.formatted(.number.precision(.fractionLength(0...2))))")
+                bits.append("\(shop.words.callIt("conv.src_layer")) \(mm.formatted(.number.precision(.fractionLength(0...2)).locale(shop.words.locale)))")
             }
             if let mm = setup.nozzleMm {
-                bits.append("\(shop.words.callIt("conv.src_nozzle")) \(mm.formatted(.number.precision(.fractionLength(0...2))))")
+                bits.append("\(shop.words.callIt("conv.src_nozzle")) \(mm.formatted(.number.precision(.fractionLength(0...2)).locale(shop.words.locale)))")
             }
             let stuff = [setup.material, setup.colour].compactMap { $0 }.joined(separator: " ")
             if !stuff.isEmpty { bits.append(stuff) }
@@ -807,10 +807,10 @@ struct VersionsSection: View {
     private func size(_ v: KhaytEngine.PrintVersions.Version) -> String? {
         var bits: [String] = []
         if let g = v.grams {
-            bits.append("\(g.formatted(.number.precision(.fractionLength(0)))) \(shop.words.callIt("common.grams"))")
+            bits.append("\(g.formatted(.number.precision(.fractionLength(0)).locale(shop.words.locale))) \(shop.words.callIt("common.grams"))")
         }
         if let h = v.hours {
-            bits.append("\(h.formatted(.number.precision(.fractionLength(1)))) \(shop.words.callIt("common.hours_short"))")
+            bits.append("\(h.formatted(.number.precision(.fractionLength(1)).locale(shop.words.locale))) \(shop.words.callIt("common.hours_short"))")
         }
         return bits.isEmpty ? nil : bits.joined(separator: " · ")
     }
@@ -870,6 +870,6 @@ struct PartsSection: View {
     }
 
     static func bytes(_ v: Double) -> String {
-        ByteCountFormatter.string(fromByteCount: Int64(v), countStyle: .file)
+        Format.fileSize(Int64(v))
     }
 }

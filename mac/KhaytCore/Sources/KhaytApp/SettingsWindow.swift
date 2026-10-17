@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytWidgetData
 import AppKit
 import KhaytCore
 
@@ -1134,6 +1135,20 @@ struct PreferencesPane: View {
                 // done: the snapshot runner could not open the settings window
                 // while an orphaned Khayt held the status bar.
                 Section(shop.words.callIt("mac.on_this_mac")) {
+                    // WHICH DIGITS — first, because it sits with the language
+                    // above: Western 0–9 in both languages unless this Mac's
+                    // owner wants the Mac's own (`Digits`). This Mac's, not
+                    // the book's: a reading habit, like the two below.
+                    Toggle(shop.words.callIt("mac.mac_digits"), isOn: Binding(
+                        get: { Digits.shared.followsMac },
+                        set: { on in
+                            Digits.shared.followsMac = on
+                            // The widgets draw from the snapshot, which says.
+                            WidgetFeed.shared.update(shop: shop)
+                        }))
+                    Text(shop.words.callIt("mac.mac_digits_note"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     UpdateToggles(shop: shop)
                     Toggle(shop.words.callIt("mac.menu_bar"), isOn: $menuBar)
                         .onChange(of: menuBar) { _, on in

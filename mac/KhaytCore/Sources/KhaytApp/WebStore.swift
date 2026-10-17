@@ -819,7 +819,7 @@ struct WebStoreSheet: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(verbatim: listing.name).font(.callout.weight(.medium))
                                     Text(listing.issues.map { shop.words.callIt("mac.ws_issue_" + $0) }
-                                            .formatted(.list(type: .and)))
+                                            .formatted(.list(type: .and).locale(shop.words.locale)))
                                         .font(.caption).foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }

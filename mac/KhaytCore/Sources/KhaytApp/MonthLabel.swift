@@ -1,4 +1,5 @@
 import Foundation
+import KhaytWidgetData
 
 /// How a month is written under a bar.
 ///
@@ -37,7 +38,7 @@ extension MonthLabel {
         let parts = key.split(separator: "-")
         guard parts.count == 2, let year = Int(parts[0]), let month = Int(parts[1]),
               (1...12).contains(month) else { return key }
-        let locale = Locale(identifier: language)
+        let locale = Digits.locale(language: language)
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = locale
         guard let date = calendar.date(from: DateComponents(year: year, month: month, day: 1))

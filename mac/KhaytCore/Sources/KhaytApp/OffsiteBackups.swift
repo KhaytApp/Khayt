@@ -229,7 +229,7 @@ extension Shop {
             if !automatic {
                 offsite.note = words.callIt("mac.offsite_done", [
                     "name": .string(outcome.name),
-                    "size": .string(ByteCountFormatter.string(fromByteCount: Int64(outcome.bytes), countStyle: .file))])
+                    "size": .string(Format.fileSize(Int64(outcome.bytes)))])
             }
         } catch {
             let why = offsiteSay(error)

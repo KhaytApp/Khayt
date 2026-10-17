@@ -652,7 +652,7 @@ struct Upkeep: View {
     }
 
     private static func amount(_ v: Double, _ shop: Shop, _ unit: String) -> String {
-        let n = v.rounded().formatted(.number.precision(.fractionLength(0)))
+        let n = v.rounded().formatted(.number.precision(.fractionLength(0)).locale(shop.words.locale))
         return "\(n) \(shop.words.callIt(unit))"
     }
 }
@@ -1302,8 +1302,8 @@ struct ConsumablesCard: View {
         static func qty(_ v: Double) -> String {
             let whole = v.rounded()
             return abs(v - whole) < 0.05
-                ? whole.formatted(.number.precision(.fractionLength(0)))
-                : v.formatted(.number.precision(.fractionLength(1)))
+                ? whole.formatted(.number.precision(.fractionLength(0)).locale(Money.digits))
+                : v.formatted(.number.precision(.fractionLength(1)).locale(Money.digits))
         }
     }
 }

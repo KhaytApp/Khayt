@@ -31,6 +31,7 @@ struct KhaytApp: App {
 
         Settings {
             SettingsWindow(shop: shop)
+                .modifier(ShopsLocale(words: shop.words))
         }
 
         // ⌘? — Khayt's own help, in a window BESIDE the app rather than on top
@@ -39,6 +40,7 @@ struct KhaytApp: App {
         // not an Apple Help Book.
         Window(Text(Words.upfront("mac.help_title")), id: HelpWindow.id) {
             HelpWindow(shop: shop)
+                .modifier(ShopsLocale(words: shop.words))
         }
         .defaultSize(width: 940, height: 640)
         .keyboardShortcut("?", modifiers: .command)
@@ -48,6 +50,7 @@ struct KhaytApp: App {
         // full screen while this one is used. See `KioskWindow`.
         Window(Text(Words.upfront("mac.kiosk_title")), id: KioskWindow.id) {
             KioskWindow(shop: shop)
+                .modifier(ShopsLocale(words: shop.words))
         }
         .defaultSize(width: 1280, height: 760)
         // No item of its own in the Window menu: a `Window` scene gets one by
@@ -87,6 +90,7 @@ struct KhaytApp: App {
         // addition to this app, not the front of it.
         Window("Khayt", id: "shop") {
             ShopWindow(shop: shop)
+                .modifier(ShopsLocale(words: shop.words))
                 // A FLOOR, so the window cannot be dragged into nonsense.
                 //
                 // "Choose a minimum and maximum size for each window to help

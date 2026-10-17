@@ -83,6 +83,13 @@ public struct KhaytWidgetView: View {
         return c
     }()
 
+    /// The locale a widget draws in: the book's language, the book's
+    /// (Gregorian) calendar, and the digits the app was told to use.
+    public static func locale(_ snapshot: ShopWidgetSnapshot) -> Locale {
+        Digits.locale(Locale(identifier: snapshot.language + "@calendar=gregorian"),
+                      followsMac: snapshot.macDigits ?? false)
+    }
+
     public var body: some View {
         if let snapshot {
             Group {
@@ -100,7 +107,11 @@ public struct KhaytWidgetView: View {
             // calendar, which is Gregorian (`Calendar.book`): a Saudi Mac set
             // to Umm al-Qura drew a due date as "5 Jumada I" beside the app's
             // "17 Oct".
-            .environment(\.locale, Locale(identifier: snapshot.language + "@calendar=gregorian;numbers=latn"))
+            //
+            // The digits are the APP's choice on this Mac (`Digits`), carried
+            // in the snapshot because this process cannot read the app's
+            // defaults: Western unless "Use the Mac's number format" is on.
+            .environment(\.locale, Self.locale(snapshot))
             .environment(\.calendar, Self.gregorian)
             .environment(\.layoutDirection, snapshot.rightToLeft ? .rightToLeft : .leftToRight)
         } else {

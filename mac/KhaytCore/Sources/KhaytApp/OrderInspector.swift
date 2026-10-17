@@ -411,7 +411,7 @@ struct ZatcaLine: View {
                         Text("·").foregroundStyle(.tertiary)
                         // The counter the authority requires to be unbroken, so
                         // a gap in it is something a shop can be asked about.
-                        Text("ICV \(icv.formatted(.number.precision(.fractionLength(0))))")
+                        Text("ICV \(icv.formatted(.number.precision(.fractionLength(0)).locale(shop.words.locale)))")
                             .monospacedDigit().foregroundStyle(.secondary)
                     }
                 }

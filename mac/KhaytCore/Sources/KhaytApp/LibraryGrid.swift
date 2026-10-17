@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytWidgetData
 import AppKit
 
 /// The shop's models.
@@ -740,20 +741,25 @@ private struct EmptyShelf: View {
 enum Format {
     /// Sizes a shop reads. Models here run to 80 MB and libraries to hundreds of
     /// gigabytes, so this is base-1000 like the Finder's, not base-1024.
+    ///
+    /// Through a format style rather than `ByteCountFormatter`, which has no
+    /// locale to give and wrote "١٢٫٣ MB" in the English app on an Arabic-Indic
+    /// Mac. `Money.digits` keeps the units as they were ("MB") and the digits
+    /// this Mac asked for (`Digits`).
     static func bytes(_ n: Double) -> String {
-        let f = ByteCountFormatter()
-        f.countStyle = .file
-        f.allowedUnits = [.useKB, .useMB, .useGB]
-        return f.string(fromByteCount: Int64(n))
+        Int64(n).formatted(.byteCount(style: .file, allowedUnits: [.kb, .mb, .gb]).locale(Money.digits))
+    }
+
+    /// Any size, in whichever unit fits — `ByteCountFormatter`'s default units.
+    static func fileSize(_ n: Int64) -> String {
+        n.formatted(.byteCount(style: .file).locale(Money.digits))
     }
 
     /// Millimetres with no more precision than a shop can hold a caliper to.
     static func mm(_ v: Double) -> String { String(format: "%.0f", v) }
 
     static func count(_ n: Int) -> String {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        return f.string(from: n as NSNumber) ?? "\(n)"
+        n.formatted(.number.locale(Money.digits))
     }
 }
 

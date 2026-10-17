@@ -1,5 +1,6 @@
 import SwiftUI
 import KhaytCore
+import KhaytWidgetData
 
 /// Money on screen.
 ///
@@ -70,7 +71,12 @@ enum Money {
     ///
     /// `en_US` and not the reflexive `en_US_POSIX`: POSIX suppresses grouping
     /// altogether and hands back "1234567.89".
-    private static let digits = Locale(identifier: "en_US")
+    ///
+    /// Western unless this Mac's owner asked for the Mac's own digits
+    /// (`Digits`, Settings > On this Mac > Use the Mac's number format) — the
+    /// one place that choice is made, so a figure here cannot disagree with a
+    /// date or a count beside it.
+    static var digits: Locale { Digits.locale(Locale(identifier: "en_US")) }
 
     /// A value that shows as zero at `decimals` places, as an UNSIGNED zero.
     ///
@@ -268,7 +274,7 @@ enum Quantity {
         let places = unit?.decimals ?? 0
         let f = NumberFormatter()
         f.numberStyle = .decimal
-        f.locale = Locale(identifier: "en_US")
+        f.locale = Money.digits
         f.minimumFractionDigits = 0
         f.maximumFractionDigits = places
         let n = f.string(from: amount as NSNumber) ?? "\(amount)"

@@ -107,8 +107,7 @@ struct OffsiteBackupSettings: View {
         if let at = status.lastAt {
             Label(shop.words.callIt("mac.offsite_last", [
                     "when": .string(shop.words.say(at, Date.FormatStyle(date: .abbreviated, time: .shortened))),
-                    "size": .string(ByteCountFormatter.string(fromByteCount: Int64(status.lastBytes ?? 0),
-                                                              countStyle: .file))]),
+                    "size": .string(Format.fileSize(Int64(status.lastBytes ?? 0)))]),
                   systemImage: "clock.arrow.circlepath")
                 .font(.callout).foregroundStyle(.secondary)
         } else {
@@ -175,7 +174,7 @@ struct OffsiteRestoreSheet: View {
                         HStack {
                             Text(verbatim: entry.day ?? entry.name).monospacedDigit()
                             Spacer()
-                            Text(ByteCountFormatter.string(fromByteCount: Int64(entry.bytes), countStyle: .file))
+                            Text(Format.fileSize(Int64(entry.bytes)))
                                 .monospacedDigit().foregroundStyle(.secondary)
                         }
                         .tag(entry.id)
