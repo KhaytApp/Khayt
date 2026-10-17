@@ -62,6 +62,12 @@ jobs:
     # `xcode-27` image (public preview) has Xcode 27.0 as default and iOS 27.0
     # simulators.
     runs-on: xcode-27
+    # Xcode 27.1, not the image's default 27.0: the iPhone Duo fold API
+    # (`GeometryProxy.reservedRegions`, iOS 27.1) is only in the 27.1 SDK. The
+    # image carries it (27A9275), the same build the TestFlight uploads use.
+    # Tests still run on the iOS 27.0 simulator, the app's minimum.
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - uses: actions/checkout@v7
 

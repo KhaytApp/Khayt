@@ -48,6 +48,10 @@ struct SettingsView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 24)
+                // A toggle a full 7.6-inch width from its label (iPhone Duo
+                // unfolded) is hard to pair with it: the calculator's reading width.
+                .frame(maxWidth: 640)
+                .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)

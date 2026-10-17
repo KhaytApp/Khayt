@@ -57,6 +57,15 @@ struct MachinesView: View {
         }
     }
 
+    /// Regular width — iPhone Duo's inner display — sets the machines two
+    /// across rather than stretching each card over the full 7.6 inches, split
+    /// at the fold when the device is partly folded (see `FoldGap`).
+    @Environment(\.horizontalSizeClass) private var widthClass
+    @State private var fold: FoldGap?
+    private var columns: [GridItem] {
+        FoldGap.columns(fold, regularWidth: widthClass == .regular, spacing: 10)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -77,10 +86,16 @@ struct MachinesView: View {
                         .padding(.vertical, 44)
                     } else {
                         LiveStamp()
-                        ForEach(rows) { m in
-                            MachineCard(live: m, fallbackStatus: statusById[m.id])
-                            cameraLink(m)
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+                            ForEach(rows) { m in
+                                VStack(spacing: 10) {
+                                    MachineCard(live: m, fallbackStatus: statusById[m.id])
+                                    cameraLink(m)
+                                }
+                                .frame(maxHeight: .infinity, alignment: .top)
+                            }
                         }
+                        .readsFold($fold)
                         if !printers.isLive {
                             Text(staleNote)
                                 .font(.khayt(12, relativeTo: .caption))
