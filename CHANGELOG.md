@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: switching spools mid-job and test prints record the lot.**
+  Filament taken off a spool partway through a job, and a test print's
+  filament, now carry the spool's lot (and the purchase order it came in on)
+  the same way a finished job's filament does. A recall then lists them under
+  the lot they were printed from, even after the spool's lot is changed.
+  Spools with no lot record exactly what they did before.
+
 - **Mac: with "Use the Mac's number format" on, editors keep their
   figures.** On a Mac that writes Arabic-Indic digits, opening a product,
   customer price or job and saving it set grams, hours and prices to 0. Edit
