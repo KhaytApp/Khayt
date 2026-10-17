@@ -1,3 +1,4 @@
+import ActivityKit
 import XCTest
 import KhaytCore
 @testable import KhaytCompanion
@@ -89,5 +90,15 @@ final class PrintActivityTests: XCTestCase {
         for p in [LiveActivityPlan.Phase.printing, .paused, .finished, .failed, .cancelled] {
             XCTAssertNotNil(PrintActivityPlan.State.Phase(rawValue: p.rawValue), "\(p) is unknown to the phone")
         }
+    }
+
+    /// A print that runs past its estimate turns its card stale (the staleDate
+    /// is the estimate). It is still the phone's to update and end: counted out,
+    /// the card stood at 84% after the print was done.
+    func testACardPastItsEstimateIsStillUpdatedAndEnded() {
+        XCTAssertTrue(PrintActivities.isRunning(.active))
+        XCTAssertTrue(PrintActivities.isRunning(.stale))
+        XCTAssertFalse(PrintActivities.isRunning(.ended))
+        XCTAssertFalse(PrintActivities.isRunning(.dismissed))
     }
 }

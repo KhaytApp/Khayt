@@ -69,6 +69,9 @@ enum PrintActivityPlan {
 final class PrintActivities {
     private var watching: AnyCancellable?
     private var switchedOff: AnyCancellable?
+    private weak var printers: LivePrinters?
+    private var holding = false
+    private var arrivals: Task<Void, Never>?
     private let settings: ConnectionSettings
     let push: LiveActivityPush
 
@@ -77,6 +80,12 @@ final class PrintActivities {
         push = LiveActivityPush(api: api, enabled: { [weak settings] in settings?.liveActivities ?? false })
         api.liveActivityPush = push
         push.begin()
+        self.printers = printers
+        holdWatch()
+        // One the cloud started while the app was closed.
+        arrivals = Task { [weak self] in
+            for await _ in Activity<PrintActivityAttributes>.activityUpdates { self?.holdWatch() }
+        }
         watching = printers.$byMachine.dropFirst().sink { [weak self, weak printers] readings in
             guard let self, printers?.isLive == true else { return }
             Task { await self.apply(readings) }
@@ -89,12 +98,31 @@ final class PrintActivities {
         }
     }
 
+    /// Still on the Lock Screen and still ours to move. `.stale` counts: the
+    /// staleDate is the estimated finish, so a print that runs past its
+    /// estimate turns stale — and when only `.active` counted, the phone
+    /// stopped seeing it, never updated or ended it, and the card stood at
+    /// its last percent long after the print was done (Oct 2026).
+    nonisolated static func isRunning(_ state: ActivityState) -> Bool {
+        state == .active || state == .stale
+    }
+
     private func running() -> [String: Activity<PrintActivityAttributes>] {
         var out: [String: Activity<PrintActivityAttributes>] = [:]
-        for a in Activity<PrintActivityAttributes>.activities where a.activityState == .active {
+        for a in Activity<PrintActivityAttributes>.activities where Self.isRunning(a.activityState) {
             out[a.attributes.machineId] = a
         }
         return out
+    }
+
+    /// While a card is up, the app asks the printers whenever it is open, on
+    /// any tab. Readings came only while a printer screen was showing, so a
+    /// phone opened on Orders never heard the finish and left the card as it was.
+    private func holdWatch() {
+        let any = Activity<PrintActivityAttributes>.activities.contains { Self.isRunning($0.activityState) }
+        guard any != holding else { return }
+        holding = any
+        if any { printers?.watch() } else { printers?.unwatch() }
     }
 
     func apply(_ readings: [String: MachineLiveStatus], now: Date = Date()) async {
@@ -119,10 +147,12 @@ final class PrintActivities {
                                     dismissalPolicy: .after(now.addingTimeInterval(30 * 60)))
             }
         }
+        holdWatch()
     }
 
     /// Switched off in Settings: every running one goes at once.
     func endAll() async {
         for a in Activity<PrintActivityAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }
+        holdWatch()
     }
 }
