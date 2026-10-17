@@ -8,7 +8,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   runs past its first estimate.** At the estimated finish iOS marks the card
   out of date, and from then on the app stopped updating it or ending it, so
   a finished print could still read 84%. Opening the app now catches the
-  card up on any tab, not only on a screen that shows printers.
+  card up on any tab, not only on a screen that shows printers, and hands
+  the Mac's pushes their address again in case it was lost.
 - **Mac: Settings ▸ Overhead no longer crashes, and monthly cost amounts
   save.** Removing a cost line while its amount box was still being edited
   quit the app. An amount typed and then saved with a click (without

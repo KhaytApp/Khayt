@@ -130,6 +130,10 @@ struct KhaytCompanionApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     live.setActive(phase == .active)
                     channel.setActive(phase == .active)
+                    // A token registration is fire-and-forget: one lost to a
+                    // dropped connection left the Mac's pushes reaching nobody
+                    // for the rest of the print. Each opening hands them over again.
+                    if phase == .active { Task { await activities.push.sendAll() } }
                 }
                 // Signing in or out of the cloud opens or closes the stream.
                 .onChange(of: api.cloud) { _, _ in channel.setActive(scenePhase == .active) }
