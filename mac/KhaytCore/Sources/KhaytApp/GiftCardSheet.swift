@@ -43,7 +43,7 @@ struct GiftCardSheet: View {
                 LabeledContent(shop.words.callIt("giftCardInitialBalance")) {
                     HStack(spacing: 4) {
                         TextField("", value: $balance,
-                                  format: .number.precision(.fractionLength(0...2)))
+                                  format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).frame(width: 90).monospacedDigit()
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }

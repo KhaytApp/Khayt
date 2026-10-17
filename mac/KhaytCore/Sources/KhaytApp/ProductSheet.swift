@@ -424,7 +424,7 @@ struct ProductSheet: View {
             Self.write(rule, into: &draft)
             await reprice()
         }
-        .sheet(isPresented: $pickingModel) {
+        .shopSheet(isPresented: $pickingModel) {
             PickModelSheet(shop: shop) { file in
                 Task {
                     guard let filled = await shop.partFields(from: file) else { return }
@@ -472,7 +472,7 @@ struct ProductSheet: View {
                     HStack(spacing: 8) {
                         TextField(shop.words.callIt("cat.tier_label"), text: $tier.label)
                             .textFieldStyle(.roundedBorder)
-                        TextField("", value: $tier.margin, format: .number)
+                        TextField("", value: $tier.margin, format: .number.locale(Money.digits))
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 60).multilineTextAlignment(.trailing)
                         Text("%").foregroundStyle(.secondary)

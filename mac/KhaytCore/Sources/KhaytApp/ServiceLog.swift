@@ -220,7 +220,7 @@ struct ServiceLog: View {
                     .disabled(!shop.canMoveJobs)
             }
         }
-        .sheet(isPresented: $adding) {
+        .shopSheet(isPresented: $adding) {
             ServiceEntrySheet(shop: shop, machine: machine)
         }
         .confirmationDialog(shop.words.callIt("common.delete") + "?",
@@ -307,7 +307,7 @@ struct ServiceEntrySheet: View {
                 GridRow {
                     Text(words.callIt("maint.cost")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $cost, format: .number.precision(.fractionLength(2)))
+                        TextField("", value: $cost, format: .number.locale(Money.digits).precision(.fractionLength(2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 110)
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }
@@ -485,12 +485,12 @@ struct MaintenanceTaskSheet: View {
                 }
                 GridRow {
                     Text(words.callIt("maint.every_hours")).foregroundStyle(.secondary)
-                    TextField("", value: $hours, format: .number.precision(.fractionLength(0)))
+                    TextField("", value: $hours, format: .number.locale(Money.digits).precision(.fractionLength(0)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 110)
                 }
                 GridRow {
                     Text(words.callIt("maint.or_days")).foregroundStyle(.secondary)
-                    TextField("", value: $days, format: .number.precision(.fractionLength(0)))
+                    TextField("", value: $days, format: .number.locale(Money.digits).precision(.fractionLength(0)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 110)
                 }
             }
@@ -559,7 +559,7 @@ struct AddMaintenanceTask: View {
             .buttonStyle(.borderless).font(.caption)
             // A sample book is not the shop's to write to.
             .disabled(!shop.canMoveJobs)
-            .sheet(isPresented: $adding) {
+            .shopSheet(isPresented: $adding) {
                 MaintenanceTaskSheet(shop: shop, machine: machine)
             }
     }

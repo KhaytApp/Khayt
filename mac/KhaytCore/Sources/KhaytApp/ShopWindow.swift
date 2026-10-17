@@ -689,31 +689,31 @@ struct WindowSheets: ViewModifier {
             // A panel that slides is not worth an app that dies. Without the
             // animation the collapse is one layout pass, on a settled pane, on a
             // turn of its own.
-            .sheet(item: $shop.pendingHold) { AskFirst(shop: shop, subject: $0, kind: .hold) }
-            .sheet(item: $shop.pendingCompletion) { CompletionSheet(shop: shop, subject: $0) }
-            .sheet(item: $shop.pendingPayment) { PaymentSheet(shop: shop, subject: $0) }
-            .sheet(item: $shop.pendingShipment) { ShipSheet(shop: shop, subject: $0) }
-            .sheet(item: $shop.pendingSend) { SendToPrinterSheet(shop: shop, subject: $0) }
-            .sheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
-            .sheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }
-            .sheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }
-            .sheet(isPresented: $shop.settingUpShop) { ShopSetupSheet(shop: shop) }
-            .sheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
-            .sheet(isPresented: $shop.planningBatch) { BatchSheet(shop: shop) }
-            .sheet(isPresented: $shop.reviewingDeposits) { DepositAuditSheet(shop: shop) }
-            .sheet(isPresented: $shop.reviewingSyncLosses) { SyncLossesSheet(shop: shop) }
+            .shopSheet(item: $shop.pendingHold) { AskFirst(shop: shop, subject: $0, kind: .hold) }
+            .shopSheet(item: $shop.pendingCompletion) { CompletionSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingPayment) { PaymentSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingShipment) { ShipSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingSend) { SendToPrinterSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingEdit) { EditJobSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingQcFail) { QcFailSheet(shop: shop, subject: $0) }
+            .shopSheet(isPresented: $shop.takingAJob) { NewJobSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.settingUpShop) { ShopSetupSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.schedulingWork) { ScheduleSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.planningBatch) { BatchSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.reviewingDeposits) { DepositAuditSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.reviewingSyncLosses) { SyncLossesSheet(shop: shop) }
             // Reached from a banner on every screen, so it is the window's —
             // not the catalogue's, where it used to be the only way in.
-            .sheet(isPresented: $shop.showingSpoolRepair) { SpoolRepairSheet(shop: shop) }
-            .sheet(item: $shop.receivingGoods) { ReceiveSheet(shop: shop, order: $0) }
-            .sheet(item: $shop.editingCustomer) { CustomerSheet(shop: shop, existing: $0) }
-            .sheet(item: $shop.editingProduct) { ProductSheet(shop: shop, existing: $0) }
-            .sheet(item: $shop.droppingFrom) { DropObjectSheet(shop: shop, machine: $0) }
-            .sheet(isPresented: $shop.findingPrinters) { FindPrintersSheet(shop: shop) }
-            .sheet(item: $shop.ratingFor) { RatingSheet(shop: shop, job: $0) }
-            .sheet(item: $shop.planFor) { PaymentPlanSheet(shop: shop, job: $0) }
-            .sheet(isPresented: $shop.pausingProduction) { PauseSheet(shop: shop) }
-            .sheet(item: $shop.movingGroups) { GroupMoveSheet(shop: shop, request: $0) }
+            .shopSheet(isPresented: $shop.showingSpoolRepair) { SpoolRepairSheet(shop: shop) }
+            .shopSheet(item: $shop.receivingGoods) { ReceiveSheet(shop: shop, order: $0) }
+            .shopSheet(item: $shop.editingCustomer) { CustomerSheet(shop: shop, existing: $0) }
+            .shopSheet(item: $shop.editingProduct) { ProductSheet(shop: shop, existing: $0) }
+            .shopSheet(item: $shop.droppingFrom) { DropObjectSheet(shop: shop, machine: $0) }
+            .shopSheet(isPresented: $shop.findingPrinters) { FindPrintersSheet(shop: shop) }
+            .shopSheet(item: $shop.ratingFor) { RatingSheet(shop: shop, job: $0) }
+            .shopSheet(item: $shop.planFor) { PaymentPlanSheet(shop: shop, job: $0) }
+            .shopSheet(isPresented: $shop.pausingProduction) { PauseSheet(shop: shop) }
+            .shopSheet(item: $shop.movingGroups) { GroupMoveSheet(shop: shop, request: $0) }
             // Cancelling throws away every hour already in the plate, and no
             // printer asks twice. Pause and resume are each other's undo and are
             // not confirmed.
@@ -810,33 +810,33 @@ struct WindowSheets: ViewModifier {
                       cancel: shop.words.callIt("common.cancel")) { asked in
                 Task { await shop.deleteCustomers(asked.ids) }
             }
-            .sheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
-            .sheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
-            .sheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }
-            .sheet(isPresented: $shop.addingSpool) { SpoolSheet(shop: shop, existing: nil) }
-            .sheet(isPresented: $shop.importingSpoolman) { SpoolmanSheet(shop: shop) }
-            .sheet(item: $shop.editingConsumable) { ConsumableSheet(shop: shop, existing: $0) }
-            .sheet(isPresented: $shop.addingConsumable) { ConsumableSheet(shop: shop, existing: nil) }
-            .sheet(isPresented: $shop.issuingGiftCard) { GiftCardSheet(shop: shop) }
-            .sheet(item: $shop.editingMachine) { MachineSheet(shop: shop, existing: $0) }
-            .sheet(item: $shop.editingSupplier) { SupplierSheet(shop: shop, supplier: $0) }
-            .sheet(item: $shop.loggingPurchaseFor) { PurchaseLogSheet(shop: shop, supplier: $0) }
-            .sheet(item: $shop.showingHistoryFor) { PurchaseHistorySheet(shop: shop, supplier: $0) }
-            .sheet(item: $shop.spoolHistoryFor) { SpoolHistorySheet(shop: shop, spool: $0) }
-            .sheet(item: $shop.billingOrder) { BillSheet(shop: shop, order: $0) }
-            .sheet(item: $shop.restoring) { RestoreSheet(shop: shop, subject: $0) }
-            .sheet(isPresented: $shop.checkingCloud) { CloudCheckSheet(shop: shop) }
-            .sheet(isPresented: $shop.scanning) { ScanSheet(shop: shop) }
-            .sheet(isPresented: $shop.planningCampaign) { CampaignSheet(shop: shop) }
-            .sheet(isPresented: $shop.signingIntoCloud) { CloudSignInSheet(shop: shop) }
-            .sheet(isPresented: $shop.sendingFeedback) { FeedbackSheet(shop: shop) }
-            .sheet(item: $shop.draftingFor) { job in
+            .shopSheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
+            .shopSheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
+            .shopSheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }
+            .shopSheet(isPresented: $shop.addingSpool) { SpoolSheet(shop: shop, existing: nil) }
+            .shopSheet(isPresented: $shop.importingSpoolman) { SpoolmanSheet(shop: shop) }
+            .shopSheet(item: $shop.editingConsumable) { ConsumableSheet(shop: shop, existing: $0) }
+            .shopSheet(isPresented: $shop.addingConsumable) { ConsumableSheet(shop: shop, existing: nil) }
+            .shopSheet(isPresented: $shop.issuingGiftCard) { GiftCardSheet(shop: shop) }
+            .shopSheet(item: $shop.editingMachine) { MachineSheet(shop: shop, existing: $0) }
+            .shopSheet(item: $shop.editingSupplier) { SupplierSheet(shop: shop, supplier: $0) }
+            .shopSheet(item: $shop.loggingPurchaseFor) { PurchaseLogSheet(shop: shop, supplier: $0) }
+            .shopSheet(item: $shop.showingHistoryFor) { PurchaseHistorySheet(shop: shop, supplier: $0) }
+            .shopSheet(item: $shop.spoolHistoryFor) { SpoolHistorySheet(shop: shop, spool: $0) }
+            .shopSheet(item: $shop.billingOrder) { BillSheet(shop: shop, order: $0) }
+            .shopSheet(item: $shop.restoring) { RestoreSheet(shop: shop, subject: $0) }
+            .shopSheet(isPresented: $shop.checkingCloud) { CloudCheckSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.scanning) { ScanSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.planningCampaign) { CampaignSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.signingIntoCloud) { CloudSignInSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.sendingFeedback) { FeedbackSheet(shop: shop) }
+            .shopSheet(item: $shop.draftingFor) { job in
                 DraftMessageSheet(shop: shop, job: job)
             }
-            .sheet(item: $shop.messagingFor) { job in
+            .shopSheet(item: $shop.messagingFor) { job in
                 MessageSheet(shop: shop, job: job)
             }
-            .sheet(isPresented: $shop.askingTheBook) {
+            .shopSheet(isPresented: $shop.askingTheBook) {
                 VStack(spacing: 0) {
                     AskTheBook(shop: shop)
                     Divider()
@@ -848,7 +848,7 @@ struct WindowSheets: ViewModifier {
                     .padding(14)
                 }
             }
-            .sheet(isPresented: $shop.addingMachine) { MachineSheet(shop: shop, existing: nil) }
+            .shopSheet(isPresented: $shop.addingMachine) { MachineSheet(shop: shop, existing: nil) }
     }
 }
 

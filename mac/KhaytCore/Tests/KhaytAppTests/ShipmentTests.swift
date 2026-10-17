@@ -104,7 +104,7 @@ struct ShipmentTests {
     func wired() {
         // A sheet nobody can open is the correct-module-with-no-caller bug.
         let window = MenuCoverageTests.source("ShopWindow.swift")
-        #expect(window.contains(".sheet(item: $shop.pendingShipment) { ShipSheet("))
+        #expect(window.contains(".shopSheet(item: $shop.pendingShipment) { ShipSheet("))
         for file in ["Menus.swift", "OrdersTable.swift", "OrderInspector.swift"] {
             #expect(MenuCoverageTests.source(file).contains("shop.pendingShipment = Shop.PendingHold("),
                     Comment(rawValue: "\(file) no longer opens the Ship sheet"))

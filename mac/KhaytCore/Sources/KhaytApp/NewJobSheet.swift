@@ -719,11 +719,11 @@ struct NewJobSheet: View {
                                 TextField("", value: Binding(
                                     get: { line.pct ?? 0 },
                                     set: { line.pct = max(0, $0) }),
-                                          format: .number.precision(.fractionLength(0...2)))
+                                          format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                                     .textFieldStyle(.roundedBorder).frame(width: 72).monospacedDigit()
                             } else {
                                 TextField("", value: $line.amount,
-                                          format: .number.precision(.fractionLength(0...2)))
+                                          format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                                     .textFieldStyle(.roundedBorder).frame(width: 72).monospacedDigit()
                             }
                             Button {
@@ -935,7 +935,7 @@ struct NewJobSheet: View {
     /// roll's cost — and money that does not is the field that gets it wrong.
     private func unit(_ value: Binding<Double>, _ width: CGFloat, _ suffix: String) -> some View {
         HStack(spacing: 4) {
-            TextField("", value: value, format: .number.precision(.fractionLength(0...2)))
+            TextField("", value: value, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                 .textFieldStyle(.roundedBorder).frame(width: width).monospacedDigit()
             Text(suffix).foregroundStyle(.secondary)
         }

@@ -30,7 +30,7 @@ struct BillSheet: View {
                 GridRow {
                     Text(shop.words.callIt("po.sup_inv_amount")).foregroundStyle(.secondary)
                     TextField("", value: $bill.amount,
-                              format: .number.precision(.fractionLength(0...2)))
+                              format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                         .textFieldStyle(.roundedBorder).monospacedDigit()
                 }
                 GridRow {

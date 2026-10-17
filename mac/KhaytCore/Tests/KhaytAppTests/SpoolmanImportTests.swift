@@ -116,7 +116,7 @@ struct SpoolmanImportTests {
     @Test("the import is reachable from the shelf")
     func wired() {
         #expect(MenuCoverageTests.source("ScreenActions.swift").contains("shop.importingSpoolman = true"))
-        #expect(MenuCoverageTests.source("ShopWindow.swift").contains(".sheet(isPresented: $shop.importingSpoolman) { SpoolmanSheet("))
+        #expect(MenuCoverageTests.source("ShopWindow.swift").contains(".shopSheet(isPresented: $shop.importingSpoolman) { SpoolmanSheet("))
         #expect(MenuCoverageTests.source("SpoolmanSheet.swift").contains("try await shop.importFromSpoolman(typed)"))
     }
 }

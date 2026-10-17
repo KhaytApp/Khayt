@@ -74,7 +74,7 @@ struct CalculatorFromModel: View {
             }
             Spacer(minLength: 0)
         }
-        .sheet(isPresented: $picking) {
+        .shopSheet(isPresented: $picking) {
             PickModelSheet(shop: shop) { file in
                 model = file
                 plate = nil

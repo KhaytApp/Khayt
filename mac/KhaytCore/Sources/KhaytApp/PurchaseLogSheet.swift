@@ -56,7 +56,7 @@ struct PurchaseLogSheet: View {
                 GridRow {
                     Text(shop.words.callIt("sup.purchase_amount")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $amount, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $amount, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit()
                             .focused($focused)
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
@@ -75,7 +75,7 @@ struct PurchaseLogSheet: View {
                 GridRow {
                     Text(shop.words.callIt("sup.quantity")).foregroundStyle(.secondary)
                     HStack(spacing: 6) {
-                        TextField("", value: $quantity, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $quantity, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit()
                             .frame(width: 90)
                         Picker("", selection: $unit) {
@@ -90,7 +90,7 @@ struct PurchaseLogSheet: View {
                     Text(shop.words.callIt("sup.unit_price")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
                         TextField("", value: $unitPrice,
-                                  format: .number.precision(.fractionLength(0...2)))
+                                  format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit()
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }

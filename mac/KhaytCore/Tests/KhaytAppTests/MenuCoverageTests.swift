@@ -220,7 +220,7 @@ struct MenuCoverageTests {
         // is presented by assigning the item itself, so it cannot be dead this
         // way, and a Toggle or Picker bound to `$shop.NAME` sets it through the
         // binding.
-        let pattern = #/\.sheet\(isPresented: \$shop\.([a-zA-Z]+)\)/#
+        let pattern = #/\.(?:sheet|shopSheet)\(isPresented: \$shop\.([a-zA-Z]+)\)/#
         let presented = app.matches(of: pattern).map { String($0.1) }
         #expect(presented.count > 5, "only \(presented.count) sheets found — the parse is wrong")
 
@@ -246,7 +246,7 @@ struct MenuCoverageTests {
         // proof: declared, bound to a sheet, reset to nil in `clearQuestion`,
         // and never once assigned a value. The reasoning was sound about the
         // MECHANISM and silent about whether anybody used it.
-        let itemPattern = #/\.(?:sheet|alert|confirmationDialog|popover|inspector)\(item: \$shop\.([a-zA-Z]+)\)/#
+        let itemPattern = #/\.(?:sheet|shopSheet|alert|confirmationDialog|popover|inspector)\(item: \$shop\.([a-zA-Z]+)\)/#
         let byItem = app.matches(of: itemPattern).map { String($0.1) }
         #expect(byItem.count > 10, "only \(byItem.count) item-presented surfaces — the parse is wrong")
 

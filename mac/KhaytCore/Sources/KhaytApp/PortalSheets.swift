@@ -54,12 +54,12 @@ struct CustomerLinkSection: View {
             }
             .buttonStyle(.link)
             .font(.callout)
-            .sheet(isPresented: $asking) {
+            .shopSheet(isPresented: $asking) {
                 QuoteLinkSheet(shop: shop, job: job) { deposit, payUrl in
                     Task { await publish(deposit, payUrl) }
                 }
             }
-            .sheet(isPresented: $talking) { PortalMessagesSheet(shop: shop, job: job) }
+            .shopSheet(isPresented: $talking) { PortalMessagesSheet(shop: shop, job: job) }
             .confirmationDialog(
                 shop.words.callIt("mac.portal_unpublish_q", ["job": .string(shop.shownTitle(of: job))]),
                 isPresented: $confirmingUnpublish, titleVisibility: .visible

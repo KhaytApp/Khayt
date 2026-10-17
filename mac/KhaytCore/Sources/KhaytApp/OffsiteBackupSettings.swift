@@ -99,7 +99,7 @@ struct OffsiteBackupSettings: View {
             if adopted != state.settings { state.settings = adopted; return }
             summary = await shop.offsiteDestinationSummary()
         }
-        .sheet(isPresented: $restoring) { OffsiteRestoreSheet(shop: shop) }
+        .shopSheet(isPresented: $restoring) { OffsiteRestoreSheet(shop: shop) }
     }
 
     @ViewBuilder

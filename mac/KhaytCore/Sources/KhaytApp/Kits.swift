@@ -64,7 +64,7 @@ struct KitBand: View {
             .scrollIndicators(.automatic)
             .background(.quaternary.opacity(0.25))
             .overlay(alignment: .bottom) { Divider() }
-            .sheet(item: $renaming) { kit in
+            .shopSheet(item: $renaming) { kit in
                 RenameKit(shop: shop, kit: kit)
             }
             // The prints are not touched, so this is a confirmation and not a
@@ -232,7 +232,7 @@ struct KitSection: View {
                 }
             }
         }
-        .sheet(isPresented: $naming) {
+        .shopSheet(isPresented: $naming) {
             NameAKit(shop: shop, jobs: [job.id], suggestion: job.project)
         }
     }

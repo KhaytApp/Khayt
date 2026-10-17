@@ -241,7 +241,7 @@ struct SupplierSheet: View {
                                   text: $quote.material)
                             .textFieldStyle(.roundedBorder)
                         TextField("0", value: $quote.pricePerKg,
-                                  format: .number.precision(.fractionLength(0...2)))
+                                  format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder)
                             .monospacedDigit()
                             .frame(width: 90)

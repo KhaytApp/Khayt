@@ -55,7 +55,7 @@ struct ReceiveSheet: View {
                          ? shop.words.callIt("po.weight_received")
                          : shop.words.callIt("po.qty_received") + " (" + order.unit + ")")
                         .foregroundStyle(.secondary)
-                    TextField("", value: $amount, format: .number.precision(.fractionLength(0...2)))
+                    TextField("", value: $amount, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                         .textFieldStyle(.roundedBorder)
                         .monospacedDigit()
                         .focused($focused)
@@ -85,7 +85,7 @@ struct ReceiveSheet: View {
                 GridRow {
                     Text(shop.words.callIt("po.sup_inv_amount")).foregroundStyle(.secondary)
                     TextField("", value: $bill.amount,
-                              format: .number.precision(.fractionLength(0...2)))
+                              format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                         .textFieldStyle(.roundedBorder).monospacedDigit()
                 }
                 GridRow {

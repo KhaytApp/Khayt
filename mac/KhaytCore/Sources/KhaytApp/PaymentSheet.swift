@@ -56,7 +56,7 @@ struct PaymentSheet: View {
                     // It said "SAR" here and drew the mark two rows above, so
                     // one sheet spelled one currency two ways.
                     HStack(spacing: 4) {
-                        TextField("", value: $amount, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $amount, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder)
                             .monospacedDigit()
                             .focused($focused)

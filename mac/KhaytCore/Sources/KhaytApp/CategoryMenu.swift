@@ -70,7 +70,7 @@ struct CategoryMenu: View {
         .help(shop.canWrite
               ? shop.words.callIt("mac.category_why")
               : shop.words.callIt("mac.group_locked"))
-        .popover(isPresented: $naming, arrowEdge: .bottom) {
+        .shopPopover(isPresented: $naming, arrowEdge: .bottom) {
             NameIt(words: shop.words, typed: $typed,
                    title: shop.words.callIt("mac.name_this_category"),
                    example: shop.words.callIt("mac.category_example"),
@@ -82,7 +82,7 @@ struct CategoryMenu: View {
                 Task { await shop.fileSelection(underCategory: wanted) }
             }
         }
-        .popover(isPresented: $tagging, arrowEdge: .bottom) {
+        .shopPopover(isPresented: $tagging, arrowEdge: .bottom) {
             NameIt(words: shop.words, typed: $typedTags,
                    title: shop.words.callIt("mac.tags"),
                    example: shop.words.callIt("mac.tag_example"),

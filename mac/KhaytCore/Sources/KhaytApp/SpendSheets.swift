@@ -85,7 +85,7 @@ struct ExpenseSheet: View {
                 GridRow {
                     Text(shop.words.callIt("exp.amount")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $amount, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $amount, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit()
                             .focused($focused)
                             .onSubmit(commit)
@@ -107,7 +107,7 @@ struct ExpenseSheet: View {
                         Text(shop.words.callIt("exp.vat_paid")).foregroundStyle(.secondary)
                         HStack(spacing: 4) {
                             TextField("", value: $vatAmount,
-                                      format: .number.precision(.fractionLength(0...2)))
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                                 .textFieldStyle(.roundedBorder).monospacedDigit()
                             Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                         }
@@ -288,14 +288,14 @@ struct WasteSheet: View {
                 }
                 GridRow {
                     Text(shop.words.callIt("waste.weight")).foregroundStyle(.secondary)
-                    TextField("", value: $weight, format: .number.precision(.fractionLength(0...1)))
+                    TextField("", value: $weight, format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
                         .textFieldStyle(.roundedBorder).monospacedDigit()
                         .focused($focused)
                 }
                 GridRow {
                     Text(shop.words.callIt("waste.est_cost")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $cost, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $cost, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit()
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }

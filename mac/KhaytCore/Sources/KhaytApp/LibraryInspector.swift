@@ -508,7 +508,7 @@ struct LibraryInspector: View {
                     }
                 }
             }
-            .sheet(item: $proofFor) { LicenceProofSheet(shop: shop, file: $0) }
+            .shopSheet(item: $proofFor) { LicenceProofSheet(shop: shop, file: $0) }
         }
     }
 
