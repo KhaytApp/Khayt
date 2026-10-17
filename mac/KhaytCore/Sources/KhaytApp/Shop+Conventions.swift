@@ -387,14 +387,24 @@ extension Shop {
     /// Files handed to the app by the Dock or the Finder ("Open With"),
     /// waiting for the window's shop to take them.
     @MainActor static var openedFiles: [URL] = [] {
-        didSet { if !openedFiles.isEmpty { NotificationCenter.default.post(name: .khaytOpenedFiles, object: nil) } }
+        didSet {
+            guard !openedFiles.isEmpty else { return }
+            openedFilesArrived = Date()
+            NotificationCenter.default.post(name: .khaytOpenedFiles, object: nil)
+        }
     }
 
-    /// Take whatever the Dock handed over, once a book is open.
-    func takeOpenedFiles() async {
+    /// When the newest of `openedFiles` arrived — see `Shop.isStale`.
+    @MainActor static var openedFilesArrived = Date.distantPast
+
+    /// Take whatever the Dock handed over, once a book is open. A drop from
+    /// well before the taking window began is discarded rather than turned into
+    /// a New Job nobody just asked for (`isStale`).
+    func takeOpenedFiles(windowOpenedAt: Date? = nil) async {
         let urls = Self.openedFiles
         guard !urls.isEmpty, engine != nil, !needsSignIn else { return }
         Self.openedFiles = []
+        guard !Self.isStale(arrivedAt: Self.openedFilesArrived, windowOpenedAt: windowOpenedAt) else { return }
         await newJob(fromDropped: urls)
     }
 }

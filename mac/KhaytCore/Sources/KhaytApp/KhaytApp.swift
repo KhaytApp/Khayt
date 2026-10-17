@@ -111,6 +111,9 @@ struct KhaytApp: App {
                 // asks the question and answers nil when the choice is theirs.
                 .tint(Khayt.appTint)
                 .task {
+                    // When this window began: a link or a drop handed over
+                    // long before it is not acted on (`Shop.isStale`).
+                    let windowOpenedAt = Date()
                     Snapshot.subject = shop
                     // The menu bar item, which is AppKit rather than a scene —
                     // see `FloorStatus` for the profile that decided that.
@@ -129,9 +132,9 @@ struct KhaytApp: App {
                     shop.offerSetupIfNew()
                     // A model dropped on the Dock icon before the book was
                     // open — the drop that launched the app.
-                    await shop.takeOpenedFiles()
+                    await shop.takeOpenedFiles(windowOpenedAt: windowOpenedAt)
                     // A widget's row clicked while the app was closed.
-                    shop.takeOpenedLinks()
+                    shop.takeOpenedLinks(windowOpenedAt: windowOpenedAt)
                     // Opt-in crash reports and usage counts (#1789). Sends
                     // nothing unless the book says so; see `Telemetry`.
                     Telemetry.shared.start(shop: shop)
@@ -210,10 +213,16 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// the app declares, khayt://, is a desktop widget's row (`DeepLink`).
     func application(_ application: NSApplication, open urls: [URL]) {
         let links = urls.compactMap(ShopWidgetSnapshot.Link.init)
-        if !links.isEmpty { MainActor.assumeIsolated { Shop.openedLinks += links } }
         let models = Shop.droppableModels(urls.filter(\.isFileURL))
-        guard !models.isEmpty else { return }
-        MainActor.assumeIsolated { Shop.openedFiles += models }
+        guard !links.isEmpty || !models.isEmpty else { return }
+        MainActor.assumeIsolated {
+            // The window first: with it closed (⌘W, the app kept alive by
+            // Settings, Help or the kiosk) nothing was listening, and the
+            // click did nothing until the window was next opened.
+            ShopWindowOpener.raise()
+            if !links.isEmpty { Shop.openedLinks += links }
+            if !models.isEmpty { Shop.openedFiles += models }
+        }
     }
 
     func applicationDidFinishLaunching(_ note: Notification) {

@@ -13,8 +13,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     dates are shown in red. It never shows the customer's name.
   - **Shop at a glance** (large) puts printing now, today's figures, low
     filament and the next jobs on one widget.
-  - Click a printer, job or spool on a medium or large widget to open Khayt
-    on it. Clicking anywhere else opens that widget's screen. The link only
+  - On a medium or large widget, click a job to open Khayt with that job
+    selected. Click a printer to open Machines, or a spool to open
+    Inventory. Clicking anywhere else opens that widget's screen, and
+    Khayt's window opens if it was closed. The link only
     opens screens and never changes anything. It shows only what you could
     open yourself with ⌘K, and does nothing for a record the open book does
     not have.

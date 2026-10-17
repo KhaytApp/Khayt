@@ -90,7 +90,7 @@ public struct KhaytWidgetView: View {
                 case .printing: PrintingView(snapshot: snapshot, family: family, now: now)
                 case .today: TodayView(snapshot: snapshot, family: family, now: now)
                 case .filament: FilamentView(snapshot: snapshot, family: family)
-                case .upNext: UpNextView(snapshot: snapshot, family: family)
+                case .upNext: UpNextView(snapshot: snapshot, family: family, now: now)
                 case .glance: GlanceView(snapshot: snapshot, now: now)
                 }
             }
@@ -384,6 +384,7 @@ enum Swatch {
 struct UpNextView: View {
     let snapshot: ShopWidgetSnapshot
     let family: WidgetFamily
+    let now: Date
 
     /// Three rows on the medium widget, six on the large.
     private var shown: Int { family == .systemLarge ? 6 : 3 }
@@ -400,7 +401,7 @@ struct UpNextView: View {
                     Spacer(minLength: 0)
                 } else {
                     ForEach(Array(jobs.prefix(shown))) { job in
-                        Tap(link: .job(job.id), family: family) { JobRow(job: job, snapshot: snapshot) }
+                        Tap(link: .job(job.id), family: family) { JobRow(job: job, snapshot: snapshot, now: now) }
                         if family == .systemLarge, job.id != jobs.prefix(shown).last?.id { Divider() }
                     }
                     Spacer(minLength: 0)
@@ -417,9 +418,23 @@ struct UpNextView: View {
 struct JobRow: View {
     let job: ShopWidgetSnapshot.QueuedJob
     let snapshot: ShopWidgetSnapshot
+    /// The timeline entry's moment. The snapshot's `late` was worked out when
+    /// the app WROTE it; after midnight, with the app closed, a job due
+    /// yesterday is late although the file still says it is not.
+    let now: Date
     @Environment(\.colorScheme) private var scheme
 
+    /// Late as the app said when it wrote the snapshot, or due before today
+    /// began — today being the entry's, on the Gregorian calendar the views
+    /// are drawn in (`KhaytWidgetView.gregorian`).
+    static func isLate(_ job: ShopWidgetSnapshot.QueuedJob, at now: Date) -> Bool {
+        if job.late { return true }
+        guard let due = job.due else { return false }
+        return due < KhaytWidgetView.gregorian.startOfDay(for: now)
+    }
+
     var body: some View {
+        let late = Self.isLate(job, at: now)
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(verbatim: job.id).font(.caption2.weight(.semibold)).monospacedDigit()
                 .foregroundStyle(.secondary).lineLimit(1).fixedSize()
@@ -431,8 +446,8 @@ struct JobRow: View {
             Spacer(minLength: 2)
             if let due = job.due {
                 Text(due, format: .dateTime.day().month(.abbreviated))
-                    .font(.caption2.weight(job.late ? .bold : .regular)).monospacedDigit()
-                    .foregroundStyle(job.late ? Ink.late.on(scheme) : .secondary)
+                    .font(.caption2.weight(late ? .bold : .regular)).monospacedDigit()
+                    .foregroundStyle(late ? Ink.late.on(scheme) : .secondary)
                     .lineLimit(1).fixedSize()
             }
         }
@@ -480,18 +495,22 @@ struct GlanceView: View {
                     Spacer(minLength: 0)
                 }
             }
-            Divider()
-            // Filament: three at most.
-            VStack(alignment: .leading, spacing: 5) {
-                let spools = snapshot.lowSpools ?? []
-                let total = snapshot.lowSpoolCount ?? spools.count
-                Header(title: snapshot.word(.filamentTitle), shop: snapshot.shopName,
-                       count: total == 0 ? nil : total, countInk: Ink.attention)
-                if spools.isEmpty {
-                    Text(snapshot.word(.allStocked)).font(.caption).foregroundStyle(.secondary)
-                } else {
-                    TwoColumns(items: Array(spools.prefix(4))) { s in
-                        Tap(link: .spool(s.id), family: .systemLarge) { SpoolRow(spool: s, snapshot: snapshot) }
+            // Filament: four at most. Only when the snapshot carries the
+            // list: one written by an older build has none, and drawing that
+            // as an empty list claimed "Every spool is stocked" about a shop
+            // nobody had counted. The same rule as Up next below.
+            if let spools = snapshot.lowSpools {
+                Divider()
+                VStack(alignment: .leading, spacing: 5) {
+                    let total = snapshot.lowSpoolCount ?? spools.count
+                    Header(title: snapshot.word(.filamentTitle), shop: snapshot.shopName,
+                           count: total == 0 ? nil : total, countInk: Ink.attention)
+                    if spools.isEmpty {
+                        Text(snapshot.word(.allStocked)).font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        TwoColumns(items: Array(spools.prefix(4))) { s in
+                            Tap(link: .spool(s.id), family: .systemLarge) { SpoolRow(spool: s, snapshot: snapshot) }
+                        }
                     }
                 }
             }
@@ -506,7 +525,7 @@ struct GlanceView: View {
                         Text(snapshot.word(.queueEmpty)).font(.caption).foregroundStyle(.secondary)
                     } else {
                         ForEach(Array(jobs.prefix(3))) { job in
-                            Tap(link: .job(job.id), family: .systemLarge) { JobRow(job: job, snapshot: snapshot) }
+                            Tap(link: .job(job.id), family: .systemLarge) { JobRow(job: job, snapshot: snapshot, now: now) }
                         }
                     }
                 }
