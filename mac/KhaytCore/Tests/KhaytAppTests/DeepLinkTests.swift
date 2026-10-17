@@ -8,6 +8,7 @@ import KhaytWidgetData
 /// are read, everything else is refused, and following one only navigates —
 /// through the same gate as ⌘K.
 @MainActor
+@Suite(.serialized)
 struct DeepLinkTests {
 
     @Test("each link survives the trip through a URL, odd ids included")
