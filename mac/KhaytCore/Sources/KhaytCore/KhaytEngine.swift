@@ -610,6 +610,9 @@ public actor KhaytEngine {
         // and until now this app could not even tell a shop it had them.
         "purchase-orders",
         "po-audit",
+        // Which jobs a manufacturer's lot went into, and which lots a job drew
+        // from — joined from what the deduction and receipts above stamp.
+        "lot-trace",
         // The supplier's own bill against the order it belongs to. The
         // arithmetic lived inside `renderer/inventory.js`'s save handler until
         // this app learnt to receive a purchase order and needed the same
