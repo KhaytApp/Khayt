@@ -20,19 +20,23 @@ public struct KhaytWidgetView: View {
     let face: WidgetFace
     let family: WidgetFamily
     let snapshot: ShopWidgetSnapshot?
+    /// The timeline entry's moment — what "now" is for this drawing, which is
+    /// not when the app wrote the file.
+    let now: Date
 
-    public init(face: WidgetFace, family: WidgetFamily, snapshot: ShopWidgetSnapshot?) {
+    public init(face: WidgetFace, family: WidgetFamily, snapshot: ShopWidgetSnapshot?, now: Date = Date()) {
         self.face = face
         self.family = family
         self.snapshot = snapshot
+        self.now = now
     }
 
     public var body: some View {
         if let snapshot {
             Group {
                 switch face {
-                case .printing: PrintingView(snapshot: snapshot, family: family)
-                case .today: TodayView(snapshot: snapshot, family: family)
+                case .printing: PrintingView(snapshot: snapshot, family: family, now: now)
+                case .today: TodayView(snapshot: snapshot, family: family, now: now)
                 }
             }
             // The BOOK's language, which is the app's — not the Mac's. Western
@@ -60,6 +64,7 @@ struct OpenKhayt: View {
 struct PrintingView: View {
     let snapshot: ShopWidgetSnapshot
     let family: WidgetFamily
+    let now: Date
 
     /// Two rows on the small widget; two columns of two on the medium. Three
     /// stacked rows were measured overflowing the medium widget's 138pt of
@@ -79,14 +84,14 @@ struct PrintingView: View {
             } else {
                 let rows = Array(snapshot.printing.prefix(shown))
                 if family == .systemSmall {
-                    ForEach(rows) { PrinterRow(printer: $0, snapshot: snapshot) }
+                    ForEach(rows) { PrinterRow(printer: $0, snapshot: snapshot, now: now) }
                 } else {
                     Grid(horizontalSpacing: 14, verticalSpacing: 8) {
                         ForEach(0..<((rows.count + 1) / 2), id: \.self) { r in
                             GridRow {
-                                PrinterRow(printer: rows[r * 2], snapshot: snapshot)
+                                PrinterRow(printer: rows[r * 2], snapshot: snapshot, now: now)
                                 if r * 2 + 1 < rows.count {
-                                    PrinterRow(printer: rows[r * 2 + 1], snapshot: snapshot)
+                                    PrinterRow(printer: rows[r * 2 + 1], snapshot: snapshot, now: now)
                                 } else {
                                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                                 }
@@ -97,7 +102,10 @@ struct PrintingView: View {
                 Spacer(minLength: 0)
             }
             HStack(spacing: 4) {
-                Updated(snapshot: snapshot)
+                // Beside "+2 more" a small widget has room for the time only;
+                // the word was cut to "Updat…".
+                Updated(snapshot: snapshot,
+                        timeOnly: family == .systemSmall && snapshot.printing.count > shown)
                 Spacer(minLength: 4)
                 if snapshot.printing.count > shown {
                     Text(verbatim: snapshot.word(.more)
@@ -113,6 +121,7 @@ struct PrintingView: View {
 struct PrinterRow: View {
     let printer: ShopWidgetSnapshot.Printer
     let snapshot: ShopWidgetSnapshot
+    let now: Date
     @Environment(\.colorScheme) private var scheme
 
     private var ink: Color { printer.paused ? Ink.attention.on(scheme) : Ink.hot.on(scheme) }
@@ -131,8 +140,12 @@ struct PrinterRow: View {
             Group {
                 if printer.paused {
                     Text(snapshot.word(.paused))
-                } else if let ends = printer.endsAt, ends > snapshot.writtenAt {
-                    // Counts down on its own between reloads.
+                } else if let ends = printer.endsAt, ShopWidgetSnapshot.countsDown(to: ends, at: now) {
+                    // Counts down on its own between reloads. Only while the
+                    // finish is ahead: past it, `.relative` counts back UP, so
+                    // a print the app has not been running to see finish read
+                    // as hours still to go. The timeline has an entry at each
+                    // finish (`FeedProvider`), so the row redraws without it.
                     Text(ends, style: .relative).monospacedDigit()
                 } else {
                     Text(verbatim: " ")
@@ -169,6 +182,15 @@ struct Bar: View {
 struct TodayView: View {
     let snapshot: ShopWidgetSnapshot
     let family: WidgetFamily
+    let now: Date
+
+    /// Yesterday's counts are not today's: past the day the app wrote them
+    /// for, due and late are a dash until the app writes again. What is owed
+    /// does not change at midnight, so it stays.
+    private var dayOver: Bool { snapshot.dayIsOver(at: now) }
+    private var due: String { dayOver ? "–" : String(snapshot.today.dueToday) }
+    private var late: String { dayOver ? "–" : String(snapshot.today.overdue) }
+    private var lateInk: Color? { !dayOver && snapshot.today.overdue > 0 ? Ink.late.on(scheme) : nil }
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -176,18 +198,16 @@ struct TodayView: View {
             Header(title: snapshot.word(.todayTitle), shop: snapshot.shopName, count: nil)
             if family == .systemSmall {
                 Spacer(minLength: 0)
-                Figure(value: String(snapshot.today.dueToday), label: snapshot.word(.dueToday), ink: nil)
-                Figure(value: String(snapshot.today.overdue), label: snapshot.word(.overdue),
-                       ink: snapshot.today.overdue > 0 ? Ink.late.on(scheme) : nil)
+                Figure(value: due, label: snapshot.word(.dueToday), ink: nil)
+                Figure(value: late, label: snapshot.word(.overdue), ink: lateInk)
                 if let owed = snapshot.today.owed {
                     Figure(value: owed, label: snapshot.word(.owed), ink: nil)
                 }
             } else {
                 Spacer(minLength: 0)
                 HStack(alignment: .top, spacing: 14) {
-                    Figure(value: String(snapshot.today.dueToday), label: snapshot.word(.dueToday), ink: nil, big: true)
-                    Figure(value: String(snapshot.today.overdue), label: snapshot.word(.overdue),
-                           ink: snapshot.today.overdue > 0 ? Ink.late.on(scheme) : nil, big: true)
+                    Figure(value: due, label: snapshot.word(.dueToday), ink: nil, big: true)
+                    Figure(value: late, label: snapshot.word(.overdue), ink: lateInk, big: true)
                     if let owed = snapshot.today.owed {
                         Figure(value: owed, label: snapshot.word(.owed), ink: nil, big: true)
                     }
@@ -249,10 +269,11 @@ struct Header: View {
 
 struct Updated: View {
     let snapshot: ShopWidgetSnapshot
+    var timeOnly = false
 
     var body: some View {
         HStack(spacing: 3) {
-            Text(snapshot.word(.updated))
+            if !timeOnly { Text(snapshot.word(.updated)) }
             // The time, not a running "2 min, 0 sec": it is never wrong and
             // needs no redraw to stay right.
             Text(snapshot.writtenAt, style: .time)

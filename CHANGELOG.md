@@ -29,6 +29,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   anyone at the Mac can see it, so it never shows a customer's name, the
   sample book never appears in it, and nothing is shown while the staff lock
   is on. Until the app has opened a real book, a widget says "Open Khayt".
+  When the app is not running to update them, a countdown stops at the
+  print's estimated finish instead of counting back up, and after midnight
+  Today shows a dash for due and late rather than yesterday's counts.
 - **iPhone: three fixes to print progress on the Lock Screen, seen on a real
   locked simulator.**
   - The time left read "1:11:--": the Lock Screen stops ticking seconds while

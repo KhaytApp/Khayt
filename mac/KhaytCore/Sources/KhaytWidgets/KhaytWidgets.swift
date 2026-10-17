@@ -86,8 +86,15 @@ struct FeedProvider: TimelineProvider {
         // quarter-hour is only so "Updated …" and a stale print catch up when
         // the app is not running to say so.
         let now = Date()
-        let entry = FeedEntry(date: now, snapshot: Feed.load())
-        completion(Timeline(entries: [entry], policy: .after(now.addingTimeInterval(15 * 60))))
+        let snap = Feed.load()
+        // An entry at each moment the drawing changes on its own: a print's
+        // estimated finish (its countdown stops) and the end of the shop's day
+        // (today's counts become a dash). See `KhaytWidgetView.now`.
+        var moments = (snap?.printing.compactMap(\.endsAt) ?? []) + [snap?.dayEnds].compactMap { $0 }
+        moments = moments.filter { $0 > now }.sorted()
+        let entries = [FeedEntry(date: now, snapshot: snap)]
+            + moments.prefix(8).map { FeedEntry(date: $0, snapshot: snap) }
+        completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(15 * 60))))
     }
 }
 
@@ -98,7 +105,7 @@ struct Face: View {
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
-        KhaytWidgetView(face: face, family: family, snapshot: entry.snapshot)
+        KhaytWidgetView(face: face, family: family, snapshot: entry.snapshot, now: entry.date)
             .containerBackground(.fill.tertiary, for: .widget)
     }
 }

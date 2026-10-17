@@ -42,6 +42,12 @@ public struct ShopWidgetSnapshot: Codable, Sendable, Equatable {
     /// how many are idle rather than looking like an empty book.
     public var machineCount: Int
     public var today: Today
+    /// When the shop's day ends (the book's calendar). `today`'s due and late
+    /// counts are true until then; after it, with the app not running to
+    /// write tomorrow's, the widget shows a dash rather than yesterday's
+    /// figures under today's heading. Optional, so a file from before it
+    /// still reads.
+    public var dayEnds: Date?
 
     public struct Printer: Codable, Sendable, Equatable, Identifiable {
         public var id: String
@@ -81,7 +87,8 @@ public struct ShopWidgetSnapshot: Codable, Sendable, Equatable {
     }
 
     public init(writtenAt: Date, shopName: String, language: String, rightToLeft: Bool,
-                words: [String: String], printing: [Printer], machineCount: Int, today: Today) {
+                words: [String: String], printing: [Printer], machineCount: Int, today: Today,
+                dayEnds: Date? = nil) {
         self.version = Self.currentVersion
         self.writtenAt = writtenAt
         self.shopName = shopName
@@ -91,9 +98,20 @@ public struct ShopWidgetSnapshot: Codable, Sendable, Equatable {
         self.printing = printing
         self.machineCount = machineCount
         self.today = today
+        self.dayEnds = dayEnds
     }
 
     public func word(_ w: Word) -> String { words[w.rawValue] ?? "" }
+
+    /// Past the day `today` was counted for: its due and late counts are no
+    /// longer today's.
+    public func dayIsOver(at now: Date) -> Bool { dayEnds.map { now >= $0 } ?? false }
+
+    /// Whether a finish time is still ahead, so a countdown to it means
+    /// something. `Text(_, style: .relative)` past its date counts back up.
+    public static func countsDown(to ends: Date?, at now: Date) -> Bool {
+        ends.map { $0 > now } ?? false
+    }
 
     // MARK: - On disk
 

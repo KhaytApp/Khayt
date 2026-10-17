@@ -174,6 +174,36 @@ struct WidgetFeedTests {
         }
     }
 
+    @Test("today's counts end with the shop's day, and an older file without that still reads")
+    func todayEndsAtTheBooksMidnight() throws {
+        let noon = Calendar.book.date(from: DateComponents(year: 2026, month: 10, day: 17, hour: 12))!
+        let shop = Shop()
+        let snap = WidgetFeed.compose(shop, now: noon)
+        let midnight = Calendar.book.date(byAdding: .day, value: 1, to: Calendar.book.startOfDay(for: noon))!
+        #expect(snap.dayEnds == midnight)
+        #expect(!snap.dayIsOver(at: noon))
+        #expect(!snap.dayIsOver(at: midnight.addingTimeInterval(-1)))
+        #expect(snap.dayIsOver(at: midnight))
+
+        // A file written before `dayEnds` existed: read, and never "over".
+        var old = Self.snapshot(at: noon)
+        old.dayEnds = nil
+        var json = try JSONSerialization.jsonObject(with: try old.encoded()) as! [String: Any]
+        json.removeValue(forKey: "dayEnds")
+        let read = ShopWidgetSnapshot.decode(try JSONSerialization.data(withJSONObject: json))
+        #expect(read != nil)
+        #expect(read?.dayIsOver(at: noon.addingTimeInterval(86_400 * 3)) == false)
+    }
+
+    @Test("a finish time counts down only while it is ahead — past it, the widget does not count back up")
+    func countdownStopsAtTheFinish() {
+        let now = Date()
+        #expect(ShopWidgetSnapshot.countsDown(to: now.addingTimeInterval(60), at: now))
+        #expect(!ShopWidgetSnapshot.countsDown(to: now, at: now))
+        #expect(!ShopWidgetSnapshot.countsDown(to: now.addingTimeInterval(-3_600), at: now))
+        #expect(!ShopWidgetSnapshot.countsDown(to: nil, at: now))
+    }
+
     @Test("a file from a newer format is not drawn")
     func newerFormatIsRefused() throws {
         var snap = Self.snapshot(at: Date())

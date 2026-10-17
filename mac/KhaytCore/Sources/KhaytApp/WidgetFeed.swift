@@ -127,7 +127,8 @@ final class WidgetFeed {
             machineCount: shop.machines.count,
             today: .init(dueToday: dueToday(shop.orders.map { (Stage.of($0), $0.dueDate) }, now: now),
                          overdue: shop.overdueCount,
-                         owed: Money.short(shop.owed, shop.currency)))
+                         owed: Money.short(shop.owed, shop.currency)),
+            dayEnds: Calendar.book.date(byAdding: .day, value: 1, to: Calendar.book.startOfDay(for: now)))
     }
 
     // MARK: - Writing it
