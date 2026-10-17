@@ -202,6 +202,11 @@ struct LibraryGrid: View {
                 return .handled
             }
             .onAppear { focused = true }
+            // Back from the Finder or another app: a drive may have been
+            // mounted, or a picture written, while the answers were kept.
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                shop.forgetLibraryDisk()
+            }
         }
         .background(Khayt.ground)
         .overlay { if shop.shownFiles.isEmpty { EmptyShelf(shop: shop) } }

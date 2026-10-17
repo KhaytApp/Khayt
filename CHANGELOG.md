@@ -4,6 +4,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the library stays quick with thousands of models.** Clicking a model,
+  typing in the search box and redrawing the library used to go through the
+  whole library several times each, and asked the disk about every visible
+  thumbnail on every redraw. On a 5,000-model library in 200 groups, a click
+  took about 0.3 seconds before anything moved and each key typed 0.1–0.5
+  seconds; now a click takes well under a millisecond and a key about 20
+  milliseconds. Each further letter typed searches only what the last one
+  found. Thumbnails are asked about once per model, and again when you open
+  the library or come back to Khayt, so a drive you just plugged in shows its
+  pictures. Pictures are decoded at the size a tile draws them, off the main
+  thread, and at most 400 are kept in memory. What is shown, and what a
+  selection or Delete acts on, is unchanged.
+
 - **Mac: widgets for the desktop and Notification Centre.** Two widgets, each
   small or medium:
   - **Printing now** shows each printer that is printing or paused, how far

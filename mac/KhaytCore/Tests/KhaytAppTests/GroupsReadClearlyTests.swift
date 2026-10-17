@@ -207,7 +207,10 @@ struct GroupsReadClearlyTests {
         shop.clearLibraryFilter()
         #expect(!shop.libraryShowsMatches)
         let src = MenuCoverageTests.source("Shop.swift")
-        #expect(src.contains("return Self.libraryEntries(shownFiles, under: group, flat: libraryFlat,"))
+        // Built once per change now (`Shop+LibraryMemo.swift`), from the same
+        // rule and the same flag.
+        #expect(src.contains("entries = Self.libraryEntries(shown, under: shownKey.group, flat: libraryFlat,"))
+        #expect(src.contains("showingMatches: libraryShowsMatches, kinds: libraryGroupKinds,"))
     }
 
     // MARK: Where the kind is kept
