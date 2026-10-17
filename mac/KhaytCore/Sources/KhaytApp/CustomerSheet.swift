@@ -299,7 +299,7 @@ struct CustomerSheet: View {
                 Text(shop.words.callIt("ce.price_list_empty"))
                     .font(.caption).foregroundStyle(.secondary)
             }
-            ForEach($agreements) { $row in
+            ForEach($agreements.byID) { $row in
                 HStack(spacing: 8) {
                     TextField(shop.words.callIt("ce.pl_product"), text: $row.product)
                         .textFieldStyle(.roundedBorder)

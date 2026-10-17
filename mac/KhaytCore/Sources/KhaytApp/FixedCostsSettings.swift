@@ -79,7 +79,7 @@ struct FixedCostsSettings: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            ForEach($lines) { $line in
+            ForEach($lines.byID) { $line in
                 HStack {
                     // The hint goes INSIDE the field. A title argument is
                     // drawn as a label beside it once the field has a bezel,
@@ -87,9 +87,7 @@ struct FixedCostsSettings: View {
                     TextField("", text: $line.name,
                               prompt: Text(shop.words.callIt("mac.fixed_name_ph")))
                         .frame(maxWidth: .infinity)
-                    TextField("", value: $line.amount,
-                              format: .number.precision(.fractionLength(0)),
-                              prompt: Text(verbatim: "0"))
+                    LiveNumberField(value: $line.amount)
                         .frame(width: 90)
                         .multilineTextAlignment(.trailing)
                     Button {

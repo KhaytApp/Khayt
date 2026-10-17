@@ -929,7 +929,7 @@ struct WebStoreSheet: View {
             .fixedSize(horizontal: false, vertical: true)
 
         Text(w.callIt("store.shipping_label")).font(.callout.weight(.medium)).padding(.top, 6)
-        ForEach($store.shipping) { $row in
+        ForEach($store.shipping.byID) { $row in
             HStack {
                 TextField(w.callIt("store.ship_label_ph"), text: $row.label).textFieldStyle(.roundedBorder)
                 TextField("0", text: $row.price).textFieldStyle(.roundedBorder).frame(width: 80)
@@ -946,7 +946,7 @@ struct WebStoreSheet: View {
             .disabled(store.shipping.count >= 8)
 
         Text(w.callIt("store.promos_label")).font(.callout.weight(.medium)).padding(.top, 6)
-        ForEach($store.promos) { $promo in
+        ForEach($store.promos.byID) { $promo in
             HStack {
                 TextField(w.callIt("store.promo_code"), text: $promo.code).textFieldStyle(.roundedBorder)
                 Picker("", selection: $promo.fixed) {
