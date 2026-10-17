@@ -192,6 +192,18 @@ test('csvForJobs quotes what needs quoting', () => {
   assert.match(LT.csvForJobs([{ orderId: 'a', project: 'x, "y"', lots: [], grams: 1 }]), /"x, ""y"""/);
 });
 
+test('csvForJobs opens a formula-looking cell as text, not a formula', () => {
+  const csv = LT.csvForJobs([
+    { orderId: 'a', project: '+cmd', client: '=1+1', lots: ['@SUM(A1)', '-x'], grams: 2 },
+    { orderId: 'b', project: 'ok', client: '=HYPERLINK("http://x","y")', lots: [], grams: 1 },
+  ]);
+  const [, a, b] = csv.trim().split('\n');
+  assert.equal(a, "a,'+cmd,'=1+1,,2,'@SUM(A1) / -x,completed");
+  assert.equal(b, `b,ok,"'=HYPERLINK(""http://x"",""y"")",,1,,completed`);
+  // A plain figure is still a figure.
+  assert.match(LT.csvForJobs([{ orderId: 'c', lots: [], grams: 3.5 }]), /^c,,,,3.5,,completed$/m);
+});
+
 test('the whole round trip: receive a lot, print from it, trace it back', () => {
   const po = { id: 'PO-1', qty: 1000 };
   const got = PO.receive({ po, item: { id: 'sp-1', material: 'PLA', weight: 0 },
