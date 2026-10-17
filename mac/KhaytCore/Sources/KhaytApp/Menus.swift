@@ -55,8 +55,12 @@ struct KhaytCommands: Commands {
         // In a Group: a `Commands` body takes at most ten children, and these
         // two made it twelve (fine in a debug build here, "extra argument in
         // call" in CI's app build).
+        //
+        // AFTER `.saveItem`, never replacing it: on macOS that group holds
+        // File ▸ Close (⌘W) too. Replacing it took Close away, and ⌘W closed
+        // nothing (alpha.78, reported by the shop).
         Group {
-            CommandGroup(replacing: .saveItem) { EditCommands().environment(shop).disabled(shop.needsSignIn) }
+            CommandGroup(after: .saveItem) { EditCommands().environment(shop).disabled(shop.needsSignIn) }
             CommandGroup(replacing: .printItem) { PrintCommands().environment(shop).disabled(shop.needsSignIn) }
         }
 

@@ -302,7 +302,10 @@ struct MacConventionsTests {
     func menuWiring() throws {
         let menus = try QuoteSheetStatusTests.source("Menus.swift")
         #expect(menus.contains("CommandGroup(replacing: .printItem)"))
-        #expect(menus.contains("CommandGroup(replacing: .saveItem)"))
+        // After the save group, not in place of it: that group is where
+        // macOS keeps File ▸ Close, and replacing it left ⌘W doing nothing.
+        #expect(menus.contains("CommandGroup(after: .saveItem)"))
+        #expect(!menus.contains("CommandGroup(replacing: .saveItem)"), "replacing .saveItem removes Close (⌘W)")
         #expect(menus.contains(".disabled(shop.printTarget == nil)"))
         #expect(menus.contains(".disabled(shop.shareTarget == nil)"))
         #expect(menus.contains(".disabled(shop.duplicateTarget == nil)"))
