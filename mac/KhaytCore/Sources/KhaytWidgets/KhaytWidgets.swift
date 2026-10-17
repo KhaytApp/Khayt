@@ -22,6 +22,9 @@ struct KhaytWidgets: WidgetBundle {
     var body: some Widget {
         PrintingNowWidget()
         TodayWidget()
+        FilamentWidget()
+        UpNextWidget()
+        GlanceWidget()
     }
 }
 
@@ -60,7 +63,18 @@ enum Feed {
                 .init(id: "b", name: "Prusa MK4S", progress: 28, endsAt: now.addingTimeInterval(9_180), paused: false),
             ],
             machineCount: 3,
-            today: .init(dueToday: 3, overdue: 1, owed: "1,240.00"))
+            today: .init(dueToday: 3, overdue: 1, owed: "1,240.00"),
+            lowSpools: [
+                .init(id: "s1", name: "PLA Basic · Black", colour: "#1C1C1C", gramsLeft: 120),
+                .init(id: "s2", name: "PETG · Orange", colour: "#F0763D", gramsLeft: 180),
+            ],
+            lowSpoolCount: 2,
+            upNext: [
+                .init(id: "ORD-01012", title: "Desk organiser", due: now, late: false, urgent: true),
+                .init(id: "ORD-01013", title: "Lamp shade", due: now.addingTimeInterval(86_400), late: false, urgent: false),
+                .init(id: "ORD-01014", title: "Cable clips ×40", due: now.addingTimeInterval(172_800), late: false, urgent: false),
+            ],
+            queuedCount: 3)
     }
 }
 
@@ -110,26 +124,52 @@ struct Face: View {
     }
 }
 
-// MARK: - The two widgets
+// MARK: - The widgets
+
+/// One face, one kind. The sizes come from the face (`WidgetFace.families`),
+/// which is what the render tests draw, so the two cannot disagree.
+@MainActor
+private func configuration(_ face: WidgetFace, kind: String, name: LocalizedStringKey,
+                           description: LocalizedStringKey) -> some WidgetConfiguration {
+    StaticConfiguration(kind: kind, provider: FeedProvider()) { entry in
+        Face(face: face, entry: entry)
+    }
+    .configurationDisplayName(Text(name))
+    .description(Text(description))
+    .supportedFamilies(face.families)
+}
 
 struct PrintingNowWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "app.khayt.mac.printing", provider: FeedProvider()) { entry in
-            Face(face: .printing, entry: entry)
-        }
-        .configurationDisplayName(Text("widget.printing.name"))
-        .description(Text("widget.printing.description"))
-        .supportedFamilies([.systemSmall, .systemMedium])
+        configuration(.printing, kind: "app.khayt.mac.printing",
+                      name: "widget.printing.name", description: "widget.printing.description")
     }
 }
 
 struct TodayWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "app.khayt.mac.today", provider: FeedProvider()) { entry in
-            Face(face: .today, entry: entry)
-        }
-        .configurationDisplayName(Text("widget.today.name"))
-        .description(Text("widget.today.description"))
-        .supportedFamilies([.systemSmall, .systemMedium])
+        configuration(.today, kind: "app.khayt.mac.today",
+                      name: "widget.today.name", description: "widget.today.description")
+    }
+}
+
+struct FilamentWidget: Widget {
+    var body: some WidgetConfiguration {
+        configuration(.filament, kind: "app.khayt.mac.filament",
+                      name: "widget.filament.name", description: "widget.filament.description")
+    }
+}
+
+struct UpNextWidget: Widget {
+    var body: some WidgetConfiguration {
+        configuration(.upNext, kind: "app.khayt.mac.upnext",
+                      name: "widget.upnext.name", description: "widget.upnext.description")
+    }
+}
+
+struct GlanceWidget: Widget {
+    var body: some WidgetConfiguration {
+        configuration(.glance, kind: "app.khayt.mac.glance",
+                      name: "widget.glance.name", description: "widget.glance.description")
     }
 }

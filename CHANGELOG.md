@@ -4,6 +4,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: three more widgets, and a widget opens Khayt where you tapped.**
+  - **Filament low** (small and medium) lists the spools running low, the
+    emptiest first, with each one's colour and the grams left. It uses the
+    same low-stock level as the Inventory screen.
+  - **Up next** (medium and large) lists the jobs waiting for a printer, in
+    the same order as the board: urgent first, then by due date. Late due
+    dates are shown in red. It never shows the customer's name.
+  - **Shop at a glance** (large) puts printing now, today's figures, low
+    filament and the next jobs on one widget.
+  - Click a printer, job or spool on a medium or large widget to open Khayt
+    on it. Clicking anywhere else opens that widget's screen. The link only
+    opens screens and never changes anything. It shows only what you could
+    open yourself with ⌘K, and does nothing for a record the open book does
+    not have.
+  - Due dates use the book's calendar, so a Mac set to the Hijri calendar
+    shows them as the app does.
+
 - **Mac: the library stays quick with thousands of models.** Clicking a model,
   typing in the search box and redrawing the library used to go through the
   whole library several times each, and asked the disk about every visible

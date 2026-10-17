@@ -686,6 +686,18 @@ $GROUP_KEY
          listening, no error anywhere. LanBonjourDeclaredTests holds this. -->
     <string>_khayt._tcp</string>
   </array>
+  <!-- ── A WIDGET ROW OPENS THE APP AT ITSELF ──────────────────────────────
+       khayt://machine/ID, job/ID, spool/ID and screen/NAME, from the desktop
+       widgets (ShopWidgetSnapshot.Link). The app reads those four and
+       nothing else: DeepLinkTests holds the handler to refusing the rest. -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key><string>app.khayt.mac.link</string>
+      <key>CFBundleURLSchemes</key><array><string>khayt</string></array>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+    </dict>
+  </array>
 $SPARKLE_KEYS
   <!-- ── A MODEL DROPPED ON THE DOCK ICON OPENS NEW JOB ON IT ─────────────
        The Dock only accepts a drop on an app that says it can open the file,

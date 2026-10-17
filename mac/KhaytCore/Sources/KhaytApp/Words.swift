@@ -2094,6 +2094,13 @@ final class Words {
         "mac.widget_owed":      ["en": "Owed",                  "ar": "المستحق"],
         "mac.widget_updated":   ["en": "Updated",               "ar": "حُدّث"],
         "mac.widget_more":      ["en": "+{n} more",             "ar": "+{n} أخرى"],
+        "mac.widget_filament":  ["en": "Filament low",          "ar": "خيط على وشك النفاد"],
+        "mac.widget_all_stocked": ["en": "Every spool is stocked", "ar": "كل البكرات متوفرة"],
+        "mac.widget_grams":     ["en": "{n} g",                 "ar": "{n} غ"],
+        "mac.widget_up_next":   ["en": "Up next",               "ar": "التالي"],
+        "mac.widget_queue_empty": ["en": "Nothing waiting to print", "ar": "لا شيء بانتظار الطباعة"],
+        "mac.widget_urgent":    ["en": "Urgent",                "ar": "عاجل"],
+        "mac.widget_glance":    ["en": "Shop at a glance",      "ar": "الورشة في لمحة"],
         // ── The sidebar's own names for three screens ────────────────────────
         //
         // Khayt calls them "Expense Tracker", "Failed Prints & Waste Log" and

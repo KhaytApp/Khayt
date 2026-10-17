@@ -17,3 +17,16 @@
 "widget.word.owed" = "Owed";
 "widget.word.updated" = "Updated";
 "widget.word.more" = "+{n} more";
+"widget.filament.name" = "Filament low";
+"widget.filament.description" = "The spools running low, emptiest first.";
+"widget.upnext.name" = "Up next";
+"widget.upnext.description" = "The jobs waiting for a printer, in the board's order.";
+"widget.glance.name" = "Shop at a glance";
+"widget.glance.description" = "What is printing, what is due, and what is running low.";
+"widget.word.filamentTitle" = "Filament low";
+"widget.word.allStocked" = "Every spool is stocked";
+"widget.word.grams" = "{n} g";
+"widget.word.upNextTitle" = "Up next";
+"widget.word.queueEmpty" = "Nothing waiting to print";
+"widget.word.urgent" = "Urgent";
+"widget.word.glanceTitle" = "Shop at a glance";

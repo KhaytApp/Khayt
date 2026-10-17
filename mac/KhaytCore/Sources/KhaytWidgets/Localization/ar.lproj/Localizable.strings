@@ -15,3 +15,16 @@
 "widget.word.owed" = "المستحق";
 "widget.word.updated" = "حُدّث";
 "widget.word.more" = "+{n} أخرى";
+"widget.filament.name" = "خيط على وشك النفاد";
+"widget.filament.description" = "البكرات التي توشك على النفاد، الأقل أولًا.";
+"widget.upnext.name" = "التالي";
+"widget.upnext.description" = "الأعمال التي تنتظر طابعة، بترتيب اللوحة.";
+"widget.glance.name" = "الورشة في لمحة";
+"widget.glance.description" = "ما يُطبع الآن، وما هو مستحق، وما يوشك على النفاد.";
+"widget.word.filamentTitle" = "خيط على وشك النفاد";
+"widget.word.allStocked" = "كل البكرات متوفرة";
+"widget.word.grams" = "{n} غ";
+"widget.word.upNextTitle" = "التالي";
+"widget.word.queueEmpty" = "لا شيء بانتظار الطباعة";
+"widget.word.urgent" = "عاجل";
+"widget.word.glanceTitle" = "الورشة في لمحة";

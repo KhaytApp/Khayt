@@ -204,6 +204,49 @@ struct WidgetFeedTests {
         #expect(!ShopWidgetSnapshot.countsDown(to: nil, at: now))
     }
 
+    @Test("Up next is the board's waiting column in the board's order, with no customer on it")
+    func upNextIsTheBoardsQueue() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let now = Date()
+        let snap = WidgetFeed.compose(shop, now: now)
+        let waiting = (shop.board[.pending] ?? [])
+        #expect(!waiting.isEmpty, "the sample must have queued work, or this proves nothing")
+        #expect(snap.queuedCount == waiting.count)
+        #expect(snap.upNext?.map(\.id) == Array(waiting.prefix(ShopWidgetSnapshot.listLimit).map(\.id)))
+        for (row, job) in zip(snap.upNext ?? [], waiting) {
+            #expect(row.urgent == job.priority)
+            #expect(row.late == job.isOverdue(now: now))
+            #expect(row.due == Order.day(job.dueDate))
+        }
+    }
+
+    @Test("Filament low is the inventory's own low set, emptiest first")
+    func lowSpoolsAreTheInventorysRule() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let snap = WidgetFeed.compose(shop, now: Date())
+        #expect(snap.lowSpoolCount == shop.lowSpools.count)
+        let listed = snap.lowSpools ?? []
+        #expect(Set(listed.map(\.id)).isSubset(of: shop.lowSpools))
+        #expect(listed.map(\.gramsLeft) == listed.map(\.gramsLeft).sorted())
+        for row in listed {
+            let spool = try #require(shop.spools.first { $0.id == row.id })
+            #expect(row.name == shop.spoolName(spool))
+            #expect(row.gramsLeft == Int((spool.weight ?? 0).rounded()))
+            if let c = row.colour { #expect(c.hasPrefix("#") && c.count == 7) }
+        }
+    }
+
+    @Test("a file from before the filament and queue widgets still reads, and says nothing about them")
+    func alpha77FileStillReads() throws {
+        var json = try JSONSerialization.jsonObject(with: try Self.snapshot(at: Date()).encoded()) as! [String: Any]
+        for key in ["lowSpools", "lowSpoolCount", "upNext", "queuedCount"] { json.removeValue(forKey: key) }
+        let read = try #require(ShopWidgetSnapshot.decode(try JSONSerialization.data(withJSONObject: json)))
+        #expect(read.lowSpools == nil && read.upNext == nil)
+        #expect(read.printing.count == 1)
+    }
+
     @Test("a file from a newer format is not drawn")
     func newerFormatIsRefused() throws {
         var snap = Self.snapshot(at: Date())
