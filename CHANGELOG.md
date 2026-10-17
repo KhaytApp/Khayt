@@ -20,6 +20,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     not have.
   - Due dates use the book's calendar, so a Mac set to the Hijri calendar
     shows them as the app does.
+  - The "Updated" time at the foot of each widget is shown in full. In
+    Arabic it was cut short, to "3:1…".
 
 - **Mac: the library stays quick with thousands of models.** Clicking a model,
   typing in the search box and redrawing the library used to go through the

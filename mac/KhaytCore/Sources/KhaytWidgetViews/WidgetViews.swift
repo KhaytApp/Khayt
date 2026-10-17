@@ -584,13 +584,19 @@ struct Header: View {
 struct Updated: View {
     let snapshot: ShopWidgetSnapshot
     var timeOnly = false
+    @Environment(\.locale) private var locale
+    @Environment(\.calendar) private var calendar
 
     var body: some View {
         HStack(spacing: 3) {
             if !timeOnly { Text(snapshot.word(.updated)) }
             // The time, not a running "2 min, 0 sec": it is never wrong and
-            // needs no redraw to stay right.
-            Text(snapshot.writtenAt, style: .time)
+            // needs no redraw to stay right. Written out here rather than
+            // `Text(_:style: .time)`, which the system lays out itself: the
+            // Arabic gallery gave it too little room and drew "3:1…".
+            Text(verbatim: snapshot.writtenAt.formatted(
+                Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar)))
+                .fixedSize()
         }
         .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
     }
