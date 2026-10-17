@@ -217,10 +217,26 @@ let package = Package(
         // What the widgets draw, apart from the extension so the tests can
         // render it (`WidgetRenderTests`) — nothing else ever sees it.
         .target(name: "KhaytWidgetViews", dependencies: ["KhaytWidgetData"]),
+        //
+        // ── AND THE PROCESS STARTS IN `NSExtensionMain`, NOT IN THAT `main` ──
+        //
+        // The `@main` is needed (it is what `__swift5_entry` points at), but
+        // it must not be the first thing run. Xcode links every extension
+        // with `-e _NSExtensionMain` — Apple's Calculator widget imports
+        // exactly that symbol — and `NSExtensionMain` → `EXExtensionMain`
+        // records the launch arguments before handing over to the Swift entry.
+        // Linked with the ordinary `_main`, WidgetKit's bootstrap found
+        // `ExtensionMain.launchArguments` nil and trapped (EXC_BREAKPOINT in
+        // `_EXRunningExtension._shared`) the moment chronod first asked the
+        // gallery's question, every time (alpha.77 widget proof).
         .executableTarget(name: "KhaytWidgets", dependencies: ["KhaytWidgetData", "KhaytWidgetViews"],
                           exclude: ["Localization"],
                           swiftSettings: [
                               .unsafeFlags(["-parse-as-library"]),
+                          ],
+                          linkerSettings: [
+                              .linkedFramework("Foundation"),
+                              .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"]),
                           ]),
         // ── THE LIBRARY, ANSWERABLE BY AN ASSISTANT ──────────────────────
         //

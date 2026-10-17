@@ -212,6 +212,22 @@ struct WidgetExtensionTests {
         otool.waitUntilExit()
         #expect(out.contains("__swift5_entry"))
         #expect(out.contains("LC_MAIN"))
+
+        // …and the process must START in `NSExtensionMain`, as Xcode links it
+        // (Apple's Calculator widget imports the same symbol). Started in the
+        // Swift `main`, WidgetKit trapped in `_EXRunningExtension._shared`
+        // on chronod's first query and the widgets never reached the gallery.
+        let nm = Process()
+        nm.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        nm.arguments = ["nm", "-u", binary.path]
+        let nmOut = Pipe()
+        nm.standardOutput = nmOut
+        nm.standardError = FileHandle.nullDevice
+        try nm.run()
+        let imports = String(decoding: nmOut.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        nm.waitUntilExit()
+        #expect(imports.contains("_NSExtensionMain"),
+                "KhaytWidgets is not linked with -e _NSExtensionMain; it will crash when the gallery asks for it")
     }
 
     /// The widget draws in the app's colours, which it cannot import. Both
