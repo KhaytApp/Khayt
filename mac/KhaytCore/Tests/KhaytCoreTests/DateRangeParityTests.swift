@@ -169,7 +169,7 @@ struct DateRangeParityTests {
             guard let now = formatter.date(from: String(format: "2026-%02d-01T00:00:01Z", month))
             else { continue }
             for day in stride(from: 0, through: 400, by: 7) {
-                guard let d = Calendar.current.date(byAdding: .day, value: -day, to: now)
+                guard let d = Calendar.book.date(byAdding: .day, value: -day, to: now)
                 else { continue }
                 let text = DateRange.localDay(d)
                 for range in ["quarter", "last_quarter", "month", "last_month", "year"] {

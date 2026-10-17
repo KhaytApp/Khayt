@@ -145,6 +145,7 @@ enum CloudIntake {
         if let date = ISO8601DateFormatter().date(from: text) { return date }
         let sql = DateFormatter()
         sql.locale = Locale(identifier: "en_US_POSIX")
+        sql.calendar = Calendar(identifier: .gregorian)
         sql.timeZone = TimeZone(identifier: "UTC")
         sql.dateFormat = "yyyy-MM-dd HH:mm:ss"
         return sql.date(from: text)

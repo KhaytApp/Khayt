@@ -158,9 +158,32 @@ struct MastheadNetTests {
     @Test("the label still names the month, because a figure with no period lies by omission")
     func theLabelNamesThePeriod() async {
         let shop = await Self.loaded()
-        let month = shop.now.formatted(.dateTime.month(.wide)).uppercased()
+        // The book's Gregorian month in the shop's language — written out here
+        // rather than with `words.say`, so the test does not grade the label
+        // against itself. Left to the Mac, a Mac set to Umm al-Qura named the
+        // Hijri month instead.
+        var style = Date.FormatStyle.dateTime.month(.wide).locale(shop.words.locale)
+        style.calendar = .book
+        let month = shop.now.formatted(style).uppercased()
         #expect(shop.monthNetLabel.contains(month),
                 Comment(rawValue: "\(shop.monthNetLabel) does not name \(month)"))
+    }
+
+    @Test("the label names the book's Gregorian month on a Mac set to the Hijri calendar")
+    func theLabelIsGregorian() async {
+        let shop = await Self.loaded()
+        let month = Calendar.book.component(.month, from: shop.now)
+        let english = Calendar.book.monthSymbols[month - 1].uppercased()
+        // `Words.say` puts the book's calendar on whatever style it is handed —
+        // here one that asks for the Mac's being Umm al-Qura.
+        var hijri = Date.FormatStyle.dateTime.month(.wide).year()
+        hijri.calendar = Calendar(identifier: .islamicUmmAlQura)
+        let en = Words()
+        await en.load("en", engine: nil)
+        let said = en.say(shop.now, hijri)
+        #expect(said.uppercased().contains(english), Comment(rawValue: "said \(said), not \(english)"))
+        #expect(said.contains(String(Calendar.book.component(.year, from: shop.now))))
+        #expect(!said.contains("AH") && !said.contains("14"), Comment(rawValue: "a Hijri date: \(said)"))
     }
 
     @Test("a book that has not been read shows the dash, not a confident zero")
@@ -176,7 +199,7 @@ struct MastheadNetTests {
         // Zero would be a claim; the dash is the truth.
         let shop = await Self.loaded()
         let engine = shop.engine
-        let far = Calendar.current.date(byAdding: .year, value: 3, to: Date()) ?? Date()
+        let far = Calendar.book.date(byAdding: .year, value: 3, to: Date()) ?? Date()
         let answer = await Shop.thisMonthsNet(
             engine: engine, orders: shop.orderRows, expenses: shop.expenseRows,
             settings: shop.settingsDict, clients: shop.clientRows,

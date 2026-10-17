@@ -25,7 +25,7 @@ struct DowntimeEditorTests {
         var parts = DateComponents()
         parts.year = 2026; parts.month = 9; parts.day = 10
         parts.hour = 14; parts.minute = 30
-        let when = try! #require(Calendar.current.date(from: parts))
+        let when = try! #require(Calendar.book.date(from: parts))
         #expect(DowntimeEditor.stamp(when) == "2026-09-10T14:30")
         // And back, so an existing window opens on the control it was set with.
         #expect(DowntimeEditor.parse("2026-09-10T14:30") == when)
@@ -37,7 +37,7 @@ struct DowntimeEditorTests {
     @Test("a naive time is read as the shop's own clock, not as UTC")
     func naiveIsLocal() {
         let read = try! #require(DowntimeEditor.parse("2026-09-10T14:30"))
-        let back = Calendar.current.dateComponents([.hour, .minute], from: read)
+        let back = Calendar.book.dateComponents([.hour, .minute], from: read)
         #expect(back.hour == 14 && back.minute == 30,
                 "read back as \(back.hour ?? -1):\(back.minute ?? -1)")
     }

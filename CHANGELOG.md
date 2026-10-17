@@ -18,6 +18,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   editable list: customer price agreements, a machine's loaded spools, a
   job's extra charges, product tiers and documents, supplier price lists,
   and the web store's shipping rates and promotions.
+- **Mac: dates use the Gregorian calendar everywhere, even on a Mac set to
+  the Hijri calendar.** Chart readouts, the month on the money masthead, the
+  "saved on" date of a backup and the other dates Khayt shows now use the
+  Gregorian calendar, as the rest of Khayt does. Before, a Mac set to Umm
+  al-Qura showed some of them as Hijri dates, such as "Safar 1448 AH".
+  The language and digits are unchanged.
 
 - **Mac: numbers are written with Western digits (0–9) by default, in English
   and Arabic.** Before, the English app followed your Mac's number format, so

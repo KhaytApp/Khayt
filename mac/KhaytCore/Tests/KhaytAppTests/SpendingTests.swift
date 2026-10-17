@@ -222,7 +222,7 @@ struct SpendingTests {
     @Test("the Swift period filter agrees with lib/date-range.js")
     func periodParity() async throws {
         let engine = try Self.engine()
-        let calendar = Calendar.current
+        let calendar = Calendar.book
         let clocks = [
             DateComponents(year: 2026, month: 9, day: 4),
             DateComponents(year: 2026, month: 1, day: 1),
@@ -296,7 +296,7 @@ struct ReceivablesTests {
     @Test("the rows are what is still owed, oldest first, and a voided invoice is not one")
     func aged() async throws {
         let engine = try KhaytEngine()
-        let now = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 6))!
+        let now = Calendar.book.date(from: DateComponents(year: 2026, month: 9, day: 6))!
         let out = try await engine.receivables(
             orders: Self.orders, settings: ["currency": .string("SAR")],
             clients: [.object(["id": .string("C1"), "nameEn": .string("Acme")])],
@@ -325,7 +325,7 @@ struct ReceivablesTests {
     @Test("an instalment is aged by its own due date, and shows only its own amount")
     func instalments() async throws {
         let engine = try KhaytEngine()
-        let now = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 6))!
+        let now = Calendar.book.date(from: DateComponents(year: 2026, month: 9, day: 6))!
         // A plan agreed in January with a payment due in August is not eight
         // months overdue; it is seventeen days overdue.
         let order: JSONValue = .object([

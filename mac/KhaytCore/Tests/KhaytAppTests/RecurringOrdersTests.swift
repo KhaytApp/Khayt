@@ -48,7 +48,7 @@ struct RecurringOrdersTests {
         let now = Date()
         let out = try await RecurringOrders.run(&root, engine: engine, now: now)
         #expect(out.changed)
-        #expect(out.created == ["INV-\(Calendar.current.component(.year, from: now))-0012"])
+        #expect(out.created == ["INV-\(Calendar.book.component(.year, from: now))-0012"])
 
         let orders = Self.objects(root, "printLog")
         #expect(orders.count == 3)

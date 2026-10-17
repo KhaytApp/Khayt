@@ -552,6 +552,7 @@ struct MachineBandView: View {
         // unattended overnight run around and "00:00" alone reads as a time
         // rather than as the end of the day.
         let cal = Calendar.book
+        f.calendar = cal
         f.timeZone = cal.timeZone
         let h = cal.component(.hour, from: at), m = cal.component(.minute, from: at)
         if h == 0 && m == 0 {
