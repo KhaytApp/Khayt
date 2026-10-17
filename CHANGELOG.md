@@ -7500,6 +7500,11 @@ Three more widgets, and clicking a widget opens Khayt where you clicked.
   Mac set to the Hijri calendar.
 - **The "Updated" time at the foot of each widget is shown in full.** In
   Arabic it was cut short, to "3:1…".
+- **Settings ▸ Overhead no longer crashes, and monthly costs save.**
+  Removing a cost line while its amount was still being edited quit the app,
+  and an amount saved with a click (without pressing Return) counted as 0.
+  Save now turns on as you type, and Arabic digits are accepted. The same
+  crash is fixed in Khayt's other editable lists.
 
 ## [4.0.0-alpha.77] - 2026-10-17
 
