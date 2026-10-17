@@ -44,6 +44,7 @@ struct DashboardView: View {
     /// sidebar — compact width: an iPhone, iPhone Duo's outer display — it
     /// opens from here.
     @Environment(\.horizontalSizeClass) private var widthClass
+    @State private var fold: FoldGap?
 
     private static let stages = ["pending", "printing", "post", "qc", "completed"]
 
@@ -57,13 +58,16 @@ struct DashboardView: View {
                     // same order, rearranged into two columns where there is
                     // room (Apple's iPhone Duo design talk: a stacked layout
                     // "that rearranges itself into a two-column layout").
+                    // Partly folded, the two columns meet at the fold rather
+                    // than straddling it (see `FoldGap`).
                     if widthClass == .regular {
-                        HStack(alignment: .top, spacing: 0) {
+                        FoldColumns(fold: fold) {
                             VStack(alignment: .leading, spacing: 0) { figures }
                                 .frame(maxWidth: .infinity, alignment: .top)
                             VStack(alignment: .leading, spacing: 0) { work.padding(.top, 14) }
                                 .frame(maxWidth: .infinity, alignment: .top)
                         }
+                        .readsFold($fold)
                     } else {
                         figures
                         work
