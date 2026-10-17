@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: Settings ▸ Overhead no longer crashes, and monthly cost amounts
+  save.** Removing a cost line while its amount box was still being edited
+  quit the app. An amount typed and then saved with a click (without
+  pressing Return) was not counted. Save now turns on as you type, and
+  Arabic digits are accepted. The same crash is fixed in every other
+  editable list: customer price agreements, a machine's loaded spools, a
+  job's extra charges, product tiers and documents, supplier price lists,
+  and the web store's shipping rates and promotions.
+
 - **Mac: three more widgets, and a widget opens Khayt where you tapped.**
   - **Filament low** (small and medium) lists the spools running low, the
     emptiest first, with each one's colour and the grams left. It uses the

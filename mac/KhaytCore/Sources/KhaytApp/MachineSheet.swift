@@ -332,7 +332,7 @@ struct MachineSheet: View {
                     GridRow(alignment: .top) {
                         Text(shop.words.callIt("mach.loaded")).foregroundStyle(.secondary)
                         VStack(alignment: .leading, spacing: 6) {
-                            ForEach($loadedRows) { $row in
+                            ForEach($loadedRows.byID) { $row in
                                 HStack(spacing: 8) {
                                     Toggle(shop.words.callIt("mach.head_n", ["n": .number(Double(row.id + 1))]),
                                            isOn: $row.on)

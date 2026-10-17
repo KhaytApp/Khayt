@@ -696,7 +696,7 @@ struct NewJobSheet: View {
                 Text(shop.words.callIt("calc.extra_lines")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary).fixedSize()
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach($extraLines) { $line in
+                    ForEach($extraLines.byID) { $line in
                         HStack(spacing: 6) {
                             TextField(shop.words.callIt("calc.extra_label_ph"), text: $line.label)
                                 .textFieldStyle(.roundedBorder).frame(width: 190)

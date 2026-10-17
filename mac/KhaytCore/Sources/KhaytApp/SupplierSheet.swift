@@ -235,7 +235,7 @@ struct SupplierSheet: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(shop.words.callIt("sup.price_list")).font(.callout)
-                ForEach($draft.priceList) { $quote in
+                ForEach($draft.priceList.byID) { $quote in
                     HStack(spacing: 6) {
                         TextField(shop.words.callIt("sup.price_material_ph"),
                                   text: $quote.material)

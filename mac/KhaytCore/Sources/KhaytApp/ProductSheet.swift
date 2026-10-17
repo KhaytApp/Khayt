@@ -468,7 +468,7 @@ struct ProductSheet: View {
                 Text(shop.words.callIt("cat.no_tiers"))
                     .font(.caption).foregroundStyle(.secondary)
             } else {
-                ForEach($tiers) { $tier in
+                ForEach($tiers.byID) { $tier in
                     HStack(spacing: 8) {
                         TextField(shop.words.callIt("cat.tier_label"), text: $tier.label)
                             .textFieldStyle(.roundedBorder)
@@ -509,7 +509,7 @@ struct ProductSheet: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                ForEach($docs) { $doc in
+                ForEach($docs.byID) { $doc in
                     HStack(spacing: 8) {
                         Text(doc.originalName).lineLimit(1).truncationMode(.middle)
                         Spacer(minLength: 8)
