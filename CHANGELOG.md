@@ -7509,6 +7509,45 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.79] - 2026-10-17
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Lot tracing, ⌘W back, and figures and dates written the shop's way
+everywhere: 0–9 and the Gregorian calendar, in English and Arabic.
+
+### Added
+
+- **Lot tracing: find every job printed from a filament lot.** Each time a
+  job takes filament off a spool, Khayt records the spool's lot (and the
+  purchase order it came in on) with that draw.
+  - A finished job's inspector has a **Filament used** section: spool, lot
+    and grams. A lot Khayt only presumes from the spool (jobs printed before
+    this) is marked *(inferred)*.
+  - Type a lot in the jobs search to find the jobs that drew from it. A
+    spool's **Where this went** shows the lot on each row.
+  - **Copy jobs from lot … as CSV** gives a recall list, failed prints
+    included.
+  - **Receiving a purchase order asks for the lot** (optional). A delivery
+    of a different lot onto a spool that still has filament becomes its own
+    spool, so the two lots stay apart. A second part delivery of that lot
+    joins the spool the first one made.
+- **Settings ▸ On this Mac ▸ Use the Mac's number format.** Khayt now writes
+  0–9 in English and Arabic by default. Turn this on to use the digits your
+  Mac is set to instead.
+
+### Fixed
+
+- **⌘W closes the window again.** File ▸ Close had gone missing from the menu
+  in alpha.78.
+- **Dates use the Gregorian calendar everywhere**, even on a Mac set to the
+  Hijri calendar: chart readouts, the money masthead's month, backups, and
+  the date pickers in every editor.
+- **Editors and sheets write figures the shop's way.** On a Mac set to
+  Arabic-Indic digits, sheets such as Edit spool, Receive and New job showed
+  ١٢٣ and Hijri months, even in English. They now match the rest of the app.
+
 ## [4.0.0-alpha.78] - 2026-10-17
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
