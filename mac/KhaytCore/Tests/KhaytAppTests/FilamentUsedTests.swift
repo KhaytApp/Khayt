@@ -118,6 +118,29 @@ struct FilamentUsedTests {
         #expect(topped["weight"] == .number(1300))
     }
 
+    @Test("a second part delivery of the same new lot tops up the spool the first one made")
+    func receiveSameNewLotTwice() async throws {
+        let shop = try await sample()
+        let engine = try #require(shop.engine)
+        let spool: JSONValue = .object(["id": .string("sp-1"), "material": .string("PLA"),
+                                        "weight": .number(300), "lot": .string("A")])
+        let po: JSONValue = .object(["id": .string("PO-1"), "qty": .number(1000), "itemId": .string("sp-1")])
+        let first = try await engine.receiveGoods(order: po, item: spool, consumable: nil, quantity: 500,
+                                                  notes: "", today: "2026-10-01", expenseId: "E",
+                                                  expenseLabel: "PO", lot: "B", newSpoolId: "INV-b")
+        let made = try #require(first.newItem)
+        let written = try #require(first.po)
+        let second = try await engine.receiveGoods(order: written, item: spool, consumable: nil, quantity: 500,
+                                                   notes: "", today: "2026-10-02", expenseId: "E",
+                                                   expenseLabel: "PO", lot: " b ", newSpoolId: "INV-b2",
+                                                   receivedSpools: [made])
+        #expect(second.newItem == nil, "no second lot-B spool")
+        guard case .object(let topped)? = second.item else { Issue.record("no spool"); return }
+        #expect(topped["id"] == .string("INV-b"))
+        #expect(topped["weight"] == .number(1000))
+        #expect(second.complete == true)
+    }
+
     @Test("every new string is in English and Arabic")
     func strings() async throws {
         let shop = try await sample()

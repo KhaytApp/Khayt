@@ -58,6 +58,7 @@ test('a failed print records the lot on drawn[], and re-opening still returns', 
 
 const spool = (over = {}) => ({ id: 'sp-1', material: 'PETG', color: '#000', brand: 'Acme',
   cost: 80, weight: 300, lot: 'OLD-1', openedAt: '2026-01-01', usageHistory: [{ orderId: 'x', weightUsed: 5 }],
+  dryingLog: [{ date: '2026-02-01', hours: 4 }], adjustments: [{ date: '2026-03-01', grams: -10 }],
   ...over });
 
 test('a different lot onto a spool that still holds filament becomes its own spool', () => {
@@ -75,6 +76,8 @@ test('a different lot onto a spool that still holds filament becomes its own spo
   assert.equal(n.brand, 'Acme');
   assert.equal(n.cost, 80);
   assert.equal(n.openedAt, undefined, 'the roll\'s own dates are not inherited');
+  assert.equal(n.dryingLog, undefined, 'a new roll has not been dried');
+  assert.equal(n.adjustments, undefined, 'nor weighed and corrected');
   assert.equal(n.usageHistory.length, 1);
   assert.equal(n.usageHistory[0].type, 'received');
   assert.equal(n.usageHistory[0].weightUsed, -1000);
@@ -216,4 +219,90 @@ test('the whole round trip: receive a lot, print from it, trace it back', () => 
   assert.equal(jobs[0].orderId, 'ORD-9');
   assert.equal(jobs[0].inferred, false);
   assert.equal(jobs[0].draws[0].poId, 'PO-1');
+});
+
+/* ── Review fixes ──────────────────────────────────────────────────────── */
+
+test('a failure that drew twice off one spool is counted once, not twice', () => {
+  // Two parts on one spool: `deductActual` writes a history row per take
+  // (30 g, 20 g) but ONE drawn row per spool (50 g). The history must be
+  // covered by the total, not matched gram for gram.
+  const inventory = [{ id: 'S1', material: 'PLA', weight: 1000, lot: 'A' }];
+  const order = job({ id: 'ORD-F', parts: [
+    { filamentId: 'S1', printWeight: 30, qty: 1 },
+    { filamentId: 'S1', printWeight: 20, qty: 1 },
+  ] });
+  const taken = D.deductActual(order, 50, { settings, inventory, today: '2026-10-01' });
+  assert.deepEqual(taken.drawn, [{ spoolId: 'S1', grams: 50, lot: 'A' }],
+    "deductActual's output shape is unchanged");
+  assert.equal(inventory[0].usageHistory.length, 2);
+  const wasteLog = [{ id: 'W1', orderId: 'ORD-F', date: '2026-10-01', weight: 50,
+                      drawn: taken.drawn }];
+  const jobs = LT.jobsForLot({ printLog: [order], wasteLog, inventory }, 'A');
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].grams, 50);
+  assert.equal(jobs[0].draws.length, 1);
+});
+
+test('history beyond what the record accounts for is still found', () => {
+  const inventory = [{ id: 'S1', material: 'PLA', lot: 'A', usageHistory: [
+    { orderId: 'J', weightUsed: 20, date: '2026-10-02' },
+    { orderId: 'J', weightUsed: 30, date: '2026-10-01' },
+  ] }];
+  const printLog = [{ id: 'J', materialDrawn: { spools: [{ spoolId: 'S1', grams: 30, lot: 'A' }] } }];
+  const jobs = LT.jobsForLot({ printLog, inventory }, 'A');
+  assert.equal(jobs[0].grams, 50, 'the 20 g the record does not cover is still counted');
+});
+
+test('a second part delivery of the same new lot tops up the spool the first one made', () => {
+  const po = { id: 'PO-7', qty: 1000, itemId: 'sp-1' };
+  const first = PO.receive({ po, item: spool(), quantity: 500, today: '2026-10-03',
+                             lot: 'B', newSpoolId: 'sp-B' });
+  assert.deepEqual(first.po.receivedInto, ['sp-B']);
+  const second = PO.receive({ po: first.po, item: spool(), quantity: 500, today: '2026-10-04',
+                              lot: ' b ', newSpoolId: 'sp-B2',
+                              receivedSpools: [first.newItem] });
+  assert.equal(second.newItem, undefined, 'no second lot-B spool');
+  assert.equal(second.item.id, 'sp-B', 'the grams go onto the lot-B spool');
+  assert.equal(second.item.weight, 1000);
+  assert.equal(second.item.usageHistory.length, 2);
+  assert.deepEqual(second.po.receivedInto, ['sp-B']);
+  assert.equal(second.complete, true);
+});
+
+test('a spool the order received into with a DIFFERENT lot is not topped up', () => {
+  const po = { id: 'PO-7', qty: 1000, itemId: 'sp-1', receivedInto: ['sp-B'] };
+  const out = PO.receive({ po, item: spool(), quantity: 500, today: 'T', lot: 'C',
+                           newSpoolId: 'sp-C',
+                           receivedSpools: [{ id: 'sp-B', material: 'PETG', weight: 500, lot: 'B' }] });
+  assert.equal(out.newItem.id, 'sp-C');
+  assert.deepEqual(out.po.receivedInto, ['sp-B', 'sp-C']);
+});
+
+test('refilling an empty spool with a new lot does not pull earlier jobs into it', () => {
+  const got = PO.receive({ po: { id: 'PO-C' }, quantity: 1000, today: '2026-10-10', lot: 'C',
+    item: { id: 'S1', material: 'PLA', weight: 0, usageHistory: [
+      { orderId: 'OLD', weightUsed: 200, date: '2025-03-01' },
+    ] } });
+  const inventory = [got.item];
+  const printLog = [{ id: 'OLD', project: '2025 job', date: '2025-03-01' }];
+  assert.deepEqual(LT.jobsForLot({ printLog, inventory }, 'C'), [],
+    'a 2025 draw is not presumed to be from a lot that arrived in October 2026');
+  const order = job({ id: 'NEW', parts: [{ filamentId: 'S1', printWeight: 10, qty: 1 }] });
+  D.deductForOrder(order, { settings, inventory, today: '2026-10-11' }, { skipRender: true });
+  printLog.push(order);
+  assert.deepEqual(LT.jobsForLot({ printLog, inventory }, 'C').map(j => j.orderId), ['NEW']);
+});
+
+test('before a refill, a draw takes the lot of the receipt then in force', () => {
+  const inventory = [{ id: 'S1', material: 'PLA', weight: 1000, lot: 'C', usageHistory: [
+    { type: 'received', orderId: 'PO-C', weightUsed: -1000, date: '2026-10-10', lot: 'C', poId: 'PO-C' },
+    { orderId: 'OLD', weightUsed: 200, date: '2026-05-01' },
+    { type: 'received', orderId: 'PO-A', weightUsed: -1000, date: '2026-04-01', lot: 'A', poId: 'PO-A' },
+  ] }];
+  const draws = LT.allDraws({ printLog: [{ id: 'OLD' }], inventory });
+  assert.equal(draws.length, 1);
+  assert.equal(draws[0].lot, 'A');
+  assert.equal(draws[0].poId, 'PO-A');
+  assert.equal(draws[0].inferred, true);
 });

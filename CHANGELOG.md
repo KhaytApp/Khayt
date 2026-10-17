@@ -29,8 +29,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   prints included. **Receiving a purchase order now asks for the lot**
   (optional): a delivery with a different lot from the spool it was ordered
   for, while that spool still has filament on it, becomes **its own spool**
-  instead of being added to the old one, so the two lots stay apart. The
-  spool editor's header shows the lot.
+  instead of being added to the old one, so the two lots stay apart; a
+  second part delivery of that lot is added to the spool the first one made.
+  The spool editor's header shows the lot.
 
 - **Mac: Settings ▸ Overhead no longer crashes, and monthly cost amounts
   save.** Removing a cost line while its amount box was still being edited

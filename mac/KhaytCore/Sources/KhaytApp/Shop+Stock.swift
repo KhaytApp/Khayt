@@ -253,6 +253,15 @@ extension Shop {
                 var bits = Self.rows(root, "consumables")
                 let spoolAt = consumable ? nil : shelf.firstIndex { Self.recordId($0) == itemId }
                 let bitAt = consumable ? bits.firstIndex { Self.recordId($0) == itemId } : nil
+                // The spools an earlier part delivery of a new lot was booked
+                // into, so a second delivery of that lot tops one up rather
+                // than making another.
+                var into = Set<String>()
+                if case .object(let o) = order, case .array(let ids)? = o["receivedInto"] {
+                    for case .string(let x) in ids { into.insert(x) }
+                }
+                let earlier = consumable || into.isEmpty ? []
+                    : shelf.filter { Self.recordId($0).map(into.contains) ?? false }
 
                 let done = try await engine.receiveGoods(
                     order: order,
@@ -261,7 +270,7 @@ extension Shop {
                     quantity: quantity, notes: notes, today: Self.localDay(),
                     expenseId: Self.uid("EXP"),
                     expenseLabel: self.words.callIt("po.receive"),
-                    lot: lot, newSpoolId: Self.uid("INV"))
+                    lot: lot, newSpoolId: Self.uid("INV"), receivedSpools: earlier)
                 guard done.ok, let written = done.po else {
                     throw MoveRefused(sentence: self.words.callIt("exp.amount_required"))
                 }
@@ -279,8 +288,11 @@ extension Shop {
                     orders[at] = .object(row)
                 }
                 root["purchaseOrders"] = .array(orders)
-                if let spoolAt, let item = done.item {
-                    shelf[spoolAt] = item
+                // By the returned spool's OWN id: it is not always the one the
+                // order points at (see `receivedSpools` in the rule).
+                if let item = done.item,
+                   let at = shelf.firstIndex(where: { Self.recordId($0) == Self.recordId(item) }) {
+                    shelf[at] = item
                     root["inventory"] = .array(shelf)
                 }
                 // A different lot is its own spool, placed beside the one the

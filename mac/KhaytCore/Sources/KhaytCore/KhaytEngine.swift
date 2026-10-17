@@ -1528,7 +1528,8 @@ public actor KhaytEngine {
     public func receiveGoods(order: JSONValue, item: JSONValue?, consumable: JSONValue?,
                              quantity: Double, notes: String, today: String,
                              expenseId: String, expenseLabel: String,
-                             lot: String = "", newSpoolId: String = "") throws -> GoodsReceived {
+                             lot: String = "", newSpoolId: String = "",
+                             receivedSpools: [JSONValue] = []) throws -> GoodsReceived {
         var arg: [String: JSONValue] = [
             "po": order, "quantity": .number(quantity), "notes": .string(notes),
             "today": .string(today), "expenseId": .string(expenseId),
@@ -1537,6 +1538,7 @@ public actor KhaytEngine {
         let lot = lot.trimmingCharacters(in: .whitespacesAndNewlines)
         if !lot.isEmpty { arg["lot"] = .string(lot) }
         if !newSpoolId.isEmpty { arg["newSpoolId"] = .string(newSpoolId) }
+        if !receivedSpools.isEmpty { arg["receivedSpools"] = .array(receivedSpools) }
         if let item { arg["item"] = item }
         if let consumable { arg["consumable"] = consumable }
         return try runtime.call("KhaytPurchaseOrders", "receive", [arg], as: GoodsReceived.self)
@@ -1552,6 +1554,9 @@ public actor KhaytEngine {
         /// True when what has arrived now covers what was ordered.
         public let complete: Bool?
         public let po: JSONValue?
+        /// The spool topped up. Usually the one the order was raised for, but
+        /// a second part delivery of a new lot lands on the spool the first
+        /// one made — so the caller finds the record to replace by THIS id.
         public let item: JSONValue?
         public let consumable: JSONValue?
         public let expense: JSONValue?
