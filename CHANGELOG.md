@@ -9,6 +9,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   width of the unfolded screen. The folded outer display and other iPhones
   keep one column. Partly folded like a book, the two columns of Home,
   Machines and Clients meet at the fold instead of running across it.
+  Settings keeps the calculator's reading width, so a switch sits near its
+  label.
   keep one column.
 - **Desktop: switching spools mid-job and test prints record the lot.**
   Filament taken off a spool partway through a job, and a test print's
