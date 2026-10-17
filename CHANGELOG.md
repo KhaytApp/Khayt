@@ -10,6 +10,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   a finished print could still read 84%. Opening the app now catches the
   card up on any tab, not only on a screen that shows printers, and hands
   the Mac's pushes their address again in case it was lost.
+- **Mac: ⌘W closes the window again.** File ▸ Close had gone missing from the
+  menu, so the shortcut did nothing.
+
 - **Mac: Settings ▸ Overhead no longer crashes, and monthly cost amounts
   save.** Removing a cost line while its amount box was still being edited
   quit the app. An amount typed and then saved with a click (without
