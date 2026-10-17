@@ -445,6 +445,10 @@ jobs:
       - name: Crash reports from a test process that died
         if: failure()
         run: |
+          # No report, or no system folder, is not a second failure: the step
+          # runs under -e -o pipefail, where find and grep finding nothing
+          # would otherwise fail it.
+          set +e +o pipefail
           mkdir -p crash-reports
           find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports \
             -name '*.ips' -mmin -120 2>/dev/null \
