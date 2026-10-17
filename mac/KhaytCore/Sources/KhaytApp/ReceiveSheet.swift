@@ -18,6 +18,8 @@ struct ReceiveSheet: View {
 
     @State private var amount: Double = 0
     @State private var notes = ""
+    /// The manufacturer's lot on the box, optional. Only asked of filament.
+    @State private var lot = ""
     /// The supplier's own bill, when it came with the goods.
     @State private var bill = Shop.Bill()
     /// "matched", "mismatch", or "none" — the rule's word, held because the
@@ -64,6 +66,25 @@ struct ReceiveSheet: View {
                 GridRow {
                     Text(shop.words.callIt("po.notes")).foregroundStyle(.secondary)
                     TextField("", text: $notes).textFieldStyle(.roundedBorder)
+                }
+                // ── THE LOT ───────────────────────────────────────────
+                //
+                // What a recall names. A lot different from the spool's own
+                // becomes its own spool (`lib/purchase-orders.js`), because
+                // grams of two lots poured into one record can never be told
+                // apart again. Filament only (counted in grams, as the weight caption
+                // above decides); the rule ignores a lot on a consumable anyway.
+                if order.unit.isEmpty || order.unit == "g" {
+                    GridRow {
+                        Text(shop.words.callIt("inv.lot")).foregroundStyle(.secondary)
+                        TextField("", text: $lot).textFieldStyle(.roundedBorder)
+                    }
+                    GridRow {
+                        Color.clear.frame(width: 0, height: 0)
+                        Text(shop.words.callIt("mac.lot_receive_hint"))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 // ── THE SUPPLIER'S OWN BILL ───────────────────────────
                 //
@@ -157,9 +178,10 @@ struct ReceiveSheet: View {
         let quantity = amount
         let note = notes
         let paper = bill
+        let typedLot = lot
         Task {
             let said = await shop.receiveGoods(id, quantity: quantity, notes: note,
-                                               invoice: paper)
+                                               invoice: paper, lot: typedLot)
             if said == nil { shop.receivingGoods = nil } else { problem = said }
         }
     }

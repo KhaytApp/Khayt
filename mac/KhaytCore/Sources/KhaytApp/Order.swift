@@ -112,6 +112,44 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// books carry one or the other — and sometimes a NUMBER. Read for ⌘K,
     /// which finds a job by the number on the paper the customer is holding.
     let invoiceNumber: String?
+    /// What the job's COMPLETION took off the shelf, draw by draw —
+    /// `lib/order-deduction.js` writes it and `returnForOrder` reads it to
+    /// put exactly that back. Decoded for display only (the Filament used
+    /// section, and finding a job by the lot it drew from); never written
+    /// from here. Absent on a job not finished, or finished before the record.
+    let materialDrawn: MaterialDrawn?
+
+    struct MaterialDrawn: Decodable, Hashable, Sendable {
+        let spools: [Draw]
+
+        struct Draw: Decodable, Hashable, Sendable {
+            let spoolId: String
+            let grams: Double
+            /// Stamped at draw time since lot tracing; absent before.
+            let lot: String?
+            let poId: String?
+
+            private enum CodingKeys: String, CodingKey { case spoolId, grams, lot, poId }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                spoolId = ((try? c.decodeIfPresent(String.self, forKey: .spoolId)) ?? nil) ?? ""
+                let g = ((try? c.decodeIfPresent(Double.self, forKey: .grams)) ?? nil) ?? 0
+                grams = g.isFinite ? g : 0
+                lot = ((try? c.decodeIfPresent(String.self, forKey: .lot)) ?? nil)
+                    .flatMap { let t = $0.trimmingCharacters(in: .whitespacesAndNewlines); return t.isEmpty ? nil : t }
+                poId = ((try? c.decodeIfPresent(String.self, forKey: .poId)) ?? nil)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey { case spools }
+
+        /// Lenient: a malformed draw is dropped, never the job.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            spools = ((try? c.decodeIfPresent([Draw].self, forKey: .spools)) ?? nil) ?? []
+        }
+    }
 
     private enum CodingKeys: String, CodingKey {
         case id, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
@@ -122,6 +160,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         case nonBusiness
         case instalments, instalmentBase
         case invoiceNumber, invoiceNum
+        case materialDrawn
     }
 
     /// THREE FIELDS A NEW JOB HAS NOT GOT YET.
@@ -243,6 +282,8 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         instalments = try c.decodeIfPresent([PlanRow].self, forKey: .instalments) ?? []
         instalmentBase = try c.decodeIfPresent(Double.self, forKey: .instalmentBase)
         invoiceNumber = Self.lenientText(c, .invoiceNumber) ?? Self.lenientText(c, .invoiceNum)
+        // Lenient: a record this app only DISPLAYS must never make a job unreadable.
+        materialDrawn = (try? c.decodeIfPresent(MaterialDrawn.self, forKey: .materialDrawn)) ?? nil
     }
 
     /// One payment of a plan, as Khayt writes it.

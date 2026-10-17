@@ -3058,6 +3058,16 @@ final class Words {
         "mac.spool_history_empty": ["en": "Nothing has been printed with this spool yet.",
                                     "ar": "لم يُطبع شيء بهذه البكرة بعد."],
         "mac.spool_history_total": ["en": "Used altogether", "ar": "المستخدم إجمالاً"],
+        // Lot tracing: which lot a job's filament came from, and back.
+        "mac.filament_used": ["en": "Filament used", "ar": "الخيط المستخدم"],
+        "mac.lot_inferred": ["en": "(inferred)", "ar": "(مُستنتَج)"],
+        "mac.lot_label": ["en": "Lot {lot}", "ar": "الدفعة {lot}"],
+        "mac.lot_copy_csv": ["en": "Copy jobs from lot {lot} as CSV",
+                             "ar": "نسخ أعمال الدفعة {lot} بصيغة CSV"],
+        "mac.lot_copied": ["en": "Copied {n} jobs to the clipboard.",
+                           "ar": "نُسخ {n} من الأعمال إلى الحافظة."],
+        "mac.lot_receive_hint": ["en": "A lot different from the spool's own is booked in as a new spool, so a recall can find it.",
+                                 "ar": "الدفعة المختلفة عن دفعة البكرة تُسجَّل بكرةً جديدة، ليسهل تتبّعها عند الاستدعاء."],
         "mac.campaign_confirm_hint": ["en": "One message each, a third of a second apart. It cannot be taken back.",
                                       "ar": "رسالة لكل عميل، بفاصل ثلث ثانية. لا يمكن التراجع عن ذلك."],
         // ── WHAT THIS USED TO SAY ─────────────────────────────────────────

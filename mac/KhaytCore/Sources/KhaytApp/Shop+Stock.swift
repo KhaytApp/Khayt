@@ -219,8 +219,13 @@ extension Shop {
     /// this app deliberately has no such list: `OnOrderCard` answers what is
     /// still to come, and a received order is history. The moment the box is
     /// opened is also the moment somebody is holding the invoice.
+    ///
+    /// `lot` is the manufacturer's lot printed on what arrived, optional. A lot
+    /// different from the spool's own, onto a spool that still holds filament,
+    /// is booked in as a NEW spool (`newItem`) — see LOT in
+    /// `lib/purchase-orders.js` — so a recall can tell the two apart.
     func receiveGoods(_ id: String, quantity: Double, notes: String,
-                      invoice: Bill = Bill()) async -> String? {
+                      invoice: Bill = Bill(), lot: String = "") async -> String? {
         guard permitted("inventory", "edit") else { return moveProblem }
         guard let build = source.build, StoreLock.weOwnIt(build) else {
             return words.callIt("mac.read_only")
@@ -255,7 +260,8 @@ extension Shop {
                     consumable: bitAt.map { bits[$0] },
                     quantity: quantity, notes: notes, today: Self.localDay(),
                     expenseId: Self.uid("EXP"),
-                    expenseLabel: self.words.callIt("po.receive"))
+                    expenseLabel: self.words.callIt("po.receive"),
+                    lot: lot, newSpoolId: Self.uid("INV"))
                 guard done.ok, let written = done.po else {
                     throw MoveRefused(sentence: self.words.callIt("exp.amount_required"))
                 }
@@ -277,6 +283,12 @@ extension Shop {
                     shelf[spoolAt] = item
                     root["inventory"] = .array(shelf)
                 }
+                // A different lot is its own spool, placed beside the one the
+                // order was raised for. The old spool is left exactly as it was.
+                if let fresh = done.newItem {
+                    shelf.insert(fresh, at: spoolAt.map { $0 + 1 } ?? shelf.endIndex)
+                    root["inventory"] = .array(shelf)
+                }
                 if let bitAt, let bit = done.consumable {
                     bits[bitAt] = bit
                     root["consumables"] = .array(bits)
@@ -294,6 +306,21 @@ extension Shop {
         }
         await load(source)
         return nil
+    }
+
+    /// Every job that drew from `lot`, put on the clipboard as CSV for a
+    /// recall. The rule is `lib/lot-trace.js`; returns what to tell the shop.
+    func copyLotRecall(_ lot: String) async -> String {
+        guard let engine else { return words.callIt("mac.move_no_engine") }
+        do {
+            let recall = try await engine.lotRecall(lot: lot, printLog: orderRows,
+                                                    wasteLog: wasteRows, inventory: inventoryRows)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(recall.csv, forType: .string)
+            return words.callIt("mac.lot_copied", ["n": .number(Double(recall.jobs.count))])
+        } catch {
+            return String(describing: error)
+        }
     }
 
     /// What a supplier charged, as the shop typed it off the invoice.
