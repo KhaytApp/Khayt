@@ -434,3 +434,39 @@ jobs:
       # on it while the runner's other cores idled. See mac/test-shards.sh.
       - name: Mac app tests
         run: bash mac/test-shards.sh
+
+      # ── A TEST PROCESS THAT DIED, NOT A TEST THAT FAILED ──────────────────
+      #
+      # "exited with unexpected signal code 5" (SIGTRAP: a Swift trap, such as
+      # an index out of range) twice on Oct 17 2026, in unrelated PRs, passing
+      # on a rerun. The log only shows which tests had STARTED in that shard,
+      # and in parallel that names nothing. macOS writes the crashed thread to
+      # a report on the runner; print its top frames here and keep the file.
+      - name: Crash reports from a test process that died
+        if: failure()
+        run: |
+          mkdir -p crash-reports
+          find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports \
+            -name '*.ips' -mmin -120 2>/dev/null \
+            | grep -iE 'swiftpm-testing-helper|KhaytCorePackageTests|xctest' \
+            | while read -r f; do
+                cp "$f" crash-reports/
+                echo "::group::$(basename "$f")"
+                # The crashed thread's frames, from the JSON body of the report.
+                tail -n +2 "$f" | python3 -c 'import json,sys
+          r=json.load(sys.stdin); t=[x for x in r.get("threads",[]) if x.get("triggered")]
+          imgs=r.get("usedImages",[])
+          print(r.get("exception"))
+          for fr in (t[0]["frames"] if t else [])[:40]:
+              print(imgs[fr["imageIndex"]].get("name","?"), fr.get("symbol","?"), fr.get("sourceFile",""), fr.get("sourceLine",""))' || true
+                echo "::endgroup::"
+              done
+          ls crash-reports
+
+      - name: Keep the crash reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mac-test-crash-reports
+          path: crash-reports
+          if-no-files-found: ignore
