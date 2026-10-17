@@ -1,4 +1,5 @@
 import CryptoKit
+import KhaytWidgetData
 import Foundation
 import Network
 import KhaytCore
@@ -2275,8 +2276,11 @@ final class LanServer {
 
     /// The time as the queue page prints it — the Node server's
     /// `toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })`.
+    /// `[]` there is the browser's locale; here it is this Mac's, with the
+    /// digits this Mac asked for (`Digits`).
     nonisolated static func clockText(_ date: Date) -> String {
         let f = DateFormatter()
+        f.locale = Digits.macLocale
         f.timeStyle = .short
         f.dateStyle = .none
         return f.string(from: date)

@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytWidgetData
 import KhaytCore
 
 /// The kiosk: every machine at once, for a screen across the shop.
@@ -177,7 +178,7 @@ enum KioskTime {
         let whole = max(0, Int(saturating: minutes.rounded()))
         return Duration.seconds(whole * 60).formatted(
             .units(allowed: [.hours, .minutes], width: .narrow, zeroValueUnits: .hide)
-                .locale(Locale(identifier: language + "@numbers=latn")))
+                .locale(Digits.locale(language: language)))
     }
 }
 

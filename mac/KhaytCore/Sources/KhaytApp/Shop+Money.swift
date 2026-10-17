@@ -1,4 +1,5 @@
 import Foundation
+import KhaytWidgetData
 import UniformTypeIdentifiers
 import AppKit
 import Observation
@@ -544,7 +545,7 @@ extension Shop {
         case .waiting:
             (words.callIt("mac.sync_waiting"), "clock.arrow.circlepath", .quiet)
         case .synced(let when):
-            (words.callIt("mac.sync_done", ["time": .string(Shop.clockText(when))]),
+            (words.callIt("mac.sync_done", ["time": .string(Shop.clockText(when, words.locale))]),
              "checkmark.icloud", .quiet)
         case .failing:
             // ATTENTION, not late: it is going to be tried again and nothing
@@ -556,9 +557,12 @@ extension Shop {
     }
 
     /// The time of day, in the shop's own locale.
-    static func clockText(_ when: Date) -> String {
+    /// It was `Locale.current` — the Mac's, not the shop's — which put an
+    /// English "5:13 PM" in the Arabic sync line and ١٢ digits in the English
+    /// one on an Arabic-Indic Mac.
+    static func clockText(_ when: Date, _ locale: Locale = Digits.macLocale) -> String {
         let f = DateFormatter()
-        f.locale = Locale.current
+        f.locale = locale
         f.timeStyle = .short
         f.dateStyle = .none
         return f.string(from: when)

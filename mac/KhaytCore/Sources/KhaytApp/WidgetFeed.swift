@@ -161,7 +161,8 @@ final class WidgetFeed {
                          owed: Money.short(shop.owed, shop.currency)),
             dayEnds: Calendar.book.date(byAdding: .day, value: 1, to: Calendar.book.startOfDay(for: now)),
             lowSpools: Array(low.prefix(ShopWidgetSnapshot.listLimit)), lowSpoolCount: low.count,
-            upNext: Array(queued.prefix(ShopWidgetSnapshot.listLimit)), queuedCount: queued.count)
+            upNext: Array(queued.prefix(ShopWidgetSnapshot.listLimit)), queuedCount: queued.count,
+            macDigits: Digits.followingMac)
     }
 
     // MARK: - Writing it

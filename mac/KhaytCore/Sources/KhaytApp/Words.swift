@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import SwiftUI
 import KhaytCore
+import KhaytWidgetData
 
 /// What the app calls things.
 ///
@@ -136,11 +137,12 @@ final class Words {
     /// and `{n} طلب` in Arabic, which works because that string is one
     /// sentence. These are a COUNT and a NOUN assembled by the window, and
     /// "1 machines" is what assembling them without asking gives you.
-    private nonisolated static let counter: NumberFormatter = {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        return f
-    }()
+    /// A count's numeral: grouped, and in the digits this Mac asked for
+    /// (`Digits`) — it was a bare `NumberFormatter`, which took the Mac's
+    /// locale and wrote "١٢ jobs" in the English app on an Arabic-Indic Mac.
+    func numeral(_ n: Int) -> String {
+        n.formatted(.number.locale(locale))
+    }
 
     func counting(_ n: Int, _ key: String) -> String {
         // ── ARABIC COUNTS TWO OF A THING DIFFERENTLY ──────────────────────
@@ -178,11 +180,11 @@ final class Words {
         // read "5 يومًا". Opt-in like the dual: only a key with a `_few`.
         let tail = n % 100
         if language == "ar", (3...10).contains(tail), let few = Self.own[key + "_few"]?["ar"], !few.isEmpty {
-            let number = Self.counter.string(from: NSNumber(value: n)) ?? String(n)
+            let number = numeral(n)
             return few.replacingOccurrences(of: "{n}", with: number)
         }
         let said = callIt(n == 1 ? key + "_one" : key)
-        let number = Self.counter.string(from: NSNumber(value: n)) ?? String(n)
+        let number = numeral(n)
         if said.contains("{n}") {
             return said.replacingOccurrences(of: "{n}", with: number)
         }
@@ -1092,6 +1094,12 @@ final class Words {
                               "ar": "البحث عن النماذج في Spotlight"],
         "mac.spotlight_note": ["en": "Model names, projects and tags only — never jobs or customers.",
                                "ar": "أسماء النماذج والمشاريع والوسوم فقط — لا الطلبات ولا العملاء."],
+
+        // Which digits a figure is written in, on this Mac (`Digits`).
+        "mac.mac_digits":      ["en": "Use the Mac's number format",
+                                "ar": "استخدام أرقام الماك"],
+        "mac.mac_digits_note": ["en": "Off, numbers are written 0–9 in English and Arabic. On, they follow Language & Region on this Mac.",
+                                "ar": "عند إيقافه تُكتب الأرقام 0–9 بالعربية والإنجليزية. وعند تشغيله تتبع إعدادات اللغة والمنطقة في هذا الماك."],
 
         // A photograph of the finished print, on the job that made it.
         "mac.add_print_photo": ["en": "Add a photo of the print",
@@ -4303,7 +4311,14 @@ extension Words {
     /// itself in Arabic-Indic digits is a stored date nothing can read back.
     /// Sweeping those too would corrupt the book, so the split is deliberate
     /// and `DatesReadInTheShopsLanguageTests` holds both halves of it.
-    var locale: Locale { Locale(identifier: language) }
+    ///
+    /// ── AND ITS DIGITS ARE THIS MAC'S CHOICE, NOT THE LANGUAGE'S ──────────
+    ///
+    /// Western 0–9 in both languages unless "Use the Mac's number format" is
+    /// on (`Digits`, Settings ▸ On this Mac). The one locale everything a
+    /// person reads is formatted in; the window puts it in the environment so
+    /// `Text(_, format:)` and every `TextField` take it too.
+    var locale: Locale { Digits.locale(language: language) }
 
     /// The one way a displayed date is written. Takes any `Date.FormatStyle`,
     /// so `.dateTime.day().month(.abbreviated)` and
@@ -4469,4 +4484,20 @@ extension Words {
         "finishing": "mac.shelf_finishing", "post-processing": "mac.shelf_finishing",
         "electronics": "mac.shelf_electronics",
     ]
+}
+
+/// The shop's locale — its language, and the digits this Mac asked for — put
+/// into a window's environment, so `Text(_, format:)`, `Text(_, style:)`,
+/// every `TextField(value:format:)` and every picker draw in it rather than in
+/// the Mac's locale. Every window and the menu bar panel wear it;
+/// `DigitsTests` checks that they do.
+///
+/// A modifier rather than an `.environment` written at each root, because a
+/// modifier's body is observed: switching "Use the Mac's number format" or the
+/// language redraws what it holds.
+struct ShopsLocale: ViewModifier {
+    let words: Words
+    func body(content: Content) -> some View {
+        content.environment(\.locale, words.locale)
+    }
 }

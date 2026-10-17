@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytWidgetData
 import KhaytCore
 
 /// When the shop actually finishes work.
@@ -25,7 +26,7 @@ struct ThroughputCard: View {
     /// calendar rather than a table of nine translations.
     private static func dayName(_ day: Int, _ language: String) -> String {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.locale = Locale(identifier: language)
+        calendar.locale = Digits.locale(language: language)
         let symbols = calendar.shortWeekdaySymbols
         return day >= 0 && day < symbols.count ? symbols[day] : ""
     }

@@ -57,6 +57,6 @@ struct RestoreSheet: View {
     /// The file's size, so a shop can tell a full book from a nearly empty one
     /// at a glance — the difference between a good backup and a bad day.
     private var size: String {
-        ByteCountFormatter.string(fromByteCount: Int64(subject.bytes), countStyle: .file)
+        Format.fileSize(Int64(subject.bytes))
     }
 }

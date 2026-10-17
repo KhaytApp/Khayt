@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytWidgetData
 
 /// Numbers — §5, which the spec calls the most important section, and it is.
 ///
@@ -264,26 +265,43 @@ struct Figure: View {
     //
     // Built once. A NumberFormatter is expensive enough that one per cell in a
     // table of forty-two jobs is measurable, and they are not free to make.
+    //
+    // Once PER LOCALE: the digits are this Mac's choice (`Digits`) and can
+    // change while the app is open, so the cache is keyed by the locale the
+    // formatter was built in rather than built once for ever.
 
-    private static let plain: NumberFormatter = {
+    private static var cache: [String: NumberFormatter] = [:]
+
+    private static func made(_ kind: String, _ build: (NumberFormatter) -> Void) -> NumberFormatter {
+        let locale = Digits.macLocale
+        let key = kind + "|" + locale.identifier
+        if let made = cache[key] { return made }
         let f = NumberFormatter()
-        f.numberStyle = .decimal
-        f.maximumFractionDigits = 0
+        f.locale = locale
+        build(f)
+        cache[key] = f
         return f
-    }()
+    }
 
-    private static let percent: NumberFormatter = {
-        let f = NumberFormatter()
-        f.numberStyle = .percent
-        f.maximumFractionDigits = 0
-        return f
-    }()
+    private static var plain: NumberFormatter {
+        made("plain") { f in
+            f.numberStyle = .decimal
+            f.maximumFractionDigits = 0
+        }
+    }
 
-    private static var moneyCache: [String: NumberFormatter] = [:]
+    private static var percent: NumberFormatter {
+        made("percent") { f in
+            f.numberStyle = .percent
+            f.maximumFractionDigits = 0
+        }
+    }
 
     private static func money(_ code: String) -> NumberFormatter {
-        if let made = moneyCache[code] { return made }
-        let f = NumberFormatter()
+        made("money:" + code) { f in configureMoney(f, code) }
+    }
+
+    private static func configureMoney(_ f: NumberFormatter, _ code: String) {
         // Digits, grouping and decimals — not the symbol. Khayt composes the
         // mark itself (§5), because the formatter places it where the LOCALE
         // wants rather than where the design does.
@@ -292,7 +310,8 @@ struct Figure: View {
         // The LOCALE decides which side the symbol sits on, and for the riyal
         // that is not a detail: writing "﷼ 1,240" by hand puts an AL-class
         // glyph next to Latin digits with nothing to say where the run ends.
-        f.locale = Locale.current
+        // So the Mac's locale (set by `made`, before the currency code, which
+        // a later locale would reset) — with its digits chosen by `Digits`.
         // ── WHICH RIYAL MARK ──────────────────────────────────────────────
         //
         // §5 names U+FDFC (﷼), and that is what this uses. The app elsewhere
@@ -305,8 +324,6 @@ struct Figure: View {
         // the app is a question for the spec, not for this formatter.
         f.maximumFractionDigits = 2
         f.minimumFractionDigits = 2
-        moneyCache[code] = f
-        return f
     }
 }
 

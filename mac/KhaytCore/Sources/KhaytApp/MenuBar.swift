@@ -1,4 +1,5 @@
 import SwiftUI
+import KhaytWidgetData
 import AppKit
 import KhaytCore
 
@@ -126,7 +127,7 @@ final class FloorStatus {
         let popover = NSPopover()
         popover.behavior = .transient
         popover.contentSize = NSSize(width: 300, height: 1)
-        popover.contentViewController = NSHostingController(rootView: FloorPanel(shop: shop))
+        popover.contentViewController = NSHostingController(rootView: FloorPanel(shop: shop).modifier(ShopsLocale(words: shop.words)))
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
         self.popover = popover
     }

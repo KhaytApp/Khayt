@@ -13,6 +13,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   job's extra charges, product tiers and documents, supplier price lists,
   and the web store's shipping rates and promotions.
 
+- **Mac: numbers are written with Western digits (0–9) by default, in English
+  and Arabic.** Before, the English app followed your Mac's number format, so
+  a Mac set to Arabic digits showed ١٢٣ in English while Arabic showed 123.
+  Money, counts, dates, times, percentages, durations, file sizes and the
+  desktop widgets now all use 0–9. Settings ▸ On this Mac ▸ **Use the Mac's
+  number format** brings back your Mac's digits in either language. It is
+  kept on this Mac only and is not synced with your book.
 - **Mac: three more widgets, and a widget opens Khayt where you tapped.**
   - **Filament low** (small and medium) lists the spools running low, the
     emptiest first, with each one's colour and the grams left. It uses the

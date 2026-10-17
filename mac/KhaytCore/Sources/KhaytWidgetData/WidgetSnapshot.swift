@@ -59,6 +59,11 @@ public struct ShopWidgetSnapshot: Codable, Sendable, Equatable {
     public var upNext: [QueuedJob]?
     /// How many jobs are waiting in all.
     public var queuedCount: Int?
+    /// Whether this Mac writes figures in its own digits ("Use the Mac's
+    /// number format", `Digits`) rather than Western 0–9. The extension
+    /// cannot read the app's defaults, so the app says. Nil — a file from
+    /// before it — is Western, the default.
+    public var macDigits: Bool?
 
     /// The most rows any widget draws (the large one); the counts say the rest.
     public static let listLimit = 6
@@ -133,7 +138,7 @@ public struct ShopWidgetSnapshot: Codable, Sendable, Equatable {
     public init(writtenAt: Date, shopName: String, language: String, rightToLeft: Bool,
                 words: [String: String], printing: [Printer], machineCount: Int, today: Today,
                 dayEnds: Date? = nil, lowSpools: [LowSpool]? = nil, lowSpoolCount: Int? = nil,
-                upNext: [QueuedJob]? = nil, queuedCount: Int? = nil) {
+                upNext: [QueuedJob]? = nil, queuedCount: Int? = nil, macDigits: Bool? = nil) {
         self.version = Self.currentVersion
         self.writtenAt = writtenAt
         self.shopName = shopName
@@ -148,6 +153,7 @@ public struct ShopWidgetSnapshot: Codable, Sendable, Equatable {
         self.lowSpoolCount = lowSpoolCount
         self.upNext = upNext
         self.queuedCount = queuedCount
+        self.macDigits = macDigits
     }
 
     public func word(_ w: Word) -> String { words[w.rawValue] ?? "" }
