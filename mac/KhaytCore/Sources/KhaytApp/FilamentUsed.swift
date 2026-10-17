@@ -112,6 +112,8 @@ struct FilamentUsedSection: View {
                     Circle()
                         .fill(Color(nsColor: row.color.flatMap { NSColor(hex: $0) } ?? .tertiaryLabelColor))
                         .frame(width: 9, height: 9)
+                        // A ring, or a black filament's dot vanishes in dark mode.
+                        .overlay(Circle().strokeBorder(.separator))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(row.name).lineLimit(1)
                         if !row.lot.isEmpty {

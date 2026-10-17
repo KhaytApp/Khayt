@@ -329,7 +329,8 @@ extension Shop {
                                                     wasteLog: wasteRows, inventory: inventoryRows)
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(recall.csv, forType: .string)
-            return words.callIt("mac.lot_copied", ["n": .number(Double(recall.jobs.count))])
+            return recall.jobs.count == 1 ? words.callIt("mac.lot_copied_one")
+                : words.callIt("mac.lot_copied", ["n": .number(Double(recall.jobs.count))])
         } catch {
             return String(describing: error)
         }

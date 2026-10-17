@@ -3066,6 +3066,8 @@ final class Words {
                              "ar": "نسخ أعمال الدفعة {lot} بصيغة CSV"],
         "mac.lot_copied": ["en": "Copied {n} jobs to the clipboard.",
                            "ar": "نُسخ {n} من الأعمال إلى الحافظة."],
+        "mac.lot_copied_one": ["en": "Copied 1 job to the clipboard.",
+                               "ar": "نُسخ عمل واحد إلى الحافظة."],
         "mac.lot_receive_hint": ["en": "A lot different from the spool's own is booked in as a new spool, so a recall can find it.",
                                  "ar": "الدفعة المختلفة عن دفعة البكرة تُسجَّل بكرةً جديدة، ليسهل تتبّعها عند الاستدعاء."],
         "mac.campaign_confirm_hint": ["en": "One message each, a third of a second apart. It cannot be taken back.",
