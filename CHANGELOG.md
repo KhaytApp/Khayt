@@ -9,6 +9,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   width of the unfolded screen. The folded outer display and other iPhones
   keep one column. Partly folded like a book, the two columns of Home,
   Machines and Clients meet at the fold instead of running across it.
+  Settings keeps the calculator's reading width, so a switch sits near its
+  label.
 
 - **iPhone: a print's Lock Screen card no longer freezes once the print
   runs past its first estimate.** At the estimated finish iOS marks the card
