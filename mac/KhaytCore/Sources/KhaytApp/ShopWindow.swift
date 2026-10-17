@@ -47,6 +47,7 @@ struct ShopWindow: View {
     /// Nil where a context has no undo, which the documentation says to expect
     /// and which every registration in `Shop` is guarded for.
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
 
 
     /// Does the screen you are on have a panel at all?
@@ -347,6 +348,10 @@ struct ShopWindow: View {
         .task { shop.librarySort = LibrarySort(rawValue: storedSort) ?? .added }
         .task(id: shop.libraryFlat) { storedFlat = shop.libraryFlat }
         .task { shop.libraryFlat = storedFlat }
+        // Kept for the app delegate, which has no environment: a widget's link
+        // or a Dock drop arriving with this window closed reopens it through
+        // this (`ShopWindowOpener`).
+        .task { ShopWindowOpener.openWindow = openWindow }
         .task {
             // Only after the book has loaded: a group shelf means nothing until
             // the groups are known, and restoring one that no longer exists

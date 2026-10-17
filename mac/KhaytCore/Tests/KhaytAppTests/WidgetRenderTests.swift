@@ -4,7 +4,7 @@ import SwiftUI
 import Testing
 import WidgetKit
 import KhaytWidgetData
-import KhaytWidgetViews
+@testable import KhaytWidgetViews
 
 /// The widgets, drawn.
 ///
@@ -89,9 +89,9 @@ struct WidgetRenderTests {
     }
 
     static func render(_ face: WidgetFace, _ family: WidgetFamily, _ snap: ShopWidgetSnapshot?,
-                       dark: Bool) -> NSImage? {
+                       dark: Bool, now: Date = Date()) -> NSImage? {
         let size = size(family)
-        let view = KhaytWidgetView(face: face, family: family, snapshot: snap)
+        let view = KhaytWidgetView(face: face, family: family, snapshot: snap, now: now)
             .padding(16)
             .frame(width: size.width, height: size.height)
             .background(dark ? Color(white: 0.17) : Color(white: 0.95))
@@ -139,5 +139,59 @@ struct WidgetRenderTests {
                 try rep.representation(using: .png, properties: [:])?.write(to: out.appending(path: name))
             }
         }
+    }
+
+    static func png(_ image: NSImage?) -> Data? {
+        image?.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?.representation(using: .png, properties: [:])
+    }
+
+    @Test("a job due before the entry's day is late, whatever the snapshot said when it was written")
+    func lateIsWorkedOutAtTheEntry() throws {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .autoupdatingCurrent
+        let now = Date()
+        let today = cal.startOfDay(for: now)
+        let yesterday = try #require(cal.date(byAdding: .day, value: -1, to: today))
+        func job(_ due: Date?, late: Bool) -> ShopWidgetSnapshot.QueuedJob {
+            .init(id: "ORD-1", title: "x", due: due, late: late, urgent: false)
+        }
+        #expect(JobRow.isLate(job(yesterday, late: false), at: now), "due yesterday, written before midnight")
+        #expect(!JobRow.isLate(job(today, late: false), at: now), "due today is not late yet")
+        #expect(!JobRow.isLate(job(nil, late: false), at: now))
+        #expect(JobRow.isLate(job(today, late: true), at: now), "the app's own late is kept")
+        // Drawn yesterday, before midnight: yesterday's due was not late then.
+        #expect(!JobRow.isLate(job(yesterday, late: false), at: yesterday.addingTimeInterval(3600)))
+
+        // And drawn so: the stale snapshot's row looks exactly like a late one.
+        var stale = Self.snapshot("en")
+        var late = stale
+        stale.upNext = [job(yesterday, late: false)]
+        late.upNext = [job(yesterday, late: true)]
+        for face in [WidgetFace.upNext, .glance] {
+            let family = try #require(face.families.last)
+            let a = try #require(Self.png(Self.render(face, family, stale, dark: false, now: now)))
+            let b = try #require(Self.png(Self.render(face, family, late, dark: false, now: now)))
+            #expect(a == b, "\(face): a job due yesterday was drawn grey")
+        }
+        // Sanity: the pictures DO tell a red row from a grey one — the same
+        // snapshot drawn before midnight, when the job was not late yet.
+        let before = yesterday.addingTimeInterval(3600)
+        let grey = try #require(Self.png(Self.render(.upNext, .systemLarge, stale, dark: false, now: before)))
+        let red = try #require(Self.png(Self.render(.upNext, .systemLarge, late, dark: false, now: before)))
+        #expect(grey != red)
+    }
+
+    @Test("a snapshot from a build that sent no low spools claims nothing about filament")
+    func glanceWithoutLowSpoolsSaysNothing() throws {
+        var old = Self.snapshot("en")
+        old.lowSpools = nil
+        old.lowSpoolCount = nil
+        var stocked = old
+        stocked.lowSpools = []
+        stocked.lowSpoolCount = 0
+        let now = Date()
+        let a = try #require(Self.png(Self.render(.glance, .systemLarge, old, dark: false, now: now)))
+        let b = try #require(Self.png(Self.render(.glance, .systemLarge, stocked, dark: false, now: now)))
+        #expect(a != b, "no list was drawn as \"Every spool is stocked\"")
     }
 }

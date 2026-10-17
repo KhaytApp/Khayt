@@ -8,6 +8,7 @@ import KhaytWidgetData
 /// are read, everything else is refused, and following one only navigates —
 /// through the same gate as ⌘K.
 @MainActor
+@Suite(.serialized)
 struct DeepLinkTests {
 
     @Test("each link survives the trip through a URL, odd ids included")
@@ -69,5 +70,33 @@ struct DeepLinkTests {
         for link in links {
             #expect(shop.follow(link), "\(link.url) leads nowhere")
         }
+    }
+
+    @Test("a link handed over long before its window began is not followed")
+    func staleLinkIsDropped() async throws {
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        // The window was already open: never stale.
+        #expect(!Shop.isStale(arrivedAt: t0.addingTimeInterval(-3600), windowOpenedAt: nil))
+        // The link that launched the app arrives as the window's task begins.
+        #expect(!Shop.isStale(arrivedAt: t0.addingTimeInterval(-1), windowOpenedAt: t0))
+        #expect(!Shop.isStale(arrivedAt: t0.addingTimeInterval(2), windowOpenedAt: t0))
+        // Clicked with the window closed, the window reopened an hour later.
+        #expect(Shop.isStale(arrivedAt: t0.addingTimeInterval(-3600), windowOpenedAt: t0))
+
+        let shop = Shop()
+        await shop.load(.sample)
+        let job = try #require(shop.orders.first)
+        shop.shelf = .dashboard
+        Shop.openedLinks = [.job(job.id)]
+        Shop.openedLinksArrived = Date().addingTimeInterval(-3600)
+        shop.takeOpenedLinks(windowOpenedAt: Date())
+        #expect(Shop.openedLinks.isEmpty, "a stale link is discarded, not kept for later")
+        #expect(shop.shelf == .dashboard, "a stale link must not move the window")
+
+        Shop.openedLinks = [.job(job.id)]
+        shop.takeOpenedLinks(windowOpenedAt: Date())
+        #expect(Shop.openedLinks.isEmpty)
+        #expect(shop.shelf == .jobs(nil), "a fresh link is followed")
+        #expect(shop.selection == job.id)
     }
 }
