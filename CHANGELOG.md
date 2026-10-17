@@ -7467,6 +7467,45 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.78] - 2026-10-17
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Three more widgets, and clicking a widget opens Khayt where you clicked.
+
+### Added
+
+- **More widgets.** Right-click the desktop, choose Edit Widgets and search
+  for Khayt.
+  - **Filament low** (small and medium) lists the spools running low, the
+    emptiest first, with each one's colour and the grams left. It uses the
+    same low-stock level as the Inventory screen.
+  - **Up next** (medium and large) lists the jobs waiting for a printer, in
+    the same order as the board: urgent first, then by due date. Late due
+    dates are shown in red, including after midnight while Khayt is closed.
+    It never shows the customer's name.
+  - **Shop at a glance** (large) puts printing now, today's figures, low
+    filament and the next jobs on one widget.
+- **Click a widget to open Khayt there.** On a medium or large widget, click a
+  job to open Khayt with that job selected. Click a printer to open Machines,
+  or a spool to open Inventory. Clicking anywhere else opens that widget's
+  screen, and Khayt's window opens if it was closed. A widget link only opens
+  screens and never changes anything. It shows only what you could open
+  yourself with ⌘K.
+
+### Fixed
+
+- **Widget due dates use the Gregorian calendar**, as the app does, even on a
+  Mac set to the Hijri calendar.
+- **The "Updated" time at the foot of each widget is shown in full.** In
+  Arabic it was cut short, to "3:1…".
+- **Settings ▸ Overhead no longer crashes, and monthly costs save.**
+  Removing a cost line while its amount was still being edited quit the app,
+  and an amount saved with a click (without pressing Return) counted as 0.
+  Save now turns on as you type, and Arabic digits are accepted. The same
+  crash is fixed in Khayt's other editable lists.
+
 ## [4.0.0-alpha.77] - 2026-10-17
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
