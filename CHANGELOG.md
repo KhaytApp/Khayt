@@ -7,7 +7,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **iPhone: on iPhone Duo's inner display, Machines and Clients sit two
   across.** Each machine card and client row used to stretch over the full
   width of the unfolded screen. The folded outer display and other iPhones
-  keep one column.
+  keep one column. Partly folded like a book, the two columns of Home,
+  Machines and Clients meet at the fold instead of running across it.
 
 - **iPhone: a print's Lock Screen card no longer freezes once the print
   runs past its first estimate.** At the estimated finish iOS marks the card

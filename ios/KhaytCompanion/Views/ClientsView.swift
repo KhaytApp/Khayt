@@ -28,8 +28,9 @@ struct ClientsView: View {
 
     /// Two across in regular width (iPhone Duo's inner display), as Machines.
     @Environment(\.horizontalSizeClass) private var widthClass
+    @State private var fold: FoldGap?
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 8), count: widthClass == .regular ? 2 : 1)
+        FoldGap.columns(fold, regularWidth: widthClass == .regular, spacing: 8)
     }
 
     var body: some View {
@@ -98,6 +99,7 @@ struct ClientsView: View {
                     .buttonStyle(.plain)
                 }
             }
+            .readsFold($fold)
             .padding(.horizontal, 16)
         }
     }
