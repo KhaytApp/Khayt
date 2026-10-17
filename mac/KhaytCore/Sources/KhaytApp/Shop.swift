@@ -548,13 +548,15 @@ final class Shop {
     /// The jobs that match what is typed in the search box, or all of them.
     ///
     /// Project, customer and job number — the three things somebody standing at
-    /// the bench actually has to hand.
+    /// the bench actually has to hand — and the filament LOT, for a recall:
+    /// typing a lot finds every job that drew from it (`FilamentUsed.jobIds`).
     func matching(_ rows: [Order]) -> [Order] {
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return rows }
+        let fromLot = FilamentUsed.jobIds(drawingFromLotMatching: q, orders: rows, spools: spools)
         return rows.filter {
             $0.project.lowercased().contains(q) || $0.client.lowercased().contains(q)
-                || $0.id.lowercased().contains(q)
+                || $0.id.lowercased().contains(q) || fromLot.contains($0.id)
         }
     }
 

@@ -16,6 +16,11 @@ import KhaytCore
 struct SpoolHistorySheet: View {
     @Bindable var shop: Shop
     let spool: Spool
+    /// What the copy-as-CSV button last said.
+    @State private var copied: String?
+
+    /// This spool's lot, trimmed; empty when it has none.
+    private var lot: String { (spool.lot ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private var uses: [Spool.Use] {
         // Newest first. The book appends, so its own order is oldest-first and
@@ -46,8 +51,17 @@ struct SpoolHistorySheet: View {
                             // to its id. A spool spent on a job since deleted
                             // still spent it, and an empty cell would read as
                             // though the plastic went nowhere.
-                            Text(use.project.isEmpty ? use.orderId : use.project)
-                                .lineLimit(1)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(use.project.isEmpty ? use.orderId : use.project)
+                                    .lineLimit(1)
+                                // The lot stamped on the row when it was drawn,
+                                // or the spool's own, marked as presumed.
+                                if let shown = use.lot ?? (lot.isEmpty ? nil : lot) {
+                                    Text(shop.words.callIt("mac.lot_label", ["lot": .string(shown)])
+                                         + (use.lot == nil ? " " + shop.words.callIt("mac.lot_inferred") : ""))
+                                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                            }
                             Spacer(minLength: 8)
                             Text(Quantity.ordered(use.weightUsed, unit: spool.unit ?? "",
                                                   words: shop.words))
@@ -69,6 +83,17 @@ struct SpoolHistorySheet: View {
             }
         } footer: {
             HStack {
+                // A RECALL: every job, across every spool, that drew from this
+                // spool's lot — `lib/lot-trace.js`, as CSV on the clipboard.
+                if !lot.isEmpty {
+                    Button(shop.words.callIt("mac.lot_copy_csv", ["lot": .string(lot)])) {
+                        Task { copied = await shop.copyLotRecall(lot) }
+                    }
+                    .buttonStyle(.link)
+                    if let copied {
+                        Text(copied).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 Spacer()
                 Button(shop.words.callIt("common.close")) { shop.spoolHistoryFor = nil }
                     .keyboardShortcut(.cancelAction)

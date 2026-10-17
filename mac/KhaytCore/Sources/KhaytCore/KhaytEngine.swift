@@ -610,6 +610,9 @@ public actor KhaytEngine {
         // and until now this app could not even tell a shop it had them.
         "purchase-orders",
         "po-audit",
+        // Which jobs a manufacturer's lot went into, and which lots a job drew
+        // from — joined from what the deduction and receipts above stamp.
+        "lot-trace",
         // The supplier's own bill against the order it belongs to. The
         // arithmetic lived inside `renderer/inventory.js`'s save handler until
         // this app learnt to receive a purchase order and needed the same
@@ -1524,12 +1527,18 @@ public actor KhaytEngine {
     /// all.
     public func receiveGoods(order: JSONValue, item: JSONValue?, consumable: JSONValue?,
                              quantity: Double, notes: String, today: String,
-                             expenseId: String, expenseLabel: String) throws -> GoodsReceived {
+                             expenseId: String, expenseLabel: String,
+                             lot: String = "", newSpoolId: String = "",
+                             receivedSpools: [JSONValue] = []) throws -> GoodsReceived {
         var arg: [String: JSONValue] = [
             "po": order, "quantity": .number(quantity), "notes": .string(notes),
             "today": .string(today), "expenseId": .string(expenseId),
             "expenseLabel": .string(expenseLabel),
         ]
+        let lot = lot.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !lot.isEmpty { arg["lot"] = .string(lot) }
+        if !newSpoolId.isEmpty { arg["newSpoolId"] = .string(newSpoolId) }
+        if !receivedSpools.isEmpty { arg["receivedSpools"] = .array(receivedSpools) }
         if let item { arg["item"] = item }
         if let consumable { arg["consumable"] = consumable }
         return try runtime.call("KhaytPurchaseOrders", "receive", [arg], as: GoodsReceived.self)
@@ -1545,9 +1554,70 @@ public actor KhaytEngine {
         /// True when what has arrived now covers what was ordered.
         public let complete: Bool?
         public let po: JSONValue?
+        /// The spool topped up. Usually the one the order was raised for, but
+        /// a second part delivery of a new lot lands on the spool the first
+        /// one made — so the caller finds the record to replace by THIS id.
         public let item: JSONValue?
         public let consumable: JSONValue?
         public let expense: JSONValue?
+        /// A delivery of a DIFFERENT lot onto a spool that still holds
+        /// filament comes back as its own spool, and `item` is then absent:
+        /// the old spool is untouched. See LOT in `lib/purchase-orders.js`.
+        public let newItem: JSONValue?
+    }
+
+    // MARK: - Lot tracing
+
+    /// One draw of filament, as `lib/lot-trace.js` normalises it.
+    public struct LotDraw: Decodable, Sendable, Hashable {
+        public let orderId: String
+        public let spoolId: String
+        public let grams: Double
+        public let lot: String
+        /// No lot of its own: the spool's CURRENT lot, presumed.
+        public let inferred: Bool
+        /// `completed`, `failed` or `history`.
+        public let source: String
+    }
+
+    /// One job that drew from a lot (or a spool), as `lib/lot-trace.js` groups it.
+    public struct LotJob: Decodable, Sendable, Hashable {
+        public let orderId: String
+        public let project: String
+        public let client: String
+        public let date: String
+        public let grams: Double
+        public let lots: [String]
+        public let failed: Bool
+        public let completed: Bool
+        public let inferred: Bool
+    }
+
+    /// What one job drew, draw by draw — `KhaytLotTrace.lotsForJob`.
+    public func lotsForJob(order: JSONValue, inventory: [JSONValue],
+                           wasteLog: [JSONValue] = []) throws -> [LotDraw] {
+        try runtime.call("KhaytLotTrace", "lotsForJob",
+                         [order, JSONValue.array(inventory), JSONValue.array(wasteLog)],
+                         as: [LotDraw].self)
+    }
+
+    /// Every job that drew from `lot`, newest first, and the same list as CSV
+    /// for a recall — `KhaytLotTrace.jobsForLot` + `csvForJobs`.
+    public struct LotRecall: Decodable, Sendable {
+        public let jobs: [LotJob]
+        public let csv: String
+    }
+
+    public func lotRecall(lot: String, printLog: [JSONValue], wasteLog: [JSONValue],
+                          inventory: [JSONValue]) throws -> LotRecall {
+        try runtime.call2("""
+            (function (lot, printLog, wasteLog, inventory) {
+              var jobs = KhaytLotTrace.jobsForLot(
+                { printLog: printLog, wasteLog: wasteLog, inventory: inventory }, lot);
+              return { jobs: jobs, csv: KhaytLotTrace.csvForJobs(jobs) };
+            })(ARG0, ARG1, ARG2, ARG3)
+            """, [.string(lot), .array(printLog), .array(wasteLog), .array(inventory)],
+            as: LotRecall.self)
     }
 
     /// What the shop is low on and has NOT already ordered.

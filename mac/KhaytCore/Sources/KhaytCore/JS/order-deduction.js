@@ -127,13 +127,32 @@
     return (m && m.locationId) || null;
   }
 
+  /**
+   * WHICH LOT, AND WHICH ORDER IT CAME IN ON — stamped onto every draw.
+   *
+   * `spool.lot` is free text the shop typed, so it is trimmed and left off
+   * entirely when empty; `poId` is the purchase order the spool was last
+   * received against. Stamped AT DRAW TIME because a spool's lot can be
+   * edited later, and a recall needs the lot the filament had when it went
+   * into the job (`lib/lot-trace.js` reads these as "recorded").
+   *
+   * Additive only: nothing that reads a draw by `spoolId`/`grams` changes.
+   */
+  function lotStamp(spool) {
+    const out = {};
+    const lot = spool && typeof spool.lot === 'string' ? spool.lot.trim() : '';
+    if (lot) out.lot = lot;
+    if (spool && spool.poId) out.poId = String(spool.poId);
+    return out;
+  }
+
   /** Draw `grams` from a spool, recording what it was for. */
   function drawFrom(spool, grams, order, today) {
     spool.weight = Math.max(0, (+spool.weight || 0) - grams);
     if (!spool.usageHistory) spool.usageHistory = [];
-    spool.usageHistory.unshift({
+    spool.usageHistory.unshift(Object.assign({
       orderId: order.id, project: order.project || '', weightUsed: grams, date: today,
-    });
+    }, lotStamp(spool)));
     if (spool.usageHistory.length > USAGE_CAP) spool.usageHistory.length = USAGE_CAP;
   }
 
@@ -326,7 +345,7 @@
         if (!spools.includes(sp.id)) spools.push(sp.id);
         const already = drawn.find(d => d.spoolId === sp.id);
         if (already) already.grams += take;
-        else drawn.push({ spoolId: sp.id, grams: take });
+        else drawn.push(Object.assign({ spoolId: sp.id, grams: take }, lotStamp(sp)));
         if (isLowStock(sp, settings) && !nowLow.some(x => x.id === sp.id)) nowLow.push(sp);
       }
     }
@@ -412,7 +431,7 @@
         if (avail <= 0) continue;
         const take = Math.min(avail, remaining);
         drawFrom(sp, take, order, today);
-        drawnSpools.push({ spoolId: sp.id, grams: take });
+        drawnSpools.push(Object.assign({ spoolId: sp.id, grams: take }, lotStamp(sp)));
         remaining -= take;
         deductedAny = true;
         totalDeducted += take;
@@ -668,6 +687,7 @@
     isLowStock, spoolsByLocationPreference, partGramsConsumed, orderLocationId,
     deductForOrder, deductPackaging, returnForOrder,
     claimsFor, claimedGrams, scaleFor, estimatedGrams, drawsFor, deductActual, restoreDrawn,
+    lotStamp,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderDeduction = api;

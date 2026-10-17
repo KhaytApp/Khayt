@@ -69,7 +69,16 @@ struct SpoolSheet: View {
         // Scrolls, so Delete, Cancel and Save stay reachable however much
         // history a spool has behind it. See `SheetFrame`.
         SheetFrame(width: Self.width) {
-            Text(shop.words.callIt(isNew ? "mac.new_spool" : "mac.edit_spool")).font(.headline)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(shop.words.callIt(isNew ? "mac.new_spool" : "mac.edit_spool")).font(.headline)
+                // The lot as it is STORED, not as it is being typed: the
+                // header says which roll this is, the field below edits it.
+                if let stored = existing?.lot?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !stored.isEmpty {
+                    Text(shop.words.callIt("mac.lot_label", ["lot": .string(stored)]))
+                        .font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+            }
 
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
