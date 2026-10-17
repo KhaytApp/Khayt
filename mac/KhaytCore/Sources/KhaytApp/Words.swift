@@ -4331,9 +4331,9 @@ extension Words {
     /// September 2026 (Oct 2026). The language is the shop's; the calendar is
     /// the book's, the same split `Calendar.book` makes for stored days.
     func say(_ date: Date, _ style: Date.FormatStyle) -> String {
-        var style = style.locale(locale)
+        var style = style
         style.calendar = .book
-        return date.formatted(style)
+        return date.formatted(style.locale(locale))
     }
 
     /// The currency menu, in the shop's language and sorted in it.

@@ -45,9 +45,9 @@ extension MonthLabel {
         else { return key }
         // The book's calendar, or a Mac set to Umm al-Qura names a Gregorian
         // month by the Hijri one it falls in ("Safar 1448 AH").
-        var style = Date.FormatStyle.dateTime.month(.wide).year().locale(locale)
+        var style = Date.FormatStyle.dateTime.month(.wide).year()
         style.calendar = .book
-        return date.formatted(style)
+        return date.formatted(style.locale(locale))
     }
 
     /// What a chart is showing: the months it covers, or the one being pointed
