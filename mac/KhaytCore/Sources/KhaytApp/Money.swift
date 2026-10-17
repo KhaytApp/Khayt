@@ -217,11 +217,16 @@ enum Money {
     ///
     /// So: no grouping, no lost precision, and an empty field — not "0" — for a
     /// figure the book has never been told.
+    ///
+    /// And always 0–9 with a full stop, never `digits`. With "Use the Mac's
+    /// number format" on, a Mac in Arabic-Indic digits wrote "١٤٠٫٩١" here,
+    /// `Double` read nil, and saving a product untouched set its grams and
+    /// hours to 0 — the catalogue price incident again (alpha.79 review).
     static func fieldValue(_ amount: Double?) -> String {
         guard let amount else { return "" }
         let f = NumberFormatter()
         f.numberStyle = .decimal
-        f.locale = digits
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.usesGroupingSeparator = false
         f.minimumFractionDigits = 0
         // Enough to hold anything a slicer writes. Four, not "as many as it

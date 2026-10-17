@@ -4506,6 +4506,9 @@ extension Words {
 struct ShopsLocale: ViewModifier {
     let words: Words
     func body(content: Content) -> some View {
+        // The book's calendar too: without it every DatePicker on a Mac set
+        // to Umm al-Qura offered Hijri months beside labels in Gregorian.
         content.environment(\.locale, words.locale)
+            .environment(\.calendar, .book)
     }
 }

@@ -86,6 +86,19 @@ struct DigitsTests {
         }
     }
 
+    /// An editor's text is read back with `Double(_:)`, so it must never take
+    /// the Mac's digits: "١٤٠٫٩١" reads as nil and the field saves as 0.
+    @Test("an editor's figure reads back as the same number, even with the setting on",
+          arguments: [englishArabicIndicMac, arabicMac])
+    func fieldValueRoundTrips(mac: Locale) {
+        Digits.$pinned.withValue(.init(followsMac: true, mac: mac)) {
+            for n in [140.91, 1234.5, 0.25, 3250] {
+                let text = Money.fieldValue(n)
+                #expect(Double(text) == n, "\(n) went into the field as \"\(text)\"")
+            }
+        }
+    }
+
     @Test("with the setting on, a Mac that writes 0–9 gets 0–9 in Arabic too")
     func followsAWesternMac() async {
         let words = await Self.words("ar")
