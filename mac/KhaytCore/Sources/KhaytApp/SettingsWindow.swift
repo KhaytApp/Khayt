@@ -90,7 +90,7 @@ struct SettingsWindow: View {
         // Raised HERE rather than from the shop window: the list it is reached
         // from lives on the Integrations pane, and a sheet bound to the same
         // state from two windows presents itself twice.
-        .sheet(item: $shop.editingTemplate) { TemplateSheet(shop: shop, template: $0) }
+        .shopSheet(item: $shop.editingTemplate) { TemplateSheet(shop: shop, template: $0) }
     }
 
     @ViewBuilder
@@ -418,7 +418,7 @@ struct BusinessPane: View {
                     row(shop.words.callIt("mac.set_elec_rate")) {
                         HStack(spacing: 4) {
                             TextField("", value: $draft.elecRate,
-                                      format: .number.precision(.fractionLength(0...3)),
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0...3)),
                                       prompt: defaultElecRate.map { Text(Money.fieldValue($0)) })
                                 .multilineTextAlignment(.trailing).monospacedDigit().frame(width: 90)
                             Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
@@ -541,7 +541,7 @@ struct InvoicePane: View {
                     }
                     Toggle(shop.words.callIt("set.enable_vat"), isOn: $draft.enableVat)
                     row(shop.words.callIt("set.vat_rate")) {
-                        TextField("", value: $draft.vatRate, format: .number.precision(.fractionLength(0...3)))
+                        TextField("", value: $draft.vatRate, format: .number.locale(Money.digits).precision(.fractionLength(0...3)))
                             .multilineTextAlignment(.trailing).frame(width: 90)
                             .disabled(!draft.enableVat)
                     }
@@ -761,12 +761,12 @@ struct PaymentsPane: View {
                     if draft.loyaltyEnabled {
                         row(shop.words.callIt("mac.points_per_unit")) {
                             TextField("", value: $draft.loyaltyPointsPerUnit,
-                                      format: .number.precision(.fractionLength(0...2)))
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                                 .monospacedDigit()
                         }
                         row(shop.words.callIt("mac.points_worth")) {
                             TextField("", value: $draft.loyaltyRedeemRate,
-                                      format: .number.precision(.fractionLength(0...4)))
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0...4)))
                                 .monospacedDigit()
                         }
                         Text(shop.words.callIt("mac.points_explains"))
@@ -920,7 +920,7 @@ struct OperationsPane: View {
                                 // belongs to, in a row whose whole job is to
                                 // put a figure under a weekday.
                                 TextField("", value: Binding(get: { draft.hours[day] ?? 0 }, set: { draft.hours[day] = $0 }),
-                                          format: .number.precision(.fractionLength(0...1)))
+                                          format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
                                     .labelsHidden()
                                     .multilineTextAlignment(.center).frame(width: 52)
                             }
@@ -961,7 +961,7 @@ struct OperationsPane: View {
                     ForEach(Draft.columns, id: \.self) { col in
                         row(shop.words.callIt(Stage(rawValue: col)?.key ?? col)) {
                             TextField("", value: Binding(get: { draft.wip[col] ?? 0 }, set: { draft.wip[col] = $0 }),
-                                      format: .number.precision(.fractionLength(0)))
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0)))
                                 .multilineTextAlignment(.trailing).frame(width: 70)
                         }
                     }
@@ -973,7 +973,7 @@ struct OperationsPane: View {
                             HStack(spacing: 4) {
                                 TextField("", value: Binding(get: { draft.budgets[category] ?? 0 },
                                                              set: { draft.budgets[category] = $0 }),
-                                          format: .number.precision(.fractionLength(0...2)))
+                                          format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                                     .multilineTextAlignment(.trailing).frame(width: 90)
                                 Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                             }
@@ -1040,7 +1040,7 @@ struct OperationsPane: View {
                            unit: String = "") -> some View {
         row(shop.words.callIt(key)) {
             HStack(spacing: 4) {
-                TextField("", value: value, format: .number.precision(.fractionLength(0...2)))
+                TextField("", value: value, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                     .multilineTextAlignment(.trailing).frame(width: 90)
                 if !unit.isEmpty { Text(unit).foregroundStyle(.secondary) }
             }
@@ -1215,28 +1215,28 @@ struct PreferencesPane: View {
                 Section(shop.words.callIt("set.stock_section")) {
                     Toggle(shop.words.callIt("set.auto_deduct"), isOn: $draft.autoDeduct)
                     row(shop.words.callIt("set.low_stock")) {
-                        TextField("", value: $draft.lowStock, format: .number.precision(.fractionLength(0)))
+                        TextField("", value: $draft.lowStock, format: .number.locale(Money.digits).precision(.fractionLength(0)))
                             .multilineTextAlignment(.trailing).frame(width: 90)
                     }
                 }
                 Section(shop.words.callIt("mac.est_section")) {
                     row(shop.words.callIt("mac.est_density")) {
-                        TextField("", value: $draft.density, format: .number.precision(.fractionLength(2)))
+                        TextField("", value: $draft.density, format: .number.locale(Money.digits).precision(.fractionLength(2)))
                             .multilineTextAlignment(.trailing).frame(width: 90)
                     }
                     row(shop.words.callIt("mac.est_infill")) {
-                        TextField("", value: $draft.infillPct, format: .number.precision(.fractionLength(0)))
+                        TextField("", value: $draft.infillPct, format: .number.locale(Money.digits).precision(.fractionLength(0)))
                             .multilineTextAlignment(.trailing).frame(width: 90)
                     }
                     row(shop.words.callIt("mac.est_wall")) {
-                        TextField("", value: $draft.wallMm, format: .number.precision(.fractionLength(1)))
+                        TextField("", value: $draft.wallMm, format: .number.locale(Money.digits).precision(.fractionLength(1)))
                             .multilineTextAlignment(.trailing).frame(width: 90)
                     }
                     Text(shop.words.callIt("mac.est_wall_hint"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     row(shop.words.callIt("mac.est_waste")) {
-                        TextField("", value: $draft.wastePct, format: .number.precision(.fractionLength(0)))
+                        TextField("", value: $draft.wastePct, format: .number.locale(Money.digits).precision(.fractionLength(0)))
                             .multilineTextAlignment(.trailing).frame(width: 90)
                     }
                     // Said here rather than left to be wondered about: the

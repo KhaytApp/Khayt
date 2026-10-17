@@ -86,7 +86,7 @@ struct LocationsSection: View {
             .disabled(!shop.canWrite)
             .help(shop.canWrite ? words.callIt("mac.locations_hint") : words.callIt("mac.move_sample"))
         }
-        .sheet(item: $editing) { loc in
+        .shopSheet(item: $editing) { loc in
             LocationEditor(shop: shop, location: loc)
         }
         .confirmationDialog(

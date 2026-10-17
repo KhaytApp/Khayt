@@ -192,7 +192,7 @@ private struct LabelledField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             Text(label).font(.caption).foregroundStyle(.secondary)
-            TextField("", value: $value, format: .number.precision(.fractionLength(0...1)))
+            TextField("", value: $value, format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
                 .textFieldStyle(.roundedBorder)
                 .monospacedDigit()
                 .frame(width: 90)

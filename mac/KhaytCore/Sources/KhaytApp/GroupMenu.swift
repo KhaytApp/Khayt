@@ -58,7 +58,7 @@ struct GroupMenu: View {
         .help(shop.canWrite
               ? shop.words.callIt("mac.group_why")
               : shop.words.callIt("mac.group_locked"))
-        .popover(isPresented: $shop.namingGroup, arrowEdge: .bottom) {
+        .shopPopover(isPresented: $shop.namingGroup, arrowEdge: .bottom) {
             NameAGroup(words: shop.words, typed: $typed, known: shop.groups) { name, kind in
                 shop.namingGroup = false
                 let wanted = TypedGroupName.flatten(name, known: shop.groups)

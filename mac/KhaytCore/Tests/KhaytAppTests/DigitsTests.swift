@@ -86,6 +86,19 @@ struct DigitsTests {
         }
     }
 
+    /// An editor's text is read back with `Double(_:)`, so it must never take
+    /// the Mac's digits: "١٤٠٫٩١" reads as nil and the field saves as 0.
+    @Test("an editor's figure reads back as the same number, even with the setting on",
+          arguments: [englishArabicIndicMac, arabicMac])
+    func fieldValueRoundTrips(mac: Locale) {
+        Digits.$pinned.withValue(.init(followsMac: true, mac: mac)) {
+            for n in [140.91, 1234.5, 0.25, 3250] {
+                let text = Money.fieldValue(n)
+                #expect(Double(text) == n, "\(n) went into the field as \"\(text)\"")
+            }
+        }
+    }
+
     @Test("with the setting on, a Mac that writes 0–9 gets 0–9 in Arabic too")
     func followsAWesternMac() async {
         let words = await Self.words("ar")
@@ -184,9 +197,11 @@ struct DigitsTests {
     ///
     /// Data is excluded by shape: a formatter pinned to `en_US_POSIX` declares
     /// itself the book's, and `String(format:)` and interpolation write 0–9
-    /// whatever the Mac says. SwiftUI's `Text(_, format:)`, `Text(_, style:)`
-    /// and `TextField(value:format:)` take the window's locale, which
-    /// `ShopsLocale` sets — the last test holds that half.
+    /// whatever the Mac says. SwiftUI's `Text(_, format:)` and `Text(_, style:)`
+    /// take the window's locale, which `ShopsLocale` sets — the tests below
+    /// hold that half. `TextField(value:format:)` does NOT (measured: it
+    /// wrote ١٬٢٣٤٫٥ under an en_US environment), so its format carries
+    /// `.locale(Money.digits)` itself.
     @Test("nothing formats a figure in the Mac's locale behind Digits' back")
     func noBypasses() throws {
         var hits: [Hit] = []
@@ -260,6 +275,42 @@ struct DigitsTests {
         for line in menu.split(separator: "\n") where line.contains("NSHostingController(rootView:") {
             #expect(line.contains("ShopsLocale"), "the menu bar panel draws in the Mac's locale")
         }
+    }
+
+    /// A field's format style ignores the environment's locale, so a style
+    /// left alone writes the Mac's digits in every edit box.
+    @Test("every number field's format names its locale")
+    func fieldsNameTheirLocale() throws {
+        var bare: [String] = []
+        let folder = Self.root.appending(path: "KhaytApp")
+        let files = try #require(FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil))
+        for case let url as URL in files where url.pathExtension == "swift" {
+            let lines = try String(contentsOf: url, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+            for (i, line) in lines.enumerated() where line.contains("format: .number") && !line.contains(".locale(") {
+                bare.append("\(url.lastPathComponent):\(i + 1)")
+            }
+        }
+        #expect(bare.isEmpty, "add .locale(Money.digits): \(bare.joined(separator: ", "))")
+    }
+
+    /// A sheet or popover on macOS starts again from the Mac's locale (it
+    /// keeps the calendar, not the locale), so they go through ShopSheets.
+    @Test("every sheet and popover carries the shop's locale")
+    func sheetsCarryTheLocale() throws {
+        var plain: [String] = []
+        let folder = Self.root.appending(path: "KhaytApp")
+        let files = try #require(FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil))
+        for case let url as URL in files where url.pathExtension == "swift" && url.lastPathComponent != "ShopSheets.swift" {
+            let lines = try String(contentsOf: url, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+            for (i, line) in lines.enumerated() {
+                let code = line.trimmingCharacters(in: .whitespaces)
+                if code.hasPrefix("//") { continue }
+                if code.contains(".sheet(") || code.contains(".popover(") {
+                    plain.append("\(url.lastPathComponent):\(i + 1)")
+                }
+            }
+        }
+        #expect(plain.isEmpty, "use .shopSheet / .shopPopover: \(plain.joined(separator: ", "))")
     }
 
     @Test("the setting is in Settings, in both languages")

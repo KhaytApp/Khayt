@@ -122,7 +122,7 @@ struct CloudSignInSheet: View {
         .padding(18)
         .frame(width: 460)
         .onAppear(perform: prefill)
-        .sheet(isPresented: $resetting) { reset }
+        .shopSheet(isPresented: $resetting) { reset }
     }
 
     /// Resetting the account password, with the emailed code.

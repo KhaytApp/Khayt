@@ -182,7 +182,7 @@ private struct Detail: View {
         .task(id: shop.printRunsStamp(job.id)) {
             printed = await shop.printedOn(job.id)
         }
-        .sheet(item: $editing) { part in
+        .shopSheet(item: $editing) { part in
             EditPartSheet(shop: shop, orderId: job.id, part: part)
         }
     }

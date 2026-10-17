@@ -140,7 +140,7 @@ struct ConsumableSheet: View {
     /// A number field that cannot be dragged below zero. The rule clamps
     /// anyway — this is so the form never SHOWS a figure the book will refuse.
     private func amount(_ value: Binding<Double>, step: Double = 1) -> some View {
-        TextField("", value: value, format: .number.precision(.fractionLength(0...2)))
+        TextField("", value: value, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
             .textFieldStyle(.roundedBorder)
             .multilineTextAlignment(.trailing)
             .onChange(of: value.wrappedValue) { _, now in

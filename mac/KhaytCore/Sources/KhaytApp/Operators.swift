@@ -201,7 +201,7 @@ struct OperatorsSection: View {
             .disabled(!shop.canWrite)
             .help(shop.canWrite ? words.callIt("mac.operators_hint") : words.callIt("mac.move_sample"))
         }
-        .sheet(item: $editing) { subject in
+        .shopSheet(item: $editing) { subject in
             OperatorEditor(shop: shop, original: subject.original)
         }
         .confirmationDialog(
@@ -275,7 +275,7 @@ struct OperatorEditor: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 TextField(words.callIt("op.hourly_rate") + " (" + shop.currency + ")",
-                          value: $fields.hourlyRate, format: .number)
+                          value: $fields.hourlyRate, format: .number.locale(Money.digits))
                     .help(words.callIt("mac.operator_rate_hint"))
                 Toggle(words.callIt("mac.operator_active"), isOn: $fields.active)
             }
@@ -391,7 +391,7 @@ struct JobStaffSection: View {
                     .font(.callout)
             }
         }
-        .sheet(isPresented: $logging) {
+        .shopSheet(isPresented: $logging) {
             LogTimeSheet(shop: shop, job: job)
         }
         // Asked first, like every removal: an entry is labour cost on the
@@ -435,7 +435,7 @@ struct LogTimeSheet: View {
                         Text(op.role.isEmpty ? op.name : op.name + " · " + op.role).tag(op.id)
                     }
                 }
-                TextField(words.callIt("time.hours"), value: $hours, format: .number)
+                TextField(words.callIt("time.hours"), value: $hours, format: .number.locale(Money.digits))
                 DatePicker(words.callIt("time.date"), selection: $day, displayedComponents: .date)
                 TextField(words.callIt("time.notes"), text: $notes, axis: .vertical)
                     .lineLimit(1...3)

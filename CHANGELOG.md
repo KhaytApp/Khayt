@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: with "Use the Mac's number format" on, editors keep their
+  figures.** On a Mac that writes Arabic-Indic digits, opening a product,
+  customer price or job and saving it set grams, hours and prices to 0. Edit
+  boxes now always hold 0–9, and date pickers show Gregorian months like the
+  rest of the app. Neither reached a release.
+
 - **iPhone: a print's Lock Screen card no longer freezes once the print
   runs past its first estimate.** At the estimated finish iOS marks the card
   out of date, and from then on the app stopped updating it or ending it, so

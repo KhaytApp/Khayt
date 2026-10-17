@@ -33,7 +33,7 @@ struct BothShellsPresentTests {
         let text = Self.source
         #expect(!text.isEmpty, "ShopWindow.swift moved — this test is reading nothing")
 
-        // Every `.sheet(` in the file must be inside `WindowSheets`, which is
+        // Every `.shopSheet(` in the file must be inside `WindowSheets`, which is
         // at the end. Anything before it is attached to one shell only.
         guard let chain = text.range(of: "struct WindowSheets: ViewModifier") else {
             Issue.record("WindowSheets is gone; the sheets are attached to a shell again")
@@ -41,6 +41,7 @@ struct BothShellsPresentTests {
         }
         let before = text[text.startIndex..<chain.lowerBound]
         let strays = before.components(separatedBy: ".sheet(").count - 1
+            + before.components(separatedBy: ".shopSheet(").count - 1
         #expect(strays == 0, Comment(rawValue: """
             \(strays) sheet(s) are attached above WindowSheets, so they exist in \
             one shell and not the other — which is silent: the button does \

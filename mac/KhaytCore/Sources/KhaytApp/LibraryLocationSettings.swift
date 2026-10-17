@@ -125,7 +125,7 @@ struct LibraryLocationSettings: View {
         }
         // "Sort linked folders": nothing moves until the shop has seen what
         // would, and pressed Apply.
-        .sheet(item: Binding(get: { shop.sortPreview }, set: { shop.sortPreview = $0 })) { preview in
+        .shopSheet(item: Binding(get: { shop.sortPreview }, set: { shop.sortPreview = $0 })) { preview in
             LinkedSortSheet(shop: shop, preview: preview)
         }
         .confirmationDialog(shop.words.callIt("mac.libmove_confirm_title"),

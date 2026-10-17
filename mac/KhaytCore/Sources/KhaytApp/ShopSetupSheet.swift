@@ -234,7 +234,7 @@ struct ShopSetupSheet: View {
                 HStack(spacing: 6) {
                     TextField("0.18", value: Binding(get: { electricity },
                                                      set: { electricity = $0; skippedShop = false }),
-                              format: .number.precision(.fractionLength(0...3)))
+                              format: .number.locale(Money.digits).precision(.fractionLength(0...3)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 90)
                     Text(words.callIt("mac.setup_per_kwh", ["mark": .string(Money.mark(currency))]))
                         .foregroundStyle(.secondary)
@@ -250,7 +250,7 @@ struct ShopSetupSheet: View {
                     Toggle(words.callIt("mac.setup_vat_on"),
                            isOn: Binding(get: { chargesVat }, set: { chargesVat = $0; skippedShop = false }))
                     if chargesVat {
-                        TextField("", value: $vatRate, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $vatRate, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 60)
                         Text(verbatim: "%").foregroundStyle(.secondary)
                     }
@@ -301,7 +301,7 @@ struct ShopSetupSheet: View {
             GridRow {
                 label("mac.power")
                 HStack(spacing: 4) {
-                    TextField("", value: edit(\.powerDraw), format: .number.precision(.fractionLength(0)))
+                    TextField("", value: edit(\.powerDraw), format: .number.locale(Money.digits).precision(.fractionLength(0)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 80)
                     Text(words.callIt("mac.unit_watts")).foregroundStyle(.secondary)
                 }
@@ -309,7 +309,7 @@ struct ShopSetupSheet: View {
             GridRow {
                 label("mac.dep_price")
                 HStack(spacing: 4) {
-                    TextField("", value: edit(\.price), format: .number.precision(.fractionLength(0...2)))
+                    TextField("", value: edit(\.price), format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                     Text(Money.mark(currency)).foregroundStyle(.secondary)
                 }
@@ -331,7 +331,7 @@ struct ShopSetupSheet: View {
             GridRow {
                 label("mac.dep_life")
                 HStack(spacing: 6) {
-                    TextField("", value: edit(\.lifeHours), format: .number.precision(.fractionLength(0)))
+                    TextField("", value: edit(\.lifeHours), format: .number.locale(Money.digits).precision(.fractionLength(0)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 80)
                     Text(words.callIt("mac.dep_unit_hours")).foregroundStyle(.secondary)
                 }
@@ -381,7 +381,7 @@ struct ShopSetupSheet: View {
             GridRow {
                 label("inv.cost")
                 HStack(spacing: 4) {
-                    TextField("", value: spoolEdit(\.cost), format: .number.precision(.fractionLength(0...2)))
+                    TextField("", value: spoolEdit(\.cost), format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                     Text(Money.mark(currency)).foregroundStyle(.secondary)
                 }
@@ -389,7 +389,7 @@ struct ShopSetupSheet: View {
             GridRow {
                 label("inv.weight")
                 HStack(spacing: 4) {
-                    TextField("", value: spoolEdit(\.weight), format: .number.precision(.fractionLength(0)))
+                    TextField("", value: spoolEdit(\.weight), format: .number.locale(Money.digits).precision(.fractionLength(0)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 80)
                     Text(words.callIt("unit.g")).foregroundStyle(.secondary)
                 }

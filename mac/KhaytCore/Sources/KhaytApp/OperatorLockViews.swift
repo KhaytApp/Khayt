@@ -199,9 +199,9 @@ struct LockSection: View {
                 }
             }
         }
-        .sheet(item: $pinFor) { op in SetPinSheet(shop: shop, person: op) }
-        .sheet(isPresented: $turningOff) { LockOffSheet(shop: shop) }
-        .sheet(item: $shown) { s in RecoveryCodeSheet(shop: shop, code: s.code) }
+        .shopSheet(item: $pinFor) { op in SetPinSheet(shop: shop, person: op) }
+        .shopSheet(isPresented: $turningOff) { LockOffSheet(shop: shop) }
+        .shopSheet(item: $shown) { s in RecoveryCodeSheet(shop: shop, code: s.code) }
     }
 
     private var status: String {

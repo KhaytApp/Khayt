@@ -152,8 +152,8 @@ struct Alpha58ReviewTests {
     @Test("the spool-size banner and its sheet are the window's, not the catalogue's")
     func spoolBannerEverywhere() {
         #expect(Self.source("Banners.swift").contains("SpoolRepairBanner(shop: shop)"))
-        #expect(Self.source("ShopWindow.swift").contains(".sheet(isPresented: $shop.showingSpoolRepair)"))
-        #expect(!Self.source("Catalogue.swift").contains(".sheet(isPresented: $shop.showingSpoolRepair)"),
+        #expect(Self.source("ShopWindow.swift").contains(".shopSheet(isPresented: $shop.showingSpoolRepair)"))
+        #expect(!Self.source("Catalogue.swift").contains(".shopSheet(isPresented: $shop.showingSpoolRepair)"),
                 "two sheets bound to one flag")
     }
 

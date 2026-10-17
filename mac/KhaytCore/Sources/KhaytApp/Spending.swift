@@ -42,8 +42,8 @@ struct Expenses: View {
         .background(Khayt.ground)
         .screenToolbar { SpendToolbar(shop: shop, add: { shop.addingExpense = true },
                                       addLabel: shop.words.callIt("exp.add_title")) }
-        .sheet(isPresented: $shop.addingExpense, onDismiss: { shop.receiptPrefill = nil }) { ExpenseSheet(shop: shop) }
-        .sheet(isPresented: $shop.readingReceipt) { ReceiptReaderSheet(shop: shop) }
+        .shopSheet(isPresented: $shop.addingExpense, onDismiss: { shop.receiptPrefill = nil }) { ExpenseSheet(shop: shop) }
+        .shopSheet(isPresented: $shop.readingReceipt) { ReceiptReaderSheet(shop: shop) }
     }
 
     private var table: some View {
@@ -219,7 +219,7 @@ struct Waste: View {
         .background(Khayt.ground)
         .screenToolbar { SpendToolbar(shop: shop, add: { shop.loggingWaste = true },
                                       addLabel: shop.words.callIt("waste.add")) }
-        .sheet(isPresented: $shop.loggingWaste) { WasteSheet(shop: shop) }
+        .shopSheet(isPresented: $shop.loggingWaste) { WasteSheet(shop: shop) }
     }
 
     private var table: some View {

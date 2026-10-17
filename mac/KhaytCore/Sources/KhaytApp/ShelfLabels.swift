@@ -196,7 +196,7 @@ final class LabelPaper: NSObject, ObservableObject, WKNavigationDelegate {
 
 /// A built label sheet, waiting to be looked at.
 ///
-/// `Identifiable` so it drives a `.sheet(item:)` like every other question this
+/// `Identifiable` so it drives a `.shopSheet(item:)` like every other question this
 /// window asks. The count is carried so the sheet can say how many labels are
 /// about to be printed BEFORE the print panel opens — "print 40 labels" is a
 /// different decision from "print".

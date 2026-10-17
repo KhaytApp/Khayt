@@ -42,8 +42,8 @@ struct Catalogue: View {
 
     var body: some View {
         content
-            .sheet(isPresented: $shop.showingOnlineOrders) { OnlineOrdersSheet(shop: shop) }
-            .sheet(isPresented: $shop.showingWebStore) { WebStoreSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.showingOnlineOrders) { OnlineOrdersSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.showingWebStore) { WebStoreSheet(shop: shop) }
             .screenToolbar {
                 ToolbarItem {
                     Picker("", selection: $layout) {
@@ -159,7 +159,7 @@ struct Catalogue: View {
         }
         .background(Khayt.ground)
         .overlay { emptyState }
-        .sheet(item: $counting) { row in
+        .shopSheet(item: $counting) { row in
             CountTheShelf(shop: shop, row: row)
         }
         .modifier(SellFromShelf(shop: shop, selling: $selling))

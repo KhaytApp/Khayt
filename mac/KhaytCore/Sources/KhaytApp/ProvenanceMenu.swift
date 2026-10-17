@@ -79,7 +79,7 @@ struct ProvenanceMenu: View {
         .help(shop.canWrite
               ? shop.words.callIt("mac.provenance_why")
               : shop.words.callIt("mac.group_locked"))
-        .popover(isPresented: $typing, arrowEdge: .bottom) {
+        .shopPopover(isPresented: $typing, arrowEdge: .bottom) {
             NameIt(words: shop.words, typed: $typed,
                    title: shop.words.callIt("plib.source"),
                    example: shop.words.callIt("plib.source_ph"),

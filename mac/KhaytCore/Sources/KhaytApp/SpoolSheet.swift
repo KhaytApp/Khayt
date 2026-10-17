@@ -159,7 +159,7 @@ struct SpoolSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mac.weight")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $weight, format: .number.precision(.fractionLength(0...1)))
+                        TextField("", value: $weight, format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                         Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
                     }
@@ -173,7 +173,7 @@ struct SpoolSheet: View {
                     GridRow {
                         Text(shop.words.callIt("mac.full_spool")).foregroundStyle(.secondary)
                         HStack(spacing: 4) {
-                            TextField("", value: $fullWeight, format: .number.precision(.fractionLength(0)))
+                            TextField("", value: $fullWeight, format: .number.locale(Money.digits).precision(.fractionLength(0)))
                                 .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                             Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
                         }
@@ -182,7 +182,7 @@ struct SpoolSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mac.cost")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $cost, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $cost, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                         // What a kilo costs is the figure that compares two
@@ -207,7 +207,7 @@ struct SpoolSheet: View {
                         Text(shop.words.callIt("exp.vat_paid")).foregroundStyle(.secondary)
                         HStack(spacing: 4) {
                             TextField("", value: $vatAmount,
-                                      format: .number.precision(.fractionLength(0...2)))
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                                 .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                             Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                             if vatAmount > 0, cost > vatAmount {
@@ -222,7 +222,7 @@ struct SpoolSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mac.spool_reorder_point")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $reorderPoint, format: .number.precision(.fractionLength(0)))
+                        TextField("", value: $reorderPoint, format: .number.locale(Money.digits).precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                         Text(shop.words.callIt("common.grams")).foregroundStyle(.secondary)
                     }
@@ -256,7 +256,7 @@ struct SpoolSheet: View {
                     // Arabic it says (كغ) over a box counted in grams.
                     Text(shop.words.callIt("mac.spool_reorder_qty")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: Self.blankWhenZero($reorderQty), format: .number.precision(.fractionLength(0)))
+                        TextField("", value: Self.blankWhenZero($reorderQty), format: .number.locale(Money.digits).precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                         // The unit's WORD, not its code — "g" sat in Latin
                         // after an Arabic label.
@@ -274,14 +274,15 @@ struct SpoolSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mac.spool_max_speed")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: Self.blankWhenZero($maxSpeed), format: .number.precision(.fractionLength(0)))
+                        TextField("", value: Self.blankWhenZero($maxSpeed), format: .number.locale(Money.digits).precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                         Text(shop.words.callIt("mac.mm_s")).foregroundStyle(.secondary)
                     }
                 }
                 GridRow {
                     Text(shop.words.callIt("inv.lot")).foregroundStyle(.secondary)
-                    TextField("", text: $lot).textFieldStyle(.roundedBorder)
+                    // A lot is a short code; unbounded, the field ran off the sheet.
+                    TextField("", text: $lot).textFieldStyle(.roundedBorder).frame(width: 220)
                 }
                 if !isNew {
                     // WHEN IT WAS BOUGHT, beside when it was opened. The two
@@ -568,7 +569,7 @@ struct SpoolSheet: View {
     /// A temperature box: the number, then °C. Empty when nobody has said.
     private func degrees(_ value: Binding<Double>) -> some View {
         HStack(spacing: 4) {
-            TextField("", value: Self.blankWhenZero(value), format: .number.precision(.fractionLength(0)))
+            TextField("", value: Self.blankWhenZero(value), format: .number.locale(Money.digits).precision(.fractionLength(0)))
                 .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
             Text(shop.words.callIt("mac.celsius")).foregroundStyle(.secondary)
         }

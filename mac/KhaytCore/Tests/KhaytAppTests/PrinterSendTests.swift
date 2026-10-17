@@ -153,7 +153,7 @@ struct PrinterSendTests {
 
     @Test("the sheet is reachable, and the send opens the key at the moment it sends")
     func wired() {
-        #expect(MenuCoverageTests.source("ShopWindow.swift").contains(".sheet(item: $shop.pendingSend) { SendToPrinterSheet("))
+        #expect(MenuCoverageTests.source("ShopWindow.swift").contains(".shopSheet(item: $shop.pendingSend) { SendToPrinterSheet("))
         for file in ["Menus.swift", "OrdersTable.swift", "OrderInspector.swift"] {
             #expect(MenuCoverageTests.source(file).contains("shop.pendingSend = Shop.PendingHold("),
                     Comment(rawValue: "\(file) no longer opens the Send sheet"))

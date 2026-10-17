@@ -361,7 +361,7 @@ struct MachineSheet: View {
                         Text(shop.words.callIt("mac.nozzle")).foregroundStyle(.secondary)
                         HStack(spacing: 4) {
                             TextField("", value: $nozzleDiameter,
-                                      format: .number.precision(.fractionLength(0...2)))
+                                      format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                                 .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
                             Text(shop.words.callIt("mac.unit_mm")).foregroundStyle(.secondary)
                         }
@@ -370,7 +370,7 @@ struct MachineSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mac.power")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $powerDraw, format: .number.precision(.fractionLength(0)))
+                        TextField("", value: $powerDraw, format: .number.locale(Money.digits).precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
                         Text(shop.words.callIt("mac.unit_watts")).foregroundStyle(.secondary)
                     }
@@ -392,7 +392,7 @@ struct MachineSheet: View {
                 }
                 GridRow {
                     Text(shop.words.callIt("mach.target_hours")).foregroundStyle(.secondary)
-                    TextField("", value: $targetHours, format: .number.precision(.fractionLength(0...1)))
+                    TextField("", value: $targetHours, format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
                         .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 70)
                 }
             }
@@ -493,7 +493,7 @@ struct MachineSheet: View {
                         GridRow {
                             Text(shop.words.callIt("plug.delay")).foregroundStyle(.secondary)
                             HStack(spacing: 4) {
-                                TextField("", value: $plugDelay, format: .number.precision(.fractionLength(0)))
+                                TextField("", value: $plugDelay, format: .number.locale(Money.digits).precision(.fractionLength(0)))
                                     .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 60)
                                 Text(shop.words.callIt("plug.minutes")).foregroundStyle(.secondary)
                             }
@@ -593,7 +593,7 @@ struct MachineSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mach.nozzle_threshold")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $nozzleThreshold, format: .number.precision(.fractionLength(0)))
+                        TextField("", value: $nozzleThreshold, format: .number.locale(Money.digits).precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 90)
                         Text(shop.words.callIt("common.grams")).foregroundStyle(.secondary)
                     }
@@ -615,7 +615,7 @@ struct MachineSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mac.dep_price")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $depPrice, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $depPrice, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }
@@ -637,7 +637,7 @@ struct MachineSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mac.dep_life")).foregroundStyle(.secondary)
                     HStack(spacing: 6) {
-                        TextField("", value: $depLife, format: .number.precision(.fractionLength(0...1)))
+                        TextField("", value: $depLife, format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 80)
                         Picker("", selection: $depUnit) {
                             Text(shop.words.callIt("mac.dep_unit_hours")).tag("hours")
@@ -649,7 +649,7 @@ struct MachineSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mac.dep_residual")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $depResidual, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $depResidual, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
                         Text(Money.mark(shop.currency)).foregroundStyle(.secondary)
                     }
@@ -670,7 +670,7 @@ struct MachineSheet: View {
                     GridRow {
                         Text(shop.words.callIt("mac.dep_monthly_hours")).foregroundStyle(.secondary)
                         HStack(spacing: 4) {
-                            TextField("", value: $depMonthly, format: .number.precision(.fractionLength(0...1)))
+                            TextField("", value: $depMonthly, format: .number.locale(Money.digits).precision(.fractionLength(0...1)))
                                 .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 80)
                             Text(shop.words.callIt("mac.dep_unit_hours")).foregroundStyle(.secondary)
                         }
@@ -1319,7 +1319,7 @@ private struct Connection: View {
                                 .textFieldStyle(.roundedBorder)
                                 .onChange(of: host) { _, _ in said = nil }
                             Text(":").foregroundStyle(.tertiary)
-                            TextField("", value: $port, format: .number.grouping(.never))
+                            TextField("", value: $port, format: .number.locale(Money.digits).grouping(.never))
                                 .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 62)
                                 .onChange(of: port) { _, _ in said = nil }
                         }

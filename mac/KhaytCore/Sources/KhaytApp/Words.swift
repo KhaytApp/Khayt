@@ -1033,7 +1033,7 @@ final class Words {
                                  "ar": "تقدير على أساس {min} دقيقة لكل تبديل بكرة (الإعدادات › العمليات). المواعيد والأولوية أولًا: لا يتأخر أي عمل لتوفير تبديل."],
         "mac.swap_minutes":     ["en": "Minutes per spool change (estimate)", "ar": "دقائق تبديل البكرة (تقدير)"],
         "mac.swap_minutes_hint": ["en": "How long it takes to take one spool off a head and load another. Used only to estimate the time saved by running jobs grouped by colour. 3 minutes suits a Snapmaker U1 with someone already at the machine; walking over to it is not counted.",
-                                  "ar": "المدة اللازمة لإخراج بكرة من رأس وتحميل أخرى. تُستخدم فقط لتقدير الوقت الموفَّر عند تجميع الأعمال حسب اللون. ٣ دقائق تناسب Snapmaker U1 بوجود شخص عند الطابعة؛ ولا يُحتسب وقت الوصول إليها."],
+                                  "ar": "المدة اللازمة لإخراج بكرة من رأس وتحميل أخرى. تُستخدم فقط لتقدير الوقت الموفَّر عند تجميع الأعمال حسب اللون. 3 دقائق تناسب Snapmaker U1 بوجود شخص عند الطابعة؛ ولا يُحتسب وقت الوصول إليها."],
         "mac.jobs_word":     ["en": "jobs",           "ar": "أعمال"],
         "mac.jobs_word_one": ["en": "job",            "ar": "عمل"],
         // Nominative: these stand alone as a label rather than after a
@@ -1583,7 +1583,7 @@ final class Words {
         "mac.put_a_spool_why": ["en": "Weight and price per kilo. Khayt does the rest.", "ar": "الوزن وسعر الكيلو. خيط يتكفّل بالباقي."],
         "mac.take_a_job": ["en": "Take your first job", "ar": "خذ أول عمل"],
         "mac.take_a_job_why": ["en": "Or price one in the Calculator without saving it.", "ar": "أو سعّر واحدًا في الحاسبة دون حفظه."],
-        "mac.open_the_sample": ["en": "Or open the sample shop — 42 jobs, 5 machines, real numbers.", "ar": "أو افتح المتجر التجريبي — ٤٢ عملًا و٥ آلات وأرقام حقيقية."],
+        "mac.open_the_sample": ["en": "Or open the sample shop — 42 jobs, 5 machines, real numbers.", "ar": "أو افتح المتجر التجريبي — 42 عملًا و5 آلات وأرقام حقيقية."],
         // ── THE DESIGN SYSTEM'S OWN WORDS ────────────────────────────────
         //
         // §4: every state is a GLYPH and a WORD as well as a hue. These are
@@ -3238,7 +3238,7 @@ final class Words {
                               + "للمتجر كله."],
         // ── DRAFTING A QUOTE FROM A DESCRIPTION ───────────────────────────
         "mac.describe_the_job": ["en": "Describe the job — \"20 cable clips, black PETG\"",
-                                 "ar": "صف العمل — «٢٠ مشبك كابل، PETG أسود»"],
+                                 "ar": "صف العمل — «20 مشبك كابل، PETG أسود»"],
         "mac.draft_it":      ["en": "Draft",           "ar": "صُغ"],
         "mac.drafting":      ["en": "Asking…",         "ar": "جارٍ السؤال…"],
         // Always shown, never folded away: a drafted part is a guess with
@@ -4506,6 +4506,9 @@ extension Words {
 struct ShopsLocale: ViewModifier {
     let words: Words
     func body(content: Content) -> some View {
+        // The book's calendar too: without it every DatePicker on a Mac set
+        // to Umm al-Qura offered Hijri months beside labels in Gregorian.
         content.environment(\.locale, words.locale)
+            .environment(\.calendar, .book)
     }
 }

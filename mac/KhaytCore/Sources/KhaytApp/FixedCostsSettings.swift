@@ -155,7 +155,7 @@ struct FixedCostsSettings: View {
                 // shows, and that is what is saved — and bordered like the
                 // other figures a shop types in Settings.
                 TextField("", value: $overhead.monthlyHours,
-                          format: .number.precision(.fractionLength(0)),
+                          format: .number.locale(Money.digits).precision(.fractionLength(0)),
                           prompt: Text(shop.words.callIt("set.overhead_hours_ph")))
                     .textFieldStyle(.roundedBorder)
                     .monospacedDigit()

@@ -602,7 +602,7 @@ struct Upkeep: View {
             .foregroundStyle(.tertiary)
             .disabled(!shop.canMoveJobs)
             .accessibilityLabel(shop.words.callIt("common.edit"))
-            .sheet(isPresented: $editing) {
+            .shopSheet(isPresented: $editing) {
                 MaintenanceTaskSheet(shop: shop, machine: machine, existing: task)
             }
             .askFirst($deleting,
