@@ -7437,6 +7437,40 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.77] - 2026-10-17
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Widgets for your desktop and Notification Centre, and a library that stays
+quick with thousands of models.
+
+### Added
+
+- **Widgets.** Right-click the desktop, choose Edit Widgets and search for
+  Khayt.
+  - **Printing now** shows each busy printer with its progress and the time
+    left. It comes in small and medium.
+  - **Today** shows the jobs due today, the jobs running late and the money
+    owed to you.
+  - Both come in English and Arabic, light and dark.
+  - The widgets show what Khayt last saw, so they keep working when Khayt is
+    closed. A print stops counting down once its finish time passes. After
+    midnight, Today shows dashes until Khayt is opened again.
+  - No customer names leave the app. The sample shop and a locked app show
+    "Open Khayt".
+
+### Fixed
+
+- **The library is quick with a large collection.** On a library of 5,000
+  models:
+  - Clicking a model used to take about a quarter of a second and is now
+    instant.
+  - Each letter typed in the search took up to half a second and now takes
+    a few hundredths.
+  - Thumbnails load in the background, and each one is checked on disk once
+    rather than on every redraw.
+
 ## [4.0.0-alpha.76] - 2026-10-16
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
