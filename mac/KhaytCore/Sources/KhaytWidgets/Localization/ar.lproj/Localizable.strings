@@ -1,0 +1,17 @@
+/* ما يظهر في معرض الأدوات وفي أداة فارغة. */
+"widget.printing.name" = "قيد الطباعة الآن";
+"widget.printing.description" = "تقدّم طابعاتك ومتى تنتهي كل واحدة.";
+"widget.today.name" = "اليوم";
+"widget.today.description" = "الأعمال المستحقة اليوم، والمتأخرة، والمبالغ المستحقة لك.";
+"widget.open_khayt" = "افتح خيط لعرض ورشتك هنا.";
+"widget.word.printingTitle" = "قيد الطباعة الآن";
+"widget.word.nothingPrinting" = "لا شيء قيد الطباعة";
+"widget.word.idleMachines" = "كل الطابعات متاحة";
+"widget.word.noMachines" = "لا توجد طابعات في الدفتر بعد";
+"widget.word.paused" = "متوقفة مؤقتًا";
+"widget.word.todayTitle" = "اليوم";
+"widget.word.dueToday" = "مستحقة اليوم";
+"widget.word.overdue" = "متأخرة";
+"widget.word.owed" = "المستحق";
+"widget.word.updated" = "حُدّث";
+"widget.word.more" = "+{n} أخرى";

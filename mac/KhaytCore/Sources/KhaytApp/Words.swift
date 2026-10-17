@@ -2083,6 +2083,17 @@ final class Words {
         "mac.goto_hint":     ["en": "\u{2191}\u{2193} to move · \u{21A9} to open · esc to close",
                               "ar": "\u{2191}\u{2193} للتنقّل · \u{21A9} للفتح · esc للإغلاق"],
         "mac.quick_look":    ["en": "Quick Look",     "ar": "نظرة سريعة"],
+        // The desktop widgets (`WidgetFeed`). Written into the widget's file in
+        // the book's language, because the widget has no catalogue of its own.
+        "mac.widget_printing":  ["en": "Printing now",          "ar": "قيد الطباعة الآن"],
+        "mac.widget_idle":      ["en": "Every printer is free", "ar": "كل الطابعات متاحة"],
+        "mac.widget_paused":    ["en": "Paused",                "ar": "متوقفة مؤقتًا"],
+        "mac.widget_today":     ["en": "Today",                 "ar": "اليوم"],
+        "mac.widget_due_today": ["en": "Due today",             "ar": "مستحقة اليوم"],
+        "mac.widget_late":      ["en": "Late",                  "ar": "متأخرة"],
+        "mac.widget_owed":      ["en": "Owed",                  "ar": "المستحق"],
+        "mac.widget_updated":   ["en": "Updated",               "ar": "حُدّث"],
+        "mac.widget_more":      ["en": "+{n} more",             "ar": "+{n} أخرى"],
         // ── The sidebar's own names for three screens ────────────────────────
         //
         // Khayt calls them "Expense Tracker", "Failed Prints & Waste Log" and

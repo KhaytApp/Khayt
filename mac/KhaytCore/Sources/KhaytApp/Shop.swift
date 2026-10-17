@@ -1196,6 +1196,9 @@ final class Shop {
             // so a book that reloads unchanged costs one string comparison —
             // and takes the library back OUT when the sample is opened.
             Spotlight.shared.reindex(shop: self)
+            // The desktop widgets, for the same reason and on the same terms:
+            // the sample and a locked book take away what was there.
+            WidgetFeed.shared.update(shop: self)
             // A model chosen in Spotlight before the book was open.
             answerPendingReveal()
             // What the chosen site shows, worked out again: the book may have
@@ -1236,6 +1239,7 @@ final class Shop {
     /// would be paying for the wrong thing.
     func printersAnswered() async {
         await publishLivePrinters()
+        WidgetFeed.shared.update(shop: self)
         guard let engine, !machineRows.isEmpty else { return }
         facts = try? await engine.dashboardFacts(orders: orderRows, machines: machineRows,
                                                  settings: kpiSettings.isEmpty ? settingsDict : kpiSettings,

@@ -1,0 +1,19 @@
+/* What the widget gallery and an empty widget say. Everything a widget shows
+   about a shop comes from the app, in the book's own language; these are only
+   the words needed before the app has written anything. */
+"widget.printing.name" = "Printing now";
+"widget.printing.description" = "Your printers' progress and when each one finishes.";
+"widget.today.name" = "Today";
+"widget.today.description" = "Jobs due today, jobs running late, and what you are owed.";
+"widget.open_khayt" = "Open Khayt to show your shop here.";
+"widget.word.printingTitle" = "Printing now";
+"widget.word.nothingPrinting" = "Nothing on the beds";
+"widget.word.idleMachines" = "Every printer is free";
+"widget.word.noMachines" = "No printers in the book yet";
+"widget.word.paused" = "Paused";
+"widget.word.todayTitle" = "Today";
+"widget.word.dueToday" = "Due today";
+"widget.word.overdue" = "Late";
+"widget.word.owed" = "Owed";
+"widget.word.updated" = "Updated";
+"widget.word.more" = "+{n} more";

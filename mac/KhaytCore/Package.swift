@@ -83,6 +83,9 @@ let package = Package(
         // slicer was told to do with it. Its own bundle for the same reason the
         // thumbnail is — one extension point per .appex.
         .executable(name: "KhaytPreview", targets: ["KhaytPreview"]),
+        // The desktop widgets — Printing now, and Today. A third .appex, on
+        // `com.apple.widgetkit-extension`, assembled by `make-app.sh`.
+        .executable(name: "KhaytWidgets", targets: ["KhaytWidgets"]),
     ],
     // ── SPARKLE, AND WHY A DEPENDENCY AT ALL ─────────────────────────────
     //
@@ -107,7 +110,7 @@ let package = Package(
         // write and swaps the file atomically. `Resources` carries the sample
         // shop and the invoice's stylesheet, synced from the renderer.
         .executableTarget(name: "KhaytApp",
-                          dependencies: ["KhaytCore",
+                          dependencies: ["KhaytCore", "KhaytWidgetData",
                                          .product(name: "Sparkle", package: "Sparkle")],
                           resources: [
                               .process("Resources"),
@@ -189,6 +192,52 @@ let package = Package(
                           ]),
         .testTarget(name: "KhaytPreviewTests",
                     dependencies: ["KhaytPreview", "KhaytCore"]),
+        // The desktop widgets. NOT shaped like the two extensions above, and
+        // the difference is the whole lesson of this target:
+        //
+        // A Quick Look extension must have no Swift entry point. A widget
+        // extension must HAVE one — its extension point prohibits a principal
+        // class, and the `WidgetBundle`'s `@main` is what WidgetKit starts.
+        // Apple's own widgets carry `LC_MAIN` and `__swift5_entry`; so does
+        // this, and `WidgetExtensionTests` checks the built binary both ways.
+        //
+        // `-parse-as-library` because `@main` may not sit beside top-level
+        // code, and there is none. The linker's ordinary `_main` is right here,
+        // so there is no `-e` to name.
+        //
+        // It reads one JSON file the app writes into the App Group container
+        // (`ShopWidgetSnapshot`). It never opens the book, has no engine, and
+        // needs none of KhaytCore — linked against KhaytCore it came out at
+        // 10 MB for a process macOS keeps resident on the desktop, so the one
+        // type both sides share is its own small target instead. The `.lproj`
+        // folders are copied into the .appex by `make-app.sh`, which is why
+        // they are excluded here rather than declared as resources: SwiftPM
+        // would put them in a `Bundle.module` that `Text("key")` never reads.
+        .target(name: "KhaytWidgetData"),
+        // What the widgets draw, apart from the extension so the tests can
+        // render it (`WidgetRenderTests`) — nothing else ever sees it.
+        .target(name: "KhaytWidgetViews", dependencies: ["KhaytWidgetData"]),
+        //
+        // ── AND THE PROCESS STARTS IN `NSExtensionMain`, NOT IN THAT `main` ──
+        //
+        // The `@main` is needed (it is what `__swift5_entry` points at), but
+        // it must not be the first thing run. Xcode links every extension
+        // with `-e _NSExtensionMain` — Apple's Calculator widget imports
+        // exactly that symbol — and `NSExtensionMain` → `EXExtensionMain`
+        // records the launch arguments before handing over to the Swift entry.
+        // Linked with the ordinary `_main`, WidgetKit's bootstrap found
+        // `ExtensionMain.launchArguments` nil and trapped (EXC_BREAKPOINT in
+        // `_EXRunningExtension._shared`) the moment chronod first asked the
+        // gallery's question, every time (alpha.77 widget proof).
+        .executableTarget(name: "KhaytWidgets", dependencies: ["KhaytWidgetData", "KhaytWidgetViews"],
+                          exclude: ["Localization"],
+                          swiftSettings: [
+                              .unsafeFlags(["-parse-as-library"]),
+                          ],
+                          linkerSettings: [
+                              .linkedFramework("Foundation"),
+                              .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"]),
+                          ]),
         // ── THE LIBRARY, ANSWERABLE BY AN ASSISTANT ──────────────────────
         //
         // A Model Context Protocol server: Claude Desktop, Cursor and Codex
@@ -208,7 +257,7 @@ let package = Package(
         // finds it by `#filePath`, not as a bundled resource. Excluded rather
         // than declared, so SwiftPM stops calling it an unhandled file and the
         // shipping app does not carry a copy of a test server.
-        .testTarget(name: "KhaytAppTests", dependencies: ["KhaytApp", "KhaytCore"],
+        .testTarget(name: "KhaytAppTests", dependencies: ["KhaytApp", "KhaytCore", "KhaytWidgetData", "KhaytWidgetViews"],
                     exclude: ["Resources/fake-smtp.py"]),
     ]
 )
