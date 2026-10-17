@@ -3,6 +3,7 @@ import AppKit
 import WebKit
 import CoreSpotlight
 import KhaytCore
+import KhaytWidgetData
 
 /// Not `@main`: `main.swift` is the entry point, because the writing direction
 /// has to be settled before AppKit starts. See `Direction.swift`.
@@ -129,6 +130,8 @@ struct KhaytApp: App {
                     // A model dropped on the Dock icon before the book was
                     // open — the drop that launched the app.
                     await shop.takeOpenedFiles()
+                    // A widget's row clicked while the app was closed.
+                    shop.takeOpenedLinks()
                     // Opt-in crash reports and usage counts (#1789). Sends
                     // nothing unless the book says so; see `Telemetry`.
                     Telemetry.shared.start(shop: shop)
@@ -156,6 +159,10 @@ struct KhaytApp: App {
                 // A model dropped on the Dock icon while the app is open.
                 .onReceive(NotificationCenter.default.publisher(for: .khaytOpenedFiles)) { _ in
                     Task { await shop.takeOpenedFiles() }
+                }
+                // A desktop widget's row, clicked while the app is open.
+                .onReceive(NotificationCenter.default.publisher(for: .khaytOpenedLinks)) { _ in
+                    shop.takeOpenedLinks()
                 }
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     guard let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
@@ -199,10 +206,12 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// Finder: New Job, seeded from it — see `Shop.newJob(fromDropped:)`.
     /// Held on `Shop.openedFiles` because a drop can be what LAUNCHES the app,
     /// before the window or its book exists; the window takes them once the
-    /// book is open. Only model files are kept — this app declares no URL
-    /// scheme, and anything else has nothing here to open it.
+    /// book is open. Only model files are kept from files; the one URL scheme
+    /// the app declares, khayt://, is a desktop widget's row (`DeepLink`).
     func application(_ application: NSApplication, open urls: [URL]) {
-        let models = Shop.droppableModels(urls)
+        let links = urls.compactMap(ShopWidgetSnapshot.Link.init)
+        if !links.isEmpty { MainActor.assumeIsolated { Shop.openedLinks += links } }
+        let models = Shop.droppableModels(urls.filter(\.isFileURL))
         guard !models.isEmpty else { return }
         MainActor.assumeIsolated { Shop.openedFiles += models }
     }

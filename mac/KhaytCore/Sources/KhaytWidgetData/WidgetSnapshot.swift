@@ -48,6 +48,49 @@ public struct ShopWidgetSnapshot: Codable, Sendable, Equatable {
     /// figures under today's heading. Optional, so a file from before it
     /// still reads.
     public var dayEnds: Date?
+    /// Spools the app calls low (`Shop.lowSpools`, the inventory's own rule),
+    /// the emptiest first, at most `listLimit`. Nil in a file from before the
+    /// filament widget, which then says "Open Khayt" rather than "all stocked".
+    public var lowSpools: [LowSpool]?
+    /// How many spools are low in all, which may be more than are listed.
+    public var lowSpoolCount: Int?
+    /// The jobs waiting for a printer, in the board's own order (urgent, then
+    /// due date, then longest waiting), at most `listLimit`. No customer.
+    public var upNext: [QueuedJob]?
+    /// How many jobs are waiting in all.
+    public var queuedCount: Int?
+
+    /// The most rows any widget draws (the large one); the counts say the rest.
+    public static let listLimit = 6
+
+    public struct LowSpool: Codable, Sendable, Equatable, Identifiable {
+        public var id: String
+        /// "PLA Basic · Black", as the inventory names it.
+        public var name: String
+        /// "#RRGGBB", when the spool has a colour.
+        public var colour: String?
+        /// Grams left, rounded.
+        public var gramsLeft: Int
+
+        public init(id: String, name: String, colour: String?, gramsLeft: Int) {
+            self.id = id; self.name = name; self.colour = colour
+            self.gramsLeft = max(0, gramsLeft)
+        }
+    }
+
+    public struct QueuedJob: Codable, Sendable, Equatable, Identifiable {
+        public var id: String
+        /// What the job is — its project title. Never the customer.
+        public var title: String
+        /// The due day's start in the shop's calendar, when it has one.
+        public var due: Date?
+        public var late: Bool
+        public var urgent: Bool
+
+        public init(id: String, title: String, due: Date?, late: Bool, urgent: Bool) {
+            self.id = id; self.title = title; self.due = due; self.late = late; self.urgent = urgent
+        }
+    }
 
     public struct Printer: Codable, Sendable, Equatable, Identifiable {
         public var id: String
@@ -84,11 +127,13 @@ public struct ShopWidgetSnapshot: Codable, Sendable, Equatable {
     public enum Word: String, CaseIterable, Sendable {
         case printingTitle, nothingPrinting, idleMachines, noMachines, paused
         case todayTitle, dueToday, overdue, owed, updated, more
+        case filamentTitle, allStocked, grams, upNextTitle, queueEmpty, urgent, glanceTitle
     }
 
     public init(writtenAt: Date, shopName: String, language: String, rightToLeft: Bool,
                 words: [String: String], printing: [Printer], machineCount: Int, today: Today,
-                dayEnds: Date? = nil) {
+                dayEnds: Date? = nil, lowSpools: [LowSpool]? = nil, lowSpoolCount: Int? = nil,
+                upNext: [QueuedJob]? = nil, queuedCount: Int? = nil) {
         self.version = Self.currentVersion
         self.writtenAt = writtenAt
         self.shopName = shopName
@@ -99,6 +144,10 @@ public struct ShopWidgetSnapshot: Codable, Sendable, Equatable {
         self.machineCount = machineCount
         self.today = today
         self.dayEnds = dayEnds
+        self.lowSpools = lowSpools
+        self.lowSpoolCount = lowSpoolCount
+        self.upNext = upNext
+        self.queuedCount = queuedCount
     }
 
     public func word(_ w: Word) -> String { words[w.rawValue] ?? "" }
@@ -111,6 +160,56 @@ public struct ShopWidgetSnapshot: Codable, Sendable, Equatable {
     /// something. `Text(_, style: .relative)` past its date counts back up.
     public static func countsDown(to ends: Date?, at now: Date) -> Bool {
         ends.map { $0 > now } ?? false
+    }
+
+    // MARK: - Opening the app at a row
+
+    /// The address a widget row opens: `khayt://machine/<id>`, `job/<id>`,
+    /// `spool/<id>`, or `screen/<name>` for a whole widget. The app's handler
+    /// (`DeepLink`) reads these and nothing else.
+    public static let scheme = "khayt"
+
+    public enum Link: Equatable, Sendable {
+        case machine(String), job(String), spool(String), screen(String)
+
+        /// The id is ONE path segment, so a "/" in it is escaped rather than
+        /// read back as a second segment (which `init` refuses).
+        public var url: URL {
+            let (kind, id): (String, String) = switch self {
+            case .machine(let id): ("machine", id)
+            case .job(let id): ("job", id)
+            case .spool(let id): ("spool", id)
+            case .screen(let name): ("screen", name)
+            }
+            var segment = CharacterSet.urlPathAllowed
+            segment.remove("/")
+            var c = URLComponents()
+            c.scheme = ShopWidgetSnapshot.scheme
+            c.host = kind
+            c.percentEncodedPath = "/" + (id.addingPercentEncoding(withAllowedCharacters: segment) ?? "")
+            return c.url ?? URL(fileURLWithPath: "/")
+        }
+
+        /// The link in `url`, or nil for anything that is not exactly one of
+        /// ours: another scheme, an unknown kind, a query, an empty or nested id.
+        public init?(_ url: URL) {
+            guard url.scheme?.lowercased() == ShopWidgetSnapshot.scheme,
+                  let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  comps.query == nil, comps.fragment == nil, comps.user == nil,
+                  comps.password == nil, comps.port == nil else { return nil }
+            let parts = comps.percentEncodedPath.split(separator: "/", omittingEmptySubsequences: false).dropFirst()
+            guard parts.count == 1, let id = parts.first.flatMap({ String($0).removingPercentEncoding }),
+                  !id.isEmpty, id.count <= 200,
+                  !id.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+            else { return nil }
+            switch comps.host?.lowercased() {
+            case "machine": self = .machine(id)
+            case "job": self = .job(id)
+            case "spool": self = .spool(id)
+            case "screen": self = .screen(id)
+            default: return nil
+            }
+        }
     }
 
     // MARK: - On disk

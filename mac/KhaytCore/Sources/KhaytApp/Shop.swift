@@ -529,15 +529,20 @@ final class Shop {
         for (stage, jobs) in out {
             // Urgent first, then by due date, then by what has been waiting
             // longest — the order someone would work through them in.
-            out[stage] = jobs.sorted { a, b in
-                if a.priority != b.priority { return a.priority }
-                let da = Order.day(a.dueDate), db = Order.day(b.dueDate)
-                if let da, let db, da != db { return da < db }
-                if (da == nil) != (db == nil) { return da != nil }
-                return (a.day ?? .distantPast) < (b.day ?? .distantPast)
-            }
+            out[stage] = jobs.sorted(by: Self.boardOrder)
         }
         return out
+    }
+
+    /// The order a column is worked through: urgent first, then by due date,
+    /// then by what has been waiting longest. The desktop widget's "Up next"
+    /// is the waiting column in this same order (`WidgetFeed.upNext`).
+    nonisolated static func boardOrder(_ a: Order, _ b: Order) -> Bool {
+        if a.priority != b.priority { return a.priority }
+        let da = Order.day(a.dueDate), db = Order.day(b.dueDate)
+        if let da, let db, da != db { return da < db }
+        if (da == nil) != (db == nil) { return da != nil }
+        return (a.day ?? .distantPast) < (b.day ?? .distantPast)
     }
 
     /// The jobs that match what is typed in the search box, or all of them.

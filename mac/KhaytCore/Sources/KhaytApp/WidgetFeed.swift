@@ -93,6 +93,31 @@ final class WidgetFeed {
         }
     }
 
+    /// The spools the inventory calls low (`Shop.lowSpools`, worked out by the
+    /// shop's own threshold in `lib/`), the emptiest first.
+    static func lowSpools(_ spools: [Spool], low: Set<String>,
+                          name: (Spool) -> String) -> [ShopWidgetSnapshot.LowSpool] {
+        spools.filter { low.contains($0.id) }
+            .map { s in
+                let hex = s.color.flatMap { $0.hasPrefix("#") && $0.count == 7 ? $0 : nil }
+                return ShopWidgetSnapshot.LowSpool(id: s.id, name: name(s), colour: hex,
+                                                   gramsLeft: Int((s.weight ?? 0).rounded()))
+            }
+            .sorted { $0.gramsLeft != $1.gramsLeft ? $0.gramsLeft < $1.gramsLeft : $0.name < $1.name }
+    }
+
+    /// The jobs waiting for a printer — the board's waiting column, in the
+    /// board's order (`Shop.boardOrder`). Title only: never the customer.
+    static func upNext(_ orders: [Order], now: Date) -> [ShopWidgetSnapshot.QueuedJob] {
+        orders.filter { Stage.of($0) == .pending }
+            .sorted(by: Shop.boardOrder)
+            .map { o in
+                ShopWidgetSnapshot.QueuedJob(id: o.id, title: o.project.isEmpty ? o.id : o.project,
+                                             due: Order.day(o.dueDate), late: o.isOverdue(now: now),
+                                             urgent: o.priority)
+            }
+    }
+
     /// The words, in the app's language.
     static func words(_ words: Words) -> [String: String] {
         let keys: [ShopWidgetSnapshot.Word: String] = [
@@ -101,6 +126,10 @@ final class WidgetFeed {
             .paused: "mac.widget_paused", .todayTitle: "mac.widget_today",
             .dueToday: "mac.widget_due_today", .overdue: "mac.widget_late",
             .owed: "mac.widget_owed", .updated: "mac.widget_updated", .more: "mac.widget_more",
+            .filamentTitle: "mac.widget_filament", .allStocked: "mac.widget_all_stocked",
+            .grams: "mac.widget_grams", .upNextTitle: "mac.widget_up_next",
+            .queueEmpty: "mac.widget_queue_empty", .urgent: "mac.widget_urgent",
+            .glanceTitle: "mac.widget_glance",
         ]
         return Dictionary(uniqueKeysWithValues: keys.map { ($0.key.rawValue, words.callIt($0.value)) })
     }
@@ -119,6 +148,8 @@ final class WidgetFeed {
             return Heard(id: machine.id, name: machine.name, state: status.state,
                          progress: status.progress, timeRemaining: status.timeRemaining)
         }
+        let low = lowSpools(shop.spools, low: shop.lowSpools, name: shop.spoolName)
+        let queued = upNext(shop.orders, now: now)
         return ShopWidgetSnapshot(
             writtenAt: now, shopName: shop.shopName,
             language: shop.words.language, rightToLeft: shop.words.isRTL,
@@ -128,7 +159,9 @@ final class WidgetFeed {
             today: .init(dueToday: dueToday(shop.orders.map { (Stage.of($0), $0.dueDate) }, now: now),
                          overdue: shop.overdueCount,
                          owed: Money.short(shop.owed, shop.currency)),
-            dayEnds: Calendar.book.date(byAdding: .day, value: 1, to: Calendar.book.startOfDay(for: now)))
+            dayEnds: Calendar.book.date(byAdding: .day, value: 1, to: Calendar.book.startOfDay(for: now)),
+            lowSpools: Array(low.prefix(ShopWidgetSnapshot.listLimit)), lowSpoolCount: low.count,
+            upNext: Array(queued.prefix(ShopWidgetSnapshot.listLimit)), queuedCount: queued.count)
     }
 
     // MARK: - Writing it
