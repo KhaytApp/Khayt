@@ -336,6 +336,11 @@
    "productId": "PRD-0522F9",
    "qcStatus": "pass",
    "qcPassedAt": "2026-06-15T14:20:00Z",
+   "materialDeducted": true,
+   "materialDrawn": {
+    "spools": [{"spoolId": "sp-1", "grams": 752.84, "lot": "GB-2406-17"}],
+    "consumables": []
+   },
    "survey": {
     "rating": 2,
     "at": "2026-06-15T09:08:00Z"
@@ -4183,8 +4188,9 @@
   {
    "id": "sp-1",
    "locationId": "LOC-sample-ryd",
+   "lot": "GB-2406-17",
    "usageHistory": [
-    {"date": "2026-06-15", "project": "Kaaba desk piece", "orderId": "ORD-01002", "weightUsed": 752.84},
+    {"date": "2026-06-15", "project": "Kaaba desk piece", "orderId": "ORD-01002", "weightUsed": 752.84, "lot": "GB-2406-17"},
     {"date": "2026-08-29", "project": "Ramadan lantern", "orderId": "ORD-01016", "weightUsed": 232.02}
    ],
    "material": "PLA+ 2.0",

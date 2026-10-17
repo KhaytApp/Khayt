@@ -18,6 +18,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the Mac's pushes their address again in case it was lost.
 - **Mac: ⌘W closes the window again.** File ▸ Close had gone missing from the
   menu, so the shortcut did nothing.
+- **Mac: lot tracing — find every job printed from a filament lot.** Each
+  time a job takes filament off a spool, Khayt now records the spool's lot
+  (and the purchase order it came in on) with that draw. A finished job's
+  inspector has a **Filament used** section listing spool, lot and grams;
+  a lot Khayt only presumes from the spool's current lot (jobs printed
+  before this) is marked *(inferred)*. Typing a lot in the jobs search finds
+  the jobs that drew from it, a spool's **Where this went** shows the lot on
+  each row, and **Copy jobs from lot … as CSV** gives a recall list, failed
+  prints included. **Receiving a purchase order now asks for the lot**
+  (optional): a delivery with a different lot from the spool it was ordered
+  for, while that spool still has filament on it, becomes **its own spool**
+  instead of being added to the old one, so the two lots stay apart; a
+  second part delivery of that lot is added to the spool the first one made.
+  The spool editor's header shows the lot.
 
 - **Mac: Settings ▸ Overhead no longer crashes, and monthly cost amounts
   save.** Removing a cost line while its amount box was still being edited

@@ -287,12 +287,19 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
         let project: String
         let orderId: String
         let weightUsed: Double
+        /// The lot the spool had when this was drawn (or received), stamped
+        /// since lot tracing (`lib/order-deduction.js` `lotStamp`). Absent on
+        /// every row written before, which `lib/lot-trace.js` then INFERS
+        /// from the spool's current lot.
+        let lot: String?
+        /// `received` for an arrival against a purchase order; absent for a job.
+        let type: String?
 
         /// Made from the row rather than stored: the book writes no id here,
         /// and two deductions on one day for one job are two entries.
         var id: String { date + "|" + orderId + "|" + String(weightUsed) }
 
-        private enum CodingKeys: String, CodingKey { case date, project, orderId, weightUsed }
+        private enum CodingKeys: String, CodingKey { case date, project, orderId, weightUsed, lot, type }
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -300,6 +307,9 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
             project = ((try? c.decodeIfPresent(String.self, forKey: .project)) ?? nil) ?? ""
             orderId = ((try? c.decodeIfPresent(String.self, forKey: .orderId)) ?? nil) ?? ""
             weightUsed = ((try? c.decodeIfPresent(Double.self, forKey: .weightUsed)) ?? nil) ?? 0
+            lot = ((try? c.decodeIfPresent(String.self, forKey: .lot)) ?? nil)
+                .flatMap { let t = $0.trimmingCharacters(in: .whitespacesAndNewlines); return t.isEmpty ? nil : t }
+            type = ((try? c.decodeIfPresent(String.self, forKey: .type)) ?? nil)
         }
     }
 

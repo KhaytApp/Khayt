@@ -82,6 +82,13 @@ private struct Detail: View {
                     Divider()
                     parts
                 }
+                // Which spool and which LOT the filament came from — what a
+                // recall asks. Hidden when the job drew nothing.
+                let drawn = FilamentUsed.rows(for: job, spools: shop.spools)
+                if !drawn.isEmpty {
+                    Divider()
+                    FilamentUsedSection(shop: shop, rows: drawn)
+                }
                 // Who did it and the hours on it — for a shop with staff, or a
                 // job that already names somebody.
                 if JobStaffSection.shows(shop, job) {
