@@ -150,7 +150,7 @@ struct PrintHeadline: View {
         switch state.phase {
         case .printing:
             if let end = state.endsAt, end > Date() {
-                Text(timerInterval: Date()...end, countsDown: true)
+                PrintTimeLeft(end: end)
             } else {
                 Text(verbatim: PrintActivityText.percent(state.progress))
             }
@@ -163,6 +163,27 @@ struct PrintHeadline: View {
     }
 }
 
+/// The time left, counted down by the system to the minute. The Lock Screen
+/// stops ticking seconds while it sleeps and draws a seconds timer as
+/// "1:11:--", so this one never asks for seconds.
+struct PrintTimeLeft: View {
+    let end: Date
+    var body: some View {
+        Text(.currentDate, format: .timer(countingDownIn: Date()..<end, showsHours: true,
+                                          maxFieldCount: 2, maxPrecision: .seconds(60)))
+            .modifier(WesternDigits())
+    }
+}
+
+/// Western digits in Arabic too, as everywhere in Khayt. The system draws
+/// these figures in the phone's own locale, which in Arabic writes ٠–٩.
+struct WesternDigits: ViewModifier {
+    @Environment(\.locale) private var locale
+    func body(content: Content) -> some View {
+        content.environment(\.locale, PrintActivityText.latinDigits(locale))
+    }
+}
+
 /// When it ends, as a clock time — only while that is still ahead.
 struct PrintEnds: View {
     let state: PrintActivityAttributes.ContentState
@@ -171,6 +192,7 @@ struct PrintEnds: View {
     var body: some View {
         if state.phase == .printing, let end = state.endsAt, end > Date() {
             Text("Ends \(Text(end, style: .time))", bundle: bundle)
+                .modifier(WesternDigits())
         }
     }
 }
@@ -184,8 +206,8 @@ struct PrintBar: View {
     let state: PrintActivityAttributes.ContentState
 
     var body: some View {
-        if state.phase == .printing, let start = state.startedAt, let end = state.endsAt, end > start {
-            ProgressView(timerInterval: start...end, countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
+        if state.phase == .printing, let range = PrintActivityText.barRange(state) {
+            ProgressView(timerInterval: range, countsDown: false) { EmptyView() } currentValueLabel: { EmptyView() }
                 .progressViewStyle(.linear)
                 .tint(PrintActivityLook.tone(state.phase))
                 .scaleEffect(x: 1, y: 1.6, anchor: .center)
@@ -205,6 +227,27 @@ struct PrintBar: View {
 
 /// Small words and figures the views share.
 enum PrintActivityText {
+    /// `base` with 0–9 digits; month names and plural rules stay its own.
+    /// The same rule as the app's `L10n.latinDigits`, which the widget cannot see.
+    static func latinDigits(_ base: Locale) -> Locale {
+        var parts = Locale.Components(locale: base)
+        parts.numberingSystem = Locale.NumberingSystem("latn")
+        return Locale(components: parts)
+    }
+
+    /// The span the system's self-filling bar runs over while printing. The
+    /// start is put back so the bar stands at the reported percent now:
+    /// `startedAt` is when the phone first SAW the print, so a print first seen
+    /// at 45% would otherwise draw an empty bar beside "45%".
+    static func barRange(_ state: PrintActivityAttributes.ContentState,
+                         now: Date = Date()) -> ClosedRange<Date>? {
+        guard state.phase == .printing, let end = state.endsAt, end > now else { return nil }
+        let done = Double(min(99, max(0, state.progress))) / 100
+        var start = now.addingTimeInterval(-end.timeIntervalSince(now) * done / (1 - done))
+        if done == 0, let seen = state.startedAt, seen < now { start = seen }
+        return start...end
+    }
+
     /// Western digits in both languages, as everywhere else in Khayt.
     static func percent(_ n: Int) -> String { "\(min(100, max(0, n)))%" }
 

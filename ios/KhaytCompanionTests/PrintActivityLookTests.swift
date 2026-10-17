@@ -70,4 +70,27 @@ final class PrintActivityLookTests: XCTestCase {
         XCTAssertEqual(PrintActivityText.percent(140), "100%")
         XCTAssertEqual(PrintActivityText.percent(-3), "0%")
     }
+
+    func testTheBarStandsAtTheReportedPercentWhenFirstSeenMidPrint() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let seen = PrintActivityAttributes.ContentState(phase: .printing, job: nil, progress: 45,
+                                                        startedAt: now, endsAt: now.addingTimeInterval(55 * 60))
+        let range = try XCTUnwrap(PrintActivityText.barRange(seen, now: now))
+        let filled = now.timeIntervalSince(range.lowerBound) / range.upperBound.timeIntervalSince(range.lowerBound)
+        XCTAssertEqual(filled, 0.45, accuracy: 0.001, "first seen at 45%, not an empty bar")
+
+        var fresh = seen; fresh.progress = 0; fresh.startedAt = now.addingTimeInterval(-60)
+        XCTAssertEqual(PrintActivityText.barRange(fresh, now: now)?.lowerBound, fresh.startedAt)
+        var over = seen; over.endsAt = now.addingTimeInterval(-1)
+        XCTAssertNil(PrintActivityText.barRange(over, now: now), "past its end: the drawn bar instead")
+        XCTAssertNil(PrintActivityText.barRange(state(.paused), now: now))
+    }
+
+    func testTheTimeLeftAndEndTimeUseWesternDigitsInArabic() {
+        let ar = PrintActivityText.latinDigits(Locale(identifier: "ar_SA"))
+        XCTAssertEqual(ar.numberingSystem.identifier, "latn")
+        XCTAssertEqual(ar.language.languageCode, .arabic, "still Arabic words and plurals")
+        let time = Date(timeIntervalSince1970: 0).formatted(.dateTime.hour().minute().locale(ar))
+        XCTAssertFalse(time.contains { "٠١٢٣٤٥٦٧٨٩".contains($0) }, time)
+    }
 }
