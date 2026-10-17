@@ -360,6 +360,7 @@ enum Feedback {
     private static func stamp() -> String {
         let format = DateFormatter()
         format.locale = Locale(identifier: "en_US_POSIX")
+        format.calendar = .book
         format.dateFormat = "yyyy-MM-dd-HHmmss"
         return format.string(from: Date())
     }

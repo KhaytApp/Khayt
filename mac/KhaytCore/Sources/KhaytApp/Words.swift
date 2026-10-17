@@ -4324,8 +4324,16 @@ extension Words {
     /// so `.dateTime.day().month(.abbreviated)` and
     /// `Date.FormatStyle(date: .abbreviated, time: .shortened)` both go
     /// through it — which is what lets a test find the ones that do not.
+    ///
+    /// In the BOOK's calendar, Gregorian. A style left alone takes the Mac's
+    /// calendar, and on a Mac set to Umm al-Qura every date Khayt showed read
+    /// "Safar 1448 AH" — while the book, the invoices and the other app say
+    /// September 2026 (Oct 2026). The language is the shop's; the calendar is
+    /// the book's, the same split `Calendar.book` makes for stored days.
     func say(_ date: Date, _ style: Date.FormatStyle) -> String {
-        date.formatted(style.locale(locale))
+        var style = style
+        style.calendar = .book
+        return date.formatted(style.locale(locale))
     }
 
     /// The currency menu, in the shop's language and sorted in it.

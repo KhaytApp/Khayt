@@ -1584,7 +1584,7 @@ import KhaytCore
         let shop = Shop()
         await shop.load(.sample)
         let engine = try #require(shop.engine)
-        let cal = Calendar.current
+        let cal = Calendar.book
 
         let spending = try await engine.expenseCategories(shop.expenseRows,
                                                           reclaimsTax: shop.reclaimsTax)

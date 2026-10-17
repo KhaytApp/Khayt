@@ -586,9 +586,11 @@ struct Reports: View {
         let since = Calendar.book.date(byAdding: .day, value: -90, to: Date()) ?? Date()
         let day = DateFormatter()
         day.locale = Locale(identifier: "en_US_POSIX")
+        day.calendar = .book
         day.dateFormat = "yyyy-MM-dd"
         let month = DateFormatter()
         month.locale = Locale(identifier: "en_US_POSIX")
+        month.calendar = .book
         month.dateFormat = "yyyy-MM"
 
         // Finished, unvoided, and business — the same set the quarters count,
@@ -614,6 +616,7 @@ struct Reports: View {
         guard let engine = shop.engine else { return }
         let month = DateFormatter()
         month.locale = Locale(identifier: "en_US_POSIX")
+        month.calendar = .book
         month.dateFormat = "yyyy-MM"
         // SIX MONTHS, the same window the other app draws. Long enough to show
         // a season and short enough that each column is still readable at the

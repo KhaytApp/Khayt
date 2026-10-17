@@ -60,7 +60,7 @@ struct BackupTests {
 
     @Test("the file is named for the day, so it sorts and Khayt recognises it")
     func naming() {
-        let day = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 6))!
+        let day = Calendar.book.date(from: DateComponents(year: 2026, month: 9, day: 6))!
         #expect(Backups.filename(for: day) == "2026-09-06.json")
     }
 
@@ -130,7 +130,7 @@ struct BackupTests {
         let day = Backups.filename()
         try Data(#"{"the":"morning copy"}"#.utf8).write(to: backups.appending(path: day))
 
-        let now = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 4,
+        let now = Calendar.book.date(from: DateComponents(year: 2026, month: 9, day: 4,
                                                              hour: 14, minute: 35))!
         let stamped = Shop.today(now) + "-1435.json"
         try Data(#"{"printLog":[]}"#.utf8).write(to: backups.appending(path: stamped))

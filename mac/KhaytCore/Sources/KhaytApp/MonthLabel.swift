@@ -43,7 +43,11 @@ extension MonthLabel {
         calendar.locale = locale
         guard let date = calendar.date(from: DateComponents(year: year, month: month, day: 1))
         else { return key }
-        return date.formatted(.dateTime.month(.wide).year().locale(locale))
+        // The book's calendar, or a Mac set to Umm al-Qura names a Gregorian
+        // month by the Hijri one it falls in ("Safar 1448 AH").
+        var style = Date.FormatStyle.dateTime.month(.wide).year()
+        style.calendar = .book
+        return date.formatted(style.locale(locale))
     }
 
     /// What a chart is showing: the months it covers, or the one being pointed

@@ -87,7 +87,7 @@ struct SampleBookAgesTests {
     @Test("every date in the book moves, and by the same number of days")
     func theWholeBookMoves() throws {
         let anchor = try #require(SampleBook.anchor)
-        let later = try #require(Calendar.current.date(byAdding: .day, value: 400, to: anchor))
+        let later = try #require(Calendar.book.date(byAdding: .day, value: 400, to: anchor))
         let moved = SampleBook.rebased(try Self.rawBook(), to: later)
         let before = Self.everyDay(in: .object(try Self.rawBook())).sorted()
         let after = Self.everyDay(in: .object(moved)).sorted()
@@ -97,7 +97,7 @@ struct SampleBookAgesTests {
         // sample book that contradicts itself, so the check is that EVERY date
         // moved by the same amount rather than that the queue looks right.
         let gaps = Set(zip(before, after).map { a, b in
-            Calendar.current.dateComponents(
+            Calendar.book.dateComponents(
                 [.day], from: DateFormatter.shopDay.date(from: String(a.prefix(10))) ?? Date(),
                 to: DateFormatter.shopDay.date(from: String(b.prefix(10))) ?? Date()).day ?? -1
         })
@@ -135,7 +135,7 @@ struct SampleBookAgesTests {
           arguments: sampleDaysOut)
     func theQueueStraddles(_ out: Int) async throws {
         let anchor = try #require(SampleBook.anchor)
-        let day = try #require(Calendar.current.date(byAdding: .day, value: out, to: anchor))
+        let day = try #require(Calendar.book.date(byAdding: .day, value: out, to: anchor))
         let today = DateFormatter.shopDay.string(from: day)
         let shop = try await Self.shop(on: day)
         let onTheFloor: Set<String> = ["pending", "printing", "post", "qc", "on_hold"]
@@ -152,7 +152,7 @@ struct SampleBookAgesTests {
           arguments: sampleDaysOut)
     func theCaseSurvives(_ out: Int) async throws {
         let anchor = try #require(SampleBook.anchor)
-        let day = try #require(Calendar.current.date(byAdding: .day, value: out, to: anchor))
+        let day = try #require(Calendar.book.date(byAdding: .day, value: out, to: anchor))
         let today = DateFormatter.shopDay.string(from: day)
         let shop = try await Self.shop(on: day)
         let timeline = try #require(shop.timeline, "nothing on the floor to project")
@@ -171,14 +171,14 @@ struct SampleBookAgesTests {
         // by exactly one day.
         for job in risky {
             let earliest = DateFormatter.shopDay.string(from:
-                Calendar.current.date(byAdding: .day, value: Self.slack,
+                Calendar.book.date(byAdding: .day, value: Self.slack,
                                       to: Order.day(job.dueDate) ?? day) ?? day)
             #expect(job.etaDate >= earliest, Comment(rawValue:
                 "\(out) days out, \(job.id) is projected ready \(job.etaDate) against a due "
                 + "date of \(job.dueDate) — under \(Self.slack) days of slack, so a machine "
                 + "a day behind this one will not see it as at risk at all"))
             let latest = DateFormatter.shopDay.string(from:
-                Calendar.current.date(byAdding: .day, value: Self.slack, to: day) ?? day)
+                Calendar.book.date(byAdding: .day, value: Self.slack, to: day) ?? day)
             #expect(job.dueDate >= latest, Comment(rawValue:
                 "\(out) days out, \(job.id) is due \(job.dueDate), under \(Self.slack) days "
                 + "away — a machine a day ahead of this one reads it as already late"))

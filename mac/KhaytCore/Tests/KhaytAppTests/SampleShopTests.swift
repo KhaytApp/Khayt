@@ -734,7 +734,7 @@ extension SampleShopTests {
     func downtimeSpan() async throws {
         let engine = try KhaytEngine()
         let machines = Shop.rows(try Self.book(), "machines")
-        let calendar = Calendar.current
+        let calendar = Calendar.book
         var periods: [(from: Date, to: Date)] = []
         for back in stride(from: 2, through: 0, by: -1) {
             guard let day = calendar.date(byAdding: .month, value: -back, to: Date()),
@@ -816,7 +816,7 @@ extension SampleShopTests {
         let orders = Shop.rows(try Self.book(), "printLog")
         // The same six months `Reports.recomputeRatings` asks for.
         var months: [String] = []
-        let calendar = Calendar.current
+        let calendar = Calendar.book
         for back in stride(from: 5, through: 0, by: -1) {
             guard let month = calendar.date(byAdding: .month, value: -back, to: Date()),
                   let year = calendar.dateComponents([.year], from: month).year,
