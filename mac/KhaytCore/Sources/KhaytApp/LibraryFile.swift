@@ -181,11 +181,17 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
 
     /// `matches(search:)` for a query `SearchText.fold` has already folded.
     func matches(folded q: String) -> Bool {
+        searchFields.contains { !$0.isEmpty && SearchText.containsFolded($0, q) }
+    }
+
+    /// What the search reads, unfolded. One list, so the library's memoised
+    /// search (`LibraryMemo.folded`) folds exactly what this reads.
+    var searchFields: [String] {
         var fields = [title, material ?? "", creator ?? "", originalName ?? "",
                       sourceFile?.filename ?? "", sourceFile?.originalName ?? ""]
         if let path = externalPath, !path.isEmpty { fields.append((path as NSString).lastPathComponent) }
         fields.append(contentsOf: tags ?? [])
-        return fields.contains { !$0.isEmpty && SearchText.containsFolded($0, q) }
+        return fields
     }
 
     var printCount: Int { timesPrinted ?? 0 }

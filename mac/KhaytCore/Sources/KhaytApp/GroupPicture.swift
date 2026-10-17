@@ -107,7 +107,7 @@ extension Shop {
                 return .file(url)
             }
         case .model(let id)?:
-            if let model = files.first(where: { $0.id == id && Self.isUnder($0.groupName, path) }),
+            if let model = libraryFile(id: id), Self.isUnder(model.groupName, path),
                let shown = thumbnail(for: model) {
                 return shown
             }

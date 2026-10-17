@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 
 /// The vocabulary an inspector is written in.
 ///
@@ -171,20 +172,59 @@ enum ThumbnailSource: Hashable, Sendable {
 
 actor ThumbnailStore {
     static let shared = ThumbnailStore()
-    private var cache: [ThumbnailSource: NSImage] = [:]
 
-    func image(for source: ThumbnailSource) -> NSImage? {
-        if let hit = cache[source] { return hit }
-        let made = Self.decode(source)
-        if let made { cache[source] = made }
+    /// How many pictures are kept. A tile draws at most ~330 px and the
+    /// right-click preview 640, so each is decoded to fit 640 — about 1.6 MB
+    /// as a bitmap — and 400 of them cover several screens of scrolling back
+    /// without a 5,000-model library holding every picture it ever showed.
+    static let limit = 400
+    /// The longest side a picture is decoded to.
+    static let maxPixels = 640
+
+    private var cache: [ThumbnailSource: (image: NSImage, used: Int)] = [:]
+    private var clock = 0
+    /// Decodes, counted — for the test that proves a second ask is a hit.
+    private(set) var decodes = 0
+
+    func image(for source: ThumbnailSource) async -> NSImage? {
+        clock &+= 1
+        if let hit = cache[source] {
+            cache[source] = (hit.image, clock)
+            return hit.image
+        }
+        decodes += 1
+        // Decoded on a global queue, never on the actor's thread or the
+        // main one: a JPEG is real work, and blocking work inside a Swift
+        // task starves the cooperative pool (memory: swift-pool-starvation).
+        let made = await withCheckedContinuation { (done: CheckedContinuation<NSImage?, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async { done.resume(returning: Self.decode(source)) }
+        }
+        if let made {
+            clock &+= 1
+            cache[source] = (made, clock)
+            if cache.count > Self.limit { evict() }
+        }
         return made
     }
 
+    /// Drop the least recently used quarter, so eviction is not paid on
+    /// every picture once the cache is full.
+    private func evict() {
+        let keep = Self.limit * 3 / 4
+        let order = cache.sorted { $0.value.used > $1.value.used }
+        cache = Dictionary(uniqueKeysWithValues: order.prefix(keep).map { ($0.key, $0.value) })
+    }
+
+    var count: Int { cache.count }
+
+    /// Read and decode, scaled to fit `maxPixels`. ImageIO decodes at that
+    /// size directly, rather than holding a full-size camera photo for a
+    /// 150-point tile.
     nonisolated static func decode(_ source: ThumbnailSource) -> NSImage? {
-        let made: NSImage?
+        let image: CGImageSource?
         switch source {
         case .file(let url):
-            made = NSImage(contentsOf: url)
+            image = CGImageSourceCreateWithURL(url as CFURL, nil)
         case .inlineData(let uri):
             // `data:[<mediatype>][;base64],<data>` — anything else is not ours.
             guard let comma = uri.firstIndex(of: ","),
@@ -192,8 +232,16 @@ actor ThumbnailStore {
                   let data = Data(base64Encoded: String(uri[uri.index(after: comma)...])) else {
                 return nil
             }
-            made = NSImage(data: data)
+            image = CGImageSourceCreateWithData(data as CFData, nil)
         }
-        return made
+        guard let image else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixels,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(image, 0, options as CFDictionary) else { return nil }
+        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
     }
 }

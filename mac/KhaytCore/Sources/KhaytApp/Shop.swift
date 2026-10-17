@@ -47,7 +47,7 @@ final class Shop {
     // Each one bumps `bookRevision`, which is how ⌘K knows its index is stale
     // (`Shop+GoTo.swift`) without being rebuilt on every keystroke.
     private(set) var orders: [Order] = [] { didSet { bookRevision &+= 1 } }
-    private(set) var files: [LibraryFile] = [] { didSet { bookRevision &+= 1 } }
+    private(set) var files: [LibraryFile] = [] { didSet { bookRevision &+= 1; filesRevision &+= 1 } }
 
     /// The library on screen, patched in place by a library edit
     /// (`Shop+LibraryWrites.swift`) rather than by reloading the whole book.
@@ -392,6 +392,9 @@ final class Shop {
             // on all of them. That is how a shop lost a 34-model group to a
             // delete it never chose (27 Sep 2026).
             clearLibrarySelection()
+            // Opening the library looks at the disk again: a drive mounted or
+            // a thumbnail written since is found on the first draw.
+            if case .library = shelf, !oldValue.isLibrary { forgetLibraryDisk() }
             if case .library = shelf { recountLibrarySoon() }
             else if case .library = oldValue { recountLibrarySoon() }
         }
@@ -611,6 +614,19 @@ final class Shop {
     /// How many times that index has been built — for the test that proves
     /// typing does not rebuild it.
     @ObservationIgnored var goToBuilds = 0
+
+    /// The library's derived lists and its thumbnail answers, kept between
+    /// draws (`Shop+LibraryMemo.swift`). A reference, so filling it from a
+    /// getter is not a change anything observes.
+    @ObservationIgnored let libraryMemo = LibraryMemo()
+    /// Moved by every change to `files`; what the memo is keyed on.
+    @ObservationIgnored private(set) var filesRevision = 0
+    /// Moved when `readyByMachine`, `duplicateOf` or the group kinds change.
+    @ObservationIgnored private(set) var libraryDerivedRevision = 0
+    /// Moved when the thumbnails on disk should be looked at again: the
+    /// library opened, or the app came back to the front. Observed, so the
+    /// drawn tiles ask again.
+    var libraryDiskEpoch = 0
 
     /// Library edits on screen and not yet written (`Shop+LibraryWrites`).
     @ObservationIgnored var pendingLibraryChanges: [PendingLibraryChange] = []
@@ -1528,7 +1544,7 @@ final class Shop {
 
     /// The library's group kinds, by path, as the book's settings hold them.
     /// See `GroupKind`.
-    internal(set) var libraryGroupKinds: [String: GroupKind] = [:]
+    internal(set) var libraryGroupKinds: [String: GroupKind] = [:] { didSet { libraryDerivedRevision &+= 1 } }
     /// The pictures the shop chose for its groups, by path. See `GroupCover`.
     internal(set) var libraryGroupCovers: [String: GroupCover] = [:]
 
@@ -2614,10 +2630,10 @@ final class Shop {
     /// Models that are the same file, or the same mesh, as another.
     var libraryDuplicatesOnly = false { didSet { libraryViewChanged() } }
     /// Which models are ready on which machine, from the last recount.
-    var readyByMachine: [String: Set<String>] = [:]
+    var readyByMachine: [String: Set<String>] = [:] { didSet { libraryDerivedRevision &+= 1 } }
 
     /// Recomputed with the facets; the grid's filter and the inspector read it.
-    var duplicateOf: [String: String] = [:]
+    var duplicateOf: [String: String] = [:] { didSet { libraryDerivedRevision &+= 1 } }
 
     /// Where a selection run started, and where the keyboard is standing.
     var anchor: LibraryFile.ID?

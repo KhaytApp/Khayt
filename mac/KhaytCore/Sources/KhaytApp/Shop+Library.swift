@@ -1557,12 +1557,8 @@ extension Shop {
         // THE ONE BUILDER of what the grid draws: the selection
         // (`visibleFiles`) is read from this list, so a new way of drawing
         // the library belongs here and nowhere else. See `libraryShowsFlat`.
-        guard !libraryShowsFlat, case .library(let group) = shelf else {
-            return shownFiles.map { LibraryEntry.file($0) }
-        }
-        return Self.libraryEntries(shownFiles, under: group, flat: libraryFlat,
-                                   showingMatches: libraryShowsMatches, kinds: libraryGroupKinds,
-                                   order: librarySort.order)
+        // Built in `memoEntries`, once per change to what it depends on.
+        memoEntries().entries
     }
 
     /// The library's tiles, without a shop around it, so it can be tested on
@@ -1773,10 +1769,14 @@ extension Shop {
             ready.append(.init(machineId: machine.id, machineName: machine.name, count: count))
         }
         guard mine == libraryRecount else { return }
-        readyByMachine = byMachine
+        // Only when they moved: each is observed and in the library's memo
+        // key, so writing the same answer back redrew the grid and rebuilt
+        // its lists after every key typed.
+        if byMachine != readyByMachine { readyByMachine = byMachine }
         // The three counted in Swift, over the same pool: the ids the other
         // axes leave, each skipping its own.
-        duplicateOf = Self.duplicateGroups(files)
+        let copies = Self.duplicateGroups(files)
+        if copies != duplicateOf { duplicateOf = copies }
         func ids(_ axis: LibraryAxis) -> Set<String> {
             Set(libraryPool(skipping: axis).map { Self.rowText($0, "id") })
         }
@@ -1790,9 +1790,10 @@ extension Shop {
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.name < $1.name }
         let printNext = ids(.printNext).count { byId[$0]?.isPrintNext == true }
         let dupes = ids(.duplicates).count { duplicateOf[$0] != nil }
-        libraryFacets = LibraryFacets(categories: categories, tags: tags,
-                                      unfiled: unfiled, neverPrinted: never, ready: ready,
-                                      creators: creators, printNext: printNext, duplicates: dupes)
+        let facets = LibraryFacets(categories: categories, tags: tags,
+                                   unfiled: unfiled, neverPrinted: never, ready: ready,
+                                   creators: creators, printNext: printNext, duplicates: dupes)
+        if facets != libraryFacets { libraryFacets = facets }
     }
 
     func recountLibrarySoon() { libraryRecountTask = Task { await readLibraryFacets() } }
@@ -1913,7 +1914,12 @@ extension Shop {
         }
     }
 
-    var shownFiles: [LibraryFile] {
+    /// Kept between draws; see `Shop+LibraryMemo.swift`.
+    var shownFiles: [LibraryFile] { memoShownFiles() }
+
+    /// One pass over the whole book, for `memoShownFiles`. `query` is the
+    /// search, trimmed and folded.
+    func buildShownFiles(query q: String) -> [LibraryFile] {
         var rows = files
         // A model a conversion has replaced is put aside rather than deleted —
         // see `LibraryFile.archivedAt`. It is still in the book, still on disk
@@ -1941,11 +1947,10 @@ extension Shop {
         }
         if libraryPrintNextOnly { rows = rows.filter(\.isPrintNext) }
         if libraryDuplicatesOnly { rows = rows.filter { duplicateOf[$0.id] != nil } }
-        let q = search.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty {
             // The file's name too, and folded — see `LibraryFile.matches`.
-            let folded = SearchText.fold(q)
-            rows = rows.filter { $0.matches(folded: folded) }
+            libraryMemo.work.rowsSearched += rows.count
+            rows = rows.filter { matchesSearch($0, q) }
         }
         // Side by side: the copies of one model together, oldest first.
         if libraryDuplicatesOnly {
@@ -1977,7 +1982,10 @@ extension Shop {
     var selectedFiles: [LibraryFile] {
         let chosen = fileSelection
         guard !chosen.isEmpty else { return [] }
-        return visibleFiles.filter { chosen.contains($0.id) }
+        // In the order they are drawn, found by position rather than by
+        // walking every tile — the menu bar asks this on every redraw.
+        let (_, visible, position) = memoEntries()
+        return chosen.compactMap { position[$0] }.sorted().map { visible[$0] }
     }
     /// The ids every "these models" action writes to. See `selectedFiles`.
     var selectedIds: Set<LibraryFile.ID> { Set(selectedFiles.map(\.id)) }
@@ -1989,7 +1997,7 @@ extension Shop {
     /// whatever sits inside a folder tile is not here. Flat: every shown
     /// model. Whatever `shownEntries` comes to draw (a group shown as one tile
     /// in the flat view, say), this follows without being told.
-    var visibleFiles: [LibraryFile] { Self.modelTiles(shownEntries) }
+    var visibleFiles: [LibraryFile] { memoEntries().visible }
 
     /// The `.file` entries of a drawn list — the only things a selection may
     /// hold. A folder tile is not a selected model.
@@ -2947,10 +2955,7 @@ extension Shop {
     /// as it came off the bed, which is what someone is trying to recognise.
     func thumbnail(for file: LibraryFile) -> ThumbnailSource? {
         if let photo = file.userPhoto, photo.hasPrefix("data:") { return .inlineData(photo) }
-        guard let dir = directory(for: file) else { return nil }
-        let name = file.thumbFile ?? "thumb.jpg"
-        let url = dir.appending(path: name)
-        return FileManager.default.fileExists(atPath: url.path) ? .file(url) : nil
+        return cachedThumbnail(for: file)
     }
 
     /// Does ANY job name a customer, or promise a date?
