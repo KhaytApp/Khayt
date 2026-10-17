@@ -2943,7 +2943,9 @@ function openSpoolSwitchModal(orderId) {
           if (invItem) {
             invItem.weight = Math.max(0, invItem.weight - weight);
             if (!invItem.usageHistory) invItem.usageHistory = [];
-            invItem.usageHistory.unshift({ orderId: order.id, project: order.project || '', weightUsed: weight, date: localDateStr() });
+            // Same stamp as lib/order-deduction.js's draws: the lot at draw time.
+            invItem.usageHistory.unshift(Object.assign({ orderId: order.id, project: order.project || '', weightUsed: weight, date: localDateStr() },
+              KhaytOrderDeduction.lotStamp(invItem)));
             if (invItem.usageHistory.length > 200) invItem.usageHistory.length = 200;
           }
           saveAll();

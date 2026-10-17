@@ -2175,7 +2175,9 @@ function openTestPrintLog(itemId) {
       if (weightUsed > 0) {
         item.weight = Math.max(0, item.weight - weightUsed);
         if (!item.usageHistory) item.usageHistory = [];
-        item.usageHistory.unshift({ orderId: newTp.id, project: `Test print (${testType})`, weightUsed, date });
+        // The spool's lot as it is today, so a recall finds test prints too.
+        item.usageHistory.unshift(Object.assign({ orderId: newTp.id, project: `Test print (${testType})`, weightUsed, date },
+          Deduction().lotStamp(item)));
         if (item.usageHistory.length > 200) item.usageHistory.length = 200;
       }
       saveAll();
