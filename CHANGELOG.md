@@ -11,7 +11,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Machines and Clients meet at the fold instead of running across it.
   Settings keeps the calculator's reading width, so a switch sits near its
   label.
-  keep one column.
+
 - **Desktop: switching spools mid-job and test prints record the lot.**
   Filament taken off a spool partway through a job, and a test print's
   filament, now carry the spool's lot (and the purchase order it came in on)
