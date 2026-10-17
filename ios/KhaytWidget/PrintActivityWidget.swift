@@ -72,8 +72,8 @@ struct PrintActivityWidget: Widget {
                     .font(.system(size: 14, weight: .semibold, design: .rounded).monospacedDigit())
                     .foregroundStyle(tone)
             } minimal: {
-                if state.phase == .printing, let start = state.startedAt, let end = state.endsAt, end > start {
-                    ProgressView(timerInterval: start...end, countsDown: false) { EmptyView() } currentValueLabel: {
+                if let range = PrintActivityText.barRange(state) {
+                    ProgressView(timerInterval: range, countsDown: false) { EmptyView() } currentValueLabel: {
                         Image(systemName: "printer.fill").font(.system(size: 9))
                     }
                     .progressViewStyle(.circular)
@@ -92,7 +92,7 @@ private struct CompactRemaining: View {
     let state: PrintActivityAttributes.ContentState
     var body: some View {
         if state.phase == .printing, let end = state.endsAt, end > Date() {
-            Text(timerInterval: Date()...end, countsDown: true)
+            PrintTimeLeft(end: end)
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: 56)
         } else {

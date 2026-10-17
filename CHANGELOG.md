@@ -16,6 +16,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   anyone at the Mac can see it, so it never shows a customer's name, the
   sample book never appears in it, and nothing is shown while the staff lock
   is on. Until the app has opened a real book, a widget says "Open Khayt".
+- **iPhone: three fixes to print progress on the Lock Screen, seen on a real
+  locked simulator.**
+  - The time left read "1:11:--": the Lock Screen stops ticking seconds while
+    the phone sleeps. It now counts to the minute ("1 hour, 11 minutes").
+  - A print the phone first saw part-way through drew an empty bar beside
+    "45%". The bar now starts at the reported percent and keeps filling.
+  - In Arabic the time left and end time came out in ٠–٩. They use Western
+    digits now, like the rest of Khayt.
 
 - **iPhone: print progress on the Lock Screen looks finished.** It used the
   system's plain defaults and an old brand colour. Now:

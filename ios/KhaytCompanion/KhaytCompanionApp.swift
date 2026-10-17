@@ -94,12 +94,14 @@ struct KhaytCompanionApp: App {
     /// `-KhaytLiveDemo printing|paused|finished|failed`: one sample print on
     /// the Lock Screen and in the Dynamic Island, so the Live Activity can be
     /// photographed in the simulator without a printer. Debug builds only.
+    /// `-KhaytLiveDemoMinutes N` sets the time left (72 by default).
     private static func startDemoActivity(_ phase: String) {
         let now = Date()
+        let minutes = max(UserDefaults.standard.integer(forKey: "KhaytLiveDemoMinutes"), 0)
         let state = PrintActivityAttributes.ContentState(
             phase: PrintActivityAttributes.ContentState.Phase(rawValue: phase) ?? .printing,
             job: "Dragon_0.2mm_PLA_3h12m.gcode", progress: 62,
-            startedAt: now.addingTimeInterval(-2 * 3600), endsAt: now.addingTimeInterval(72 * 60))
+            startedAt: now.addingTimeInterval(-2 * 3600), endsAt: now.addingTimeInterval(Double(minutes > 0 ? minutes : 72) * 60))
         Task { @MainActor in
             for a in Activity<PrintActivityAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }
             _ = try? Activity.request(attributes: PrintActivityAttributes(machineId: "demo", machineName: "Snapmaker U1"),
