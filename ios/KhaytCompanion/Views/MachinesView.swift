@@ -57,6 +57,14 @@ struct MachinesView: View {
         }
     }
 
+    /// Regular width — iPhone Duo's inner display — sets the machines two
+    /// across rather than stretching each card over the full 7.6 inches.
+    @Environment(\.horizontalSizeClass) private var widthClass
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 10, alignment: .top),
+              count: widthClass == .regular ? 2 : 1)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -77,9 +85,14 @@ struct MachinesView: View {
                         .padding(.vertical, 44)
                     } else {
                         LiveStamp()
-                        ForEach(rows) { m in
-                            MachineCard(live: m, fallbackStatus: statusById[m.id])
-                            cameraLink(m)
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+                            ForEach(rows) { m in
+                                VStack(spacing: 10) {
+                                    MachineCard(live: m, fallbackStatus: statusById[m.id])
+                                    cameraLink(m)
+                                }
+                                .frame(maxHeight: .infinity, alignment: .top)
+                            }
                         }
                         if !printers.isLive {
                             Text(staleNote)

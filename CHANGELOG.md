@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: on iPhone Duo's inner display, Machines and Clients sit two
+  across.** Each machine card and client row used to stretch over the full
+  width of the unfolded screen. The folded outer display and other iPhones
+  keep one column.
+
 - **iPhone: a print's Lock Screen card no longer freezes once the print
   runs past its first estimate.** At the estimated finish iOS marks the card
   out of date, and from then on the app stopped updating it or ending it, so

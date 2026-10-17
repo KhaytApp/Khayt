@@ -26,6 +26,12 @@ struct ClientsView: View {
         return list.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
+    /// Two across in regular width (iPhone Duo's inner display), as Machines.
+    @Environment(\.horizontalSizeClass) private var widthClass
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 8), count: widthClass == .regular ? 2 : 1)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -83,7 +89,7 @@ struct ClientsView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 44).padding(.horizontal, 16)
         } else {
-            LazyVStack(spacing: 8) {
+            LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(displayed) { client in
                     Button { if client.canBeContacted { contactFor = client } } label: {
                         ClientRow(client: client, open: count(openByName, client),
