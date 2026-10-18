@@ -110,7 +110,9 @@ function saveSettingsFromForm() {
       const mode = $('#set_taxMode')?.value || prof.mode;
       const rate = +$('#set_vatRate')?.value;
       const enabled = !!$('#set_enableVat')?.checked;
-      const rates = (settings.tax?.rates?.length && settings.tax.rates.length > 1)
+      // The one deliberate change since the lift: two rates are kept only
+      // while tax is on (see the two-rate test below).
+      const rates = (enabled && settings.tax?.rates?.length && settings.tax.rates.length > 1)
         ? settings.tax.rates
         : (enabled && rate > 0 ? [{ id: 'vat', label: prof.rates[0]?.label || 'VAT', percent: rate }] : []);
       return { country: $('#set_taxCountry')?.value || settings.tax?.country || '',
@@ -739,4 +741,15 @@ test('minutes per spool change is saved, clamped, and left alone when absent', (
   assert.equal(apply({}, { swapMinutes: 'x' }, { year: 2026 }).swapMinutes, 3);
   assert.equal(apply({ swapMinutes: 7 }, {}, { year: 2026 }).swapMinutes, 7);
   assert.equal('swapMinutes' in apply({}, {}, { year: 2026 }), false);
+});
+
+test('a shop with two tax rates that switches tax off has no rates left', () => {
+  const SE = require('../lib/settings-edit.js');
+  require('../lib/tax.js');
+  const s = { enableVat: true, vatRate: 9, tax: { country: 'IN', mode: 'exclusive',
+    rates: [{ id: 'cgst', label: 'CGST', percent: 9 }, { id: 'sgst', label: 'SGST', percent: 9 }] } };
+  const off = SE.apply(s, { enableVat: false });
+  assert.deepEqual(off.tax.rates, []);
+  const kept = SE.apply(s, { taxMode: 'exclusive' });
+  assert.equal(kept.tax.rates.length, 2, 'still on: both rates kept');
 });

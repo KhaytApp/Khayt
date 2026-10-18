@@ -59,6 +59,18 @@ enum LibraryImport {
             case .failed(let why): return "Could not add the file: \(why)"
             }
         }
+
+        /// The same, in the shop's language. A system reason after "could not
+        /// add" stays as the system wrote it.
+        @MainActor func said(_ words: Words) -> String {
+            switch self {
+            case .notOurs: words.callIt("mac.lib_err_not_ours")
+            case .noLibrary: words.callIt("mac.lib_err_no_library")
+            case .unknownKind(let ext): words.callIt("mac.lib_err_unknown_kind", ["ext": .string(ext)])
+            case .alreadyHere(let name): words.callIt("mac.lib_err_already_here", ["name": .string(name)])
+            case .failed(let why): words.callIt("mac.lib_err_failed", ["why": .string(why)])
+            }
+        }
     }
 
     /// What was added, for the sentence afterwards.

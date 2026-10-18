@@ -97,6 +97,9 @@ extension Shop {
     func sendWhatsApp(for job: Order, text: String, milestone: String?,
                       lang: String?) async -> String? {
         guard let engine else { return words.callIt("mac.move_no_engine") }
+        // Checked BEFORE WhatsApp opens: a send the log then refused left a
+        // message sent with no line saying so (Oct 2026 review).
+        guard permitted("orders", "edit") else { return moveProblem ?? words.callIt("mac.lock_not_allowed") }
         guard let record = clientRecord(for: job) else {
             return whatsAppReason("no_customer")
         }
@@ -109,7 +112,7 @@ extension Shop {
         if case .object(let raw)? = try? await engine.whatsAppCommEntry(
             id: Self.uid("CMM"), at: Date(), text: text, orderId: job.id,
             milestone: milestone, lang: lang) {
-            await addCommunication(CommEntry(raw: raw), to: record.client.id)
+            await addCommunication(CommEntry(raw: raw), to: record.client.id, gate: ("orders", "edit"))
         }
         return nil
     }

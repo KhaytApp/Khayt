@@ -12,6 +12,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   that does not have the check yet, still asks "Your Mac answered at a new
   address" first.
 
+- **Mac: put a printer under service, retire it, or delete it.** A machine
+  card's menu (and the Status menu at the foot of the machine sheet) marks a
+  printer under service with an optional reason, brings it back, retires it
+  (dated today, with an optional reason, saying first how many unfinished jobs
+  will lose it), returns a retired one to service, and deletes one — only when
+  nothing in the book names it; otherwise Delete is greyed with what still
+  does, e.g. "used by 12 jobs and 3 service entries". Each has Undo. The card
+  says "Under service" or "Retired" in words with the reason and date; retired
+  printers fold into a "Retired (n)" list. Retired printers leave polling,
+  cameras, the plug's automatic switch-off, Send to printer, the pickers
+  (unless the record already names one, shown "(retired)"), the menu bar,
+  the Triage tiles, the sidebar count, the widget, `/api/machines/live`, Live
+  Activities, the band, the kiosk and the dashboard fleet, where an
+  under-service printer now counts as down. Under-service printers are not
+  polled or sent files and the card says why. A job naming a printer that is
+  gone says "Deleted printer" instead of its id. Rule: `lib/machine-status.js`.
+- **Mac: a customer can have their data, or have it erased.** A Mac-only
+  shop can now answer a customer's request under the PDPL, as the desktop
+  can. "Export this customer's data…" (the customer's right-click menu, or
+  Privacy & Customer Data in their detail) saves everything the book holds
+  about them as a JSON file, using the shared `lib/privacy.js` rule. "Erase
+  Customer…" shows how many jobs, intake rows and logged communications they
+  have, and offers Unlink (recommended: the record goes, the jobs stay with
+  the name) or Full erase (the name is also blanked on jobs with no invoice
+  and no payment, and their intake rows go). Invoiced or paid jobs keep the
+  name, since a tax invoice is kept as issued. Edit › Undo brings it back.
+  Plain Delete, for customers with no jobs, is unchanged.
 - **Stock: deliveries, waste and spool prices add up.** A part delivery of a
   new lot is priced at what arrived (250 g of an 80-for-1000 g roll was costed
   at 80, not 20) and grows with later parts. Waste logged against a roll with
@@ -102,6 +129,34 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   copy straight back. Off now holds for the shop on Khayt Cloud. Every other
   Mac stops uploading, switches itself off and says why. Turning it on again
   is always a person's press, never the background upload.
+- **Mac: more fixes from the full review.**
+  - **Converting a model with "replace the original"** puts the right model
+    aside. Before, it could hide an older conversion, or the original as
+    replaced by itself.
+  - **"Send to printer" for a linked model** finds the G-code sliced next to
+    the shop's own file.
+  - **Two backups in the same minute** are both kept. Before, the second
+    overwrote the first.
+  - **An order's Total** on a shop that adds tax on top is what the
+    customer is billed, the same figure Paid and Owed are measured against.
+  - **Recording a payment** waits until the bill has been worked out, so a
+    quick Save on a shop that adds tax on top no longer records a payment
+    short by the tax.
+  - **WhatsApp updates sent by staff** are logged on the customer. A
+    viewer can no longer send one.
+  - **Errors in the shop's language:** about eighty places that showed an
+    error from the app itself in English now say it in Arabic in the Arabic
+    app. These include another app holding the book, a change too large to
+    back up, and a refused move. A system's own error is still shown as the
+    system wrote it.
+  - **Library import and conversion errors** are in Arabic in the Arabic
+    app, with figures in the shop's digits.
+  - **Crash reports** (when a shop shares them) leave out anything an
+    error quoted from the shop's data, such as a customer's name. They
+    keep only the code names that make a crash readable.
+  - **Switching tax off** on a shop with two tax rates (such as CGST and
+    SGST) turns it off.
+
 - **iPhone: the phone asks before following its Mac to a new address.** When
   the Mac stops answering and its name turns up somewhere else on the
   network, the phone used to move there by itself and send its PIN along.
@@ -127,6 +182,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the orders list already did. The sample shop now holds a delivery that
   arrived in a different lot from the spool it was ordered for, received as
   its own spool, so the screens that show one are drawn with one.
+- **Mac: printer setup fixes from the October review.** The machine sheet's
+  Test button now asks a Bambu over MQTT and an Elegoo over SDCP, with the
+  serial, slug and access code, as the live card does; it used to ask them
+  the Klipper question and report a working printer as unreachable. Save
+  keeps the sheet open until the book accepts it and says why inside the
+  sheet when it does not, and a smart-plug password that cannot be locked in
+  the Keychain now stops the save instead of being dropped. A machine with
+  no tasks yet shows the maintenance section, so a Mac-only shop can add its
+  first task and log its first service. A printer Khayt desktop saved as
+  "None" is no longer offered Send to printer or a blank protocol menu. A
+  camera on a printer whose address is not on the shop's network is no longer
+  sent the printer's key. Printer errors, the Test result and the units on the
+  machine card (mm, W, kWh) are in Arabic for an Arabic shop, a very large bed
+  or wattage in the book no longer closes the app, and removing a downtime
+  row no longer mixes up the rows below it.
 
 - **Desktop: a saved password or token only goes to the address saved with
   it.** The app fills saved secrets in itself and never shows them to the

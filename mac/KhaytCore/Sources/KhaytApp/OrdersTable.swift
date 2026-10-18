@@ -159,8 +159,12 @@ struct OrdersTable: View {
                 // reads money from, beside a figure summary and a dashboard
                 // that both carry the mark, read as a count of something. The
                 // job's own currency, since a book can price in more than one.
+                // What the customer is BILLED: on a shop that adds tax on
+                // top, the price plus the tax — the figure the Paid and Owed
+                // beside it are measured against.
                 if job.price > 0 {
-                    Text(Money.text(job.price, job.currency.isEmpty ? shop.currency : job.currency))
+                    Text(Money.text(job.figures?.billed ?? job.price,
+                                    job.currency.isEmpty ? shop.currency : job.currency))
                         .moneyStyle()
                 } else {
                     Text("—").foregroundStyle(.quaternary)

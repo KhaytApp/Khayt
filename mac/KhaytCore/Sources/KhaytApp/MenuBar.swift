@@ -160,15 +160,16 @@ struct FloorPanel: View {
 
             Divider()
 
-            if shop.machines.isEmpty {
+            // Retired printers are not on the floor any more (`machinesInUse`).
+            if shop.machinesInUse.isEmpty {
                 Text(shop.words.callIt("mac.no_machines"))
                     .font(.callout).foregroundStyle(.secondary)
                     .padding(14)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(shop.machines) { machine in
+                    ForEach(shop.machinesInUse) { machine in
                         MachineLine(machine: machine, shop: shop)
-                        if machine.id != shop.machines.last?.id { Divider().padding(.leading, 14) }
+                        if machine.id != shop.machinesInUse.last?.id { Divider().padding(.leading, 14) }
                     }
                 }
                 .padding(.vertical, 4)
@@ -185,7 +186,7 @@ struct FloorPanel: View {
                 }
                 // Planning the floor is editing jobs; and nothing that opens a
                 // sheet over the sign-in screen (alpha.62 re-check).
-                if !shop.schedulableRows.isEmpty && !shop.machines.isEmpty
+                if !shop.schedulableRows.isEmpty && !shop.workingMachines.isEmpty
                     && shop.lockAllows("orders", "edit") {
                     MenuLine(text: shop.words.callIt("sched.suggest_btn"), key: nil) {
                         openWindow(id: "shop")
@@ -256,6 +257,8 @@ private struct MachineLine: View {
         case .noConnection: return shop.words.callIt("mac.not_connected")
         case .otherProtocol(let name):
             return shop.words.callIt("mac.not_polled", ["protocol": .string(name)])
+        case .underService: return shop.words.callIt("mac.life_not_polled_service")
+        case .retired: return shop.words.callIt("mac.life_not_polled_retired")
         case nil:
             return shop.printers.readings[machine.id]?.problem
                 ?? shop.words.callIt("mac.asking")

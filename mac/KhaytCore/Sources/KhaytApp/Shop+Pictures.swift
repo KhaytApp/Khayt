@@ -210,7 +210,7 @@ extension Shop {
                 } catch {
                     touched.insert(sig)
                     marks[sig] = SortFailures.Mark(count: (marks[sig]?.count ?? 0) + 1, last: today)
-                    result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                    result.problem = (error as? LocalizedError)?.errorDescription ?? self.said(error)
                 }
             }
         }

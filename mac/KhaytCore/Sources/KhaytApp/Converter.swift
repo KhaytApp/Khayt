@@ -187,6 +187,24 @@ enum Converter {
                 return "This 3MF unpacks to \(mb) MB, more than the \(cap) MB a conversion will hold at once."
             }
         }
+
+        /// The same, in the shop's language, figures in the shop's digits.
+        @MainActor func said(_ words: Words) -> String {
+            switch self {
+            case .notOurs: return words.callIt("mac.lib_err_not_ours")
+            case .unreadable(let why): return words.callIt("mac.conv_err_unreadable", ["why": .string(why)])
+            case .refused(let why): return why
+            case .meshTooBig(let name, let bytes):
+                return words.callIt("mac.conv_err_mesh_too_big", [
+                    "name": .string(name),
+                    "mb": .string(Money.quantity(Double(bytes) / 1_048_576, decimals: 0)),
+                    "cap": .string(Money.quantity(Double(Converter.paintLimitMB), decimals: 0))])
+            case .tooBig(let bytes):
+                return words.callIt("mac.conv_err_too_big", [
+                    "mb": .string(Money.quantity(Double(bytes) / 1_048_576, decimals: 0)),
+                    "cap": .string(Money.quantity(Double(Converter.rebuildLimit / 1_048_576), decimals: 0))])
+            }
+        }
     }
 
     struct Result: Sendable {

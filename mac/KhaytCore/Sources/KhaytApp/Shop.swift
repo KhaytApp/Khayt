@@ -94,8 +94,8 @@ final class Shop {
     /// a flatbed 508 × 330 have different proportions, and comparing every card
     /// against a single rectangle is the only way the cards compare to
     /// each other.
-    var widestBed: Double { max(machines.compactMap { $0.bed?.x }.max() ?? 1, 1) }
-    var deepestBed: Double { max(machines.compactMap { $0.bed?.y }.max() ?? 1, 1) }
+    var widestBed: Double { max(machinesInUse.compactMap { $0.bed?.x }.max() ?? 1, 1) }
+    var deepestBed: Double { max(machinesInUse.compactMap { $0.bed?.y }.max() ?? 1, 1) }
     /// Where this shop's models live. Resolved once per book, because it reads
     /// settings and probes the disk, and every cell asks about it.
     private(set) var libraryRoots: LibraryLocation.Roots?
@@ -252,7 +252,7 @@ final class Shop {
             catch {
                 // Shown in the shop's own settings pane, where the address is
                 // theirs to see; the LOG gets the kind of failure only.
-                ntfyProblem = String(describing: error)
+                ntfyProblem = self.said(error)
                 FileHandle.standardError.write(Data("printer alert ntfy failed: \(RedactedError.describe(error))\n".utf8))
             }
         }
@@ -373,6 +373,15 @@ final class Shop {
     var pendingJobDelete: RecordDeleteRequest?
     /// The customers the shop asked to delete, until it confirms.
     var pendingCustomerDelete: RecordDeleteRequest?
+    /// A question about a printer's working life — under service, retire,
+    /// delete — until the shop answers (`Shop+MachineLife.swift`).
+    var pendingMachineAsk: MachineAsk?
+    /// Whether each machine may be deleted, read with the book
+    /// (`lib/machine-status.js canDelete`). Absent means "not read yet", which
+    /// a menu treats as not deletable.
+    var machineDeleteVerdicts: [String: KhaytEngine.MachineDeleteVerdict] = [:]
+    /// The customer the shop asked to erase, until it chooses how (`Shop+Privacy.swift`).
+    var erasingCustomer: CustomerEraseRequest?
     /// What `lib/record-delete.js` refuses in this book, read with it. Nil
     /// until it has been asked — and then nothing is offered for deletion.
     var deleteVerdicts: KhaytEngine.DeleteVerdicts?
@@ -810,7 +819,7 @@ final class Shop {
             // a photograph to notice.
             if engine == nil {
                 do { engine = try KhaytEngine() }
-                catch { engineProblem = String(describing: error) }
+                catch { engineProblem = self.said(error) }
             }
             // `settings.lang` and not the system language: a Riyadh shop on an
             // English Mac still keeps its book in Arabic, and the book is what
@@ -991,7 +1000,7 @@ final class Shop {
             // from the machines and those change.
             let figured = files
             let worked = await LoadFigures.work(
-                .init(files: figured, machines: machineRows, settings: Self.settings(root),
+                .init(files: figured, machines: machineRowsInUse, settings: Self.settings(root),
                       orders: orderRows, nozzle: nozzleForRisk),
                 engine: engine, wanted: { generation == self.loadGeneration })
             if let hook = Self.whileFiguringForTests { await hook() }
@@ -1165,6 +1174,8 @@ final class Shop {
             if overtaken() { return }
             await computeDashboard(root)
             if overtaken() { return }
+            await readMachineDeleteVerdicts(root)
+            if overtaken() { return }
             // Ask the machines what they are doing — but never for the sample
             // shop, whose printers are somebody else's addresses on somebody
             // else's network.
@@ -1257,6 +1268,7 @@ final class Shop {
             categoriesInUse = []
             tagsInUse = []
             machines = []
+            machineDeleteVerdicts = [:]
             spools = []
             consumables = []
             messageTemplates = []
@@ -1266,7 +1278,7 @@ final class Shop {
             owner = nil
             facts = nil
             printers.stop()
-            problem = String(describing: error)
+            problem = self.said(error)
         }
     }
 
@@ -1279,9 +1291,10 @@ final class Shop {
         await publishLivePrinters()
         WidgetFeed.shared.update(shop: self)
         guard let engine, !machineRows.isEmpty else { return }
-        facts = try? await engine.dashboardFacts(orders: orderRows, machines: machineRows,
+        let fleet = Self.fleetForDashboard(machineRows, cache: printers.statusCache)
+        facts = try? await engine.dashboardFacts(orders: orderRows, machines: fleet.machines,
                                                  settings: kpiSettings.isEmpty ? settingsDict : kpiSettings,
-                                                 statusCache: printers.statusCache,
+                                                 statusCache: fleet.cache,
                                                  inventory: inventoryRows)
     }
 
@@ -1361,9 +1374,12 @@ final class Shop {
         // Only `load` asks: an answer about a book a newer load has replaced
         // is dropped, never put over the newer book's (see `load`).
         let ticket = loadGeneration
-        let dashboard = try? await engine.dashboardFacts(orders: orders, machines: machines,
+        // Retired printers leave the fleet; under-service ones count as down
+        // (`fleetForDashboard`).
+        let fleet = Self.fleetForDashboard(machines, cache: printers.statusCache)
+        let dashboard = try? await engine.dashboardFacts(orders: orders, machines: fleet.machines,
                                                          settings: settings,
-                                                         statusCache: printers.statusCache,
+                                                         statusCache: fleet.cache,
                                                          inventory: shelf)
         guard ticket == loadGeneration else { return }
         facts = dashboard

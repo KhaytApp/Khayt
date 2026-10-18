@@ -132,7 +132,7 @@ extension Shop {
             }
             return nil
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
     }
 
@@ -209,7 +209,7 @@ extension Shop {
     /// to no job, so nothing on the phone can move a real order.
     func sendTestAlert() async {
         guard cloudDek != nil else { testAlertSaid = words.callIt("mac.alert_test_locked"); return }
-        let machine = machines.first
+        let machine = workingMachines.first
         let ended = FinishCamera.Ended(machineId: machine?.id ?? "test", machineName: machine?.name ?? "Khayt",
                                        orderId: nil, outcome: "finished", durationS: 3720,
                                        photoTaken: false, filename: "test.gcode")

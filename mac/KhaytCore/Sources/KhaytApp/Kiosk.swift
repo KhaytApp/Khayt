@@ -49,7 +49,7 @@ struct KioskWindow: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            if shop.machines.isEmpty {
+            if shop.machinesInUse.isEmpty {
                 ContentUnavailableView(shop.words.callIt("kiosk.no_machines"),
                                        systemImage: "printer")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -76,7 +76,7 @@ struct KioskWindow: View {
     /// What the cards were computed FROM. The band's signature covers what the
     /// printers said; the orders' hash covers a job moved on the board.
     private var signature: String {
-        "\(shop.bandSignature)#\(minute)#\(shop.orders.hashValue)#\(shop.machines.count)"
+        "\(shop.bandSignature)#\(minute)#\(shop.orders.hashValue)#\(shop.machinesInUse.count)"
     }
 
     private var header: some View {

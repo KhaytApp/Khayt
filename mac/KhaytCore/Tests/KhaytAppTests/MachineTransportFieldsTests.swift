@@ -24,7 +24,12 @@ struct MachineTransportFieldsTests {
     @Test("the access code is sealed before it is written, or refused")
     func sealsTheCode() {
         let s = Self.sheet
-        #expect(s.contains(#"api["accessCode"] = .string(try await Secrets.seal(typedCode, for: build))"#),
+        // Every typed secret goes through one all-or-nothing seal
+        // (`MachineSheet.sealEach`, tested in `PrinterReviewTests`), and the
+        // access code is written from what it sealed — never from the typed one.
+        #expect(s.contains(#"sealed = try await Self.sealEach(typed) { typed in try await Secrets.seal(typed, for: build) }"#),
+                "the typed secrets are no longer sealed")
+        #expect(s.contains(#"else if let code = sealed["accessCode"] { api["accessCode"] = .string(code) }"#),
                 "a Bambu access code is being written without being sealed")
         #expect(!s.contains(#"api["accessCode"] = .string(typedCode)"#), "the access code is written in the clear")
     }

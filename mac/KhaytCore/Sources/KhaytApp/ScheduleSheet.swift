@@ -41,7 +41,7 @@ struct ScheduleSheet: View {
             Text(shop.words.callIt("sched.suggest_title"))
                 .font(.headline)
             Text(shop.words.counting(shop.schedulableRows.count, "mac.jobs_word")
-                 + " · " + shop.words.counting(shop.machines.count, "mac.machines_count"))
+                 + " · " + shop.words.counting(shop.workingMachines.count, "mac.machines_count"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

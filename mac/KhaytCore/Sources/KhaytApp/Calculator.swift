@@ -223,8 +223,10 @@ struct Calculator: View {
                                         model.firstLineID.map(model.spoolBinding) ?? .constant(nil))
                             Picker(shop.words.callIt("mac.calc_printer"), selection: $model.machineId) {
                                 Text(shop.words.callIt("mac.any_machine")).tag(String?.none)
-                                ForEach(shop.machines) { machine in
-                                    Text(machine.name).tag(String?.some(machine.id))
+                                // Not a retired printer — unless this quote
+                                // already names one, which stays, labelled.
+                                ForEach(shop.machineChoices(keeping: model.machineId)) { machine in
+                                    Text(shop.machineChoiceLabel(machine)).tag(String?.some(machine.id))
                                 }
                             }
                             // The shop's own rates. A machine carries two of

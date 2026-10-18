@@ -80,7 +80,7 @@ extension Shop {
                 await Self.pnlPaper(docs.html)
                     .printWithPanel(title: pnlFilename(.pdf, now: now), over: window)
             } catch {
-                moveProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+                moveProblem = words.callIt("mac.export_failed") + " " + self.said(error)
             }
         case nil:
             return
@@ -183,7 +183,7 @@ extension Shop {
                 Telemetry.feature(.invoiceExported, in: self)
                 return url
             } catch {
-                moveProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+                moveProblem = words.callIt("mac.export_failed") + " " + self.said(error)
                 return nil
             }
         }

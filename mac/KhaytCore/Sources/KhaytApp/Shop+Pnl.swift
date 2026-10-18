@@ -133,7 +133,7 @@ extension Shop {
             }
             spendNote = words.callIt("pnl.exported_as") + " " + url.lastPathComponent
         } catch {
-            spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+            spendProblem = words.callIt("mac.export_failed") + " " + self.said(error)
         }
     }
 

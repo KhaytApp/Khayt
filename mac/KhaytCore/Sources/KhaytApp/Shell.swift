@@ -384,7 +384,7 @@ struct ShellSidebar: View {
                         .lineLimit(1)
                 }
                 HStack(spacing: Space.xs) {
-                    Text(shop.words.counting(shop.machines.count, "mac.n_machines"))
+                    Text(shop.words.counting(shop.machinesInUse.count, "mac.n_machines"))
                     Text("·")
                     Text(shop.words.counting(shop.customers.count, "mac.n_people"))
                 }

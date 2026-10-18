@@ -73,7 +73,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -174,7 +174,32 @@ extension Shop {
         var from: String
         var to: String
         var reason: String
-        var id: String { from + "|" + to + "|" + reason }
+        /// Which row this is on screen, for as long as it is on screen.
+        ///
+        /// NOT derived from the fields. It was `from|to|reason`, so typing one
+        /// letter of a reason gave the row a new identity — SwiftUI rebuilt
+        /// the row and the text field lost focus mid-word — and two identical
+        /// windows were one id. Never written to the book, and left out of
+        /// equality: two windows with the same times and reason are the same
+        /// window to the sheet's "has anything changed" question.
+        let id: UUID
+
+        init(from: String, to: String, reason: String, id: UUID = UUID()) {
+            self.from = from
+            self.to = to
+            self.reason = reason
+            self.id = id
+        }
+
+        static func == (a: Self, b: Self) -> Bool {
+            a.from == b.from && a.to == b.to && a.reason == b.reason
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(from)
+            hasher.combine(to)
+            hasher.combine(reason)
+        }
 
         /// Does this window run forwards? The shared rule DROPS one that does
         /// not, so a sheet that cannot say so lets a shop type something and
@@ -283,7 +308,7 @@ extension Shop {
             editingCustomer = nil
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -509,7 +534,7 @@ extension Shop {
             await load(source)
             await planDispatch()
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -590,7 +615,7 @@ extension Shop {
             await load(source)
             await planDispatch()
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -1046,7 +1071,7 @@ extension Shop {
                 jobs: chosen.map(Self.plateJob),
                 maxHours: max(1, batchMaxHours), maxGrams: max(1, batchMaxGrams))
         } catch {
-            batchProblem = String(describing: error)
+            batchProblem = self.said(error)
         }
     }
 
@@ -1102,7 +1127,7 @@ extension Shop {
             schedulePlan = plan
             await planSwaps(plan)
         } catch {
-            scheduleProblem = String(describing: error)
+            scheduleProblem = self.said(error)
         }
     }
 
@@ -1149,7 +1174,7 @@ extension Shop {
         } catch let refusal as StoreWriter.Refusal {
             scheduleProblem = refusal.description
         } catch {
-            scheduleProblem = String(describing: error)
+            scheduleProblem = self.said(error)
         }
     }
 
@@ -1165,7 +1190,7 @@ extension Shop {
     /// the module's own reason.
     func scheduleRow(_ a: KhaytEngine.SchedulePlan.Assignment) -> (job: String, machine: String, why: String) {
         let job = orders.first { $0.id == a.orderId }?.project ?? a.orderId
-        let machine = machines.first { $0.id == a.machineId }?.name ?? a.machineId
+        let machine = machineName(forId: a.machineId)
         return (job, machine, a.reason ?? "")
     }
 
@@ -1198,8 +1223,8 @@ extension Shop {
             backupProblem = nil
             Telemetry.feature(.backupRun, in: self)
         } catch {
-            backupProblem = String(describing: error)
-            spendProblem = words.callIt("mac.backup_failed") + " " + String(describing: error)
+            backupProblem = self.said(error)
+            spendProblem = words.callIt("mac.backup_failed") + " " + self.said(error)
         }
     }
 
@@ -1247,7 +1272,7 @@ extension Shop {
             try await Export.payload(from: root, engine: engine).write(to: url, options: .atomic)
             spendNote = words.callIt("mac.exported_to") + " " + url.lastPathComponent
         } catch {
-            spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+            spendProblem = words.callIt("mac.export_failed") + " " + self.said(error)
         }
     }
 
@@ -1302,7 +1327,7 @@ extension Shop {
             spendNote = words.callIt("set.csv_exported",
                                      ["n": .number(Double(files.count))])
         } catch {
-            spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+            spendProblem = words.callIt("mac.export_failed") + " " + self.said(error)
         }
     }
 
@@ -1436,7 +1461,7 @@ extension Shop {
             if format == "wafeq" { spendNote? += " — " + words.callIt("mac.export_wafeq_note") }
             if format == "daftra" { spendNote? += " — " + words.callIt("mac.export_daftra_note") }
         } catch {
-            spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+            spendProblem = words.callIt("mac.export_failed") + " " + self.said(error)
         }
     }
 
@@ -1530,7 +1555,7 @@ extension Shop {
             await load(source)
             return .added
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
             return .failed
         }
     }
@@ -1964,7 +1989,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -2009,7 +2034,7 @@ extension Shop {
             } catch {
                 moveProblem = words.callIt("mac.webhook_failed", ["where": .string(name)])
                     + " " + ((error as? LocalizedError)?.errorDescription
-                             ?? String(describing: error))
+                             ?? self.said(error))
             }
         }
         if sent > 0 {
@@ -2057,7 +2082,7 @@ extension Shop {
         } catch let locked as Secrets.Failure {
             moveProblem = words.callIt("mac.portal_failed") + " " + locked.description
         } catch {
-            moveProblem = words.callIt("mac.portal_failed") + " " + String(describing: error)
+            moveProblem = words.callIt("mac.portal_failed") + " " + self.said(error)
         }
     }
 
@@ -2088,7 +2113,7 @@ extension Shop {
         } catch let locked as Secrets.Failure {
             moveProblem = words.callIt("mac.email_failed") + " " + locked.description
         } catch {
-            moveProblem = words.callIt("mac.email_failed") + " " + String(describing: error)
+            moveProblem = words.callIt("mac.email_failed") + " " + self.said(error)
         }
     }
 
@@ -2109,7 +2134,7 @@ extension Shop {
         } catch let locked as Secrets.Failure {
             moveProblem = words.callIt("mac.telegram_failed") + " " + locked.description
         } catch {
-            moveProblem = words.callIt("mac.telegram_failed") + " " + String(describing: error)
+            moveProblem = words.callIt("mac.telegram_failed") + " " + self.said(error)
         }
     }
 
@@ -2584,7 +2609,7 @@ extension Shop {
                 await self.load(self.source)
                 return outcome.redo
             } catch {
-                self.moveProblem = String(describing: error)
+                self.moveProblem = self.said(error)
                 return nil
             }
         }
@@ -2619,7 +2644,7 @@ extension Shop {
             // it just put there.
             await load(source)
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 

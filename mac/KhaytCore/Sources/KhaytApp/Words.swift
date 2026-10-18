@@ -240,9 +240,21 @@ final class Words {
         return out
     }
 
+    /// One of this app's own sentences in English, with no `Words` to hand —
+    /// for a `description` that lands in a log, or a test. What a shop reads
+    /// goes through `callIt`, in the shop's language; this is the same entry's
+    /// English, so the two cannot drift into two spellings.
+    nonisolated static func english(_ key: String, _ params: [String: JSONValue] = [:]) -> String {
+        var out = own[key]?["en"] ?? key
+        for (name, value) in params {
+            out = out.replacingOccurrences(of: "{\(name)}", with: plain(value))
+        }
+        return out
+    }
+
     /// A parameter as the renderer's `String(vars[k])` would render it —
     /// including a whole number staying whole, which `"\(Double)"` does not do.
-    static func plain(_ value: JSONValue) -> String {
+    nonisolated static func plain(_ value: JSONValue) -> String {
         switch value {
         case .string(let s): return s
         case .number(let n):
@@ -684,6 +696,7 @@ final class Words {
         // Units beside the printer's fields, in the shop's language.
         "mac.unit_mm":          ["en": "mm", "ar": "مم"],
         "mac.unit_watts":       ["en": "W", "ar": "واط"],
+        "mac.unit_kwh":         ["en": "kWh", "ar": "كيلوواط ساعة"],
         // Electricity quoted against electricity metered, per machine — the
         // actuals panel, not the P&L.
         "mac.acc_power_title":  ["en": "Electricity: quoted and metered", "ar": "الكهرباء: المقدّرة والمقيسة"],
@@ -2199,6 +2212,54 @@ final class Words {
                               "ar": "يُحفظ مشفَّراً في سلسلة المفاتيح، كما تحفظه خيط."],
         "mach.test":         ["en": "Test",            "ar": "اختبر"],
         "mach.test_bad_draft":["en": "Fill in an address first.", "ar": "أدخل العنوان أولاً."],
+        // A save the book refused, said inside the machine sheet — which now
+        // stays open so nothing typed is lost.
+        "mac.mach_not_saved": ["en": "The machine was not saved.", "ar": "لم تُحفظ الآلة."],
+        // ── What a printer's failure says (`PrinterWatch.sentence`) ─────────
+        // Reaches the Test button, the machine card and the menu bar.
+        "mac.pw_handshake": ["en": "The printer refused the connection: {why}",
+                             "ar": "رفضت الطابعة الاتصال: {why}"],
+        "mac.pw_needs_serial": ["en": "This Bambu has no serial number yet. It is printed on the machine, and every message to it is addressed by it, so there is nothing to ask without one.",
+                                "ar": "لا يوجد رقم تسلسلي لطابعة Bambu هذه بعد. الرقم مطبوع على الجهاز، وكل رسالة إليها تُوجَّه به، فلا يمكن سؤالها من دونه."],
+        "mac.pw_unreadable": ["en": "The {type} printer answered with something this app could not read.",
+                              "ar": "ردّت طابعة {type} بشيء لم يستطع هذا التطبيق قراءته."],
+        "mac.pw_needs_mainboard": ["en": "This printer has no mainboard ID yet. It is how every message reaches it, and it is not printed on the machine — scan the network to find it.",
+                                   "ar": "لا يوجد معرّف اللوحة الرئيسية لهذه الطابعة بعد. به تصل إليها كل رسالة، وهو غير مطبوع على الجهاز — افحص الشبكة للعثور عليه."],
+        "mac.pw_no_host": ["en": "This machine has no address yet.", "ar": "لا يوجد عنوان لهذه الآلة بعد."],
+        "mac.pw_not_lan": ["en": "{host} is not an address on this network. A printer is a machine in the workshop, so only the private ranges are allowed.",
+                           "ar": "{host} ليس عنوانًا على هذه الشبكة. الطابعة جهاز داخل الورشة، لذا يُسمح بالعناوين الخاصة فقط."],
+        "mac.pw_bad_port": ["en": "{port} is not a port.", "ar": "{port} ليس منفذًا صالحًا."],
+        "mac.pw_redirected": ["en": "The printer sent this request somewhere else, so it was dropped.",
+                              "ar": "حوّلت الطابعة هذا الطلب إلى مكان آخر، فأُلغي."],
+        "mac.pw_http": ["en": "The printer's server answered {code}.", "ar": "أجاب خادم الطابعة بالرمز {code}."],
+        "mac.pw_http_body": ["en": "The printer's server answered {code}: {body}.",
+                             "ar": "أجاب خادم الطابعة بالرمز {code}: {body}."],
+        "mac.pw_no_history": ["en": "A {type} printer does not keep a job history Khayt can read. Klipper (Moonraker) is the only one of the three that does — the rest answer nothing at all, which arrives as a 404. Khayt counts this machine's wear from the jobs in your own book instead.",
+                              "ar": "طابعة {type} لا تحتفظ بسجل مهام يستطيع خيط قراءته. Klipper (Moonraker) وحدها من الثلاث تفعل ذلك — والبقية لا تجيب بشيء، فيصل ذلك على شكل 404. يحسب خيط اهتراء هذه الآلة من المهام في دفترك بدلًا من ذلك."],
+        "mac.pw_no_history_any": ["en": "A printer of this kind does not keep a job history Khayt can read. Klipper (Moonraker) is the only one of the three that does — the rest answer nothing at all, which arrives as a 404. Khayt counts this machine's wear from the jobs in your own book instead.",
+                                  "ar": "هذا النوع من الطابعات لا يحتفظ بسجل مهام يستطيع خيط قراءته. Klipper (Moonraker) وحدها من الثلاث تفعل ذلك — والبقية لا تجيب بشيء، فيصل ذلك على شكل 404. يحسب خيط اهتراء هذه الآلة من المهام في دفترك بدلًا من ذلك."],
+        "mac.pw_not_json": ["en": "The printer's answer was not JSON.", "ar": "لم يكن ردّ الطابعة بصيغة JSON."],
+        "mac.pw_timed_out": ["en": "The printer did not answer in time. It may be asleep or off the network.",
+                             "ar": "لم تُجب الطابعة في الوقت المحدد. ربما هي في وضع السكون أو خارج الشبكة."],
+        "mac.pw_cannot_connect": ["en": "Nothing answered at that address. Check the printer is on and on this network.",
+                                  "ar": "لم يُجب شيء على هذا العنوان. تأكد أن الطابعة تعمل ومتصلة بهذه الشبكة."],
+        "mac.pw_cannot_find": ["en": "That name did not resolve to anything on this network.",
+                               "ar": "لم يُشِر هذا الاسم إلى أي جهاز على هذه الشبكة."],
+        "mac.pw_sdcp_refused": ["en": "The printer refused: {why}", "ar": "رفضت الطابعة: {why}"],
+        "mac.pw_sdcp_silent": ["en": "The printer did not answer in time. Check it is on, and that the mainboard ID is the one this machine actually has.",
+                               "ar": "لم تُجب الطابعة في الوقت المحدد. تأكد أنها تعمل، وأن معرّف اللوحة الرئيسية هو معرّف هذه الآلة فعلًا."],
+        "mac.pw_closed": ["en": "The printer closed the connection before answering.",
+                          "ar": "أغلقت الطابعة الاتصال قبل أن تُجيب."],
+        "mac.pw_conn_closed": ["en": "The connection to the printer was closed.", "ar": "أُغلق الاتصال بالطابعة."],
+        "mac.pw_unreachable": ["en": "Could not reach the printer: {why}", "ar": "تعذّر الوصول إلى الطابعة: {why}"],
+        "mac.pw_malformed": ["en": "The printer sent something this app could not read.",
+                             "ar": "أرسلت الطابعة شيئًا لم يستطع هذا التطبيق قراءته."],
+        "mac.pw_cert_changed": ["en": "The printer answered with a different certificate from the one it used before, so the access code was not sent. If the printer was replaced or reset, save its access code again on the machine sheet to trust the new one.",
+                                "ar": "ردّت الطابعة بشهادة مختلفة عن التي استخدمتها من قبل، لذا لم يُرسَل رمز الوصول. إن استُبدلت الطابعة أو أُعيد ضبطها، فاحفظ رمز الوصول مجددًا في نافذة الآلة لتثق بالشهادة الجديدة."],
+        "mac.pw_code_refused": ["en": "The printer refused the access code (CONNACK {code}). It is shown on the printer's own screen, in the LAN-only Mode area.",
+                                "ar": "رفضت الطابعة رمز الوصول (CONNACK {code}). يظهر الرمز على شاشة الطابعة نفسها، في قسم وضع الشبكة المحلية فقط."],
+        "mac.pw_bambu_silent": ["en": "The printer accepted the connection and then said nothing. That is what happens when Developer Mode is off — LAN-only Mode alone does not open MQTT. Both are in the same menu on the printer (Settings → LAN Mode, or WLAN/Network on P1 and A1).",
+                                "ar": "قبلت الطابعة الاتصال ثم لم تقل شيئًا. هذا ما يحدث حين يكون وضع المطوّر (Developer Mode) مطفأً — وضع الشبكة المحلية وحده لا يفتح MQTT. كلاهما في القائمة نفسها على الطابعة (Settings ← LAN Mode، أو WLAN/Network في P1 وA1)."],
         "mac.nozzle_wear":   ["en": "Nozzle wear",     "ar": "تآكل الفوهة"],
         // The dashed rectangle behind a bed plan. Without this the drawing
         // reads as a rendering fault rather than as a comparison.
@@ -2754,6 +2815,19 @@ final class Words {
                                 "ar": "تغيّرت نقاط هذا العميل على جهاز آخر. راجعها ثم استبدل المتبقي."],
         "mac.cr_off_elsewhere": ["en": "Customer records were turned off for this shop on another Mac, so they are off here too. Turn them on again to publish.",
                                  "ar": "أُوقفت سجلات العملاء لهذا المتجر على جهاز ماك آخر، فأُوقفت هنا أيضًا. شغّلها مجددًا للنشر."],
+        "mac.lib_err_not_ours": ["en": "Another app has this book open.", "ar": "تطبيق آخر يفتح هذا الدفتر."],
+        "mac.lib_err_no_library": ["en": "This Mac has no print library folder.", "ar": "لا يوجد مجلد لمكتبة الطباعة على هذا الماك."],
+        "mac.lib_err_unknown_kind": ["en": "Khayt does not read .{ext} files.", "ar": "لا يقرأ خيط ملفات ‎.{ext}‎."],
+        "mac.lib_err_already_here": ["en": "{name} is already in the library.", "ar": "{name} موجود في المكتبة بالفعل."],
+        "mac.lib_err_failed": ["en": "Could not add the file: {why}", "ar": "تعذّرت إضافة الملف: {why}"],
+        "mac.conv_err_unreadable": ["en": "Could not read the 3MF: {why}", "ar": "تعذّرت قراءة ملف 3MF: {why}"],
+        "mac.conv_err_mesh_too_big": ["en": "A colour plan has to rewrite the model itself, and {name} is {mb} MB, more than the {cap} MB this app will bring in at once. Convert it in Khayt, or retarget it here without a colour plan.",
+                                      "ar": "خطة الألوان تعيد كتابة النموذج نفسه، و{name} حجمه {mb} ميغابايت، أكثر من {cap} ميغابايت يجلبها هذا التطبيق دفعة واحدة. حوّله في خيط، أو أعد توجيهه هنا دون خطة ألوان."],
+        "mac.conv_err_too_big": ["en": "This 3MF unpacks to {mb} MB, more than the {cap} MB a conversion will hold at once.",
+                                 "ar": "يتوسّع ملف 3MF هذا إلى {mb} ميغابايت، أكثر من {cap} ميغابايت تتسع لها عملية تحويل واحدة."],
+        "mac.store_too_large": ["en": "That change would make the book larger than a backup can hold, so nothing was written.",
+                                "ar": "هذا التغيير يجعل الدفتر أكبر مما تتسع له النسخة الاحتياطية، فلم يُكتب شيء."],
+        "mac.store_unreadable": ["en": "Could not read the book to change it: {why}", "ar": "تعذّرت قراءة الدفتر لتعديله: {why}"],
         "mac.cloud_err_http": ["en": "Khayt Cloud answered with error {code}.", "ar": "ردّت سحابة خيط بالخطأ {code}."],
         "mac.wa_err_unauthorised": ["en": "Khayt Cloud did not accept this shop's sign-in. Sign in to Khayt Cloud again.",
                                     "ar": "لم تقبل سحابة خيط تسجيل دخول هذا المحل. سجّل الدخول إلى سحابة خيط مرة أخرى."],
@@ -3988,6 +4062,9 @@ final class Words {
                                       "ar": "لا يمكن حذف أي من العملاء المختارين: لكل منهم أعمال أو بطاقات هدايا."],
         "mac.deleted_customers": ["en": "Customers deleted: {n}.", "ar": "العملاء المحذوفون: {n}."],
         "mac.delete_customers_action": ["en": "Delete Customers", "ar": "حذف العملاء"],
+        // A customer's right to erasure (`Shop+Privacy.swift`). The sheet's
+        // own words are the desktop's `priv.*`; only the menu item is new.
+        "mac.erase_customer": ["en": "Erase Customer\u{2026}", "ar": "محو العميل\u{2026}"],
         // ── ASKED BEFORE A ONE-CLICK REMOVAL (see `AskFirst`) ────────────
         // `mac.delete_product_q` above is the title for every named delete —
         // "Delete “{name}”?" is not about products. These say what happens
@@ -4220,6 +4297,92 @@ final class Words {
                               "ar": "أحد الأجزاء لا يحمل عمالة أو كهرباء أو استهلاكاً، فتُحتسب كلفته من الخيط وحده. أضفه من جديد بالأرقام أعلاه لتسعيره بالكامل."],
         "mac.tracking_link_copied": ["en": "Tracking link copied. The customer sees the stage, the shipping and, once done, a short survey.",
                                      "ar": "نُسخ رابط المتابعة. يرى العميل المرحلة والشحن، وبعد الإنجاز استبياناً قصيراً."],
+        // ── A printer's working life: under service, retired, deleted ─────
+        // (`Shop+MachineLife.swift`, `lib/machine-status.js`).
+        "mac.life_badge_service": ["en": "Under service", "ar": "تحت الصيانة"],
+        "mac.life_badge_retired": ["en": "Retired", "ar": "خارج الخدمة"],
+        "mac.life_since": ["en": "since {date}", "ar": "منذ {date}"],
+        "mac.life_retired_on": ["en": "Retired {date}", "ar": "خرجت من الخدمة في {date}"],
+        "mac.life_retired_list": ["en": "Retired ({n})", "ar": "خارج الخدمة ({n})"],
+        "mac.life_retired_hint": ["en": "Kept for their history — jobs, costs and service. Not polled, not offered for work.",
+                                  "ar": "محفوظة لسجلها — الأعمال والتكاليف والصيانة. لا تُتابَع ولا تُعرض للعمل."],
+        "mac.life_retired_suffix": ["en": "(retired)", "ar": "(خارج الخدمة)"],
+        "mac.life_service_suffix": ["en": "(under service)", "ar": "(تحت الصيانة)"],
+        "mac.life_deleted_printer": ["en": "Deleted printer", "ar": "طابعة محذوفة"],
+        "mac.life_status": ["en": "Status", "ar": "الحالة"],
+        "mac.life_mark_service": ["en": "Mark Under Service…", "ar": "ضعها تحت الصيانة…"],
+        "mac.life_mark_service_action": ["en": "Mark Under Service", "ar": "وضع تحت الصيانة"],
+        "mac.life_back_in_service": ["en": "Back in Service", "ar": "أعدها للعمل"],
+        "mac.life_retire": ["en": "Retire…", "ar": "أخرجها من الخدمة…"],
+        "mac.life_retire_action": ["en": "Retire Printer", "ar": "إخراج الطابعة من الخدمة"],
+        "mac.life_unretire": ["en": "Return to Service", "ar": "أعدها إلى الخدمة"],
+        "mac.life_delete": ["en": "Delete Printer…", "ar": "احذف الطابعة…"],
+        "mac.life_delete_action": ["en": "Delete Printer", "ar": "حذف الطابعة"],
+        "mac.life_delete_blocked": ["en": "Can't delete — used by {what}", "ar": "لا يمكن حذفها — مستخدمة في {what}"],
+        "mac.life_delete_blocked_hint": ["en": "Retire it instead: its history stays.",
+                                         "ar": "أخرجها من الخدمة بدلًا من ذلك: يبقى سجلها."],
+        "mac.life_delete_missing": ["en": "This printer is no longer in the book.", "ar": "هذه الطابعة لم تعد في الدفتر."],
+        "mac.life_delete_refused_now": ["en": "Not deleted:", "ar": "لم تُحذف:"],
+        "mac.life_ref_jobs": ["en": "{n} jobs", "ar": "{n} عملًا"],
+        "mac.life_ref_jobs_one": ["en": "{n} job", "ar": "عمل واحد"],
+        "mac.life_ref_jobs_two": ["en": "2 jobs", "ar": "عملين"],
+        "mac.life_ref_jobs_few": ["en": "{n} jobs", "ar": "{n} أعمال"],
+        "mac.life_ref_service": ["en": "{n} service entries", "ar": "{n} سجل صيانة"],
+        "mac.life_ref_service_one": ["en": "{n} service entry", "ar": "سجل صيانة واحد"],
+        "mac.life_ref_service_two": ["en": "2 service entries", "ar": "سجلَّي صيانة"],
+        "mac.life_ref_service_few": ["en": "{n} service entries", "ar": "{n} سجلات صيانة"],
+        "mac.life_ref_tasks": ["en": "{n} maintenance tasks", "ar": "{n} مهمة صيانة"],
+        "mac.life_ref_tasks_one": ["en": "{n} maintenance task", "ar": "مهمة صيانة واحدة"],
+        "mac.life_ref_tasks_two": ["en": "2 maintenance tasks", "ar": "مهمتَي صيانة"],
+        "mac.life_ref_tasks_few": ["en": "{n} maintenance tasks", "ar": "{n} مهام صيانة"],
+        "mac.life_ref_waste": ["en": "{n} waste entries", "ar": "{n} سجل هدر"],
+        "mac.life_ref_waste_one": ["en": "{n} waste entry", "ar": "سجل هدر واحد"],
+        "mac.life_ref_waste_two": ["en": "2 waste entries", "ar": "سجلَّي هدر"],
+        "mac.life_ref_waste_few": ["en": "{n} waste entries", "ar": "{n} سجلات هدر"],
+        "mac.life_ref_expenses": ["en": "{n} expenses", "ar": "{n} مصروفًا"],
+        "mac.life_ref_expenses_one": ["en": "{n} expense", "ar": "مصروف واحد"],
+        "mac.life_ref_expenses_two": ["en": "2 expenses", "ar": "مصروفين"],
+        "mac.life_ref_expenses_few": ["en": "{n} expenses", "ar": "{n} مصروفات"],
+        "mac.life_ref_time": ["en": "{n} time entries", "ar": "{n} سجل وقت"],
+        "mac.life_ref_time_one": ["en": "{n} time entry", "ar": "سجل وقت واحد"],
+        "mac.life_ref_time_two": ["en": "2 time entries", "ar": "سجلَّي وقت"],
+        "mac.life_ref_time_few": ["en": "{n} time entries", "ar": "{n} سجلات وقت"],
+        "mac.life_ref_completions": ["en": "{n} print records from the printer", "ar": "{n} سجل طباعة من الطابعة"],
+        "mac.life_ref_completions_one": ["en": "the printer's own print record", "ar": "سجل طباعة واحد من الطابعة"],
+        "mac.life_ref_completions_two": ["en": "2 print records from the printer", "ar": "سجلَّي طباعة من الطابعة"],
+        "mac.life_ref_completions_few": ["en": "{n} print records from the printer", "ar": "{n} سجلات طباعة من الطابعة"],
+        "mac.life_ref_other": ["en": "{n} other records", "ar": "{n} سجلًا آخر"],
+        "mac.life_ref_other_one": ["en": "{n} other record", "ar": "سجل آخر واحد"],
+        "mac.life_ref_other_two": ["en": "2 other records", "ar": "سجلين آخرين"],
+        "mac.life_ref_other_few": ["en": "{n} other records", "ar": "{n} سجلات أخرى"],
+        "mac.life_service_title": ["en": "Mark “{name}” under service?", "ar": "هل تضع «{name}» تحت الصيانة؟"],
+        "mac.life_service_message": ["en": "Khayt stops asking it for its status and stops offering it for work until you put it back in service. Its history and costs stay.",
+                                     "ar": "يتوقف خيط عن سؤالها عن حالتها وعن عرضها للعمل حتى تعيدها للعمل. يبقى سجلها وتكاليفها."],
+        "mac.life_reason": ["en": "Reason (optional)", "ar": "السبب (اختياري)"],
+        "mac.life_service_confirm": ["en": "Mark Under Service", "ar": "ضعها تحت الصيانة"],
+        "mac.life_retire_title": ["en": "Retire “{name}”?", "ar": "هل تُخرج «{name}» من الخدمة؟"],
+        "mac.life_retire_message": ["en": "A retired printer keeps its jobs, costs and service history, and leaves the lists, pickers and polling. You can return it to service later.",
+                                    "ar": "تحتفظ الطابعة الخارجة من الخدمة بأعمالها وتكاليفها وسجل صيانتها، وتختفي من القوائم والاختيارات والمتابعة. يمكنك إعادتها إلى الخدمة لاحقًا."],
+        "mac.life_retire_jobs": ["en": "{n} unfinished jobs will lose their printer.", "ar": "ستُزال الطابعة من {n} عملًا غير منتهٍ."],
+        "mac.life_retire_jobs_one": ["en": "{n} unfinished job will lose its printer.", "ar": "ستُزال الطابعة من عمل واحد غير منتهٍ."],
+        "mac.life_retire_jobs_two": ["en": "2 unfinished jobs will lose their printer.", "ar": "ستُزال الطابعة من عملين غير منتهيين."],
+        "mac.life_retire_jobs_few": ["en": "{n} unfinished jobs will lose their printer.", "ar": "ستُزال الطابعة من {n} أعمال غير منتهية."],
+        "mac.life_retire_none": ["en": "No unfinished job is on it.", "ar": "لا يوجد عليها عمل غير منتهٍ."],
+        "mac.life_retire_confirm": ["en": "Retire", "ar": "أخرجها من الخدمة"],
+        "mac.life_delete_title": ["en": "Delete “{name}”?", "ar": "هل تحذف «{name}»؟"],
+        "mac.life_delete_message": ["en": "Nothing in the book refers to this printer, so it can be deleted. Undo brings it back.",
+                                    "ar": "لا شيء في الدفتر يشير إلى هذه الطابعة، لذا يمكن حذفها. التراجع يعيدها."],
+        "mac.life_now_service": ["en": "{name} is under service.", "ar": "«{name}» تحت الصيانة الآن."],
+        "mac.life_now_in_service": ["en": "{name} is back in service.", "ar": "عادت «{name}» إلى العمل."],
+        "mac.life_now_retired": ["en": "{name} is retired.", "ar": "خرجت «{name}» من الخدمة."],
+        "mac.life_now_returned": ["en": "{name} is back in service.", "ar": "عادت «{name}» إلى الخدمة."],
+        "mac.life_now_deleted": ["en": "{name} was deleted.", "ar": "حُذفت «{name}»."],
+        "mac.life_jobs_unassigned": ["en": "{n} jobs no longer have a printer.", "ar": "{n} عملًا لم تعد لها طابعة."],
+        "mac.life_jobs_unassigned_one": ["en": "{n} job no longer has a printer.", "ar": "عمل واحد لم تعد له طابعة."],
+        "mac.life_jobs_unassigned_two": ["en": "2 jobs no longer have a printer.", "ar": "عملان لم تعد لهما طابعة."],
+        "mac.life_jobs_unassigned_few": ["en": "{n} jobs no longer have a printer.", "ar": "{n} أعمال لم تعد لها طابعة."],
+        "mac.life_not_polled_service": ["en": "Under service — Khayt is not asking it", "ar": "تحت الصيانة — لا يسألها خيط"],
+        "mac.life_not_polled_retired": ["en": "Retired — Khayt is not asking it", "ar": "خارج الخدمة — لا يسألها خيط"],
     ]
 
     /// The Khayt keys this app leans on. Listed so a test can prove every one of

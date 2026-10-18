@@ -171,6 +171,10 @@ extension Shop {
     /// got no answer does not call this — a machine nobody heard from has not
     /// ended, as the phone's rule says.
     func liveActivityHeard(_ machine: Machine, status: KhaytEngine.PrinterStatus, now: Date = Date()) {
+        // A retired or under-service printer is not polled, but a one-off
+        // refresh can still hear it; nothing about it belongs on a phone's
+        // Lock Screen (`lib/machine-status.js`).
+        guard machine.inService else { return }
         guard liveActivitiesOptedIn(), Self.cloudConnected(settingsDict), cloudRoleCanWrite else { return }
         var cloud: [String: JSONValue] = [:]
         if case .object(let c)? = settingsDict["cloud"] { cloud = c }

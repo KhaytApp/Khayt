@@ -330,7 +330,11 @@ struct WasteSheet: View {
                     Text(shop.words.callIt("waste.printer")).foregroundStyle(.secondary)
                     Picker("", selection: $machineId) {
                         Text(shop.words.callIt("mach.unassigned")).tag("")
-                        ForEach(shop.machines) { Text($0.name).tag($0.id) }
+                        // A failure is often logged on the job's own printer,
+                        // retired since: that one stays, labelled.
+                        ForEach(shop.machineChoices(keeping: machineId)) {
+                            Text(shop.machineChoiceLabel($0)).tag($0.id)
+                        }
                     }
                     .labelsHidden()
                 }
