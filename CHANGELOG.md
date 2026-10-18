@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: opening and attaching files checks where the file really is.**
+  Opening a saved report, attaching a file to a job, and adding a model to
+  the library now follow shortcuts (symlinks) to the real file before
+  checking it. A shortcut named `model.stl` that leads to a private key, or a
+  `report.pdf` that leads to an app, is refused. Only file types Khayt
+  writes or reads are accepted: reports, invoices and exports to open; print
+  files, archives and photos to attach.
 - **Mac: customer records for your web store can be turned on.** The privacy
   policy now covers the copy (khaytapp.com/privacy, "Customer records"), so the
   switch in Settings → Online works. It stays off until a shop turns it on, and

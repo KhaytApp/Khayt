@@ -74,6 +74,7 @@ const KhaytRepetier = require('./lib/repetier');
 const printerCommands = require('./lib/printer-commands');
 const excludeObject = require('./lib/exclude-object');
 const webhookBus = require('./lib/webhook-bus');
+const SafeFilePath = require('./lib/safe-file-path');
 const { normalizeStoreSnapshot, STORE_VERSION } = require('./lib/store-validate');
 const upgradeBackup = require('./lib/upgrade-backup');
 const safeNames = require('./lib/safe-names');
@@ -778,16 +779,15 @@ ipcMain.handle('hub:reveal-in-finder', async (_e, filePath) => {
 });
 
 ipcMain.handle('hub:open-path', async (_e, filePath) => {
-  if (!filePath) return { ok: false };
-  const resolved = path.resolve(String(filePath));
-  const allowedOpen = [
-    path.resolve(app.getPath('userData')),
-    path.resolve(app.getPath('documents')),
-    path.resolve(app.getPath('downloads')),
-    path.resolve(app.getPath('desktop')),
-  ];
-  if (!allowedOpen.some(d => resolved.startsWith(d + path.sep) || resolved === d)) return { ok: false };
-  if (fs.existsSync(resolved)) shell.openPath(resolved);
+  // Where the file REALLY is, and only a kind the app writes for the shop to
+  // open (lib/safe-file-path.js): a symlink in Downloads could otherwise name
+  // an app, and openPath would launch it.
+  const r = SafeFilePath.realFileWithin(filePath, {
+    dirs: [app.getPath('userData'), app.getPath('documents'), app.getPath('downloads'), app.getPath('desktop')],
+    exts: SafeFilePath.OPENABLE_EXTS, fs, path,
+  });
+  if (!r.ok) return { ok: false, error: r.error };
+  shell.openPath(r.real);
   return { ok: true };
 });
 
@@ -2023,18 +2023,14 @@ ipcMain.handle('hub:reveal-store-file', async () => {
 // --- Feature 2: File vault (per-order 3D files) ---
 const fileVaultDir = () => ensureDir('file-vault');
 ipcMain.handle('hub:copy-file-to-vault', async (_e, { srcPath, orderId }) => {
-  const resolvedSrc = path.resolve(String(srcPath || ''));
-  const allowedSrcDirs = [
-    app.getPath('userData'),
-    app.getPath('documents'),
-    app.getPath('downloads'),
-    app.getPath('desktop'),
-    app.getPath('temp'),
-  ];
-  if (!allowedSrcDirs.some(d => resolvedSrc.startsWith(path.resolve(d) + path.sep) || resolvedSrc === path.resolve(d))) {
-    return { ok: false, error: 'Source path is outside allowed directories' };
-  }
-  const src = resolvedSrc;
+  // Checked where the file REALLY is: a `model.stl` in Downloads that links to
+  // a key file would otherwise be copied into the job (lib/safe-file-path.js).
+  const r = SafeFilePath.realFileWithin(srcPath, {
+    dirs: [app.getPath('userData'), app.getPath('documents'), app.getPath('downloads'), app.getPath('desktop'), app.getPath('temp')],
+    exts: SafeFilePath.VAULT_EXTS, fs, path,
+  });
+  if (!r.ok) return { ok: false, error: r.error };
+  const src = r.real;
   const safeId = path.basename(String(orderId || '')).replace(/[^a-zA-Z0-9_-]/g, '_');
   const orderVaultDir = path.join(fileVaultDir(), safeId);
   if (!fs.existsSync(orderVaultDir)) fs.mkdirSync(orderVaultDir, { recursive: true });
@@ -3257,11 +3253,15 @@ ipcMain.handle('hub:printlib-pick-multi', async (event) => {
 // pick-and-copy. Extension-gated to real print files so a stray drop can't smuggle in something else.
 ipcMain.handle('hub:printlib-copy-path', async (_e, { id, srcPath } = {}) => {
   try {
-    const src = path.resolve(String(srcPath || ''));
-    if (!src || !fs.existsSync(src) || !fs.statSync(src).isFile()) return { ok: false, error: 'File not found.' };
-    const originalName = path.basename(src);
-    const ext = path.extname(originalName).slice(1).toLowerCase();
-    if (!/^(stl|3mf|obj|gcode|gco)$/.test(ext)) return { ok: false, error: 'Not a print file (need STL, 3MF, OBJ or G-code).' };
+    // Any folder — a model pack lives on a NAS or a USB stick as often as in
+    // Downloads — but the REAL file must be a print file: a `part.stl` that
+    // links to a key file would otherwise be copied into the library, and the
+    // library mirrors to the shop's cloud storage (lib/safe-file-path.js).
+    const r = SafeFilePath.realFileWithin(srcPath, { exts: ['stl', '3mf', 'obj', 'gcode', 'gco'], fs, path });
+    if (!r.ok) return { ok: false, error: /not allowed/.test(r.error) ? 'Not a print file (need STL, 3MF, OBJ or G-code).' : r.error };
+    const src = r.real;
+    const originalName = path.basename(String(srcPath));
+    const ext = path.extname(src).slice(1).toLowerCase();
     // Hash the SOURCE, before the copy. A file the shop already has should be
     // recognised without first writing a second copy of it into the library.
     let contentHash = null;
