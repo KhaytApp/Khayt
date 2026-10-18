@@ -278,6 +278,7 @@ extension Shop {
     /// sending anything: the copy is already down, and a delete from here
     /// would be one more request saying what the cloud already knows.
     func switchCustomerRecordsOffHere() async {
+        // lock: system — follows an off the shop already made on another Mac; it can only turn the upload off, never on.
         guard let build = source.build else { return }
         let at = Self.isoNow()
         try? await StoreWriter.updateOffMain(build) { root in
