@@ -2403,6 +2403,7 @@
   "po.received_toast": "Satın alma siparişi teslim alındı olarak işaretlendi",
   "po.created_toast": "Satın alma siparişi oluşturuldu",
   "po.partial": "Kısmen teslim alındı",
+  "po.item_gone": "Bu siparişin kalemi artık stokta kayıtlı değil, bu yüzden hiçbir şey teslim alınmadı. Yeniden ekleyin veya siparişi elle kapatın.",
   "po.received_so_far": "Şimdiye kadar teslim alınan",
   "po.receive_more": "Daha fazla teslim al",
   "po.close_po": "SAS'ı Kapat",

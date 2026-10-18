@@ -2403,6 +2403,7 @@
   "po.received_toast": "OC marcada como recibida",
   "po.created_toast": "OC creada",
   "po.partial": "Recibido parcialmente",
+  "po.item_gone": "El artículo de este pedido ya no está en el inventario, así que no se recibió nada. Vuelve a añadirlo o cierra el pedido a mano.",
   "po.received_so_far": "Recibido hasta ahora",
   "po.receive_more": "Recibir más",
   "po.close_po": "Cerrar OC",

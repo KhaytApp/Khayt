@@ -2403,6 +2403,7 @@
   "po.received_toast": "発注書を受領済みにしました",
   "po.created_toast": "発注書を作成しました",
   "po.partial": "一部受領",
+  "po.item_gone": "この発注の品目は在庫に存在しないため、何も入荷されませんでした。再登録するか、発注を手動で完了してください。",
   "po.received_so_far": "受領済み数量",
   "po.receive_more": "追加受領",
   "po.close_po": "発注書を閉じる",

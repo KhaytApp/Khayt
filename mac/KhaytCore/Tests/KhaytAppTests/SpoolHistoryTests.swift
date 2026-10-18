@@ -34,7 +34,7 @@ struct SpoolHistoryTests {
     func theTotal() async throws {
         let spools = await Self.sampleSpools()
         let used = try #require(spools.first { !($0.usageHistory ?? []).isEmpty })
-        let expected = (used.usageHistory ?? []).reduce(0) { $0 + $1.weightUsed }
+        let expected = (used.usageHistory ?? []).filter { !$0.isReceipt }.reduce(0) { $0 + $1.weightUsed }
         #expect(used.totalUsed == expected)
         #expect(used.totalUsed > 0)
         // And it is NOT what is left on the spool — a screen that showed the
@@ -47,7 +47,8 @@ struct SpoolHistoryTests {
         // A sample spool showed 298 g and 79 g over a total of 376 g: the
         // rows were rounded one by one and the total once.
         for spool in await Self.sampleSpools() where !(spool.usageHistory ?? []).isEmpty {
-            let shown = (spool.usageHistory ?? []).reduce(0) { $0 + $1.weightUsed.rounded() }
+            let shown = (spool.usageHistory ?? []).filter { !$0.isReceipt }
+                .reduce(0) { $0 + $1.weightUsed.rounded() }
             #expect(SpoolHistorySheet.shownTotal(spool, places: 0) == shown, "\(spool.id)")
         }
     }
@@ -71,19 +72,42 @@ struct SpoolHistoryTests {
         #expect(spool.usageHistory?[1].date.isEmpty == true)
     }
 
-    @Test("two deductions on one day for one job are two rows, not one")
-    func idsAreDistinct() throws {
-        // The book writes no id, so the screen makes one. A key built from the
-        // date and the job alone would collapse a reprint into the first.
+    @Test("two equal deductions on one day for one job are two rows, not one")
+    func rowsAreKeyedByPosition() throws {
+        // The book writes no id. A key built from the row — date, job, grams —
+        // REPEATS for two equal draws on one day, and SwiftUI drew them as one.
+        let sheet = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp/SpoolHistorySheet.swift"),
+            encoding: .utf8)
+        #expect(sheet.contains("ForEach(Array(uses.enumerated()), id: \\.offset)"),
+                "the rows are keyed by something that can repeat")
         let spool = try JSONDecoder().decode(Spool.self, from: JSONEncoder().encode(
             JSONValue.object(["id": .string("SP-Y"), "material": .string("PLA"),
                               "usageHistory": .array([
                                 .object(["date": .string("2026-09-01"), "orderId": .string("O1"),
                                          "weightUsed": .number(40)]),
                                 .object(["date": .string("2026-09-01"), "orderId": .string("O1"),
-                                         "weightUsed": .number(55)])])])))
-        let uses = try #require(spool.usageHistory)
-        #expect(Set(uses.map(\.id)).count == 2, "a reprint on the same day vanished from the list")
+                                         "weightUsed": .number(40)])])])))
+        #expect(spool.usageHistory?.count == 2)
+        #expect(spool.totalUsed == 80, "a reprint on the same day vanished from the total")
+    }
+
+    @Test("a receipt is shown but is not counted as use")
+    func receiptsAreNotUse() throws {
+        // The history is what LEFT the spool, so a delivery is a NEGATIVE row.
+        // Added in, 1000 g received and 300 g used read as "-700 g".
+        let spool = try JSONDecoder().decode(Spool.self, from: JSONEncoder().encode(
+            JSONValue.object(["id": .string("SP-R"), "material": .string("PLA"),
+                              "usageHistory": .array([
+                                .object(["date": .string("2026-09-02"), "orderId": .string("O1"),
+                                         "weightUsed": .number(300.4)]),
+                                .object(["date": .string("2026-09-01"), "orderId": .string("PO-1"),
+                                         "type": .string("received"),
+                                         "weightUsed": .number(-1000)])])])))
+        #expect(spool.usageHistory?.count == 2, "the receipt row is no longer shown")
+        #expect(spool.totalUsed == 300.4)
+        #expect(SpoolHistorySheet.shownTotal(spool, places: 0) == 300)
     }
 
     @Test("the sheet is presented, and offered only when there is something to show")

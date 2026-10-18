@@ -1561,7 +1561,7 @@ public actor KhaytEngine {
     /// books no expense rather than one for nothing.
     public struct GoodsReceived: Decodable, Sendable {
         public let ok: Bool
-        /// 'no_order' or 'no_quantity' when it refuses.
+        /// 'no_order', 'no_quantity' or 'no_item' (the spool or consumable is gone) when it refuses.
         public let reason: String?
         /// True when what has arrived now covers what was ordered.
         public let complete: Bool?
@@ -7959,16 +7959,44 @@ public actor KhaytEngine {
     /// progress, energy }` — `settings` for the shop's tariff) the row also carries the failed print's machine time and
     /// electricity beside its filament (`lib/failed-print-cost.js`). `cost`
     /// is never changed by that: it stays the material figure the P&L reads.
+    ///
+    /// A failure on a JOB that deducts goes through `forOrder`, as the other
+    /// app's does: the grams come off the spools that job was printing from,
+    /// the entry records exactly what came off each (`drawn`) and the spool
+    /// history lines carry the lot, so a recall finds it and deleting it puts
+    /// back what was taken. `newEntry` took the first spool of the material,
+    /// whatever the job was on. What the sheet asks that `forOrder` does not
+    /// write (reason, printer, the typed cost) is kept on the entry.
+    /// `settings` and `machines` are what `forOrder` reads to pick the spools.
     public func newWasteEntry(_ input: [String: JSONValue], id: String, today: String,
                               inventory: [JSONValue], order: JSONValue? = nil,
-                              costing: JSONValue? = nil) throws -> WasteWritten {
+                              costing: JSONValue? = nil,
+                              settings: [String: JSONValue] = [:],
+                              machines: [JSONValue] = [],
+                              reclaimsTax: Bool = false) throws -> WasteWritten {
         try runtime.call2(
-            "(function(){var inv = ARG3; var out = KhaytWasteEntry.newEntry(ARG0, {id: ARG1, today: ARG2, inventory: inv});"
-          + " if (out.entry && ARG4 && ARG5) KhaytFailedPrintCost.attach(out.entry, ARG4, ARG5,"
+            "(function(){var inv = ARG3, i = ARG0, o = ARG4, out;"
+          + " if (o && i.deduct) {"
+          + "   out = KhaytWasteEntry.forOrder(o, i, {id: ARG1, today: ARG2, inventory: inv,"
+          + "     settings: ARG6, machines: ARG7, reclaimsTax: ARG8});"
+          // A job with no spool assigned to any part has nothing for
+          // `forOrder` to draw from; the first spool of the material is
+          // still a better answer than taking nothing off the shelf.
+          + "   if (out.entry && !(out.deducted > 0) && +i.weight > 0) out = KhaytWasteEntry.newEntry(i, {id: ARG1, today: ARG2, inventory: inv});"
+          + "   else if (out.entry) {"
+          + "     out.entry.reason = String(i.reason == null ? '' : i.reason).trim();"
+          + "     var mid = String(i.machineId == null ? '' : i.machineId).trim();"
+          + "     out.entry.machineId = mid || o.machineId || null;"
+          + "     var typed = parseFloat(i.cost);"
+          + "     if (isFinite(typed) && typed > 0) out.entry.cost = typed;"
+          + "   }"
+          + " } else out = KhaytWasteEntry.newEntry(i, {id: ARG1, today: ARG2, inventory: inv});"
+          + " if (out.entry && o && ARG5) KhaytFailedPrintCost.attach(out.entry, o, ARG5,"
           + "   { machine: ARG5.machine || null, preset: ARG5.preset || null, settings: ARG5.settings || null });"
           + " return {entry: out.entry, refused: out.refused, inventory: inv};})()",
             [.object(input), .string(id), .string(today), .array(inventory),
-             order ?? .null, costing ?? .null], as: WasteWritten.self)
+             order ?? .null, costing ?? .null, .object(settings), .array(machines),
+             .bool(reclaimsTax)], as: WasteWritten.self)
     }
 
     /// What wasted grams of a material cost, from the spool they came off.

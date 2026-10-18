@@ -210,4 +210,35 @@ struct FilamentDrynessParityTests {
             try checkStatus(value, now: now, "record \(value)", js)
         }
     }
+    @Test("a drying written into the log agrees with recordDrying, row and driedAt")
+    func recordDryingMatches() throws {
+        // The Mac's "mark dried" set `driedAt` and never wrote the log row the
+        // other app's drying form writes. It writes both now, through this.
+        let js = try js()
+        let row: (String) -> JSONValue = { .object(["date": .string($0), "hours": .number(4)]) }
+        let records: [JSONValue] = [
+            .null, .object([:]),
+            .object(["driedAt": .string("2026-09-01")]),
+            .object(["driedAt": .string("2026-09-01T10:00:00Z"), "dryingLog": .array([row("2026-08-01")])]),
+            .object(["dryingLog": .array([row("2026-10-09"), row("2026-07-01")])]),
+            .object(["driedAt": .string("2026-12-31"), "dryingLog": .string("not a list")]),
+        ]
+        let entries: [[String: JSONValue]] = [
+            ["id": .string("DRY-1"), "date": .string("2026-10-01")],
+            ["id": .string("DRY-2"), "date": .string("2026-10-01T23:59:00"), "tempC": .number(55)],
+            ["id": .string("DRY-3"), "date": .string("")],
+            ["id": .string("DRY-4")],
+        ]
+        for record in records {
+            for entry in entries {
+                let mine = FilamentDryness.recordDrying(record, entry: entry)
+                var mineJSON: [String: JSONValue] = ["dryingLog": .array(mine.dryingLog)]
+                if let d = mine.driedAt { mineJSON["driedAt"] = .string(d) }
+                let theirs = try js.value("globalThis.KhaytFilamentDryness.recordDrying(ARG0, ARG1)",
+                                          [record, .object(entry)])
+                #expect(JSONValue.object(mineJSON) == theirs,
+                        Comment(rawValue: "\(record) + \(entry)\n  swift \(mineJSON)\n  js    \(theirs)"))
+            }
+        }
+    }
 }

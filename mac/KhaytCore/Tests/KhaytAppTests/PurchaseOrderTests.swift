@@ -135,7 +135,10 @@ struct PurchaseOrderTests {
     func partialReceipt() async throws {
         let engine = try KhaytEngine()
         let out = try await engine.receiveGoods(
-            order: Self.order("PO-3", qty: 1000), item: nil, consumable: nil,
+            // With a spool: an order whose spool is gone is refused (`no_item`)
+            // rather than advanced with the grams landing nowhere.
+            order: Self.order("PO-3", qty: 1000),
+            item: .object(["id": .string("sp-1"), "weight": .number(100)]), consumable: nil,
             quantity: 400, notes: "", today: "T", expenseId: "E", expenseLabel: "R")
         guard case .object(let po)? = out.po else { Issue.record("no order back"); return }
         #expect(po["status"] == .string("partial"))

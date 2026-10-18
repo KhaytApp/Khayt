@@ -4,6 +4,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Stock: deliveries, waste and spool prices add up.** A part delivery of a
+  new lot is priced at what arrived (250 g of an 80-for-1000 g roll was costed
+  at 80, not 20) and grows with later parts. Waste logged against a roll with
+  less on it than was wasted gives back only what it took when deleted, skips
+  empty rolls, and a deleted failure leaves the lot's recall list. On the Mac,
+  waste logged against a job comes off that job's own spools, as it does on
+  the desktop. Receiving against a deleted spool or consumable is refused in
+  words instead of booking an expense for goods that landed nowhere, and the
+  Mac's Receive button cannot receive twice. Raising a spool's price and its
+  tax together keeps the tax; a spool's history total no longer counts
+  receipts as use; per-gram order prices keep six decimals; and the Mac's
+  "mark dried" writes a drying-log row.
 - **Money: seven fixes to what a shop is owed and what it exports.**
   Quotes, cancelled jobs, voided invoices and fully credited orders no longer
   count as owed: not in receivables, the dashboard strip, or the Mac's title
