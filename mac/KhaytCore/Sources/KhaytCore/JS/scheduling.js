@@ -222,7 +222,11 @@ function proposeSchedule(machines, orders, opts) {
     ? options.batchToleranceMins
     : 0;
 
-  const machineList = Array.isArray(machines) ? machines.filter(Boolean) : [];
+  // A retired printer is not a candidate, and not "offline" either: it is not
+  // coming back, so "waiting for a printer to come back" would be a lie.
+  const machineList = Array.isArray(machines)
+    ? machines.filter((m) => m && m.status !== 'retired' && !(m.retiredAt && String(m.retiredAt).trim()))
+    : [];
   const orderList = Array.isArray(orders) ? orders.filter(Boolean) : [];
 
   const assignments = [];
@@ -272,16 +276,16 @@ function proposeSchedule(machines, orders, opts) {
   // Step 4 + 5: greedy placement with same-material batching.
   for (const order of ordered) {
     // Step 2: candidate machines.
-    const offlineExisted = machineList.some(m => m.isOffline);
+    const offlineExisted = machineList.some(m => m.isOffline || m.status === 'offline');
     const candidates = machineList.filter(
-      m => !m.isOffline
+      m => !m.isOffline && m.status !== 'offline'
         && machineAcceptsMaterial(m, order.material)
         && nozzleOk(m, order)
     );
 
     if (candidates.length === 0) {
       const reason = offlineExisted && machineList.every(
-        m => m.isOffline || machineAcceptsMaterial(m, order.material) && nozzleOk(m, order)
+        m => m.isOffline || m.status === 'offline' || machineAcceptsMaterial(m, order.material) && nozzleOk(m, order)
       )
         ? 'all printers offline'
         : 'no compatible printer';

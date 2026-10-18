@@ -121,12 +121,19 @@ function taskStatus(task, machineHours, now) {
  * @returns {object[]} shallow copies of the qualifying tasks, each extended with
  *   { status, hoursRemaining, daysRemaining }, ordered overdue -> due -> warning.
  */
-function dueTasks(tasks, hoursByMachineId, now) {
+function dueTasks(tasks, hoursByMachineId, now, machines) {
   if (!Array.isArray(tasks)) return [];
   const byMachine = hoursByMachineId || {};
+  // With the machine list: a task for a retired printer, or one deleted, is
+  // never due again — a day-interval clean would otherwise come due forever.
+  const live = Array.isArray(machines)
+    ? new Set(machines.filter((m) => m && m.id != null && m.status !== 'retired'
+        && !(m.retiredAt && String(m.retiredAt).trim())).map((m) => String(m.id)))
+    : null;
   const annotated = [];
   for (const task of tasks) {
     if (!task) continue;
+    if (live && task.machineId != null && !live.has(String(task.machineId))) continue;
     const hours = num(byMachine[task.machineId], 0);
     const st = taskStatus(task, hours, now);
     if (st.status === 'ok') continue;

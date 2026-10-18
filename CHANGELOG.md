@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Maintainers) A printer's status is one shared rule.** `lib/machine-status.js`:
+  - **Under service** is the `isOffline` flag the desktop already writes, with
+    an optional reason and date.
+  - **Retired** is `status: 'retired'` with `retiredAt`.
+  - **Delete** is allowed only when no record in the book names the printer.
+  - **Retiring** takes the printer off its unfinished jobs.
+
+  Depreciation stops on the retire day. Dispatch proposes nothing for a
+  printer under service or retired. The schedule never places work on a
+  retired one. Maintenance tasks for a retired or deleted printer stop
+  coming due when the machine list is passed in.
 - **Mac: the iPhone can check it is talking to your Mac.** The Mac now has
   its own identity key. A paired iPhone keeps it, and before it sends the
   PIN to a new address it asks the Mac there to sign a random challenge. A

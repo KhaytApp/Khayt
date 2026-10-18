@@ -3682,6 +3682,8 @@ final class Words {
         "ad.printer_error":   ["en": "Reporting a fault", "ar": "تبلّغ عن عطل"],
         "ad.no_reading":      ["en": "Not answering", "ar": "لا تجيب"],
         "ad.no_printer":      ["en": "No printer linked", "ar": "لا طابعة مرتبطة"],
+        "ad.under_service":   ["en": "Under service", "ar": "قيد الصيانة"],
+        "ad.retired":         ["en": "Retired", "ar": "خارج الخدمة نهائيًا"],
         "ad.held":            ["en": "Held back",    "ar": "موقوفة"],
         "mac.bed_cleared":    ["en": "Bed is clear", "ar": "الطاولة فارغة"],
         "mac.help_title":    ["en": "Khayt Help",   "ar": "مساعدة خيط"],
