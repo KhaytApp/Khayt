@@ -83,8 +83,10 @@ try {
 
   // A token must NOT widen access beyond the scope model: an unscoped PIN-gated page
   // (the LAN kiosk shell) still requires the owner PIN, even with a valid token.
+  // With no PIN the page is now its PIN form (200), never the queue.
   const page = await call('/', { token: toks.read });
-  ok(page.status === 401, `token cannot open an unscoped PIN-gated page (${page.status})`);
+  ok(typeof page.body === 'string' && page.body.includes('action="/session"'),
+    `token cannot open an unscoped PIN-gated page (${page.status}: the PIN form, not the queue)`);
   // …while its own scoped data remains reachable.
   const stillOk = await call('/v1/orders', { token: toks.read });
   ok(stillOk.status === 200, 'scoped data still reachable with the same token');
