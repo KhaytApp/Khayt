@@ -97,6 +97,21 @@ Public aggregate counts for the active queue.
 
 `waiting` — active job intake / waiting-list entries (excludes declined).
 
+### `GET /api/identity` and `GET /api/proof` — is this the paired computer?
+
+Both apps (Mac #1942, desktop). A phone can check that whatever answers to the
+shop's Bonjour name holds the key it paired with, **before** sending the PIN.
+
+- `GET /api/identity` (owner PIN) → `{"alg":"ed25519","publicKey":"<base64 of the raw 32-byte key>"}`.
+  The phone keeps it at pairing.
+- `GET /api/proof?nonce=<32–128 hex>` (open) → `{"alg":"ed25519","sig":"<base64>"}`, an
+  Ed25519 signature over the ASCII bytes `khayt-proof:` + the nonce in lower case.
+  Any other nonce → **400** `{"error":"nonce"}`.
+
+The key is made once per computer and kept out of the book (sealed by the
+keychain), so a restored backup or a second computer does not claim to be this
+one. Nothing on the open route depends on the PIN.
+
 ### `GET /api/queue`
 
 Active kanban orders (`pending`, `printing`, `post`, `qc`). **Requires owner PIN** when configured.
