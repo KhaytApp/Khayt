@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Docs:** weekly competitive review, 2026-10-18.
 - **iPhone: the Home pipeline and Orders filters stop at the screen's own
   controls.** Where the tab bar and toolbar buttons sit down the side of the
   screen, as on iPhone Duo's folded outer display, the last filter used to

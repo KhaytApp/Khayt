@@ -662,3 +662,37 @@ Re-read the §0/§6/§7 products from an environment where the fetches resolve, 
 the Meshory price change on 28 Oct and the Stimalo free period ending 31 Dec.
 
 *Caveat, as §5–§7: marketing pages and listing snippets, not hands-on evaluations.*
+
+## Weekly reading — 2026-10-18
+
+Nothing material changed. This run hit the same wall as 2026-10-11: every direct fetch
+(printago.io, foxtrack.studio, stimalo.com, layers.app) failed with a DNS error
+(`ENOTFOUND`), so **no product's own pages could be read** and the products in §0, §6 and §7
+are marked **❌ not re-read**. No price, feature, shutdown or pivot is reported as changed.
+Only web search worked.
+
+What search showed:
+
+| Product | What search showed | Read? |
+|---|---|---|
+| [FoxTrack](https://www.producthunt.com/products/foxtrack/launches/foxtrack) | Product Hunt launch dated 2026-04-22; order dashboard, quote calculator, QR filament tracking, maintenance tracking. Nothing newer than §7. | ⚠️ listing snippet only |
+| [SimplyPrint](https://simplyprint.io/integrations/fusion.md) | Fusion 360 add-in (10 Jun 2026) and an iOS app with print history and spool tracking. No October announcement found. | ⚠️ snippet only |
+| [AutoQuote3D](https://3dprinting.com/news/autoquote3d-launches-full-platform-to-streamline-3d-printing-quoting-and-order-management) | Quoting, payment collection and job tracking, from about $15/mo. The article dates the full launch to April 2025, so it is old rather than new. Not named in §0–§7 before. | ⚠️ news snippet only |
+| [Formfactories](https://www.formfactories.com), MakerOS | Project-management and customer-portal tools for print services, invoices included. Not tax-aware as far as the snippets show. Older products, not named before. | ⚠️ snippet only |
+
+Printago, Layers, Stimalo, CalcMyPrint and the rest: search returned nothing new.
+
+**New products worth reading next time:** AutoQuote3D and Formfactories/MakerOS (both are
+quote-to-invoice for service bureaus). Neither showed tax compliance.
+
+**Saudi / Arabic:** an Arabic-language search again found **no 3D-print shop software for
+Saudi Arabia and nothing with ZATCA integration**. Reddit threads and Product Hunt October
+launches were not reachable through search.
+
+**Verified gaps, false alarms, ranked ideas:** no new feature claim about Khayt was made, so
+nothing was checked against the code. §7's gaps and ranked ideas stand unchanged.
+
+**Next reading:** needs an environment where the fetches resolve. Still to confirm: Meshory's
+price change on 28 Oct and Stimalo's free period ending 31 Dec.
+
+*Caveat, as §5–§7: search snippets only, not the products' own pages.*
