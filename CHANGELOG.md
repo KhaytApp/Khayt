@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the board says why a lot search found a card.** A job on the board
+  found only by the filament lot it drew from shows that lot, as its row in
+  the orders list already did. The sample shop now holds a delivery that
+  arrived in a different lot from the spool it was ordered for, received as
+  its own spool, so the screens that show one are drawn with one.
+
 - **Mac: customer records for your web store can be turned on.** The privacy
   policy now covers the copy (khaytapp.com/privacy, "Customer records"), so the
   switch in Settings → Online works. It stays off until a shop turns it on, and

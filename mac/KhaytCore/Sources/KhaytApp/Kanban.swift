@@ -66,11 +66,15 @@ struct Kanban: View {
                     Button(shop.words.callIt("mac.board_open_jobs")) { shop.shelf = .jobs(nil) }
                 }
             }
+            // Asked once per draw, not per card: it walks every spool's
+            // history. A card found only by its lot says so, as its row in
+            // the orders table does.
+            let lots = shop.lotReasons(shop.orders)
             ScrollView([.horizontal, .vertical]) {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(columns) { stage in
                         Column(stage: stage, jobs: shop.board[stage] ?? [], shop: shop,
-                               board: board)
+                               board: board, lots: lots)
                     }
                 }
                 .padding(Metric.screen)
@@ -236,6 +240,8 @@ private struct Column: View {
     let jobs: [Order]
     let shop: Shop
     let board: Namespace.ID
+    /// The lot each card matched on, when that is the only reason it is here.
+    var lots: [String: String] = [:]
     @State private var isTarget = false
     @Environment(\.accessibilityReduceMotion) private var reduced
 
@@ -276,7 +282,7 @@ private struct Column: View {
                     .padding(.vertical, 18)
             } else {
                 ForEach(jobs) { job in
-                    JobCard(job: job, shop: shop)
+                    JobCard(job: job, shop: shop, matchedLot: lots[job.id])
                         // The card's path from the column it left to the one
                         // it landed in. Keyed by job id, so the SAME card
                         // travels rather than one fading out while another
@@ -387,6 +393,8 @@ private extension Stage {
 private struct JobCard: View {
     let job: Order
     let shop: Shop
+    /// A lot search found this job by its lot alone (`Shop.lotReasons`).
+    var matchedLot: String? = nil
     /// The board is the screen a shop stands in front of, and nothing on it
     /// answered the pointer. `Dashboard`'s machine tile has the same job and
     /// says why it does it: "A tile that looks pressable has to be." This card
@@ -419,6 +427,11 @@ private struct JobCard: View {
                     }
                     if !job.client.isEmpty {
                         Text(job.client).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    if let matchedLot {
+                        Label(shop.words.callIt("mac.lot_label", ["lot": .string(matchedLot)]),
+                              systemImage: "magnifyingglass")
+                            .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                     }
                     // Who it is on, as the other app's card says it — the
                     // question a shop with staff asks of every card.
