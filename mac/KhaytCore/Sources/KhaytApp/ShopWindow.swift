@@ -783,7 +783,11 @@ struct WindowSheets: ViewModifier {
                 titleVisibility: .visible
             ) {
                 deleteChoices {
-                    Task { await shop.confirmLibraryDeletes() }
+                    // Taken here, not in the Task: the dialog empties the
+                    // list as it closes, before the Task runs.
+                    let chosen = shop.pendingLibraryDeletes
+                    guard !chosen.isEmpty, let plan = shop.deletePlan, shop.stillTheQuestion(plan) else { return }
+                    Task { await shop.confirmLibraryDeletes(chosen) }
                 }
                 Button(shop.words.callIt("common.cancel"), role: .cancel) {
                     shop.pendingLibraryDeletes = []

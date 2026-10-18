@@ -127,6 +127,36 @@ test('a merge with no engine refuses rather than doing nothing', () => {
 
 /** ── The lift ────────────────────────────────────────────────────────────── */
 
+function withRevs(b) {
+  for (const k of Object.keys(b)) {
+    if (k !== 'tombstones' && Array.isArray(b[k])) b[k] = b[k].filter((r) => r.rev > 0);
+  }
+  return b;
+}
+
+test('a record the cloud holds without a rev comes down where this book has none, and overwrites nothing', () => {
+  sync._resetIndex();
+  const local = {
+    inventory: [{ id: 'a', rev: 3, weight: 5 }],
+    tombstones: [{ collection: 'inventory', id: 'gone', deletedAt: '2026-10-01T00:00:00Z' }],
+  };
+  const server = {
+    inventory: [{ id: 'a', weight: 999 }, { id: 'n', weight: 7 }, { id: 'gone', weight: 1 }],
+    giftCards: [{ id: 'g', balance: 50 }],
+    loyaltyLedger: [{ id: 'L1', clientId: 'c', points: -100 }],
+    settings: { currency: 'SAR' },
+    tombstones: [],
+  };
+  const r = inbox.merge(local, server);
+  assert.deepEqual(local.inventory.find((x) => x.id === 'a'), { id: 'a', rev: 3, weight: 5 }, 'overwrote a record here');
+  assert.equal(local.inventory.find((x) => x.id === 'n').rev, 1);
+  assert.ok(!local.inventory.some((x) => x.id === 'gone'), 'a deleted record came back');
+  assert.equal(local.giftCards[0].id, 'g');
+  assert.equal(local.loyaltyLedger[0].id, 'L1', 'a ledger row is added like any other');
+  assert.equal(local.settings, undefined, 'settings never come down');
+  assert.ok(r.applied >= 3);
+});
+
 function book(seed) {
   let n = seed;
   const rnd = () => (n = (n * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
@@ -166,7 +196,9 @@ function book(seed) {
 test('the lift changed nothing, over two thousand books', () => {
   for (let seed = 1; seed <= 1000; seed++) {
     const local = book(seed);
-    const server = book(seed + 5000);
+    // Rev-less server records are the one deliberate change since the lift
+    // (see the test below), so the comparison is of everything else.
+    const server = withRevs(book(seed + 5000));
 
     const mineLocal = clone(local);
     const theirsLocal = clone(local);
