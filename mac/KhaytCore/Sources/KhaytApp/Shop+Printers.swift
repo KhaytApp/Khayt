@@ -151,7 +151,7 @@ extension Shop {
                                          "host": .string(move.to)])
             await load(source)
         } catch {
-            relocateProblem = String(describing: error)
+            relocateProblem = self.said(error)
         }
     }
 
@@ -207,7 +207,7 @@ extension Shop {
             if added, Self.linksPrinter(record, over: nil) { Telemetry.feature(.printerLinked, in: self) }
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -229,7 +229,7 @@ extension Shop {
             // that appears to do nothing for ten seconds gets pressed again.
             await printers.refresh(machine, shop: self)
         } catch {
-            printerProblem[machine.id] = String(describing: error)
+            printerProblem[machine.id] = self.said(error)
         }
     }
 
@@ -292,7 +292,7 @@ extension Shop {
             }
             await printers.refresh(machine, shop: self)
         } catch {
-            let said = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            let said = (error as? LocalizedError)?.errorDescription ?? self.said(error)
             printerProblem[machine.id] = said
             sendNote = said
         }
@@ -316,7 +316,7 @@ extension Shop {
         } catch {
             // The print went; the record of it did not. Said, not swallowed:
             // a shop told nothing would trust a P&L that never heard of it.
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -360,7 +360,7 @@ extension Shop {
         // dropping an object is `drop`, which asks the lock.
         guard let engine else { return nil }
         do { return try await PrinterControl.plate(of: machine, engine: engine, build: source.build) }
-        catch { printerProblem[machine.id] = String(describing: error); return nil }
+        catch { printerProblem[machine.id] = self.said(error); return nil }
     }
 
     /// Drop one object from a running print. NOT UNDOABLE — the caller has
@@ -374,7 +374,7 @@ extension Shop {
         do {
             try await PrinterControl.drop(object, on: machine, engine: engine, build: source.build)
         } catch {
-            printerProblem[machine.id] = String(describing: error)
+            printerProblem[machine.id] = self.said(error)
         }
     }
 
@@ -570,7 +570,7 @@ extension Shop {
             if state.on == nil { await readPlug(machine) } else { plugStates[machine.id] = state }
         } catch {
             plugProblem[machine.id] = words.callIt("plug.unreachable") + " "
-                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+                + ((error as? LocalizedError)?.errorDescription ?? self.said(error))
         }
     }
 
@@ -693,8 +693,8 @@ extension Shop {
             leadTimeProblem = nil
             note("this shop has no cloud")
         } catch {
-            leadTimeProblem = String(describing: error)
-            note(String(describing: error))
+            leadTimeProblem = self.said(error)
+            note(self.said(error))
         }
     }
 
@@ -725,7 +725,7 @@ extension Shop {
             quoteSheetProblem = false
         } catch {
             quoteSheetSaid = words.callIt("mac.qs_failed") + " "
-                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+                + ((error as? LocalizedError)?.errorDescription ?? self.said(error))
             quoteSheetProblem = true
         }
         if let said = quoteSheetSaid {
@@ -843,7 +843,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             spendProblem = refusal.sentence
         } catch {
-            spendProblem = String(describing: error)
+            spendProblem = self.said(error)
         }
     }
 
@@ -1020,7 +1020,7 @@ extension Shop {
             // one step further away.
             Task { await load(source) }
         } catch {
-            riskProblem = String(describing: error)
+            riskProblem = self.said(error)
         }
     }
 

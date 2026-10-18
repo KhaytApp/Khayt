@@ -264,7 +264,7 @@ extension Shop {
             // read" — rather than a generic failure, because each of them
             // tells the shop what to do differently.
             writeProblem = (error as? LocalizedError)?.errorDescription
-                ?? String(describing: error)
+                ?? self.said(error)
             return
         }
         editFiles([fileId], named: words.callIt("mac.lp_action")) { record in

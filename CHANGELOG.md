@@ -19,6 +19,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     short by the tax.
   - **WhatsApp updates sent by staff** are logged on the customer. A
     viewer can no longer send one.
+  - **Errors in the shop's language:** about eighty places that showed an
+    error from the app itself in English now say it in Arabic in the Arabic
+    app. These include another app holding the book, a change too large to
+    back up, and a refused move. A system's own error is still shown as the
+    system wrote it.
   - **Library import and conversion errors** are in Arabic in the Arabic
     app, with figures in the shop's digits.
   - **Crash reports** (when a shop shares them) leave out anything an

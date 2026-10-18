@@ -32,6 +32,14 @@ struct NeedsTheOtherAppTests {
 
     /// THE LIST. Shorten it; do not lengthen it without a very good `why`.
     static let known: [Gap] = [
+        // Declared when the sentence moved into Words (Oct 2026 review): it
+        // was English in `Converter.Failure` before, so this test never saw it.
+        Gap(id: "convert.paint.large",
+            what: "Painting a colour plan onto a model whose mesh is larger than "
+                + "this app brings in at once",
+            why: "A colour plan rewrites every triangle, and this app holds the "
+               + "mesh in memory to do it, within `paintInlineLimit`. The other "
+               + "app streams it. A plain retarget of the same file works here."),
         // NARROWED, not removed. SendGrid and Mailgun are sent from this app
         // now: the words are `lib/order-email.js` and the sending is one
         // URLSession POST each. What is left is the third provider, and it is
@@ -90,6 +98,7 @@ struct NeedsTheOtherAppTests {
             // campaign is email, and email on an SMTP shop is `outbound.email.smtp`.
             // Two sentences, one dependency — so this is not a new Gap.
             "Campaigns go through SendGrid or Mailgun",             // outbound.email.smtp
+            "A colour plan has to rewrite the model itself",        // convert.paint.large
         ]
         let undeclared = pointers.filter { said in
             !allowed.contains { said.hasPrefix($0) }
@@ -202,7 +211,11 @@ struct NeedsTheOtherAppTests {
         // 3 → 1 on 2026-09-14. `cloud.signin` was added and then closed the
         // same day — this app signs in to the cloud itself now — so the cap
         // follows the list down rather than leaving the slot it used.
-        #expect(Self.known.count <= 1, Comment(rawValue: """
+        // 1 → 2 on 2026-10-18, deliberately: `convert.paint.large` was always
+        // a dependency, said in English inside `Converter.Failure` where this
+        // test could not read it. Moving it into Words made it visible; the
+        // dependency is not new, only declared.
+        #expect(Self.known.count <= 2, Comment(rawValue: """
             \(Self.known.count) things still need the other app. This number is \
             a ratchet — if a new dependency is genuinely unavoidable, lower \
             something else first or raise this deliberately.

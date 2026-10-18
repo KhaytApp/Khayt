@@ -85,7 +85,7 @@ extension Shop {
             }
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -107,7 +107,7 @@ extension Shop {
             }
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -623,7 +623,7 @@ extension Shop {
                 code: Self.uid("LOY"), cardId: Self.uid("GC"),
                 entryId: Self.uid("LOY"), now: Self.isoNow())
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
         guard made.ok, let card = made.card, let entry = made.entry else {
             return words.callIt("loyalty.none_to_redeem")
@@ -642,7 +642,7 @@ extension Shop {
                 root["loyaltyLedger"] = .array(ledger)
             }
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
         await load(source)
         return nil
@@ -848,7 +848,7 @@ extension Shop {
             }
         } catch {
             endLibraryChange(pending)
-            importProblem = String(describing: error)
+            importProblem = self.said(error)
             // Nothing was written, and nothing went to the Trash: the book
             // still holds them, with their files, so the screen must too.
             await load(source)

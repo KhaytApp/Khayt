@@ -61,7 +61,7 @@ extension Shop {
         } catch AiClient.Failure.noKey {
             return .refused(words.callIt("mac.ai_no_key"))
         } catch {
-            return .refused(String(describing: error))
+            return .refused(self.said(error))
         }
     }
 
@@ -120,7 +120,7 @@ extension Shop {
         } catch AiClient.Failure.noKey {
             asked[at].problem = words.callIt("mac.ai_no_key")
         } catch {
-            asked[at].problem = String(describing: error)
+            asked[at].problem = self.said(error)
         }
     }
 
@@ -224,7 +224,7 @@ extension Shop {
         } catch AiClient.Failure.noKey {
             return .refused(words.callIt("mac.ai_no_key"))
         } catch {
-            return .refused(String(describing: error))
+            return .refused(self.said(error))
         }
     }
 
@@ -422,7 +422,7 @@ extension Shop {
                     staged![i].bytes = nil
                 } catch {
                     for name in written { ProductPhotos.discard(name, in: build) }
-                    moveProblem = String(describing: error)
+                    moveProblem = self.said(error)
                     return
                 }
             }
@@ -549,7 +549,7 @@ extension Shop {
         } catch {
             // The record still names the original; the new files are nobody's.
             for name in written { ProductPhotos.discard(name, in: build) }
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 

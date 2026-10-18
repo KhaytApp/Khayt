@@ -313,7 +313,7 @@ extension Shop {
             await load(source)
             return id
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
             return nil
         }
     }
@@ -691,7 +691,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -916,7 +916,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -1298,7 +1298,7 @@ extension Shop {
             moveProblem = refusal.sentence
             return false
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
             return false
         }
     }
@@ -1513,7 +1513,7 @@ extension Shop {
             made = try await engine.newGiftCard(input, id: Self.uid("GC"),
                                                 now: Self.isoNow(), existing: giftCardRows)
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
         guard made.ok, let card = made.card else {
             // The rule answers with a key; the window owns the language.
@@ -1528,7 +1528,7 @@ extension Shop {
                 root["giftCards"] = .array(rows)
             }
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
         await load(source)
         return nil
@@ -1551,7 +1551,7 @@ extension Shop {
         } catch let refusal as LibraryImport.Failure {
             importProblem = refusal.said(words)
         } catch {
-            importProblem = String(describing: error)
+            importProblem = self.said(error)
         }
     }
 

@@ -152,7 +152,7 @@ extension Shop {
                 // This request failed; the next may not (one too long for
                 // the provider says nothing about the others).
                 failed.insert(sig)
-                result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                result.problem = (error as? LocalizedError)?.errorDescription ?? self.said(error)
             }
         }
         // THE LOOSE FILES, the same way: names only, a batch at a time, each
@@ -185,7 +185,7 @@ extension Shop {
                 halted = true
             } catch {
                 failed.insert(sig)
-                result.problem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                result.problem = (error as? LocalizedError)?.errorDescription ?? self.said(error)
             }
         }
         // A unit is remembered only when every one of its folders came back:
@@ -216,7 +216,7 @@ extension Shop {
                 }
             }
         } catch {
-            result.problem = String(describing: error)
+            result.problem = self.said(error)
         }
         return result
     }
@@ -542,7 +542,7 @@ extension Shop {
             if pictures > 0 { lines.append(words.callIt("mac.sort_pictures_added", ["n": .number(Double(pictures))])) }
             libraryMoveNote = lines.joined(separator: " ")
         } catch {
-            libraryMoveProblem = String(describing: error)
+            libraryMoveProblem = self.said(error)
         }
     }
 }

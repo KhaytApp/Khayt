@@ -132,7 +132,7 @@ extension Shop {
             }
             return nil
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
     }
 

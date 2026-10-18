@@ -110,7 +110,7 @@ extension Shop {
             syncLossesPutBack.insert(loss.id)
             await load(source)
         } catch {
-            moveProblem = words.callIt("mac.losses_put_back_failed") + " " + String(describing: error)
+            moveProblem = words.callIt("mac.losses_put_back_failed") + " " + self.said(error)
         }
     }
 

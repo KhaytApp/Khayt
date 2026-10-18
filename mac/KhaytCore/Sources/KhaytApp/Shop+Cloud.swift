@@ -31,7 +31,7 @@ extension Shop {
             _ = try await Backups.writeDaily(for: build, engine: engine)
             backupProblem = nil
         } catch {
-            backupProblem = String(describing: error)
+            backupProblem = self.said(error)
         }
         lastBackup = Backups.lastBackupDay(in: Backups.directory(for: build))
         lastCrash = LastWords.read(for: build)
@@ -242,7 +242,7 @@ extension Shop {
             await load(source)
             moveNotices = [words.callIt("mac.cloud_signed_out")]
         } catch {
-            cloudProblem = String(describing: error)
+            cloudProblem = self.said(error)
         }
     }
 
@@ -418,7 +418,7 @@ extension Shop {
                         connection, token: session.token, keyset: keyset) { try await web.data(for: $0) } == .published
                 } catch {
                     cloudProblem = words.callIt("mac.cloud_key_not_published") + " "
-                        + ((error as? CustomStringConvertible)?.description ?? String(describing: error))
+                        + ((error as? CustomStringConvertible)?.description ?? self.said(error))
                 }
                 if published { await sendToCloud() }
             }
@@ -436,7 +436,7 @@ extension Shop {
                 + " (" + String(describing: crypto) + ")"
         } catch {
             cloudProblem = words.callIt("mac.cloud_signin_failed") + " "
-                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+                + ((error as? LocalizedError)?.errorDescription ?? self.said(error))
         }
     }
 
@@ -463,7 +463,7 @@ extension Shop {
             }
         } catch {
             cloudProblem = words.callIt("mac.cloud_signin_failed") + " "
-                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+                + ((error as? LocalizedError)?.errorDescription ?? self.said(error))
         }
     }
 
@@ -489,7 +489,7 @@ extension Shop {
             moveNotices = [words.callIt("mac.cloud_reset_done")]
         } catch {
             cloudProblem = words.callIt("mac.cloud_reset_failed") + " "
-                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+                + ((error as? LocalizedError)?.errorDescription ?? self.said(error))
         }
     }
 
@@ -555,7 +555,7 @@ extension Shop {
         } catch let locked as Secrets.Failure {
             cloudProblem = locked.description
         } catch {
-            cloudProblem = String(describing: error)
+            cloudProblem = self.said(error)
         }
     }
 
@@ -721,7 +721,7 @@ extension Shop {
         } catch let locked as Secrets.Failure {
             cloudProblem = locked.description
         } catch {
-            cloudProblem = String(describing: error)
+            cloudProblem = self.said(error)
         }
     }
 
@@ -842,7 +842,7 @@ extension Shop {
         } catch let locked as Secrets.Failure {
             cloudProblem = locked.description
         } catch {
-            cloudProblem = String(describing: error)
+            cloudProblem = self.said(error)
         }
     }
 
@@ -1146,7 +1146,7 @@ extension Shop {
             spendNote = words.callIt("mac.restored") + " " + candidate.filename
             await load(source)
         } catch {
-            spendProblem = words.callIt("mac.restore_failed") + " " + String(describing: error)
+            spendProblem = words.callIt("mac.restore_failed") + " " + self.said(error)
         }
     }
 }
