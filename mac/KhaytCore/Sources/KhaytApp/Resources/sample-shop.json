@@ -4208,6 +4208,35 @@
    "driedAt": "2026-08-29"
   },
   {
+   "id": "sp-14",
+   "locationId": "LOC-sample-ryd",
+   "lot": "GB-2408-05",
+   "material": "PLA+ 2.0",
+   "cost": 75,
+   "weight": 1000,
+   "rev": 1,
+   "storage": "drybox",
+   "updatedAt": "2026-08-20T09:00:00.000Z",
+   "color": "#1B1B1F",
+   "colourVariant": "Galaxy Black",
+   "vatAmount": 9.78,
+   "unit": "g",
+   "spoolWeight": 1000,
+   "purchasedAt": "2026-09-01",
+   "poId": "PO-sample03",
+   "usageHistory": [
+    {
+     "type": "received",
+     "orderId": "PO-sample03",
+     "weightUsed": -1000,
+     "date": "2026-09-01",
+     "notes": "",
+     "lot": "GB-2408-05",
+     "poId": "PO-sample03"
+    }
+   ]
+  },
+  {
    "id": "sp-2",
    "locationId": "LOC-sample-ryd",
    "usageHistory": [
@@ -4409,6 +4438,15 @@
    "recurring": null,
    "nextDue": null,
    "vatAmount": 2100
+  },
+  {
+   "id": "EXP-0011",
+   "date": "2026-09-01",
+   "amount": 75,
+   "category": "filament",
+   "note": "Purchase order: PO-sample03",
+   "orderId": null,
+   "poId": "PO-sample03"
   },
   {
    "id": "EXP-0009",
@@ -5801,6 +5839,24 @@
    "orderedAt": "2026-09-05",
    "receivedAt": null,
    "notes": ""
+  },
+  {
+   "id": "PO-sample03",
+   "itemId": "sp-1",
+   "itemName": "Galaxy Black PLA+ 2.0",
+   "supplierId": null,
+   "supplierName": "Tuwaiq Filament Supply",
+   "qty": 1000,
+   "unitPrice": 0.075,
+   "estimatedDelivery": "2026-09-02",
+   "status": "received",
+   "orderedAt": "2026-08-25",
+   "receivedAt": "2026-09-01",
+   "notes": "",
+   "receivedSoFar": 1000,
+   "receivedInto": [
+    "sp-14"
+   ]
   }
  ],
  "loyaltyLedger": [

@@ -132,6 +132,27 @@ struct FilamentUsedTests {
         #expect(topped["weight"] == .number(1300))
     }
 
+    /// The split above, as the sample book holds it, so the screens that draw
+    /// a received spool are drawn with one: PO-sample03 was raised for sp-1
+    /// (lot GB-2406-17) and arrived as GB-2408-05, which became sp-14.
+    @Test("the sample book holds a delivery that arrived in another lot, as its own spool")
+    func sampleSplit() async throws {
+        let shop = try await sample()
+        let old = try #require(shop.spools.first { $0.id == "sp-1" })
+        let fresh = try #require(shop.spools.first { $0.id == "sp-14" })
+        #expect(old.lot == "GB-2406-17", "the spool the order was raised for keeps its lot")
+        #expect(fresh.lot == "GB-2408-05")
+        #expect(fresh.material == old.material)
+        #expect(fresh.usageHistory?.first?.orderId == "PO-sample03")
+        let po = try #require(shop.purchaseOrderRows.first {
+            if case .object(let o) = $0 { return o["id"] == .string("PO-sample03") } else { return false }
+        })
+        guard case .object(let o) = po else { Issue.record("shape"); return }
+        #expect(o["itemId"] == .string("sp-1"))
+        #expect(o["receivedInto"] == .array([.string("sp-14")]))
+        #expect(o["status"] == .string("received"))
+    }
+
     @Test("a second part delivery of the same new lot tops up the spool the first one made")
     func receiveSameNewLotTwice() async throws {
         let shop = try await sample()
