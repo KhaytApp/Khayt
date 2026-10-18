@@ -109,10 +109,34 @@ extension Quantity {
         // An order with no unit is a FILAMENT order — the same reading the
         // receive path takes, because absent `kind` means filament — so it is
         // grams, in Khayt's own word for them.
-        guard !named.isEmpty else { return say(amount, nil, words) }
-        let n = amount == amount.rounded() ? String(Int(amount))
-                                           : String(format: "%.2f", amount)
-        return n + " " + named
+        //
+        // An order copies its unit from the item it restocks, so "g", "ml" and
+        // "sheet" arrive here as the SHELF's words. Written raw, an Arabic
+        // order said "1000 g" with an English letter, and a sheet order "sheet"
+        // beside a shelf that says "لوح" (alpha.79 review). Those three are
+        // said in the shelf's words, to the shelf's decimals
+        // (`lib/inventory-units.js` SPEC); only a unit a shop typed itself is
+        // written back as typed.
+        if named.isEmpty || named == "g" { return say(amount, nil, words) }
+        if let places = shelfPlaces[named] {
+            return figure(amount, upTo: places) + " " + words.callIt("unit." + named)
+        }
+        return figure(amount, upTo: 2) + " " + named
+    }
+
+    /// The shelf units other than the gram, and their decimals. A copy of
+    /// `lib/inventory-units.js`; `OrderedQuantityTests` fails if they part.
+    static let shelfPlaces: [String: Int] = ["ml": 0, "sheet": 1]
+
+    /// Up to `places` decimals, none where the figure is whole: "3", "2.5".
+    @MainActor
+    private static func figure(_ amount: Double, upTo places: Int) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.locale = Money.digits
+        f.minimumFractionDigits = 0
+        f.maximumFractionDigits = places
+        return f.string(from: amount as NSNumber) ?? "\(amount)"
     }
 }
 

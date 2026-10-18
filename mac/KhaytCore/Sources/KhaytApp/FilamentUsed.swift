@@ -72,21 +72,30 @@ enum FilamentUsed {
     /// inferred from a spool carrying that lot — for the search box. `q` is
     /// already trimmed and lowercased; it matches anywhere in the lot.
     static func jobIds(drawingFromLotMatching q: String, orders: [Order], spools: [Spool]) -> Set<String> {
-        guard !q.isEmpty else { return [] }
-        var ids = Set<String>()
+        Set(lots(matching: q, orders: orders, spools: spools).keys)
+    }
+
+    /// The same jobs, each with the lot that matched, as written — so the row
+    /// a search turned up can say WHY it is there. "gb-2406" found two jobs
+    /// whose rows mentioned no lot at all (alpha.79 review). A job's own
+    /// recorded draw wins over a spool's inferred lot.
+    static func lots(matching q: String, orders: [Order], spools: [Spool]) -> [String: String] {
+        guard !q.isEmpty else { return [:] }
+        var out: [String: String] = [:]
         for o in orders {
-            if o.materialDrawn?.spools.contains(where: { ($0.lot ?? "").lowercased().contains(q) }) == true {
-                ids.insert(o.id)
+            if let lot = o.materialDrawn?.spools.lazy.compactMap(\.lot)
+                .first(where: { $0.lowercased().contains(q) }) {
+                out[o.id] = lot
             }
         }
         for s in spools {
-            let spoolLot = (s.lot ?? "").lowercased()
-            for h in s.usageHistory ?? [] where h.type != "received" && !h.orderId.isEmpty {
-                let lot = h.lot?.lowercased() ?? spoolLot
-                if !lot.isEmpty, lot.contains(q) { ids.insert(h.orderId) }
+            for h in s.usageHistory ?? [] where h.type != "received" && !h.orderId.isEmpty
+                && out[h.orderId] == nil {
+                let lot = h.lot ?? s.lot ?? ""
+                if !lot.isEmpty, lot.lowercased().contains(q) { out[h.orderId] = lot }
             }
         }
-        return ids
+        return out
     }
 
     /// "PLA+ · Galaxy Black" — what tells one roll from another in a list.

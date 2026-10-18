@@ -323,4 +323,18 @@ struct DigitsTests {
         #expect(settings.contains("callIt(\"mac.mac_digits\")"))
         #expect(settings.contains("Digits.shared.followsMac = on"))
     }
+
+    @Test("the Arabic help pages are written in Western digits, like the app")
+    func helpDigits() throws {
+        // Four pages said "٢٠٪" and "٠٫٧٪" beside an app that says "20%".
+        let dir = Self.root.appending(path: "KhaytApp/Help/ar")
+        var found: [String] = []
+        for name in try FileManager.default.contentsOfDirectory(atPath: dir.path) where name.hasSuffix(".md") {
+            let text = try String(contentsOf: dir.appending(path: name), encoding: .utf8)
+            if text.unicodeScalars.contains(where: { (0x0660...0x066C).contains($0.value) }) {
+                found.append(name)
+            }
+        }
+        #expect(found.isEmpty, "Eastern Arabic digits in: \(found)")
+    }
 }

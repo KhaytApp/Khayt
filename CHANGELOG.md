@@ -5,6 +5,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 ## [Unreleased]
 
 - **Docs:** weekly competitive review, 2026-10-18.
+- **iPhone: the Home pipeline and Orders filters stop at the screen's own
+  controls.** Where the tab bar and toolbar buttons sit down the side of the
+  screen, as on iPhone Duo's folded outer display, the last filter used to
+  run under them and sit half hidden. The strip now ends beside them and
+  still scrolls.
+- **Mac: units in Arabic, and lot search says why.** A spool's history,
+  a purchase order's quantity, the job inspector's machine time and the
+  capacity card's hours wrote "g", "h" and "sheet" as English letters in the
+  Arabic app, and the spool history showed grams to two decimals beside a
+  shelf that showed whole grams. They now use the same words and rounding
+  as the shelf. A job that a lot search finds only by its lot shows that lot
+  in its row, so a recall list says why each job is on it. The Arabic help
+  pages use Western digits, as the app does.
+
 - **iPhone: on iPhone Duo's inner display, Machines and Clients sit two
   across.** Each machine card and client row used to stretch over the full
   width of the unfolded screen. The folded outer display and other iPhones

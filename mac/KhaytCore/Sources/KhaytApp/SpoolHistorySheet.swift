@@ -63,8 +63,7 @@ struct SpoolHistorySheet: View {
                                 }
                             }
                             Spacer(minLength: 8)
-                            Text(Quantity.ordered(use.weightUsed, unit: spool.unit ?? "",
-                                                  words: shop.words))
+                            Text(Quantity.say(use.weightUsed, shop.unit(of: spool), shop.words))
                                 .monospacedDigit()
                         }
                         .padding(.vertical, 7)
@@ -75,8 +74,7 @@ struct SpoolHistorySheet: View {
                 HStack {
                     Text(shop.words.callIt("mac.spool_history_total")).foregroundStyle(.secondary)
                     Spacer()
-                    Text(Quantity.ordered(spool.totalUsed, unit: spool.unit ?? "",
-                                          words: shop.words))
+                    Text(Quantity.say(spool.totalUsed, shop.unit(of: spool), shop.words))
                         .monospacedDigit().fontWeight(.semibold)
                 }
                 .padding(.top, 4)

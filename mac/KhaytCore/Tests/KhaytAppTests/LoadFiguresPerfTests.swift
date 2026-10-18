@@ -13,9 +13,13 @@ import KhaytCore
 /// Measured on a debug build (Oct 14 2026, an M-series Mac with other work
 /// running): one engine call per model made the full book's load take ~235 s
 /// against ~6 s bare — a mesh estimate carried the whole 1 MB settings across
-/// for each of 3,600 meshes. Batched, the full book loads in ~7 s. The
-/// budget, twice the bare load plus ten seconds, fails the old code by an
-/// order of magnitude and leaves CI's slower runners room.
+/// for each of 3,600 meshes. Batched, the full book loads in ~7 s.
+///
+/// The budget is four times the bare load plus twenty seconds. It was twice
+/// plus ten, and a loaded CI runner went past it on an unrelated PR (28.0 s
+/// against 21.4 s, run 39099662401, beside two other suites): the bare and
+/// full loads run minutes apart, and the runner's load changes in between.
+/// About 45 s still fails the old code fivefold.
 ///
 /// In `LibraryEditPerfTests`, the one serialised suite that may set the test
 /// support folder (a single global).
@@ -46,7 +50,7 @@ extension LibraryEditPerfTests {
 
         let bareSeconds = try await Self.reloadSeconds(bare)
         let fullSeconds = try await Self.reloadSeconds(full)
-        let budget = bareSeconds * 2 + 10
+        let budget = bareSeconds * 4 + 20
         #expect(fullSeconds < budget,
                 "the full book took \(fullSeconds) s against \(bareSeconds) s bare (budget \(budget) s)")
     }

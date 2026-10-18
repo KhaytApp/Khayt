@@ -386,7 +386,7 @@ private struct Detail: View {
                         .disabled(!shop.canMoveJobs)
                 }
             }
-            DetailLine(shop.words.callIt("mac.machine_time"), String(format: "%.1f h", job.printTime), dim: true)
+            DetailLine(shop.words.callIt("mac.machine_time"), Money.quantity(job.printTime, decimals: 1) + " " + shop.words.callIt("mac.unit_h"), dim: true)
         }
     }
 }
