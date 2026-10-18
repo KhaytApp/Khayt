@@ -28,7 +28,12 @@ struct SampleFiguresTests {
         // The figure still belongs here: what this suite guards is that
         // MEASURED ACTUALS move no money, and a deliberate change to the book
         // is not that. It moves when somebody means it to and says so.
-        #expect(abs(shop.owed - 50_422.39) < 0.005, "owed is \(shop.owed)")
+        //
+        // And it moved again, by 13,988.16: the sample's seven quotes and two
+        // cancelled jobs were counted as owed, which they never were. A quote
+        // has not been agreed and a cancelled job was called off
+        // (`KhaytOrderMoney.owesAtAll`), so 50,422.39 was that mistake.
+        #expect(abs(shop.owed - 36_434.23) < 0.005, "owed is \(shop.owed)")
 
         let facts = try #require(shop.facts, "the dashboard computed nothing")
         #expect(facts.activeCount == 11, "open is \(facts.activeCount)")
