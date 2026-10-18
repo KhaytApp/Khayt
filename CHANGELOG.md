@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the iPhone can check it is talking to your Mac.** The Mac now has
+  its own identity key. A paired iPhone keeps it, and before it sends the
+  PIN to a new address it asks the Mac there to sign a random challenge. A
+  device on the Wi-Fi that copied the Mac's name cannot pass. The PIN is
+  never part of the check.
+
 - **Mac: small fixes from a full review.**
   - **Words:** the VAT line on an order's money block, the Copy button on a
     message and the printer sheet's Undo now show words, not their keys.
