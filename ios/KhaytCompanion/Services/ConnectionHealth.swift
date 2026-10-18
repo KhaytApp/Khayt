@@ -28,6 +28,11 @@ enum ConnectionHealthState: String, Sendable {
     }
 }
 
+struct MacAddress: Equatable, Sendable {
+    let host: String
+    let port: Int
+}
+
 @MainActor
 final class ConnectionHealth: ObservableObject {
     @Published private(set) var state: ConnectionHealthState = .unknown
@@ -37,6 +42,12 @@ final class ConnectionHealth: ObservableObject {
     /// with a book on the phone, the screens read the book and `state` reads
     /// connected whether the Mac is there or not. The strip needs the truth.
     @Published private(set) var macInReach = false
+    /// Where the paired Mac's name answers now, when that is not where the
+    /// phone has it — waiting for the person to say it is their Mac.
+    @Published private(set) var macMoved: MacAddress?
+    /// A new address the person said no to, so the strip does not ask again
+    /// every minute.
+    private var declined: MacAddress?
 
     private let api: KhaytAPIClient
     private weak var settings: ConnectionSettings?
@@ -122,7 +133,15 @@ final class ConnectionHealth: ObservableObject {
     }
 
     /// The Mac did not answer at its stored address. If it is on this network
-    /// under the name it was paired with, somewhere else, move there.
+    /// under the name it was paired with, somewhere else, offer to move there.
+    ///
+    /// ── ASKED, NOT DONE ──────────────────────────────────────────────────
+    ///
+    /// This used to move by itself. But a Bonjour name is only a claim: while
+    /// the Mac sleeps, any device on the network can advertise the same name,
+    /// and every request after the move carries the PIN — which then opens the
+    /// shop's book on the real Mac. So the phone stops at "your Mac answered
+    /// at a new address" and moves only when the person says so.
     ///
     /// At most once a minute: a Mac that is simply switched off answers no
     /// lookup either, and browsing every thirty seconds for a machine that is
@@ -135,10 +154,31 @@ final class ConnectionHealth: ObservableObject {
         lastLookup = now
         guard let found = await MacFinder.find(named: name) else { return false }
         guard found.host != settings.host || found.port != settings.port else { return false }
-        settings.host = found.host
-        settings.port = found.port
-        if settings.serviceName.isEmpty { settings.serviceName = name }
-        return true
+        offerMove(to: MacAddress(host: found.host, port: found.port))
+        return false
+    }
+
+    /// Ask about `address`, unless the person already said no to it.
+    func offerMove(to address: MacAddress) {
+        if address != declined { macMoved = address }
+    }
+
+    /// The person says the new address is their Mac: move there.
+    func acceptMove() async {
+        guard let settings, let address = macMoved else { return }
+        settings.host = address.host
+        settings.port = address.port
+        if settings.serviceName.isEmpty, let name = settings.bonjourName { settings.serviceName = name }
+        macMoved = nil
+        declined = nil
+        await refresh()
+    }
+
+    /// The person does not recognise it: stay put, and do not ask about that
+    /// address again.
+    func declineMove() {
+        declined = macMoved
+        macMoved = nil
     }
 
     private func refreshWidgetsAndAlerts(status: ShopStatus, queue: [QueueOrder]) async {

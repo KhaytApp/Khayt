@@ -30,6 +30,10 @@ struct MachinesView: View {
         return L10n.tr("machines.stale")
     }
 
+    private var offline: Set<String> {
+        Set(machines.filter { $0.isOffline == true }.map(\.id))
+    }
+
     private var statusById: [String: String] {
         Dictionary(machines.compactMap { m in m.status.map { (m.id, $0) } }, uniquingKeysWith: { a, _ in a })
     }
@@ -89,7 +93,7 @@ struct MachinesView: View {
                         LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
                             ForEach(rows) { m in
                                 VStack(spacing: 10) {
-                                    MachineCard(live: m, fallbackStatus: statusById[m.id])
+                                    MachineCard(live: m, fallbackStatus: statusById[m.id], offline: offline.contains(m.id))
                                     cameraLink(m)
                                 }
                                 .frame(maxHeight: .infinity, alignment: .top)
@@ -129,7 +133,9 @@ struct MachinesView: View {
     private func load() async {
         errorMessage = nil
         do {
-            machines = try await api.fetchMachines()
+            // A retired machine stays in the book only so past orders can
+            // name it; it is not one of the shop's machines any more.
+            machines = try await api.fetchMachines().filter { !$0.isRetired }
             var found: [String: KhaytAPIClient.CameraAnswer] = [:]
             for m in machines { found[m.id] = await api.camera(machineId: m.id) }
             cameras = found
@@ -177,11 +183,13 @@ struct LiveStamp: View {
 private struct MachineCard: View {
     let live: MachineLiveStatus
     let fallbackStatus: String?
+    var offline = false
 
-    private enum Mode { case printing, idle, error }
+    private enum Mode { case printing, idle, error, offline }
 
     private var mode: Mode {
         if live.hasError { return .error }
+        if offline && !live.isPrinting { return .offline }
         if live.isPrinting { return .printing }
         if let s = fallbackStatus?.lowercased(), s.contains("print") { return .printing }
         return .idle
@@ -190,7 +198,7 @@ private struct MachineCard: View {
     private var tone: Color {
         switch mode {
         case .printing: return KhaytDesign.hot
-        case .idle: return KhaytDesign.note
+        case .idle, .offline: return KhaytDesign.note
         case .error: return KhaytDesign.late
         }
     }
@@ -200,6 +208,7 @@ private struct MachineCard: View {
         case .printing: return L10n.tr("status.printing")
         case .idle: return L10n.tr("machines.idle")
         case .error: return L10n.tr("machines.error")
+        case .offline: return L10n.tr("machines.offline")
         }
     }
 
@@ -208,6 +217,7 @@ private struct MachineCard: View {
         case .printing: return live.filename.flatMap { $0.isEmpty ? nil : $0 }
         case .idle: return live.hasPrinterApi ? L10n.tr("machines.ready") : L10n.tr("machines.no_live")
         case .error: return live.error
+        case .offline: return L10n.tr("machines.offline.sub")
         }
     }
 

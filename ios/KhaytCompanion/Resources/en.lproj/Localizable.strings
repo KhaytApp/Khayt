@@ -10,6 +10,10 @@
 "connection.checking" = "Checking…";
 "connection.connected" = "Connected";
 "connection.unreachable" = "Desktop unreachable";
+"connection.moved" = "Your Mac answered at a new address";
+"connection.moved.line" = "Move to %@ only if this is your shop’s Mac. Moving sends it your PIN.";
+"connection.moved.use" = "Move";
+"connection.moved.not_now" = "Not now";
 "connection.unauthorized" = "Wrong LAN PIN";
 "connection.banner.unreachable" = "Cannot reach Khayt on your network. Check Wi‑Fi and desktop LAN API.";
 "connection.banner.pin" = "LAN PIN rejected. Update PIN in Settings to match desktop.";
@@ -488,6 +492,8 @@
 /* Machines, as design/ios-v2 draws them */
 "machines.idle" = "Idle";
 "machines.error" = "Error";
+"machines.offline" = "Offline";
+"machines.offline.sub" = "Marked offline on the Mac";
 "machines.ready" = "Ready for the next job";
 "machines.nozzle" = "Nozzle";
 "machines.bed" = "Bed";

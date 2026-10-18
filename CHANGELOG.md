@@ -4,6 +4,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: the phone asks before following its Mac to a new address.** When
+  the Mac stops answering and its name turns up somewhere else on the
+  network, the phone used to move there by itself and send its PIN along.
+  Any device can take that name while the Mac sleeps, so the phone now says
+  "Your Mac answered at a new address" and moves only when you tap Move.
+  Requests to the Mac also no longer follow a redirect, which would have
+  carried the PIN to another host.
+
+- **iPhone: retired machines are gone, and offline ones take no new work.**
+  A machine retired on the Mac no longer shows on Machines as Ready or in the
+  machine pickers; past orders still name it. A machine marked offline shows
+  as Offline and is left out of the pickers.
+
 - **Mac: the board says why a lot search found a card.** A job on the board
   found only by the filament lot it drew from shows that lot, as its row in
   the orders list already did. The sample shop now holds a delivery that
