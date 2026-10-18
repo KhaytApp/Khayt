@@ -7597,6 +7597,24 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.81] - 2026-10-18
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Customer records for your web store can be turned on.
+
+### Added
+
+- **Customer records for your web store.** The switch in Settings ▸ Online,
+  held in alpha.80, now works, because Khayt's privacy policy covers it
+  (khaytapp.com/privacy, "Customer records"). It stays off until the shop
+  turns it on. While it is on, Khayt Cloud keeps a copy, not encrypted, of
+  each customer who has an email: their email, name and phone, and their
+  newest 100 orders, so the shop's own storefront can show a signed-in
+  customer their history. It never includes costs, margins, notes, files or
+  addresses. Turning it off deletes the copy.
+
 ## [4.0.0-alpha.80] - 2026-10-18
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
