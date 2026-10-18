@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: turning customer records off turns them off for the whole shop.**
+  The switch lives in each Mac's own settings, so turning it off stopped
+  only the Mac where it was pressed: a second Mac with its switch on put the
+  copy straight back. Off now holds for the shop on Khayt Cloud. Every other
+  Mac stops uploading, switches itself off and says why. Turning it on again
+  is always a person's press, never the background upload.
+
 - **Mac: the board says why a lot search found a card.** A job on the board
   found only by the filament lot it drew from shows that lot, as its row in
   the orders list already did. The sample shop now holds a delivery that
