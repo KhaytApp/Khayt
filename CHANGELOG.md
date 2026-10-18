@@ -41,6 +41,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     count, not one.
   - **Customer records:** restoring a backup no longer turns the upload
     back on. The switch stays as it was.
+- **Mac: turning customer records off turns them off for the whole shop.**
+  The switch lives in each Mac's own settings, so turning it off stopped
+  only the Mac where it was pressed: a second Mac with its switch on put the
+  copy straight back. Off now holds for the shop on Khayt Cloud. Every other
+  Mac stops uploading, switches itself off and says why. Turning it on again
+  is always a person's press, never the background upload.
 - **iPhone: the phone asks before following its Mac to a new address.** When
   the Mac stops answering and its name turns up somewhere else on the
   network, the phone used to move there by itself and send its PIN along.

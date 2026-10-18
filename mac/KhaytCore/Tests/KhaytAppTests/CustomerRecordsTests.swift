@@ -125,7 +125,7 @@ struct CustomerRecordsTests {
             for key in ["mac.cr_title", "mac.cr_enable", "mac.cr_hint", "mac.cr_held",
                         "mac.cr_needs_cloud", "mac.cr_published", "mac.cr_deleted", "mac.cr_failed", "mac.cr_trimmed",
                         "mac.cr_err_unauthorised", "mac.cr_err_read_only", "mac.cr_err_not_offered",
-                        "mac.cr_err_too_large", "mac.cr_err_limited", "mac.cloud_err_http"] {
+                        "mac.cr_err_too_large", "mac.cr_err_limited", "mac.cr_off_elsewhere", "mac.cloud_err_http"] {
                 #expect(w.callIt(key) != key, "\(key) has no \(lang)")
             }
         }
@@ -162,6 +162,33 @@ struct CustomerRecordsTests {
         let none = Restore.keepCustomerRecordsSwitch(backup, from: nil)
         guard case .object(let b)? = none["settings"] else { Issue.record("shape"); return }
         #expect(b["customerRecords"] == nil, "no book here: off")
+    }
+
+    @Test("only a person's press says it for the shop: off with scope=shop, on with enable")
+    func shopWide() async throws {
+        let body: JSONValue = .object(["customers": .array([])])
+        var seen: [URLRequest] = []
+        let ok: (URLRequest) -> (Data, URLResponse) = { seen.append($0); return Self.answer(200)($0) }
+        try await CustomerRecordsPublisher.publish(Self.connection, token: "t", body: nil, byPerson: true, fetch: ok)
+        try await CustomerRecordsPublisher.publish(Self.connection, token: "t", body: nil, fetch: ok)
+        try await CustomerRecordsPublisher.publish(Self.connection, token: "t", body: body, byPerson: true, fetch: ok)
+        try await CustomerRecordsPublisher.publish(Self.connection, token: "t", body: body, fetch: ok)
+        #expect(seen[0].url?.absoluteString.hasSuffix("/customers?scope=shop") == true)
+        #expect(seen[1].url?.absoluteString.hasSuffix("/customers") == true, "the loop's tidy-up is this Mac only")
+        let on = try JSONDecoder().decode(JSONValue.self, from: try #require(seen[2].httpBody))
+        let loop = try JSONDecoder().decode(JSONValue.self, from: try #require(seen[3].httpBody))
+        guard case .object(let a) = on, case .object(let b) = loop else { Issue.record("shape"); return }
+        #expect(a["enable"] == .bool(true))
+        #expect(b["enable"] == nil, "the loop never lifts an off made elsewhere")
+    }
+
+    @Test("a PUT refused 409 is 'turned off on another Mac'")
+    func offElsewhere() async {
+        await #expect(throws: CustomerRecordsPublisher.Failure.offElsewhere) {
+            try await CustomerRecordsPublisher.publish(Self.connection, token: "t",
+                                                       body: .object(["customers": .array([])]),
+                                                       fetch: Self.answer(409))
+        }
     }
 
     @Test("failures are said in the shop's language, and a reached cloud is not 'could not reach'")
