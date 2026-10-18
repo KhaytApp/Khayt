@@ -4,6 +4,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: put a printer under service, retire it, or delete it.** A machine
+  card's menu (and the Status menu at the foot of the machine sheet) marks a
+  printer under service with an optional reason, brings it back, retires it
+  (dated today, with an optional reason, saying first how many unfinished jobs
+  will lose it), returns a retired one to service, and deletes one — only when
+  nothing in the book names it; otherwise Delete is greyed with what still
+  does, e.g. "used by 12 jobs and 3 service entries". Each has Undo. The card
+  says "Under service" or "Retired" in words with the reason and date; retired
+  printers fold into a "Retired (n)" list. Retired printers leave polling,
+  cameras, the plug's automatic switch-off, Send to printer, the pickers
+  (unless the record already names one, shown "(retired)"), the menu bar,
+  the Triage tiles, the sidebar count, the widget, `/api/machines/live`, Live
+  Activities, the band, the kiosk and the dashboard fleet, where an
+  under-service printer now counts as down. Under-service printers are not
+  polled or sent files and the card says why. A job naming a printer that is
+  gone says "Deleted printer" instead of its id. Rule: `lib/machine-status.js`.
 - **Stock: deliveries, waste and spool prices add up.** A part delivery of a
   new lot is priced at what arrived (250 g of an 80-for-1000 g roll was costed
   at 80, not 20) and grows with later parts. Waste logged against a roll with
@@ -147,6 +163,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   the orders list already did. The sample shop now holds a delivery that
   arrived in a different lot from the spool it was ordered for, received as
   its own spool, so the screens that show one are drawn with one.
+- **Mac: printer setup fixes from the October review.** The machine sheet's
+  Test button now asks a Bambu over MQTT and an Elegoo over SDCP, with the
+  serial, slug and access code, as the live card does; it used to ask them
+  the Klipper question and report a working printer as unreachable. Save
+  keeps the sheet open until the book accepts it and says why inside the
+  sheet when it does not, and a smart-plug password that cannot be locked in
+  the Keychain now stops the save instead of being dropped. A machine with
+  no tasks yet shows the maintenance section, so a Mac-only shop can add its
+  first task and log its first service. A printer Khayt desktop saved as
+  "None" is no longer offered Send to printer or a blank protocol menu. A
+  camera on a printer whose address is not on the shop's network is no longer
+  sent the printer's key. Printer errors, the Test result and the units on the
+  machine card (mm, W, kWh) are in Arabic for an Arabic shop, a very large bed
+  or wattage in the book no longer closes the app, and removing a downtime
+  row no longer mixes up the rows below it.
 
 - **Desktop: a saved password or token only goes to the address saved with
   it.** The app fills saved secrets in itself and never shows them to the

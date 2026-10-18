@@ -220,7 +220,7 @@ extension Shop {
             fits[id] = nil; estimates[id] = nil; licences[id] = nil; risks[id] = nil
         }
         if !touchedFiles.isEmpty {
-            let fitted = await Self.measureFit(touchedFiles, machines: machineRows, engine: engine)
+            let fitted = await Self.measureFit(touchedFiles, machines: machineRowsInUse, engine: engine)
             let priced = await Self.priceMeshes(touchedFiles, settings: settings,
                                                 orders: orderRows, engine: engine)
             for file in touchedFiles {

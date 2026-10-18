@@ -174,7 +174,10 @@ extension Shop {
                 "status": .string("idle"),
                 "createdAt": .string(Self.localDay()),
                 "printerApi": .object([
-                    "type": .string(printer.connection ?? "none"),
+                    // '' for a printer the finder could not name a protocol
+                    // for — not "none", which the machine sheet's picker has
+                    // no tag for and which read as linked everywhere else.
+                    "type": .string(Self.connectionType(printer.connection)),
                     "host": .string(printer.host),
                     "port": .number(Double(printer.port ?? 0)),
                 ]),
@@ -230,6 +233,7 @@ extension Shop {
             await printers.refresh(machine, shop: self)
         } catch {
             printerProblem[machine.id] = self.said(error)
+            printerProblem[machine.id] = PrinterWatch.problem(error, words)
         }
     }
 
@@ -238,8 +242,27 @@ extension Shop {
     /// The machines a file can be sent to: every one with a printer
     /// connection. A type that cannot be sent to yet is still listed — the
     /// sheet says why rather than hiding the shop's own printer.
+    ///
+    /// "Has a connection" is `PrinterWatch.notWatched`'s answer, not a
+    /// non-empty type: the Electron machine form writes `type: "none"` for a
+    /// printer with no link, and that was offered "Send to printer".
+    ///
+    /// Only a printer IN service: one under service is on the bench, and one
+    /// retired has left the shop — a file sent to either is a print nobody is
+    /// there to take off the plate (`lib/machine-status.js`).
     var sendablePrinters: [Machine] {
-        machines.filter { !($0.printerApi?.type ?? "").isEmpty }
+        workingMachines.filter { PrinterWatch.notWatched($0) != .noConnection }
+    }
+
+    /// A connection type as this app stores and shows it: `""` for none.
+    ///
+    /// Electron's machine form (`renderer/machines.js`) and the old finder
+    /// both wrote `"none"`; the machine sheet's picker has a tag for `""`
+    /// only, so `"none"` drew a blank picker over an address, a key field and
+    /// a Test button for a printer that was not linked at all.
+    nonisolated static func connectionType(_ raw: String?) -> String {
+        let type = (raw ?? "").trimmingCharacters(in: .whitespaces)
+        return type == "none" ? "" : type
     }
 
     /// The sliced files beside a job's models, newest first. Read off the
@@ -274,7 +297,7 @@ extension Shop {
     /// depreciation go to the printer that ran it, with nobody picking it by
     /// hand. A send that failed records nothing.
     func sendToPrinter(_ file: URL, machineId: String, startPrint: Bool, jobId: String? = nil) async {
-        guard let engine, let machine = machines.first(where: { $0.id == machineId }) else { return }
+        guard let engine, let machine = sendablePrinters.first(where: { $0.id == machineId }) else { return }
         guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
         sendNote = nil
         printerProblem[machine.id] = nil
@@ -361,6 +384,7 @@ extension Shop {
         guard let engine else { return nil }
         do { return try await PrinterControl.plate(of: machine, engine: engine, build: source.build) }
         catch { printerProblem[machine.id] = self.said(error); return nil }
+        catch { printerProblem[machine.id] = PrinterWatch.problem(error, words); return nil }
     }
 
     /// Drop one object from a running print. NOT UNDOABLE — the caller has
@@ -375,6 +399,7 @@ extension Shop {
             try await PrinterControl.drop(object, on: machine, engine: engine, build: source.build)
         } catch {
             printerProblem[machine.id] = self.said(error)
+            printerProblem[machine.id] = PrinterWatch.problem(error, words)
         }
     }
 
@@ -446,7 +471,7 @@ extension Shop {
             }
             spendNote = line
         } catch {
-            spendProblem = words.callIt("mac.history_failed") + " " + PrinterWatch.say(error)
+            spendProblem = words.callIt("mac.history_failed") + " " + PrinterWatch.say(error, words)
         }
     }
 
@@ -598,7 +623,10 @@ extension Shop {
         // split: those machines are never metered (`lib/print-energy.js`).
         let sharedPlugs = Set((try? await engine.sharedPlugIds(machines: machineRows)) ?? [])
         let meter = energyMeter()
-        for machine in machines where machine.smartPlug?.usable == true {
+        // Not a retired printer's plug at all. An under-service one is still
+        // read — the card shows whether it is on — but never switched off by
+        // the tick: somebody is working on it, and may be running a test.
+        for machine in machinesInUse where machine.smartPlug?.usable == true {
             let live = printers.statusCache[machine.id]
             // A print ending is the edge from printing to anything else.
             if case .object(let o)? = live, case .string(let state)? = o["state"] {
@@ -614,7 +642,7 @@ extension Shop {
             await meter?.observe(machine.id, watts: plugStates[machine.id]?.watts,
                                  live: printers.statusCache[machine.id],
                                  shared: sharedPlugs.contains(machine.id), now: now, engine: engine)
-            guard plugStates[machine.id]?.on == true,
+            guard machine.inService, plugStates[machine.id]?.on == true,
                   let record = await plugRecord(machine.id),
                   (try? await engine.plugAutoOffDue(machine: record, live: live,
                                                     finishedAt: printEndedAt[machine.id], now: now)) == true
@@ -803,16 +831,21 @@ extension Shop {
 
     /// `opened` is the sheet's `MachineSheet.Form.input()` for the machine as
     /// it opened — nil for a new one.
+    ///
+    /// True once the book has the machine. The sheet closes on true and only
+    /// on true, and reads `spendProblem` (or `moveProblem`, for the lock) for
+    /// what to say otherwise.
+    @discardableResult
     func saveMachine(_ input: [String: JSONValue], id: Machine.ID?, catalogId: String?,
-                     opened: [String: JSONValue]?) async {
-        guard permitted("inventory", "edit") else { return }
+                     opened: [String: JSONValue]?) async -> Bool {
+        guard permitted("inventory", "edit") else { return false }
         spendProblem = nil
         spendNote = nil
         guard let build = source.build else {
-            spendProblem = words.callIt("mac.move_sample"); return
+            spendProblem = words.callIt("mac.move_sample"); return false
         }
         guard let engine else {
-            spendProblem = words.callIt("mac.move_no_engine"); return
+            spendProblem = words.callIt("mac.move_no_engine"); return false
         }
         var undo: [ChangedRecord] = []
         do {
@@ -840,11 +873,13 @@ extension Shop {
             addingMachine = false
             await load(source)
             spendNote = words.callIt("mach.saved")
+            return true
         } catch let refusal as MoveRefused {
             spendProblem = refusal.sentence
         } catch {
             spendProblem = self.said(error)
         }
+        return false
     }
 
     /// Why a machine write was refused, before it has words.

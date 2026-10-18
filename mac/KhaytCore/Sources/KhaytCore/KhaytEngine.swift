@@ -5509,6 +5509,11 @@ public actor KhaytEngine {
             public let intervalHours: Double?
             public let intervalDays: Double?
         }
+
+        /// A machine with nothing scheduled yet. Still a card: the section it
+        /// draws is where the FIRST task is added, so a shop with none must
+        /// be shown one.
+        public static let empty = MaintenanceCard(hours: 0, tasks: [])
     }
 
     /// Every task on one machine, with the hour meter it is measured against.
@@ -11531,6 +11536,109 @@ public actor KhaytEngine {
     public func restoreClients(book: [String: JSONValue], deleted: [JSONValue]) throws -> [String: JSONValue] {
         try runtime.call2("KhaytRecordDelete.restoreClients(ARG0, ARG1)",
                           [.object(book), .array(deleted)], as: [String: JSONValue].self)
+    }
+
+    // MARK: - A printer's working life: in service, under service, retired
+
+    /// `lib/machine-status.js canDelete`: whether a printer may be deleted, and
+    /// when it may not, what in the book still names it. `reason` is
+    /// `has_history`, `missing` or nil; `by` is collection → how many records
+    /// (`printLog`, `machMaintLog`, `settings.printerCompletions`, …).
+    public struct MachineDeleteVerdict: Decodable, Sendable, Equatable {
+        public let ok: Bool
+        public let reason: String?
+        public let total: Int
+        public let by: [String: Int]
+        public init(ok: Bool, reason: String?, total: Int, by: [String: Int]) {
+            self.ok = ok; self.reason = reason; self.total = total; self.by = by
+        }
+    }
+
+    /// `stateOf`: `active`, `service` or `retired`.
+    public func machineState(_ machine: JSONValue) throws -> String {
+        try runtime.call2("KhaytMachineStatus.stateOf(ARG0)", [machine], as: String.self)
+    }
+
+    /// `canDelete` for one printer, against the WHOLE book — every collection
+    /// that names a machine counts, including ones added after this was written.
+    public func machineCanDelete(book: [String: JSONValue], id: String) throws -> MachineDeleteVerdict {
+        try runtime.call2("KhaytMachineStatus.canDelete(ARG0, ARG1)",
+                          [.object(book), .string(id)], as: MachineDeleteVerdict.self)
+    }
+
+    /// `canDelete` for several printers in one crossing — the machines screen
+    /// asks once a load, not once a card.
+    public func machineDeleteVerdicts(book: [String: JSONValue], ids: [String]) throws -> [String: MachineDeleteVerdict] {
+        try runtime.call2("""
+            (function (b, ids) {
+              const out = {};
+              for (const id of ids) out[id] = KhaytMachineStatus.canDelete(b, id);
+              return out;
+            })(ARG0, ARG1)
+            """, [.object(book), .array(ids.map { .string($0) })], as: [String: MachineDeleteVerdict].self)
+    }
+
+    /// What `remove` did: the machine list as it now stands (unchanged when it
+    /// was refused), the record taken out and where it sat, and the verdict.
+    public struct MachineRemoved: Decodable, Sendable {
+        public let ok: Bool
+        public let reason: String?
+        public let total: Int
+        public let by: [String: Int]
+        public let removed: JSONValue?
+        public let index: Int?
+        public let machines: [JSONValue]
+    }
+
+    /// `remove`: delete the printer only when `canDelete` allows.
+    public func removeMachine(book: [String: JSONValue], id: String) throws -> MachineRemoved {
+        try runtime.call2("""
+            (function (b, id) {
+              const r = KhaytMachineStatus.remove(b, id);
+              return Object.assign({}, r, { machines: Array.isArray(b.machines) ? b.machines : [] });
+            })(ARG0, ARG1)
+            """, [.object(book), .string(id)], as: MachineRemoved.self)
+    }
+
+    /// `setUnderService`: the machine record with the flag, reason and date set
+    /// or cleared. `since` is an ISO day, handed in — the rule has no clock.
+    public func setUnderService(_ machine: JSONValue, on: Bool, reason: String?,
+                                since: String?) throws -> JSONValue {
+        var opts: [String: JSONValue] = ["on": .bool(on)]
+        if let reason { opts["reason"] = .string(reason) }
+        if let since { opts["since"] = .string(since) }
+        return try runtime.call2("KhaytMachineStatus.setUnderService(ARG0, ARG1)",
+                                 [machine, .object(opts)], as: JSONValue.self)
+    }
+
+    /// What `retire` did. `machines` and `printLog` are the two collections it
+    /// changes, as they now stand; `unassigned` the unfinished jobs it took the
+    /// printer off.
+    public struct MachineRetired: Decodable, Sendable {
+        public let ok: Bool
+        public let reason: String?
+        public let machine: JSONValue?
+        public let unassigned: [String]
+        public let machines: [JSONValue]
+        public let printLog: [JSONValue]
+    }
+
+    /// `retire`: retired on `at` (ISO day), off every unfinished job.
+    public func retireMachine(machines: [JSONValue], printLog: [JSONValue], id: String,
+                              at: String, reason: String?) throws -> MachineRetired {
+        var opts: [String: JSONValue] = ["at": .string(at)]
+        if let reason { opts["reason"] = .string(reason) }
+        return try runtime.call2("""
+            (function (b, id, o) {
+              const r = KhaytMachineStatus.retire(b, id, o);
+              return Object.assign({}, r, { machines: b.machines, printLog: b.printLog });
+            })({ machines: ARG0, printLog: ARG1 }, ARG2, ARG3)
+            """, [.array(machines), .array(printLog), .string(id), .object(opts)], as: MachineRetired.self)
+    }
+
+    /// `unretire`: back in service, its history untouched.
+    public func unretireMachine(_ machine: JSONValue) throws -> JSONValue {
+        try runtime.call2("KhaytMachineStatus.unretire(ARG0)", [machine], as: JSONValue.self)
     }
 
     /// What a job's components cost — `lib/order-new.js componentsCost`, the

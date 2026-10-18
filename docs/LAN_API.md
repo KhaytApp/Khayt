@@ -614,7 +614,9 @@ Machine list glance. **Requires owner PIN.**
 
 Live printer telemetry from the app's own printer polling (OctoPrint, Moonraker, PrusaLink, Bambu, …). **Requires owner PIN.** Cheap enough for a phone to poll every few seconds.
 
-**Response 200** — one entry per `store.machines` row:
+**Response 200** — one entry per `store.machines` row. The native Mac leaves
+out a retired printer (`lib/machine-status.js isRetired`); `lib/lan-server.js`
+still lists it, and the phone hides it either way:
 
 ```json
 [{ "id": "M-1", "name": "U1", "hasPrinterApi": true,

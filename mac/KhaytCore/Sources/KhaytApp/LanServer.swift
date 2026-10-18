@@ -2940,9 +2940,10 @@ extension LanServer {
 }
 
 extension Shop {
-    /// `/api/machines/live`: every machine, with what its printer last said.
+    /// `/api/machines/live`: every machine still in use, with what its printer
+    /// last said. A retired printer is history, not something to watch.
     func machinesLive() -> [JSONValue] {
-        machines.map { m in
+        machinesInUse.map { m in
             LanServer.liveRow(id: m.id, name: m.name, apiType: m.printerApi?.type,
                               reading: printers.readings[m.id])
         }

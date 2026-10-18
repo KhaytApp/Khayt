@@ -162,7 +162,7 @@ private struct FloorStrip: View {
 
     var body: some View {
         // The site's machines when narrowed — every machine, always, at it.
-        if !shop.siteMachines.isEmpty {
+        if !shop.siteMachinesInUse.isEmpty {
             Group {
                 // ── AN HStack, NOT A LazyVGrid ────────────────────────────
                 //
@@ -179,7 +179,7 @@ private struct FloorStrip: View {
                 // handful of machines, not forty, so there is nothing here a
                 // grid was buying.
                 HStack(spacing: 0) {
-                    ForEach(Array(shop.siteMachines.enumerated()), id: \.element.id) { index, machine in
+                    ForEach(Array(shop.siteMachinesInUse.enumerated()), id: \.element.id) { index, machine in
                         if index > 0 {
                             Rectangle().fill(Khayt.layerLine)
                                 .frame(width: 1).padding(.vertical, 6)
@@ -834,7 +834,7 @@ private struct RunningNow: View {
     let shop: Shop
 
     private var running: [(Machine, KhaytEngine.PrinterStatus)] {
-        shop.siteMachines.compactMap { machine in
+        shop.siteMachinesInUse.compactMap { machine in
             // The one predicate, not a fourth spelling of it. This file, the
             // machine card and two properties on `Shop` each had their own,
             // and two of the four forgot to lowercase.

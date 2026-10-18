@@ -174,7 +174,32 @@ extension Shop {
         var from: String
         var to: String
         var reason: String
-        var id: String { from + "|" + to + "|" + reason }
+        /// Which row this is on screen, for as long as it is on screen.
+        ///
+        /// NOT derived from the fields. It was `from|to|reason`, so typing one
+        /// letter of a reason gave the row a new identity — SwiftUI rebuilt
+        /// the row and the text field lost focus mid-word — and two identical
+        /// windows were one id. Never written to the book, and left out of
+        /// equality: two windows with the same times and reason are the same
+        /// window to the sheet's "has anything changed" question.
+        let id: UUID
+
+        init(from: String, to: String, reason: String, id: UUID = UUID()) {
+            self.from = from
+            self.to = to
+            self.reason = reason
+            self.id = id
+        }
+
+        static func == (a: Self, b: Self) -> Bool {
+            a.from == b.from && a.to == b.to && a.reason == b.reason
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(from)
+            hasher.combine(to)
+            hasher.combine(reason)
+        }
 
         /// Does this window run forwards? The shared rule DROPS one that does
         /// not, so a sheet that cannot say so lets a shop type something and
@@ -1165,7 +1190,7 @@ extension Shop {
     /// the module's own reason.
     func scheduleRow(_ a: KhaytEngine.SchedulePlan.Assignment) -> (job: String, machine: String, why: String) {
         let job = orders.first { $0.id == a.orderId }?.project ?? a.orderId
-        let machine = machines.first { $0.id == a.machineId }?.name ?? a.machineId
+        let machine = machineName(forId: a.machineId)
         return (job, machine, a.reason ?? "")
     }
 

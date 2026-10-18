@@ -74,7 +74,10 @@ final class Camera {
     private func sweep(shop: Shop) async {
         for machine in shop.machines {
             if Task.isCancelled { return }
-            guard machine.hasCamera else { frames[machine.id] = .none; continue }
+            // Not a printer in service: retired has left the shop, and under
+            // service is on the bench, usually switched off — asking its camera
+            // every few seconds would only draw a failure.
+            guard machine.hasCamera, machine.inService else { frames[machine.id] = .none; continue }
             frames[machine.id] = await Self.fetch(machine, shop: shop)
         }
     }
@@ -113,6 +116,11 @@ final class Camera {
             } catch {
                 return .failed("refused")
             }
+            // And the poller's LAN rule, which the one above does not apply
+            // to the printer's own host — see the HTTP still below.
+            guard let parsed = URL(string: feed), await PrinterWatch.onThisNetwork(parsed, engine: engine) else {
+                return .failed("refused")
+            }
             guard let session = try? RtspSession(url: feed) else { return .failed("bad address") }
             do { return .picture(try await session.still()) }
             catch Rtsp.Failure.refused(404) {
@@ -142,6 +150,15 @@ final class Camera {
         }
 
         guard let url = URL(string: still) else { return .failed("bad address") }
+        // ── AND ON THIS NETWORK, BY THE POLLER'S RULE ────────────────────
+        //
+        // `assertWebcamHost` lets through any address EQUAL to the printer's
+        // host without asking whether that host is on the LAN — and a book
+        // that arrived by restore or sync can name a public one. The poller
+        // refuses such a printer (`PrinterWatch.baseURL`); the camera sent it
+        // the printer's key on every frame. Same rule here, before anything
+        // that may carry a credential is built.
+        guard await PrinterWatch.onThisNetwork(url, engine: engine) else { return .failed("refused") }
         var request = URLRequest(url: url)
         request.timeoutInterval = 5
         request.httpMethod = "GET"

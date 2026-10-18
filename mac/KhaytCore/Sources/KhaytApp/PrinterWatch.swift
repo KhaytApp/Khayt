@@ -101,6 +101,13 @@ final class PrinterWatch {
     enum NotWatched: Equatable {
         case noConnection
         case otherProtocol(String)
+        /// The shop marked it under service: it is being repaired or waits for
+        /// a part, and asking it every ten seconds would only raise "offline"
+        /// alerts about a machine everybody knows is off.
+        case underService
+        /// Sold, scrapped or given away (`lib/machine-status.js`). Kept for its
+        /// history, never asked anything again.
+        case retired
     }
 
     private(set) var readings: [Machine.ID: Reading] = [:]
@@ -224,6 +231,10 @@ final class PrinterWatch {
 
     /// Is this a machine this app can ask? Nil when it can.
     static func notWatched(_ machine: Machine) -> NotWatched? {
+        // Before the connection: a retired printer with an address is still
+        // not one to ask, and the card says why in those words.
+        if machine.isRetired { return .retired }
+        if machine.isUnderService { return .underService }
         let type = machine.printerApi?.type ?? ""
         if type.isEmpty || type == "none" { return .noConnection }
         return spoken.contains(type) ? nil : .otherProtocol(type)
@@ -415,7 +426,7 @@ final class PrinterWatch {
         let enable = (try? await engine.alertEnable(settings: shop.settingsDict)) ?? KhaytEngine.Alerting.sensible
         guard let found = try? await engine.printerAlerts(
             was: previous, now: current, settings: shop.settingsDict,
-            machines: shop.machineRows, state: alertState,
+            machines: shop.machineRowsInUse, state: alertState,
             enable: enable) else {
             previous = current
             return
@@ -423,7 +434,7 @@ final class PrinterWatch {
         previous = current
         alertState = found.state
         for alert in found.alerts {
-            let name = shop.machines.first { $0.id == alert.machineId }?.name ?? alert.machineId
+            let name = shop.machineName(forId: alert.machineId)
             let title = Self.title(alert.type, machine: name, shop: shop)
             let body = Self.body(alert, machine: name, shop: shop)
             notices.raise(PrinterNotice.Notice(
@@ -467,6 +478,8 @@ final class PrinterWatch {
     /// — ten seconds away — is a button somebody presses again, and pressing
     /// `cancel` twice is harmless while pressing `pause` twice is not.
     func refresh(_ machine: Machine, shop: Shop) async {
+        // Not one the sweep leaves alone on purpose (`notWatched`).
+        guard machine.inService else { return }
         await poll(machine, shop: shop)
     }
 
@@ -474,7 +487,6 @@ final class PrinterWatch {
         let engine = shop.engine
         guard let engine else { return }
         do {
-            let base = try await Self.baseURL(machine, engine: engine)
             // The API key, opened at the moment it is sent and never held.
             // Moonraker in trusted-client mode needs none; the other two always
             // do, and an unset one must be sent as NOTHING rather than as the
@@ -484,23 +496,13 @@ final class PrinterWatch {
             if let sealed = machine.printerApi?.apiKey, !sealed.isEmpty, let build = source {
                 key = (try? await Secrets.open(sealed, for: build)) ?? ""
             }
-            let status: KhaytEngine.PrinterStatus
-            if machine.printerApi?.type == "sdcp" {
-                status = try await Self.askSdcp(machine, engine: engine, base: base)
-            } else if machine.printerApi?.type == "bambu" {
-                // Not `read`: there is no request and no response, so the seam
-                // that every other protocol shares has nothing to stand in for.
-                var accessCode = ""
-                if let sealed = machine.printerApi?.accessCode, !sealed.isEmpty, let build = source {
-                    accessCode = (try? await Secrets.open(sealed, for: build)) ?? ""
-                }
-                status = try await Self.askBambu(machine, engine: engine,
-                                                 base: base, accessCode: accessCode)
-            } else {
-                status = try await Self.read(machine, engine: engine, base: base, key: key) { request in
-                    try await Self.session.data(for: request)
-                }
+            // A Bambu's access code, the same way — and only for a Bambu.
+            var accessCode = ""
+            if machine.printerApi?.type == "bambu",
+               let sealed = machine.printerApi?.accessCode, !sealed.isEmpty, let build = source {
+                accessCode = (try? await Secrets.open(sealed, for: build)) ?? ""
             }
+            let status = try await Self.ask(machine, engine: engine, key: key, accessCode: accessCode)
             let loadedBefore = readings[machine.id]?.status?.loaded ?? []
             readings[machine.id] = Reading(status: status, problem: nil, at: Date(),
                                            consecutiveFailures: 0, lastGood: status)
@@ -519,13 +521,51 @@ final class PrinterWatch {
         } catch {
             let before = readings[machine.id]?.consecutiveFailures ?? 0
             let last = readings[machine.id]?.status ?? readings[machine.id]?.lastGood
-            readings[machine.id] = Reading(status: nil, problem: Self.say(error), at: Date(),
+            readings[machine.id] = Reading(status: nil, problem: Self.say(error, shop.words), at: Date(),
                                            consecutiveFailures: before + 1, lastGood: last)
         }
     }
 
     /// Which book this watch belongs to, so a credential can be opened.
     var source: StoreReader.Build?
+
+    /// Ask one machine what it is doing, by whichever protocol it speaks.
+    ///
+    /// ── THE POLL AND THE TEST BUTTON ASK THE SAME WAY ────────────────────
+    ///
+    /// The machine sheet's Test button used to call `read` for every type, so
+    /// a Bambu or an Elegoo was asked the Moonraker HTTP question and the
+    /// shop was told its correctly-set-up printer did not answer. One function
+    /// for both means the button tests what the poller will actually do.
+    ///
+    /// `key` and `accessCode` arrive OPENED, by the caller, at the point of
+    /// use — this never reads the book's sealed fields itself.
+    static func ask(_ machine: Machine, engine: KhaytEngine, key: String, accessCode: String,
+                    fetch: @escaping (URLRequest) async throws -> (Data, URLResponse) = {
+                        try await PrinterWatch.session.data(for: $0)
+                    }) async throws -> KhaytEngine.PrinterStatus {
+        let base = try await baseURL(machine, engine: engine)
+        switch machine.printerApi?.type {
+        case "sdcp":
+            return try await askSdcp(machine, engine: engine, base: base)
+        case "bambu":
+            // Not `read`: there is no request and no response, so the seam
+            // that every other protocol shares has nothing to stand in for.
+            return try await askBambu(machine, engine: engine, base: base, accessCode: accessCode)
+        default:
+            return try await read(machine, engine: engine, base: base, key: key, fetch: fetch)
+        }
+    }
+
+    /// Is this address on the shop's own network, by the rule `baseURL`
+    /// applies to a printer? Asked before any request that carries a
+    /// printer's credential — a camera URL is matched against the printer's
+    /// host, and a printer host that is itself public was never checked.
+    nonisolated static func onThisNetwork(_ url: URL, engine: KhaytEngine) async -> Bool {
+        guard let raw = url.host(percentEncoded: false), !raw.isEmpty,
+              let host = try? await engine.printerHost(raw), !host.isEmpty else { return false }
+        return (try? await engine.printerHostAllowed(host)) == true
+    }
 
     // MARK: - The conversations
 
@@ -787,37 +827,13 @@ final class PrinterWatch {
         /// how a shop gets one.
         case needsMainboardId
 
+        /// English, for `String(describing:)` and logs. What a shop READS
+        /// goes through `PrinterWatch.say(_:_:)`, in the shop's language —
+        /// both spell the same sentence out of `Words`' own table, so there is
+        /// one copy of it to reword.
         var description: String {
-            switch self {
-            case .handshakeRefused(let why): return "the printer refused the connection: \(why)"
-            case .needsSerial:
-                return "This Bambu has no serial number yet. It is printed on the machine, and "
-                     + "every message to it is addressed by it, so there is nothing to ask without one."
-            case .unreadable(let type):
-                return "The \(type) printer answered with something this app could not read."
-            case .needsMainboardId:
-                return "This printer has no mainboard ID yet. It is how every message reaches it, "
-                     + "and it is not printed on the machine — scan the network to find it."
-            case .noHost:
-                return "This machine has no address yet."
-            case .notALanAddress(let host):
-                return "\(host) is not an address on this network. A printer is a machine "
-                     + "in the workshop, so only the private ranges are allowed."
-            case .badPort(let port):
-                return "\(port) is not a port."
-            case .redirected:
-                return "The printer sent this request somewhere else, so it was dropped."
-            case .http(let code, let body):
-                return "The printer's server answered \(code)"
-                     + (body.isEmpty ? "." : ": \(body).")
-            case .noHistoryKept(let type):
-                return "A \(type.isEmpty ? "printer of this kind" : type) printer does not keep a "
-                     + "job history Khayt can read. Klipper (Moonraker) is the only one of the three "
-                     + "that does — the rest answer nothing at all, which arrives as a 404. Khayt "
-                     + "counts this machine's wear from the jobs in your own book instead."
-            case .notJSON:
-                return "The printer's answer was not JSON."
-            }
+            guard let said = PrinterWatch.sentence(self) else { return "\(self)" }
+            return Words.english(said.key, said.params)
         }
     }
 
@@ -1124,83 +1140,114 @@ final class PrinterWatch {
 
     static func degrees(_ value: Double) -> String { "\(Int(saturating: value.rounded()))°" }
 
-    /// A failure in the vocabulary of the person who has to fix it.
-    static func say(_ error: any Error) -> String {
-        if let refusal = error as? Refusal { return refusal.description }
-        if let trouble = error as? BambuMqtt.Trouble { return say(trouble) }
-        if let trouble = error as? SdcpSocket.Trouble { return say(trouble) }
-        let ns = error as NSError
-        switch ns.code {
-        case NSURLErrorTimedOut:
-            return "The printer did not answer in time. It may be asleep or off the network."
-        case NSURLErrorCannotConnectToHost, NSURLErrorNetworkConnectionLost:
-            return "Nothing answered at that address. Check the printer is on and on this network."
-        case NSURLErrorCannotFindHost:
-            return "That name did not resolve to anything on this network."
-        default:
-            return ns.localizedDescription
-        }
+    /// A failure in the vocabulary of the person who has to fix it, in the
+    /// shop's language. This is what the Test button, the machine card and
+    /// the menu bar show.
+    static func say(_ error: any Error, _ words: Words) -> String {
+        guard let said = sentence(error) else { return (error as NSError).localizedDescription }
+        return words.callIt(said.key, said.params)
     }
 
-    /// What went wrong with an Elegoo, in words.
+    /// A failure from a command, an upload or a plug — where most errors are
+    /// the printer's and some are this app's own. Ours are said in the shop's
+    /// language; anything else keeps its own description, which for this
+    /// app's error types is more use than `localizedDescription`'s
+    /// "The operation couldn't be completed".
+    static func problem(_ error: any Error, _ words: Words) -> String {
+        sentence(error) == nil ? String(describing: error) : say(error, words)
+    }
+
+    /// The same sentence in English, for a log or a test with no `Words`.
+    nonisolated static func say(_ error: any Error) -> String {
+        guard let said = sentence(error) else { return (error as NSError).localizedDescription }
+        return Words.english(said.key, said.params)
+    }
+
+    nonisolated static func say(_ trouble: SdcpSocket.Trouble) -> String { say(trouble as any Error) }
+    nonisolated static func say(_ trouble: BambuMqtt.Trouble) -> String { say(trouble as any Error) }
+
+    /// Which sentence a failure is, as a key in `Words`' own table and its
+    /// parameters. Nil for an error with no sentence of ours, which is said in
+    /// the system's own words (`localizedDescription`).
     ///
-    /// A refusal, silence and a hang-up are three different situations and read
-    /// as three different sentences. Collapsing them into "could not reach the
-    /// printer" is what makes a diagnostic useless: the shop cannot tell
-    /// whether to look at the network, the machine, or the print it just sent.
-    static func say(_ trouble: SdcpSocket.Trouble) -> String {
-        switch trouble {
-        case .refused(let why):
+    /// ── A REFUSAL, SILENCE AND A HANG-UP ARE THREE SENTENCES ─────────────
+    ///
+    /// Collapsing them into "could not reach the printer" is what makes a
+    /// diagnostic useless: the shop cannot tell whether to look at the
+    /// network, the machine, or the print it just sent. Every printer
+    /// diagnostic is chosen here, in one file, and spelled once in `Words` —
+    /// so the Developer Mode sentence, the one somebody will want to reword,
+    /// has one home in each language.
+    nonisolated static func sentence(_ error: any Error) -> (key: String, params: [String: JSONValue])? {
+        if let refusal = error as? Refusal {
+            switch refusal {
+            case .handshakeRefused(let why): return ("mac.pw_handshake", ["why": .string(why)])
+            case .needsSerial: return ("mac.pw_needs_serial", [:])
+            case .unreadable(let type): return ("mac.pw_unreadable", ["type": .string(type)])
+            case .needsMainboardId: return ("mac.pw_needs_mainboard", [:])
+            case .noHost: return ("mac.pw_no_host", [:])
+            case .notALanAddress(let host): return ("mac.pw_not_lan", ["host": .string(host)])
+            case .badPort(let port): return ("mac.pw_bad_port", ["port": .string(String(port))])
+            case .redirected: return ("mac.pw_redirected", [:])
+            case .http(let code, let body):
+                return body.isEmpty
+                    ? ("mac.pw_http", ["code": .string(String(code))])
+                    : ("mac.pw_http_body", ["code": .string(String(code)), "body": .string(body)])
+            case .noHistoryKept(let type):
+                return type.isEmpty ? ("mac.pw_no_history_any", [:])
+                                    : ("mac.pw_no_history", ["type": .string(type)])
+            case .notJSON: return ("mac.pw_not_json", [:])
+            }
+        }
+        if let trouble = error as? SdcpSocket.Trouble {
+            switch trouble {
             // The printer ANSWERED. Its own words, not ours.
-            return "The printer refused: \(why)"
-        case .silent:
-            return "The printer did not answer in time. Check it is on, and that the mainboard ID "
-                 + "is the one this machine actually has."
-        case .closed:
-            return "The printer closed the connection before answering."
-        case .socket(let why):
-            return "Could not reach the printer: \(why)"
+            case .refused(let why): return ("mac.pw_sdcp_refused", ["why": .string(why)])
+            case .silent: return ("mac.pw_sdcp_silent", [:])
+            case .closed: return ("mac.pw_closed", [:])
+            case .socket(let why): return ("mac.pw_unreachable", ["why": .string(why)])
+            }
+        }
+        if let trouble = error as? BambuMqtt.Trouble {
+            switch trouble {
+            case .malformed: return ("mac.pw_malformed", [:])
+            case .certificateChanged: return ("mac.pw_cert_changed", [:])
+            case .refused(let code): return ("mac.pw_code_refused", ["code": .string(String(code))])
+            case .silent:
+                // NAMING DEVELOPER MODE FIRST IS THE POINT OF THIS MESSAGE.
+                //
+                // Reaching here means the socket opened and the printer said
+                // nothing, which is what Developer Mode being off looks like
+                // and only that: a wrong access code is refused with a CONNACK
+                // and a wrong address never connects, so neither lands on this
+                // line. A message naming address, access code and LAN mode
+                // would be listing three things that are all correct.
+                return ("mac.pw_bambu_silent", [:])
+            case .closed("hungUp"): return ("mac.pw_closed", [:])
+            case .closed("cancelled"): return ("mac.pw_conn_closed", [:])
+            case .closed(let why): return ("mac.pw_unreachable", ["why": .string(why)])
+            }
+        }
+        let ns = error as NSError
+        guard ns.domain == NSURLErrorDomain else { return nil }
+        switch ns.code {
+        case NSURLErrorTimedOut: return ("mac.pw_timed_out", [:])
+        case NSURLErrorCannotConnectToHost, NSURLErrorNetworkConnectionLost: return ("mac.pw_cannot_connect", [:])
+        case NSURLErrorCannotFindHost: return ("mac.pw_cannot_find", [:])
+        default: return nil
         }
     }
 
-    /// What went wrong with a Bambu, in words.
-    ///
-    /// Here rather than on `BambuMqtt.Trouble` so every printer diagnostic is
-    /// in one file — including the untranslated-English gap this file carries
-    /// and documents. A transport that owned its own copy would be a second
-    /// place to look, and the Developer Mode sentence is the one somebody will
-    /// want to reword.
-    static func say(_ trouble: BambuMqtt.Trouble) -> String {
-        switch trouble {
-        case .malformed:
-            return "The printer sent something this app could not read."
-        case .certificateChanged:
-            return "The printer answered with a different certificate from the one it used before, "
-                 + "so the access code was not sent. If the printer was replaced or reset, save its "
-                 + "access code again on the machine sheet to trust the new one."
-        case .refused(let code):
-            return "The printer refused the access code (CONNACK \(code)). It is shown on the "
-                 + "printer's own screen, in the LAN-only Mode area."
-        case .silent:
-            // NAMING DEVELOPER MODE FIRST IS THE POINT OF THIS MESSAGE.
-            //
-            // Reaching here means the socket opened and the printer said
-            // nothing, which is what Developer Mode being off looks like and
-            // only that: a wrong access code is refused with a CONNACK and a
-            // wrong address never connects, so neither lands on this line. A
-            // message naming address, access code and LAN mode would be listing
-            // three things that are all correct — which is the worst kind of
-            // diagnostic, because it sends a shop to check what is already
-            // right.
-            return "The printer accepted the connection and then said nothing. That is what happens "
-                 + "when Developer Mode is off — LAN-only Mode alone does not open MQTT. Both are in "
-                 + "the same menu on the printer (Settings → LAN Mode, or WLAN/Network on P1 and A1)."
-        case .closed("hungUp"):
-            return "The printer closed the connection before answering."
-        case .closed("cancelled"):
-            return "The connection to the printer was closed."
-        case .closed(let why):
-            return "Could not reach the printer: \(why)"
+    /// What a printer says it is doing, in the shop's language where Khayt
+    /// has a word for it — the machine card's words, so the Test button and
+    /// the card cannot call one state two things.
+    static func stateWord(_ raw: String, _ words: Words) -> String {
+        switch raw.lowercased() {
+        case "printing": return words.callIt("mach.live_printing")
+        case "standby", "ready", "complete": return words.callIt("mach.live_idle")
+        case "paused": return words.callIt("rec.paused")
+        case "error": return words.callIt("mach.live_error")
+        default: return raw
         }
     }
 }
