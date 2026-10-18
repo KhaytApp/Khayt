@@ -448,6 +448,13 @@ struct CustomerInspector: View {
                         HStack(spacing: 6) {
                             Text(shop.words.callIt(line.wordKey)).font(.callout.weight(.medium))
                             Text(line.day).font(.caption).foregroundStyle(.tertiary).monospacedDigit()
+                            if let delivery = line.deliveryKey {
+                                Text(shop.words.callIt(delivery)
+                                     + (line.deliveryProblem.map { ": " + $0 } ?? ""))
+                                    .font(.caption)
+                                    .foregroundStyle(delivery == "mac.wa_status_failed"
+                                                     ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
+                            }
                         }
                         Text(line.note).font(.callout).textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)

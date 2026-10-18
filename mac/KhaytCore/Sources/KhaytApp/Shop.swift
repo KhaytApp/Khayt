@@ -2378,6 +2378,10 @@ final class Shop {
     var whatsAppReportsTask: Task<Void, Never>?
     var whatsAppHook: WhatsAppReports.Hook?
     var whatsAppHookProblem: String?
+    /// The shop `whatsAppHook` was last answered for; nil asks again.
+    var whatsAppHookFor: String?
+    /// A staff sign-in: may not see the hook, may read the reports.
+    var whatsAppReportsAsStaff = false
 
     var quoteSheetPublished: JSONValue??
     /// What the last attempt said, in the shop's words, for the Online pane.

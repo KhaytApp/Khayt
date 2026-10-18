@@ -45,6 +45,23 @@ enum WhatsAppReports {
             case .http(let code, let body): "Khayt Cloud answered \(code)" + (body.isEmpty ? "" : ": \(body)")
             }
         }
+
+        /// The same, in the shop's words.
+        @MainActor func said(_ words: Words) -> String {
+            switch self {
+            case .unauthorised: words.callIt("mac.wa_err_unauthorised")
+            case .notAllowed: words.callIt("mac.wa_hook_owner_only")
+            case .notOffered: words.callIt("mac.wa_err_not_offered")
+            case .badSecret: words.callIt("mac.wa_err_bad_secret")
+            case .http(let code, _): words.callIt("mac.cloud_err_http", ["code": .string(String(code))])
+            }
+        }
+    }
+
+    /// A failure as the pane says it: ours in the shop's words, the
+    /// system's (offline, timed out) as the system says it.
+    @MainActor static func said(_ error: Error, _ words: Words) -> String {
+        (error as? Failure)?.said(words) ?? error.localizedDescription
     }
 
     static let every: Duration = .seconds(120)
@@ -84,14 +101,16 @@ enum WhatsAppReports {
         let tail = "/whatsapp-statuses" + (since.map { "?since=\($0)" } ?? "")
         let request = try CloudReader.request(connection, token: token, method: "GET", tail: tail)
         let (data, response) = try await fetch(request)
-        try check(data, response)
+        // A 400 here is the cursor, not the secret.
+        try check(data, response, badRequest: .http(400, ""))
         return try JSONDecoder().decode(Page.self, from: data)
     }
 
-    private static func check(_ data: Data, _ response: URLResponse) throws {
+    private static func check(_ data: Data, _ response: URLResponse,
+                              badRequest: Failure = .badSecret) throws {
         switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
         case 200, 204: return
-        case 400: throw Failure.badSecret
+        case 400: throw badRequest
         case 401: throw Failure.unauthorised
         case 403: throw Failure.notAllowed
         case 404, 405: throw Failure.notOffered
@@ -102,7 +121,9 @@ enum WhatsAppReports {
     /// `nextSince` as a number, whichever way the cloud spelt it.
     static func seq(_ v: JSONValue?) -> Int? {
         switch v {
-        case .number(let n)?: return Int(n)
+        // `exactly`: a fraction or a 1e300 is not a place in the stream, and
+        // `Int(1e300)` traps.
+        case .number(let n)?: return Int(exactly: n)
         case .string(let s)?: return Int(s)
         default: return nil
         }
@@ -132,27 +153,55 @@ extension Shop {
 
     /// Ask the cloud whether this shop's hook is set up. Quiet when there is
     /// no cloud: most shops have none.
+    ///
+    /// `whatsAppHookFor` is set only once the cloud has answered for that
+    /// shop, so a Mac that opened offline, or hit a cloud error, asks again
+    /// on the next poll instead of never polling that session; and a book
+    /// switched to another shop is asked about afresh.
     func refreshWhatsAppHook() async {
+        let connection: CloudReader.Connection
+        let token: String
         do {
-            let (connection, token) = try await cloudToken()
+            (connection, token) = try await cloudToken()
+        } catch CloudReader.Failure.notConnected {
+            whatsAppHook = nil
+            whatsAppHookFor = nil
+            whatsAppReportsAsStaff = false
+            return
+        } catch {
+            // A locked keychain or a token gone: said, and the hook as last
+            // known stays on screen.
+            whatsAppHookFor = nil
+            whatsAppHookProblem = WhatsAppReports.said(error, words)
+            return
+        }
+        do {
             let session = CloudReader.session
             whatsAppHook = try await WhatsAppReports.hook(connection, token: token, method: "GET") {
                 try await session.data(for: $0)
             }
             whatsAppHookProblem = nil
-        } catch CloudReader.Failure.notConnected {
-            whatsAppHook = nil
+            whatsAppReportsAsStaff = false
+            whatsAppHookFor = connection.shopId
         } catch WhatsAppReports.Failure.notAllowed {
-            // A staff sign-in: the pane says who can, not that it failed.
+            // A staff sign-in: the pane says who can set it up, not that it
+            // failed — and it still reads the reports, which staff may.
             whatsAppHook = nil
             whatsAppHookProblem = words.callIt("mac.wa_hook_owner_only")
+            whatsAppReportsAsStaff = true
+            whatsAppHookFor = connection.shopId
         } catch {
-            whatsAppHookProblem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            whatsAppHookFor = nil
+            whatsAppHookProblem = WhatsAppReports.said(error, words)
         }
     }
 
     /// Hand the cloud the Meta app secret, or take the hook down with nil.
     func setWhatsAppHook(appSecret: String?) async {
+        guard lockAllows("settings", "edit") else {
+            whatsAppHookProblem = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
+            return
+        }
         do {
             let (connection, token) = try await cloudToken()
             let session = CloudReader.session
@@ -161,16 +210,16 @@ extension Shop {
             ) { try await session.data(for: $0) }
             if appSecret == nil { WhatsAppReports.remember(nil, connection.shopId) }
             whatsAppHookProblem = nil
+            whatsAppHookFor = connection.shopId
             startPollingWhatsAppReports()
         } catch {
-            whatsAppHookProblem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            whatsAppHookProblem = WhatsAppReports.said(error, words)
         }
     }
 
     func startPollingWhatsAppReports() {
         guard whatsAppReportsTask == nil else { return }
         whatsAppReportsTask = Task { [weak self] in
-            await self?.refreshWhatsAppHook()
             while !Task.isCancelled {
                 await self?.pollWhatsAppReports()
                 try? await Task.sleep(for: WhatsAppReports.every)
@@ -186,9 +235,11 @@ extension Shop {
     /// Read every report after this Mac's place and move the lines they name.
     func pollWhatsAppReports() async {
         // lock: system — Meta's own delivery reports, moving lines this shop already sent; no person acts here.
-        guard whatsAppHook?.configured == true, let engine, let build = source.build else { return }
+        guard let engine, let build = source.build else { return }
         do {
             let (connection, token) = try await cloudToken()
+            if whatsAppHookFor != connection.shopId { await refreshWhatsAppHook() }
+            guard whatsAppHook?.configured == true || whatsAppReportsAsStaff else { return }
             let session = CloudReader.session
             var since = WhatsAppReports.since(connection.shopId)
             // Pages of up to 500; a Mac back from a week away reads them all.
@@ -196,7 +247,11 @@ extension Shop {
                 let page = try await WhatsAppReports.statuses(connection, token: token, since: since) {
                     try await session.data(for: $0)
                 }
-                if !page.items.isEmpty {
+                // Tried on the book in memory first: a page that moves nothing
+                // (most of them, until this Mac sends through Meta) must not
+                // rewrite the whole book.
+                if !page.items.isEmpty,
+                   try await engine.applyWhatsAppStatuses(clients: clientRows, items: page.items).changed > 0 {
                     let items = page.items
                     var moved = 0
                     try await StoreWriter.update(
@@ -216,10 +271,14 @@ extension Shop {
                 guard let next, next != since, page.items.count >= 500 else { break }
                 since = next
             }
+            if !whatsAppReportsAsStaff { whatsAppHookProblem = nil }
         } catch CloudReader.Failure.notConnected {
             return
+        } catch WhatsAppReports.Failure.notAllowed {
+            // A viewer: not theirs to read. Asked again only on another book.
+            whatsAppReportsAsStaff = false
         } catch {
-            whatsAppHookProblem = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            whatsAppHookProblem = WhatsAppReports.said(error, words)
         }
     }
 }
@@ -276,7 +335,6 @@ struct WhatsAppReportsSection: View {
                 }
             }
         }
-        .task { await shop.refreshWhatsAppHook() }
     }
 
     private func copyRow(_ key: String, _ value: String) -> some View {

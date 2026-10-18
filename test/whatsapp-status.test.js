@@ -57,3 +57,13 @@ test('reports for messages this book does not hold are counted, not invented', (
   assert.equal(r.changed, 0);
   assert.equal(r.unmatched, 1);
 });
+
+test('only a real instant, a numeric code and a short title reach the book', () => {
+  const r = WS.apply(clients(), [{ messageId: 'wamid.A', status: 'failed', at: 'x'.repeat(5000),
+    errorCode: { nested: 'x'.repeat(5000) }, errorTitle: 't'.repeat(5000) }]);
+  const line = r.clients[0].commLog[0];
+  assert.equal(line.status, 'failed');
+  assert.equal(line.statusAt, undefined);
+  assert.equal(line.errorCode, undefined);
+  assert.equal(line.errorTitle.length, 200);
+});

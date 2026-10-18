@@ -12,6 +12,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   screen, as on iPhone Duo's folded outer display, the last filter used to
   run under them and sit half hidden. The strip now ends beside them and
   still scrolls.
+- **Mac: customer records and WhatsApp reports, after review.** Turning
+  customer records off deletes the cloud copy even when another Mac sent it,
+  and a send that was on its way when the switch went off is deleted too. A
+  book that has the switch on from elsewhere shows it on, so it can be turned
+  off. WhatsApp reports are read after a Mac opens offline, after switching
+  books and on a staff sign-in. A batch that changes nothing no longer
+  rewrites the book, and only a date, a numeric code and a short reason from a
+  report are kept. The customer's log shows sent, delivered, read or not
+  delivered beside a message Meta reported on. Errors in both sections are
+  in Arabic in the Arabic app.
+
 - **Mac: customer records for your web store (held), and WhatsApp delivery
   reports.** Settings → Online gains a switch that publishes each customer
   who has an email (name, phone and their orders, with what they paid) to
