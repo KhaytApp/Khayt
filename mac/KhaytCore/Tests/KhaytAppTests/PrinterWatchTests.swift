@@ -104,8 +104,11 @@ struct PrinterWatchTests {
         // nothing, rather than an attacker's domain wearing a LAN address.
         let engine = try KhaytEngine()
         for smuggled in ["192.168.1.5@evil.example", "192.168.1.5/../evil", "192.168.1.5:9/x"] {
+            // A scrubbed name is now also LOOKED UP (PrinterHostResolveTests);
+            // answered here with a LAN address, so what is checked is the
+            // shape of the URL, not this Mac's DNS.
             let url = try await PrinterWatch.baseURL(
-                Self.machine("moonraker", host: smuggled), engine: engine)
+                Self.machine("moonraker", host: smuggled), engine: engine, lookUp: { _ in ["192.168.1.5"] })
             let authority = url.absoluteString.replacingOccurrences(of: "http://", with: "")
             #expect(!authority.contains("@"), "\(smuggled) kept its userinfo")
             #expect(!authority.contains("/"), "\(smuggled) kept a path")
