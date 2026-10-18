@@ -349,7 +349,7 @@ struct FlowChips: View {
                 }
                 .padding(.horizontal, 11).padding(.vertical, 5)
                 .background(isOn(key) ? Khayt.brand : Khayt.recessed, in: Capsule())
-                .foregroundStyle(isOn(key) ? Color.white : Color.primary)
+                .foregroundStyle(isOn(key) ? Khayt.onBrand : Color.primary)
             }
         }
     }

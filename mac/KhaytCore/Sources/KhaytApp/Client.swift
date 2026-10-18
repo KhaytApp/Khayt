@@ -341,7 +341,12 @@ struct Recurring: Hashable, Sendable {
         get { str(raw["endDate"]).flatMap { $0.isEmpty ? nil : $0 } }
         set { raw["endDate"] = newValue.map(JSONValue.string) ?? .null }
     }
-    var leadDays: Int { Int(num(raw["leadDays"]) ?? 0) }
+    /// Whole days, held to a sane range: `Int(_:)` traps on NaN, infinity
+    /// or anything past Int's reach, and a typed "1e20" is all it takes.
+    var leadDays: Int {
+        guard let n = num(raw["leadDays"]), n.isFinite else { return 0 }
+        return Int(min(max(n, 0), 3650))
+    }
     var templateOrderId: String? { str(raw["templateOrderId"]).flatMap { $0.isEmpty ? nil : $0 } }
 
     /// `YYYY-MM-DD` ⇄ a local day, the way `localDateStr` in renderer/util.js

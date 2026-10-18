@@ -3875,6 +3875,8 @@ final class Words {
         "mac.draft_again":   ["en": "Draft another",     "ar": "صُغ أخرى"],
         "mac.copy_message":  ["en": "Copy",              "ar": "نسخ"],
         "mac.copied":        ["en": "Copied",            "ar": "نُسخ"],
+        "mac.vat":           ["en": "VAT",               "ar": "الضريبة"],
+        "common.undo":       ["en": "Undo",              "ar": "تراجع"],
         // Said under every draft. It DRAFTS; the shop sends.
         "mac.draft_not_sent": ["en": "Nothing has been sent. Read it, change what you want, "
                                + "and send it yourself.",

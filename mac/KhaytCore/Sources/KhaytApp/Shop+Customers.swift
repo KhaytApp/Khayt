@@ -157,7 +157,9 @@ extension Shop {
         guard let row = orderRows.first(where: { Self.recordId($0) == id }),
               case .object(let o) = row, case .object(let survey)? = o["survey"]
         else { return (0, "") }
-        let rating = Int(JSSemantics.number(survey["rating"]))
+        // A survey with no rating is NaN here, and Int(NaN) traps.
+        let raw = JSSemantics.number(survey["rating"])
+        let rating = raw.isFinite ? Int(min(max(raw, 0), 10)) : 0
         var comment = ""
         if case .string(let c)? = survey["comment"] { comment = c }
         return (rating, comment)
