@@ -6,7 +6,8 @@
  * are copied below VERBATIM and run beside the module over generated forms and
  * shelves; the entry and the shelf are compared. The one deliberate fix — the
  * entry now records which spool it deducted from — is outside the comparison
- * (the original wrote nothing there) and has its own tests.
+ * (the original wrote nothing there) and has its own tests, as do the two
+ * later ones: `drawn` (what really came off) and skipping an empty roll.
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -88,9 +89,13 @@ test('the module and the original agree, entry and shelf, over 4000 generated fo
       machineId: pick(r, [undefined, '', 'M1']),
     };
     const a = shelf(r), b = JSON.parse(JSON.stringify(a));
+    // The second deliberate fix: an EMPTY first roll is skipped for the next
+    // one of the material. The original took from it and so took nothing. Its
+    // own tests are below; the comparison holds only where it cannot arise.
+    if (a[0].weight === 0) continue;
     const theirs = runOriginal(form, { today: '2026-09-04', id: 'w-1', inventory: a });
     const ours = W.newEntry(form, { today: '2026-09-04', id: 'w-1', inventory: b });
-    if (ours.entry) delete ours.entry.spoolId;   // the deliberate addition
+    if (ours.entry) { delete ours.entry.spoolId; delete ours.entry.drawn; }   // the deliberate additions
     assert.deepEqual(ours, theirs, JSON.stringify(form));
     assert.deepEqual(b, a, 'the shelf after: ' + JSON.stringify(form));
   }

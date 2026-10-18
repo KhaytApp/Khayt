@@ -2403,6 +2403,7 @@
   "po.received_toast": "采购订单已标记为已收货",
   "po.created_toast": "采购订单已创建",
   "po.partial": "部分收货",
+  "po.item_gone": "此采购单的物品已不在库存中，因此未收货。请重新添加该物品，或手动关闭此采购单。",
   "po.received_so_far": "已收货总量",
   "po.receive_more": "继续收货",
   "po.close_po": "关闭采购订单",

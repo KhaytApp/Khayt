@@ -2403,6 +2403,7 @@
   "po.received_toast": "Bestellung als erhalten markiert",
   "po.created_toast": "Bestellung erstellt",
   "po.partial": "Teilweise eingegangen",
+  "po.item_gone": "Der Artikel dieser Bestellung ist nicht mehr im Bestand, daher wurde nichts empfangen. Füge ihn erneut hinzu oder schließe die Bestellung manuell.",
   "po.received_so_far": "Bisher eingegangen",
   "po.receive_more": "Mehr empfangen",
   "po.close_po": "Bestellung abschließen",
