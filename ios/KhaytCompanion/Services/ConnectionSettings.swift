@@ -114,7 +114,17 @@ final class ConnectionSettings: ObservableObject {
         didSet { UserDefaults.standard.set(port, forKey: Keys.port) }
     }
     @Published var pin: String {
-        didSet { KeychainHelper.set(pin, for: Keys.pinKeychain) }
+        didSet {
+            KeychainHelper.set(pin, for: Keys.pinKeychain)
+            // A new PIN may be a new Mac: pin its key again from there.
+            if pin != oldValue { macIdentityKey = "" }
+        }
+    }
+    /// The paired Mac's Ed25519 public key, base64 — pinned while the phone
+    /// talks to it with the PIN, so a moved Mac can prove itself without the
+    /// PIN being sent anywhere new. See `MacIdentity`. Empty until pinned.
+    @Published var macIdentityKey: String {
+        didSet { UserDefaults.standard.set(macIdentityKey, forKey: Keys.macIdentity) }
     }
     @Published var isPaired: Bool {
         didSet { UserDefaults.standard.set(isPaired, forKey: Keys.paired) }
@@ -176,6 +186,7 @@ final class ConnectionSettings: ObservableObject {
         static let serviceName = "khayt.serviceName"
         static let pinKeychain = "khayt.lanPin"
         static let paired = "khayt.paired"
+        static let macIdentity = "khayt.macIdentity"
         static let language = "khayt.language"
         static let notifyQueue = "khayt.notify.queue"
         static let notifyConnection = "khayt.notify.connection"
@@ -194,6 +205,7 @@ final class ConnectionSettings: ObservableObject {
         serviceName = defaults.string(forKey: Keys.serviceName) ?? ""
         isPaired = defaults.bool(forKey: Keys.paired)
         pin = KeychainHelper.get(Keys.pinKeychain) ?? ""
+        macIdentityKey = defaults.string(forKey: Keys.macIdentity) ?? ""
         let langRaw = defaults.string(forKey: Keys.language) ?? AppLanguage.system.rawValue
         appLanguage = AppLanguage(rawValue: langRaw) ?? .system
         notifyQueueChanges = defaults.object(forKey: Keys.notifyQueue) as? Bool ?? true
@@ -249,6 +261,7 @@ final class ConnectionSettings: ObservableObject {
         isSampleShop = false
         serviceName = ""
         pin = ""
+        macIdentityKey = ""
         KeychainHelper.delete(Keys.pinKeychain)
         // The offline cache holds the shop's client list, orders and inventory.
         // Dropping the PIN while leaving that on disk would mean "unpaired" only

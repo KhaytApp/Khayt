@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: a Mac that changes address is followed again, once it proves
+  who it is.** The phone keeps the Mac's identity key from a connection it
+  already trusts. When the Mac turns up at a new address, the phone asks it
+  to sign a one-time challenge, which needs no PIN, and moves by itself
+  only if the signature matches. Anything else, including a desktop app
+  that does not have the check yet, still asks "Your Mac answered at a new
+  address" first.
+
 - **Stock: deliveries, waste and spool prices add up.** A part delivery of a
   new lot is priced at what arrived (250 g of an 80-for-1000 g roll was costed
   at 80, not 20) and grows with later parts. Waste logged against a roll with

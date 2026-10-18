@@ -1182,6 +1182,42 @@ final class KhaytAPIClient: ObservableObject {
         return encoded
     }
 
+    // MARK: - The Mac's identity
+
+    private struct IdentityAnswer: Decodable { let alg: String?; let publicKey: String }
+    private struct ProofAnswer: Decodable { let alg: String?; let sig: String }
+
+    /// The Mac's public key, asked with the PIN at the address the phone
+    /// already uses. Nil when the Mac has none to give (a desktop without the
+    /// route, a 503) or sends something that is not a key.
+    func fetchIdentityKey() async -> String? {
+        guard let (data, response) = try? await request(path: "/api/identity", method: "GET",
+                                                         body: nil, requiresPin: true),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let answer = try? JSONDecoder().decode(IdentityAnswer.self, from: data),
+              answer.alg == MacIdentity.algorithm,
+              MacIdentity.publicKey(answer.publicKey) != nil else { return nil }
+        return answer.publicKey
+    }
+
+    /// Whether whatever answers at `host:port` holds `key`. No PIN is sent:
+    /// only a fresh nonce, and the signature is checked here.
+    func proves(host: String, port: Int, key: String) async -> Bool {
+        guard let base = ConnectionSettings.baseURL(host: host, port: port),
+              var parts = URLComponents(url: base, resolvingAgainstBaseURL: false) else { return false }
+        let nonce = MacIdentity.nonce()
+        parts.path = "/api/proof"
+        parts.queryItems = [URLQueryItem(name: "nonce", value: nonce)]
+        guard let url = parts.url else { return false }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 5
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        guard let (data, response) = try? await session.data(for: req),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let answer = try? JSONDecoder().decode(ProofAnswer.self, from: data) else { return false }
+        return MacIdentity.verify(signature: answer.sig, alg: answer.alg, nonce: nonce, key: key)
+    }
+
     private func makeURL(path: String) throws -> URL {
         guard let base = settings.baseURL else { throw KhaytAPIError.notConfigured }
         guard path.hasPrefix("/") else { throw KhaytAPIError.invalidURL }
