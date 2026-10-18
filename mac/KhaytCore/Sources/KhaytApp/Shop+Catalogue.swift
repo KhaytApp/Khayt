@@ -160,7 +160,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             writeProblem = refusal.sentence
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 
@@ -703,7 +703,7 @@ extension Shop {
         } catch AiClient.Failure.noKey {
             return .refused(words.callIt("mac.ai_no_key"))
         } catch {
-            return .refused(String(describing: error))
+            return .refused(self.said(error))
         }
     }
 
@@ -998,7 +998,7 @@ extension Shop {
             writeProblem = nil
             await load(source)
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 
@@ -1234,7 +1234,7 @@ extension Shop {
             await load(source)
             productNote = words.callIt("pe.deleted")
         } catch {
-            productProblem = String(describing: error)
+            productProblem = self.said(error)
         }
     }
 
@@ -1296,7 +1296,7 @@ extension Shop {
             }
             await shop.load(shop.source)
         } catch {
-            shop.productProblem = String(describing: error)
+            shop.productProblem = self.said(error)
         } }
     }
 
@@ -1322,7 +1322,7 @@ extension Shop {
                 // until something else reloads it.
                 await shop.load(shop.source)
             } catch {
-                shop.spendProblem = String(describing: error)
+                shop.spendProblem = self.said(error)
             }
         }
     }

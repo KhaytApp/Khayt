@@ -443,7 +443,7 @@ extension Shop {
             settleGroupPictures(covers)
             await load(source)
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 
@@ -705,7 +705,7 @@ extension Shop {
                 await self.showLibraryWritten(library, touched: ids)
                 return undo
             } catch {
-                self.writeProblem = String(describing: error)
+                self.writeProblem = self.said(error)
                 self.endLibraryChange(pending)
                 // Nothing was written: the screen goes back to the book.
                 await self.load(self.source)
@@ -796,7 +796,7 @@ extension Shop {
         } catch {
             // An undo that cannot be applied — the book changed hands while the
             // menu was open — must say so rather than fail quietly.
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
             return nil
         }
     }
@@ -1037,10 +1037,10 @@ extension Shop {
         guard permitted("inventory", "create") else { importProblem = moveProblem; return }
         importCancelled = false
         guard let build = source.build, StoreLock.weOwnIt(build) else {
-            importProblem = LibraryImport.Failure.notOurs.description; return
+            importProblem = LibraryImport.Failure.notOurs.said(words); return
         }
         guard let roots = libraryRoots else {
-            importProblem = LibraryImport.Failure.noLibrary.description; return
+            importProblem = LibraryImport.Failure.noLibrary.said(words); return
         }
         guard let engine else { importProblem = "the engine is not loaded"; return }
 
@@ -1068,7 +1068,7 @@ extension Shop {
             } catch let refusal as ArchiveImport.Failure {
                 refusals.append(refusal.description)
             } catch {
-                refusals.append(String(describing: error))
+                refusals.append(self.said(error))
             }
         }
         // The scratch copies are consumed by the import (it MOVES them in), but
@@ -1223,22 +1223,25 @@ extension Shop {
             // correct, and saying otherwise would send a shop looking for a
             // problem with a conversion that worked. It is said separately.
             var landed = false
+            var addedId: String?
             do {
-                _ = try await LibraryImport.add(destination, shop: self, keepOriginal: true)
+                addedId = try await LibraryImport.add(destination, shop: self, keepOriginal: true).id
                 landed = true
             } catch let refusal as LibraryImport.Failure {
-                convertProblem = refusal.description
+                convertProblem = refusal.said(words)
             } catch {
-                convertProblem = String(describing: error)
+                convertProblem = self.said(error)
             }
 
             // Only once the replacement is IN the library. Putting the
             // original aside in favour of a file the library does not have
             // would leave the shop with neither.
-            if replaceOriginal, landed,
-               let replacement = files.first(where: { $0.name == destination.lastPathComponent })
-                                 ?? files.first(where: { $0.title == destination.deletingPathExtension().lastPathComponent }) {
-                await supersede(file, with: replacement.id)
+            // BY THE ID THE IMPORT HANDED BACK. Looked up by title, the first
+            // model of that name won — an older conversion, or the original
+            // itself, which was then put aside as superseded by itself.
+            if replaceOriginal, landed, let addedId, addedId != file.id,
+               files.contains(where: { $0.id == addedId }) {
+                await supersede(file, with: addedId)
             }
 
             convertNote = words.callIt(landed ? "mac.converted_into_library" : "mac.converted", [
@@ -1246,9 +1249,9 @@ extension Shop {
                 "target": .string(target?.name ?? words.callIt("mac.standard_3mf")),
             ])
         } catch let refusal as Converter.Failure {
-            convertProblem = refusal.description
+            convertProblem = refusal.said(words)
         } catch {
-            convertProblem = String(describing: error)
+            convertProblem = self.said(error)
         }
     }
 
@@ -1272,7 +1275,7 @@ extension Shop {
                 record["supersededBy"] = .string(replacement)
             }
         } catch {
-            convertProblem = String(describing: error)
+            convertProblem = self.said(error)
             return
         }
         await load(source)
@@ -1291,7 +1294,7 @@ extension Shop {
                 record.removeValue(forKey: "supersededBy")
             }
         } catch {
-            convertProblem = String(describing: error)
+            convertProblem = self.said(error)
             return
         }
         await load(source)
@@ -2460,7 +2463,7 @@ extension Shop {
                 Self.applySpoolRepair(changes, to: &root)
             }
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
             return
         }
         guard !done.isEmpty else { return }
@@ -2549,7 +2552,7 @@ extension Shop {
             writeProblem = nil
             await load(source)
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 
@@ -2597,7 +2600,7 @@ extension Shop {
             }
             await load(source)
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 
@@ -2638,7 +2641,7 @@ extension Shop {
             }
             await load(source)
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 
@@ -2658,7 +2661,7 @@ extension Shop {
             }
             await load(source)
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 
@@ -2716,7 +2719,7 @@ extension Shop {
             }
             await load(source)
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 
@@ -2739,7 +2742,7 @@ extension Shop {
             }
             await load(source)
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 

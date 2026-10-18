@@ -123,7 +123,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence; return nil
         } catch {
-            moveProblem = String(describing: error); return nil
+            moveProblem = self.said(error); return nil
         }
         await load(source)
         return drafted
@@ -194,7 +194,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             return refusal.sentence
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
         await load(source)
         return nil
@@ -318,7 +318,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             return refusal.sentence
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
         await load(source)
         return nil
@@ -336,7 +336,7 @@ extension Shop {
             return recall.jobs.count == 1 ? words.callIt("mac.lot_copied_one")
                 : words.callIt("mac.lot_copied", ["n": .number(Double(recall.jobs.count))])
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
     }
 
@@ -445,7 +445,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             return refusal.sentence
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
         await load(source)
         return nil
@@ -515,7 +515,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             return refusal.sentence
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
         await load(source)
         return nil
@@ -549,7 +549,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             return refusal.sentence
         } catch {
-            return String(describing: error)
+            return self.said(error)
         }
         await load(source)
         return nil
@@ -624,7 +624,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -704,7 +704,7 @@ extension Shop {
             await load(source)
             moveNotices = [words.callIt("sup.saved")]
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -750,7 +750,7 @@ extension Shop {
             await load(source)
             moveNotices = [words.callIt("sup.deleted")]
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -830,7 +830,7 @@ extension Shop {
             // until something else reloads it.
             await shop.load(shop.source)
         } catch {
-            shop.moveProblem = String(describing: error)
+            shop.moveProblem = self.said(error)
         } }
     }
 
@@ -1153,7 +1153,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             spendProblem = refusal.sentence
         } catch {
-            spendProblem = String(describing: error)
+            spendProblem = self.said(error)
         }
     }
 
@@ -1217,7 +1217,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             spendProblem = refusal.sentence
         } catch {
-            spendProblem = String(describing: error)
+            spendProblem = self.said(error)
         }
     }
 
@@ -1255,7 +1255,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             spendProblem = refusal.sentence
         } catch {
-            spendProblem = String(describing: error)
+            spendProblem = self.said(error)
         }
     }
 
@@ -1445,7 +1445,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             spendProblem = refusal.sentence
         } catch {
-            spendProblem = String(describing: error)
+            spendProblem = self.said(error)
         }
     }
 
@@ -1478,7 +1478,7 @@ extension Shop {
             await load(source)
             spendNote = words.callIt("inv.removed")
         } catch {
-            spendProblem = String(describing: error)
+            spendProblem = self.said(error)
         }
     }
 
@@ -1555,7 +1555,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             spendProblem = refusal.sentence
         } catch {
-            spendProblem = String(describing: error)
+            spendProblem = self.said(error)
         }
     }
 
@@ -1578,7 +1578,7 @@ extension Shop {
                 }
                 await shop.load(shop.source)
             } catch {
-                shop.spendProblem = String(describing: error)
+                shop.spendProblem = self.said(error)
             }
         }
     }
@@ -1616,7 +1616,7 @@ extension Shop {
             await load(source)
             spendNote = words.callIt("inv.removed")
         } catch {
-            spendProblem = String(describing: error)
+            spendProblem = self.said(error)
         }
     }
 

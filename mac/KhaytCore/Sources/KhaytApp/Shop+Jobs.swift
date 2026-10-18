@@ -73,7 +73,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -283,7 +283,7 @@ extension Shop {
             editingCustomer = nil
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -509,7 +509,7 @@ extension Shop {
             await load(source)
             await planDispatch()
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -590,7 +590,7 @@ extension Shop {
             await load(source)
             await planDispatch()
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -1046,7 +1046,7 @@ extension Shop {
                 jobs: chosen.map(Self.plateJob),
                 maxHours: max(1, batchMaxHours), maxGrams: max(1, batchMaxGrams))
         } catch {
-            batchProblem = String(describing: error)
+            batchProblem = self.said(error)
         }
     }
 
@@ -1102,7 +1102,7 @@ extension Shop {
             schedulePlan = plan
             await planSwaps(plan)
         } catch {
-            scheduleProblem = String(describing: error)
+            scheduleProblem = self.said(error)
         }
     }
 
@@ -1149,7 +1149,7 @@ extension Shop {
         } catch let refusal as StoreWriter.Refusal {
             scheduleProblem = refusal.description
         } catch {
-            scheduleProblem = String(describing: error)
+            scheduleProblem = self.said(error)
         }
     }
 
@@ -1198,8 +1198,8 @@ extension Shop {
             backupProblem = nil
             Telemetry.feature(.backupRun, in: self)
         } catch {
-            backupProblem = String(describing: error)
-            spendProblem = words.callIt("mac.backup_failed") + " " + String(describing: error)
+            backupProblem = self.said(error)
+            spendProblem = words.callIt("mac.backup_failed") + " " + self.said(error)
         }
     }
 
@@ -1247,7 +1247,7 @@ extension Shop {
             try await Export.payload(from: root, engine: engine).write(to: url, options: .atomic)
             spendNote = words.callIt("mac.exported_to") + " " + url.lastPathComponent
         } catch {
-            spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+            spendProblem = words.callIt("mac.export_failed") + " " + self.said(error)
         }
     }
 
@@ -1302,7 +1302,7 @@ extension Shop {
             spendNote = words.callIt("set.csv_exported",
                                      ["n": .number(Double(files.count))])
         } catch {
-            spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+            spendProblem = words.callIt("mac.export_failed") + " " + self.said(error)
         }
     }
 
@@ -1436,7 +1436,7 @@ extension Shop {
             if format == "wafeq" { spendNote? += " — " + words.callIt("mac.export_wafeq_note") }
             if format == "daftra" { spendNote? += " — " + words.callIt("mac.export_daftra_note") }
         } catch {
-            spendProblem = words.callIt("mac.export_failed") + " " + String(describing: error)
+            spendProblem = words.callIt("mac.export_failed") + " " + self.said(error)
         }
     }
 
@@ -1530,7 +1530,7 @@ extension Shop {
             await load(source)
             return .added
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
             return .failed
         }
     }
@@ -1964,7 +1964,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -2009,7 +2009,7 @@ extension Shop {
             } catch {
                 moveProblem = words.callIt("mac.webhook_failed", ["where": .string(name)])
                     + " " + ((error as? LocalizedError)?.errorDescription
-                             ?? String(describing: error))
+                             ?? self.said(error))
             }
         }
         if sent > 0 {
@@ -2057,7 +2057,7 @@ extension Shop {
         } catch let locked as Secrets.Failure {
             moveProblem = words.callIt("mac.portal_failed") + " " + locked.description
         } catch {
-            moveProblem = words.callIt("mac.portal_failed") + " " + String(describing: error)
+            moveProblem = words.callIt("mac.portal_failed") + " " + self.said(error)
         }
     }
 
@@ -2088,7 +2088,7 @@ extension Shop {
         } catch let locked as Secrets.Failure {
             moveProblem = words.callIt("mac.email_failed") + " " + locked.description
         } catch {
-            moveProblem = words.callIt("mac.email_failed") + " " + String(describing: error)
+            moveProblem = words.callIt("mac.email_failed") + " " + self.said(error)
         }
     }
 
@@ -2109,7 +2109,7 @@ extension Shop {
         } catch let locked as Secrets.Failure {
             moveProblem = words.callIt("mac.telegram_failed") + " " + locked.description
         } catch {
-            moveProblem = words.callIt("mac.telegram_failed") + " " + String(describing: error)
+            moveProblem = words.callIt("mac.telegram_failed") + " " + self.said(error)
         }
     }
 
@@ -2584,7 +2584,7 @@ extension Shop {
                 await self.load(self.source)
                 return outcome.redo
             } catch {
-                self.moveProblem = String(describing: error)
+                self.moveProblem = self.said(error)
                 return nil
             }
         }
@@ -2619,7 +2619,7 @@ extension Shop {
             // it just put there.
             await load(source)
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
         }
     }
 

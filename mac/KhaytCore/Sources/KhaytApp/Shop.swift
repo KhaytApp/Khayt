@@ -252,7 +252,7 @@ final class Shop {
             catch {
                 // Shown in the shop's own settings pane, where the address is
                 // theirs to see; the LOG gets the kind of failure only.
-                ntfyProblem = String(describing: error)
+                ntfyProblem = self.said(error)
                 FileHandle.standardError.write(Data("printer alert ntfy failed: \(RedactedError.describe(error))\n".utf8))
             }
         }
@@ -810,7 +810,7 @@ final class Shop {
             // a photograph to notice.
             if engine == nil {
                 do { engine = try KhaytEngine() }
-                catch { engineProblem = String(describing: error) }
+                catch { engineProblem = self.said(error) }
             }
             // `settings.lang` and not the system language: a Riyadh shop on an
             // English Mac still keeps its book in Arabic, and the book is what
@@ -1266,7 +1266,7 @@ final class Shop {
             owner = nil
             facts = nil
             printers.stop()
-            problem = String(describing: error)
+            problem = self.said(error)
         }
     }
 

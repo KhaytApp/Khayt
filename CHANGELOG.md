@@ -94,6 +94,34 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   copy straight back. Off now holds for the shop on Khayt Cloud. Every other
   Mac stops uploading, switches itself off and says why. Turning it on again
   is always a person's press, never the background upload.
+- **Mac: more fixes from the full review.**
+  - **Converting a model with "replace the original"** puts the right model
+    aside. Before, it could hide an older conversion, or the original as
+    replaced by itself.
+  - **"Send to printer" for a linked model** finds the G-code sliced next to
+    the shop's own file.
+  - **Two backups in the same minute** are both kept. Before, the second
+    overwrote the first.
+  - **An order's Total** on a shop that adds tax on top is what the
+    customer is billed, the same figure Paid and Owed are measured against.
+  - **Recording a payment** waits until the bill has been worked out, so a
+    quick Save on a shop that adds tax on top no longer records a payment
+    short by the tax.
+  - **WhatsApp updates sent by staff** are logged on the customer. A
+    viewer can no longer send one.
+  - **Errors in the shop's language:** about eighty places that showed an
+    error from the app itself in English now say it in Arabic in the Arabic
+    app. These include another app holding the book, a change too large to
+    back up, and a refused move. A system's own error is still shown as the
+    system wrote it.
+  - **Library import and conversion errors** are in Arabic in the Arabic
+    app, with figures in the shop's digits.
+  - **Crash reports** (when a shop shares them) leave out anything an
+    error quoted from the shop's data, such as a customer's name. They
+    keep only the code names that make a crash readable.
+  - **Switching tax off** on a shop with two tax rates (such as CGST and
+    SGST) turns it off.
+
 - **iPhone: the phone asks before following its Mac to a new address.** When
   the Mac stops answering and its name turns up somewhere else on the
   network, the phone used to move there by itself and send its PIN along.

@@ -298,7 +298,7 @@ extension Shop {
         } catch let refusal as MoveRefused {
             moveProblem = refusal.sentence
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -322,7 +322,7 @@ extension Shop {
             }
             await shop.load(shop.source)
         } catch {
-            shop.moveProblem = String(describing: error)
+            shop.moveProblem = self.said(error)
         } }
     }
 
@@ -422,7 +422,7 @@ extension Shop {
             }
             moveNotices = said
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -438,7 +438,7 @@ extension Shop {
             }
             await shop.load(shop.source)
         } catch {
-            shop.moveProblem = String(describing: error)
+            shop.moveProblem = self.said(error)
         } }
     }
 }

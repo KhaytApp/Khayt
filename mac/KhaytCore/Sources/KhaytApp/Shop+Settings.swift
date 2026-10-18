@@ -46,7 +46,7 @@ extension Shop {
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("set.locations")) }
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -112,7 +112,7 @@ extension Shop {
             if let removed { pending.keep((removed, unlinked)) }
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -184,7 +184,7 @@ extension Shop {
                 }
                 await shop.load(shop.source)
             } catch {
-                shop.moveProblem = String(describing: error)
+                shop.moveProblem = self.said(error)
             }
         }
     }
@@ -267,7 +267,7 @@ extension Shop {
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("op.title")) }
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -353,7 +353,7 @@ extension Shop {
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("op.title")) }
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
         return outcome
     }
@@ -420,7 +420,7 @@ extension Shop {
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("time.log_title")) }
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -468,7 +468,7 @@ extension Shop {
             if !undo.isEmpty { registerMoveUndo(undo, named: words.callIt("time.log_title")) }
             await load(source)
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -574,7 +574,7 @@ extension Shop {
             await load(source)
             settingsNote = words.callIt("mac.settings_saved")
         } catch {
-            settingsProblem = String(describing: error)
+            settingsProblem = self.said(error)
         }
     }
 
@@ -668,7 +668,7 @@ extension Shop {
             }
             await load(source)
         } catch {
-            settingsProblem = String(describing: error)
+            settingsProblem = self.said(error)
         }
     }
 
@@ -948,7 +948,7 @@ extension Shop {
             await load(source)
             settingsNote = words.callIt("mac.settings_saved")
         } catch {
-            settingsProblem = String(describing: error)
+            settingsProblem = self.said(error)
         }
     }
 
@@ -1009,7 +1009,7 @@ extension Shop {
             writeProblem = words.callIt(refused.errorDescription ?? "")
             return
         } catch {
-            writeProblem = String(describing: error)
+            writeProblem = self.said(error)
             return
         }
         await write(as: .person("settings", "edit")) { root in
