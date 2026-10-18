@@ -380,6 +380,8 @@ final class Shop {
     /// (`lib/machine-status.js canDelete`). Absent means "not read yet", which
     /// a menu treats as not deletable.
     var machineDeleteVerdicts: [String: KhaytEngine.MachineDeleteVerdict] = [:]
+    /// The customer the shop asked to erase, until it chooses how (`Shop+Privacy.swift`).
+    var erasingCustomer: CustomerEraseRequest?
     /// What `lib/record-delete.js` refuses in this book, read with it. Nil
     /// until it has been asked — and then nothing is offered for deletion.
     var deleteVerdicts: KhaytEngine.DeleteVerdicts?

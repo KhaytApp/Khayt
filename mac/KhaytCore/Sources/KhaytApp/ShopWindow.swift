@@ -817,6 +817,8 @@ struct WindowSheets: ViewModifier {
             // A printer under service, retired or deleted — asked from the
             // machine card's menu (`MachineLifeDialogs`).
             .machineLifeDialogs(shop: shop, ask: $shop.pendingMachineAsk)
+            // A customer with work erased, Unlink or Full (`Shop+Privacy.swift`).
+            .shopSheet(item: $shop.erasingCustomer) { CustomerEraseSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }

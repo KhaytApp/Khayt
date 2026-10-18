@@ -120,6 +120,10 @@ struct CustomersTable: View {
                 Divider()
             }
             CustomerDeleteItems(shop: shop, ids: shop.shownCustomers.map(\.id).filter { ids.contains($0) })
+            if ids.count == 1, let id = ids.first,
+               let person = shop.shownCustomers.first(where: { $0.id == id }) {
+                CustomerPrivacyItems(shop: shop, person: person)
+            }
         } primaryAction: { ids in
             // Double-click edits them, which is what a double-click does to a
             // row everywhere else in this app.
@@ -152,6 +156,30 @@ struct CustomersTable: View {
             }
         }
         .background(Khayt.ground)
+    }
+}
+
+/// A customer's own data: "Export this customer's data…" and "Erase
+/// Customer…" (`Shop+Privacy.swift`). Only for someone written down — a name
+/// on old jobs has no record to export or erase.
+struct CustomerPrivacyItems: View {
+    let shop: Shop
+    let person: Customer
+    /// In a context menu, set off from Delete by a divider.
+    var inMenu = true
+
+    var body: some View {
+        if person.record != nil {
+            if inMenu { Divider() }
+            Button(shop.words.callIt("priv.export_data") + "\u{2026}") {
+                Task { await shop.exportCustomerData(person) }
+            }
+            .disabled(shop.source.build == nil || !shop.lockAllows("clients", "edit"))
+            Button(shop.words.callIt("mac.erase_customer"), role: .destructive) {
+                Task { await shop.askToEraseCustomer(person) }
+            }
+            .disabled(!shop.canMoveJobs || !shop.lockAllows("clients", "delete"))
+        }
     }
 }
 
@@ -358,6 +386,14 @@ struct CustomerInspector: View {
                                                                       : AnyShapeStyle(.primary)))
                             }
                             .padding(.vertical, 2)
+                        }
+                    }
+                    if person.record != nil {
+                        LayerRule()
+                        DetailSection(shop.words.callIt("priv.section")) {
+                            CustomerPrivacyItems(shop: shop, person: person, inMenu: false)
+                                .buttonStyle(.link)
+                                .font(.callout)
                         }
                     }
                 }

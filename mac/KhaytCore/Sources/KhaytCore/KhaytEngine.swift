@@ -11639,6 +11639,50 @@ public actor KhaytEngine {
     /// `unretire`: back in service, its history untouched.
     public func unretireMachine(_ machine: JSONValue) throws -> JSONValue {
         try runtime.call2("KhaytMachineStatus.unretire(ARG0)", [machine], as: JSONValue.self)
+    // MARK: - A customer's own data (PDPL access and erasure)
+
+    /// `lib/privacy.js buildClientDataExport`: everything the book holds about
+    /// one customer — their record, communications, jobs and intake rows —
+    /// as the desktop's "Export this customer's data" writes it. Never shop
+    /// settings or secrets. `collections` is `{clients, printLog, waitingList,
+    /// waitingListHistory}`.
+    public func clientDataExport(clientId: String, collections: [String: JSONValue],
+                                 nowIso: String? = nil) throws -> JSONValue {
+        try runtime.call2("KhaytPrivacy.buildClientDataExport(ARG0, ARG1, ARG2 || undefined)",
+                          [.string(clientId), .object(collections), nowIso.map { .string($0) } ?? .null],
+                          as: JSONValue.self)
+    }
+
+    /// What `lib/privacy.js planClientErasure` says an erasure touches. Read
+    /// only: the caller applies it, inside one store write.
+    public struct ErasurePlan: Decodable, Sendable, Equatable {
+        public struct Counts: Decodable, Sendable, Equatable {
+            public let orders: Int
+            /// Jobs that keep the customer's name on a full erase, because an
+            /// invoice or a payment was recorded on them.
+            public let keptNames: Int
+            public let intake: Int
+            public let communications: Int
+        }
+        /// `unlink` or `full`.
+        public let mode: String
+        public let clientId: String
+        public let orderIds: [String]
+        public let blankNameOrderIds: [String]
+        public let keepNameOrderIds: [String]
+        public let purgeIntakeIds: [String]
+        public let purgeIntakeHistoryIds: [String]
+        public let purgeCommLog: Bool
+        public let counts: Counts
+    }
+
+    /// `lib/privacy.js planClientErasure`. `full` is a full erase; anything
+    /// else unlinks.
+    public func planClientErasure(clientId: String, collections: [String: JSONValue],
+                                  full: Bool) throws -> ErasurePlan {
+        try runtime.call2("KhaytPrivacy.planClientErasure(ARG0, ARG1, ARG2)",
+                          [.string(clientId), .object(collections), .string(full ? "full" : "unlink")],
+                          as: ErasurePlan.self)
     }
 
     /// What a job's components cost — `lib/order-new.js componentsCost`, the

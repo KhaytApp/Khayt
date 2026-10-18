@@ -185,6 +185,7 @@ extension Shop {
         pendingCompletion = nil; pendingEdit = nil; pendingHold = nil; pendingInvoice = nil
         pendingLabels = nil; pendingLibraryDelete = nil; pendingPayment = nil
         pendingJobDelete = nil; pendingCustomerDelete = nil; pendingMachineAsk = nil
+        pendingJobDelete = nil; pendingCustomerDelete = nil; erasingCustomer = nil
         pendingQcFail = nil; pendingSend = nil; pendingShipment = nil
         planFor = nil; ratingFor = nil; receivingGoods = nil; restoring = nil
         showingHistoryFor = nil; spoolHistoryFor = nil
