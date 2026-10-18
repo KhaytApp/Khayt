@@ -50,8 +50,10 @@ extension Shop {
             else { return nil }
             return value
         }
+        // Not a retired printer: it is not coming back to be found, and its
+        // old address is not a subnet worth sweeping (alpha.82 review).
         relocations = (try? await engine.planRelocations(
-            machines: machineRows,
+            machines: machineRowsInUse,
             discovered: discovered,
             statusCache: printers.statusCache)) ?? []
 
@@ -75,7 +77,7 @@ extension Shop {
                 sweeping = false
                 if !swept.isEmpty {
                     relocations = (try? await engine.planRelocations(
-                        machines: machineRows,
+                        machines: machineRowsInUse,
                         discovered: discovered + swept,
                         statusCache: printers.statusCache)) ?? []
                 }
@@ -95,7 +97,7 @@ extension Shop {
     /// known. A machine with no address configured has no subnet to sweep.
     func offlineMachineHosts() -> [String] {
         var out: [String] = []
-        for row in machineRows {
+        for row in machineRowsInUse {
             guard case .object(let m) = row,
                   case .string(let id)? = m["id"],
                   case .object(let api)? = m["printerApi"],
@@ -296,7 +298,15 @@ extension Shop {
     /// depreciation go to the printer that ran it, with nobody picking it by
     /// hand. A send that failed records nothing.
     func sendToPrinter(_ file: URL, machineId: String, startPrint: Bool, jobId: String? = nil) async {
-        guard let engine, let machine = sendablePrinters.first(where: { $0.id == machineId }) else { return }
+        guard let engine else { return }
+        guard let machine = sendablePrinters.first(where: { $0.id == machineId }) else {
+            // Put under service or retired while the sheet was open: said,
+            // not a send that silently did nothing (alpha.82 review).
+            if let gone = machines.first(where: { $0.id == machineId }) {
+                moveProblem = words.callIt("mac.life_send_refused", ["name": .string(gone.name)])
+            }
+            return
+        }
         guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
         sendNote = nil
         printerProblem[machine.id] = nil

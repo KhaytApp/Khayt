@@ -46,6 +46,6 @@ struct SliceUploadSafetyTests {
     @Test("the LAN upload path strips a 3MF before it slices")
     func wired() throws {
         let source = try QuoteSheetStatusTests.source("LanServer.swift")
-        #expect(source.contains("SlicerRun.keepOnlyTheModel(model)"))
+        #expect(source.contains("SlicerRun.keepOnlyTheModel(model, limit: 64 << 20)"))
     }
 }

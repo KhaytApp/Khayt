@@ -469,7 +469,10 @@
       queuePos: orders.filter(o => o && o.status === 'pending').length + 1,
       machineId: i.machineId || null,
       materialDeducted: false,
-      depositAmount: deposit,
+      // The deposit as TAKEN — clamped to the bill like `paidAmount` below.
+      // Stored as typed, a 200 deposit on a 115 bill read 200 here and 115
+      // paid, and the deposit audit flagged the shop's own new order.
+      depositAmount: depositFields(deposit, finalPrice, settings).paidAmount,
       // Derived here rather than taken, for the reason lib/order-payment.js
       // exists: a stored status that disagrees with the arithmetic is how an
       // order sits in receivables after it was settled.

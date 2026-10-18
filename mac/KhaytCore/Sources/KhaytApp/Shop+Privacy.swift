@@ -106,6 +106,9 @@ extension Shop {
             panel.nameFieldStringValue = Self.customerDataFilename(name: person.name, clientId: clientId)
             guard panel.runModal() == .OK, let url = panel.url else { return }
             try data.write(to: url, options: .atomic)
+            // One person's whole record: readable by this Mac's user only,
+            // wherever the shop put it (alpha.82 review).
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
             var orders = 0
             if case .object(let o) = payload, case .object(let counts)? = o["counts"],
                case .number(let n)? = counts["orders"] { orders = Int(n) }
@@ -275,6 +278,6 @@ extension Shop {
     /// 2026). Off, with nothing of this Mac's published, this does nothing;
     /// the shared rule decides put or none as it always does.
     func customersChangedOnCloud() async {
-        await publishCustomerRecords()
+        await publishCustomerRecords(urgent: true)
     }
 }

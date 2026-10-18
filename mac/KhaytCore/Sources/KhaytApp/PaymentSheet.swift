@@ -34,7 +34,10 @@ struct PaymentSheet: View {
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
     /// What the customer is asked for — the price, or price + tax on a shop
     /// that adds it on top.
-    private var price: Double { due?.gross ?? job?.price ?? 0 }
+    // The engine's bill, else the bill the order was loaded with (price +
+    // tax on top), and the bare price only when neither is known: a cap at
+    // the bare price recorded a payment short by the tax (alpha.82 review).
+    private var price: Double { due?.gross ?? job?.figures?.billed ?? job?.price ?? 0 }
     /// What the typed figure is measured against: the bill, less what a gift
     /// card or a credit note has already taken off it.
     private var cashDue: Double { due?.cash ?? price }
