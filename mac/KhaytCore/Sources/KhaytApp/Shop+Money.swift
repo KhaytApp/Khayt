@@ -1549,7 +1549,7 @@ extension Shop {
                                 "n": .number(Double(added.triangleCount ?? 0))])
                 : words.callIt(key + "_plain", ["name": .string(added.name)])
         } catch let refusal as LibraryImport.Failure {
-            importProblem = refusal.description
+            importProblem = refusal.said(words)
         } catch {
             importProblem = String(describing: error)
         }

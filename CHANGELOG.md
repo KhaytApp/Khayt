@@ -16,6 +16,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     customer is billed, the same figure Paid and Owed are measured against.
   - **WhatsApp updates sent by staff** are logged on the customer. A
     viewer can no longer send one.
+  - **Library import and conversion errors** are in Arabic in the Arabic
+    app, with figures in the shop's digits.
   - **Crash reports** (when a shop shares them) leave out anything an
     error quoted from the shop's data, such as a customer's name. They
     keep only the code names that make a crash readable.

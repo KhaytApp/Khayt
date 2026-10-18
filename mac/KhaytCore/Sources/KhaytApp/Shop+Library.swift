@@ -1037,10 +1037,10 @@ extension Shop {
         guard permitted("inventory", "create") else { importProblem = moveProblem; return }
         importCancelled = false
         guard let build = source.build, StoreLock.weOwnIt(build) else {
-            importProblem = LibraryImport.Failure.notOurs.description; return
+            importProblem = LibraryImport.Failure.notOurs.said(words); return
         }
         guard let roots = libraryRoots else {
-            importProblem = LibraryImport.Failure.noLibrary.description; return
+            importProblem = LibraryImport.Failure.noLibrary.said(words); return
         }
         guard let engine else { importProblem = "the engine is not loaded"; return }
 
@@ -1228,7 +1228,7 @@ extension Shop {
                 addedId = try await LibraryImport.add(destination, shop: self, keepOriginal: true).id
                 landed = true
             } catch let refusal as LibraryImport.Failure {
-                convertProblem = refusal.description
+                convertProblem = refusal.said(words)
             } catch {
                 convertProblem = String(describing: error)
             }
@@ -1249,7 +1249,7 @@ extension Shop {
                 "target": .string(target?.name ?? words.callIt("mac.standard_3mf")),
             ])
         } catch let refusal as Converter.Failure {
-            convertProblem = refusal.description
+            convertProblem = refusal.said(words)
         } catch {
             convertProblem = String(describing: error)
         }
