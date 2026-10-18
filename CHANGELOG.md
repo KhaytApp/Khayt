@@ -4,6 +4,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: lot recall counts jobs correctly in Arabic.** The summary and
+  the "copied" message used one plural form for every count above one, which
+  reads wrong for 2 and for 11 and up. Both now read correctly at any count.
 - **iPhone: the Home pipeline and Orders filters stop at the screen's own
   controls.** Where the tab bar and toolbar buttons sit down the side of the
   screen, as on iPhone Duo's folded outer display, the last filter used to
