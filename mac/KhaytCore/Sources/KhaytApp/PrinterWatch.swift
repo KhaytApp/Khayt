@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import KhaytCore
 
 /// Asking the shop's printers what they are doing.
@@ -843,14 +844,40 @@ final class PrinterWatch {
     /// address here is server-side request forgery with a printer card as the
     /// pretext, and the spellings that matter are the numeric ones —
     /// `2130706433` and `127.1` are loopback and neither looks like an address.
-    static func baseURL(_ machine: Machine, engine: KhaytEngine) async throws -> URL {
+    ///
+    /// ── A NAME IS CHECKED BY WHAT IT RESOLVES TO ──────────────────────────
+    ///
+    /// The shared rule judges a host by its text, and any name passes it —
+    /// `attacker.com`, or `127.0.0.1.nip.io`, which points back at this Mac.
+    /// The poll sends the printer's API key, and Bambu's MQTT its access code,
+    /// so a book whose printer host was changed (a sync, a restore, an import)
+    /// handed the real key to whoever answered. Now every address a name
+    /// resolves to must be one a printer may be at, and the request goes to
+    /// the checked IPv4 address, so the name cannot change its answer between
+    /// the check and the connection (`SmartPlug.target`, the same rule). A
+    /// `.local` name that resolves only to link-local IPv6 is checked and
+    /// sent by name, because the resolver drops the zone it would need.
+    static func baseURL(_ machine: Machine, engine: KhaytEngine,
+                        lookUp: @escaping @Sendable (String) async -> [String] = { await WebhookClient.addresses(of: $0) })
+    async throws -> URL {
         let raw = machine.printerApi?.host ?? ""
         let host = try await engine.printerHost(raw)
         guard !host.isEmpty else { throw Refusal.noHost }
         guard try await engine.printerHostAllowed(host) else { throw Refusal.notALanAddress(host) }
         let port = machine.printerApi?.port ?? defaultPort(machine.printerApi?.type ?? "")
         guard port > 0, port <= 65535 else { throw Refusal.badPort(port) }
-        guard let url = URL(string: "http://\(host):\(port)") else { throw Refusal.noHost }
+        var target = host
+        if IPv4Address(host) == nil, IPv6Address(host) == nil {
+            let addresses = await lookUp(host)
+            guard !addresses.isEmpty else { throw Refusal.notALanAddress(host) }
+            for address in addresses {
+                let bare = String(address.split(separator: "%", maxSplits: 1).first ?? "")
+                guard await SmartPlug.addressAllowed(bare, engine: engine) else { throw Refusal.notALanAddress(host) }
+            }
+            if let v4 = addresses.first(where: { !$0.contains(":") }) { target = v4 }
+        }
+        let shown = target.contains(":") ? "[\(target)]" : target
+        guard let url = URL(string: "http://\(shown):\(port)") else { throw Refusal.noHost }
         return url
     }
 

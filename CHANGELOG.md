@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a printer named by its host name must be on the shop's network.**
+  The check read only the name, so any name passed, even one pointing
+  outside the shop or back at this Mac, and the printer's key or access code
+  went with the request. Every address the name resolves to is now checked,
+  and the Mac talks to the address it checked.
 - **Mac: an erased or deleted customer leaves Khayt Cloud at once.** With
   customer records on, the cloud copy is updated as soon as a customer is
   erased or deleted, or put back with Undo, rather than on the next upload
