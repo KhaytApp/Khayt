@@ -101,7 +101,9 @@ final class KhaytAPIClient: ObservableObject {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 30
-        self.session = URLSession(configuration: config)
+        // Every request to the Mac carries the PIN, so none may follow a
+        // redirect to another host — see `NoRedirects`.
+        self.session = URLSession(configuration: config, delegate: NoRedirects(), delegateQueue: nil)
         let opened = try? CompanionBook.inSharedContainer()
         self.book = opened
         self.reader = opened.map(BookReader.init(book:))

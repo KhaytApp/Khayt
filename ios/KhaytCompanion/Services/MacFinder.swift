@@ -12,7 +12,9 @@ import Foundation
 ///
 /// So when the stored address stops answering, the phone looks the Mac up by
 /// the NAME it was paired with, and if the name now resolves somewhere else,
-/// moves there. It never picks a different Mac: only the paired name counts.
+/// asks the person whether to move there (`ConnectionHealth.followTheMac`).
+/// Only the paired name counts — but a name is a claim any device can make,
+/// so it is never followed without asking.
 @MainActor
 enum MacFinder {
     /// Browse for `name` for up to `timeout` seconds and resolve it.

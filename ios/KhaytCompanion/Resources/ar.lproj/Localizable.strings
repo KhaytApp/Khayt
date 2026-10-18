@@ -10,6 +10,10 @@
 "connection.checking" = "جاري الاتصال…";
 "connection.connected" = "متصل";
 "connection.unreachable" = "تعذر الوصول للكمبيوتر";
+"connection.moved" = "أجاب الماك من عنوان جديد";
+"connection.moved.line" = "انتقل إلى %@ فقط إن كان هذا ماك ورشتك. الانتقال يرسل إليه رمز PIN.";
+"connection.moved.use" = "انتقل";
+"connection.moved.not_now" = "ليس الآن";
 "connection.unauthorized" = "رمز PIN خاطئ";
 "connection.banner.unreachable" = "لا يمكن الوصول إلى Khayt على الشبكة. تحقق من الواي فاي وتفعيل LAN API.";
 "connection.banner.pin" = "رمز LAN مرفوض. حدّث PIN في الإعدادات ليطابق سطح المكتب.";
@@ -488,6 +492,8 @@
 /* Machines, as design/ios-v2 draws them */
 "machines.idle" = "خامل";
 "machines.error" = "خطأ";
+"machines.offline" = "متوقفة";
+"machines.offline.sub" = "أُوقفت من الماك";
 "machines.ready" = "جاهز للمهمة التالية";
 "machines.nozzle" = "الفوهة";
 "machines.bed" = "المنصّة";

@@ -158,9 +158,19 @@ struct MachineInfo: Codable, Identifiable, Sendable {
     /// So the rule is applied here, where both paths pass: the wire's boolean
     /// when it is sent, derived from `printerApi` when it is not.
     var hasPrinterApi: Bool?
+    /// Set by hand on the Mac when a machine is down for a while.
+    var isOffline: Bool?
+    /// When the machine was retired. The Mac keeps a retired machine in the
+    /// book, with `status: "retired"`, so past orders still name it.
+    var retiredAt: String?
+
+    /// Gone from the shop: kept only so past orders can still name it.
+    var isRetired: Bool { status?.lowercased() == "retired" || retiredAt != nil }
+    /// Whether a new order, or a reassignment, may be put on this machine.
+    var isAssignable: Bool { !isRetired && isOffline != true }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, type, status, hasPrinterApi, printerApi
+        case id, name, type, status, hasPrinterApi, printerApi, isOffline, retiredAt
     }
 
     private struct PrinterApi: Decodable { let type: String? }
@@ -171,6 +181,8 @@ struct MachineInfo: Codable, Identifiable, Sendable {
         name = try c.decodeIfPresent(String.self, forKey: .name)
         type = try c.decodeIfPresent(String.self, forKey: .type)
         status = try c.decodeIfPresent(String.self, forKey: .status)
+        isOffline = try? c.decodeIfPresent(Bool.self, forKey: .isOffline)
+        retiredAt = try? c.decodeIfPresent(String.self, forKey: .retiredAt)
         if let sent = try c.decodeIfPresent(Bool.self, forKey: .hasPrinterApi) {
             hasPrinterApi = sent
         } else if let api = try? c.decode(PrinterApi.self, forKey: .printerApi) {
@@ -195,6 +207,8 @@ struct MachineInfo: Codable, Identifiable, Sendable {
         try c.encodeIfPresent(type, forKey: .type)
         try c.encodeIfPresent(status, forKey: .status)
         try c.encodeIfPresent(hasPrinterApi, forKey: .hasPrinterApi)
+        try c.encodeIfPresent(isOffline, forKey: .isOffline)
+        try c.encodeIfPresent(retiredAt, forKey: .retiredAt)
     }
 }
 

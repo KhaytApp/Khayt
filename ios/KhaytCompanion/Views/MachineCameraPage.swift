@@ -79,8 +79,6 @@ struct MachineCameraPage: View {
 
 /// A session that follows no redirect — the rule refuses one (`redirect_refused`),
 /// because a camera on the LAN must not be able to send the request elsewhere.
-private final class NoRedirects: NSObject, URLSessionTaskDelegate {
+private extension NoRedirects {
     static let session = URLSession(configuration: .ephemeral, delegate: NoRedirects(), delegateQueue: nil)
-    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest) async -> URLRequest? { nil }
 }
