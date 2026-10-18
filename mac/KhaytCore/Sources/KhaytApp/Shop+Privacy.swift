@@ -244,8 +244,9 @@ extension Shop {
             customerSelections.remove(clientId)
             await load(source)
             moveNotices = [words.callIt(full ? "priv.erased_full" : "ce.deleted")]
+            await customersChangedOnCloud()
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 
@@ -258,8 +259,22 @@ extension Shop {
                 for one in erased.reversed() { Self.applyCustomerUnerase(to: &root, one) }
             }
             await shop.load(shop.source)
+            await shop.customersChangedOnCloud()
         } catch {
-            shop.moveProblem = String(describing: error)
+            shop.moveProblem = shop.said(error)
         } }
+    }
+}
+
+extension Shop {
+    /// The customer list changed by a person's hand — an erase, a delete, or
+    /// the Undo of either: the cloud's customer-records copy is brought into
+    /// line NOW, not on the next ten-minute look. An erased customer's email,
+    /// phone and orders stayed readable on Khayt Cloud until then, and until
+    /// the 30-day prune if this Mac was closed first (Khayt Cloud review, Oct
+    /// 2026). Off, with nothing of this Mac's published, this does nothing;
+    /// the shared rule decides put or none as it always does.
+    func customersChangedOnCloud() async {
+        await publishCustomerRecords()
     }
 }

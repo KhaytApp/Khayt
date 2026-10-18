@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: an erased or deleted customer leaves Khayt Cloud at once.** With
+  customer records on, the cloud copy is updated as soon as a customer is
+  erased or deleted, or put back with Undo, rather than on the next upload
+  ten minutes later.
+
 - **iPhone: a Mac that changes address is followed again, once it proves
   who it is.** The phone keeps the Mac's identity key from a connection it
   already trusts. When the Mac turns up at a new address, the phone asks it
