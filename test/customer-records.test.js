@@ -24,9 +24,46 @@ const printLog = [
   { id: 'ORD-6', clientId: 'c4', date: '2026-10-09', project: 'Own', status: 'completed', nonBusiness: true },
 ];
 
-test('held: the switch stays shut until the privacy policy covers the copy', () => {
-  assert.equal(CR.READY, false);
-  assert.equal(CR.enabled({ customerRecords: { enabled: true } }), false);
+test('ready: the privacy policy covers the copy, and the shop still turns it on itself', () => {
+  assert.equal(CR.READY, true);
+  assert.equal(CR.enabled({ customerRecords: { enabled: true } }), true);
+  assert.equal(CR.enabled({ customerRecords: { enabled: 'yes' } }), false);
+  assert.equal(CR.enabled({}), false, 'off unless the shop turns it on');
+  assert.equal(CR.enabled(undefined), false);
+});
+
+// khaytapp.com/privacy/#customer-records-en promises exactly these fields. A
+// key that is not here is a change to the published policy: tell the website
+// lane BEFORE adding it. No addresses: the policy says the Mac sends none.
+const POLICY = {
+  customer: ['email', 'name', 'phone', 'orders'],
+  order: ['orderId', 'ref', 'at', 'title', 'status', 'total', 'currency', 'lines'],
+  line: ['productId', 'name', 'qty'],
+};
+
+test('the body holds only what the privacy policy names', () => {
+  const book = clients.concat([{ id: 'c5', nameEn: 'Huda', email: 'huda@example.com', phone: '1',
+    address: 'Riyadh', addresses: [{ line1: 'x' }], notes: 'private', company: 'Co' }]);
+  const log = printLog.concat([{ id: 'ORD-7', clientId: 'c5', date: '2026-10-10', project: 'Cup', status: 'completed',
+    price: 20, currency: 'SAR', productId: 'p-cup', qty: 1, source: 'salla', sourceOrderId: '99',
+    cost: 5, margin: 15, notes: 'n', files: ['a.3mf'], filamentCost: 2, shippingAddress: 'Riyadh' }]);
+  const { customers } = CR.build(book, log, { currency: 'SAR' }).body;
+  assert.ok(customers.length >= 3);
+  let orders = 0, lines = 0;
+  for (const c of customers) {
+    for (const k of Object.keys(c)) assert.ok(POLICY.customer.includes(k), `customer.${k} is not in the policy`);
+    for (const o of c.orders || []) {
+      orders++;
+      for (const k of Object.keys(o)) assert.ok(POLICY.order.includes(k), `order.${k} is not in the policy`);
+      for (const l of o.lines || []) {
+        lines++;
+        for (const k of Object.keys(l)) assert.ok(POLICY.line.includes(k), `line.${k} is not in the policy`);
+      }
+    }
+    assert.ok(!c.orders || c.orders.length <= 100, 'the newest 100 orders at most');
+  }
+  assert.ok(orders >= 3 && lines >= 2, 'the sample reaches orders and lines');
+  assert.ok(customers.some((c) => c.orders && c.orders.some((o) => o.ref)), 'the sample reaches a web store ref');
 });
 
 test('only customers with an email, lower-cased, first in the book wins a shared email', () => {

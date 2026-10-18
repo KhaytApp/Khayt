@@ -22,13 +22,14 @@ struct CustomerRecordsTests {
         }
     }
 
-    @Test("held: this build cannot turn it on until the privacy policy covers it")
-    func held() async throws {
+    @Test("ready: the privacy policy covers it, and only the shop's own switch turns it on")
+    func ready() async throws {
         let engine = try KhaytEngine()
-        let state = try await engine.customerRecordsState(
+        let on = try await engine.customerRecordsState(
             settings: ["customerRecords": .object(["enabled": .bool(true)])])
-        #expect(state.ready == false)
-        #expect(state.on == false, "a book with the switch on publishes nothing while held")
+        #expect(on.ready && on.on)
+        let off = try await engine.customerRecordsState(settings: [:])
+        #expect(off.ready && !off.on, "off unless the shop turns it on")
     }
 
     @Test("on: the whole set is PUT, as plain JSON, to the shop's customers route")
@@ -139,7 +140,7 @@ struct CustomerRecordsTests {
         #expect(CustomerRecordsPublisher.retryAfter(nil) == nil)
     }
 
-    @Test("a book holding 'on' from elsewhere shows on while held, so the switch can turn it off")
+    @Test("a book holding 'on' from elsewhere shows on, so the switch can turn it off")
     func heldBookShowsOn() async {
         let shop = Shop()
         await shop.load(.sample)
@@ -147,7 +148,6 @@ struct CustomerRecordsTests {
         settings["customerRecords"] = .object(["enabled": .bool(true)])
         shop.settingsValue = .object(settings)
         #expect(shop.customerRecordsOn)
-        #expect(!shop.customerRecordsReady)
     }
 
     @Test("failures are said in the shop's language, and a reached cloud is not 'could not reach'")

@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: customer records for your web store can be turned on.** The privacy
+  policy now covers the copy (khaytapp.com/privacy, "Customer records"), so the
+  switch in Settings → Online works. It stays off until a shop turns it on, and
+  sends only what the policy names: each customer's email, name and phone, and
+  their newest 100 orders. Never costs, margins, notes, files or addresses.
+
 - **iPhone: the Home pipeline and Orders filters stop at the screen's own
   controls.** Where the tab bar and toolbar buttons sit down the side of the
   screen, as on iPhone Duo's folded outer display, the last filter used to
