@@ -96,6 +96,7 @@ final class ConnectionHealth: ObservableObject {
             do {
                 let queue = try await api.fetchQueue()
                 state = .connected
+                if macInReach { await pinMacIdentity() }
                 await refreshWidgetsAndAlerts(status: status, queue: queue)
             } catch let err as KhaytAPIError {
                 lastStatus = nil
@@ -137,11 +138,12 @@ final class ConnectionHealth: ObservableObject {
     ///
     /// ── ASKED, NOT DONE ──────────────────────────────────────────────────
     ///
-    /// This used to move by itself. But a Bonjour name is only a claim: while
-    /// the Mac sleeps, any device on the network can advertise the same name,
-    /// and every request after the move carries the PIN — which then opens the
-    /// shop's book on the real Mac. So the phone stops at "your Mac answered
-    /// at a new address" and moves only when the person says so.
+    /// A Bonjour name is only a claim: while the Mac sleeps, any device on the
+    /// network can advertise the same name, and every request after a move
+    /// carries the PIN — which then opens the shop's book on the real Mac. So
+    /// the phone moves by itself only when the new address proves it holds the
+    /// Mac's pinned key (`MacIdentity`), which costs no PIN. Otherwise it stops
+    /// at "your Mac answered at a new address" and moves when the person says so.
     ///
     /// At most once a minute: a Mac that is simply switched off answers no
     /// lookup either, and browsing every thirty seconds for a machine that is
@@ -154,8 +156,30 @@ final class ConnectionHealth: ObservableObject {
         lastLookup = now
         guard let found = await MacFinder.find(named: name) else { return false }
         guard found.host != settings.host || found.port != settings.port else { return false }
+        let key = settings.macIdentityKey
+        if !key.isEmpty, await api.proves(host: found.host, port: found.port, key: key) {
+            settings.host = found.host
+            settings.port = found.port
+            if settings.serviceName.isEmpty { settings.serviceName = name }
+            macMoved = nil
+            return true
+        }
         offerMove(to: MacAddress(host: found.host, port: found.port))
         return false
+    }
+
+    /// When the phone last asked the Mac for its key and got none — a desktop
+    /// without the route asks again hourly, not every half-minute.
+    private var lastIdentityTry: Date?
+
+    /// Pin the Mac's key while the phone is talking to it, with the PIN, at the
+    /// address it already trusts. Once pinned it is kept until the PIN changes,
+    /// the phone unpairs, or the person moves it by hand.
+    private func pinMacIdentity(now: Date = Date()) async {
+        guard let settings, settings.isPaired, !settings.isSampleShop, settings.macIdentityKey.isEmpty else { return }
+        if let last = lastIdentityTry, now.timeIntervalSince(last) < 3600 { return }
+        lastIdentityTry = now
+        if let key = await api.fetchIdentityKey() { settings.macIdentityKey = key }
     }
 
     /// Ask about `address`, unless the person already said no to it.
@@ -169,6 +193,10 @@ final class ConnectionHealth: ObservableObject {
         settings.host = address.host
         settings.port = address.port
         if settings.serviceName.isEmpty, let name = settings.bonjourName { settings.serviceName = name }
+        // The person vouched for this address, not for its key: pin again
+        // from here rather than keep a key it could not prove.
+        settings.macIdentityKey = ""
+        lastIdentityTry = nil
         macMoved = nil
         declined = nil
         await refresh()

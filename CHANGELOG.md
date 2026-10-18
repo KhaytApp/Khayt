@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: a Mac that changes address is followed again, once it proves
+  who it is.** The phone keeps the Mac's identity key from a connection it
+  already trusts. When the Mac turns up at a new address, the phone asks it
+  to sign a one-time challenge, which needs no PIN, and moves by itself
+  only if the signature matches. Anything else, including a desktop app
+  that does not have the check yet, still asks "Your Mac answered at a new
+  address" first.
+
 - **Mac: put a printer under service, retire it, or delete it.** A machine
   card's menu (and the Status menu at the foot of the machine sheet) marks a
   printer under service with an optional reason, brings it back, retires it
