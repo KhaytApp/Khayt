@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a customer's 3MF is sliced as shapes only.** With "slice uploads"
+  on, a 3MF a customer uploaded over the shop's Wi-Fi reached the slicer
+  with its own settings, and those settings can name a command the slicer
+  runs when it saves G-code. The upload is now reduced to its model parts
+  first, and the shop's own presets are used, as for any bare model.
 - **Mac: fixes from a full review.**
   - **Sync:** a spool, gift card, loyalty redemption or message template
     made on the Mac reaches the other devices now. Before, it waited at
