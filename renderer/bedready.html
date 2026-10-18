@@ -746,6 +746,7 @@
         <div class="card">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
             <h3 class="card-head" style="margin:0;flex:1;"><span class="swatch"></span><span data-i18n="inv.stock">Stock List</span></h3>
+            <button type="button" class="btn small ghost" id="btnLotRecall" data-i18n="inv.lot_recall_open">Lot recall</button>
             <input type="search" id="invSearch" class="toolbar-search" style="max-width:200px;" data-i18n-placeholder="inv.search_ph">
           </div>
           <!-- Inventory valuation summary -->
@@ -1981,6 +1982,8 @@
 <script src="../lib/stock-undo.js"></script>
 <script src="../lib/inventory-units.js"></script>
 <script src="../lib/order-deduction.js"></script>
+<!-- Which jobs a filament lot went into (spool history, Lot recall). -->
+<script src="../lib/lot-trace.js"></script>
 <!-- The low-stock warning's words and conditions; needs order-deduction
      above it, which decides which spools are low. -->
 <script src="../lib/order-payment.js"></script>
