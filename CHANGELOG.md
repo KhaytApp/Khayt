@@ -4,6 +4,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **(Maintainers) A printer's status is one shared rule.** `lib/machine-status.js`:
+  - **Under service** is the `isOffline` flag the desktop already writes, with
+    an optional reason and date.
+  - **Retired** is `status: 'retired'` with `retiredAt`.
+  - **Delete** is allowed only when no record in the book names the printer.
+  - **Retiring** takes the printer off its unfinished jobs.
+
+  Depreciation stops on the retire day. Dispatch proposes nothing for a
+  printer under service or retired. The schedule never places work on a
+  retired one. Maintenance tasks for a retired or deleted printer stop
+  coming due when the machine list is passed in.
+
 - **Mac: the board says why a lot search found a card.** A job on the board
   found only by the filament lot it drew from shows that lot, as its row in
   the orders list already did. The sample shop now holds a delivery that

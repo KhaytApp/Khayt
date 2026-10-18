@@ -458,6 +458,9 @@ public actor KhaytEngine {
         // job — those are cancelled), and what a delete tidies. The desktop's
         // `deleteLog` asks the same rule.
         "record-delete",
+        // A printer in service, under service or retired, and when one may be
+        // deleted at all (only when nothing in the book names it).
+        "machine-status",
         // Which language a shop writes its customers' names in, and which of
         // them to show. Not the interface language: a shop that writes only
         // Arabic must not be shown the stale English name left over from setup.
