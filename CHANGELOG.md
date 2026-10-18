@@ -4,6 +4,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: fixes from the pre-release review.**
+  - **Uploads:** a customer's 3MF upload is unpacked off the window's thread
+    and capped at 64 MB, so a large one can't freeze the app.
+  - **Customer records:**
+    - Only Khayt Cloud's own "turned off" answer switches them off on this
+      Mac, not any refusal.
+    - Uploads run one at a time.
+    - After an erase the upload goes out even while the cloud has asked
+      for fewer uploads.
+  - **Errors:**
+    - A refused write names who has the book open.
+    - Keychain errors are in the shop's language.
+    - Sending to a printer that was put under service while the sheet was
+      open says so instead of doing nothing.
+  - **Payments:** a payment is capped at the bill the order was loaded with,
+    not its bare price, when the bill can't be worked out.
+  - **Customer data:** an exported customer file is readable only by this
+    Mac's user.
+  - **Printers:** a retired printer is left out of the search for printers
+    that moved.
+  - **Crash reports** also leave out single quoted names and file names.
+  - **Shared rules:**
+    - A new order's stored deposit is the one actually taken.
+    - A split job never gives a part more paid than its own price.
+
 - **Mac: an erased or deleted customer leaves Khayt Cloud at once.** With
   customer records on, the cloud copy is updated as soon as a customer is
   erased or deleted, or put back with Undo, rather than on the next upload

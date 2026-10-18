@@ -261,7 +261,7 @@ struct CustomerChangesReachTheCloudTests {
                 "erase and its Undo, plus the definition")
         #expect(delete.components(separatedBy: "customersChangedOnCloud()").count - 1 >= 2,
                 "delete and its Undo")
-        #expect(privacy.contains("await publishCustomerRecords()"))
+        #expect(privacy.contains("await publishCustomerRecords(urgent: true)"))
     }
 
     @Test("with no cloud, the republish is a no-op, not an error")

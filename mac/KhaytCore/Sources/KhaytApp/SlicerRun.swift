@@ -105,7 +105,7 @@ enum SlicerRun {
     /// from the content types, the relationships and the `3D/…model` parts
     /// only; the shop's own presets are applied to what is left, as for any
     /// bare model. Throws when there is no model part to keep.
-    static func keepOnlyTheModel(_ url: URL, limit: Int = 512 << 20) throws {
+    nonisolated static func keepOnlyTheModel(_ url: URL, limit: Int = 64 << 20) throws {
         let entries = try Zip.entries(of: url)
         var kept: [ZipWrite.Member] = []
         var total = 0

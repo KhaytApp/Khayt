@@ -224,4 +224,7 @@ test('a quoted value is redacted, a quoted code name is kept', () => {
   assert.equal(T.scrubText("No client 'Noura Al-Qahtani'"), "No client '<redacted>'");
   assert.equal(T.scrubText('Unknown material "Galaxy Black"'), 'Unknown material "<redacted>"');
   assert.equal(T.scrubText("bad value 'ريم'"), "bad value '<redacted>'");
+  assert.equal(T.scrubText("No client 'Noura' for 'Noura_order.3mf'"),
+    "No client '<redacted>' for '<redacted>'", 'one word, and a file name, are data too');
+  assert.equal(T.scrubText("x 'order.items.length'"), "x 'order.items.length'");
 });

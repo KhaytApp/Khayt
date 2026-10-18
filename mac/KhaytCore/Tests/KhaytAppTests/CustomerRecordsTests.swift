@@ -182,13 +182,33 @@ struct CustomerRecordsTests {
         #expect(b["enable"] == nil, "the loop never lifts an off made elsewhere")
     }
 
-    @Test("a PUT refused 409 is 'turned off on another Mac'")
+    @Test("a PUT refused 409 'disabled' is 'turned off on another Mac'; any other 409 is not")
     func offElsewhere() async {
+        let disabled: (URLRequest) -> (Data, URLResponse) = { request in
+            (Data(#"{"error":"disabled","offAt":"2026-10-19T08:00:00Z"}"#.utf8),
+             HTTPURLResponse(url: request.url!, statusCode: 409, httpVersion: nil, headerFields: nil)!)
+        }
         await #expect(throws: CustomerRecordsPublisher.Failure.offElsewhere) {
+            try await CustomerRecordsPublisher.publish(Self.connection, token: "t",
+                                                       body: .object(["customers": .array([])]),
+                                                       fetch: disabled)
+        }
+        await #expect(throws: CustomerRecordsPublisher.Failure.http(409, #"{"ok":true}"#),
+                      "a proxy's 409 must not switch a shop's uploads off") {
             try await CustomerRecordsPublisher.publish(Self.connection, token: "t",
                                                        body: .object(["customers": .array([])]),
                                                        fetch: Self.answer(409))
         }
+    }
+
+    @Test("a send asked for while one is on its way is merged, and the person's intent wins")
+    func queued() {
+        let loop = CustomerRecordsAsk(delete: false, byPerson: false, urgent: false)
+        let off = CustomerRecordsAsk(delete: true, byPerson: true, urgent: false)
+        let erase = CustomerRecordsAsk(delete: false, byPerson: false, urgent: true)
+        #expect(loop.merged(off) == off)
+        #expect(off.merged(loop) == off)
+        #expect(loop.merged(erase).urgent)
     }
 
     @Test("failures are said in the shop's language, and a reached cloud is not 'could not reach'")
