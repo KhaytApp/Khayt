@@ -417,4 +417,14 @@ struct CommEntry: Identifiable, Hashable, Sendable {
         kind == "whatsapp" ? "ce.comm_wa" : "ce.comm_\(kind)"
     }
     var wordKey: String { Self.wordKey(for: kind) }
+
+    /// What Meta last said of a message sent through it (WhatsAppReports),
+    /// as a word key; nil for every line Meta has not reported on.
+    var deliveryKey: String? {
+        guard let status = str(raw["status"]), ["sent", "delivered", "read", "failed"].contains(status)
+        else { return nil }
+        return "mac.wa_status_" + status
+    }
+    /// Meta's reason, when it gave up on one.
+    var deliveryProblem: String? { deliveryKey == "mac.wa_status_failed" ? str(raw["errorTitle"]) : nil }
 }

@@ -40,6 +40,28 @@ enum CustomerRecordsPublisher {
             case .http(let code, let body): "Khayt Cloud answered \(code) to customer records" + (body.isEmpty ? "" : ": \(body)")
             }
         }
+
+        /// The same, in the shop's words — the pane is read in Arabic too.
+        /// The cloud's own text after a status code stays out: it is English.
+        @MainActor func said(_ words: Words) -> String {
+            switch self {
+            case .unauthorised: words.callIt("mac.cr_err_unauthorised")
+            case .readOnly: words.callIt("mac.cr_err_read_only")
+            case .notOffered: words.callIt("mac.cr_err_not_offered")
+            case .tooLarge: words.callIt("mac.cr_err_too_large")
+            case .limited: words.callIt("mac.cr_err_limited")
+            case .http(let code, _): words.callIt("mac.cloud_err_http", ["code": .string(String(code))])
+            }
+        }
+    }
+
+    /// A `Retry-After` the cloud sent, held to between a second and a day:
+    /// `inf` parses as a number, and would have stopped every send, the
+    /// switch's delete included, until the app was quit.
+    nonisolated static func retryAfter(_ header: String?) -> TimeInterval? {
+        guard let header, let seconds = TimeInterval(header.trimmingCharacters(in: .whitespaces)),
+              seconds.isFinite else { return nil }
+        return min(max(seconds, 1), 86_400)
     }
 
     static let every: Duration = .seconds(600)
@@ -62,7 +84,7 @@ enum CustomerRecordsPublisher {
         case 403: throw Failure.readOnly
         case 404, 405: throw Failure.notOffered
         case 413: throw Failure.tooLarge
-        case 429: throw Failure.limited(retryAfter: http?.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init))
+        case 429: throw Failure.limited(retryAfter: retryAfter(http?.value(forHTTPHeaderField: "Retry-After")))
         case let code: throw Failure.http(code, String(decoding: data.prefix(200), as: UTF8.self))
         }
     }
@@ -113,7 +135,11 @@ extension Shop {
     }
 
     /// One look: put, delete or nothing, as the module decides.
-    func publishCustomerRecords(now: Date = Date()) async {
+    ///
+    /// `delete` is the switch going off: the copy is deleted whatever this
+    /// Mac remembers sending, because another Mac may have sent it and "off
+    /// deletes it" is what the pane promises.
+    func publishCustomerRecords(now: Date = Date(), delete: Bool = false) async {
         guard let engine, let build = source.build else { return }
         if let notBefore = customerRecordsNotBefore, now < notBefore { return }
         do {
@@ -123,13 +149,18 @@ extension Shop {
             let memory = CustomerRecordsPublisher.memory(connection.shopId)
             // Off, and nothing of this Mac's out there: the usual case, and
             // not worth reading every customer for.
-            if !state.on, memory == nil { return }
+            if !state.on, memory == nil, !delete { return }
             let built = try await engine.customerRecords(clients: clientRows, printLog: orderRows,
                                                           settings: settingsDict)
             let fingerprint = try CustomerRecordsPublisher.fingerprint(built.body)
-            let action = try await engine.customerRecordsNext(
-                on: state.on, fingerprint: fingerprint,
-                memory: memory.map { ($0.fingerprint, $0.at) }, now: Self.isoNow(now))
+            let action: String
+            if delete && !state.on {
+                action = "delete"
+            } else {
+                action = try await engine.customerRecordsNext(
+                    on: state.on, fingerprint: fingerprint,
+                    memory: memory.map { ($0.fingerprint, $0.at) }, now: Self.isoNow(now))
+            }
             guard action != "none" else { return }
 
             let token = try await Secrets.open(connection.storedToken, for: build)
@@ -138,6 +169,17 @@ extension Shop {
             try await CustomerRecordsPublisher.publish(connection, token: token,
                                                        body: action == "put" ? built.body : nil) {
                 try await session.data(for: $0)
+            }
+            // Switched off while this PUT was on its way: the switch's DELETE
+            // may have landed first, so the copy just sent goes too.
+            if action == "put", !customerRecordsOn {
+                try await CustomerRecordsPublisher.publish(connection, token: token, body: nil) {
+                    try await session.data(for: $0)
+                }
+                CustomerRecordsPublisher.remember(nil, connection.shopId)
+                customerRecordsSaid = words.callIt("mac.cr_deleted")
+                customerRecordsProblem = false
+                return
             }
             CustomerRecordsPublisher.remember(
                 action == "put" ? .init(fingerprint: fingerprint, at: Self.isoNow(now)) : nil,
@@ -157,9 +199,11 @@ extension Shop {
             customerRecordsSaid = nil
         } catch CustomerRecordsPublisher.Failure.limited(let after) {
             customerRecordsNotBefore = now.addingTimeInterval(after ?? 3600)
+        } catch let failure as CustomerRecordsPublisher.Failure {
+            customerRecordsSaid = failure.said(words)
+            customerRecordsProblem = true
         } catch {
-            customerRecordsSaid = words.callIt("mac.cr_failed") + " "
-                + ((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+            customerRecordsSaid = words.callIt("mac.cr_failed") + " " + error.localizedDescription
             customerRecordsProblem = true
         }
     }
@@ -190,7 +234,7 @@ extension Shop {
             }
             await load(source)
             customerRecordsNotBefore = nil
-            await publishCustomerRecords()
+            await publishCustomerRecords(delete: !on)
         } catch {
             customerRecordsSaid = words.callIt("mac.cr_failed") + " " + String(describing: error)
             customerRecordsProblem = true
@@ -221,7 +265,9 @@ struct CustomerRecordsSection: View {
     var body: some View {
         Section(shop.words.callIt("mac.cr_title")) {
             Toggle(shop.words.callIt("mac.cr_enable"), isOn: Binding(
-                get: { shop.customerRecordsReady && shop.customerRecordsOn },
+                // As the book has it, ready or not: a book holding "on" from
+                // elsewhere shows on, so the one press it allows turns it off.
+                get: { shop.customerRecordsOn },
                 set: { on in
                     busy = true
                     Task { await shop.setCustomerRecords(on); busy = false }
@@ -249,6 +295,5 @@ struct CustomerRecordsSection: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .task(id: shop.settingsValue) { await shop.refreshCustomerRecordsReady() }
     }
 }

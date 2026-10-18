@@ -12,6 +12,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   screen, as on iPhone Duo's folded outer display, the last filter used to
   run under them and sit half hidden. The strip now ends beside them and
   still scrolls.
+- **Mac: customer records and WhatsApp reports, after review.** Turning
+  customer records off deletes the cloud copy even when another Mac sent it,
+  and a send that was on its way when the switch went off is deleted too. A
+  book that has the switch on from elsewhere shows it on, so it can be turned
+  off. WhatsApp reports are read after a Mac opens offline, after switching
+  books and on a staff sign-in. A batch that changes nothing no longer
+  rewrites the book, and only a date, a numeric code and a short reason from a
+  report are kept. The customer's log shows sent, delivered, read or not
+  delivered beside a message Meta reported on. Errors in both sections are
+  in Arabic in the Arabic app. A spool's history totals the grams as its rows show
+  them, so 298 g and 79 g add up to 377 g, not 376 g.
+
 - **Mac: customer records for your web store (held), and WhatsApp delivery
   reports.** Settings → Online gains a switch that publishes each customer
   who has an email (name, phone and their orders, with what they paid) to
@@ -7570,6 +7582,41 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-alpha.80] - 2026-10-18
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+WhatsApp delivery reports, units in Arabic, and a lot search that says why
+each job is on the list.
+
+### Added
+
+- **WhatsApp delivery reports.** Settings ▸ Online ▸ WhatsApp delivery
+  reports connects the shop's Meta app to Khayt Cloud: enter the app secret,
+  then copy the callback address and verify token into Meta. Khayt then reads
+  Meta's sent, delivered, read and failed reports onto each message in the
+  customer's log, and a message only moves forward. The log shows sent,
+  delivered, read or not delivered beside each one. (Sending through Meta
+  itself comes in a later alpha, so until then there is nothing to report on.)
+- **Customer records for your web store (held).** A switch in Settings ▸
+  Online will publish customers who have an email, with their orders, so the
+  shop's storefront can show them their history. It stays off and cannot be
+  turned on until Khayt's privacy policy covers it. Turning it off always
+  deletes the cloud copy, even one another Mac sent.
+- **A lot search says why.** A job that a lot search finds only by its lot
+  shows that lot in its row.
+
+### Fixed
+
+- **Units in Arabic.** Spool history, purchase-order quantities, the job
+  inspector's machine time and the capacity card wrote "g", "h" and "sheet"
+  as English letters in the Arabic app. Spool history also showed grams to
+  two decimals beside a shelf that showed whole grams.
+- **The Arabic help uses Western digits**, as the app does.
+- **A spool's history adds up.** Its total is the sum of the rows as shown,
+  so 298 g and 79 g total 377 g rather than 376 g.
 
 ## [4.0.0-alpha.79] - 2026-10-17
 

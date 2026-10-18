@@ -67,6 +67,9 @@ struct WhatsAppReportsTests {
         #expect(WhatsAppReports.seq(page.nextSince) == 42)
         #expect(WhatsAppReports.seq(.string("7")) == 7)
         #expect(WhatsAppReports.seq(.null) == nil)
+        // Not a place in the stream, and `Int(1e300)` would trap.
+        #expect(WhatsAppReports.seq(.number(1e300)) == nil)
+        #expect(WhatsAppReports.seq(.number(4.5)) == nil)
     }
 
     @Test("the shared rule moves a line forward by its message id, through the engine")
@@ -93,9 +96,40 @@ struct WhatsAppReportsTests {
             await w.load(lang, engine: try? KhaytEngine())
             for key in ["mac.wa_hook_title", "mac.wa_hook_hint", "mac.wa_app_secret", "mac.wa_hook_connect",
                         "mac.wa_hook_url", "mac.wa_hook_verify", "mac.wa_hook_last", "mac.wa_hook_none_yet",
-                        "mac.wa_hook_remove", "mac.wa_hook_owner_only"] {
+                        "mac.wa_hook_remove", "mac.wa_hook_owner_only", "mac.wa_err_unauthorised",
+                        "mac.wa_err_not_offered", "mac.wa_err_bad_secret", "mac.cloud_err_http",
+                        "mac.wa_status_sent", "mac.wa_status_delivered", "mac.wa_status_read",
+                        "mac.wa_status_failed"] {
                 #expect(w.callIt(key) != key, "\(key) has no \(lang)")
             }
         }
+    }
+
+    @Test("a 400 on the report stream is not said as a bad secret")
+    func cursorRefused() async throws {
+        await #expect(throws: WhatsAppReports.Failure.http(400, "")) {
+            _ = try await WhatsAppReports.statuses(Self.connection, token: "t", since: 3,
+                                                   fetch: Self.answer(400, "{}"))
+        }
+    }
+
+    @Test("a log line shows what Meta said of it, and only a line Meta reported on")
+    func delivery() {
+        let read = CommEntry(raw: ["type": .string("whatsapp"), "status": .string("read")])
+        #expect(read.deliveryKey == "mac.wa_status_read")
+        #expect(read.deliveryProblem == nil)
+        let failed = CommEntry(raw: ["status": .string("failed"), "errorTitle": .string("Undeliverable")])
+        #expect(failed.deliveryProblem == "Undeliverable")
+        #expect(CommEntry(raw: ["type": .string("call")]).deliveryKey == nil)
+        #expect(CommEntry(raw: ["status": .string("bogus")]).deliveryKey == nil)
+    }
+
+    @Test("failures are said in the shop's language")
+    func saidInArabic() async {
+        let w = Words()
+        await w.load("ar", engine: try? KhaytEngine())
+        let said = WhatsAppReports.said(WhatsAppReports.Failure.badSecret, w)
+        #expect(said != "mac.wa_err_bad_secret")
+        #expect(!said.contains("Meta app secret"), "English in the Arabic pane")
     }
 }

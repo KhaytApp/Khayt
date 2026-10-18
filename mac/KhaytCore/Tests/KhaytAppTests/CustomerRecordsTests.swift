@@ -122,9 +122,43 @@ struct CustomerRecordsTests {
             let w = Words()
             await w.load(lang, engine: try? KhaytEngine())
             for key in ["mac.cr_title", "mac.cr_enable", "mac.cr_hint", "mac.cr_held",
-                        "mac.cr_needs_cloud", "mac.cr_published", "mac.cr_deleted", "mac.cr_failed", "mac.cr_trimmed"] {
+                        "mac.cr_needs_cloud", "mac.cr_published", "mac.cr_deleted", "mac.cr_failed", "mac.cr_trimmed",
+                        "mac.cr_err_unauthorised", "mac.cr_err_read_only", "mac.cr_err_not_offered",
+                        "mac.cr_err_too_large", "mac.cr_err_limited", "mac.cloud_err_http"] {
                 #expect(w.callIt(key) != key, "\(key) has no \(lang)")
             }
+        }
+    }
+
+    @Test("a Retry-After is held to a second..a day; inf would have stopped the switch's delete")
+    func retryAfterClamped() {
+        #expect(CustomerRecordsPublisher.retryAfter("120") == 120)
+        #expect(CustomerRecordsPublisher.retryAfter("inf") == nil)
+        #expect(CustomerRecordsPublisher.retryAfter("1e308") == 86_400)
+        #expect(CustomerRecordsPublisher.retryAfter("0") == 1)
+        #expect(CustomerRecordsPublisher.retryAfter(nil) == nil)
+    }
+
+    @Test("a book holding 'on' from elsewhere shows on while held, so the switch can turn it off")
+    func heldBookShowsOn() async {
+        let shop = Shop()
+        await shop.load(.sample)
+        var settings = shop.settingsDict
+        settings["customerRecords"] = .object(["enabled": .bool(true)])
+        shop.settingsValue = .object(settings)
+        #expect(shop.customerRecordsOn)
+        #expect(!shop.customerRecordsReady)
+    }
+
+    @Test("failures are said in the shop's language, and a reached cloud is not 'could not reach'")
+    func saidInArabic() async {
+        let w = Words()
+        await w.load("ar", engine: try? KhaytEngine())
+        for failure in [CustomerRecordsPublisher.Failure.readOnly, .tooLarge, .http(500, "boom")] {
+            let said = failure.said(w)
+            #expect(!said.contains("Khayt Cloud"), "English in the Arabic pane: \(said)")
+            #expect(!said.contains("boom"), "the cloud's own English stays out")
+            #expect(!said.contains(w.callIt("mac.cr_failed")))
         }
     }
 }

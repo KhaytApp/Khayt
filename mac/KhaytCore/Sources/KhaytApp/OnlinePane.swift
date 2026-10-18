@@ -204,8 +204,13 @@ struct OnlinePane: View {
                 }
                 // The plaintext copy of the shop's customers for its own
                 // storefront — off, and shut until the privacy policy says so.
+                // Asked here rather than inside the sections, so that what a
+                // section draws is only what the shop holds — and so a
+                // photograph of it is of the state it was given.
                 CustomerRecordsSection(shop: shop)
+                    .task(id: shop.settingsValue) { await shop.refreshCustomerRecordsReady() }
                 WhatsAppReportsSection(shop: shop)
+                    .task { await shop.refreshWhatsAppHook() }
                 // ── LETTING A STRANGER SEE A PRICE ────────────────────
                 //
                 // Folded away, and off unless the shop turns it on: this is

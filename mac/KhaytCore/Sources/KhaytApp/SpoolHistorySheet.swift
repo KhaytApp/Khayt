@@ -14,6 +14,11 @@ import KhaytCore
 /// bottom, because the arithmetic somebody would otherwise do on paper is the
 /// whole reason to open this.
 struct SpoolHistorySheet: View {
+    /// What the rows on screen add up to.
+    static func shownTotal(_ spool: Spool, places: Int) -> Double {
+        (spool.usageHistory ?? []).reduce(0) { $0 + $1.weightUsed.rounded(toPlaces: places) }
+    }
+
     @Bindable var shop: Shop
     let spool: Spool
     /// What the copy-as-CSV button last said.
@@ -74,7 +79,11 @@ struct SpoolHistorySheet: View {
                 HStack {
                     Text(shop.words.callIt("mac.spool_history_total")).foregroundStyle(.secondary)
                     Spacer()
-                    Text(Quantity.say(spool.totalUsed, shop.unit(of: spool), shop.words))
+                    // The rows as SHOWN, added up: each row is rounded to the
+                    // unit's places, and a total of the unrounded draws read
+                    // 376 g under 298 g and 79 g (alpha.80 review).
+                    Text(Quantity.say(Self.shownTotal(spool, places: shop.unit(of: spool)?.decimals ?? 0),
+                                      shop.unit(of: spool), shop.words))
                         .monospacedDigit().fontWeight(.semibold)
                 }
                 .padding(.top, 4)
