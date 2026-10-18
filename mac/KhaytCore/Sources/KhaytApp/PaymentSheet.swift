@@ -24,6 +24,8 @@ struct PaymentSheet: View {
     /// What the order is billed and already paid down without cash, by
     /// `KhaytOrderPayment.cashDue`. Nil until asked, or with no engine.
     @State private var due: KhaytEngine.CashDue?
+    /// The engine has answered (or failed to); Save waits for it.
+    @State private var asked = false
     /// "Clear payment" pressed and not yet answered. It wiped what the
     /// customer paid in one click, from a sheet opened to RECORD a payment.
     @State private var clearing: Order?
@@ -121,11 +123,16 @@ struct PaymentSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save"), action: commit)
                     .keyboardShortcut(.defaultAction)
+                    // Not before the bill is known: until then `price` is the
+                    // job's bare price, which on a shop adding tax on top is
+                    // short by the tax, and the cap in `commit` would record
+                    // a payment short by exactly that (Oct 2026 review).
+                    .disabled(!asked && shop.engine != nil)
             }
         }
         .padding(18)
         .frame(width: Self.width)
-        .task(id: subject.id) { due = await shop.cashDue(subject.id) }
+        .task(id: subject.id) { due = await shop.cashDue(subject.id); asked = true }
         .askFirst($clearing,
                   title: { shop.words.callIt("mac.clear_payment_q",
                                              ["amount": .string(Money.text($0.paidAmount, currency)),

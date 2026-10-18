@@ -14,6 +14,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     overwrote the first.
   - **An order's Total** on a shop that adds tax on top is what the
     customer is billed, the same figure Paid and Owed are measured against.
+  - **Recording a payment** waits until the bill has been worked out, so a
+    quick Save on a shop that adds tax on top no longer records a payment
+    short by the tax.
   - **WhatsApp updates sent by staff** are logged on the customer. A
     viewer can no longer send one.
   - **Library import and conversion errors** are in Arabic in the Arabic
