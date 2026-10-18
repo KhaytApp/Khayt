@@ -912,6 +912,7 @@ function wireEvents() {
   // Inventory
   $('#btnAddInv')?.addEventListener('click', addInventoryItem);
   $('#btnBrowseCatalog')?.addEventListener('click', openFilamentCatalog);
+  $('#btnLotRecall')?.addEventListener('click', () => openLotRecall());
   // QW7: Dynamic unit label for Resin vs FDM in add form
   $('#invMaterialType')?.addEventListener('change', (e) => {
     const isResin = e.target.value === 'resin';

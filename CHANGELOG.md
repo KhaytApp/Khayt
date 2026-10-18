@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: find every job printed from a filament lot.** Inventory ▸
+  Stock List has a **Lot recall** button. Pick a lot and Khayt lists every
+  job that took filament from it, newest first, with the customer and the
+  grams, failed prints included. Click a job to open it, or **Copy as CSV**
+  for a recall list. A spool's **Usage History** now shows the lot each use
+  came from, and a spool with a lot has a **Jobs from lot …** button. A use
+  recorded before Khayt saved the lot with each use takes the spool's
+  current lot and is marked *(inferred)*.
+- **Desktop: a spool's "Total consumed" no longer drops when a delivery is
+  received.** A purchase-order receipt was counted as negative use.
+
 - **iPhone: on iPhone Duo's inner display, Machines and Clients sit two
   across.** Each machine card and client row used to stretch over the full
   width of the unfolded screen. The folded outer display and other iPhones

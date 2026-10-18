@@ -1910,13 +1910,15 @@ function openSpoolHistory(itemId) {
   const item = inventory.find(i => i.id === itemId);
   if (!item) return;
   const history = item.usageHistory || [];
-  const totalConsumed = history.reduce((s, h) => s + (+h.weightUsed || 0), 0);
+  // Receipts are rows of minus what arrived; only what left the shelf is consumed.
+  const totalConsumed = history.reduce((s, h) => s + Math.max(0, +h.weightUsed || 0), 0);
   const tableHtml = history.length === 0
     ? `<p style="color:var(--text-muted); font-size:13px; text-align:center; padding:16px 0;">${escapeHtml(t('inv.spool_hist_empty'))}</p>`
     : `<div class="table-wrap"><table style="width:100%;">
         <thead><tr>
           <th>${escapeHtml(t('common.date'))}</th>
           <th>${escapeHtml(t('log.client'))}</th>
+          <th>${escapeHtml(t('inv.lot'))}</th>
           <th>${escapeHtml(t('inv.spool_hist_weight'))}</th>
         </tr></thead>
         <tbody>${history.map(h => {
@@ -1926,6 +1928,7 @@ function openSpoolHistory(itemId) {
           return `<tr>
             <td style="font-family:var(--font-num); font-size:12px; color:var(--text-dim); white-space:nowrap;">${escapeHtml(h.date || '')}</td>
             <td>${orderLabel}</td>
+            <td dir="auto" style="font-size:12px; color:var(--text-dim);">${escapeHtml(h.lot || '')}</td>
             <td style="text-align:right; font-variant-numeric:tabular-nums;">${(+h.weightUsed || 0).toFixed(0)}g</td>
           </tr>`;
         }).join('')}</tbody>
@@ -1938,18 +1941,144 @@ function openSpoolHistory(itemId) {
       <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:14px; font-size:13px;">
         <span>${escapeHtml(t('inv.current_stock'))}: <strong>${Math.round(item.weight)}g</strong></span>
         <span>${escapeHtml(t('inv.spool_consumed'))}: <strong>${totalConsumed.toFixed(0)}g</strong></span>
+        ${item.lot ? `<span>${escapeHtml(t('inv.lot'))}: <strong dir="auto">${escapeHtml(item.lot)}</strong></span>
+        <button type="button" class="btn small ghost" id="spoolHistLotRecall">${escapeHtml(t('inv.lot_recall_for', { lot: '\u2068' + item.lot + '\u2069' }))}</button>` : ''}
       </div>
       ${tableHtml}`,
     onMount(modal) {
       modal.querySelectorAll('.spool-hist-order-link').forEach(link => {
         link.addEventListener('click', (e) => {
           e.preventDefault();
-          const oid = link.dataset.orderId;
-          // Close modal by clicking cancel, then navigate
-          modal.closest('.modal-backdrop')?.querySelector('[data-act="cancel"]')?.click();
-          switchTab('logs-tab');
-          setTimeout(() => { logSearchTerm = oid; renderLogs(); }, 60);
+          _openJobFromModal(modal, link.dataset.orderId);
         });
+      });
+      modal.querySelector('#spoolHistLotRecall')?.addEventListener('click', () => {
+        _closeModal(modal);
+        openLotRecall(item.lot);
+      });
+    },
+  });
+}
+
+/** Close a form modal the way its Cancel button does. */
+function _closeModal(modal) {
+  modal.closest('.modal-backdrop')?.querySelector('[data-act="cancel"]')?.click();
+}
+
+/** Close the modal, then show the job in the Jobs log. */
+function _openJobFromModal(modal, orderId) {
+  _closeModal(modal);
+  switchTab('logs-tab');
+  setTimeout(() => { logSearchTerm = orderId; renderLogs(); }, 60);
+}
+
+/* ============================================================
+   Lot recall: every job a filament lot went into
+   ============================================================ */
+
+/** lib/lot-trace.js decides which draws came from a lot; this draws the list. */
+function LotTrace() {
+  if (typeof globalThis !== 'undefined' && globalThis.KhaytLotTrace) return globalThis.KhaytLotTrace;
+  return require('../lib/lot-trace.js');
+}
+
+/** The rows for one lot, with the client's name as this shop shows it.
+ *  Desktop jobs carry a clientId, which lot-trace cannot resolve on its own. */
+function lotRecallJobs(lot, book) {
+  const b = book || { printLog, wasteLog, inventory };
+  const byId = new Map((b.printLog || []).map(o => [o.id, o]));
+  const cl = (typeof clients !== 'undefined' && Array.isArray(clients)) ? clients : [];
+  return LotTrace().jobsForLot(b, lot).map(j => {
+    const o = byId.get(j.orderId);
+    const c = o && o.clientId ? cl.find(x => x.id === o.clientId) : null;
+    return Object.assign({}, j, {
+      client: (c ? localName(c) : '') || j.client || '',
+      known: !!o,
+    });
+  });
+}
+
+function openLotRecall(lot) {
+  const T = LotTrace();
+  const book = { printLog, wasteLog, inventory };
+  const lots = T.knownLots(book);
+  const want = T.lotKey(lot);
+  let current = (want && lots.find(l => T.lotKey(l) === want)) || lots[0] || '';
+  let jobs = [];
+
+  function listHtml() {
+    jobs = lotRecallJobs(current, book);
+    if (!jobs.length) {
+      return `<p style="color:var(--text-muted); font-size:13px; text-align:center; padding:16px 0;">${escapeHtml(t('inv.lot_recall_none'))}</p>`;
+    }
+    const grams = jobs.reduce((s, j) => s + (+j.grams || 0), 0);
+    const summary = jobs.length === 1
+      ? t('inv.lot_recall_summary_one', { g: Math.round(grams) })
+      : t('inv.lot_recall_summary', { n: jobs.length, g: Math.round(grams) });
+    const anyInferred = jobs.some(j => j.inferred);
+    return `
+      <p style="font-size:13px; margin:0 0 10px;">${escapeHtml(summary)}</p>
+      <div class="table-wrap"><table style="width:100%;">
+        <thead><tr>
+          <th>${escapeHtml(t('common.date'))}</th>
+          <th>${escapeHtml(t('inv.lot_recall_job'))}</th>
+          <th>${escapeHtml(t('doc.client'))}</th>
+          <th>${escapeHtml(t('inv.spool_hist_weight'))}</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${jobs.map(j => {
+          const label = escapeHtml(j.project || j.orderId);
+          const jobCell = j.known
+            ? `<a class="lot-recall-job" href="#" data-order-id="${escapeHtml(j.orderId)}" style="color:var(--primary); text-decoration:none;">${label}</a>`
+            : label;
+          const notes = [
+            j.failed && !j.completed ? escapeHtml(t('inv.lot_recall_failed')) : '',
+            j.inferred ? `<span title="${escapeHtml(t('inv.lot_inferred_hint'))}">${escapeHtml(t('inv.lot_inferred'))}</span>` : '',
+          ].filter(Boolean).join(' ');
+          return `<tr>
+            <td style="font-family:var(--font-num); font-size:12px; color:var(--text-dim); white-space:nowrap;">${escapeHtml(j.date || '')}</td>
+            <td>${jobCell}</td>
+            <td>${escapeHtml(j.client || '')}</td>
+            <td style="text-align:right; font-variant-numeric:tabular-nums;">${(+j.grams || 0).toFixed(0)}g</td>
+            <td style="font-size:12px; color:var(--text-dim);">${notes}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+      ${anyInferred ? `<p style="font-size:12px; color:var(--text-dim); margin:8px 0 0;">${escapeHtml(t('inv.lot_inferred_hint'))}</p>` : ''}`;
+  }
+
+  const bodyHtml = !lots.length
+    ? `<p style="color:var(--text-muted); font-size:13px; text-align:center; padding:16px 0;">${escapeHtml(t('inv.lot_recall_no_lots'))}</p>`
+    : `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+        <label for="lotRecallPick" style="margin:0;">${escapeHtml(t('inv.lot'))}</label>
+        <select id="lotRecallPick" dir="auto" style="min-width:180px;">${lots.map(l =>
+          `<option dir="auto" value="${escapeHtml(l)}"${l === current ? ' selected' : ''}>${escapeHtml(l)}</option>`).join('')}</select>
+        <span style="flex:1;"></span>
+        <button type="button" class="btn small ghost" id="lotRecallCopy">${_iIcoL('clipboard', '📋', 13)}${escapeHtml(t('inv.lot_recall_copy'))}</button>
+      </div>
+      <div id="lotRecallList">${listHtml()}</div>`;
+
+  openFormModal({
+    title: t('inv.lot_recall_title'),
+    noSave: true,
+    sizeLg: true,
+    bodyHtml,
+    onMount(modal) {
+      const list = modal.querySelector('#lotRecallList');
+      const wire = () => list?.querySelectorAll('.lot-recall-job').forEach(a => {
+        a.addEventListener('click', (e) => { e.preventDefault(); _openJobFromModal(modal, a.dataset.orderId); });
+      });
+      wire();
+      modal.querySelector('#lotRecallPick')?.addEventListener('change', (e) => {
+        current = e.target.value;
+        list.innerHTML = listHtml();
+        wire();
+      });
+      modal.querySelector('#lotRecallCopy')?.addEventListener('click', () => {
+        if (!jobs.length) { toast(t('inv.lot_recall_none'), 'info'); return; }
+        copyAndToast(T.csvForJobs(jobs), jobs.length === 1
+          ? t('inv.lot_recall_copied_one')
+          : t('inv.lot_recall_copied', { n: jobs.length }));
       });
     },
   });
@@ -4832,6 +4961,8 @@ async function printSpoolLabel(itemId) {
     renderInventory,
     openStockAdjustModal,
     openSpoolHistory,
+    openLotRecall,
+    lotRecallJobs,
     openDryingLog,
     openTestPrintLog,
     deductFilamentForOrder,
