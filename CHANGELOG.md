@@ -21,7 +21,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   rewrites the book, and only a date, a numeric code and a short reason from a
   report are kept. The customer's log shows sent, delivered, read or not
   delivered beside a message Meta reported on. Errors in both sections are
-  in Arabic in the Arabic app.
+  in Arabic in the Arabic app. A spool's history totals the grams as its rows show
+  them, so 298 g and 79 g add up to 377 g, not 376 g.
 
 - **Mac: customer records for your web store (held), and WhatsApp delivery
   reports.** Settings → Online gains a switch that publishes each customer

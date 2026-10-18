@@ -42,6 +42,16 @@ struct SpoolHistoryTests {
         #expect(used.totalUsed != used.weight)
     }
 
+    @Test("the total under the rows is what the rows on screen add up to")
+    func theTotalAddsUp() async throws {
+        // A sample spool showed 298 g and 79 g over a total of 376 g: the
+        // rows were rounded one by one and the total once.
+        for spool in await Self.sampleSpools() where !(spool.usageHistory ?? []).isEmpty {
+            let shown = (spool.usageHistory ?? []).reduce(0) { $0 + $1.weightUsed.rounded() }
+            #expect(SpoolHistorySheet.shownTotal(spool, places: 0) == shown, "\(spool.id)")
+        }
+    }
+
     @Test("an entry survives the shapes the book actually holds")
     func decodesLoosely() throws {
         // Written by the deduction chain in two apps over two years; a row
