@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the iPhone can check it is talking to your Mac.** The Mac now has
+  its own identity key. A paired iPhone keeps it, and before it sends the
+  PIN to a new address it asks the Mac there to sign a random challenge. A
+  device on the Wi-Fi that copied the Mac's name cannot pass. The PIN is
+  never part of the check.
+
 - **Mac: the board says why a lot search found a card.** A job on the board
   found only by the filament lot it drew from shows that lot, as its row in
   the orders list already did. The sample shop now holds a delivery that
