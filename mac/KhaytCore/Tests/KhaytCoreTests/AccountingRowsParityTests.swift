@@ -64,6 +64,45 @@ struct AccountingRowsParityTests {
         try check([], settings: [:], clients: [], tax: vat, "an empty book", js)
     }
 
+    @Test("split parents, voided, cancelled, not-business and fully credited orders are not invoices; credit notes net off")
+    func moneyReviewScope() throws {
+        let js = try js()
+        func row(_ id: String, _ extra: [String: JSONValue]) -> JSONValue {
+            var o: [String: JSONValue] = ["id": .string(id), "status": .string("completed"),
+                                          "price": .number(100)]
+            for (k, v) in extra { o[k] = v }
+            return .object(o)
+        }
+        let orders: [JSONValue] = [
+            row("P", ["status": .string("split"), "price": .number(300),
+                      "splitInto": .array([.string("P-1"), .string("P-2")])]),
+            // A status of 'split' with nothing split into is still an invoice.
+            row("S", ["status": .string("split"), "splitInto": .array([])]),
+            row("P-1", ["price": .number(150)]),
+            row("V", ["voidedAt": .string("2026-09-01")]),
+            row("V0", ["voidedAt": .string("")]),
+            row("X", ["status": .string("cancelled")]),
+            row("G", ["nonBusiness": .bool(true)]),
+            row("G0", ["nonBusiness": .string("true")]),
+            row("C", ["creditedAt": .string("x"), "creditNotes": .array([.object(["amount": .number(100)])])]),
+            row("N", ["price": .number(115),
+                      "creditNotes": .array([.object(["amount": .number(15)]),
+                                             .object(["amount": .string("5")]),
+                                             .null, .object([:])])]),
+            row("Z", ["creditNotes": .array([.object(["amount": .number(150)])])]),
+            row("R", ["price": .number(10.1),
+                      "creditNotes": .array([.object(["amount": .number(0.07)])])]),
+        ]
+        try check(orders, settings: ["currency": .string("SAR")], clients: [],
+                  tax: vat, "the money review's exclusions", js)
+        let ids = AccountingRows.invoiceRows(orders: orders, settings: [:], clients: [], tax: vat)
+            .compactMap { row -> String? in
+                guard case .object(let o) = row, case .string(let id)? = o["id"] else { return nil }
+                return id
+            }
+        #expect(ids == ["S", "P-1", "V0", "G0", "N", "R"])
+    }
+
     @Test("the customer's name, and the two older fields it falls back to")
     func namesMatch() throws {
         let js = try js()

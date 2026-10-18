@@ -2171,7 +2171,7 @@ function openOrderEditor(orderId) {
           // before tax-on-top was counted (orderDueRaw, #1730): editing that
           // order's plan must not flip it back to partial.
           giftCardDiscount: +order.giftCardDiscount || 0,
-          credited: KhaytOrderMoney.orderCreditedRaw(order),
+          credited: KhaytOrderMoney.orderCreditedDueRaw(order, { settings }),
           due: KhaytOrderMoney.orderDueRaw(order, { settings }),
         });
         order.paidAmount = totals.paidAmount;

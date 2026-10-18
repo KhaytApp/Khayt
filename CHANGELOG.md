@@ -4,6 +4,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Money: seven fixes to what a shop is owed and what it exports.**
+  Quotes, cancelled jobs, voided invoices and fully credited orders no longer
+  count as owed: not in receivables, the dashboard strip, or the Mac's title
+  bar, widget and customers table. A deposit taken with a new order on a shop
+  that adds tax on top is now judged against price + tax, so a deposit of the
+  bare price leaves the tax owed instead of reading paid. On those shops a
+  credit note also comes off with its tax: 100 at 10% with 50 credited now
+  owes 55, not 60. An instalment plan no longer lists rows already covered by
+  cash paid outside it; that cash settles the oldest rows first. Splitting a
+  job across machines can no longer give one machine a negative share. The
+  accountant's export now leaves out split parents, voided, cancelled and
+  not-business orders, and takes credit notes off the price. On the Mac, a
+  customer billed in another currency now exports in that currency, with the
+  shop's base columns filled in.
 - **(Maintainers) A printer's status is one shared rule.** `lib/machine-status.js`:
   - **Under service** is the `isOffline` flag the desktop already writes, with
     an optional reason and date.
