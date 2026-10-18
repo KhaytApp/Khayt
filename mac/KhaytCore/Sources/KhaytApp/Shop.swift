@@ -560,6 +560,19 @@ final class Shop {
         }
     }
 
+    /// The lot each searched-for job matched on, for jobs that matched ONLY
+    /// on a lot — a row found by its own name needs no reason given.
+    func lotReasons(_ rows: [Order]) -> [String: String] {
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return [:] }
+        let byId = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return FilamentUsed.lots(matching: q, orders: rows, spools: spools).filter { id, _ in
+            guard let o = byId[id] else { return false }
+            return !(o.project.lowercased().contains(q) || o.client.lowercased().contains(q)
+                     || o.id.lowercased().contains(q))
+        }
+    }
+
     /// Jobs the board has no column for.
     ///
     /// A `split` parent, or a status a later version of Khayt introduces. They

@@ -84,6 +84,20 @@ struct FilamentUsedTests {
         shop.search = ""
     }
 
+    @Test("a job found by its lot says which lot; one found by its name says nothing")
+    func searchSaysWhy() async throws {
+        let shop = try await sample()
+        shop.search = "gb-2406"
+        let why = shop.lotReasons(shop.matching(shop.orders))
+        #expect(why["ORD-01002"] == "GB-2406-17", "the lot as written, not as typed")
+        #expect(why["ORD-01016"] == "GB-2406-17")
+        shop.search = "ord-01002"
+        #expect(shop.lotReasons(shop.matching(shop.orders)).isEmpty,
+                "a job found by its number needs no reason")
+        shop.search = ""
+        #expect(shop.lotReasons(shop.orders).isEmpty)
+    }
+
     @Test("a recall on the sample lot lists both jobs, as CSV")
     func recall() async throws {
         let shop = try await sample()

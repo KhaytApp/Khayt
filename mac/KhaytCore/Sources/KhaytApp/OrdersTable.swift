@@ -69,14 +69,17 @@ struct OrdersTable: View {
     static let jobRowHeight: CGFloat = 20
 
     private var table: some View {
+        // Asked once per draw, not per row: it walks every spool's history.
+        let lots = shop.lotReasons(rows)
         // SEVERAL ROWS AT ONCE (⌘/⇧-click), for Delete…: `selectJobs` keeps
         // `selection` — the job the details pane and the Job menu act on —
         // one of them.
-        Table(rows, selection: Binding(get: { shop.jobSelection }, set: { shop.selectJobs($0) }),
+        return Table(rows, selection: Binding(get: { shop.jobSelection }, set: { shop.selectJobs($0) }),
               sortOrder: $order,
               columnCustomization: $columns) {
             TableColumn(shop.words.callIt("mac.job"), value: \.project) { job in
-                JobTitleCell(shop: shop, job: job, thumbnail: shop.modelThumbnail(for: job))
+                JobTitleCell(shop: shop, job: job, thumbnail: shop.modelThumbnail(for: job),
+                             matchedLot: lots[job.id])
             }
             // ── IDEALS THAT FIT, BECAUSE THEY ARE A FLOOR ────────────────────
             //
@@ -225,6 +228,9 @@ struct JobTitleCell: View {
     let job: Order
     /// `Shop.modelThumbnail(for:)`, handed in.
     let thumbnail: ThumbnailSource?
+    /// The lot a search found this job by, when nothing else in the row
+    /// says why it is there (`Shop.lotReasons`).
+    var matchedLot: String? = nil
 
     var body: some View {
         HStack(spacing: 8) {
@@ -267,6 +273,11 @@ struct JobTitleCell: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1).fixedSize()
                     .help(shop.words.callIt("oe.non_business"))
+            }
+            if let matchedLot {
+                Text(shop.words.callIt("mac.lot_label", ["lot": .string(matchedLot)]))
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .lineLimit(1).fixedSize()
             }
             // THE ID WHOLE OR NOT AT ALL. Squeezed by the "Own print" tag it
             // was clipped to its first letter — a "C" that is nobody's job
