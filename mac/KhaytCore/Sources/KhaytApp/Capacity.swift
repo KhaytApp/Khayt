@@ -97,7 +97,7 @@ struct CapacityCard: View {
         private func said(_ words: Words) -> String {
             guard let days = row.daysToClear else {
                 // No target, so no date. The hours are still true.
-                return Money.quantity(row.bookedHours, decimals: 1) + " h"
+                return Money.quantity(row.bookedHours, decimals: 1) + " " + words.callIt("mac.unit_h")
             }
             if row.overbooked {
                 let over = days - (row.availableHours / max(row.hoursPerDay, 1))
