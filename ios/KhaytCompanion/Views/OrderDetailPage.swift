@@ -304,7 +304,7 @@ struct OrderDetailContent: View {
                 Button { onAssignMachine(nil) } label: {
                     Label(L10n.tr("common.unassigned"), systemImage: order.machineId == nil ? "checkmark" : "circle")
                 }
-                ForEach(machines) { m in
+                ForEach(machines.filter { $0.isAssignable || $0.id == order.machineId }) { m in
                     Button { onAssignMachine(m.id) } label: {
                         Label(m.name ?? m.id, systemImage: order.machineId == m.id ? "checkmark" : "printer")
                     }

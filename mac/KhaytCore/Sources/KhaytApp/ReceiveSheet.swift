@@ -27,6 +27,9 @@ struct ReceiveSheet: View {
     @State private var verdict = "none"
     @State private var problem: String?
     @State private var started = false
+    /// True for the whole write. Without it a double click, or Return pressed
+    /// twice, received the same delivery twice — two receipts, two expenses.
+    @State private var busy = false
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -154,7 +157,7 @@ struct ReceiveSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("po.receive"), action: commit)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(amount <= 0)
+                    .disabled(amount <= 0 || busy)
             }
         }
         // Asked of the rule on every change, rather than compared here: a
@@ -174,6 +177,8 @@ struct ReceiveSheet: View {
     }
 
     private func commit() {
+        guard !busy else { return }
+        busy = true
         let id = order.id
         let quantity = amount
         let note = notes
@@ -183,6 +188,7 @@ struct ReceiveSheet: View {
             let said = await shop.receiveGoods(id, quantity: quantity, notes: note,
                                                invoice: paper, lot: typedLot)
             if said == nil { shop.receivingGoods = nil } else { problem = said }
+            busy = false
         }
     }
 }

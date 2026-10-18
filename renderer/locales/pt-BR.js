@@ -2404,6 +2404,7 @@
   "po.received_toast": "Pedido de compra marcado como recebido",
   "po.created_toast": "Pedido de compra criado",
   "po.partial": "Recebido parcialmente",
+  "po.item_gone": "O item deste pedido não está mais no estoque, então nada foi recebido. Adicione-o novamente ou feche o pedido manualmente.",
   "po.received_so_far": "Recebido até agora",
   "po.receive_more": "Receber mais",
   "po.close_po": "Encerrar pedido",

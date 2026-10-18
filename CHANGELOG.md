@@ -4,6 +4,104 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Stock: deliveries, waste and spool prices add up.** A part delivery of a
+  new lot is priced at what arrived (250 g of an 80-for-1000 g roll was costed
+  at 80, not 20) and grows with later parts. Waste logged against a roll with
+  less on it than was wasted gives back only what it took when deleted, skips
+  empty rolls, and a deleted failure leaves the lot's recall list. On the Mac,
+  waste logged against a job comes off that job's own spools, as it does on
+  the desktop. Receiving against a deleted spool or consumable is refused in
+  words instead of booking an expense for goods that landed nowhere, and the
+  Mac's Receive button cannot receive twice. Raising a spool's price and its
+  tax together keeps the tax; a spool's history total no longer counts
+  receipts as use; per-gram order prices keep six decimals; and the Mac's
+  "mark dried" writes a drying-log row.
+- **Money: seven fixes to what a shop is owed and what it exports.**
+  Quotes, cancelled jobs, voided invoices and fully credited orders no longer
+  count as owed: not in receivables, the dashboard strip, or the Mac's title
+  bar, widget and customers table. A deposit taken with a new order on a shop
+  that adds tax on top is now judged against price + tax, so a deposit of the
+  bare price leaves the tax owed instead of reading paid. On those shops a
+  credit note also comes off with its tax: 100 at 10% with 50 credited now
+  owes 55, not 60. An instalment plan no longer lists rows already covered by
+  cash paid outside it; that cash settles the oldest rows first. Splitting a
+  job across machines can no longer give one machine a negative share. The
+  accountant's export now leaves out split parents, voided, cancelled and
+  not-business orders, and takes credit notes off the price. On the Mac, a
+  customer billed in another currency now exports in that currency, with the
+  shop's base columns filled in.
+- **(Maintainers) A printer's status is one shared rule.** `lib/machine-status.js`:
+  - **Under service** is the `isOffline` flag the desktop already writes, with
+    an optional reason and date.
+  - **Retired** is `status: 'retired'` with `retiredAt`.
+  - **Delete** is allowed only when no record in the book names the printer.
+  - **Retiring** takes the printer off its unfinished jobs.
+
+  Depreciation stops on the retire day. Dispatch proposes nothing for a
+  printer under service or retired. The schedule never places work on a
+  retired one. Maintenance tasks for a retired or deleted printer stop
+  coming due when the machine list is passed in.
+- **Mac: the iPhone can check it is talking to your Mac.** The Mac now has
+  its own identity key. A paired iPhone keeps it, and before it sends the
+  PIN to a new address it asks the Mac there to sign a random challenge. A
+  device on the Wi-Fi that copied the Mac's name cannot pass. The PIN is
+  never part of the check.
+
+- **Mac: small fixes from a full review.**
+  - **Words:** the VAT line on an order's money block, the Copy button on a
+    message and the printer sheet's Undo now show words, not their keys.
+  - **Arrows:** the arrows between an estimate and what a print really took,
+    and between a late job's due day and finish day, point the right way in
+    Arabic. The days are written in the shop's own words.
+  - **Dark mode:** a chosen filter in a custom report is readable.
+  - **Crashes:** a customer's lead time or a survey without a rating can no
+    longer crash the app.
+  - **Lock:** accepting an older cloud copy needs the cloud permission, like
+    every other cloud action.
+- **Mac: a customer's 3MF is sliced as shapes only.** With "slice uploads"
+  on, a 3MF a customer uploaded over the shop's Wi-Fi reached the slicer
+  with its own settings, and those settings can name a command the slicer
+  runs when it saves G-code. The upload is now reduced to its model parts
+  first, and the shop's own presets are used, as for any bare model.
+- **Mac: fixes from a full review.**
+  - **Sync:** a spool, gift card, loyalty redemption or message template
+    made on the Mac reaches the other devices now. Before, it waited at
+    Khayt Cloud until someone edited it. Records already waiting there come
+    down to devices that don't have them, and never overwrite anything.
+  - **Product sheet:** turning "Show on web store" back on lists the
+    product again, and a cleared margin or translation stays cleared.
+  - **Library:** Delete for several models at once deletes them. It did
+    nothing before.
+  - **Loyalty:** points are not turned into store credit twice when another
+    device redeemed them first.
+  - **Shelf sales:** two quick sales from the shelf take two off the
+    count, not one.
+  - **Customer records:** restoring a backup no longer turns the upload
+    back on. The switch stays as it was.
+- **Mac: turning customer records off turns them off for the whole shop.**
+  The switch lives in each Mac's own settings, so turning it off stopped
+  only the Mac where it was pressed: a second Mac with its switch on put the
+  copy straight back. Off now holds for the shop on Khayt Cloud. Every other
+  Mac stops uploading, switches itself off and says why. Turning it on again
+  is always a person's press, never the background upload.
+- **iPhone: the phone asks before following its Mac to a new address.** When
+  the Mac stops answering and its name turns up somewhere else on the
+  network, the phone used to move there by itself and send its PIN along.
+  Any device can take that name while the Mac sleeps, so the phone now says
+  "Your Mac answered at a new address" and moves only when you tap Move.
+  Requests to the Mac also no longer follow a redirect, which would have
+  carried the PIN to another host.
+
+- **iPhone: retired machines are gone, and offline ones take no new work.**
+  A machine retired on the Mac no longer shows on Machines as Ready or in the
+  machine pickers; past orders still name it. A machine marked offline shows
+  as Offline and is left out of the pickers.
+
+- **Mac: the board says why a lot search found a card.** A job on the board
+  found only by the filament lot it drew from shows that lot, as its row in
+  the orders list already did. The sample shop now holds a delivery that
+  arrived in a different lot from the spool it was ordered for, received as
+  its own spool, so the screens that show one are drawn with one.
 - **Mac: printer setup fixes from the October review.** The machine sheet's
   Test button now asks a Bambu over MQTT and an Elegoo over SDCP, with the
   serial, slug and access code, as the live card does; it used to ask them

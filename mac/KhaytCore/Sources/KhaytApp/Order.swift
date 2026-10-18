@@ -40,6 +40,11 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// counts and reports, still in nozzle wear and capacity. See
     /// `lib/business-scope.js`. Absent is the ordinary case, a real job.
     let nonBusiness: Bool?
+    /// `voidedAt` / `creditedAt` are set: the invoice was voided, or credited
+    /// in full. Read as `!!x` the way the shared rules read them. Neither is
+    /// money owed — see `owesAtAll`.
+    let voided: Bool
+    let credited: Bool
     let paidAmount: Double
     let costBasis: Double
     /// What the product's components (a box, magnets) cost when the job was
@@ -158,6 +163,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         case carrier, trackingNumber, shippingService, shippingStatus
         case fromStock
         case nonBusiness
+        case voidedAt, creditedAt
         case instalments, instalmentBase
         case invoiceNumber, invoiceNum
         case materialDrawn
@@ -247,6 +253,8 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         // Lenient: only `true` means anything, and a stray value in an old
         // book must not take the whole job list down with it.
         nonBusiness = (try? c.decodeIfPresent(Bool.self, forKey: .nonBusiness)) ?? nil
+        voided = Self.truthy(c, .voidedAt)
+        credited = Self.truthy(c, .creditedAt)
         price = try c.decodeIfPresent(Double.self, forKey: .price) ?? 0
         paidAmount = try c.decodeIfPresent(Double.self, forKey: .paidAmount) ?? 0
         costBasis = try c.decodeIfPresent(Double.self, forKey: .costBasis) ?? 0
@@ -388,7 +396,20 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// The shared answer when there is one, and a subtraction when there is
     /// not. A dead engine must not blank the money column — but it is the LAST
     /// resort, and it is wrong in the two ways above.
-    var owed: Double { owedResolved ?? max(0, price - paidAmount) }
+    var owed: Double {
+        guard owesAtAll else { return 0 }
+        return owedResolved ?? max(0, price - paidAmount)
+    }
+
+    /// Can this job owe the shop anything at all? `KhaytOrderMoney.owesAtAll`:
+    /// a quote has not been agreed, a cancelled job was called off, a voided
+    /// invoice is not an invoice and one credited in full was handed back. The
+    /// shared rule already answers 0 for them; this keeps the dead-engine
+    /// fallback — and the title bar and widget built on `owed` — from
+    /// counting them anyway.
+    var owesAtAll: Bool {
+        status != "quote" && status != "cancelled" && !voided && !credited
+    }
 
     var isSettled: Bool { owed < 0.005 }
 
@@ -403,7 +424,10 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// total across jobs and wrong beside a job's own price: a 100 USD job on
     /// a riyal shop read "Owed 375.00 USD" in the inspector. The subtraction
     /// is the dead-engine fallback, as it is for `owed`.
-    var owedInOwnCurrency: Double { figures?.owed ?? max(0, price - paidAmount) }
+    var owedInOwnCurrency: Double {
+        guard owesAtAll else { return 0 }
+        return figures?.owed ?? max(0, price - paidAmount)
+    }
 
     /// Whether the attention engine calls this job late, resolved once per
     /// load by `Shop` — the same answer the dashboard's Late tile shows.

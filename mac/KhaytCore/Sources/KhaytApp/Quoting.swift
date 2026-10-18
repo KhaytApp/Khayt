@@ -169,7 +169,10 @@ struct Quoting: View {
                         }
                         .font(.callout.monospacedDigit())
                     } else {
-                        Text("\(figure(est)) \(shown) → \(figure(act)) \(shown)")
+                        // A glyph, not "→": the symbol turns with the
+                        // layout in Arabic, the arrow character does not.
+                        (Text("\(figure(est)) \(shown) ") + Text(Image(systemName: "arrow.forward"))
+                            + Text(" \(figure(act)) \(shown)"))
                             .font(.callout.monospacedDigit())
                     }
                 } else {

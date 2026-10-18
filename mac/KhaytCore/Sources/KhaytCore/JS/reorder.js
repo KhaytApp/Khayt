@@ -271,7 +271,7 @@ function perGramPriceFor(item, suppliers) {
   const quoted = supplierPriceFor(suppliers, row.material);
   if (quoted && quoted.pricePerKg > 0) {
     return {
-      perG: Math.round((quoted.pricePerKg / 1000) * 1000) / 1000,
+      perG: Math.round((quoted.pricePerKg / 1000) * 1e6) / 1e6,
       supplierId: quoted.supplierId,
       supplierName: quoted.supplierName,
     };
@@ -281,7 +281,7 @@ function perGramPriceFor(item, suppliers) {
     ? perSpool / Math.max(1, +row.spoolWeight || 1000)
     : (row.costPerKg ? +row.costPerKg / 1000 : 0);
   return {
-    perG: perG > 0 ? Math.round(perG * 1000) / 1000 : 0,
+    perG: perG > 0 ? Math.round(perG * 1e6) / 1e6 : 0,
     supplierId: row.supplierId || null,
     supplierName: '',
   };

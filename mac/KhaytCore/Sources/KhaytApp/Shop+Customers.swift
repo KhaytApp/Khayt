@@ -157,7 +157,9 @@ extension Shop {
         guard let row = orderRows.first(where: { Self.recordId($0) == id }),
               case .object(let o) = row, case .object(let survey)? = o["survey"]
         else { return (0, "") }
-        let rating = Int(JSSemantics.number(survey["rating"]))
+        // A survey with no rating is NaN here, and Int(NaN) traps.
+        let raw = JSSemantics.number(survey["rating"])
+        let rating = raw.isFinite ? Int(min(max(raw, 0), 10)) : 0
         var comment = ""
         if case .string(let c)? = survey["comment"] { comment = c }
         return (rating, comment)
@@ -624,8 +626,19 @@ extension Shop {
             return words.callIt("loyalty.none_to_redeem")
         }
 
+        // THE STANDING WAS WORKED OUT FROM THE BOOK AS LOADED. Another device
+        // or the other app may have redeemed these same points since; issued
+        // again, they are store credit twice. So the write refuses when the
+        // customer's ledger on disk holds a row this standing never saw.
+        let seen = Self.ledgerIds(loyaltyRows, clientId: clientId)
+        let changed = words.callIt("mac.loyalty_changed")
         do {
             try await StoreWriter.updateOffMain(build) { root in
+                var onDisk: [JSONValue] = []
+                if case .array(let rows)? = root["loyaltyLedger"] { onDisk = rows }
+                guard Self.ledgerIds(onDisk, clientId: clientId).isSubset(of: seen) else {
+                    throw MoveRefused(sentence: changed)
+                }
                 var cards: [JSONValue] = []
                 if case .array(let existing)? = root["giftCards"] { cards = existing }
                 cards.append(card)
@@ -636,11 +649,23 @@ extension Shop {
                 ledger.append(entry)
                 root["loyaltyLedger"] = .array(ledger)
             }
+        } catch let refusal as MoveRefused {
+            await load(source)
+            return refusal.sentence
         } catch {
             return String(describing: error)
         }
         await load(source)
         return nil
+    }
+
+    /// The ids of one customer's loyalty ledger rows.
+    nonisolated static func ledgerIds(_ rows: [JSONValue], clientId: String) -> Set<String> {
+        var out: Set<String> = []
+        for case .object(let o) in rows where o["clientId"] == .string(clientId) {
+            if case .string(let id)? = o["id"] { out.insert(id) }
+        }
+        return out
     }
 
     var shownCustomers: [Customer] {
@@ -732,8 +757,13 @@ extension Shop {
 
     /// The confirmation's Delete: checked again, because a question can sit
     /// open while the library underneath it changes.
-    func confirmLibraryDeletes() async {
-        let chosen = pendingLibraryDeletes
+    ///
+    /// `chosen` is the list as the button saw it, taken SYNCHRONOUSLY in its
+    /// action: the dialog empties `pendingLibraryDeletes` as it closes, before
+    /// any `Task` the button starts gets to run, so a Delete that read it here
+    /// deleted nothing at all (Oct 2026 review).
+    func confirmLibraryDeletes(_ chosen: [LibraryFile]? = nil) async {
+        let chosen = chosen ?? pendingLibraryDeletes
         let hidden = notOnScreen(chosen)
         guard hidden.isEmpty else {
             pendingLibraryDeletes = []

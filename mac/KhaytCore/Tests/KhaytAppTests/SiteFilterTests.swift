@@ -39,8 +39,9 @@ import KhaytCore
         // Machines: the U1 and the X1C, and the laser, which has no site.
         #expect(Set(shop.siteMachines.map(\.id)) == ["MACH-u1", "MACH-x1c", "MACH-LASER"])
         #expect(shop.siteMachines.count < allMachines)
-        // Spools: Riyadh's four and the six with no site, not Jeddah's three.
-        #expect(shop.siteSpools.count == 10 && allSpools == 13)
+        // Spools: Riyadh's five (sp-14 is the delivery that came in another
+        // lot) and the six with no site, not Jeddah's three.
+        #expect(shop.siteSpools.count == 11 && allSpools == 14)
         #expect(!shop.siteSpools.contains { $0.id == "sp-4" }, "a Jeddah spool shown in Riyadh")
         #expect(shop.siteSpools.contains { $0.id == "INV-RESIN01" }, "stock with no site went missing")
 

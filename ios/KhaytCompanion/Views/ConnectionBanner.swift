@@ -43,6 +43,8 @@ struct ConnectionBanner: View {
             .padding(.horizontal, KhaytDesign.pad)
             .padding(.vertical, 7)
             .background(KhaytDesign.attention.opacity(0.12))
+        } else if let moved = health.macMoved {
+            moveStrip(moved)
         } else if health.state == .pinTooShort {
             strip(tint: KhaytDesign.attention, loud: true,
                   title: L10n.tr("connection.pin_too_short"), line: L10n.tr("pair.pin.too_short"),
@@ -72,6 +74,42 @@ struct ConnectionBanner: View {
     }
 
     private var pending: String { L10n.format("sync.pending", api.pendingCount) }
+
+    /// The paired Mac's name answers at a new address. Moving sends the PIN
+    /// there, so it waits for the person — see `ConnectionHealth.followTheMac`.
+    private func moveStrip(_ moved: MacAddress) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Circle().fill(KhaytDesign.attention).frame(width: 7, height: 7)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(L10n.tr("connection.moved"))
+                        .font(.khayt(12, .semibold, relativeTo: .caption))
+                        .foregroundStyle(KhaytDesign.attention)
+                    Text(L10n.format("connection.moved.line", "\(moved.host):\(moved.port)"))
+                        .font(.khayt(11, relativeTo: .caption2))
+                        .foregroundStyle(KhaytDesign.textDim)
+                }
+            }
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                Button(L10n.tr("connection.moved.not_now")) { health.declineMove() }
+                    .font(.khayt(12, .semibold, relativeTo: .caption))
+                    .foregroundStyle(KhaytDesign.textDim)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 5)
+                Button(L10n.tr("connection.moved.use")) { Task { await health.acceptMove() } }
+                    .font(.khayt(12, .semibold, relativeTo: .caption))
+                    .foregroundStyle(Color.white)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 5)
+                    .background(KhaytDesign.attention, in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding(.horizontal, KhaytDesign.pad)
+        .padding(.vertical, 7)
+        .background(KhaytDesign.attention.opacity(0.14))
+        .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
+    }
 
     private var asOf: String {
         let when = api.bookAsOf.map { $0.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.locale)) } ?? "—"

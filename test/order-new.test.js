@@ -266,6 +266,14 @@ test('the lifted record and the original agree, all forty-five fields', () => {
 
     const a = JSON.parse(JSON.stringify(shop));
     const recordA = originalRecord(form, a);
+    // ONE DELIBERATE DEPARTURE: a deposit is clamped to what the order is
+    // billed and stamped `paidGross` (see `depositFields`, and
+    // test/money-review.test.js for the tax-on-top case it was for). These
+    // shops add no tax, so the bill is the price and the status is unchanged.
+    if (recordA.paidAmount > 0) {
+      recordA.paidAmount = +Math.min(recordA.paidAmount, recordA.price).toFixed(2);
+      recordA.paidGross = true;
+    }
 
     const b = JSON.parse(JSON.stringify(shop));
     const recordB = N.newOrder(form, {

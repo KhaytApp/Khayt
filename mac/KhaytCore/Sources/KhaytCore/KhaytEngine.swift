@@ -458,6 +458,9 @@ public actor KhaytEngine {
         // job — those are cancelled), and what a delete tidies. The desktop's
         // `deleteLog` asks the same rule.
         "record-delete",
+        // A printer in service, under service or retired, and when one may be
+        // deleted at all (only when nothing in the book names it).
+        "machine-status",
         // Which language a shop writes its customers' names in, and which of
         // them to show. Not the interface language: a shop that writes only
         // Arabic must not be shown the stale English name left over from setup.
@@ -1515,7 +1518,7 @@ public actor KhaytEngine {
                 price: +o.price || 0, paidAmount: +o.paidAmount || 0,
                 instalments: rows, instalmentBase: base,
                 giftCardDiscount: +o.giftCardDiscount || 0,
-                credited: M.orderCreditedRaw(o),
+                credited: M.orderCreditedDueRaw(o, {settings: settings}),
                 // What is DUE, not what was billed: an order settled before tax
                 // on top was owed is settled at its price (`orderDueRaw`).
                 due: M.orderDueRaw(o, {settings: settings}),
@@ -1558,7 +1561,7 @@ public actor KhaytEngine {
     /// books no expense rather than one for nothing.
     public struct GoodsReceived: Decodable, Sendable {
         public let ok: Bool
-        /// 'no_order' or 'no_quantity' when it refuses.
+        /// 'no_order', 'no_quantity' or 'no_item' (the spool or consumable is gone) when it refuses.
         public let reason: String?
         /// True when what has arrived now covers what was ordered.
         public let complete: Bool?
@@ -2115,10 +2118,15 @@ public actor KhaytEngine {
     /// `orders` is the book's own rows, unmapped — the rule decides which of
     /// them are invoices at all. Passing pre-filtered rows would be this app
     /// deciding that, and deciding it differently from the other one.
+    ///
+    /// `currencies` is the app's currency table (`Invoice.currencyTable`), the
+    /// `known` catalogue `KhaytOrderMoney.orderCurrency` checks a code against
+    /// — the other app passes its `CURRENCIES`. Nil accepts any code.
     public func invoiceCsv(_ orders: [JSONValue], settings: [String: JSONValue],
                            clients: [JSONValue], format: String,
                            language: String = "en",
-                           from: String = "", to: String = "") throws -> String {
+                           from: String = "", to: String = "",
+                           currencies: [String: JSONValue]? = nil) throws -> String {
         // The PROFILE is still `lib/tax.js` — eight bundled modules read it, so
         // it has not moved — but which orders are invoices, and whose name goes
         // on each row, is `KhaytCore.AccountingRows` now.
@@ -2158,9 +2166,50 @@ public actor KhaytEngine {
             }
         }
 
+        // ── WHICH CURRENCY, AND WHAT IT IS IN THE SHOP'S ───────────────────
+        //
+        // The other app hands the rule `orderCurrency` and `convertToBase`;
+        // this one handed it neither, so a customer billed in USD exported as
+        // the shop's own currency at its face value, with the base columns
+        // empty. Both answers come from `KhaytOrderMoney`, in ONE crossing:
+        // each order's currency, and what one unit of each currency is worth
+        // in the base (`convertToBase` is a multiplication — or the amount
+        // itself, for the base and for a currency with no usable rate).
+        struct Money: Decodable { let currencyById: [String: String]; let rates: [String: Double] }
+        let money = try? runtime.call2(#"""
+            (function (rows, ctx, known) {
+              var M = globalThis.KhaytOrderMoney;
+              var byId = {}, rates = {};
+              for (var i = 0; i < rows.length; i++) {
+                var o = rows[i];
+                if (!o || typeof o !== 'object' || o.id == null) continue;
+                var cur = M.orderCurrency(o, ctx, known || undefined);
+                byId[String(o.id)] = cur;
+                if (!(cur in rates)) rates[cur] = M.convertToBase(1, cur, ctx);
+              }
+              return { currencyById: byId, rates: rates };
+            })(ARG0, {settings: ARG1, clients: ARG2}, ARG3)
+            """#, [.array(orders), .object(settings), .array(clients),
+                   currencies.flatMap { $0.isEmpty ? nil : .object($0) } ?? .null],
+            as: Money.self)
+
         let rows = AccountingRows.invoiceRows(
             orders: orders, settings: settings, clients: clients,
             tax: AccountingRows.tax(profile: profile),
+            currencyOf: money.map { m in
+                { order in
+                    guard case .object(let o) = order, let id = o["id"],
+                          let cur = m.currencyById[JSSemantics.text(id)] else {
+                        // The rule's own default: the order's code, else the shop's.
+                        if case .object(let o) = order, JSSemantics.truthy(o["currency"]) {
+                            return JSSemantics.text(o["currency"])
+                        }
+                        return JSSemantics.truthy(settings["currency"]) ? JSSemantics.text(settings["currency"]) : "SAR"
+                    }
+                    return cur
+                }
+            },
+            toBase: money.map { m in { amount, currency in amount * (m.rates[currency] ?? 1) } },
             localName: nameById.isEmpty ? nil : { client in
                 guard case .object(let c) = client, let id = c["id"] else { return "" }
                 return nameById[JSSemantics.text(id)] ?? ""
@@ -7915,16 +7964,44 @@ public actor KhaytEngine {
     /// progress, energy }` — `settings` for the shop's tariff) the row also carries the failed print's machine time and
     /// electricity beside its filament (`lib/failed-print-cost.js`). `cost`
     /// is never changed by that: it stays the material figure the P&L reads.
+    ///
+    /// A failure on a JOB that deducts goes through `forOrder`, as the other
+    /// app's does: the grams come off the spools that job was printing from,
+    /// the entry records exactly what came off each (`drawn`) and the spool
+    /// history lines carry the lot, so a recall finds it and deleting it puts
+    /// back what was taken. `newEntry` took the first spool of the material,
+    /// whatever the job was on. What the sheet asks that `forOrder` does not
+    /// write (reason, printer, the typed cost) is kept on the entry.
+    /// `settings` and `machines` are what `forOrder` reads to pick the spools.
     public func newWasteEntry(_ input: [String: JSONValue], id: String, today: String,
                               inventory: [JSONValue], order: JSONValue? = nil,
-                              costing: JSONValue? = nil) throws -> WasteWritten {
+                              costing: JSONValue? = nil,
+                              settings: [String: JSONValue] = [:],
+                              machines: [JSONValue] = [],
+                              reclaimsTax: Bool = false) throws -> WasteWritten {
         try runtime.call2(
-            "(function(){var inv = ARG3; var out = KhaytWasteEntry.newEntry(ARG0, {id: ARG1, today: ARG2, inventory: inv});"
-          + " if (out.entry && ARG4 && ARG5) KhaytFailedPrintCost.attach(out.entry, ARG4, ARG5,"
+            "(function(){var inv = ARG3, i = ARG0, o = ARG4, out;"
+          + " if (o && i.deduct) {"
+          + "   out = KhaytWasteEntry.forOrder(o, i, {id: ARG1, today: ARG2, inventory: inv,"
+          + "     settings: ARG6, machines: ARG7, reclaimsTax: ARG8});"
+          // A job with no spool assigned to any part has nothing for
+          // `forOrder` to draw from; the first spool of the material is
+          // still a better answer than taking nothing off the shelf.
+          + "   if (out.entry && !(out.deducted > 0) && +i.weight > 0) out = KhaytWasteEntry.newEntry(i, {id: ARG1, today: ARG2, inventory: inv});"
+          + "   else if (out.entry) {"
+          + "     out.entry.reason = String(i.reason == null ? '' : i.reason).trim();"
+          + "     var mid = String(i.machineId == null ? '' : i.machineId).trim();"
+          + "     out.entry.machineId = mid || o.machineId || null;"
+          + "     var typed = parseFloat(i.cost);"
+          + "     if (isFinite(typed) && typed > 0) out.entry.cost = typed;"
+          + "   }"
+          + " } else out = KhaytWasteEntry.newEntry(i, {id: ARG1, today: ARG2, inventory: inv});"
+          + " if (out.entry && o && ARG5) KhaytFailedPrintCost.attach(out.entry, o, ARG5,"
           + "   { machine: ARG5.machine || null, preset: ARG5.preset || null, settings: ARG5.settings || null });"
           + " return {entry: out.entry, refused: out.refused, inventory: inv};})()",
             [.object(input), .string(id), .string(today), .array(inventory),
-             order ?? .null, costing ?? .null], as: WasteWritten.self)
+             order ?? .null, costing ?? .null, .object(settings), .array(machines),
+             .bool(reclaimsTax)], as: WasteWritten.self)
     }
 
     /// What wasted grams of a material cost, from the spool they came off.

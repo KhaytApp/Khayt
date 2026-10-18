@@ -178,7 +178,7 @@ struct NewOrderSheet: View {
                 Button { draft.machineId = nil } label: {
                     Label(L10n.tr("order.new.unassigned"), systemImage: draft.machineId == nil ? "checkmark" : "circle")
                 }
-                ForEach(machines) { m in
+                ForEach(machines.filter(\.isAssignable)) { m in
                     Button { draft.machineId = m.id } label: {
                         Label(m.name ?? m.id, systemImage: draft.machineId == m.id ? "checkmark" : "printer")
                     }

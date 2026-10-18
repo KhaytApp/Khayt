@@ -282,7 +282,7 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
     /// the question a shelf count raises every time it disagrees.
     let usageHistory: [Use]?
 
-    struct Use: Decodable, Hashable, Sendable, Identifiable {
+    struct Use: Decodable, Hashable, Sendable {
         /// `YYYY-MM-DD`.
         let date: String
         /// The job it went to, as it was named at the time. A job since
@@ -299,9 +299,14 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
         /// `received` for an arrival against a purchase order; absent for a job.
         let type: String?
 
-        /// Made from the row rather than stored: the book writes no id here,
-        /// and two deductions on one day for one job are two entries.
-        var id: String { date + "|" + orderId + "|" + String(weightUsed) }
+        /// No `id`: the book writes none, and one made from the row
+        /// (date|job|grams) REPEATS — two equal draws on one day for one job
+        /// are two entries — which SwiftUI then drew as one. A list of these
+        /// is keyed by its position instead (`SpoolHistorySheet`).
+
+        /// An arrival against a purchase order: a NEGATIVE `weightUsed`,
+        /// because the history is what LEFT the spool. Not a use.
+        var isReceipt: Bool { type == "received" }
 
         private enum CodingKeys: String, CodingKey { case date, project, orderId, weightUsed, lot, type }
 
@@ -318,7 +323,13 @@ struct Spool: Identifiable, Decodable, Hashable, Sendable {
     }
 
     /// What this spool has been spent on altogether, in its own unit.
-    var totalUsed: Double { (usageHistory ?? []).reduce(0) { $0 + $1.weightUsed } }
+    ///
+    /// Receipts are not spending. They are negative rows, and adding them in
+    /// netted the delivery against the use: 1000 g received and 300 g used
+    /// read as "−700 g used".
+    var totalUsed: Double {
+        (usageHistory ?? []).reduce(0) { $1.isReceipt ? $0 : $0 + $1.weightUsed }
+    }
 
     /// How a shop picks this spool out of a list: what it is, and where — the
     /// two things that tell one 1kg PLA apart from another on the same shelf.
