@@ -1425,7 +1425,7 @@ extension Shop {
             // time, whoever is reading.
             let invoices = try await engine.invoiceCsv(
                 orderRows, settings: settingsDict, clients: clientRows, format: format,
-                language: words.language)
+                language: words.language, currencies: Invoice.currencyTable(self))
             let expenses = try await engine.expenseCsv(expenseRows, format: format, settings: settingsDict)
             let a = dir.appending(path: "khayt-invoices-\(day).csv")
             let b = dir.appending(path: "khayt-expenses-\(day).csv")

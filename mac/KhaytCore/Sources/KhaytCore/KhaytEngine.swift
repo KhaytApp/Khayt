@@ -1515,7 +1515,7 @@ public actor KhaytEngine {
                 price: +o.price || 0, paidAmount: +o.paidAmount || 0,
                 instalments: rows, instalmentBase: base,
                 giftCardDiscount: +o.giftCardDiscount || 0,
-                credited: M.orderCreditedRaw(o),
+                credited: M.orderCreditedDueRaw(o, {settings: settings}),
                 // What is DUE, not what was billed: an order settled before tax
                 // on top was owed is settled at its price (`orderDueRaw`).
                 due: M.orderDueRaw(o, {settings: settings}),
@@ -2115,10 +2115,15 @@ public actor KhaytEngine {
     /// `orders` is the book's own rows, unmapped — the rule decides which of
     /// them are invoices at all. Passing pre-filtered rows would be this app
     /// deciding that, and deciding it differently from the other one.
+    ///
+    /// `currencies` is the app's currency table (`Invoice.currencyTable`), the
+    /// `known` catalogue `KhaytOrderMoney.orderCurrency` checks a code against
+    /// — the other app passes its `CURRENCIES`. Nil accepts any code.
     public func invoiceCsv(_ orders: [JSONValue], settings: [String: JSONValue],
                            clients: [JSONValue], format: String,
                            language: String = "en",
-                           from: String = "", to: String = "") throws -> String {
+                           from: String = "", to: String = "",
+                           currencies: [String: JSONValue]? = nil) throws -> String {
         // The PROFILE is still `lib/tax.js` — eight bundled modules read it, so
         // it has not moved — but which orders are invoices, and whose name goes
         // on each row, is `KhaytCore.AccountingRows` now.
@@ -2158,9 +2163,50 @@ public actor KhaytEngine {
             }
         }
 
+        // ── WHICH CURRENCY, AND WHAT IT IS IN THE SHOP'S ───────────────────
+        //
+        // The other app hands the rule `orderCurrency` and `convertToBase`;
+        // this one handed it neither, so a customer billed in USD exported as
+        // the shop's own currency at its face value, with the base columns
+        // empty. Both answers come from `KhaytOrderMoney`, in ONE crossing:
+        // each order's currency, and what one unit of each currency is worth
+        // in the base (`convertToBase` is a multiplication — or the amount
+        // itself, for the base and for a currency with no usable rate).
+        struct Money: Decodable { let currencyById: [String: String]; let rates: [String: Double] }
+        let money = try? runtime.call2(#"""
+            (function (rows, ctx, known) {
+              var M = globalThis.KhaytOrderMoney;
+              var byId = {}, rates = {};
+              for (var i = 0; i < rows.length; i++) {
+                var o = rows[i];
+                if (!o || typeof o !== 'object' || o.id == null) continue;
+                var cur = M.orderCurrency(o, ctx, known || undefined);
+                byId[String(o.id)] = cur;
+                if (!(cur in rates)) rates[cur] = M.convertToBase(1, cur, ctx);
+              }
+              return { currencyById: byId, rates: rates };
+            })(ARG0, {settings: ARG1, clients: ARG2}, ARG3)
+            """#, [.array(orders), .object(settings), .array(clients),
+                   currencies.flatMap { $0.isEmpty ? nil : .object($0) } ?? .null],
+            as: Money.self)
+
         let rows = AccountingRows.invoiceRows(
             orders: orders, settings: settings, clients: clients,
             tax: AccountingRows.tax(profile: profile),
+            currencyOf: money.map { m in
+                { order in
+                    guard case .object(let o) = order, let id = o["id"],
+                          let cur = m.currencyById[JSSemantics.text(id)] else {
+                        // The rule's own default: the order's code, else the shop's.
+                        if case .object(let o) = order, JSSemantics.truthy(o["currency"]) {
+                            return JSSemantics.text(o["currency"])
+                        }
+                        return JSSemantics.truthy(settings["currency"]) ? JSSemantics.text(settings["currency"]) : "SAR"
+                    }
+                    return cur
+                }
+            },
+            toBase: money.map { m in { amount, currency in amount * (m.rates[currency] ?? 1) } },
             localName: nameById.isEmpty ? nil : { client in
                 guard case .object(let c) = client, let id = c["id"] else { return "" }
                 return nameById[JSSemantics.text(id)] ?? ""

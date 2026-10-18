@@ -54,6 +54,41 @@ public enum AccountingRows {
         return Tax(rate: rate, mode: JSSemantics.text(p["mode"]))
     }
 
+    /// Is this record an invoice the accountant should see? `isInvoice` in
+    /// `lib/accounting-rows.js`, line for line.
+    ///
+    /// Not a QUOTE, not a CANCELLED job, not a VOIDED invoice, not one CREDITED
+    /// IN FULL, not a print marked NOT BUSINESS, and not a SPLIT PARENT — its
+    /// sub-orders carry its price between them, so exporting it as well
+    /// invoiced the job twice.
+    public static func isInvoice(_ o: [String: JSONValue]) -> Bool {
+        let status: String? = { if case .string(let s)? = o["status"] { return s }; return nil }()
+        if status == "quote" || status == "cancelled" { return false }
+        if JSSemantics.truthy(o["voidedAt"]) || JSSemantics.truthy(o["creditedAt"]) { return false }
+        if case .bool(true)? = o["nonBusiness"] { return false }
+        if status == "split", case .array(let into)? = o["splitInto"], !into.isEmpty { return false }
+        return true
+    }
+
+    /// The price less every credit note, never below zero, to the cent —
+    /// `netPrice` in `lib/accounting-rows.js`. A credit note is taken against
+    /// the price in the price's own terms, so the row says what the shop
+    /// actually invoiced and kept.
+    public static func netPrice(_ o: [String: JSONValue]) -> Double {
+        let raw = JSSemantics.number(o["price"])
+        let price = raw.isNaN ? 0 : raw
+        var credited = 0.0
+        if case .array(let notes)? = o["creditNotes"] {
+            for note in notes {
+                guard case .object(let cn) = note else { continue }
+                let amount = JSSemantics.number(cn["amount"])
+                credited += (amount.isNaN || amount == 0) ? 0 : amount
+            }
+        }
+        guard credited > 0 else { return raw }
+        return max(0, ((price - credited) * 100).rounded() / 100)
+    }
+
     /// The whole print log in; the rows that come back are the ones that are
     /// invoices.
     ///
@@ -76,9 +111,10 @@ public enum AccountingRows {
         var out: [JSONValue] = []
         for order in orders {
             guard JSSemantics.truthy(order), case .object(let o) = order else { continue }
-            if case .string("quote")? = o["status"] { continue }
-            let price = JSSemantics.number(o["price"])
-            guard price > 0 else { continue }   // `!(+o.price > 0)` — NaN too
+            guard isInvoice(o) else { continue }
+            // NET OF CREDIT NOTES — see `netPrice`.
+            let price = netPrice(o)
+            guard price > 0 else { continue }   // `!(price > 0)` — NaN too
 
             let currency = currencyOf?(order)
                 ?? (JSSemantics.truthy(o["currency"]) ? JSSemantics.text(o["currency"])
