@@ -248,3 +248,28 @@ struct CustomerPrivacyTests {
         #expect(Words.own["mac.erase_customer"]?["ar"]?.isEmpty == false)
     }
 }
+
+/// An erased or deleted customer leaves Khayt Cloud's customer-records copy
+/// at once, not on the next ten-minute look.
+@MainActor
+struct CustomerChangesReachTheCloudTests {
+    @Test("erase, delete and both Undos republish customer records straight away")
+    func wired() throws {
+        let privacy = try QuoteSheetStatusTests.source("Shop+Privacy.swift")
+        let delete = try QuoteSheetStatusTests.source("Shop+Delete.swift")
+        #expect(privacy.components(separatedBy: "customersChangedOnCloud()").count - 1 >= 3,
+                "erase and its Undo, plus the definition")
+        #expect(delete.components(separatedBy: "customersChangedOnCloud()").count - 1 >= 2,
+                "delete and its Undo")
+        #expect(privacy.contains("await publishCustomerRecords()"))
+    }
+
+    @Test("with no cloud, the republish is a no-op, not an error")
+    func quietWithoutCloud() async {
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.stopPublishingCustomerRecords()
+        await shop.customersChangedOnCloud()
+        #expect(shop.customerRecordsProblem == false)
+    }
+}

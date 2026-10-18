@@ -421,6 +421,7 @@ extension Shop {
                                          ["n": .number(Double(outcome.skipped.count))]))
             }
             moveNotices = said
+            if !gone.isEmpty { await customersChangedOnCloud() }
         } catch {
             moveProblem = self.said(error)
         }
@@ -437,6 +438,7 @@ extension Shop {
                 if let next = back["clients"] { root["clients"] = next }
             }
             await shop.load(shop.source)
+            await shop.customersChangedOnCloud()
         } catch {
             shop.moveProblem = self.said(error)
         } }
