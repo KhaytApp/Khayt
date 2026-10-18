@@ -115,7 +115,13 @@ function renderMachines() {
     list.innerHTML = `<div style="color:var(--text-muted);font-size:13px;padding:8px 0;">${escapeHtml(t('mach.empty'))}</div>`;
     return;
   }
-  list.innerHTML = machines.map(m => {
+  // Retired printers last: still listed, for their history and to be
+  // returned to service, but behind the ones in use.
+  const MS = typeof KhaytMachineStatus !== 'undefined' ? KhaytMachineStatus : null;
+  const isRetired = (m) => !!(MS && MS.isRetired(m));
+  const ordered = machines.filter(m => !isRetired(m)).concat(machines.filter(isRetired));
+  list.innerHTML = ordered.map(m => {
+    const retired = isRetired(m);
     const active = printLog.filter(o => o.machineId === m.id && !KhaytOrderStatus.isFinished(o) && o.status !== 'quote').length;
     const svc = machineServiceStatus(m);
     const svcBadge = svc.due
@@ -188,6 +194,7 @@ function renderMachines() {
         <span class="machine-dot" style="background:${safeCssColor(m.color)};"></span>
         <span class="machine-name">${escapeHtml(m.name)}</span>
         ${compatHtml}
+        ${retired ? `<span class="machine-jobs-badge" style="background:var(--text-muted); color:#fff;">${escapeHtml(t('mach.retired_badge', { date: m.retiredAt || '' }))}</span>` : ''}
         ${m.isOffline ? `<span class="machine-jobs-badge" style="background:var(--danger); color:#fff;">${_mIcoL('alert', '⚠', 12)}${escapeHtml(t('mach.offline_badge'))}</span>` : ''}
         <span data-machine-live="${escapeHtml(m.id)}">${machineLiveBadge(m)}</span>
         ${active > 0 ? `<span class="machine-jobs-badge">${active} ${escapeHtml(t('mach.active_jobs'))}</span>` : ''}
@@ -199,7 +206,9 @@ function renderMachines() {
         <button class="btn small ghost pro-only" data-act="log-nozzle-change" data-id="${m.id}" title="${escapeHtml(t('mach.log_nozzle'))}" style="font-size:11px;" aria-label="${escapeHtml(t('mach.log_nozzle'))}"><span aria-hidden="true">🔩</span></button>
         ${m.printerApi?.type === 'moonraker' ? `<button class="btn small ghost pro-only" data-act="import-history" data-id="${m.id}" title="${escapeHtml(t('mach.import_history_hint') || 'Read every job this printer has run. Read-only — safe while it is printing.')}" style="font-size:11px;" aria-label="${escapeHtml(t('mach.import_history') || 'Import print history')}"><span aria-hidden="true">📥</span></button>` : ''}
         <button class="btn small" data-act="edit-mach" data-id="${m.id}">${escapeHtml(t('common.edit'))}</button>
-        <button class="btn danger small" data-act="del-mach" data-id="${m.id}">${escapeHtml(t('common.delete'))}</button>
+        ${retired
+          ? `<button class="btn small" data-act="unretire-mach" data-id="${m.id}">${escapeHtml(t('mach.unretire'))}</button>`
+          : `<button class="btn danger small" data-act="del-mach" data-id="${m.id}">${escapeHtml(t('common.delete'))}</button>`}
         ${nozzleHtml}
         ${specsHtml}
         ${(typeof KhaytWebcam !== 'undefined' && KhaytWebcam.hasCamera(m)) ? `
@@ -279,7 +288,7 @@ async function refreshMachineCameras() {
 
 function renderMachineDropdown() {
   const optionsHtml = `<option value="">${escapeHtml(t('mach.unassigned'))}</option>` +
-    machines.map(m => `<option value="${m.id}">${escapeHtml(m.name)}${m.isOffline ? ' (' + escapeHtml(t('mach.offline_badge')) + ')' : ''}</option>`).join('');
+    activeMachines().map(m => `<option value="${m.id}">${escapeHtml(m.name)}${m.isOffline ? ' (' + escapeHtml(t('mach.offline_badge')) + ')' : ''}</option>`).join('');
   const sel = $('#machineAssign');
   if (sel) {
     const prev = sel.value;
@@ -1113,12 +1122,43 @@ function logNozzleChange(machineId) {
   });
 }
 
+/** Back in service: the retirement undone, its history untouched. */
+function unretireMachine(machineId) {
+  const i = machines.findIndex(m => m.id === machineId);
+  if (i < 0) return;
+  machines[i] = KhaytMachineStatus.unretire(machines[i]);
+  if (typeof clearOverheadCache === 'function') clearOverheadCache();
+  saveAll();
+  renderMachines();
+  renderMachineDropdown();
+}
+
+/**
+ * Delete a printer only when nothing in the book names it — one added by
+ * mistake. One with history is RETIRED instead (lib/machine-status.js):
+ * deleting it rewrote the past, dropping its depreciation from earlier
+ * periods, its jobs into "Unassigned" and its service costs from the P&L.
+ * Retiring keeps all of that and takes it off its unfinished jobs.
+ */
 async function deleteMachine(machineId) {
-  const inUse = printLog.some(o => o.machineId === machineId && !KhaytOrderStatus.isFinished(o));
-  const msg = inUse ? t('mach.delete_active_q') : t('mach.delete_q');
-  const ok = await confirmModal(msg, { danger: true });
-  if (!ok) return;
-  machines = machines.filter(m => m.id !== machineId);
+  const MS = KhaytMachineStatus;
+  const book = collectStoreCollections();
+  const verdict = MS.canDelete(book, machineId);
+  if (verdict.reason === 'missing') return;
+  if (!verdict.ok) {
+    const ok = await confirmModal(t('mach.retire_instead_q', { n: verdict.total }), { okText: t('mach.retire') });
+    if (!ok) return;
+    const r = MS.retire(book, machineId, { at: localDateStr() });
+    if (!r.ok) return;
+    // retire() changed `book.machines` and the jobs in `book.printLog`, which
+    // are this window's own arrays.
+    if (r.unassigned.length) toast(t('mach.retired_unassigned', { n: r.unassigned.length }), 'info', 6000);
+    else toast(t('mach.retired_done'), 'success');
+  } else {
+    const ok = await confirmModal(t('mach.delete_q'), { danger: true });
+    if (!ok) return;
+    MS.remove(book, machineId);
+  }
   if (typeof clearOverheadCache === 'function') clearOverheadCache();
   saveAll();
   renderMachines();
@@ -1704,6 +1744,7 @@ function machineWearRate(m) {
     openMachineEditor,
     logNozzleChange,
     deleteMachine,
+    unretireMachine,
     openMaintLog,
     machineHoursMeter,
     machineServiceStatus,

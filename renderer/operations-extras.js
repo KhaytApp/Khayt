@@ -608,7 +608,7 @@ function renderSlicerProfiles() {
 
 function openSlicerProfileModal(profileId) {
   const existing = profileId ? (slicerProfiles || []).find(p => p.id === profileId) : null;
-  const machOptions = machines.map(m => `<option value="${m.id}"${existing && existing.machineId === m.id ? ' selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
+  const machOptions = activeMachines(existing && existing.machineId).map(m => `<option value="${m.id}"${existing && existing.machineId === m.id ? ' selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
   const matOptions = [...new Set(inventory.map(i => i.material).filter(Boolean))].map(m =>
     `<option value="${escapeHtml(m)}"${existing && existing.material === m ? ' selected' : ''}>${escapeHtml(m)}</option>`
   ).join('');
@@ -727,7 +727,7 @@ function renderEnvLogs() {
 }
 
 function openLogEnvModal() {
-  const machOptions = machines.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  const machOptions = activeMachines().map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
   openFormModal({
     title: 'Log Environmental Conditions',
     sizeLg: false,

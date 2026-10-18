@@ -522,7 +522,7 @@ function renderDashboard() {
       const activeOrds = printLog.filter(o => !KhaytOrderStatus.isFinished(o) && o.status !== 'quote');
       const WORK_HRS_PER_DAY = Math.max(1, avgDailyWorkingHours()); // use configured working hours
       // Feature 1: Per-machine clearance forecast
-      const machRows = machines.map(m => {
+      const machRows = activeMachines().map(m => {
         const mJobs  = activeOrds.filter(o => o.machineId === m.id);
         const mHrs   = mJobs.reduce((s, o) => s + +o.printTime, 0);
         const estDays = mHrs > 0 ? Math.ceil(mHrs / WORK_HRS_PER_DAY) : 0;
@@ -580,7 +580,7 @@ function renderDashboard() {
     })()}
 
     ${(() => {
-      const maintMachines = machines.filter(m => {
+      const maintMachines = activeMachines().filter(m => {
         const s = machineServiceStatus(m);
         return s.due || s.warning;
       });

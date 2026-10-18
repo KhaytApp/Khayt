@@ -385,7 +385,7 @@ function renderBatchBar() {
     if (machSel) {
       const prev = machSel.value;
       machSel.innerHTML = `<option value="">${escapeHtml(t('batch.assign_machine_ph') || '— Assign machine —')}</option>` +
-        machines.map(m => `<option value="${m.id}"${m.id === prev ? ' selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
+        activeMachines().map(m => `<option value="${m.id}"${m.id === prev ? ' selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
     }
     // Kits the shop already has, offered rather than retyped.
     //

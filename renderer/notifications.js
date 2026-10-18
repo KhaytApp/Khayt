@@ -132,7 +132,8 @@ function buildNotifications() {
     const hoursByMachine = {};
     for (const m of machines) hoursByMachine[m.id] = machineHoursMeter(m.id);
     const machineName = (id) => (machines.find(m => m.id === id) || {}).name || '';
-    for (const task of KhaytMaintenance.dueTasks(machMaintTasks, hoursByMachine, Date.now())) {
+    // `machines` as the 4th argument: a retired (or deleted) printer's tasks are not due.
+    for (const task of KhaytMaintenance.dueTasks(machMaintTasks, hoursByMachine, Date.now(), machines)) {
       const key = 'mtask:' + task.id;
       if (isDismissed(key)) continue;
       const overdue = task.status === 'overdue';

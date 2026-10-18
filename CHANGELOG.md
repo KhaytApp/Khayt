@@ -30,6 +30,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   not-business orders, and takes credit notes off the price. On the Mac, a
   customer billed in another currency now exports in that currency, with the
   shop's base columns filled in.
+- **Desktop: a printer with history is retired, not deleted.** Deleting a
+  printer that jobs, costs or service records name rewrote the past: its
+  depreciation disappeared from earlier months, its jobs fell into
+  "Unassigned", and its service costs dropped out of the machine profit and
+  loss. Now Delete removes only a printer that nothing refers to. Any other
+  printer is offered **Retire** instead. A retired printer stays in your
+  records, leaves the pickers, the board, the dashboard and printer polling,
+  and stops counting toward maintenance reminders. Its unfinished jobs become
+  unassigned. **Return to service** brings it back. The Mac app follows the
+  same rule.
 - **(Maintainers) A printer's status is one shared rule.** `lib/machine-status.js`:
   - **Under service** is the `isOffline` flag the desktop already writes, with
     an optional reason and date.
