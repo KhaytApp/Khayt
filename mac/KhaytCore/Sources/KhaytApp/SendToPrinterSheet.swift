@@ -24,7 +24,9 @@ struct SendToPrinterSheet: View {
     @State private var started = false
 
     private var job: Order? { shop.orders.first { $0.id == subject.id } }
-    private var machine: Machine? { shop.machines.first { $0.id == machineId } }
+    /// Only one the sheet offers: a retired or under-service printer the job
+    /// still names is not a printer to send to.
+    private var machine: Machine? { shop.sendablePrinters.first { $0.id == machineId } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {

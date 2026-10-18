@@ -1760,7 +1760,7 @@ extension Shop {
         // the search have left.
         var byMachine: [String: Set<String>] = [:]
         var ready: [LibraryFacets.Ready] = []
-        for machine in machines {
+        for machine in machinesInUse {
             let loaded = loadedSlots(for: machine.id)
             guard !loaded.isEmpty else { continue }
             let ids = Set((try? await engine.readyToPrint(libraryRows, loaded: loaded)) ?? [])
@@ -2246,7 +2246,8 @@ extension Shop {
         // that had never answered at all. `heard` decides the grace now, for
         // all three. A machine Khayt has no protocol for, or one not set up,
         // is still counted as free: the shop plans those by hand.
-        return try? await engine.machineBand(machines: machineRows, orders: orderRows,
+        // Not a retired printer: it has no lane on the floor any more.
+        return try? await engine.machineBand(machines: machineRowsInUse, orders: orderRows,
                                              inventory: inventoryRows, live: liveReadings(),
                                              now: Date(), hours: hours)
     }
@@ -2257,7 +2258,13 @@ extension Shop {
     /// `error` for one that is not answering.
     private func liveReadings() -> [String: JSONValue] {
         var live: [String: JSONValue] = [:]
-        for machine in machines {
+        for machine in machinesInUse {
+            // Under service: down, said in those words — never drawn as a
+            // free lane a job could be planned onto.
+            if machine.isUnderService {
+                live[machine.id] = .object(["error": .string(words.callIt("mac.life_badge_service"))])
+                continue
+            }
             if let status = printers.heard(machine.id) {
                 guard PrinterWatch.isPrinting(status.state) else { continue }
                 var seen: [String: JSONValue] = ["progress": .number(Double(status.progress))]
@@ -2276,7 +2283,7 @@ extension Shop {
     /// about which printer is printing.
     func kiosk() async -> [KhaytEngine.KioskCard]? {
         guard let engine else { return nil }
-        return try? await engine.kiosk(machines: machineRows, orders: orderRows,
+        return try? await engine.kiosk(machines: machineRowsInUse, orders: orderRows,
                                        live: liveReadings(), mode: mode, now: Date())
     }
 
@@ -2686,7 +2693,7 @@ extension Shop {
         }
         let day = Self.localDay(date)
         let paid = max(0, cost)
-        let name = machines.first { $0.id == machineId }?.name ?? machineId
+        let name = machineName(forId: machineId)
         do {
             try await StoreWriter.updateOffMain(build) { root in
                 var log: [JSONValue] = []

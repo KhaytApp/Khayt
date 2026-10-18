@@ -55,6 +55,9 @@ extension Shop {
 
     /// The machines the chosen site shows.
     var siteMachines: [Machine] { machines.filter { inSite(machine: $0.id) } }
+    /// The same without the retired — the floor as it is today. Retired
+    /// printers keep their place in the reports, never on the floor.
+    var siteMachinesInUse: [Machine] { siteMachines.filter { !$0.isRetired } }
     /// The spools the chosen site shows.
     var siteSpools: [Spool] { spools.filter { inSite(spool: $0.id) } }
 

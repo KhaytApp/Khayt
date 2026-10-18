@@ -49,7 +49,7 @@ struct Machines: View {
                 // Above the cards, because it answers the question the shop
                 // came to this screen with. The cards answer "what is this
                 // machine", which is the second question and the rarer one.
-                if let band, !shop.machines.isEmpty {
+                if let band, !shop.machinesInUse.isEmpty {
                     MachineBandView(shop: shop, band: band)
                 }
                 // ── AND WHAT TO PUT ON THE IDLE ONES ──────────────────────
@@ -57,7 +57,7 @@ struct Machines: View {
                 // FIRST, above the band. The band says what is running; this
                 // says what should be. A shop standing here with a machine
                 // finishing is asking this question and nothing answered it.
-                if !shop.machines.isEmpty {
+                if !shop.machinesInUse.isEmpty {
                     NextUp(shop: shop)
                 }
                 // A shop that has just plugged a printer in does not know its
@@ -81,7 +81,7 @@ struct Machines: View {
                     }
                     Spacer()
                     // The same machines, drawn for a screen across the room.
-                    if !shop.machines.isEmpty {
+                    if !shop.machinesInUse.isEmpty {
                         Button {
                             openWindow(id: KioskWindow.id)
                         } label: {
@@ -95,7 +95,7 @@ struct Machines: View {
                 // behind it and when it clears. A shop asked "can you do this
                 // by Thursday" is asking exactly this, and the answer lived
                 // nowhere in this app.
-                if !shop.machines.isEmpty {
+                if !shop.machinesInUse.isEmpty {
                     CapacityCard(shop: shop, report: load)
                         .card(rail: load?.totals.overbooked == true ? Khayt.late : Khayt.brand,
                               padding: 14)
@@ -107,13 +107,18 @@ struct Machines: View {
                                     ? Khayt.attention : Khayt.brand,
                               padding: 14)
                 }
+                // Retired printers are not on the floor: they are listed below,
+                // folded away, for their history and the two things a shop
+                // still does with one — return it to service, or (when nothing
+                // in the book names it) delete it.
                 LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(shop.siteMachines) { machine in
-                        Card(machine: machine, wear: shop.wear[machine.id], shop: shop)
+                    ForEach(shop.siteMachinesInUse) { machine in
+                        MachineCard(machine: machine, wear: shop.wear[machine.id], shop: shop)
                             .atCardHeight(tallest)
                     }
                 }
                 .equalCardHeights($tallest)
+                RetiredMachines(shop: shop, columns: columns)
             }
             .padding(Metric.screen)
         }
@@ -150,7 +155,7 @@ struct Machines: View {
                     shop.forgetSchedule()
                     shop.schedulingWork = true
                 }
-                .disabled(shop.schedulableRows.isEmpty || shop.machines.isEmpty)
+                .disabled(shop.schedulableRows.isEmpty || shop.workingMachines.isEmpty)
             }
             ToolbarItem {
                 Button(shop.words.callIt("mach.add"), systemImage: "plus") { shop.addingMachine = true }
@@ -160,7 +165,7 @@ struct Machines: View {
     }
 }
 
-private struct Card: View {
+struct MachineCard: View {
     /// The stills, refetched on their own timer — see `Camera`.
     @Environment(Camera.self) private var camera
     let machine: Machine
@@ -178,7 +183,7 @@ private struct Card: View {
             // also what Khayt says when a printer is switched off, and the two
             // have completely different fixes, so this offers the one that
             // applies to a moved lease.
-            if shop.looksUnreachable(machine.id) { relocateRow }
+            if shop.looksUnreachable(machine.id), machine.inService { relocateRow }
         }
         .contextMenu {
                 if shop.canMoveJobs {
@@ -194,11 +199,17 @@ private struct Card: View {
                     // THREE protocols this app speaks — so it offered the item
                     // for a Prusa and handed back a 404 from Moonraker's path.
                     // The predicate now says what the comment always said.
-                    if PrinterWatch.keepsHistory(machine) {
+                    if PrinterWatch.keepsHistory(machine), !machine.isRetired {
                         Button(shop.words.callIt("mac.read_history")) {
                             Task { await shop.importPrinterHistory(machine) }
                         }
                         .disabled(shop.importingHistory != nil)
+                    }
+                    // Under service, retired, deleted: the owner's "how do I
+                    // delete a printer?" — see `Shop+MachineLife.swift`.
+                    Divider()
+                    MachineLifeItems(machine: machine, shop: shop) { kind in
+                        Task { await shop.ask(kind, about: machine) }
                     }
                 }
             }
@@ -300,7 +311,7 @@ private struct Card: View {
             // plate look right", and the answer is the picture. Only where
             // there is one — a placeholder on every machine would make a screen
             // mostly grey rectangles.
-            if machine.hasCamera {
+            if machine.hasCamera, machine.inService {
                 CameraTile(frame: camera.frames[machine.id] ?? .none, webcam: machine.webcam,
                            words: shop.words)
             }
@@ -335,6 +346,9 @@ private struct Card: View {
                     }
                 }
             }
+            // Under service or retired, said in words with its reason and
+            // date — never colour alone.
+            MachineLifeBadge(machine: machine, words: shop.words)
 
             // Only when there is something under it. A section header with
             // nothing beneath it reads as a screen that failed to load.
@@ -470,7 +484,10 @@ private struct Card: View {
             // Kept quiet when empty: one small grey line and the button, so
             // a printer with nothing scheduled is not shouting about it on
             // the screen a shop looks at most.
-            if let upkeep {
+            // Not for a retired printer: nothing is ever due on one again
+            // (`lib/maintenance.js dueTasks` drops its tasks). What was done
+            // stays, below.
+            if let upkeep, !machine.isRetired {
                 DetailSection(shop.words.callIt("maint.recurring"),
                               accent: Self.worst(upkeep.tasks)) {
                     VStack(alignment: .leading, spacing: 7) {
@@ -1656,13 +1673,24 @@ private struct Live: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        // Under service or retired: not asked, and the card says so in words
+        // — the badge above says which; this says what follows from it.
+        case .underService, .retired:
+            DetailSection(shop.words.callIt("mac.live")) {
+                Text(shop.words.callIt(machine.isRetired ? "mac.life_not_polled_retired"
+                                                         : "mac.life_not_polled_service"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         case nil:
             DetailSection(shop.words.callIt("mac.live")) { reading }
         }
         // The plug the printer sits on, when there is one. Switching OFF goes
         // through the shared rule every time; the button is refused with the
         // reason rather than hidden, so the shop knows why it cannot.
-        if machine.smartPlug?.usable == true {
+        // Not on a retired printer: it has left the shop, and a switch on its
+        // card is a way to power something that is no longer there.
+        if machine.smartPlug?.usable == true, !machine.isRetired {
             DetailSection(shop.words.callIt("plug.title")) { plugRow }
         }
     }

@@ -245,8 +245,12 @@ extension Shop {
     /// "Has a connection" is `PrinterWatch.notWatched`'s answer, not a
     /// non-empty type: the Electron machine form writes `type: "none"` for a
     /// printer with no link, and that was offered "Send to printer".
+    ///
+    /// Only a printer IN service: one under service is on the bench, and one
+    /// retired has left the shop — a file sent to either is a print nobody is
+    /// there to take off the plate (`lib/machine-status.js`).
     var sendablePrinters: [Machine] {
-        machines.filter { PrinterWatch.notWatched($0) != .noConnection }
+        workingMachines.filter { PrinterWatch.notWatched($0) != .noConnection }
     }
 
     /// A connection type as this app stores and shows it: `""` for none.
@@ -281,7 +285,7 @@ extension Shop {
     /// depreciation go to the printer that ran it, with nobody picking it by
     /// hand. A send that failed records nothing.
     func sendToPrinter(_ file: URL, machineId: String, startPrint: Bool, jobId: String? = nil) async {
-        guard let engine, let machine = machines.first(where: { $0.id == machineId }) else { return }
+        guard let engine, let machine = sendablePrinters.first(where: { $0.id == machineId }) else { return }
         guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
         sendNote = nil
         printerProblem[machine.id] = nil
@@ -605,7 +609,10 @@ extension Shop {
         // split: those machines are never metered (`lib/print-energy.js`).
         let sharedPlugs = Set((try? await engine.sharedPlugIds(machines: machineRows)) ?? [])
         let meter = energyMeter()
-        for machine in machines where machine.smartPlug?.usable == true {
+        // Not a retired printer's plug at all. An under-service one is still
+        // read — the card shows whether it is on — but never switched off by
+        // the tick: somebody is working on it, and may be running a test.
+        for machine in machinesInUse where machine.smartPlug?.usable == true {
             let live = printers.statusCache[machine.id]
             // A print ending is the edge from printing to anything else.
             if case .object(let o)? = live, case .string(let state)? = o["state"] {
@@ -621,7 +628,7 @@ extension Shop {
             await meter?.observe(machine.id, watts: plugStates[machine.id]?.watts,
                                  live: printers.statusCache[machine.id],
                                  shared: sharedPlugs.contains(machine.id), now: now, engine: engine)
-            guard plugStates[machine.id]?.on == true,
+            guard machine.inService, plugStates[machine.id]?.on == true,
                   let record = await plugRecord(machine.id),
                   (try? await engine.plugAutoOffDue(machine: record, live: live,
                                                     finishedAt: printEndedAt[machine.id], now: now)) == true

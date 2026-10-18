@@ -101,6 +101,13 @@ final class PrinterWatch {
     enum NotWatched: Equatable {
         case noConnection
         case otherProtocol(String)
+        /// The shop marked it under service: it is being repaired or waits for
+        /// a part, and asking it every ten seconds would only raise "offline"
+        /// alerts about a machine everybody knows is off.
+        case underService
+        /// Sold, scrapped or given away (`lib/machine-status.js`). Kept for its
+        /// history, never asked anything again.
+        case retired
     }
 
     private(set) var readings: [Machine.ID: Reading] = [:]
@@ -224,6 +231,10 @@ final class PrinterWatch {
 
     /// Is this a machine this app can ask? Nil when it can.
     static func notWatched(_ machine: Machine) -> NotWatched? {
+        // Before the connection: a retired printer with an address is still
+        // not one to ask, and the card says why in those words.
+        if machine.isRetired { return .retired }
+        if machine.isUnderService { return .underService }
         let type = machine.printerApi?.type ?? ""
         if type.isEmpty || type == "none" { return .noConnection }
         return spoken.contains(type) ? nil : .otherProtocol(type)
@@ -415,7 +426,7 @@ final class PrinterWatch {
         let enable = (try? await engine.alertEnable(settings: shop.settingsDict)) ?? KhaytEngine.Alerting.sensible
         guard let found = try? await engine.printerAlerts(
             was: previous, now: current, settings: shop.settingsDict,
-            machines: shop.machineRows, state: alertState,
+            machines: shop.machineRowsInUse, state: alertState,
             enable: enable) else {
             previous = current
             return
@@ -423,7 +434,7 @@ final class PrinterWatch {
         previous = current
         alertState = found.state
         for alert in found.alerts {
-            let name = shop.machines.first { $0.id == alert.machineId }?.name ?? alert.machineId
+            let name = shop.machineName(forId: alert.machineId)
             let title = Self.title(alert.type, machine: name, shop: shop)
             let body = Self.body(alert, machine: name, shop: shop)
             notices.raise(PrinterNotice.Notice(
@@ -467,6 +478,8 @@ final class PrinterWatch {
     /// — ten seconds away — is a button somebody presses again, and pressing
     /// `cancel` twice is harmless while pressing `pause` twice is not.
     func refresh(_ machine: Machine, shop: Shop) async {
+        // Not one the sweep leaves alone on purpose (`notWatched`).
+        guard machine.inService else { return }
         await poll(machine, shop: shop)
     }
 

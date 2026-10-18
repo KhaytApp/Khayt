@@ -14,10 +14,11 @@ struct OnTheMachines: View {
         VStack(alignment: .leading, spacing: Space.md) {
             SectionHead(title: shop.words.callIt("mac.on_the_machines"))
             HStack(spacing: 8) {
-                ForEach(shop.machines.prefix(5)) { machine in
+                // Retired printers are history, not the floor.
+                ForEach(shop.machinesInUse.prefix(5)) { machine in
                     MachineTile(machine: machine, shop: shop)
                 }
-                if shop.machines.isEmpty {
+                if shop.machinesInUse.isEmpty {
                     Text(shop.words.callIt("mac.no_machines_yet"))
                         .font(TypeScale.body(11))
                         .foregroundStyle(Role.text3)

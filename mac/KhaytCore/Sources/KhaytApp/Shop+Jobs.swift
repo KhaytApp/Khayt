@@ -1190,7 +1190,7 @@ extension Shop {
     /// the module's own reason.
     func scheduleRow(_ a: KhaytEngine.SchedulePlan.Assignment) -> (job: String, machine: String, why: String) {
         let job = orders.first { $0.id == a.orderId }?.project ?? a.orderId
-        let machine = machines.first { $0.id == a.machineId }?.name ?? a.machineId
+        let machine = machineName(forId: a.machineId)
         return (job, machine, a.reason ?? "")
     }
 

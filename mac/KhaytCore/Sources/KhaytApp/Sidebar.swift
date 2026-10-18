@@ -74,7 +74,7 @@ struct Sidebar: View {
             // The floor: what the shop prints with and prints on.
             Section(shop.words.callIt("mac.the_floor")) {
                 Row(title: shop.words.callIt("mac.machines"), mark: .machines,
-                    count: shop.machines.count, selected: shop.shelf == .machines)
+                    count: shop.machinesInUse.count, selected: shop.shelf == .machines)
                     .tag(Shop.Shelf.machines)
                 Row(title: shop.words.callIt("mac.inventory"), mark: .filament,
                     count: shop.spools.count, selected: shop.shelf == .inventory)

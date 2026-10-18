@@ -475,7 +475,8 @@ struct JobMachineLine: View {
     let printed: KhaytEngine.PrintedOn?
 
     var body: some View {
-        let name: (String) -> String = { id in shop.machines.first { $0.id == id }?.name ?? id }
+        // "Deleted printer", never the raw id, for one no longer in the book.
+        let name: (String) -> String = { id in shop.machineName(forId: id) }
         if let printed {
             VStack(alignment: .leading, spacing: 2) {
                 Label(Self.sentence(printed, name: name, words: shop.words), systemImage: "printer")

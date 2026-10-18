@@ -267,6 +267,11 @@ extension Shop {
         /// Answering, and not printing. Not a problem; the ordinary state of
         /// a machine between jobs.
         case idle
+        /// The shop marked it under service, so it is not asked
+        /// (`lib/machine-status.js`). Down, and the shop knows why.
+        case underService
+        /// Retired: kept for its history, never asked.
+        case retired
 
         var wordKey: String {
             switch self {
@@ -274,6 +279,8 @@ extension Shop {
             case .notSetUp:     "mac.not_connected"
             case .notAnswering: "mac.attn_state_offline"
             case .idle:         "mac.idle"
+            case .underService: "mac.life_badge_service"
+            case .retired:      "mac.life_badge_retired"
             }
         }
 
@@ -294,12 +301,19 @@ extension Shop {
         var state: ShopState {
             switch self {
             case .notAnswering:              .machineCheck
+            // `offline` is the lifecycle word for a machine that is down on
+            // purpose — not the attention mark, which would ask for a look.
+            case .underService, .retired:    .offline
             case .noProtocol, .notSetUp, .idle: .queued
             }
         }
     }
 
     func quiet(_ machine: Machine) -> Quiet {
+        // BEFORE any reading: neither is polled, and a reading left over from
+        // before the shop said so must not make it look idle and free.
+        if machine.isRetired { return .retired }
+        if machine.isUnderService { return .underService }
         // AN ANSWER BEATS EVERY GUESS. If the machine has told this app what
         // it is doing, nothing read off the settings can contradict it — and
         // this test was third at first, so a machine that had answered was

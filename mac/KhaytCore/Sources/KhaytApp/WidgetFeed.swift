@@ -143,7 +143,7 @@ final class WidgetFeed {
     /// The snapshot, without asking whether it may be shown — for the tests,
     /// which have only the sample book to compose from.
     static func compose(_ shop: Shop, now: Date) -> ShopWidgetSnapshot {
-        let heard = shop.machines.compactMap { machine -> Heard? in
+        let heard = shop.machinesInUse.compactMap { machine -> Heard? in
             guard let status = shop.printers.readings[machine.id]?.status else { return nil }
             return Heard(id: machine.id, name: machine.name, state: status.state,
                          progress: status.progress, timeRemaining: status.timeRemaining)
@@ -155,7 +155,7 @@ final class WidgetFeed {
             language: shop.words.language, rightToLeft: shop.words.isRTL,
             words: words(shop.words),
             printing: printing(heard, now: now),
-            machineCount: shop.machines.count,
+            machineCount: shop.machinesInUse.count,
             today: .init(dueToday: dueToday(shop.orders.map { (Stage.of($0), $0.dueDate) }, now: now),
                          overdue: shop.overdueCount,
                          owed: Money.short(shop.owed, shop.currency)),

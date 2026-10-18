@@ -586,7 +586,7 @@ extension Shop {
     func capacity() async -> KhaytEngine.Capacity? {
         guard let engine else { return nil }
         return try? await engine.capacity(
-            machines: machineRows, orders: orderRows, days: 7,
+            machines: machineRowsInUse, orders: orderRows, days: 7,
             unassigned: words.callIt("dash.unassigned"))
     }
 

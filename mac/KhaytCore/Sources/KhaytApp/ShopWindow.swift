@@ -382,7 +382,7 @@ struct ShopWindow: View {
         }
         if shop.showingDashboard || shop.showingBoard { return provenance }
         if shop.showingMachines {
-            return shop.words.counting(shop.machines.count, "mac.machines_count") + " · " + provenance
+            return shop.words.counting(shop.machinesInUse.count, "mac.machines_count") + " · " + provenance
         }
         if shop.showingInventory {
             return shop.words.counting(shop.spools.count, "mac.spools_count") + " · " + provenance
@@ -814,6 +814,9 @@ struct WindowSheets: ViewModifier {
                       cancel: shop.words.callIt("common.cancel")) { asked in
                 Task { await shop.deleteCustomers(asked.ids) }
             }
+            // A printer under service, retired or deleted — asked from the
+            // machine card's menu (`MachineLifeDialogs`).
+            .machineLifeDialogs(shop: shop, ask: $shop.pendingMachineAsk)
             .shopSheet(item: $shop.pendingInvoice) { InvoiceSheet(shop: shop, subject: $0) }
             .shopSheet(item: $shop.pendingLabels) { LabelSheet(shop: shop, request: $0) }
             .shopSheet(item: $shop.editingSpool) { SpoolSheet(shop: shop, existing: $0) }

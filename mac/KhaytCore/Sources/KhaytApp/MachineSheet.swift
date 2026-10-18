@@ -124,6 +124,10 @@ struct MachineSheet: View {
     @State private var saveProblem: String?
     /// A save in flight, so a second press does not race the first.
     @State private var saving = false
+    /// Under service, retire or delete, asked from the footer's Status menu.
+    /// Held here rather than on the shop: a sheet is up, and the window's own
+    /// dialogs cannot be shown over it.
+    @State private var lifeAsk: MachineAsk?
     @FocusState private var focused: Bool
 
     // ── What it cost, and how long it should last ───────────────────────
@@ -192,6 +196,19 @@ struct MachineSheet: View {
             }
         } footer: {
             HStack {
+                // The printer's working life, for one already in the book.
+                // Each acts on the book straight away and closes the sheet —
+                // anything typed above and not saved is not part of it.
+                if let existing, shop.canMoveJobs {
+                    Menu(shop.words.callIt("mac.life_status")) {
+                        MachineLifeItems(machine: shop.machines.first { $0.id == existing.id } ?? existing,
+                                         shop: shop, acted: { dismiss() }) { kind in
+                            Task { lifeAsk = await shop.question(kind, about: existing) }
+                        }
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                }
                 if let saveProblem {
                     Text(saveProblem)
                         .font(.caption).foregroundStyle(Khayt.late)
@@ -212,6 +229,7 @@ struct MachineSheet: View {
             if let existing { measuredPower = await shop.measuredPowerDraw(existing.id) }
         }
         .onAppear(perform: fill)
+        .machineLifeDialogs(shop: shop, ask: $lifeAsk) { dismiss() }
     }
 
     /// The catalogue model this sheet is about to apply, if any.

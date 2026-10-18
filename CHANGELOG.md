@@ -4,6 +4,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: put a printer under service, retire it, or delete it.** A machine
+  card's menu (and the Status menu at the foot of the machine sheet) marks a
+  printer under service with an optional reason, brings it back, retires it
+  (dated today, with an optional reason, saying first how many unfinished jobs
+  will lose it), returns a retired one to service, and deletes one — only when
+  nothing in the book names it; otherwise Delete is greyed with what still
+  does, e.g. "used by 12 jobs and 3 service entries". Each has Undo. The card
+  says "Under service" or "Retired" in words with the reason and date; retired
+  printers fold into a "Retired (n)" list. Retired printers leave polling,
+  cameras, the plug's automatic switch-off, Send to printer, the pickers
+  (unless the record already names one, shown "(retired)"), the menu bar,
+  the Triage tiles, the sidebar count, the widget, `/api/machines/live`, Live
+  Activities, the band, the kiosk and the dashboard fleet, where an
+  under-service printer now counts as down. Under-service printers are not
+  polled or sent files and the card says why. A job naming a printer that is
+  gone says "Deleted printer" instead of its id. Rule: `lib/machine-status.js`.
 - **Stock: deliveries, waste and spool prices add up.** A part delivery of a
   new lot is priced at what arrived (250 g of an 80-for-1000 g roll was costed
   at 80, not 20) and grows with later parts. Waste logged against a roll with

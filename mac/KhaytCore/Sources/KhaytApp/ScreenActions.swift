@@ -149,7 +149,7 @@ struct ScreenActions: View {
             } else if shop.showingMachines {
                 NavyAction(label: shop.words.callIt("sched.suggest_btn"),
                            symbol: "wand.and.stars",
-                           enabled: !shop.schedulableRows.isEmpty && !shop.machines.isEmpty) {
+                           enabled: !shop.schedulableRows.isEmpty && !shop.workingMachines.isEmpty) {
                     shop.forgetSchedule()
                     shop.schedulingWork = true
                 }

@@ -53,6 +53,45 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     /// belongs to this site unless the job names one of its own.
     let locationId: String?
 
+    // ── IN SERVICE, UNDER SERVICE, RETIRED ───────────────────────────────
+    //
+    // `lib/machine-status.js` owns the meaning; these are the fields as the
+    // book writes them, each read on its own so a hand-edited `isOffline: "yes"`
+    // costs that field and never the whole machine list. Read them through
+    // `isRetired` / `isUnderService` and the four accessors below.
+    let isOffline: LenientField<Bool>?
+    let offlineReason: LenientField<String>?
+    let offlineSince: LenientField<String>?
+    let status: LenientField<String>?
+    let retiredAt: LenientField<String>?
+    let retiredReason: LenientField<String>?
+
+    private static func text(_ field: LenientField<String>?) -> String {
+        (field?.value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    private static func said(_ field: LenientField<String>?) -> String? {
+        let t = text(field); return t.isEmpty ? nil : t
+    }
+
+    /// Sold, scrapped or given away — `isRetired` in the rule: `status:
+    /// 'retired'`, or a `retiredAt` on its own.
+    var isRetired: Bool { Self.text(status) == "retired" || !Self.text(retiredAt).isEmpty }
+
+    /// Temporarily out — `isUnderService`: never as well as retired.
+    var isUnderService: Bool {
+        !isRetired && (isOffline?.value == true || Self.text(status) == "offline")
+    }
+
+    /// Neither: may be given work today.
+    var inService: Bool { !isRetired && !isUnderService }
+
+    /// Why it is under service, and since when (an ISO day), when the shop said.
+    var underServiceReason: String? { isUnderService ? Self.said(offlineReason) : nil }
+    var underServiceSince: String? { isUnderService ? Self.said(offlineSince) : nil }
+    /// When it was retired (an ISO day) and why, when the shop said.
+    var retiredOn: String? { isRetired ? Self.said(retiredAt).map { String($0.prefix(10)) } : nil }
+    var retiredBecause: String? { isRetired ? Self.said(retiredReason) : nil }
+
     struct Depreciation: Decodable, Hashable, Sendable {
         let price: Double?
         let purchaseDate: String?
@@ -225,6 +264,17 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
         guard let api = printerApi, let host = api.host, !host.isEmpty else { return nil }
         guard let port = api.port, port > 0 else { return host }
         return "\(host):\(port)"
+    }
+}
+
+/// One field read leniently: a value of the wrong type reads as nil, never as
+/// a machine list that failed to decode. Absent or `null` is a nil field
+/// (`decodeIfPresent`), so only a present value ever reaches this.
+struct LenientField<T: Decodable & Hashable & Sendable>: Decodable, Hashable, Sendable {
+    let value: T?
+    init(_ value: T?) { self.value = value }
+    init(from decoder: Decoder) throws {
+        value = try? decoder.singleValueContainer().decode(T.self)
     }
 }
 

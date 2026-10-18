@@ -74,7 +74,10 @@ final class Camera {
     private func sweep(shop: Shop) async {
         for machine in shop.machines {
             if Task.isCancelled { return }
-            guard machine.hasCamera else { frames[machine.id] = .none; continue }
+            // Not a printer in service: retired has left the shop, and under
+            // service is on the bench, usually switched off — asking its camera
+            // every few seconds would only draw a failure.
+            guard machine.hasCamera, machine.inService else { frames[machine.id] = .none; continue }
             frames[machine.id] = await Self.fetch(machine, shop: shop)
         }
     }

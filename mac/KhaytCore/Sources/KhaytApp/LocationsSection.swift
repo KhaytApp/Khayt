@@ -60,7 +60,7 @@ struct LocationsSection: View {
                                 Text(loc.address).font(.caption).foregroundStyle(.secondary)
                                     .lineLimit(1).truncationMode(.tail)
                             }
-                            let here = shop.machines.filter { $0.locationId == loc.id }.map(\.name)
+                            let here = shop.machinesInUse.filter { $0.locationId == loc.id }.map(\.name)
                             if !here.isEmpty {
                                 Text(here.joined(separator: words.language == "ar" ? "، " : ", "))
                                     .font(.caption).foregroundStyle(.secondary)
