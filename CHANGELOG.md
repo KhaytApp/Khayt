@@ -5978,6 +5978,67 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [3.11.16] - 2026-10-19
+
+### Before you update
+
+- **Set a LAN PIN of at least 8 characters, or phones and the queue page stop
+  connecting.** A shorter PIN no longer opens anything on the LAN server, and
+  the PIN is only accepted from the app, never in a page address. If yours is
+  shorter, the Online panel says so; set a longer one in Settings → Online and
+  enter it on the iPhone. An old queue-page bookmark with `?pin=` signs in
+  once and the PIN drops out of the address.
+- **Delete now offers Retire for a printer that jobs or service records name.**
+  Deleting such a printer used to rewrite your past months: its depreciation
+  vanished, its jobs fell into "Unassigned" and its service costs left the
+  machine profit and loss. A retired printer keeps all of that, leaves the
+  pickers, the board, the dashboard and printer polling, and its unfinished
+  jobs become unassigned. **Return to service** brings it back. A printer
+  nothing refers to is still deleted as before.
+
+### Changed
+
+A longer LAN PIN, retiring printers, safer saved secrets and money fixes, since 3.11.15.
+Individual entries are kept below; this is what changed for you.
+
+The LAN server needs a PIN of 8 characters or more, a printer with history is retired instead of deleted, saved passwords go only to the address saved with them, and what a shop is owed adds up in more cases.
+
+- **Desktop: a LAN PIN of at least 8 characters, sent only by the app.** The
+  PIN is read only from the app's request header, never from `?pin=` in an
+  address, which puts it in history and logs. The queue page asks for the PIN
+  on a form and remembers it for 12 hours. Requests arriving under someone
+  else's domain name are refused, which blocks DNS-rebinding attacks, and the
+  calendar feed accepts only its own token.
+- **Desktop: a printer with history is retired, not deleted.** See "Before you
+  update" above. Retired printers are listed last with a **Return to
+  service** button, and stop counting toward maintenance reminders.
+- **Desktop: a saved password or token only goes to the address saved with
+  it.** The Khayt Cloud token, the accounting and event webhook secrets, an
+  SMS webhook secret and the mail server password now go only to their own
+  saved server. Changing that address in Settings without re-entering the
+  secret clears it, so it has to be entered again. Event webhooks are now
+  signed with the saved secret.
+- **Desktop: opening and attaching files checks where the file really leads.**
+  A shortcut named like a model or a report that leads to something else is
+  refused, and only the file types Khayt reads or writes are accepted.
+- **Desktop: a paired iPhone can check it is talking to your computer.** The
+  LAN server has its own key, kept sealed in the keychain, and signs a
+  one-time challenge from the phone. A phone that finds your computer at a
+  new address follows it without asking once the signature checks out.
+- **Money:** quotes, cancelled jobs, voided invoices and fully credited orders
+  no longer count as owed. On a shop that adds tax on top, a deposit is judged
+  against price + tax, and a credit note comes off with its tax. An instalment
+  plan no longer lists rows already covered by cash paid outside it. Splitting
+  a job can no longer give one machine a negative share or a part more paid
+  than its own price. The accountant's export leaves out split parents,
+  voided, cancelled and not-business orders, and takes credit notes off the
+  price. Switching tax off on a shop with two tax rates (such as CGST and SGST)
+  turns it off.
+- **Stock:** a part delivery of a new lot is priced at what arrived, waste
+  logged against a nearly empty roll gives back only what it took when
+  deleted, receiving against a deleted spool is refused in words, and a
+  spool's history total no longer counts receipts as use.
+
 ## [3.11.15] - 2026-10-18
 
 Lot recall reads right in Arabic, since 3.11.14.
