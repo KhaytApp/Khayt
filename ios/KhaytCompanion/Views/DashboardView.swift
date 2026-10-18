@@ -368,6 +368,7 @@ struct DashboardView: View {
             }
             .padding(.horizontal, 16)
         }
+        .clipShape(Rectangle())
     }
 
     // MARK: - Rails that need a person

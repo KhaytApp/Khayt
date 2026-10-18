@@ -212,6 +212,7 @@ struct OrdersView: View {
             }
             .padding(.horizontal, 16)
         }
+        .clipShape(Rectangle())
         .padding(.bottom, 14)
     }
 
