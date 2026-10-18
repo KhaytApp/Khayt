@@ -1184,6 +1184,8 @@ final class Shop {
             // whose cloud settings belong to nobody.
             if next.build != nil { startPublishingLeadTime() } else { stopPublishingLeadTime() }
             if next.build != nil { startWatchingPlugs() } else { stopWatchingPlugs() }
+            if next.build != nil { startPublishingCustomerRecords() } else { stopPublishingCustomerRecords() }
+            if next.build != nil { startPollingWhatsAppReports() } else { stopPollingWhatsAppReports() }
             // The web store's paid orders in, and their progress back out.
             // Not for the sample, whose cloud belongs to nobody.
             if next.build != nil { startWatchingWebStoreOrders() } else { stopWatchingWebStoreOrders() }
@@ -2360,6 +2362,22 @@ final class Shop {
     var webStoreExplicitPrices: [String: String] = [:]
     /// Web-sized pictures already made, by file name and the file's date.
     var webStoreHeroes: [String: (Date, String)] = [:]
+
+    // "Customer records for your web store" (CustomerRecords.swift).
+    var customerRecordsTask: Task<Void, Never>?
+    /// What the last send said, in the shop's words, for the Online pane.
+    var customerRecordsSaid: String?
+    var customerRecordsProblem = false
+    /// After a 429: nothing is sent before this.
+    var customerRecordsNotBefore: Date?
+    /// `KhaytCustomerRecords.READY`: false until the privacy policy covers
+    /// the copy, and the pane's switch stays shut.
+    var customerRecordsReady = false
+
+    // WhatsApp delivery reports (WhatsAppReports.swift).
+    var whatsAppReportsTask: Task<Void, Never>?
+    var whatsAppHook: WhatsAppReports.Hook?
+    var whatsAppHookProblem: String?
 
     var quoteSheetPublished: JSONValue??
     /// What the last attempt said, in the shop's words, for the Online pane.

@@ -202,6 +202,10 @@ struct OnlinePane: View {
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // The plaintext copy of the shop's customers for its own
+                // storefront — off, and shut until the privacy policy says so.
+                CustomerRecordsSection(shop: shop)
+                WhatsAppReportsSection(shop: shop)
                 // ── LETTING A STRANGER SEE A PRICE ────────────────────
                 //
                 // Folded away, and off unless the shop turns it on: this is

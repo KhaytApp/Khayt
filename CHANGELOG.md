@@ -9,6 +9,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   screen, as on iPhone Duo's folded outer display, the last filter used to
   run under them and sit half hidden. The strip now ends beside them and
   still scrolls.
+- **Mac: customer records for your web store (held), and WhatsApp delivery
+  reports.** Settings → Online gains a switch that publishes each customer
+  who has an email (name, phone and their orders, with what they paid) to
+  Khayt Cloud, so the shop's own storefront can show customers their history
+  once they sign in. It is off by default. Turning it off deletes the copy.
+  Because the copy is not encrypted, the switch stays shut until Khayt's
+  privacy policy covers it. Beside it, the shop can connect its Meta app to
+  Khayt Cloud's WhatsApp webhook: it enters the app secret, then copies the
+  callback address and verify token into Meta. The Mac then reads Meta's
+  sent, delivered, read and failed reports and moves each message in the
+  customer's log forward. A message only moves forward, never back.
+
 - **Mac: units in Arabic, and lot search says why.** A spool's history,
   a purchase order's quantity, the job inspector's machine time and the
   capacity card's hours wrote "g", "h" and "sheet" as English letters in the

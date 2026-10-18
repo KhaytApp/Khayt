@@ -1027,6 +1027,15 @@ public actor KhaytEngine {
         // store is told as the job moves. After `carriers`, whose tracking
         // links it reads, and `shelf-sale`, which reads the basket.
         "webstore-order",
+        // What the shop's storefront may know about a customer — the
+        // plaintext copy behind khayt-cloud's `/customers`, OFF unless the shop
+        // turns it on, and held shut until the privacy policy covers it.
+        // After `webstore-order` (the status words) and `order-money` (the
+        // total the customer pays).
+        "customer-records",
+        // Meta's delivery reports for the shop's WhatsApp messages, onto the
+        // customer's log by message id — forward only.
+        "whatsapp-status",
         // Opt-in crash reports and usage counts (#1789). The scrubber is the
         // one place that decides what may leave a shop's Mac — rebuilt field by
         // field from an allowlist — and the Mac runs the SAME file Electron
@@ -11908,6 +11917,57 @@ public actor KhaytEngine {
     public func webStoreFingerprint(_ update: WebStoreStatus) throws -> String {
         let value = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(update))
         return try runtime.call2("KhaytWebstoreOrder.fingerprint(ARG0)", [value], as: String.self)
+    }
+
+    /// The body of `PUT /customers`, built by `KhaytCustomerRecords.build`.
+    ///
+    /// `body` is kept as JSON: the Mac sends it as it came and never reads a
+    /// field of it, so a field added to the module reaches the cloud without
+    /// a Swift change.
+    public struct CustomerRecords: Decodable, Sendable {
+        public let body: JSONValue
+        public let published: Int
+        public let withoutEmail: Int
+        public let sharedEmail: Int
+        /// What was left out to keep the body under the cloud's 4 MB.
+        public let trimmed: Trimmed
+        public struct Trimmed: Decodable, Sendable { public let orders: Int; public let people: Int }
+    }
+
+    public func customerRecords(clients: [JSONValue], printLog: [JSONValue],
+                                settings: [String: JSONValue]) throws -> CustomerRecords {
+        try runtime.call2("KhaytCustomerRecords.build(ARG0, ARG1, ARG2)",
+                          [.array(clients), .array(printLog), .object(settings)],
+                          as: CustomerRecords.self)
+    }
+
+    /// Whether this build lets the switch be on, and whether the book has it on.
+    public func customerRecordsState(settings: [String: JSONValue]) throws -> (ready: Bool, on: Bool) {
+        struct State: Decodable { let ready: Bool; let on: Bool }
+        let s = try runtime.call2(
+            "({ ready: KhaytCustomerRecords.READY, on: KhaytCustomerRecords.enabled(ARG0) })",
+            [.object(settings)], as: State.self)
+        return (s.ready, s.on)
+    }
+
+    /// `put`, `delete` or `none` — `KhaytCustomerRecords.next`.
+    public func customerRecordsNext(on: Bool, fingerprint: String,
+                                    memory: (fingerprint: String, at: String)?, now: String) throws -> String {
+        let m: JSONValue = memory.map { .object(["fingerprint": .string($0.fingerprint), "at": .string($0.at)]) } ?? .null
+        return try runtime.call2("KhaytCustomerRecords.next(ARG0, ARG1, ARG2, ARG3)",
+                                 [.bool(on), .string(fingerprint), m, .string(now)], as: String.self)
+    }
+
+    /// `KhaytWhatsappStatus.apply`: the clients with their lines moved on.
+    public struct WhatsAppApplied: Decodable, Sendable {
+        public let clients: [JSONValue]
+        public let changed: Int
+        public let unmatched: Int
+    }
+
+    public func applyWhatsAppStatuses(clients: [JSONValue], items: [JSONValue]) throws -> WhatsAppApplied {
+        try runtime.call2("KhaytWhatsappStatus.apply(ARG0, ARG1)", [.array(clients), .array(items)],
+                          as: WhatsAppApplied.self)
     }
 
     /// One line of an online order, priced — `KhaytWebstoreOrder.linePrices`.
