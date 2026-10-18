@@ -11639,6 +11639,8 @@ public actor KhaytEngine {
     /// `unretire`: back in service, its history untouched.
     public func unretireMachine(_ machine: JSONValue) throws -> JSONValue {
         try runtime.call2("KhaytMachineStatus.unretire(ARG0)", [machine], as: JSONValue.self)
+    }
+
     // MARK: - A customer's own data (PDPL access and erasure)
 
     /// `lib/privacy.js buildClientDataExport`: everything the book holds about
