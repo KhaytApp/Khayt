@@ -26,7 +26,7 @@ const { createStoreIo } = require(path.join(ROOT, 'lib/store-io.js'));
 const { safeJsonParse } = require(path.join(ROOT, 'lib/safe-json.js'));
 
 const PORT = 3990;
-const PIN = '4321';
+const PIN = '43218765';
 const BASE = `http://127.0.0.1:${PORT}`;
 const handlers = new Map();
 const noop = () => {};

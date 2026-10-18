@@ -374,7 +374,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initAppShell();
 
   // Feature 2 (new batch): Start live printer polling for connected machines
-  const apiMachines = machines.filter(m => m.printerApi?.type && m.printerApi.type !== 'none');
+  const apiMachines = activeMachines().filter(m => m.printerApi?.type && m.printerApi.type !== 'none');
   if (apiMachines.length > 0 && window.hubAPI?.startPrinterPolling) {
     window.hubAPI.startPrinterPolling(apiMachines).then(cache => {
       machineStatusCache = cache || {};

@@ -195,7 +195,7 @@ function openWasteForm() {
       <label style="margin-top:12px;">${escapeHtml(t('waste.printer') || 'Printer / Machine')}</label>
       <select id="wf_machine">
         <option value="">${escapeHtml(t('mach.unassigned') || '— Unassigned —')}</option>
-        ${machines.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)}</option>`).join('')}
+        ${activeMachines().map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)}</option>`).join('')}
       </select>
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:14px;">
         <input type="checkbox" id="wf_deduct" checked style="width:auto; margin:0;">

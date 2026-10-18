@@ -616,6 +616,13 @@ async function startLanServer() {
       statusRow.innerHTML = `🟢 Active at <a href="#" class="lan-url-link" data-url="${escapeHtml(res.url)}" style="color:var(--primary);">${escapeHtml(res.url)}</a>${loopbackWarn}`;
       statusRow.querySelectorAll('.lan-url-link').forEach(a => { a.addEventListener('click', e => { e.preventDefault(); window.hubAPI?.openExternal?.(a.dataset.url); }); });
     }
+    if (res.pinTooShort) {
+      // The Mac refuses a short PIN too, so the phone and the queue page stop
+      // opening until the shop sets a longer one.
+      const msg = t('lan.pin_too_short', { n: 8 });
+      if (statusRow) statusRow.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--danger);margin-top:6px;">${escapeHtml(msg)}</div>`);
+      toast(msg, 'warning', 10000);
+    }
     if (res.loopbackOnly && settings.onlineEnabled) {
       toast(t('lan.loopback_warn') || 'LAN is localhost-only — other devices cannot connect. Enable network listen in Settings → Online.', 'warning', 8000);
     }

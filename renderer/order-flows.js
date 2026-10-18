@@ -3016,7 +3016,7 @@ async function splitOrderAcrossMachines(orderId) {
   if (!order || !order.parts || order.parts.length < 2) return;
 
   const machineOptions = `<option value="">${escapeHtml(t('mach.unassigned'))}</option>` +
-    machines.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+    activeMachines().map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
 
   const partsHtml = order.parts.map((p, i) => `
     <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--border-soft);">

@@ -173,6 +173,48 @@ function globalAuthThrottle(state, now, failed, opts = {}) {
 }
 
 /**
+ * The shortest owner PIN the LAN server accepts, on both apps. A PIN saved
+ * shorter than this — a four-digit one from before the rule, or one the other
+ * app wrote — opens nothing until the shop sets a new one: ten thousand guesses
+ * is a day at the per-address limit. The Mac's LanServer.minimumPin is the same
+ * number. Empty is "not configured", a different answer, so it is not short.
+ */
+const MIN_LAN_PIN = 8;
+function pinTooShort(pin) {
+  const p = String(pin == null ? '' : pin).trim();
+  return p.length > 0 && p.length < MIN_LAN_PIN;
+}
+
+/**
+ * Is this Host header one a phone or the shop's own browser sends: an IP
+ * address, `localhost`, or a Bonjour `.local` name? Anything else is somebody's
+ * domain pointed at this computer (DNS rebinding: a page the owner visits
+ * re-points its own name here and reads the book through the owner's browser,
+ * same-origin). No header at all is not a browser, and is let through.
+ * `alsoAllow` is a hostname that is ours too — the tunnel's, while it runs.
+ * Mirrors the Mac's LanServer.hostIsLocal.
+ */
+function hostIsLocal(header, alsoAllow) {
+  let h = String(header == null ? '' : header).trim().toLowerCase();
+  if (!h) return true;
+  if (h[0] === '[') {
+    const close = h.indexOf(']');
+    if (close < 0) return false;
+    return /^[0-9a-f:.]+(%[0-9a-z._-]+)?$/.test(h.slice(1, close)) && h.slice(1, close).includes(':');
+  }
+  const colon = h.lastIndexOf(':');
+  if (colon >= 0 && h.indexOf(':') === colon) {
+    if (!/^\d{1,5}$/.test(h.slice(colon + 1))) return false;
+    h = h.slice(0, colon);
+  }
+  if (h.endsWith('.')) h = h.slice(0, -1);
+  if (/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(h)) return h.split('.').every(n => +n <= 255);
+  if (h === 'localhost' || h.endsWith('.local')) return true;
+  const extra = String(alsoAllow || '').trim().toLowerCase();
+  return !!extra && h === extra;
+}
+
+/**
  * Returns a human-readable warning when tunnel mode is on and the PIN is too
  * weak to expose to the public internet, or null when it is acceptable. Does
  * not block — callers surface this as advice only.
@@ -221,6 +263,7 @@ const api = {
   bumpFailure, isLockedOut, sweepFailedAttempts,
   globalWindowGate, globalAuthThrottle,
   weakTunnelPinWarning, tunnelClientIp, sanitizeLanHttpUrl,
+  MIN_LAN_PIN, pinTooShort, hostIsLocal,
   GLOBAL_THROTTLE_LIMIT, GLOBAL_THROTTLE_WINDOW_MS, GLOBAL_THROTTLE_COOLDOWN_MS,
   PER_IP_LIMIT, LOCKOUT_MS, MAX_FAILED_ATTEMPT_KEYS,
 };

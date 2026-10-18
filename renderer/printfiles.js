@@ -1378,7 +1378,7 @@
   function editSetup(rec, existing, done) {
     const ps = PS(); if (!ps) return;
     const su = existing || {};
-    const machineOpts = (typeof machines !== 'undefined' ? machines : []).map((m) =>
+    const machineOpts = (typeof activeMachines === 'function' ? activeMachines(su.machineId) : []).map((m) =>
       `<option value="${escapeHtml(m.id)}"${su.machineId === m.id ? ' selected' : ''}>${escapeHtml(m.name || m.id)}</option>`).join('');
     const statusOpts = ['', 'known-good', 'needs-test', 'failed'].map((v) =>
       `<option value="${v}"${(su.status || '') === v ? ' selected' : ''}>${escapeHtml(

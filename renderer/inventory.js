@@ -2221,7 +2221,7 @@ function openTestPrintLog(itemId) {
   }
 
   const machOptions = `<option value="">${escapeHtml(t('mach.unassigned'))}</option>` +
-    machines.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+    activeMachines().map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
   const typeOptions = TEST_TYPES.map(tp => `<option value="${tp}">${escapeHtml(t('inv.test.' + tp))}</option>`).join('');
   const resultOptions = TEST_RESULTS.map(r => `<option value="${r}">${escapeHtml(t('inv.test.' + r))}</option>`).join('');
 

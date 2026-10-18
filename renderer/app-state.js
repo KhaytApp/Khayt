@@ -490,6 +490,18 @@ function isValidRecord(r) {
 let _saveAllTimer = null;
 let _saveChain = Promise.resolve();
 
+/**
+ * The printers that can be given work today or picked for something new. A
+ * retired one (lib/machine-status.js) stays in the book for its history —
+ * past jobs, depreciation up to the day it went, its service log — and out of
+ * every picker, poll, board and dashboard. `keepId` keeps the one a record
+ * being edited already names, so editing it does not silently change it.
+ */
+function activeMachines(keepId) {
+  const MS = typeof KhaytMachineStatus !== 'undefined' ? KhaytMachineStatus : null;
+  return machines.filter(m => !MS || !MS.isRetired(m) || (keepId && m.id === keepId));
+}
+
 function collectStoreCollections() {
   return {
     printLog, inventory, templates, products, clients, settings, printers,
@@ -977,6 +989,7 @@ function pruneExpiredNotifs() {
     defaultWaTemplates,
     fillWaTemplate,
     collectStoreCollections,
+    activeMachines,
     buildStoreSnapshot,
     buildExportPayload,
     // Called BARE (not behind a typeof guard) from settings.js, by all three

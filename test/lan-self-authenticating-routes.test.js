@@ -36,7 +36,7 @@ const ROOT = path.join(__dirname, '..');
 const { registerLanServer } = require(path.join(ROOT, 'lib/lan-server.js'));
 
 const PORT = 3997;   // 3991-3996 are taken by the other LAN suites
-const PIN = '4321';
+const PIN = '43218765';
 const CAL_TOKEN = 'calendar-token-abcdef';
 const TRACK = 'tracking-token-abcdef';
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -118,18 +118,13 @@ test('a self-authenticating route still refuses a WRONG token', async () => {
   assert.equal((await fetch(`${BASE}/calendar.ics`)).status, 401, 'no token at all');
 });
 
-test('guessing the PIN through the calendar feed locks out like anywhere else', async () => {
-  // The route accepts the owner PIN as well as its token, and it is now exempt
-  // from the gate that used to do the counting. Exempt from the gate must not
-  // mean exempt from the lockout: the PIN is four digits in the field's own
-  // placeholder, and an unthrottled endpoint that accepts it is a guessing
-  // oracle for the credential that opens every other route.
-  let sawLock = false;
-  for (let i = 0; i < 20; i++) {
-    const res = await fetch(`${BASE}/calendar.ics?pin=wrong${i}`);
-    if (res.status === 429) { sawLock = true; break; }
-  }
-  assert.ok(sawLock, 'the calendar feed answers wrong PINs for ever');
+test('the calendar feed does not take the owner PIN at all', async () => {
+  // It used to take the PIN as well as its token. A calendar app polls on a
+  // schedule of its own, so it was a PIN oracle: guess here until a 200, then
+  // open every other route. The token is 128 random bits and the link the app
+  // shows has always carried it. The Mac's calendar route is the same.
+  assert.equal((await fetch(`${BASE}/calendar.ics?pin=${PIN}`)).status, 401, 'the right PIN in the address');
+  assert.equal((await fetch(`${BASE}/calendar.ics`, { headers: { 'x-khayt-pin': PIN } })).status, 401, 'the right PIN in the header');
 });
 
 // ── A REQUEST THAT CANNOT BE UNDERSTOOD IS STILL ANSWERED ──────────────────

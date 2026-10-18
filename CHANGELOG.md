@@ -30,6 +30,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   not-business orders, and takes credit notes off the price. On the Mac, a
   customer billed in another currency now exports in that currency, with the
   shop's base columns filled in.
+- **Desktop: a printer with history is retired, not deleted.** Deleting a
+  printer that jobs, costs or service records name rewrote the past: its
+  depreciation disappeared from earlier months, its jobs fell into
+  "Unassigned", and its service costs dropped out of the machine profit and
+  loss. Now Delete removes only a printer that nothing refers to. Any other
+  printer is offered **Retire** instead. A retired printer stays in your
+  records, leaves the pickers, the board, the dashboard and printer polling,
+  and stops counting toward maintenance reminders. Its unfinished jobs become
+  unassigned. **Return to service** brings it back. The Mac app follows the
+  same rule.
 - **(Maintainers) A printer's status is one shared rule.** `lib/machine-status.js`:
   - **Under service** is the `isOffline` flag the desktop already writes, with
     an optional reason and date.
@@ -97,12 +107,46 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   machine pickers; past orders still name it. A machine marked offline shows
   as Offline and is left out of the pickers.
 
+- **Desktop: a paired iPhone can check it is talking to your computer.** The
+  LAN server now has its own key, made once and stored sealed in the keychain.
+  It answers `GET /api/identity` (requires the PIN) with the key's public part
+  and `GET /api/proof` with a signature. Before sending the PIN, the iPhone
+  can check that whatever answers to the shop's network name is the computer
+  it paired with, not a device copying that name. The Mac app answers the
+  same two requests.
 - **Mac: the board says why a lot search found a card.** A job on the board
   found only by the filament lot it drew from shows that lot, as its row in
   the orders list already did. The sample shop now holds a delivery that
   arrived in a different lot from the spool it was ordered for, received as
   its own spool, so the screens that show one are drawn with one.
 
+- **Desktop: a saved password or token only goes to the address saved with
+  it.** The app fills saved secrets in itself and never shows them to the
+  window, but it used to take the address to send them to from the window.
+  Something injected into the window could therefore have had the Khayt Cloud
+  token, the accounting or event webhook secret, an SMS webhook secret or the
+  mail server password sent to an address of its choosing. Each one now goes
+  only to its own saved server or URL. Changing that address in Settings while
+  leaving the secret untouched clears the secret, so it has to be entered
+  again. Signing in to a different Khayt Cloud server already does this.
+- **Desktop: the LAN server's PIN checks now match the Mac app's.** The owner
+  PIN is only read from the `x-khayt-pin` header, never from `?pin=` in an
+  address, because an address puts the PIN in clear text in history and logs.
+  An old queue-page bookmark with `?pin=` still works once: it is swapped for
+  a sign-in cookie and the PIN disappears from the address. Opening the queue
+  page without a PIN now shows a PIN form. Requests that arrive under someone
+  else's domain name are refused, which blocks DNS-rebinding attacks. The
+  calendar feed accepts only its own token, not the PIN. **A LAN PIN shorter
+  than 8 characters no longer opens anything.** If yours is shorter, the
+  Online panel says so; set a longer one in Settings → Online before phones
+  and the queue page can connect again. The Mac app already worked this way.
+- **Desktop: opening and attaching files checks where the file really is.**
+  Opening a saved report, attaching a file to a job, and adding a model to
+  the library now follow shortcuts (symlinks) to the real file before
+  checking it. A shortcut named `model.stl` that leads to a private key, or a
+  `report.pdf` that leads to an app, is refused. Only file types Khayt
+  writes or reads are accepted: reports, invoices and exports to open; print
+  files, archives and photos to attach.
 - **Mac: customer records for your web store can be turned on.** The privacy
   policy now covers the copy (khaytapp.com/privacy, "Customer records"), so the
   switch in Settings → Online works. It stays off until a shop turns it on, and

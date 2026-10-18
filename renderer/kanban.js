@@ -818,7 +818,7 @@ function renderKanban() {
     if (typeof KhaytTiers === 'undefined' || !KhaytTiers.isProMode(settings.mode)) return;
     if (!renderKanban._fepAlerted) renderKanban._fepAlerted = new Map();
     const resinCompleted = printLog.filter(o => o.isResin && KhaytOrderStatus.isFinished(o));
-    machines.forEach(m => {
+    activeMachines().forEach(m => {
       const count = resinCompleted.filter(o => o.machineId === m.id).length;
       const threshold = Math.floor(count / 50) * 50;
       const lastAlerted = renderKanban._fepAlerted.get(m.id) || 0;
@@ -865,8 +865,8 @@ function renderMachineQueues() {
 
   const today = localDateStr();
   const machList = typeof machineMatchesActiveLocation === 'function'
-    ? machines.filter(machineMatchesActiveLocation)
-    : machines;
+    ? activeMachines().filter(machineMatchesActiveLocation)
+    : activeMachines();
   if (machList.length === 0) {
     container.innerHTML = `<div class="empty-state" style="padding:24px;">${escapeHtml(t('loc.no_machines'))}</div>`;
     return;
