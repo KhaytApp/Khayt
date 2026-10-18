@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: the Home pipeline and Orders filters stop at the screen's own
+  controls.** Where the tab bar and toolbar buttons sit down the side of the
+  screen, as on iPhone Duo's folded outer display, the last filter used to
+  run under them and sit half hidden. The strip now ends beside them and
+  still scrolls.
+
 - **iPhone: on iPhone Duo's inner display, Machines and Clients sit two
   across.** Each machine card and client row used to stretch over the full
   width of the unfolded screen. The folded outer display and other iPhones
