@@ -232,7 +232,6 @@ extension Shop {
             // that appears to do nothing for ten seconds gets pressed again.
             await printers.refresh(machine, shop: self)
         } catch {
-            printerProblem[machine.id] = self.said(error)
             printerProblem[machine.id] = PrinterWatch.problem(error, words)
         }
     }
@@ -383,7 +382,6 @@ extension Shop {
         // dropping an object is `drop`, which asks the lock.
         guard let engine else { return nil }
         do { return try await PrinterControl.plate(of: machine, engine: engine, build: source.build) }
-        catch { printerProblem[machine.id] = self.said(error); return nil }
         catch { printerProblem[machine.id] = PrinterWatch.problem(error, words); return nil }
     }
 
@@ -398,7 +396,6 @@ extension Shop {
         do {
             try await PrinterControl.drop(object, on: machine, engine: engine, build: source.build)
         } catch {
-            printerProblem[machine.id] = self.said(error)
             printerProblem[machine.id] = PrinterWatch.problem(error, words)
         }
     }
