@@ -4,9 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: lot recall counts jobs correctly in Arabic.** The summary and
-  the "copied" message used one plural form for every count above one, which
-  reads wrong for 2 and for 11 and up. Both now read correctly at any count.
 - **iPhone: the Home pipeline and Orders filters stop at the screen's own
   controls.** Where the tab bar and toolbar buttons sit down the side of the
   screen, as on iPhone Duo's folded outer display, the last filter used to
@@ -5718,6 +5715,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.15] - 2026-10-18
+
+Lot recall reads right in Arabic, since 3.11.14.
+Individual entries are kept below; this is what changed for you.
+
+In Arabic, Lot recall's job count now reads correctly at every number.
+
+- **Desktop: lot recall counts jobs correctly in Arabic.** The summary and
+  the "copied" message used one plural form for every count above one, which
+  reads wrong for 2 and for 11 and up. Both now read correctly at any count.
 
 ## [3.11.14] - 2026-10-18
 
