@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a customer's 3MF is sliced as shapes only.** With "slice uploads"
+  on, a 3MF a customer uploaded over the shop's Wi-Fi reached the slicer
+  with its own settings, and those settings can name a command the slicer
+  runs when it saves G-code. The upload is now reduced to its model parts
+  first, and the shop's own presets are used, as for any bare model.
+
 - **Mac: customer records for your web store can be turned on.** The privacy
   policy now covers the copy (khaytapp.com/privacy, "Customer records"), so the
   switch in Settings → Online works. It stays off until a shop turns it on, and

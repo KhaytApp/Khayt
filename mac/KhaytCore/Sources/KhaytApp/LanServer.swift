@@ -2724,6 +2724,11 @@ extension Shop {
         let model = dir.appending(path: "upload.\(ext)")
         let output = dir.appending(path: "out.gcode")
         guard (try? data.write(to: model, options: .atomic)) != nil else { return nil }
+        // Its shapes only: a 3MF's own settings can name a command the slicer
+        // runs (`SlicerRun.keepOnlyTheModel`). Unreadable is not sliced.
+        if ext.lowercased() == "3mf" {
+            guard (try? SlicerRun.keepOnlyTheModel(model)) != nil else { return nil }
+        }
         // A customer's upload is nearly always a bare mesh, and an Orca fork
         // will not slice one without a printer, print and filament profile —
         // its built-in defaults fail its own validation (#1778).
