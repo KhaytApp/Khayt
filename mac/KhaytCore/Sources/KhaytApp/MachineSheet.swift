@@ -1162,7 +1162,10 @@ struct MachineSheet: View {
                 // The poller's own branches — Bambu over MQTT, Elegoo over
                 // SDCP, the rest over HTTP — so the button proves what the
                 // card will actually do.
-                let status = try await PrinterWatch.ask(draft, engine: engine, key: key, accessCode: code)
+                // The poller's session, named here: no redirect carries the
+                // key to an address `baseURL` never saw.
+                let status = try await PrinterWatch.ask(draft, engine: engine, key: key, accessCode: code,
+                                                        fetch: { try await PrinterWatch.session.data(for: $0) })
                 testWorked = true
                 testSaid = Self.answered(status, words)
             } catch {
@@ -1262,7 +1265,7 @@ struct MachineSheet: View {
             var sealed: [String: String] = [:]
             if !typed.isEmpty {
                 guard let build else { saveProblem = words.callIt("mac.move_sample"); return }
-                do { sealed = try await Self.sealEach(typed) { try await Secrets.seal($0, for: build) } }
+                do { sealed = try await Self.sealEach(typed) { typed in try await Secrets.seal(typed, for: build) } }
                 catch { saveProblem = String(describing: error); return }
             }
             if clearing { api["apiKey"] = .string("") }
@@ -1601,7 +1604,7 @@ struct DowntimeEditor: View {
             // a row while SwiftUI still held a binding to the last index read
             // past the end of the array, and an index is not an identity — the
             // rows below a removed one were redrawn as each other.
-            ForEach($blocks) { $block in
+            ForEach($blocks.byID) { $block in
                 HStack(spacing: 8) {
                     DatePicker("", selection: Self.date($block.from), displayedComponents: [.date, .hourAndMinute])
                         .labelsHidden().datePickerStyle(.compact)
