@@ -7583,6 +7583,41 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.80] - 2026-10-18
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+WhatsApp delivery reports, units in Arabic, and a lot search that says why
+each job is on the list.
+
+### Added
+
+- **WhatsApp delivery reports.** Settings ▸ Online ▸ WhatsApp delivery
+  reports connects the shop's Meta app to Khayt Cloud: enter the app secret,
+  then copy the callback address and verify token into Meta. Khayt then reads
+  Meta's sent, delivered, read and failed reports onto each message in the
+  customer's log, and a message only moves forward. The log shows sent,
+  delivered, read or not delivered beside each one. (Sending through Meta
+  itself comes in a later alpha, so until then there is nothing to report on.)
+- **Customer records for your web store (held).** A switch in Settings ▸
+  Online will publish customers who have an email, with their orders, so the
+  shop's storefront can show them their history. It stays off and cannot be
+  turned on until Khayt's privacy policy covers it. Turning it off always
+  deletes the cloud copy, even one another Mac sent.
+- **A lot search says why.** A job that a lot search finds only by its lot
+  shows that lot in its row.
+
+### Fixed
+
+- **Units in Arabic.** Spool history, purchase-order quantities, the job
+  inspector's machine time and the capacity card wrote "g", "h" and "sheet"
+  as English letters in the Arabic app. Spool history also showed grams to
+  two decimals beside a shelf that showed whole grams.
+- **The Arabic help uses Western digits**, as the app does.
+- **A spool's history adds up.** Its total is the sum of the rows as shown,
+  so 298 g and 79 g total 377 g rather than 376 g.
+
 ## [4.0.0-alpha.79] - 2026-10-17
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
