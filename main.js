@@ -74,6 +74,7 @@ const KhaytRepetier = require('./lib/repetier');
 const printerCommands = require('./lib/printer-commands');
 const excludeObject = require('./lib/exclude-object');
 const webhookBus = require('./lib/webhook-bus');
+const SecretDestination = require('./lib/secret-destination');
 const { normalizeStoreSnapshot, STORE_VERSION } = require('./lib/store-validate');
 const upgradeBackup = require('./lib/upgrade-backup');
 const safeNames = require('./lib/safe-names');
@@ -190,6 +191,7 @@ const {
   persistLanStoreUpdate,
   updateStoreOnDisk,
   resolveStoreSecret,
+  resolveStoreSecretFor,
   isStoreSecretMasked,
   readStoreDecryptedFromDisk,
   dataFilePath,
@@ -5461,7 +5463,12 @@ ipcMain.handle('hub:send-email', async (event, { to, subject, body, smtpConfig }
     }
   }
   if (cfg?.provider === 'custom' && cfg?.smtpHost) {
-    cfg.smtpPassword = resolveStoreSecret(cfg.smtpPassword, d => d?.settings?.emailConfig?.smtpPassword);
+    // The password logs in to the server it was saved for, never one the window names.
+    try {
+      cfg.smtpPassword = resolveStoreSecretFor(cfg.smtpPassword, d => d?.settings?.emailConfig?.smtpPassword,
+        SecretDestination.smtpKey(cfg.smtpHost, cfg.smtpPort),
+        d => SecretDestination.smtpKey(d?.settings?.emailConfig?.smtpHost, d?.settings?.emailConfig?.smtpPort));
+    } catch (e) { return { ok: false, error: e.message }; }
     return sendCustomSmtp({
       host: cfg.smtpHost,
       port: cfg.smtpPort || 587,
@@ -5485,10 +5492,19 @@ ipcMain.handle('hub:send-email', async (event, { to, subject, body, smtpConfig }
 ipcMain.handle('hub:send-sms', async (_e, { to, message, channel, smsConfig } = {}) => {
   const cfg = smsConfig ? { ...smsConfig } : {};
   const provider = cfg.provider;
-  cfg.authToken = resolveStoreSecret(cfg.authToken, d => d?.settings?.smsConfig?.authToken);
-  cfg.token     = resolveStoreSecret(cfg.token,     d => d?.settings?.smsConfig?.token);
-  cfg.appSid    = resolveStoreSecret(cfg.appSid,    d => d?.settings?.smsConfig?.appSid);
-  cfg.secret    = resolveStoreSecret(cfg.secret,    d => d?.settings?.smsConfig?.secret);
+  // The fixed providers' hosts are written into lib/sms.js. The webhook
+  // provider's is the shop's own, so there every saved secret is bound to the
+  // URL saved with it — whichever field the window put the mask in.
+  const smsSecret = (incoming, getter) => (provider === 'webhook'
+    ? resolveStoreSecretFor(incoming, getter, SecretDestination.urlKey(cfg.url),
+        d => SecretDestination.urlKey(d?.settings?.smsConfig?.url))
+    : resolveStoreSecret(incoming, getter));
+  try {
+    cfg.authToken = smsSecret(cfg.authToken, d => d?.settings?.smsConfig?.authToken);
+    cfg.token     = smsSecret(cfg.token,     d => d?.settings?.smsConfig?.token);
+    cfg.appSid    = smsSecret(cfg.appSid,    d => d?.settings?.smsConfig?.appSid);
+    cfg.secret    = smsSecret(cfg.secret,    d => d?.settings?.smsConfig?.secret);
+  } catch (e) { return { ok: false, error: e.message }; }
   return sendSms(provider, cfg, { to, message, channel });
 });
 
@@ -5505,8 +5521,10 @@ ipcMain.handle('hub:accounting-push', async (_e, { url, secret, payload } = {}) 
   // private/loopback/metadata targets are refused, the connection goes to the
   // address that was checked (lib/webhook-send.js, no DNS rebinding) and a
   // redirect is never followed.
-  secret = resolveStoreSecret(secret, d => d?.settings?.accountingSync?.secret);
   try {
+    // Bound to the saved webhook URL (lib/secret-destination.js).
+    secret = resolveStoreSecretFor(secret, d => d?.settings?.accountingSync?.secret,
+      SecretDestination.urlKey(url), d => SecretDestination.urlKey(d?.settings?.accountingSync?.webhookUrl));
     const headers = { 'content-type': 'application/json' };
     if (secret) headers['X-Khayt-Secret'] = String(secret);
     if (payload && payload.idempotencyKey) headers['Idempotency-Key'] = String(payload.idempotencyKey);
@@ -5532,8 +5550,11 @@ ipcMain.handle('hub:accounting-push', async (_e, { url, secret, payload } = {}) 
 // to the address that was checked (no DNS rebinding), never redirected.
 ipcMain.handle('hub:webhook-post', async (_e, { url, secret, payload } = {}) => {
   if (!url || !String(url).startsWith('https://')) return { ok: false, error: 'Webhook needs an https:// URL' };
-  secret = resolveStoreSecret(secret, d => d?.settings?.eventWebhooks?.secret);
   try {
+    // Bound to the saved webhook URL: the window cannot have the shop's real
+    // secret sign a body it wrote for an address it chose.
+    secret = resolveStoreSecretFor(secret, d => d?.settings?.eventWebhooks?.secret,
+      SecretDestination.urlKey(url), d => SecretDestination.urlKey(d?.settings?.eventWebhooks?.url));
     const body = JSON.stringify(payload || {});
     const headers = {
       'content-type': 'application/json',
@@ -5642,6 +5663,15 @@ ipcMain.handle('hub:ai-extract', async (_e, { apiKey, model, system, request, im
 // passphrase is never stored, so the renderer re-unlocks each launch.
 let cloudBackend = null;
 
+// The shop's cloud token, for the server it was saved for. Every handler below
+// takes the URL from the window; a saved token goes only to the saved server's
+// origin (lib/secret-destination.js), so a script in the window cannot read it
+// off a server of its own.
+function cloudToken(token, url) {
+  return resolveStoreSecretFor(token, d => d?.settings?.cloud?.token,
+    SecretDestination.originKey(url), d => SecretDestination.originKey(d?.settings?.cloud?.url));
+}
+
 // Same probe, but says WHY it failed — timeout, unreachable, wrong server, bad
 // address — so the user is told which of those to go and fix.
 ipcMain.handle('hub:cloud-health-detail', (_e, url) => cloudClient.healthDetail(url));
@@ -5671,35 +5701,35 @@ ipcMain.handle('hub:cloud-accept-invite', async (_e, { url, email, password, cod
 
 ipcMain.handle('hub:cloud-member-invite', async (_e, { url, shopId, token, email, role } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.inviteMember(url, shopId, token, email, role)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-members-list', async (_e, { url, shopId, token } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, members: await cloudClient.listMembers(url, shopId, token) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-get-slug', async (_e, { url, shopId, token } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.getShopSlug(url, shopId, token)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-set-slug', async (_e, { url, shopId, token, slug } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.setShopSlug(url, shopId, token, slug)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-member-remove', async (_e, { url, shopId, token, email } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.removeMember(url, shopId, token, email)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
@@ -5779,7 +5809,7 @@ function startLeadTimePublisher() {
 
 ipcMain.handle('hub:cloud-catalog-publish', async (_e, { url, shopId, token, catalog } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.putCatalog(url, shopId, token, catalog)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
@@ -6076,14 +6106,14 @@ ipcMain.handle('hub:cloud-review-summary', async (_e, { url, shopId } = {}) => {
 
 ipcMain.handle('hub:cloud-list-reviews', async (_e, { url, shopId, token, limit } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, reviews: await cloudClient.listReviews(url, shopId, token, limit) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-delete-review', async (_e, { url, shopId, token, reviewId } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     await cloudClient.deleteReview(url, shopId, token, reviewId);
     return { ok: true };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
@@ -6112,63 +6142,63 @@ ipcMain.handle('hub:cloud-verify-email', async (_e, { url, email, code } = {}) =
 // Customer portal: publish/unpublish an owner-curated (plaintext) item; list actions.
 ipcMain.handle('hub:cloud-publish', async (_e, { url, shopId, token, pubToken, kind, payload, customerEmail } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.publishPortal(url, shopId, token, pubToken, kind, payload, customerEmail)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-unpublish', async (_e, { url, shopId, token, pubToken } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.unpublishPortal(url, shopId, token, pubToken)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-published-list', async (_e, { url, shopId, token } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, items: await cloudClient.listPublished(url, shopId, token) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-intake-list', async (_e, { url, shopId, token } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, items: await cloudClient.listIntake(url, shopId, token) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-intake-delete', async (_e, { url, shopId, token, id } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.deleteIntake(url, shopId, token, id)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-storefront-stats', async (_e, { url, shopId, token } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, stats: await cloudClient.storefrontStats(url, shopId, token) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-portal-messages', async (_e, { url, shopId, token, authToken } = {}) => {
   try {
-    authToken = resolveStoreSecret(authToken, d => d?.settings?.cloud?.token);
+    authToken = cloudToken(authToken, url);
     return { ok: true, messages: await cloudClient.portalMessages(url, shopId, token, authToken) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-portal-reply', async (_e, { url, shopId, token, authToken, text } = {}) => {
   try {
-    authToken = resolveStoreSecret(authToken, d => d?.settings?.cloud?.token);
+    authToken = cloudToken(authToken, url);
     return { ok: true, ...(await cloudClient.portalReply(url, shopId, token, authToken, text)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-billing-me', async (_e, { url, shopId, token } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.billingMe(url, shopId, token)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
@@ -6176,14 +6206,14 @@ ipcMain.handle('hub:cloud-billing-me', async (_e, { url, shopId, token } = {}) =
 // Store the (already-encrypted) keyset server-side so other devices can fetch it.
 ipcMain.handle('hub:cloud-put-keyset', async (_e, { url, shopId, token, keyset } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.putKeyset(url, shopId, token, keyset)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:cloud-unlock', (_e, { url, shopId, token, keyset, passphrase } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     const dek = cloudClient.unlockWithPassphrase(String(passphrase || ''), keyset);
     cloudBackend = cloudClient.backendFor(url, shopId, token, dek, {
       // Warm launch: let this session start from the server view the last one
@@ -6298,7 +6328,7 @@ ipcMain.handle('hub:org-change-passphrase', (_e, { orgKeyset, currentPassphrase,
 ipcMain.handle('hub:org-overview', async (_e, { url, shopId, token, today } = {}) => {
   if (!orgKey) return { ok: false, error: 'locked' };
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     const members = await cloudClient.getOrgKeysets(url, shopId, token);
     const branches = [];
     for (const m of members) {
@@ -6325,21 +6355,21 @@ ipcMain.handle('hub:org-overview', async (_e, { url, shopId, token, today } = {}
 /* Org membership on the server — the wrapped org keyset and which branches are in. */
 ipcMain.handle('hub:org-get', async (_e, { url, shopId, token } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, org: await cloudClient.getOrg(url, shopId, token) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:org-put', async (_e, { url, shopId, token, orgId: id, keyset } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.putOrg(url, shopId, token, id, keyset)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:org-leave', async (_e, { url, shopId, token } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     const r = await cloudClient.leaveOrgRemote(url, shopId, token);
     clearOrgSession();
     return { ok: true, ...r };
@@ -6348,21 +6378,21 @@ ipcMain.handle('hub:org-leave', async (_e, { url, shopId, token } = {}) => {
 
 ipcMain.handle('hub:org-invite', async (_e, { url, shopId, token } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.createOrgInvite(url, shopId, token)) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:org-join', async (_e, { url, shopId, token, code } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, ...(await cloudClient.joinOrgRemote(url, shopId, token, String(code || '').trim())) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
 ipcMain.handle('hub:org-members', async (_e, { url, shopId, token } = {}) => {
   try {
-    token = resolveStoreSecret(token, d => d?.settings?.cloud?.token);
+    token = cloudToken(token, url);
     return { ok: true, members: await cloudClient.listOrgMembers(url, shopId, token) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
@@ -6432,6 +6462,11 @@ ipcMain.handle('hub:fire-webhook', async (event, { url, event: webhookEvent, pay
   // check-then-fetch let a rebinding name through. lib/webhook-send.js.
   if (!url || !url.startsWith('https://')) return { ok: false, error: 'Invalid URL — only https:// allowed' };
   try {
+    // The order-event webhook comes through here too (deliverWebhook), and its
+    // secret reaches the window masked. Fill it in only for its saved URL; a
+    // subscription's own secret is not masked and passes through.
+    secret = resolveStoreSecretFor(secret, d => d?.settings?.eventWebhooks?.secret,
+      SecretDestination.urlKey(url), d => SecretDestination.urlKey(d?.settings?.eventWebhooks?.url));
     const body = JSON.stringify(webhookBus.buildWireBody(webhookEvent, payload));
     // V1 stays bare hex, as this transport has always sent it; V2 and the
     // timestamp are added (see webhook-send.js).
