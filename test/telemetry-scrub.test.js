@@ -216,3 +216,12 @@ test('the Mac 4.0 alpha lane keeps its channel (khayt-cloud #114 accepts alpha)'
   assert.equal(S.buildCrashReport({ channel: 'alpha' }).channel, 'alpha');
   assert.equal(S.buildUsageEvent({ feature: 'app_launch', channel: 'alpha' }).channel, 'alpha');
 });
+
+test('a quoted value is redacted, a quoted code name is kept', () => {
+  const T = require('../lib/telemetry-scrub.js');
+  assert.equal(T.scrubText("Cannot read properties of undefined (reading 'name')"),
+    "Cannot read properties of undefined (reading 'name')");
+  assert.equal(T.scrubText("No client 'Noura Al-Qahtani'"), "No client '<redacted>'");
+  assert.equal(T.scrubText('Unknown material "Galaxy Black"'), 'Unknown material "<redacted>"');
+  assert.equal(T.scrubText("bad value 'ريم'"), "bad value '<redacted>'");
+});
