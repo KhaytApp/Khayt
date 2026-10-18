@@ -10,6 +10,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   arrived in a different lot from the spool it was ordered for, received as
   its own spool, so the screens that show one are drawn with one.
 
+- **Desktop: the LAN server's PIN checks now match the Mac app's.** The owner
+  PIN is only read from the `x-khayt-pin` header, never from `?pin=` in an
+  address, because an address puts the PIN in clear text in history and logs.
+  An old queue-page bookmark with `?pin=` still works once: it is swapped for
+  a sign-in cookie and the PIN disappears from the address. Opening the queue
+  page without a PIN now shows a PIN form. Requests that arrive under someone
+  else's domain name are refused, which blocks DNS-rebinding attacks. The
+  calendar feed accepts only its own token, not the PIN. **A LAN PIN shorter
+  than 8 characters no longer opens anything.** If yours is shorter, the
+  Online panel says so; set a longer one in Settings → Online before phones
+  and the queue page can connect again. The Mac app already worked this way.
 - **Mac: customer records for your web store can be turned on.** The privacy
   policy now covers the copy (khaytapp.com/privacy, "Customer records"), so the
   switch in Settings → Online works. It stays off until a shop turns it on, and
