@@ -7853,6 +7853,73 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.82] - 2026-10-19
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Printers can be put under service, retired or deleted. A customer's data can
+be exported or erased. And a full review of the app fixed sync, money, stock
+and security problems.
+
+### Added
+
+- **Under service, retired, or deleted.** A printer's menu on the Machines
+  screen, and its sheet, now offer:
+  - **Mark Under Service:** takes it off the work, with a reason and a date
+    on its card, and it isn't polled.
+  - **Retire:** for a printer sold or scrapped. It is kept for its history
+    (jobs, costs, service) and taken out of everything day to day. Its
+    unfinished jobs lose their printer so they can be placed again.
+  - **Delete:** only for a printer nothing in the book refers to. Otherwise
+    the menu says what still refers to it and offers Retire instead.
+
+  Retired printers are listed under "Retired" and can be returned to service.
+- **A customer's data, exported or erased.** From a customer's menu or
+  detail: **Export Customer's Data…** saves everything held about them as a
+  file. **Erase Customer…** offers Unlink or Full erase. Orders with an
+  invoice or a payment keep the customer's name, because tax invoices must
+  be kept as issued. Both can be undone.
+- **The iPhone can check it is talking to your Mac.** The Mac has its own
+  identity key, so a phone can tell it apart from a device that copies its
+  name, before it sends the PIN.
+
+### Fixed
+
+- **Sync:** a spool, gift card, loyalty redemption or message template made
+  on the Mac reaches your other devices. Before, it waited in the cloud
+  until someone edited it.
+- **Money:**
+  - Quotes, cancelled and voided orders are no longer counted as owed.
+  - A deposit on a shop that adds tax on top no longer leaves the tax
+    unbilled.
+  - The accountant's export counts each split job once and leaves out
+    voided and non-business orders.
+  - A credit note takes off the tax too.
+  - The order's Total is what the customer is billed.
+- **Stock:**
+  - A delivery that came in a new lot is priced for what arrived.
+  - Deleting a waste entry puts back only what it took.
+  - Receiving can't be done twice by a double click.
+  - Receiving for a spool that was deleted is refused.
+- **Product sheet:** "Show on web store" lists a product again, and a
+  cleared margin or translation stays cleared.
+- **Library:** Delete for several models at once works.
+- **Printers:**
+  - Test checks Bambu and Elegoo printers properly.
+  - A Mac-only shop can create its first maintenance task.
+  - A printer's host name must be on the shop's network before its key is
+    sent.
+  - Printer errors are in Arabic in the Arabic app.
+- **Customer records:**
+  - Turning them off turns them off for every Mac in the shop.
+  - Restoring a backup doesn't turn them back on.
+  - An erased customer leaves Khayt Cloud at once.
+- **Security:** a customer's 3MF upload is sliced as shapes only, with its
+  own slicer settings removed. Crash reports leave out names.
+- **Arabic:** about eighty error messages that were English are now in
+  Arabic, along with several labels that showed their key.
+
 ## [4.0.0-alpha.81] - 2026-10-18
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
