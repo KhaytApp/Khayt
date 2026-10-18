@@ -100,7 +100,19 @@ enum Backups {
         stamp.locale = Locale(identifier: "en_US_POSIX")
         stamp.calendar = .book
         stamp.dateFormat = "HHmm"
-        let target = directory.appending(path: Shop.today(now) + "-" + stamp.string(from: now) + ".json")
+        var target = directory.appending(path: Shop.today(now) + "-" + stamp.string(from: now) + ".json")
+        // TWO IN ONE MINUTE: the second used to overwrite the first — and a
+        // restore's safety copy, taken the same minute as the backup being
+        // restored, replaced that very backup with the book it was undoing.
+        if FileManager.default.fileExists(atPath: target.path) {
+            stamp.dateFormat = "HHmmss"
+            let base = Shop.today(now) + "-" + stamp.string(from: now)
+            target = directory.appending(path: base + ".json")
+            var n = 2
+            while FileManager.default.fileExists(atPath: target.path) {
+                target = directory.appending(path: base + "-\(n).json"); n += 1
+            }
+        }
         try Data(contentsOf: build.storeURL).write(to: target, options: .atomic)
         try await rotate(directory: directory, engine: engine, keep: keep, except: except)
         return target

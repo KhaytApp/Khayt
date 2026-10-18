@@ -60,9 +60,14 @@ extension Shop {
     /// so that closing the sheet with the × does not lose it. Only the log is
     /// touched: the rest of the record stays as it is on disk, whatever a
     /// sheet somewhere else is holding.
-    func addCommunication(_ entry: CommEntry, to clientId: String) async {
+    /// `gate` is the permission the ACTION needs. A job update sent to a
+    /// customer is order work, which staff may do; its log line is part of
+    /// that send, not an edit of the customer, so it is written under the
+    /// send's own permission rather than refused after WhatsApp has opened.
+    func addCommunication(_ entry: CommEntry, to clientId: String,
+                          gate: (area: String, action: String) = ("clients", "edit")) async {
         moveProblem = nil
-        guard permitted("clients", "edit") else { return }
+        guard permitted(gate.area, gate.action) else { return }
         guard let build = source.build else {
             moveProblem = words.callIt("mac.move_sample"); return
         }

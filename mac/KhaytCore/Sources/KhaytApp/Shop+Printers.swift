@@ -248,9 +248,20 @@ extension Shop {
     func slicedFiles(for job: Order) -> [URL] {
         var out: [URL] = []
         for part in job.parts {
-            guard let id = part.printFileId, let file = files.first(where: { $0.id == id }),
-                  let dir = directory(for: file) else { continue }
-            for url in PrinterSend.slicedFiles(in: dir) where !out.contains(url) { out.append(url) }
+            guard let id = part.printFileId, let file = files.first(where: { $0.id == id }) else { continue }
+            if let dir = directory(for: file) {
+                for url in PrinterSend.slicedFiles(in: dir) where !out.contains(url) { out.append(url) }
+            }
+            // A LINKED model lives where the shop keeps it, and its slicer
+            // writes the G-code beside it — the app's own folder for it holds
+            // only pictures. That folder can hold a whole shelf of other
+            // jobs' G-code, so only files named after this model are taken.
+            if let path = file.externalPath, !path.isEmpty {
+                let model = URL(fileURLWithPath: path)
+                for url in PrinterSend.slicedFiles(in: model.deletingLastPathComponent(),
+                                                   namedAfter: model.deletingPathExtension().lastPathComponent)
+                where !out.contains(url) { out.append(url) }
+            }
         }
         return out
     }

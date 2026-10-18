@@ -1223,8 +1223,9 @@ extension Shop {
             // correct, and saying otherwise would send a shop looking for a
             // problem with a conversion that worked. It is said separately.
             var landed = false
+            var addedId: String?
             do {
-                _ = try await LibraryImport.add(destination, shop: self, keepOriginal: true)
+                addedId = try await LibraryImport.add(destination, shop: self, keepOriginal: true).id
                 landed = true
             } catch let refusal as LibraryImport.Failure {
                 convertProblem = refusal.description
@@ -1235,10 +1236,12 @@ extension Shop {
             // Only once the replacement is IN the library. Putting the
             // original aside in favour of a file the library does not have
             // would leave the shop with neither.
-            if replaceOriginal, landed,
-               let replacement = files.first(where: { $0.name == destination.lastPathComponent })
-                                 ?? files.first(where: { $0.title == destination.deletingPathExtension().lastPathComponent }) {
-                await supersede(file, with: replacement.id)
+            // BY THE ID THE IMPORT HANDED BACK. Looked up by title, the first
+            // model of that name won — an older conversion, or the original
+            // itself, which was then put aside as superseded by itself.
+            if replaceOriginal, landed, let addedId, addedId != file.id,
+               files.contains(where: { $0.id == addedId }) {
+                await supersede(file, with: addedId)
             }
 
             convertNote = words.callIt(landed ? "mac.converted_into_library" : "mac.converted", [

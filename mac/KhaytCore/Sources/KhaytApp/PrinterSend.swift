@@ -99,6 +99,16 @@ enum PrinterSend {
 
     /// The files in a folder that look sliced — what a job's model folder
     /// offers to send. Newest first: the plate sliced last is the one meant.
+    /// The same, keeping only files whose name starts with `stem` (case and
+    /// width folded): a sliced copy of a model is named after it.
+    static func slicedFiles(in folder: URL, namedAfter stem: String) -> [URL] {
+        let key = stem.folding(options: [.caseInsensitive, .widthInsensitive], locale: nil)
+        guard !key.isEmpty else { return [] }
+        return slicedFiles(in: folder).filter {
+            $0.lastPathComponent.folding(options: [.caseInsensitive, .widthInsensitive], locale: nil).hasPrefix(key)
+        }
+    }
+
     static func slicedFiles(in folder: URL) -> [URL] {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]
         guard let found = try? FileManager.default.contentsOfDirectory(

@@ -4,6 +4,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: more fixes from the full review.**
+  - **Converting a model with "replace the original"** puts the right model
+    aside. Before, it could hide an older conversion, or the original as
+    replaced by itself.
+  - **"Send to printer" for a linked model** finds the G-code sliced next to
+    the shop's own file.
+  - **Two backups in the same minute** are both kept. Before, the second
+    overwrote the first.
+  - **An order's Total** on a shop that adds tax on top is what the
+    customer is billed, the same figure Paid and Owed are measured against.
+  - **WhatsApp updates sent by staff** are logged on the customer. A
+    viewer can no longer send one.
+  - **Switching tax off** on a shop with two tax rates (such as CGST and
+    SGST) turns it off.
+
 - **iPhone: the phone asks before following its Mac to a new address.** When
   the Mac stops answering and its name turns up somewhere else on the
   network, the phone used to move there by itself and send its PIN along.
