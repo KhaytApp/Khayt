@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a saved password or token only goes to the address saved with
+  it.** The app fills saved secrets in itself and never shows them to the
+  window, but it used to take the address to send them to from the window.
+  Something injected into the window could therefore have had the Khayt Cloud
+  token, the accounting or event webhook secret, an SMS webhook secret or the
+  mail server password sent to an address of its choosing. Each one now goes
+  only to its own saved server or URL. Changing that address in Settings while
+  leaving the secret untouched clears the secret, so it has to be entered
+  again. Signing in to a different Khayt Cloud server already does this.
 - **Mac: customer records for your web store can be turned on.** The privacy
   policy now covers the copy (khaytapp.com/privacy, "Customer records"), so the
   switch in Settings → Online works. It stays off until a shop turns it on, and
