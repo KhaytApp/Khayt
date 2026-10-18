@@ -97,6 +97,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   machine pickers; past orders still name it. A machine marked offline shows
   as Offline and is left out of the pickers.
 
+- **Desktop: a paired iPhone can check it is talking to your computer.** The
+  LAN server now has its own key, made once and stored sealed in the keychain.
+  It answers `GET /api/identity` (requires the PIN) with the key's public part
+  and `GET /api/proof` with a signature. Before sending the PIN, the iPhone
+  can check that whatever answers to the shop's network name is the computer
+  it paired with, not a device copying that name. The Mac app answers the
+  same two requests.
 - **Mac: the board says why a lot search found a card.** A job on the board
   found only by the filament lot it drew from shows that lot, as its row in
   the orders list already did. The sample shop now holds a delivery that

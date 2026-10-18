@@ -4417,6 +4417,14 @@ registerLanServer({
   // Signed webhooks already accepted, kept 30 days so a replay is refused
   // after a restart too (lib/webhook-replay.js, SEC-010).
   webhookSeenPath: () => path.join(app.getPath('userData'), 'khayt-webhook-seen.json'),
+  // The key a paired phone checks this computer against before sending the
+  // PIN (lib/lan-identity.js). Made on first use, sealed by the keychain.
+  lanIdentity: require('./lib/lan-identity').createLanIdentity({
+    fs,
+    keyPath: path.join(app.getPath('userData'), 'khayt-lan-identity.key'),
+    seal: (s) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(s) : null),
+    unseal: (b) => safeStorage.decryptString(b),
+  }),
 });
 
 /**
