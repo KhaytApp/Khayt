@@ -4,6 +4,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: small fixes from a full review.**
+  - **Words:** the VAT line on an order's money block, the Copy button on a
+    message and the printer sheet's Undo now show words, not their keys.
+  - **Arrows:** the arrows between an estimate and what a print really took,
+    and between a late job's due day and finish day, point the right way in
+    Arabic. The days are written in the shop's own words.
+  - **Dark mode:** a chosen filter in a custom report is readable.
+  - **Crashes:** a customer's lead time or a survey without a rating can no
+    longer crash the app.
+  - **Lock:** accepting an older cloud copy needs the cloud permission, like
+    every other cloud action.
+
 - **Mac: customer records for your web store can be turned on.** The privacy
   policy now covers the copy (khaytapp.com/privacy, "Customer records"), so the
   switch in Settings → Online works. It stays off until a shop turns it on, and
