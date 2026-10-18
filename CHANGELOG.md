@@ -4,17 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: find every job printed from a filament lot.** Inventory ▸
-  Stock List has a **Lot recall** button. Pick a lot and Khayt lists every
-  job that took filament from it, newest first, with the customer and the
-  grams, failed prints included. Click a job to open it, or **Copy as CSV**
-  for a recall list. A spool's **Usage History** now shows the lot each use
-  came from, and a spool with a lot has a **Jobs from lot …** button. A use
-  recorded before Khayt saved the lot with each use takes the spool's
-  current lot and is marked *(inferred)*.
-- **Desktop: a spool's "Total consumed" no longer drops when a delivery is
-  received.** A purchase-order receipt was counted as negative use.
-
 - **iPhone: on iPhone Duo's inner display, Machines and Clients sit two
   across.** Each machine card and client row used to stretch over the full
   width of the unfolded screen. The folded outer display and other iPhones
@@ -23,12 +12,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   Settings keeps the calculator's reading width, so a switch sits near its
   label.
 
-- **Desktop: switching spools mid-job and test prints record the lot.**
-  Filament taken off a spool partway through a job, and a test print's
-  filament, now carry the spool's lot (and the purchase order it came in on)
-  the same way a finished job's filament does. A recall then lists them under
-  the lot they were printed from, even after the spool's lot is changed.
-  Spools with no lot record exactly what they did before.
 
 - **Mac: with "Use the Mac's number format" on, editors keep their
   figures.** On a Mac that writes Arabic-Indic digits, opening a product,
@@ -5694,6 +5677,30 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.14] - 2026-10-18
+
+Find every job printed from a filament lot, since 3.11.13.
+Individual entries are kept below; this is what changed for you.
+
+Inventory has a Lot recall: pick a lot and see every job that used it, failed prints included, and copy the list as CSV. A spool's usage history shows the lot each use came from, and switching spools mid-job and test prints now record it too. A spool's "Total consumed" no longer goes down when a delivery is received.
+
+- **Desktop: find every job printed from a filament lot.** Inventory ▸
+  Stock List has a **Lot recall** button. Pick a lot and Khayt lists every
+  job that took filament from it, newest first, with the customer and the
+  grams, failed prints included. Click a job to open it, or **Copy as CSV**
+  for a recall list. A spool's **Usage History** now shows the lot each use
+  came from, and a spool with a lot has a **Jobs from lot …** button. A use
+  recorded before Khayt saved the lot with each use takes the spool's
+  current lot and is marked *(inferred)*.
+- **Desktop: a spool's "Total consumed" no longer drops when a delivery is
+  received.** A purchase-order receipt was counted as negative use.
+- **Desktop: switching spools mid-job and test prints record the lot.**
+  Filament taken off a spool partway through a job, and a test print's
+  filament, now carry the spool's lot (and the purchase order it came in on)
+  the same way a finished job's filament does. A recall then lists them under
+  the lot they were printed from, even after the spool's lot is changed.
+  Spools with no lot record exactly what they did before.
 
 ## [3.11.13] - 2026-10-16
 
