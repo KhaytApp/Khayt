@@ -273,6 +273,8 @@ test('the lifted record and the original agree, all forty-five fields', () => {
     if (recordA.paidAmount > 0) {
       recordA.paidAmount = +Math.min(recordA.paidAmount, recordA.price).toFixed(2);
       recordA.paidGross = true;
+      // And the deposit stored is the one taken (alpha.82 review).
+      recordA.depositAmount = recordA.paidAmount;
     }
 
     const b = JSON.parse(JSON.stringify(shop));

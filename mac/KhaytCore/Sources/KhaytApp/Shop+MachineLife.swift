@@ -244,7 +244,7 @@ extension Shop {
                 moveProblem = words.callIt("mac.life_delete_refused_now") + " " + cannotDeleteSentence(verdict)
             }
         } catch {
-            moveProblem = String(describing: error)
+            moveProblem = self.said(error)
         }
     }
 

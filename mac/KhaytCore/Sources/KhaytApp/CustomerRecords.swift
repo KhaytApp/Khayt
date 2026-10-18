@@ -23,6 +23,18 @@ import SwiftUI
 /// What this Mac last sent is kept in UserDefaults per shop, not in the book:
 /// it is this Mac's memory of its own sends, and a synced book would hand one
 /// Mac's memory to another that never sent anything.
+/// A send asked for while another was on its way (`publishCustomerRecords`).
+struct CustomerRecordsAsk: Equatable, Sendable {
+    var delete: Bool
+    var byPerson: Bool
+    var urgent: Bool
+    /// Two asks as one: the person's intent wins over the loop's.
+    func merged(_ other: CustomerRecordsAsk) -> CustomerRecordsAsk {
+        CustomerRecordsAsk(delete: other.byPerson ? other.delete : (byPerson ? delete : (delete || other.delete)),
+                           byPerson: byPerson || other.byPerson, urgent: urgent || other.urgent)
+    }
+}
+
 @MainActor
 enum CustomerRecordsPublisher {
     enum Failure: Error, LocalizedError, Equatable {
@@ -102,11 +114,20 @@ enum CustomerRecordsPublisher {
         case 401: throw Failure.unauthorised
         case 403: throw Failure.readOnly
         case 404, 405: throw Failure.notOffered
-        case 409 where body != nil: throw Failure.offElsewhere
+        // Only the cloud's own "disabled": a 409 from anything else (a proxy,
+        // another conflict) must not switch a shop's uploads off for it.
+        case 409 where body != nil && Self.saysDisabled(data): throw Failure.offElsewhere
         case 413: throw Failure.tooLarge
         case 429: throw Failure.limited(retryAfter: retryAfter(http?.value(forHTTPHeaderField: "Retry-After")))
         case let code: throw Failure.http(code, String(decoding: data.prefix(200), as: UTF8.self))
         }
+    }
+
+    /// `{"error":"disabled"}` — khayt-cloud #122's answer when the shop was
+    /// switched off on another Mac.
+    nonisolated static func saysDisabled(_ data: Data) -> Bool {
+        guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        return (o["error"] as? String) == "disabled"
     }
 
     /// What a body is, for "has it changed since I sent it": a SHA-256 of its
@@ -161,9 +182,37 @@ extension Shop {
     /// deletes it" is what the pane promises.
     /// `byPerson` is the switch being pressed, on or off — see
     /// `CustomerRecordsPublisher.publish`. The loop never passes it.
-    func publishCustomerRecords(now: Date = Date(), delete: Bool = false, byPerson: Bool = false) async {
+    /// ── ONE AT A TIME ───────────────────────────────────────────────────────
+    ///
+    /// The ten-minute loop and a person's erase could both be sending, and
+    /// the loop's PUT — built before the erase — could land after it and put
+    /// the erased customer back (alpha.82 review). A call that finds a send
+    /// on its way is queued, merged with any other queued one so a person's
+    /// off or on is never lost, and run as soon as it lands.
+    ///
+    /// `urgent` sends once even while the cloud has asked for fewer uploads:
+    /// an erased customer's record staying readable for an hour is the worse
+    /// of the two. Only a person's action passes it.
+    func publishCustomerRecords(now: Date = Date(), delete: Bool = false, byPerson: Bool = false,
+                                urgent: Bool = false) async {
+        var ask = CustomerRecordsAsk(delete: delete, byPerson: byPerson, urgent: urgent)
+        if customerRecordsSending {
+            customerRecordsQueued = customerRecordsQueued.map { $0.merged(ask) } ?? ask
+            return
+        }
+        customerRecordsSending = true
+        defer { customerRecordsSending = false }
+        while true {
+            await publishCustomerRecordsOnce(now: now, delete: ask.delete, byPerson: ask.byPerson, urgent: ask.urgent)
+            guard let next = customerRecordsQueued else { break }
+            customerRecordsQueued = nil
+            ask = next
+        }
+    }
+
+    private func publishCustomerRecordsOnce(now: Date, delete: Bool, byPerson: Bool, urgent: Bool) async {
         guard let engine, let build = source.build else { return }
-        if let notBefore = customerRecordsNotBefore, now < notBefore { return }
+        if !urgent, let notBefore = customerRecordsNotBefore, now < notBefore { return }
         do {
             let connection = try CloudReader.connection(settingsDict)
             let state = try await engine.customerRecordsState(settings: settingsDict)

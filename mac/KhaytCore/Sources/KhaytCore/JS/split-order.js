@@ -33,6 +33,23 @@
    * @param {{price:number, paid:number, credited:number, costs:number[]}} input
    * @returns {{price:number, paidAmount:number, credited:number}[]} one per group
    */
+  /** `amounts` moved so none is above its `caps`, keeping the total where it fits. */
+  function within(amounts, caps) {
+    const cents = amounts.map((a) => Math.round(a * 100));
+    const room = caps.map((c, i) => Math.round(c * 100) - cents[i]);
+    let spare = 0;
+    for (let i = 0; i < cents.length; i++) {
+      if (room[i] < 0 && cents[i] > 0) { const over = Math.min(-room[i], cents[i]); cents[i] -= over; spare += over; room[i] += over; }
+    }
+    for (let i = 0; i < cents.length && spare > 0; i++) {
+      if (room[i] > 0) { const give = Math.min(room[i], spare); cents[i] += give; room[i] -= give; spare -= give; }
+    }
+    // Paid more than the whole price: what is left stays on the last part, as
+    // it always has, rather than vanishing.
+    if (spare > 0) cents[cents.length - 1] += spare;
+    return cents.map((c) => c / 100);
+  }
+
   function splitMoney({ price = 0, paid = 0, credited = 0, costs = [] } = {}) {
     const weights = costs.map((c) => Math.max(0, +c || 0));
     const total = weights.reduce((s, c) => s + c, 0);
@@ -59,7 +76,11 @@
     };
 
     const prices = share(price);
-    const paids = share(paid);
+    // NEVER MORE PAID THAN PRICED. Shared out separately, the cents of the
+    // payment and of the price could round apart, so a part priced 0.14 was
+    // paid 0.15 — a sub-order "overpaid" by a cent the customer never gave.
+    // The excess moves, cent by cent, to the parts that still have room.
+    const paids = within(share(paid), prices);
     const credits = share(credited);
     return weights.map((_, i) => ({ price: prices[i], paidAmount: paids[i], credited: credits[i] }));
   }

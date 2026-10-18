@@ -2386,6 +2386,10 @@ final class Shop {
     var customerRecordsProblem = false
     /// After a 429: nothing is sent before this.
     var customerRecordsNotBefore: Date?
+    /// One send at a time (`publishCustomerRecords`): what arrived while one
+    /// was on its way, merged, to run once it lands.
+    var customerRecordsSending = false
+    var customerRecordsQueued: CustomerRecordsAsk?
     /// `KhaytCustomerRecords.READY`: false until the privacy policy covers
     /// the copy, and the pane's switch stays shut.
     var customerRecordsReady = false

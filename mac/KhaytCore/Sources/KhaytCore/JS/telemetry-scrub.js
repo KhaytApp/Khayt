@@ -95,11 +95,13 @@
     // QUOTED VALUES. An error quoting what it was handed — "No client 'Noura
     // Al-Qahtani'", "Unknown material "Galaxy Black"" — carries shop data no
     // pattern above has a shape for. A quoted CODE NAME is what makes a crash
-    // readable ("reading 'name'"), so an identifier is kept and anything else
+    // readable ("reading 'name'"), so a lower-case identifier or dotted path
+    // is kept — a capitalised word is far more often a person ('Noura'), and
+    // a file name carries one too ('Noura_order.3mf') — and anything else
     // between quotes is redacted. Up to 120 characters, so an unpaired quote
     // cannot swallow the message.
     out = out.replace(/(['"`\u2018\u201C])([^'"`\u2018\u2019\u201C\u201D\n]{1,120})(['"`\u2019\u201D])/g,
-      (m, open, body, close) => (/^[A-Za-z_$][\w$.]*$/.test(body) ? m : open + REDACTED + close));
+      (m, open, body, close) => (/^[a-z_$][\w$]*(?:\.[a-z_$][\w$]*)*$/.test(body) ? m : open + REDACTED + close));
     return out;
   }
 

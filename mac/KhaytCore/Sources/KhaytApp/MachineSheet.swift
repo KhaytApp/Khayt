@@ -1284,7 +1284,7 @@ struct MachineSheet: View {
             if !typed.isEmpty {
                 guard let build else { saveProblem = words.callIt("mac.move_sample"); return }
                 do { sealed = try await Self.sealEach(typed) { typed in try await Secrets.seal(typed, for: build) } }
-                catch { saveProblem = String(describing: error); return }
+                catch { saveProblem = shop.said(error); return }
             }
             if clearing { api["apiKey"] = .string("") }
             else if let key = sealed["apiKey"] { api["apiKey"] = .string(key) }

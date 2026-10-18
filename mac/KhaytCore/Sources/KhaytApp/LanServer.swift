@@ -2746,8 +2746,17 @@ extension Shop {
         guard (try? data.write(to: model, options: .atomic)) != nil else { return nil }
         // Its shapes only: a 3MF's own settings can name a command the slicer
         // runs (`SlicerRun.keepOnlyTheModel`). Unreadable is not sliced.
+        // Off the main actor and on the measuring queue, like the slice: it
+        // unpacks a stranger's zip, and on the shop's main actor a large one
+        // froze the window (alpha.82 review). Held to 64 MB unpacked — a
+        // customer's model, not a project archive.
         if ext.lowercased() == "3mf" {
-            guard (try? SlicerRun.keepOnlyTheModel(model)) != nil else { return nil }
+            let stripped: Bool = await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
+                LanServer.measureQueue.async {
+                    done.resume(returning: (try? SlicerRun.keepOnlyTheModel(model, limit: 64 << 20)) != nil)
+                }
+            }
+            guard stripped else { return nil }
         }
         // A customer's upload is nearly always a bare mesh, and an Orca fork
         // will not slice one without a printer, print and filament profile —

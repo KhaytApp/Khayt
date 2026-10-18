@@ -199,3 +199,10 @@ test('7. no share of a split is ever negative, and the shares add back up', () =
   // Even split when nothing is costed.
   assert.deepEqual(splitMoney({ price: 1, costs: [0, 0, 0] }).map((s) => s.price), [0.34, 0.33, 0.33]);
 });
+
+test('no part is paid more than its own price, and the payment still adds up', () => {
+  const S = require('../lib/split-order.js');
+  const r = S.splitMoney({ price: 14.01, paid: 13.97, costs: [0.14, 0.99, 3.97, 8.38] });
+  for (const g of r) assert.ok(g.paidAmount <= g.price + 1e-9, JSON.stringify(g));
+  assert.equal(+r.reduce((s, g) => s + g.paidAmount, 0).toFixed(2), 13.97);
+});
