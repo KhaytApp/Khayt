@@ -176,16 +176,36 @@ test('deleting a job\'s waste takes its line out of the spool history, so a reca
   assert.equal(inv[0].usageHistory[0].date, 'earlier');
 });
 
-test('restoreDrawn without a job leaves history alone; a split draw removes every line it wrote', () => {
-  const inv = [{ id: 'S1', weight: 0, usageHistory: [
-    { orderId: 'J1', weightUsed: 30 }, { orderId: 'J1', weightUsed: 20 }, { orderId: 'J2', weightUsed: 50 },
+test('restoreDrawn takes back the lines its waste entry tagged, and never guesses at the job\'s own', () => {
+  const inv = () => [{ id: 'S1', weight: 0, usageHistory: [
+    { orderId: 'J1', weightUsed: 30, wasteId: 'W1' }, { orderId: 'J1', weightUsed: 20, wasteId: 'W1' },
+    { orderId: 'J1', weightUsed: 50 }, { orderId: 'J2', weightUsed: 50 },
     { type: 'received', orderId: 'J1', weightUsed: -50 },
   ] }];
-  D.restoreDrawn([{ spoolId: 'S1', grams: 50 }], { inventory: inv });
-  assert.equal(inv[0].usageHistory.length, 4);
-  D.restoreDrawn([{ spoolId: 'S1', grams: 50 }], { inventory: inv, orderId: 'J1' });
-  assert.deepEqual(inv[0].usageHistory.map((h) => h.orderId + ':' + h.weightUsed), ['J2:50', 'J1:-50']);
-  assert.equal(inv[0].weight, 100);
+  const a = inv();
+  D.restoreDrawn([{ spoolId: 'S1', grams: 50 }], { inventory: a });
+  assert.equal(a[0].usageHistory.length, 5, 'no job: history left alone');
+  const b = inv();
+  D.restoreDrawn([{ spoolId: 'S1', grams: 50 }], { inventory: b, orderId: 'J1', wasteId: 'W1' });
+  assert.deepEqual(b[0].usageHistory.map((h) => h.orderId + ':' + h.weightUsed), ['J1:50', 'J2:50', 'J1:-50'],
+    'the tagged split lines go; the job\'s 50 g print line stays');
+  assert.equal(b[0].weight, 50);
+  // An entry from before the tag: the exact line only, and no guessing.
+  const c = [{ id: 'S1', weight: 0, usageHistory: [{ orderId: 'J1', weightUsed: 30 }, { orderId: 'J1', weightUsed: 20 }] }];
+  D.restoreDrawn([{ spoolId: 'S1', grams: 50 }], { inventory: c, orderId: 'J1', wasteId: 'old' });
+  assert.equal(c[0].usageHistory.length, 2, 'two print lines that add up to the grams are not the waste');
+});
+
+test('a job\'s waste, logged and deleted, leaves the job\'s print lines as they were', () => {
+  const W = require('../lib/waste-entry.js');
+  const order = { id: 'J1', project: 'Vase', parts: [{ id: 'p', filamentId: 'S1', printWeight: 40 }] };
+  const inventory = [{ id: 'S1', material: 'PLA', weight: 500, usageHistory: [{ orderId: 'J1', weightUsed: 40, date: 'd0' }] }];
+  const r = W.forOrder(order, { material: 'PLA', weight: 40 }, { id: 'W9', today: 'd1', inventory, settings: {} });
+  const log = [r.entry];
+  assert.ok(inventory[0].usageHistory.some((h) => h.wasteId === 'W9'), 'the waste line is tagged');
+  W.removeEntry(log, 'W9', { inventory });
+  assert.deepEqual(inventory[0].usageHistory, [{ orderId: 'J1', weightUsed: 40, date: 'd0' }]);
+  assert.equal(inventory[0].weight, 500);
 });
 
 // ── 7. The tax is held against the NEW price ────────────────────────────────
