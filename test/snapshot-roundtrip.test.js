@@ -142,7 +142,7 @@ test('an order built from a hostile outside body still survives normalization', 
   const { registerLanServer } = require(path.join(ROOT, 'lib/lan-server.js'));
 
   const PORT = 3988;
-  const PIN = '4321';
+  const PIN = '43218765';
   const handlers = new Map();
   const noop = () => {};
   let store = {

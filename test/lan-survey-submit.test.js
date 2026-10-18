@@ -61,7 +61,7 @@ before(async () => {
     appRoot: ROOT,
     getPrinterStatusCache: () => ({}),
   });
-  const r = await handlers.get('hub:start-lan-server')(null, { port: PORT, pin: '4321', bindLan: 'loopback' });
+  const r = await handlers.get('hub:start-lan-server')(null, { port: PORT, pin: '43218765', bindLan: 'loopback' });
   assert.ok(r && r.ok, `server did not start: ${JSON.stringify(r)}`);
 });
 

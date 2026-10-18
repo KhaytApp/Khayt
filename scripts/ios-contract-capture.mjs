@@ -133,7 +133,7 @@ if (!start) throw new Error('hub:start-lan-server was never registered');
 const PORT = 3987;
 // The owner PIN gates every route carrying shop data — which is all of them bar
 // /api/status. The phone sends it as `x-khayt-pin`; so does this capture.
-const PIN = '4321';
+const PIN = '43218765';
 const res = await start(null, { port: PORT, pin: PIN, bindLan: 'loopback' });
 if (!res?.ok) throw new Error(`server did not start: ${JSON.stringify(res)}`);
 

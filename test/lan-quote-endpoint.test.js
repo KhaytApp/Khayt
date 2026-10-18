@@ -25,7 +25,7 @@ const ROOT = path.join(__dirname, '..');
 const { registerLanServer } = require(path.join(ROOT, 'lib/lan-server.js'));
 
 const PORT = 3991;
-const PIN = '4321';
+const PIN = '43218765';
 const BASE = `http://127.0.0.1:${PORT}`;
 
 const handlers = new Map();

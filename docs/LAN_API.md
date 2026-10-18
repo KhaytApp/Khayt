@@ -49,7 +49,7 @@ Authorization: Bearer khayt_<random>
 | Mechanism | Details |
 |-----------|---------|
 | Header | `x-khayt-pin: <owner-pin>` (preferred for native clients) |
-| Query | `?pin=<owner-pin>` (used by some PWA links) — **desktop app only**. The native Mac app ignores `?pin=` on every API route, read or write, and takes the header; the one exception is the queue page's old `/?pin=` bookmark, which it trades once for a session cookie |
+| Query | **Not accepted** on any API route, read or write, by either app (it put the PIN in every link's address, in clear over plain HTTP). The one exception is the queue page's old `/?pin=` bookmark, which is traded once for a `khayt_lan` session cookie and a redirect to a clean `/`; the page with no PIN shows a form that posts it to `/session` |
 
 **Owner PIN** is `settings.lanApi.pin` in the store — same as kiosk / queue API.
 
@@ -59,7 +59,8 @@ Authorization: Bearer khayt_<random>
 - If **no** owner PIN is configured, sensitive `GET` routes return **401** (queue/inventory/machines are unavailable until a PIN is set).
 - **Writes** without a configured PIN return **403**.
 - **Brute force:** 10 failed attempts per client IP → **429** for 1 minute (the native Mac app counts an IPv6 client from outside the shop's network per /64, and a link-local, unique-local or same-network IPv6 client by its own address).
-- **Native Mac app:** an owner PIN shorter than 8 characters opens nothing — owner routes answer **401** with `{"reason":"pin-too-short", "error": …}` until the shop sets a new one (clients should key on `reason`, not the sentence). `/calendar.ics` takes the calendar token only, never the owner PIN.
+- **Both apps:** an owner PIN shorter than 8 characters opens nothing — owner routes answer **401** with `{"reason":"pin-too-short", "error": …}` until the shop sets a new one (clients should key on `reason`, not the sentence). `/calendar.ics` takes the calendar token only, never the owner PIN.
+- **Both apps:** a PIN-gated route asked under a `Host` that is not an IP address, `localhost` or a `.local` name answers **421** `{"error":"host-not-local"}` (DNS rebinding). The desktop also accepts its tunnel's own hostname while the tunnel runs.
 
 ### Public routes (no owner PIN)
 

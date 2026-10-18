@@ -17,7 +17,7 @@ const { registerLanServer } = require(path.join(ROOT, 'lib/lan-server.js'));
 const { writeZip } = require(path.join(ROOT, 'lib/zip-write.js'));
 
 const PORT = 3994;
-const PIN = '4321';
+const PIN = '43218765';
 const BASE = `http://127.0.0.1:${PORT}`;
 const handlers = new Map();
 const noop = () => {};

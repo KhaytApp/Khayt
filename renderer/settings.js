@@ -4062,7 +4062,7 @@ function renderLanApiSettings() {
       </div>
       <div>
         <label data-i18n="lan.pin">Owner LAN PIN (queue API, kiosk, tunnel)</label>
-        <input type="password" id="lan_pin" value="${escapeHtml(secretInputValue(lan.pin))}" maxlength="12" placeholder="${escapeHtml(secretFieldPlaceholder(lan.pin) || 'e.g. 1234')}" autocomplete="off">
+        <input type="password" id="lan_pin" value="${escapeHtml(secretInputValue(lan.pin))}" minlength="8" maxlength="64" placeholder="${escapeHtml(secretFieldPlaceholder(lan.pin) || t('lan.pin_placeholder', { n: 8 }))}" autocomplete="off">
       </div>
     </div>
     <div class="inline-pair" style="margin-top:10px;">
@@ -5460,11 +5460,19 @@ function saveLanApiSettingsFromForm({ restartServer = false } = {}) {
   const section = document.getElementById('lanApiSection');
   if (!section) return;
   const prev = settings.lanApi || {};
+  // A new owner PIN shorter than eight characters is not saved: the LAN server
+  // on both apps refuses one (lib/lan-auth.js pinTooShort), so it would lock
+  // the phone out rather than protect anything. The old PIN stays.
+  const pinEl = section.querySelector('#lan_pin');
+  const typedPin = String(pinEl?.value || '').trim();
+  const pinRefused = !!typedPin && typeof KhaytLanAuth !== 'undefined' && KhaytLanAuth.pinTooShort(typedPin)
+    && typedPin !== String(secretInputValue(prev.pin) || '');
+  if (pinRefused && restartServer) toast(t('lan.pin_min', { n: KhaytLanAuth.MIN_LAN_PIN }), 'error', 8000);
   settings.lanApi = {
     ...prev,
     enabled: section.querySelector('#lan_enabled')?.checked ?? prev.enabled,
     port: parseInt(section.querySelector('#lan_port')?.value, 10) || 3219,
-    pin: secretInputSave(prev.pin, section.querySelector('#lan_pin')?.value),
+    pin: pinRefused ? prev.pin : secretInputSave(prev.pin, pinEl?.value),
     intakePin: secretInputSave(prev.intakePin, section.querySelector('#lan_intake_pin')?.value),
     webhookToken: secretInputSave(prev.webhookToken, section.querySelector('#lan_wh_token')?.value),
     sallaWebhookSecret: secretInputSave(prev.sallaWebhookSecret, section.querySelector('#lan_salla_secret')?.value),
