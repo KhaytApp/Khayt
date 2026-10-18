@@ -132,8 +132,22 @@ test('the module and the original agree, bucket for bucket, over 2000 generated 
   const r = rng(90210);
   const settings = { currency: 'SAR', exchangeRates: { USD: 3.75 } };
   const clients = [{ id: 'C1', nameEn: 'Acme' }];
+  // WHERE THE ORIGINAL IS NO LONGER THE RULE, ON PURPOSE: an instalment plan
+  // whose unpaid rows add up to more than the order still owes (cash taken
+  // outside the plan) is now capped at what is owed, oldest rows settled
+  // first; and a plan on a foreign-currency order is converted to the shop's
+  // currency like every other row. The original listed both at face value.
+  // Those orders are pinned by test/money-review.test.js instead, and left out
+  // of this comparison — everything else must still agree to the cent.
+  const ctx = { settings, clients };
+  const planDiverges = (o) => {
+    if (!Array.isArray(o.instalments) || !o.instalments.length) return false;
+    if (money.orderCurrency(o, ctx, CURRENCIES) !== settings.currency) return true;
+    const listed = o.instalments.filter((x) => !x.paid).reduce((s, x) => s + Math.max(0, +x.amount || 0), 0);
+    return listed > money.orderOwedRaw(o, ctx) + 0.005;
+  };
   for (let i = 0; i < 2000; i++) {
-    const orders = someBook(r);
+    const orders = someBook(r).filter((o) => !planDiverges(o));
     const now = new Date(2026, 8, 6);
     const theirs = runOriginal(orders, settings, clients, now);
     const ours = R.aged(orders, { settings, clients, currencies: CURRENCIES, now, language: 'en' });

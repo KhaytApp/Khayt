@@ -79,6 +79,7 @@ extension Shop {
     /// The shop reset or restored its cloud on purpose: carry on from the
     /// older copy. The next check pulls it cold, as after any reset.
     func acceptCloudRollback() {
+        guard permitted("cloud", "edit") else { return }
         guard let connection = try? CloudReader.connection(settingsDict) else { return }
         if cloudRevisions.accept(connection) {
             cloudSeen = nil

@@ -824,6 +824,7 @@ final class LanServer {
     nonisolated static let endpoints = [
         "/", "/session", "/intake", "/manifest.json", "/sw.js",
         "/api/status", "/api/queue", "/api/machines/live", "/api/store", "/api/store/deltas",
+        "/api/identity", "/api/proof",
         "/api/intake", "/api/intake/estimate", "/api/survey",
         "/order/:id", "/order/:id/quote", "/order/:id/approve", "/status/:id",
         "/calendar.ics",
@@ -855,6 +856,25 @@ final class LanServer {
             if request.query["format"] != "json" { return .redirect("/intake") }
             let body = (try? await engine.lanStatusBody(store: store, today: Self.localDay(host.now()))) ?? "{}"
             return .json(200, body)
+
+        // ── WHO THIS MAC IS (see `LanIdentity`) ──────────────────────────
+        //
+        // The public key behind the PIN, for a paired phone to pin; and, with
+        // no PIN at all, a signature over a nonce the phone chose, so it can
+        // tell this Mac from a device that took its Bonjour name BEFORE it
+        // sends the PIN anywhere new. The signature reveals nothing about
+        // the PIN, which is why the second route may be open.
+        case ("/api/identity", true):
+            if let refused = await pinGate(request) { return refused }
+            guard let key = LanIdentity.publicKey() else { return .json(503, #"{"error":"no_identity"}"#) }
+            return .json(200, #"{"alg":"ed25519","publicKey":"\#(key)"}"#)
+
+        case ("/api/proof", true):
+            guard let nonce = request.query["nonce"], LanIdentity.plausibleNonce(nonce) else {
+                return .json(400, #"{"error":"nonce"}"#)
+            }
+            guard let sig = LanIdentity.proof(nonce: nonce) else { return .json(503, #"{"error":"no_identity"}"#) }
+            return .json(200, #"{"alg":"ed25519","sig":"\#(sig)"}"#)
 
         case ("/api/queue", true):
             if let refused = await pinGate(request) { return refused }
@@ -2724,6 +2744,11 @@ extension Shop {
         let model = dir.appending(path: "upload.\(ext)")
         let output = dir.appending(path: "out.gcode")
         guard (try? data.write(to: model, options: .atomic)) != nil else { return nil }
+        // Its shapes only: a 3MF's own settings can name a command the slicer
+        // runs (`SlicerRun.keepOnlyTheModel`). Unreadable is not sliced.
+        if ext.lowercased() == "3mf" {
+            guard (try? SlicerRun.keepOnlyTheModel(model)) != nil else { return nil }
+        }
         // A customer's upload is nearly always a bare mesh, and an Orca fork
         // will not slice one without a printer, print and filament profile —
         // its built-in defaults fail its own validation (#1778).

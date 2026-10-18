@@ -40,6 +40,46 @@
   const pricing = () => (typeof globalThis !== 'undefined' ? globalThis.KhaytPricing : undefined);
   const calculatorCost = () => (typeof globalThis !== 'undefined' ? globalThis.KhaytCalculatorCost : undefined);
   const workingWeek = () => (typeof globalThis !== 'undefined' ? globalThis.KhaytWorkingWeek : undefined);
+  /**
+   * The money rules a deposit is judged by, however this file was loaded: as
+   * globals in both apps, and by `require` under Node when nothing else
+   * loaded them — so a test of this module alone reaches the same rule.
+   */
+  function sibling(name, file) {
+    const g = typeof globalThis !== 'undefined' ? globalThis[name] : undefined;
+    if (g) return g;
+    if (typeof require !== 'function') return undefined;
+    try { require(file); } catch (e) { return undefined; }
+    return typeof globalThis !== 'undefined' ? globalThis[name] : undefined;
+  }
+
+  /**
+   * What a deposit taken with a NEW order writes onto it.
+   *
+   * The deposit was written as `paidAmount` with a status from `deposit >=
+   * price` — the PRE-TAX price. On a shop that adds tax on top, a 100 job at
+   * 10% with a 100 deposit read `paid`, and because nothing said the payment
+   * was judged against the gross, `settledBeforeTaxOnTop` grandfathered it as
+   * settled: the 10 of tax was never billed. Now the deposit is clamped to
+   * what the order is BILLED (price + tax there), stamped `paidGross: true`
+   * the way `recordPayment` stamps every payment, and its status is
+   * `KhaytOrderPayment.statusOf`'s — the one rule — with the shop's settings.
+   */
+  function depositFields(deposit, finalPrice, settings) {
+    if (!(deposit > 0)) return { paymentStatus: 'unpaid', paidAmount: deposit };
+    sibling('KhaytTax', './tax.js');
+    const M = sibling('KhaytOrderMoney', './order-money.js');
+    const P = sibling('KhaytOrderPayment', './order-payment.js');
+    const ctx = { settings: settings || {} };
+    const probe = { price: finalPrice, paidGross: true };
+    const gross = (M && typeof M.orderGrossRaw === 'function') ? num(M.orderGrossRaw(probe, ctx), finalPrice) : finalPrice;
+    const paid = +Math.min(deposit, Math.max(0, gross)).toFixed(2);
+    probe.paidAmount = paid;
+    const status = (P && typeof P.statusOf === 'function')
+      ? P.statusOf(probe, ctx)
+      : (paid >= gross ? 'paid' : 'partial');
+    return { paymentStatus: status, paidAmount: paid, paidGross: true };
+  }
 
   /** `YYYY-MM-DD` in the shop's own timezone — a due date is a local day. */
   function localDateStr(d) {
@@ -433,8 +473,9 @@
       // Derived here rather than taken, for the reason lib/order-payment.js
       // exists: a stored status that disagrees with the arithmetic is how an
       // order sits in receivables after it was settled.
-      paymentStatus: deposit <= 0 ? 'unpaid' : (deposit >= finalPrice ? 'paid' : 'partial'),
-      paidAmount: deposit,
+      // and on a shop that adds tax on top, judged against price + tax — see
+      // `depositFields`. `paidGross` is ABSENT on a job taken without one.
+      ...depositFields(deposit, finalPrice, settings),
       paymentMethod: null,
       paidAt: null,
       // Empty for a job taken fresh. A COPY of a job (`lib/record-duplicate.js`)

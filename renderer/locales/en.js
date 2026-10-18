@@ -2404,6 +2404,7 @@
   "po.received_toast": "Purchase order marked as received",
   "po.created_toast": "Purchase order created",
   "po.partial": "Partially received",
+  "po.item_gone": "The item this order was for is no longer in stock records, so nothing was received. Re-add it, or close the order by hand.",
   "po.received_so_far": "Received so far",
   "po.receive_more": "Receive more",
   "po.close_po": "Close PO",

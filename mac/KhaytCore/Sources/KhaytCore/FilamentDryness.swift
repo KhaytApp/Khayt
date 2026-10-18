@@ -131,4 +131,34 @@ public enum FilamentDryness {
         let state = pct < 0.75 ? "good" : (pct < 1 ? "due" : "overdue")
         return Status(state: state, daysSince: daysSince, intervalDays: interval, pct: pct)
     }
+
+    /// A drying, written into the spool's log — `recordDrying` in
+    /// `lib/filament-dryness.js`.
+    ///
+    /// The newest row goes first, and `driedAt` becomes the newest date the
+    /// log or the record holds: `status` reads `driedAt` and nothing else, so a
+    /// drying recorded only in the log left the spool overdue, and a `driedAt`
+    /// set with no log row (what this app's "mark dried" did) left the log
+    /// with no record of it. Returns the two fields to write; `driedAt` nil
+    /// means the record should not carry one.
+    public static func recordDrying(_ record: JSONValue?,
+                                    entry: [String: JSONValue]) -> (dryingLog: [JSONValue], driedAt: String?) {
+        var log: [JSONValue] = []
+        var was: JSONValue?
+        if case .object(let r)? = record {
+            if case .array(let rows)? = r["dryingLog"] { log = rows }
+            was = r["driedAt"]
+        }
+        let date = String((JSSemantics.truthy(entry["date"]) ? JSSemantics.text(entry["date"]) : "").prefix(10))
+        if !date.isEmpty {
+            var row = entry
+            row["date"] = .string(date)
+            log.insert(.object(row), at: 0)
+        }
+        var newest = String((JSSemantics.truthy(was) ? JSSemantics.text(was) : "").prefix(10))
+        for case .object(let row) in log {
+            if case .string(let d)? = row["date"], d > newest { newest = d }
+        }
+        return (log, newest.isEmpty ? nil : newest)
+    }
 }

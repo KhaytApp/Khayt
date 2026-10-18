@@ -2403,6 +2403,7 @@
   "po.received_toast": "BC marqué comme reçu",
   "po.created_toast": "BC créé",
   "po.partial": "Partiellement reçu",
+  "po.item_gone": "L'article de cette commande n'est plus dans le stock, rien n'a donc été reçu. Ajoutez-le à nouveau ou clôturez la commande manuellement.",
   "po.received_so_far": "Reçu jusqu'à présent",
   "po.receive_more": "Recevoir plus",
   "po.close_po": "Clôturer le BC",

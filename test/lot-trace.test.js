@@ -74,7 +74,7 @@ test('a different lot onto a spool that still holds filament becomes its own spo
   assert.equal(n.poId, 'PO-7');
   assert.equal(n.material, 'PETG');
   assert.equal(n.brand, 'Acme');
-  assert.equal(n.cost, 80);
+  assert.equal(n.cost, 80, 'a roll with no spoolWeight reads as a kilo, so 1000 g is its price');
   assert.equal(n.openedAt, undefined, 'the roll\'s own dates are not inherited');
   assert.equal(n.dryingLog, undefined, 'a new roll has not been dried');
   assert.equal(n.adjustments, undefined, 'nor weighed and corrected');

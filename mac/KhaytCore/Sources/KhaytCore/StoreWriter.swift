@@ -625,10 +625,23 @@ public enum StoreWriter {
                 guard case .object(var o) = rows[i], case .string(let id)? = o["id"] else { continue }
                 let prior = was[id]
                 let oldRev = revOf(prior), newRev = revOf(o)
-                // New here: not an edit. It is sent because the cloud does not
-                // have it, whatever its rev, and the Mac has always left it
-                // unstamped.
-                guard let prior, newRev <= oldRev, content(prior) != content(o) else { continue }
+                // NEW HERE, AND NO REV: stamped rev 1, as `lib/sync.js`
+                // stampChanges stamps a created record. Left unstamped, it
+                // reached the cloud and stopped there: every other device's
+                // merge (`extractDeltas`) takes only records with a rev, so a
+                // spool, gift card or redemption made on this Mac was missing
+                // everywhere else until somebody edited it. One that arrives
+                // WITH a rev (a merge, an undo) keeps the one it has.
+                guard let prior else {
+                    if newRev <= 0 {
+                        o["rev"] = .number(1)
+                        if case .string? = o["updatedAt"] {} else { o["updatedAt"] = .string(iso(Date())) }
+                        rows[i] = .object(o)
+                        changed = true
+                    }
+                    continue
+                }
+                guard newRev <= oldRev, content(prior) != content(o) else { continue }
                 o["rev"] = .number(max(oldRev, newRev) + 1)
                 o["updatedAt"] = .string(iso(Date()))
                 rows[i] = .object(o)

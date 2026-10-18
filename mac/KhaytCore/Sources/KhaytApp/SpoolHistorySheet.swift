@@ -14,9 +14,13 @@ import KhaytCore
 /// bottom, because the arithmetic somebody would otherwise do on paper is the
 /// whole reason to open this.
 struct SpoolHistorySheet: View {
-    /// What the rows on screen add up to.
+    /// What the rows on screen that are USES add up to — a receipt is shown
+    /// (it is where the plastic came from) but is not spending, and adding its
+    /// negative grams in read 1000 g received and 300 g used as "−700 g".
     static func shownTotal(_ spool: Spool, places: Int) -> Double {
-        (spool.usageHistory ?? []).reduce(0) { $0 + $1.weightUsed.rounded(toPlaces: places) }
+        (spool.usageHistory ?? []).reduce(0) {
+            $1.isReceipt ? $0 : $0 + $1.weightUsed.rounded(toPlaces: places)
+        }
     }
 
     @Bindable var shop: Shop
@@ -47,7 +51,7 @@ struct SpoolHistorySheet: View {
                     .padding(.vertical, 8)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(uses) { use in
+                    ForEach(Array(uses.enumerated()), id: \.offset) { index, use in
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
                             Text(use.date.isEmpty ? "—" : use.date)
                                 .font(.caption).foregroundStyle(.secondary)
@@ -72,7 +76,7 @@ struct SpoolHistorySheet: View {
                                 .monospacedDigit()
                         }
                         .padding(.vertical, 7)
-                        if use.id != uses.last?.id { Divider() }
+                        if index < uses.count - 1 { Divider() }
                     }
                 }
                 Divider()

@@ -27,6 +27,9 @@ import SwiftUI
 enum CustomerRecordsPublisher {
     enum Failure: Error, LocalizedError, Equatable {
         case unauthorised, readOnly, notOffered, tooLarge
+        /// 409 `disabled`: somebody turned customer records off for the
+        /// whole shop on another Mac (khayt-cloud #122).
+        case offElsewhere
         case limited(retryAfter: TimeInterval?)
         case http(Int, String)
 
@@ -36,6 +39,7 @@ enum CustomerRecordsPublisher {
             case .readOnly: "This sign-in can read this shop but not publish its customers."
             case .notOffered: "Khayt Cloud does not take customer records yet."
             case .tooLarge: "More customers than Khayt Cloud keeps (5,000 or 4 MB)."
+            case .offElsewhere: "Customer records were turned off for this shop on another Mac."
             case .limited: "Khayt Cloud asked for fewer uploads; trying again later."
             case .http(let code, let body): "Khayt Cloud answered \(code) to customer records" + (body.isEmpty ? "" : ": \(body)")
             }
@@ -49,6 +53,7 @@ enum CustomerRecordsPublisher {
             case .readOnly: words.callIt("mac.cr_err_read_only")
             case .notOffered: words.callIt("mac.cr_err_not_offered")
             case .tooLarge: words.callIt("mac.cr_err_too_large")
+            case .offElsewhere: words.callIt("mac.cr_off_elsewhere")
             case .limited: words.callIt("mac.cr_err_limited")
             case .http(let code, _): words.callIt("mac.cloud_err_http", ["code": .string(String(code))])
             }
@@ -68,11 +73,25 @@ enum CustomerRecordsPublisher {
     static let first: Duration = .seconds(120)
 
     /// Send the whole set (`body`), or delete it with nil.
+    ///
+    /// ── WHO SAID IT: A PERSON, OR THE LOOP ───────────────────────────────
+    ///
+    /// The switch is in each Mac's own settings, which never sync, so "off"
+    /// on one Mac used to stop that Mac only: a second one with its switch
+    /// on put the copy straight back. khayt-cloud #122 keeps the decision for
+    /// the shop. `byPerson` marks the two sends only a person's press may
+    /// make: off with `?scope=shop`, which marks the shop off for every Mac,
+    /// and on with `enable: true`, which clears that mark. The ten-minute
+    /// loop never sends either, so it can never undo what a person decided
+    /// on another Mac. A cloud without #122 ignores both.
     static func publish(_ connection: CloudReader.Connection, token: String, body: JSONValue?,
+                        byPerson: Bool = false,
                         fetch: (URLRequest) async throws -> (Data, URLResponse)) async throws {
+        let tail = body == nil && byPerson ? "/customers?scope=shop" : "/customers"
         var request = try CloudReader.request(connection, token: token,
-                                              method: body == nil ? "DELETE" : "PUT", tail: "/customers")
-        if let body {
+                                              method: body == nil ? "DELETE" : "PUT", tail: tail)
+        if var body {
+            if byPerson, case .object(var o) = body { o["enable"] = .bool(true); body = .object(o) }
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONEncoder().encode(body)
         }
@@ -83,6 +102,7 @@ enum CustomerRecordsPublisher {
         case 401: throw Failure.unauthorised
         case 403: throw Failure.readOnly
         case 404, 405: throw Failure.notOffered
+        case 409 where body != nil: throw Failure.offElsewhere
         case 413: throw Failure.tooLarge
         case 429: throw Failure.limited(retryAfter: retryAfter(http?.value(forHTTPHeaderField: "Retry-After")))
         case let code: throw Failure.http(code, String(decoding: data.prefix(200), as: UTF8.self))
@@ -139,7 +159,9 @@ extension Shop {
     /// `delete` is the switch going off: the copy is deleted whatever this
     /// Mac remembers sending, because another Mac may have sent it and "off
     /// deletes it" is what the pane promises.
-    func publishCustomerRecords(now: Date = Date(), delete: Bool = false) async {
+    /// `byPerson` is the switch being pressed, on or off — see
+    /// `CustomerRecordsPublisher.publish`. The loop never passes it.
+    func publishCustomerRecords(now: Date = Date(), delete: Bool = false, byPerson: Bool = false) async {
         guard let engine, let build = source.build else { return }
         if let notBefore = customerRecordsNotBefore, now < notBefore { return }
         do {
@@ -156,6 +178,10 @@ extension Shop {
             let action: String
             if delete && !state.on {
                 action = "delete"
+            } else if byPerson && state.on {
+                // Turned on by hand: sent now, whatever this Mac remembers,
+                // because the send is what lifts an off made on another Mac.
+                action = "put"
             } else {
                 action = try await engine.customerRecordsNext(
                     on: state.on, fingerprint: fingerprint,
@@ -167,7 +193,8 @@ extension Shop {
             guard !token.isEmpty else { throw CloudReader.Failure.unauthorised }
             let session = CloudReader.session
             try await CustomerRecordsPublisher.publish(connection, token: token,
-                                                       body: action == "put" ? built.body : nil) {
+                                                       body: action == "put" ? built.body : nil,
+                                                       byPerson: byPerson) {
                 try await session.data(for: $0)
             }
             // Switched off while this PUT was on its way: the switch's DELETE
@@ -197,6 +224,12 @@ extension Shop {
             customerRecordsProblem = false
         } catch CloudReader.Failure.notConnected {
             customerRecordsSaid = nil
+        } catch CustomerRecordsPublisher.Failure.offElsewhere {
+            // Turned off for the whole shop on another Mac: this one follows,
+            // so it stops trying, and the pane says why it is off.
+            await switchCustomerRecordsOffHere()
+            customerRecordsSaid = CustomerRecordsPublisher.Failure.offElsewhere.said(words)
+            customerRecordsProblem = false
         } catch CustomerRecordsPublisher.Failure.limited(let after) {
             customerRecordsNotBefore = now.addingTimeInterval(after ?? 3600)
         } catch let failure as CustomerRecordsPublisher.Failure {
@@ -234,11 +267,31 @@ extension Shop {
             }
             await load(source)
             customerRecordsNotBefore = nil
-            await publishCustomerRecords(delete: !on)
+            await publishCustomerRecords(delete: !on, byPerson: true)
         } catch {
             customerRecordsSaid = words.callIt("mac.cr_failed") + " " + String(describing: error)
             customerRecordsProblem = true
         }
+    }
+
+    /// This Mac's switch off, as the cloud says the shop decided, without
+    /// sending anything: the copy is already down, and a delete from here
+    /// would be one more request saying what the cloud already knows.
+    func switchCustomerRecordsOffHere() async {
+        // lock: system — follows an off the shop already made on another Mac; it can only turn the upload off, never on.
+        guard let build = source.build else { return }
+        let at = Self.isoNow()
+        try? await StoreWriter.updateOffMain(build) { root in
+            var settings: [String: JSONValue] = [:]
+            if case .object(let had)? = root["settings"] { settings = had }
+            settings["customerRecords"] = .object(["enabled": .bool(false), "changedAt": .string(at),
+                                                   "offElsewhere": .bool(true)])
+            root["settings"] = .object(settings)
+        }
+        if let connection = try? CloudReader.connection(settingsDict) {
+            CustomerRecordsPublisher.remember(nil, connection.shopId)
+        }
+        await load(source)
     }
 
     /// Whether the book has the switch on, as written — the pane's toggle.

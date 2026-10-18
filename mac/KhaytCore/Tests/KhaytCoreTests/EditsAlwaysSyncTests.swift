@@ -49,14 +49,21 @@ struct EditsAlwaysSyncTests {
         #expect(Self.rev(after, "spools", "S2") == 7)
     }
 
-    @Test("a new record is not an edit, and is left as it was written")
+    /// Left unstamped, a record made here reached the cloud and stopped:
+    /// every other device's merge takes only records with a rev.
+    @Test("a new record without a rev is stamped 1, as lib/sync.js stamps a created one; one with a rev keeps it")
     func newRecords() {
         let before: [String: JSONValue] = ["clients": .array([])]
         var after = before
-        after["clients"] = .array([Self.row("C1", rev: nil), Self.row("C2", rev: 9)])
+        after["clients"] = .array([Self.row("C1", rev: nil), Self.row("C2", rev: 9), Self.row("C3", rev: 0)])
         StoreWriter.stampChanged(before: before, after: &after)
-        #expect(Self.rev(after, "clients", "C1") == nil)
+        #expect(Self.rev(after, "clients", "C1") == 1)
         #expect(Self.rev(after, "clients", "C2") == 9)
+        #expect(Self.rev(after, "clients", "C3") == 1)
+        guard case .array(let rows)? = after["clients"], case .object(let c1) = rows[0] else {
+            Issue.record("shape"); return
+        }
+        #expect(c1["updatedAt"] != nil, "stamped records say when")
     }
 
     @Test("through StoreWriter.update, and not for a merge")

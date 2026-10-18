@@ -2219,7 +2219,12 @@ function wireEvents() {
             today: localDateStr(), expenseId: uid('EXP'),
             expenseLabel: t('po.receive') || 'PO receive',
           });
-          if (!done.ok) { toast(t('exp.amount_required') || 'Enter a weight', 'error'); return false; }
+          if (!done.ok) {
+            // The spool or consumable was deleted after the order was raised:
+            // say so, rather than asking for a weight that was typed.
+            toast(done.reason === 'no_item' ? t('po.item_gone') : t('exp.amount_required'), 'error');
+            return false;
+          }
 
           Object.assign(po, done.po);
           if (done.consumable && cons) { Object.assign(cons, done.consumable); renderConsumables(); }

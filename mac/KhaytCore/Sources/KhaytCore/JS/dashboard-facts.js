@@ -187,6 +187,10 @@ function dashboardFacts(input) {
   if (showsMoney && m && typeof m.payStatus === 'function' && typeof m.owedFor === 'function') {
     owed = 0;
     for (const o of orders) {
+      // A quote, a cancelled job, a voided invoice and one credited in full
+      // owe nothing — `orderOwedBase` says so, and this does not rely on the
+      // injected `owedFor` being that rule.
+      if (!o || o.status === 'quote' || o.status === 'cancelled' || o.voidedAt || o.creditedAt) continue;
       try { if (m.payStatus(o) !== 'paid') owed += num(m.owedFor(o)); } catch (e) { /* one bad order must not blank the strip */ }
     }
   }

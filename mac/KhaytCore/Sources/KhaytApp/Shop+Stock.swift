@@ -272,7 +272,11 @@ extension Shop {
                     expenseLabel: self.words.callIt("po.receive"),
                     lot: lot, newSpoolId: Self.uid("INV"), receivedSpools: earlier)
                 guard done.ok, let written = done.po else {
-                    throw MoveRefused(sentence: self.words.callIt("exp.amount_required"))
+                    // A spool or consumable deleted after the order was raised
+                    // has nowhere for the goods to land — say THAT, not "enter
+                    // an amount" to someone who typed one.
+                    throw MoveRefused(sentence: self.words.callIt(
+                        done.reason == "no_item" ? "po.item_gone" : "exp.amount_required"))
                 }
 
                 orders[at] = written
@@ -419,12 +423,21 @@ extension Shop {
                       case .object(let was) = shelf[at] else {
                     throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))
                 }
+                let when = day ?? Self.localDay()
                 let out = try await engine.editSpool(
                     shelf[at],
                     input: ["material": .string(Self.plainString(was["material"]) ?? ""),
-                            "driedAt": .string(day ?? Self.localDay())],
+                            "driedAt": .string(when)],
                     settings: Self.settings(root), today: Self.today())
                 guard case .object(var record) = out.spool else { return }
+                // AND the log row, through the drying-log rule, as the other
+                // app's drying form writes it. `driedAt` alone cleared the nag
+                // but left the spool's drying history with no record of it.
+                let logged = FilamentDryness.recordDrying(
+                    .object(record),
+                    entry: ["id": .string(Self.uid("DRY")), "date": .string(when)])
+                record["dryingLog"] = .array(logged.dryingLog)
+                if let newest = logged.driedAt { record["driedAt"] = .string(newest) }
                 StoreWriter.stamp(&record)
                 shelf[at] = .object(record)
                 root["inventory"] = .array(shelf)
@@ -1177,9 +1190,13 @@ extension Shop {
                 }
                 let costing = costed?.costing
                 spentAttempt = costed?.spent
+                // With a job, the grams come off THAT job's spools (`forOrder`),
+                // as the other app's waste form takes them.
                 let made = try await engine.newWasteEntry(
                     input, id: Self.uid("W"), today: Self.today(),
-                    inventory: Self.rows(root, "inventory"), order: job, costing: costing)
+                    inventory: Self.rows(root, "inventory"), order: job, costing: costing,
+                    settings: Self.settings(root), machines: Self.rows(root, "machines"),
+                    reclaimsTax: self.reclaimsTax)
                 guard let entry = made.entry else {
                     throw MoveRefused(sentence: self.words.callIt("waste.err_material"))
                 }

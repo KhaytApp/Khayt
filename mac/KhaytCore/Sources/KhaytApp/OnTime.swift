@@ -10,6 +10,13 @@ import KhaytCore
 /// rule is `lib/on-time.js`, drawn by both apps. Nothing promised is no
 /// record, and the card says so rather than showing 0% or 100%.
 struct OnTimeCard: View {
+    /// A stored "yyyy-MM-dd" in the shop's words; the text itself when it
+    /// is not a day.
+    @MainActor static func day(_ iso: String, _ words: Words) -> String {
+        guard let day = Order.day(iso) else { return iso }
+        return words.say(day, .dateTime.day().month(.abbreviated))
+    }
+
     let shop: Shop
     let report: KhaytEngine.OnTime?
 
@@ -51,7 +58,11 @@ struct OnTimeCard: View {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(job.project.isEmpty ? job.id : job.project).lineLimit(1)
-                                Text(job.dueDate + " → " + job.finishedDay)
+                                // Due, then finished: dates in the shop's own
+                                // words, and an arrow that turns in Arabic.
+                                (Text(Self.day(job.dueDate, words)) + Text(" ")
+                                    + Text(Image(systemName: "arrow.forward"))
+                                    + Text(" " + Self.day(job.finishedDay, words)))
                                     .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
                             }
                             Spacer(minLength: 8)

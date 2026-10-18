@@ -94,6 +94,35 @@ enum SlicerRun {
         try run(slicer.path, argv, timeout: timeout, name: slicer.name)
     }
 
+    /// A STRANGER'S 3MF, REDUCED TO ITS SHAPES.
+    ///
+    /// A 3MF is a zip, and what a slicer reads from it is not only geometry:
+    /// `Metadata/*.config` and `project_settings.config` carry the whole
+    /// print profile, including `post_process`, a command the slicer RUNS
+    /// when it exports G-code (the CVE-2023-47268 class). A customer's upload
+    /// over the shop's Wi-Fi reached the slicer with its own settings, so a
+    /// model could run a program on this Mac with no PIN. Rewritten in place
+    /// from the content types, the relationships and the `3D/…model` parts
+    /// only; the shop's own presets are applied to what is left, as for any
+    /// bare model. Throws when there is no model part to keep.
+    static func keepOnlyTheModel(_ url: URL, limit: Int = 512 << 20) throws {
+        let entries = try Zip.entries(of: url)
+        var kept: [ZipWrite.Member] = []
+        var total = 0
+        for entry in entries {
+            let name = entry.name.lowercased()
+            guard !name.contains(".."), !name.hasPrefix("/") else { continue }
+            let keep = name == "[content_types].xml" || name.hasPrefix("_rels/")
+                || name.hasPrefix("3d/_rels/") || (name.hasPrefix("3d/") && name.hasSuffix(".model"))
+            guard keep else { continue }
+            total += entry.size
+            guard total <= limit else { throw Failure.missingModel }
+            kept.append(ZipWrite.Member(entry.name, try Zip.data(of: entry, in: url, limit: limit)))
+        }
+        guard kept.contains(where: { $0.name.lowercased().hasSuffix(".model") }) else { throw Failure.missingModel }
+        try ZipWrite.archive(kept).write(to: url, options: .atomic)
+    }
+
     /// Presets for a model with no settings of its own, sliced by an Orca or
     /// Bambu Studio fork with the arguments Khayt chose (#1778): the printer
     /// the shop last used in that slicer, a print and a filament profile it

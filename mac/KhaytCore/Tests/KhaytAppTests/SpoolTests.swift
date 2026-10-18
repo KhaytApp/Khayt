@@ -114,7 +114,9 @@ struct SpoolTests {
         #expect(Self.number(shelf[0]["rev"]) == 5, "the corrected spool is stamped")
         #expect(Self.number(shelf[1]["rev"]) == 1, "the one nobody touched is not")
         #expect(shelf.count == 3)
-        #expect(shelf[2]["rev"] == nil, "a new record is not an edit, so it is not stamped")
+        // A new record is stamped 1, as lib/sync.js stamps a created one:
+        // unstamped, it never reached another device (Oct 2026 review).
+        #expect(Self.number(shelf[2]["rev"]) == 1, "a new spool is stamped once, as created")
     }
 
     @Test("deleting a spool takes it off the shelf and leaves the rest")

@@ -337,6 +337,25 @@ struct RoundTripTests {
         #expect(Self.diff(saved, raw) == ["category"])
     }
 
+    /// The record put a key the edit took away back from the stored row:
+    /// a hidden product could not be listed again, a cleared margin returned.
+    @Test("a field the edit takes away stays away: back on the web store, margin cleared")
+    func productRemovalsStick() {
+        var raw = Self.first("products")
+        raw["storefrontHidden"] = .bool(true)
+        raw["defaultMargin"] = .number(35)
+        let opened = ProductSheet.opening(Product.from(raw, keys: Self.keys))
+        #expect(!opened.draft.onWebStore && opened.draft.margin == 35)
+        var edited = opened
+        edited.draft.onWebStore = true
+        edited.draft.margin = nil
+        let saved = Shop.productRecord(written: Self.productSave(edited), baseline: Self.productSave(opened),
+                                       priced: [:], over: raw)
+        #expect(saved["storefrontHidden"] == nil, "still hidden from the web store")
+        #expect(saved["defaultMargin"] == nil, "the cleared margin came back")
+        #expect(saved["parts"] == raw["parts"], "what the edit did not touch is kept")
+    }
+
     // MARK: - Products, priced (#1676)
     //
     // The cases above pass `priced: [:]`, so they never saw the price. The

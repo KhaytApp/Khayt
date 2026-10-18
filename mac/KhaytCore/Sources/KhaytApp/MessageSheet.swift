@@ -128,7 +128,7 @@ struct MessageSheet: View {
             }
 
             HStack {
-                Button(shop.words.callIt(copied ? "mac.copied" : "mac.copy")) {
+                Button(shop.words.callIt(copied ? "mac.copied" : "common.copy")) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                     copied = true

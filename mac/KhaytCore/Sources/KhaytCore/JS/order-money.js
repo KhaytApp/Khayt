@@ -109,29 +109,72 @@
    * What is still outstanding, in the order's OWN currency.
    *
    * `ctx` is optional and carries the settings: given them, an exclusive shop
-   * is owed price + tax (see `orderGrossRaw`). Without them the price is what
-   * is due, as it always was.
+   * is owed price + tax (see `orderGrossRaw`), and its credit notes are grossed
+   * up the same way (`orderCreditedDueRaw`). Without them the price is what is
+   * due, as it always was.
    */
   function orderOwedRaw(o, ctx) {
     if (!earns(o)) return 0;
+    if (!owesAtAll(o)) return 0;
     return Math.max(
       0,
       orderDueRaw(o, ctx) - (+((o && o.paidAmount)) || 0)
-        - (+((o && o.giftCardDiscount)) || 0) - orderCreditedRaw(o),
+        - (+((o && o.giftCardDiscount)) || 0) - orderCreditedDueRaw(o, ctx),
     );
   }
 
   /** What is still outstanding, in the shop's base currency. */
   function orderOwedBase(o, ctx, known) {
     if (!earns(o)) return 0;
+    if (!owesAtAll(o)) return 0;
     const cur = orderCurrency(o, ctx, known);
     return Math.max(
       0,
       convertToBase(orderDueRaw(o, ctx), cur, ctx)
         - convertToBase(+((o && o.paidAmount)) || 0, cur, ctx)
         - convertToBase(+((o && o.giftCardDiscount)) || 0, cur, ctx)
-        - orderCreditedBase(o, ctx, known),
+        - convertToBase(orderCreditedDueRaw(o, ctx), cur, ctx),
     );
+  }
+
+  /**
+   * Can this order owe the shop anything at all?
+   *
+   * A QUOTE has not been agreed, a CANCELLED job was called off, a VOIDED
+   * invoice is not an invoice and one CREDITED IN FULL (`creditedAt`, stamped
+   * by `generateCreditNote`) was handed back. None of them is a debt, whatever
+   * their price and paid fields say — and receivables, the masthead total, the
+   * Mac's title bar and widget all read owed through here.
+   * `lib/payment-reminder.js` already refused quotes and voided orders; this is
+   * that rule at the chokepoint, so every reader inherits it.
+   */
+  function owesAtAll(o) {
+    if (!o || typeof o !== 'object') return false;
+    if (o.status === 'quote' || o.status === 'cancelled') return false;
+    if (o.voidedAt || o.creditedAt) return false;
+    return earns(o);
+  }
+
+  /**
+   * The credit notes in the same terms as what is DUE, in the order's own
+   * currency.
+   *
+   * A credit note is taken against the PRICE (the dialog caps it there). On a
+   * shop that adds tax on top the price is pre-tax while what is due is
+   * price + tax, so subtracting the bare credit from the gross left the tax on
+   * the credited part still owed: 100 at 10% with 50 credited read 60 owed
+   * instead of 55. Scaled by due / price — exactly 1 on every inclusive or
+   * unregistered shop, and on an order settled before tax on top (whose due is
+   * its price, see `orderDueRaw`).
+   */
+  function orderCreditedDueRaw(o, ctx) {
+    const credited = orderCreditedRaw(o);
+    if (credited <= 0) return credited;
+    const price = +((o && o.price)) || 0;
+    if (price <= 0) return credited;
+    const due = orderDueRaw(o, ctx);
+    if (!(due > price)) return credited;
+    return Math.round(credited * (due / price) * 100) / 100;
   }
 
   /**
@@ -235,6 +278,7 @@
     orderRevenueBase, orderCreditedRaw, orderCreditedBase,
     orderNetRevenueBase, orderOwedRaw, orderOwedBase,
     orderGrossRaw, orderDueRaw, settledBeforeTaxOnTop, orderEarnedBase,
+    owesAtAll, orderCreditedDueRaw,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytOrderMoney = api;

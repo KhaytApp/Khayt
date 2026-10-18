@@ -312,10 +312,16 @@ extension Shop {
                               over was: [String: JSONValue]) -> [String: JSONValue] {
         var record = written
         if let baseline {
+            // Keeps what the sheet does not edit, and lets a key the edit
+            // took away STAY away: a cleared translation, a cleared margin,
+            // "Show on web store" switched back on (`storefrontHidden` gone).
             record = RoundTrip.keepUntouched(written: written, baseline: baseline, stored: was)
+        } else {
+            // No baseline to tell a removal from a field this sheet never
+            // reads: keep everything the book has that the sheet did not write.
+            for (key, value) in was where record[key] == nil { record[key] = value }
         }
         for (key, value) in priced { record[key] = value }
-        for (key, value) in was where record[key] == nil { record[key] = value }
         return record
     }
 

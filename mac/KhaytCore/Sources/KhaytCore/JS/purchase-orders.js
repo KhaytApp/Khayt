@@ -154,6 +154,12 @@ function receive({ po, item, consumable, quantity, notes, today, expenseId,
   if (!(amount > 0)) return { ok: false, reason: 'no_quantity' };
 
   const forConsumable = isConsumableOrder(po);
+  // The goods have to land SOMEWHERE. A spool or consumable deleted after the
+  // order was raised used to come back ok: the expense was booked and the
+  // order advanced while the grams went nowhere, so the shop paid for stock
+  // the shelf never showed.
+  const target = forConsumable ? consumable : item;
+  if (!target || typeof target !== 'object') return { ok: false, reason: 'no_item' };
   const ordered = num(po.qty);
   const already = num(po.receivedSoFar);
   const received = round2(already + amount);
@@ -174,10 +180,8 @@ function receive({ po, item, consumable, quantity, notes, today, expenseId,
 
   if (forConsumable) {
     // No 99,000 cap here: that is a spool's limit, not a box of gloves'.
-    if (consumable && typeof consumable === 'object') {
-      out.consumable = { ...consumable, stock: Math.max(0, round2(num(consumable.stock) + amount)) };
-    }
-  } else if (item && typeof item === 'object') {
+    out.consumable = { ...consumable, stock: Math.max(0, round2(num(consumable.stock) + amount)) };
+  } else {
     const newLot = str(lot).trim();
     const oldLot = str(item.lot).trim();
     // NEGATIVE `weightUsed`: the shelf's history is a list of what left it, so
@@ -190,6 +194,7 @@ function receive({ po, item, consumable, quantity, notes, today, expenseId,
     if (newLot || oldLot) row.lot = newLot || oldLot;
     if (po.id) row.poId = str(po.id);
 
+    let topUp = false;
     let split = newLot && num(item.weight) > 0
       && newLot.toLowerCase() !== oldLot.toLowerCase();
     if (split) {
@@ -197,7 +202,7 @@ function receive({ po, item, consumable, quantity, notes, today, expenseId,
       const earlier = (Array.isArray(receivedSpools) ? receivedSpools : []).find((s) =>
         s && typeof s === 'object' && into.includes(str(s.id))
         && str(s.lot).trim().toLowerCase() === newLot.toLowerCase());
-      if (earlier) { item = earlier; split = false; }
+      if (earlier) { item = earlier; split = false; topUp = true; }
     }
     if (split) {
       const id = str(newSpoolId) || (str(item.id) + '-' + str(po.id) + '-' + Math.round(received));
@@ -210,11 +215,16 @@ function receive({ po, item, consumable, quantity, notes, today, expenseId,
       for (const k of ['usageHistory', 'priceHistory', 'openedAt', 'driedAt',
                        'dryingLog', 'adjustments', 'purchasedAt', 'spoolWeight',
                        'addedAt']) delete clone[k];
+      // The PRICE is the delivery's, not the old roll's: `cost` is what the
+      // whole roll cost, and copying 80 for 1000 g onto a 250 g roll made its
+      // plastic four times dearer than the 20 the expense booked.
+      const grams = Math.min(round2(amount), MAX_SPOOL_GRAMS);
+      Object.assign(clone, pricedFor(item, grams, num(po.unitPrice)));
       out.newItem = {
         ...clone,
         id,
-        weight: Math.min(round2(amount), MAX_SPOOL_GRAMS),
-        spoolWeight: Math.min(round2(amount), MAX_SPOOL_GRAMS),
+        weight: grams,
+        spoolWeight: grams,
         purchasedAt: str(today),
         lot: newLot,
         poId: str(po.id),
@@ -232,6 +242,20 @@ function receive({ po, item, consumable, quantity, notes, today, expenseId,
       };
       if (newLot) out.item.lot = newLot;
       if (po.id) out.item.poId = str(po.id);
+      // A later part of a new lot tops up the roll the first part became.
+      // That roll's `spoolWeight` and `cost` describe ONLY what has arrived
+      // into it, so both grow with it — otherwise the second 250 g would be
+      // priced against a 250 g roll at the first part's price.
+      if (topUp) {
+        const before = num(item.spoolWeight);
+        const grams = Math.min(round2(before + amount), MAX_SPOOL_GRAMS) - before;
+        if (before > 0 && grams > 0) {
+          const extra = pricedFor(item, grams, num(po.unitPrice));
+          out.item.spoolWeight = round2(before + grams);
+          if ('cost' in extra) out.item.cost = round2(num(item.cost) + extra.cost);
+          if ('vatAmount' in extra) out.item.vatAmount = round2(num(item.vatAmount) + extra.vatAmount);
+        }
+      }
     }
   }
 
@@ -258,6 +282,37 @@ function receive({ po, item, consumable, quantity, notes, today, expenseId,
         poId: po.id,
       };
     }
+  }
+  return out;
+}
+
+/**
+ * What `grams` of a roll like `item` cost: `{ cost, vatAmount }`, whichever
+ * the roll carries.
+ *
+ * The order's own per-gram price is the truth when it has one — it is what the
+ * expense books. Without it the roll's price is scaled by the share of the roll
+ * those grams are (`spoolWeight`, what it weighed when it arrived). Tax scales
+ * with the cost it was charged on.
+ */
+function pricedFor(item, grams, unitPrice) {
+  const out = {};
+  const oldCost = num(item && item.cost);
+  // Never `weight`: that is what is LEFT, and dividing by it prices a
+  // half-used roll's plastic double. A roll that predates `spoolWeight` reads
+  // as the kilo every other price-per-gram rule here assumes (reorder.js,
+  // po-audit.js).
+  const bought = num(item && item.spoolWeight) > 0 ? num(item.spoolWeight) : 1000;
+  const share = bought > 0 ? grams / bought : 0;
+  let factor = share;
+  if (unitPrice > 0) {
+    out.cost = round2(grams * unitPrice);
+    factor = oldCost > 0 ? out.cost / oldCost : share;
+  } else if (item && 'cost' in item) {
+    out.cost = round2(oldCost * share);
+  }
+  if (item && item.vatAmount != null && num(item.vatAmount) !== 0) {
+    out.vatAmount = round2(num(item.vatAmount) * factor);
   }
   return out;
 }
