@@ -240,9 +240,21 @@ final class Words {
         return out
     }
 
+    /// One of this app's own sentences in English, with no `Words` to hand —
+    /// for a `description` that lands in a log, or a test. What a shop reads
+    /// goes through `callIt`, in the shop's language; this is the same entry's
+    /// English, so the two cannot drift into two spellings.
+    nonisolated static func english(_ key: String, _ params: [String: JSONValue] = [:]) -> String {
+        var out = own[key]?["en"] ?? key
+        for (name, value) in params {
+            out = out.replacingOccurrences(of: "{\(name)}", with: plain(value))
+        }
+        return out
+    }
+
     /// A parameter as the renderer's `String(vars[k])` would render it —
     /// including a whole number staying whole, which `"\(Double)"` does not do.
-    static func plain(_ value: JSONValue) -> String {
+    nonisolated static func plain(_ value: JSONValue) -> String {
         switch value {
         case .string(let s): return s
         case .number(let n):
@@ -684,6 +696,7 @@ final class Words {
         // Units beside the printer's fields, in the shop's language.
         "mac.unit_mm":          ["en": "mm", "ar": "مم"],
         "mac.unit_watts":       ["en": "W", "ar": "واط"],
+        "mac.unit_kwh":         ["en": "kWh", "ar": "كيلوواط ساعة"],
         // Electricity quoted against electricity metered, per machine — the
         // actuals panel, not the P&L.
         "mac.acc_power_title":  ["en": "Electricity: quoted and metered", "ar": "الكهرباء: المقدّرة والمقيسة"],
@@ -2199,6 +2212,54 @@ final class Words {
                               "ar": "يُحفظ مشفَّراً في سلسلة المفاتيح، كما تحفظه خيط."],
         "mach.test":         ["en": "Test",            "ar": "اختبر"],
         "mach.test_bad_draft":["en": "Fill in an address first.", "ar": "أدخل العنوان أولاً."],
+        // A save the book refused, said inside the machine sheet — which now
+        // stays open so nothing typed is lost.
+        "mac.mach_not_saved": ["en": "The machine was not saved.", "ar": "لم تُحفظ الآلة."],
+        // ── What a printer's failure says (`PrinterWatch.sentence`) ─────────
+        // Reaches the Test button, the machine card and the menu bar.
+        "mac.pw_handshake": ["en": "The printer refused the connection: {why}",
+                             "ar": "رفضت الطابعة الاتصال: {why}"],
+        "mac.pw_needs_serial": ["en": "This Bambu has no serial number yet. It is printed on the machine, and every message to it is addressed by it, so there is nothing to ask without one.",
+                                "ar": "لا يوجد رقم تسلسلي لطابعة Bambu هذه بعد. الرقم مطبوع على الجهاز، وكل رسالة إليها تُوجَّه به، فلا يمكن سؤالها من دونه."],
+        "mac.pw_unreadable": ["en": "The {type} printer answered with something this app could not read.",
+                              "ar": "ردّت طابعة {type} بشيء لم يستطع هذا التطبيق قراءته."],
+        "mac.pw_needs_mainboard": ["en": "This printer has no mainboard ID yet. It is how every message reaches it, and it is not printed on the machine — scan the network to find it.",
+                                   "ar": "لا يوجد معرّف اللوحة الرئيسية لهذه الطابعة بعد. به تصل إليها كل رسالة، وهو غير مطبوع على الجهاز — افحص الشبكة للعثور عليه."],
+        "mac.pw_no_host": ["en": "This machine has no address yet.", "ar": "لا يوجد عنوان لهذه الآلة بعد."],
+        "mac.pw_not_lan": ["en": "{host} is not an address on this network. A printer is a machine in the workshop, so only the private ranges are allowed.",
+                           "ar": "{host} ليس عنوانًا على هذه الشبكة. الطابعة جهاز داخل الورشة، لذا يُسمح بالعناوين الخاصة فقط."],
+        "mac.pw_bad_port": ["en": "{port} is not a port.", "ar": "{port} ليس منفذًا صالحًا."],
+        "mac.pw_redirected": ["en": "The printer sent this request somewhere else, so it was dropped.",
+                              "ar": "حوّلت الطابعة هذا الطلب إلى مكان آخر، فأُلغي."],
+        "mac.pw_http": ["en": "The printer's server answered {code}.", "ar": "أجاب خادم الطابعة بالرمز {code}."],
+        "mac.pw_http_body": ["en": "The printer's server answered {code}: {body}.",
+                             "ar": "أجاب خادم الطابعة بالرمز {code}: {body}."],
+        "mac.pw_no_history": ["en": "A {type} printer does not keep a job history Khayt can read. Klipper (Moonraker) is the only one of the three that does — the rest answer nothing at all, which arrives as a 404. Khayt counts this machine's wear from the jobs in your own book instead.",
+                              "ar": "طابعة {type} لا تحتفظ بسجل مهام يستطيع خيط قراءته. Klipper (Moonraker) وحدها من الثلاث تفعل ذلك — والبقية لا تجيب بشيء، فيصل ذلك على شكل 404. يحسب خيط اهتراء هذه الآلة من المهام في دفترك بدلًا من ذلك."],
+        "mac.pw_no_history_any": ["en": "A printer of this kind does not keep a job history Khayt can read. Klipper (Moonraker) is the only one of the three that does — the rest answer nothing at all, which arrives as a 404. Khayt counts this machine's wear from the jobs in your own book instead.",
+                                  "ar": "هذا النوع من الطابعات لا يحتفظ بسجل مهام يستطيع خيط قراءته. Klipper (Moonraker) وحدها من الثلاث تفعل ذلك — والبقية لا تجيب بشيء، فيصل ذلك على شكل 404. يحسب خيط اهتراء هذه الآلة من المهام في دفترك بدلًا من ذلك."],
+        "mac.pw_not_json": ["en": "The printer's answer was not JSON.", "ar": "لم يكن ردّ الطابعة بصيغة JSON."],
+        "mac.pw_timed_out": ["en": "The printer did not answer in time. It may be asleep or off the network.",
+                             "ar": "لم تُجب الطابعة في الوقت المحدد. ربما هي في وضع السكون أو خارج الشبكة."],
+        "mac.pw_cannot_connect": ["en": "Nothing answered at that address. Check the printer is on and on this network.",
+                                  "ar": "لم يُجب شيء على هذا العنوان. تأكد أن الطابعة تعمل ومتصلة بهذه الشبكة."],
+        "mac.pw_cannot_find": ["en": "That name did not resolve to anything on this network.",
+                               "ar": "لم يُشِر هذا الاسم إلى أي جهاز على هذه الشبكة."],
+        "mac.pw_sdcp_refused": ["en": "The printer refused: {why}", "ar": "رفضت الطابعة: {why}"],
+        "mac.pw_sdcp_silent": ["en": "The printer did not answer in time. Check it is on, and that the mainboard ID is the one this machine actually has.",
+                               "ar": "لم تُجب الطابعة في الوقت المحدد. تأكد أنها تعمل، وأن معرّف اللوحة الرئيسية هو معرّف هذه الآلة فعلًا."],
+        "mac.pw_closed": ["en": "The printer closed the connection before answering.",
+                          "ar": "أغلقت الطابعة الاتصال قبل أن تُجيب."],
+        "mac.pw_conn_closed": ["en": "The connection to the printer was closed.", "ar": "أُغلق الاتصال بالطابعة."],
+        "mac.pw_unreachable": ["en": "Could not reach the printer: {why}", "ar": "تعذّر الوصول إلى الطابعة: {why}"],
+        "mac.pw_malformed": ["en": "The printer sent something this app could not read.",
+                             "ar": "أرسلت الطابعة شيئًا لم يستطع هذا التطبيق قراءته."],
+        "mac.pw_cert_changed": ["en": "The printer answered with a different certificate from the one it used before, so the access code was not sent. If the printer was replaced or reset, save its access code again on the machine sheet to trust the new one.",
+                                "ar": "ردّت الطابعة بشهادة مختلفة عن التي استخدمتها من قبل، لذا لم يُرسَل رمز الوصول. إن استُبدلت الطابعة أو أُعيد ضبطها، فاحفظ رمز الوصول مجددًا في نافذة الآلة لتثق بالشهادة الجديدة."],
+        "mac.pw_code_refused": ["en": "The printer refused the access code (CONNACK {code}). It is shown on the printer's own screen, in the LAN-only Mode area.",
+                                "ar": "رفضت الطابعة رمز الوصول (CONNACK {code}). يظهر الرمز على شاشة الطابعة نفسها، في قسم وضع الشبكة المحلية فقط."],
+        "mac.pw_bambu_silent": ["en": "The printer accepted the connection and then said nothing. That is what happens when Developer Mode is off — LAN-only Mode alone does not open MQTT. Both are in the same menu on the printer (Settings → LAN Mode, or WLAN/Network on P1 and A1).",
+                                "ar": "قبلت الطابعة الاتصال ثم لم تقل شيئًا. هذا ما يحدث حين يكون وضع المطوّر (Developer Mode) مطفأً — وضع الشبكة المحلية وحده لا يفتح MQTT. كلاهما في القائمة نفسها على الطابعة (Settings ← LAN Mode، أو WLAN/Network في P1 وA1)."],
         "mac.nozzle_wear":   ["en": "Nozzle wear",     "ar": "تآكل الفوهة"],
         // The dashed rectangle behind a bed plan. Without this the drawing
         // reads as a rendering fault rather than as a comparison.

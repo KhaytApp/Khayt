@@ -5460,6 +5460,11 @@ public actor KhaytEngine {
             public let intervalHours: Double?
             public let intervalDays: Double?
         }
+
+        /// A machine with nothing scheduled yet. Still a card: the section it
+        /// draws is where the FIRST task is added, so a shop with none must
+        /// be shown one.
+        public static let empty = MaintenanceCard(hours: 0, tasks: [])
     }
 
     /// Every task on one machine, with the hour meter it is measured against.

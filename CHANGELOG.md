@@ -4,6 +4,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: printer setup fixes from the October review.** The machine sheet's
+  Test button now asks a Bambu over MQTT and an Elegoo over SDCP, with the
+  serial, slug and access code, as the live card does; it used to ask them
+  the Klipper question and report a working printer as unreachable. Save
+  keeps the sheet open until the book accepts it and says why inside the
+  sheet when it does not, and a smart-plug password that cannot be locked in
+  the Keychain now stops the save instead of being dropped. A machine with
+  no tasks yet shows the maintenance section, so a Mac-only shop can add its
+  first task and log its first service. A printer Khayt desktop saved as
+  "None" is no longer offered Send to printer or a blank protocol menu. A
+  camera on a printer whose address is not on the shop's network is no longer
+  sent the printer's key. Printer errors, the Test result and the units on the
+  machine card (mm, W, kWh) are in Arabic for an Arabic shop, a very large bed
+  or wattage in the book no longer closes the app, and removing a downtime
+  row no longer mixes up the rows below it.
+
 - **Mac: customer records for your web store can be turned on.** The privacy
   policy now covers the copy (khaytapp.com/privacy, "Customer records"), so the
   switch in Settings → Online works. It stays off until a shop turns it on, and

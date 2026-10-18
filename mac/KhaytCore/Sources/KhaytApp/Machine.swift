@@ -210,10 +210,14 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
 
     var model: String { printerModelName ?? vendor ?? "" }
 
-    /// `270 × 270 × 270 mm`, or nothing when the record does not say.
+    /// `270 × 270 × 270`, or nothing when the record does not say. The unit
+    /// is the caller's to add, in the shop's language (`mac.unit_mm`).
+    ///
+    /// `Int(saturating:)`, not `Int(_:)`: a bed of 1e300 from a hand-edited
+    /// or imported book trapped and took the machine card down with it.
     var bedSize: String? {
         guard let bed, let x = bed.x, let y = bed.y, let z = bed.z else { return nil }
-        return "\(Int(x)) × \(Int(y)) × \(Int(z)) mm"
+        return "\(Int(saturating: x)) × \(Int(saturating: y)) × \(Int(saturating: z))"
     }
 
     /// Where it can be reached, without the credential.

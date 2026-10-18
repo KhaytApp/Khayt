@@ -353,12 +353,12 @@ private struct Card: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(shop.words.callIt("mac.bed"))
                                 .font(.caption).foregroundStyle(.secondary)
-                            Text(bed).font(.callout.weight(.semibold)).monospacedDigit()
+                            Text("\(bed) \(shop.words.callIt("mac.unit_mm"))").font(.callout.weight(.semibold)).monospacedDigit()
                             // The dashed rectangle needs naming, or a small
                             // square inside a big one reads as a rendering
                             // fault rather than as a comparison.
                             Text(shop.words.callIt("mac.bed_against",
-                                 ["w": .string("\(Int(shop.widestBed))"), "d": .string("\(Int(shop.deepestBed))")]))
+                                 ["w": .string("\(Int(saturating: shop.widestBed))"), "d": .string("\(Int(saturating: shop.deepestBed))")]))
                                 .font(.caption2).foregroundStyle(.tertiary)
                                 // It wrapped to one truncated line — "dashed:
                                 // the largest bed…" says nothing at all.
@@ -375,7 +375,7 @@ private struct Card: View {
                 // the record, so it was drawn. `lib/machine-kinds.js` says
                 // which specs belong to which kind, and this asks it.
                 if let d = machine.nozzleDiameter, shows("nozzleDiameter") {
-                    DetailLine(shop.words.callIt("mac.nozzle"), "\(Money.figure(d)) mm")
+                    DetailLine(shop.words.callIt("mac.nozzle"), "\(Money.figure(d)) \(shop.words.callIt("mac.unit_mm"))")
                 }
                 if let n = machine.maxColors, shows("maxColors") {
                     DetailLine(shop.words.callIt("mac.colours"), "\(n)")
@@ -383,7 +383,7 @@ private struct Card: View {
                 if let e = machine.extruderType, shows("extruderType") {
                     DetailLine(shop.words.callIt("mac.extruder"), e)
                 }
-                if let w = machine.powerDraw { DetailLine(shop.words.callIt("mac.power"), "\(Int(w)) W") }
+                if let w = machine.powerDraw { DetailLine(shop.words.callIt("mac.power"), "\(Int(saturating: w)) \(shop.words.callIt("mac.unit_watts"))") }
                 if let address = machine.address {
                     // The address, never the key. The store keeps that encrypted
                     // and this screen has no business opening it to say where a
@@ -411,7 +411,7 @@ private struct Card: View {
                     HStack(alignment: .center, spacing: 11) {
                         WearGauge(pct: wear.pct)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("\(Int(wear.wear)) / \(Int(wear.threshold)) \(shop.words.callIt("common.grams"))")
+                            Text("\(Int(saturating: wear.wear)) / \(Int(saturating: wear.threshold)) \(shop.words.callIt("common.grams"))")
                                 .font(.callout).monospacedDigit()
                             if wear.over {
                                 Text(shop.words.callIt("mac.nozzle_due"))
@@ -459,21 +459,24 @@ private struct Card: View {
                 }
             }
 
-            // What this machine is due for. Only where the shop has set tasks
-            // up: a permanent "no tasks" heading on every printer would be
-            // noise on the screen a shop looks at most.
-            // Drawn whenever maintenance is ON, not only when tasks exist: the
-            // shop has to be able to create the first one, and a section that
-            // appears only once something is in it is a section nobody can put
-            // anything into. The Mac could read a schedule and never write one,
-            // so a shop whose only app is this one had no schedule at all.
+            // What this machine is due for. Drawn whenever maintenance is ON,
+            // not only when tasks exist: the shop has to be able to create the
+            // first one, and a section that appears only once something is in
+            // it is a section nobody can put anything into. The Mac could read
+            // a schedule and never write one, so a shop whose only app is this
+            // one had no schedule at all. `Shop.maintenance(for:)` returns an
+            // EMPTY card for that, never nil — nil is "maintenance is off".
+            //
+            // Kept quiet when empty: one small grey line and the button, so
+            // a printer with nothing scheduled is not shouting about it on
+            // the screen a shop looks at most.
             if let upkeep {
                 DetailSection(shop.words.callIt("maint.recurring"),
                               accent: Self.worst(upkeep.tasks)) {
                     VStack(alignment: .leading, spacing: 7) {
                         if upkeep.tasks.isEmpty {
                             Text(shop.words.callIt("maint.no_tasks"))
-                                .font(.callout).foregroundStyle(.secondary)
+                                .font(.caption).foregroundStyle(.tertiary)
                         }
                         ForEach(upkeep.tasks) { task in
                             Upkeep(task: task, machine: machine, shop: shop)
@@ -498,7 +501,7 @@ private struct Card: View {
         // other app hides the whole of it from a Simple shop. Not asked for
         // rather than asked and hidden — the answer costs a walk of the book.
         .task(id: upkeepInputs) {
-            upkeep = shop.has("maintenance") ? await shop.maintenance(for: machine) : nil
+            upkeep = await shop.maintenance(for: machine)
         }
         .card(rail: running ? Khayt.hot : nil, padding: 14, fills: true)
     }
@@ -1674,7 +1677,7 @@ private struct Live: View {
                                        : state?.on == false ? "plug.off" : "plug.unknown"))
                     .font(.callout)
                 if let watts = state?.watts {
-                    Text("\(Money.quantity(watts)) W").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                    Text("\(Money.quantity(watts)) \(shop.words.callIt("mac.unit_watts"))").font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
                 Spacer()
                 if state?.on == true {
@@ -1850,16 +1853,9 @@ private struct Live: View {
         }
     }
 
-    /// Klipper's own words, in the shop's language where Khayt has one.
-    private func state(_ raw: String) -> String {
-        switch raw.lowercased() {
-        case "printing": return shop.words.callIt("mach.live_printing")
-        case "standby", "ready", "complete": return shop.words.callIt("mach.live_idle")
-        case "paused": return shop.words.callIt("rec.paused")
-        case "error": return shop.words.callIt("mach.live_error")
-        default: return raw
-        }
-    }
+    /// Klipper's own words, in the shop's language where Khayt has one —
+    /// `PrinterWatch.stateWord`, which the machine sheet's Test button uses too.
+    private func state(_ raw: String) -> String { PrinterWatch.stateWord(raw, shop.words) }
 
     /// Is there a job on this machine — running or held part-way through?
     /// This is the question the progress bar asks, and a paused print still

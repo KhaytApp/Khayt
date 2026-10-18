@@ -2286,17 +2286,22 @@ extension Shop {
     /// every job that finishes, and a card still showing "40h remaining" after
     /// the meter passed it is the one thing this screen exists to prevent.
     ///
-    /// Nil when the machine has no tasks at all, so the card can leave the
-    /// section out entirely rather than drawing an empty heading — most shops
-    /// have not set any up, and a permanent "No tasks" on every printer is
-    /// noise on the screen a shop looks at most.
+    /// ── NIL ONLY WHEN MAINTENANCE IS OFF ─────────────────────────────────
+    ///
+    /// This used to be nil whenever the machine had no tasks, so the card
+    /// could leave the section out — and the section is where "New task" and
+    /// the service log live. A shop whose only app is this one could never
+    /// add its first task or log its first service. Now a shop with
+    /// maintenance on gets a card, empty when nothing is scheduled; the card
+    /// keeps that state quiet. Nil means the feature is off (or there is no
+    /// engine to ask).
     func maintenance(for machine: Machine) async -> KhaytEngine.MaintenanceCard? {
-        guard let engine, !maintTaskRows.isEmpty else { return nil }
+        guard has("maintenance"), let engine else { return nil }
+        guard !maintTaskRows.isEmpty else { return .empty }
         let card = try? await engine.maintenance(
             machineId: machine.id, tasks: maintTaskRows, jobs: orderRows,
             machine: .object(["id": .string(machine.id)]), now: Date())
-        guard let card, !card.tasks.isEmpty else { return nil }
-        return card
+        return card ?? .empty
     }
 
     /// Record a task as done, at the meter's current reading.

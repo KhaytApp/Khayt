@@ -120,6 +120,10 @@ struct MachineSheet: View {
     /// What the printer said, or why it could not be reached.
     @State private var testSaid: String?
     @State private var testWorked = false
+    /// Why the last Save did not happen, said in the sheet — which stays open.
+    @State private var saveProblem: String?
+    /// A save in flight, so a second press does not race the first.
+    @State private var saving = false
     @FocusState private var focused: Bool
 
     // ── What it cost, and how long it should last ───────────────────────
@@ -188,12 +192,18 @@ struct MachineSheet: View {
             }
         } footer: {
             HStack {
+                if let saveProblem {
+                    Text(saveProblem)
+                        .font(.caption).foregroundStyle(Khayt.late)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
                 Spacer()
                 Button(shop.words.callIt("common.cancel")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(shop.words.callIt("common.save"), action: commit)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(saving || name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
         .task {
@@ -802,7 +812,9 @@ struct MachineSheet: View {
             f.camRotate = machine.webcam?.rotate ?? 0
             f.camFlipH = machine.webcam?.flipH ?? false
             f.camFlipV = machine.webcam?.flipV ?? false
-            f.apiType = machine.printerApi?.type ?? ""
+            // "none" — what Electron writes for no link — opens as "", the
+            // picker's own "None"; see `Shop.connectionType`.
+            f.apiType = Shop.connectionType(machine.printerApi?.type)
             f.apiHost = machine.printerApi?.host ?? ""
             f.apiPort = machine.printerApi?.port ?? 0
             f.apiSerial = machine.printerApi?.serial ?? ""
@@ -1078,6 +1090,11 @@ struct MachineSheet: View {
             for candidate in candidates {
                 if (try? await engine.assertWebcamHost(candidate, printerApi: row)) == nil { continue }
                 guard let url = URL(string: candidate) else { continue }
+                // The host rule above passes ANY address equal to the
+                // printer's own — and the printer's own was typed into this
+                // sheet a moment ago and never checked. The key goes nowhere
+                // the poller's LAN rule would refuse.
+                guard await PrinterWatch.onThisNetwork(url, engine: engine) else { continue }
                 var request = URLRequest(url: url)
                 request.timeoutInterval = 4
                 if let headers = try? await engine.webcamAuthHeaders(printerApi: row) {
@@ -1107,54 +1124,84 @@ struct MachineSheet: View {
     private func test() {
         testing = true
         testSaid = nil
-        guard let draft = draftMachine() else {
+        guard let draft = Self.draft(id: existing?.id, name: name, type: apiType, host: apiHost,
+                                     port: apiPort, serial: apiSerial, slug: apiSlug) else {
             testing = false
             testSaid = shop.words.callIt("mach.test_bad_draft")
             testWorked = false
             return
         }
-        let typed = apiKey
+        let typed = apiKey, typedCode = accessCode
         let build = shop.source.build
-        let stored = existing?.printerApi?.apiKey ?? ""
+        // A stored credential the shop has just asked to forget is not one
+        // to test with: Save is about to clear it.
+        let stored = forgetKey ? "" : (existing?.printerApi?.apiKey ?? "")
+        let storedCode = forgetCode ? "" : (existing?.printerApi?.accessCode ?? "")
+        let words = shop.words
         Task {
             defer { testing = false }
             guard let engine = shop.engine else {
-                testSaid = shop.words.callIt("mac.move_no_engine"); testWorked = false; return
+                testSaid = words.callIt("mac.move_no_engine"); testWorked = false; return
             }
             do {
                 // The typed key if there is one, else the stored one opened at
                 // the point of use — which is the only place this app opens a
-                // credential at all.
+                // credential at all. The access code the same way, and only
+                // for the protocol that sends one.
                 var key = typed
                 if key.isEmpty, !stored.isEmpty, let build {
                     key = (try? await Secrets.open(stored, for: build)) ?? ""
                 }
-                let base = try await PrinterWatch.baseURL(draft, engine: engine)
-                let status = try await PrinterWatch.read(draft, engine: engine, base: base, key: key,
-                                                         fetch: { try await PrinterWatch.session.data(for: $0) })
+                var code = ""
+                if draft.printerApi?.type == "bambu" {
+                    code = typedCode
+                    if code.isEmpty, !storedCode.isEmpty, let build {
+                        code = (try? await Secrets.open(storedCode, for: build)) ?? ""
+                    }
+                }
+                // The poller's own branches — Bambu over MQTT, Elegoo over
+                // SDCP, the rest over HTTP — so the button proves what the
+                // card will actually do.
+                let status = try await PrinterWatch.ask(draft, engine: engine, key: key, accessCode: code)
                 testWorked = true
-                let state = status.state.isEmpty ? "—" : status.state
-                testSaid = status.filename.isEmpty
-                    ? state
-                    : "\(state) · \(status.filename)"
+                testSaid = Self.answered(status, words)
             } catch {
                 testWorked = false
-                testSaid = PrinterWatch.say(error)
+                testSaid = PrinterWatch.say(error, words)
             }
         }
+    }
+
+    /// What a printer that answered the Test button said: its state in the
+    /// card's words, and the file when there is one.
+    static func answered(_ status: KhaytEngine.PrinterStatus, _ words: Words) -> String {
+        let state = status.state.isEmpty ? "—" : PrinterWatch.stateWord(status.state, words)
+        return status.filename.isEmpty ? state : "\(state) · \(status.filename)"
     }
 
     /// The machine as the form currently describes it, for the test above.
     /// Built by decoding, because `Machine` is the store's shape and this sheet
     /// must not become a second definition of it.
-    private func draftMachine() -> Machine? {
-        let api: [String: JSONValue] = [
-            "type": .string(apiType),
-            "host": .string(apiHost.trimmingCharacters(in: .whitespaces)),
-            "port": .number(Double(apiPort)),
+    ///
+    /// The serial (a Bambu's, or an Elegoo's mainboard id) and the Repetier
+    /// slug come too: without them the Bambu and SDCP branches refuse before
+    /// asking, and a Repetier is asked about the wrong printer. Secrets do NOT
+    /// go on the draft — they are opened at the point of use and handed over.
+    static func draft(id: String?, name: String, type: String, host: String, port: Int,
+                      serial: String, slug: String) -> Machine? {
+        var api: [String: JSONValue] = [
+            "type": .string(type),
+            "host": .string(host.trimmingCharacters(in: .whitespaces)),
         ]
+        // A blank port is the protocol's default, as the poller reads a record
+        // with none — not port 0, which `baseURL` refuses as "not a port".
+        if port > 0 { api["port"] = .number(Double(port)) }
+        let serial = serial.trimmingCharacters(in: .whitespaces)
+        let slug = slug.trimmingCharacters(in: .whitespaces)
+        if !serial.isEmpty { api["serial"] = .string(serial) }
+        if !slug.isEmpty { api["printerSlug"] = .string(slug) }
         let record: JSONValue = .object([
-            "id": .string(existing?.id ?? "MACH-draft"),
+            "id": .string(id ?? "MACH-draft"),
             "name": .string(name),
             "printerApi": .object(api),
         ])
@@ -1163,80 +1210,97 @@ struct MachineSheet: View {
         return machine
     }
 
+    /// Seal, save, and only then close.
+    ///
+    /// ── THE SHEET STAYS OPEN UNTIL THE BOOK HAS SAID YES ─────────────────
+    ///
+    /// This used to `dismiss()` first and seal and save afterwards, so a key
+    /// that could not be sealed, a sample book, or a save the book refused
+    /// closed the sheet anyway and took everything typed in it — the refusal
+    /// landed on a screen behind it, if anywhere. Now a refusal is said here,
+    /// under the buttons, with the form still filled in.
     private func commit() {
         var input = form.input()
         let was = opened?.input()
         let id = existing?.id
         let catalogId = chosen
-        let typed = apiKey
         let clearing = forgetKey
-        let typedCode = accessCode
         let clearingCode = forgetCode
         let serial = apiSerial.trimmingCharacters(in: .whitespaces)
         let host = apiHost.trimmingCharacters(in: .whitespaces)
         let type = apiType
-        let typedPlugToken = plugToken, typedPlugPassword = plugPassword
+        // What was TYPED, by where it goes. Blank means "keep what is
+        // stored", so a blank one is not sealed and not written.
+        let typed = [
+            "apiKey": clearing ? "" : apiKey,
+            "accessCode": type == "bambu" && !clearingCode ? accessCode : "",
+            "token": plugToken,
+            "password": plugPassword,
+        ].filter { !$0.value.isEmpty }
         let build = shop.source.build
-        dismiss()
+        let words = shop.words
+        saveProblem = nil
+        saving = true
         Task {
+            defer { saving = false }
             guard case .object(var api)? = input["printerApi"],
-                  case .object(var plug)? = input["smartPlug"] else { return }
-            // ── THE KEY IS SEALED HERE OR NOT WRITTEN AT ALL ──────────────
+                  case .object(var plug)? = input["smartPlug"] else {
+                saveProblem = words.callIt("mac.mach_not_saved"); return
+            }
+            // ── EVERY SECRET IS SEALED HERE OR NOT WRITTEN AT ALL ─────────
             //
             // `apiKey` is a registered secret path, so what belongs on the
             // record is `__enc__` + OSCrypt under the book's own Keychain key
             // — the same bytes Electron writes and reads. Absent means the
             // shared rule carries the stored one through untouched.
             //
-            // A key that cannot be sealed is REFUSED rather than written in
-            // the clear: this file syncs, backs up and exports.
-            if clearing {
-                api["apiKey"] = .string("")
-            } else if !typed.isEmpty {
-                guard let build else {
-                    await MainActor.run { shop.spendProblem = shop.words.callIt("mac.move_sample") }
-                    return
-                }
-                do {
-                    api["apiKey"] = .string(try await Secrets.seal(typed, for: build))
-                } catch {
-                    await MainActor.run {
-                        shop.spendProblem = String(describing: error)
-                    }
-                    return
-                }
+            // A secret that cannot be sealed is REFUSED rather than written in
+            // the clear: this file syncs, backs up and exports. That includes
+            // the plug's token and password, which used to be dropped on a
+            // failed seal while the rest saved — "saved", about a token that
+            // was never written.
+            var sealed: [String: String] = [:]
+            if !typed.isEmpty {
+                guard let build else { saveProblem = words.callIt("mac.move_sample"); return }
+                do { sealed = try await Self.sealEach(typed) { try await Secrets.seal($0, for: build) } }
+                catch { saveProblem = String(describing: error); return }
             }
-            // A Bambu's access code: sealed here or not written, exactly as the
-            // key above — it is the MQTT password and a registered secret path.
+            if clearing { api["apiKey"] = .string("") }
+            else if let key = sealed["apiKey"] { api["apiKey"] = .string(key) }
+            // A Bambu's access code: sealed exactly as the key above — it is
+            // the MQTT password and a registered secret path.
             if type == "bambu" {
-                if clearingCode {
-                    api["accessCode"] = .string("")
-                } else if !typedCode.isEmpty {
-                    guard let build else {
-                        await MainActor.run { shop.spendProblem = shop.words.callIt("mac.move_sample") }
-                        return
-                    }
-                    // A new access code re-trusts the printer's certificate:
-                    // this is how a replaced or reset Bambu is let back in.
-                    BambuPin.forget(serial: serial, host: host)
-                    do { api["accessCode"] = .string(try await Secrets.seal(typedCode, for: build)) }
-                    catch {
-                        await MainActor.run { shop.spendProblem = String(describing: error) }
-                        return
-                    }
-                }
+                if clearingCode { api["accessCode"] = .string("") }
+                else if let code = sealed["accessCode"] { api["accessCode"] = .string(code) }
             }
             input["printerApi"] = .object(api)
-            // The plug's secrets go in SEALED, and only when one was typed:
-            // absent keeps what is stored.
-            for (key, typed) in [("token", typedPlugToken), ("password", typedPlugPassword)] where !typed.isEmpty {
-                guard let build else { break }
-                if let sealed = try? await Secrets.seal(typed, for: build) { plug[key] = .string(sealed) }
-            }
+            if let token = sealed["token"] { plug["token"] = .string(token) }
+            if let password = sealed["password"] { plug["password"] = .string(password) }
             input["smartPlug"] = .object(plug)
-            await shop.saveMachine(input, id: id, catalogId: catalogId, opened: was)
+            guard await shop.saveMachine(input, id: id, catalogId: catalogId, opened: was) else {
+                saveProblem = shop.spendProblem ?? shop.moveProblem ?? words.callIt("mac.mach_not_saved")
+                return
+            }
+            // A new access code re-trusts the printer's certificate: this is
+            // how a replaced or reset Bambu is let back in. After the save, so
+            // a refused one leaves the old trust where it was.
+            if sealed["accessCode"] != nil { BambuPin.forget(serial: serial, host: host) }
             shop.loadedChanged()
+            dismiss()
         }
+    }
+
+    /// Every typed secret sealed, or a throw — never some of them.
+    ///
+    /// All-or-nothing on purpose: a save that went ahead with one secret
+    /// missing would tell the shop it had saved what it had not.
+    static func sealEach(_ typed: [String: String],
+                         with seal: (String) async throws -> String) async throws -> [String: String] {
+        var out: [String: String] = [:]
+        for (field, plain) in typed where !plain.isEmpty {
+            out[field] = try await seal(plain)
+        }
+        return out
     }
 }
 
@@ -1531,20 +1595,27 @@ struct DowntimeEditor: View {
                 Text(words.callIt("mac.downtime_none"))
                     .font(.caption).foregroundStyle(.secondary)
             }
-            ForEach(blocks.indices, id: \.self) { at in
+            // ── BY IDENTITY, NOT BY POSITION ─────────────────────────────
+            //
+            // This was `ForEach(blocks.indices)` with `remove(at:)`: removing
+            // a row while SwiftUI still held a binding to the last index read
+            // past the end of the array, and an index is not an identity — the
+            // rows below a removed one were redrawn as each other.
+            ForEach($blocks) { $block in
                 HStack(spacing: 8) {
-                    DatePicker("", selection: binding(at, \.from), displayedComponents: [.date, .hourAndMinute])
+                    DatePicker("", selection: Self.date($block.from), displayedComponents: [.date, .hourAndMinute])
                         .labelsHidden().datePickerStyle(.compact)
                     // A symbol, not a typed "→": the symbol turns round in a
                     // right-to-left window and the character does not, so the
                     // Arabic row pointed from the end back to the start.
                     Image(systemName: "arrow.forward").foregroundStyle(.tertiary)
-                    DatePicker("", selection: binding(at, \.to), displayedComponents: [.date, .hourAndMinute])
+                    DatePicker("", selection: Self.date($block.to), displayedComponents: [.date, .hourAndMinute])
                         .labelsHidden().datePickerStyle(.compact)
-                    TextField(words.callIt("mach.downtime_reason"), text: reason(at))
+                    TextField(words.callIt("mach.downtime_reason"), text: $block.reason)
                         .textFieldStyle(.roundedBorder).frame(minWidth: 90)
                     Button {
-                        blocks.remove(at: at)
+                        let gone = block.id
+                        blocks.removeAll { $0.id == gone }
                     } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless)
                         .help(words.callIt("common.delete"))
@@ -1557,7 +1628,7 @@ struct DowntimeEditor: View {
                 // shared rule, silently — which would be a shop typing
                 // something and finding nothing there. It is said here instead,
                 // while it can still be corrected.
-                if !blocks[at].isReadable {
+                if !block.isReadable {
                     Text(words.callIt("mac.downtime_backwards"))
                         .font(.caption2).foregroundStyle(Khayt.attention)
                 }
@@ -1565,14 +1636,13 @@ struct DowntimeEditor: View {
         }
     }
 
-    private func binding(_ at: Int, _ path: WritableKeyPath<Shop.DowntimeBlock, String>) -> Binding<Date> {
+    /// One end of a window as the picker's date, written back through
+    /// `edited` so a picker reporting the minute it already shows is not an
+    /// edit.
+    static func date(_ stamp: Binding<String>) -> Binding<Date> {
         Binding(
-            get: { Self.parse(blocks[at][keyPath: path]) ?? Date() },
-            set: { blocks[at][keyPath: path] = Self.edited(blocks[at][keyPath: path], picked: $0) })
-    }
-
-    private func reason(_ at: Int) -> Binding<String> {
-        Binding(get: { blocks[at].reason }, set: { blocks[at].reason = $0 })
+            get: { parse(stamp.wrappedValue) ?? Date() },
+            set: { stamp.wrappedValue = edited(stamp.wrappedValue, picked: $0) })
     }
 
     /// The windows a machine opens with — exactly as the book holds them.
