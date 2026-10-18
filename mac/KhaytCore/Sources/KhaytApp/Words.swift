@@ -3988,6 +3988,9 @@ final class Words {
                                       "ar": "لا يمكن حذف أي من العملاء المختارين: لكل منهم أعمال أو بطاقات هدايا."],
         "mac.deleted_customers": ["en": "Customers deleted: {n}.", "ar": "العملاء المحذوفون: {n}."],
         "mac.delete_customers_action": ["en": "Delete Customers", "ar": "حذف العملاء"],
+        // A customer's right to erasure (`Shop+Privacy.swift`). The sheet's
+        // own words are the desktop's `priv.*`; only the menu item is new.
+        "mac.erase_customer": ["en": "Erase Customer\u{2026}", "ar": "محو العميل\u{2026}"],
         // ── ASKED BEFORE A ONE-CLICK REMOVAL (see `AskFirst`) ────────────
         // `mac.delete_product_q` above is the title for every named delete —
         // "Delete “{name}”?" is not about products. These say what happens

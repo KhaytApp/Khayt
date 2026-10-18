@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a customer can have their data, or have it erased.** A Mac-only
+  shop can now answer a customer's request under the PDPL, as the desktop
+  can. "Export this customer's data…" (the customer's right-click menu, or
+  Privacy & Customer Data in their detail) saves everything the book holds
+  about them as a JSON file, using the shared `lib/privacy.js` rule. "Erase
+  Customer…" shows how many jobs, intake rows and logged communications they
+  have, and offers Unlink (recommended: the record goes, the jobs stay with
+  the name) or Full erase (the name is also blanked on jobs with no invoice
+  and no payment, and their intake rows go). Invoiced or paid jobs keep the
+  name, since a tax invoice is kept as issued. Edit › Undo brings it back.
+  Plain Delete, for customers with no jobs, is unchanged.
 - **Stock: deliveries, waste and spool prices add up.** A part delivery of a
   new lot is priced at what arrived (250 g of an 80-for-1000 g roll was costed
   at 80, not 20) and grows with later parts. Waste logged against a roll with
