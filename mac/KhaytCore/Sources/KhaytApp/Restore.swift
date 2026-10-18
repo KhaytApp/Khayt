@@ -218,6 +218,8 @@ enum Restore {
             snapshot = try await engine.keepMachineLocal(local: current ?? [:], incoming: snapshot)
         }
 
+        snapshot = keepCustomerRecordsSwitch(snapshot, from: current)
+
         // ── A RESTORE THE NEXT SYNC CANNOT UNDO ───────────────────────────
         //
         // The bytes alone lost to the next merge: a delete made after the
@@ -277,6 +279,26 @@ enum Restore {
     /// This is `mergeStoreSecretsFromDisk` for a restore. It takes nothing the
     /// backup genuinely has — a Mac-written backup is a byte copy of the store
     /// and carries its own `__enc__` secrets, and those are the ones restored.
+    /// The customer-records switch stays as the book being replaced has it.
+    ///
+    /// It decides whether customers' names, emails and phones are uploaded,
+    /// in the clear, to Khayt Cloud. A backup taken while it was on would turn
+    /// it back on, and the upload would start within ten minutes, with nobody
+    /// having pressed anything: the copy the shop deleted by turning it off,
+    /// back. No book here, or none with the switch, is off.
+    static func keepCustomerRecordsSwitch(_ snapshot: [String: JSONValue],
+                                          from current: [String: JSONValue]?) -> [String: JSONValue] {
+        var out = snapshot
+        guard case .object(var settings)? = out["settings"] else { return out }
+        if case .object(let now)? = current?["settings"], let kept = now["customerRecords"] {
+            settings["customerRecords"] = kept
+        } else {
+            settings.removeValue(forKey: "customerRecords")
+        }
+        out["settings"] = .object(settings)
+        return out
+    }
+
     static func carryForward(into snapshot: [String: JSONValue],
                              from current: [String: JSONValue],
                              paths: [String]) -> [String: JSONValue] {

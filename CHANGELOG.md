@@ -4,6 +4,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: fixes from a full review.**
+  - **Sync:** a spool, gift card, loyalty redemption or message template
+    made on the Mac reaches the other devices now. Before, it waited at
+    Khayt Cloud until someone edited it. Records already waiting there come
+    down to devices that don't have them, and never overwrite anything.
+  - **Product sheet:** turning "Show on web store" back on lists the
+    product again, and a cleared margin or translation stays cleared.
+  - **Library:** Delete for several models at once deletes them. It did
+    nothing before.
+  - **Loyalty:** points are not turned into store credit twice when another
+    device redeemed them first.
+  - **Shelf sales:** two quick sales from the shelf take two off the
+    count, not one.
+  - **Customer records:** restoring a backup no longer turns the upload
+    back on. The switch stays as it was.
 - **iPhone: the phone asks before following its Mac to a new address.** When
   the Mac stops answering and its name turns up somewhere else on the
   network, the phone used to move there by itself and send its PIN along.

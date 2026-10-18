@@ -150,6 +150,20 @@ struct CustomerRecordsTests {
         #expect(shop.customerRecordsOn)
     }
 
+    @Test("a restore keeps the switch as the book it replaces has it, never the backup's")
+    func restoreKeepsSwitch() {
+        let on: JSONValue = .object(["enabled": .bool(true)])
+        let off: JSONValue = .object(["enabled": .bool(false)])
+        let backup: [String: JSONValue] = ["settings": .object(["customerRecords": on, "currency": .string("SAR")])]
+        let turnedOff = Restore.keepCustomerRecordsSwitch(backup, from: ["settings": .object(["customerRecords": off])])
+        guard case .object(let a)? = turnedOff["settings"] else { Issue.record("shape"); return }
+        #expect(a["customerRecords"] == off)
+        #expect(a["currency"] == .string("SAR"), "the rest of the backup's settings are restored")
+        let none = Restore.keepCustomerRecordsSwitch(backup, from: nil)
+        guard case .object(let b)? = none["settings"] else { Issue.record("shape"); return }
+        #expect(b["customerRecords"] == nil, "no book here: off")
+    }
+
     @Test("failures are said in the shop's language, and a reached cloud is not 'could not reach'")
     func saidInArabic() async {
         let w = Words()

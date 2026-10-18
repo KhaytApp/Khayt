@@ -2750,6 +2750,8 @@ final class Words {
                                  "ar": "عدد العملاء أكبر مما تحفظه سحابة خيط (5000 أو 4 ميغابايت)."],
         "mac.cr_err_limited": ["en": "Khayt Cloud asked for fewer sends. Khayt will try again later.",
                                "ar": "طلبت سحابة خيط تقليل الإرسال. سيعيد خيط المحاولة لاحقًا."],
+        "mac.loyalty_changed": ["en": "This customer's points changed on another device. Look again and redeem what is left.",
+                                "ar": "تغيّرت نقاط هذا العميل على جهاز آخر. راجعها ثم استبدل المتبقي."],
         "mac.cloud_err_http": ["en": "Khayt Cloud answered with error {code}.", "ar": "ردّت سحابة خيط بالخطأ {code}."],
         "mac.wa_err_unauthorised": ["en": "Khayt Cloud did not accept this shop's sign-in. Sign in to Khayt Cloud again.",
                                     "ar": "لم تقبل سحابة خيط تسجيل دخول هذا المحل. سجّل الدخول إلى سحابة خيط مرة أخرى."],

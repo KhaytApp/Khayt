@@ -109,6 +109,7 @@ extension Shop {
                                 rush: false, asQuote: false, fromProduct: product,
                                 rule: Self.priceRule(of: product))
         input["fromStock"] = JSONValue.bool(true)
+        let notEnough = words.callIt("mac.not_enough_on_shelf")
 
         writeProblem = nil
         do {
@@ -117,6 +118,14 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+            // THE SHELF AS IT IS ON DISK. The count above is the one this
+            // window last drew; a sale made a moment ago, a web-store order or
+            // a sync since then has moved it, and writing `drawn - count` over
+            // that undid the other sale.
+            let onDisk = Self.stockCount(of: product.id, in: root["settings"] ?? .null)
+            guard let onDisk, onDisk >= count else {
+                throw MoveRefused(sentence: notEnough)
+            }
             let orders = Self.rows(root, "printLog")
             let out = try await engine.newOrder(
                 input, orders: orders, settings: Self.settings(root), now: Date(),
@@ -145,7 +154,7 @@ extension Shop {
             // The invoice counter the order consumed travels with it, for the
             // reason `createJob` gives: one swap, both records.
             var settings = out.settings
-            Self.putStockCount(onShelf - count, for: product.id, into: &settings, at: Date())
+            Self.putStockCount(onDisk - count, for: product.id, into: &settings, at: Date())
             root["settings"] = .object(settings)
             }
         } catch let refusal as MoveRefused {
