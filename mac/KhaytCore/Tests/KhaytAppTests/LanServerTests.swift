@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import Testing
 import KhaytCore
 @testable import KhaytApp
@@ -36,7 +37,8 @@ struct LanServerTests {
 
         init(pin: String = "24682468", intakeToken: String = "", recordFails: Bool = false,
              calendarToken: String = "", measures: Bool = true, sliced: Bool = false,
-             readTimeout: TimeInterval = 15, foldsDeltas: Bool = false) async throws {
+             readTimeout: TimeInterval = 15, foldsDeltas: Bool = false,
+             identity: Curve25519.Signing.PrivateKey = .init()) async throws {
             let shop = Shop()
             await shop.load(.sample)
             let engine = try #require(shop.engine)
@@ -55,6 +57,7 @@ struct LanServerTests {
                 icon: { LanServer.bundledIcon($0) })
             host.intakeToken = intakeToken
             host.calendarToken = calendarToken
+            host.identity = { identity }
             // The pricing inputs, from the same bench book — the app hands the
             // server `Shop.pricingBook` here; see `PricingBookTests` for why.
             host.pricing = { book.value }

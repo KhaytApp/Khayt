@@ -14,6 +14,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   sealed beside the identity key, never in the book. Changing the LAN PIN
   removes every enrolled phone, and a phone that cannot enrol keeps sending
   the PIN as before.
+- **Mac: a paired phone stops sending the LAN PIN on every request.**
+  - A phone enrols once with the PIN (`POST /api/devices`), then signs each
+    request with a key of its own. Someone on the same Wi-Fi can no longer
+    read the PIN off the traffic, or replay a request they copied.
+  - The phone keys stay in this Mac's Keychain, never in the book or a
+    backup. Up to 32 phones; changing the PIN signs every one of them out.
+  - A phone without this, or a Mac without it, keeps using the PIN as before.
 
 - **Mac: fixes from the pre-release review.**
   - **Uploads:** a customer's 3MF upload is unpacked off the window's thread

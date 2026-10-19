@@ -32,8 +32,7 @@ struct LanIdentityTests {
     @Test("the routes: identity behind the PIN, proof open, both from the same key")
     func routes() async throws {
         let key = Curve25519.Signing.PrivateKey()
-        LanIdentity.use(key)
-        let bench = try await LanServerTests.Bench()
+        let bench = try await LanServerTests.Bench(identity: key)
         defer { bench.stop() }
 
         let refused = try await bench.get("/api/identity")
