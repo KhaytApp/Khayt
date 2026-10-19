@@ -776,3 +776,29 @@
 
 "Price a part" = "Price a part";
 "home.calculator.sub" = "What a part costs you, and what to charge for it";
+
+/* Library */
+"library.title" = "Library";
+"library.price" = "Price from the library";
+"home.library.sub" = "Find a model you've printed before and price it.";
+"library.search" = "Search models, folders, tags";
+"library.folders" = "Folders";
+"library.models" = "Models";
+"library.found" = "%d found";
+"library.more" = "Show more";
+"library.empty" = "No models in this folder.";
+"library.no_match" = "No models match.";
+"library.favorite" = "Favourite";
+"library.printed" = "Printed %d times";
+"library.plate" = "Plate";
+"library.plate.all" = "Every plate";
+"library.plate.n" = "Plate %d";
+"library.calculator" = "Open in the calculator";
+"library.notes" = "Notes from printing it";
+"library.not_estimable" = "The Mac can price STL, OBJ, 3MF and G-code models. Use the calculator for this one.";
+"library.needs_mac" = "Pricing from the library needs your Mac on the shop's Wi-Fi, with a Khayt version that has it. The calculator still works.";
+"library.reason.no-file" = "The Mac has this model listed but not its file.";
+"library.reason.not-found" = "This model is no longer in the library.";
+"quote.file.unreliable" = "This model is outside what the estimate is good for. Check the figure before sending it.";
+"library.reason.not-configured" = "Set up instant quotes on the computer first: a printer and a filament for the estimate.";
+"library.sample" = "The sample shop has no Mac to measure models with. Open it in the calculator to price it from its recorded weight and time.";

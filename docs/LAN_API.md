@@ -225,11 +225,26 @@ not have; send null rather than a made-up 0.
 
 **`POST /api/library/{id}/estimate?qty=1&plate=`** (no body) → the same answer
 as `POST /api/intake/estimate`: `{ok, reason, price, currency, qty, grams,
-hours, exact}`, priced by the shop's settings. Slicer numbers recorded on the
-model (or on `plate`, when given) are used as they are, with `exact: true`;
-otherwise the file in the vault is measured. Refusals: **404**
-`{"ok":false,"reason":"not-found"}`, **409** `"no-file"` (nothing in the vault),
-**415** `"unsupported"`, **413** `"too-large"`. `{id}` is percent-encoded.
+hours, exact}`, plus optional `reliable` (false when a geometry estimate is
+outside the range it is good for — the phone shows a warning) and `missing`.
+`price` is for the whole `qty`; `grams` and `hours` are for one piece.
+
+- **The price is the owner's**, not the public intake figure: what the
+  computer's own "quote this model" calculator gives — the shop's spools,
+  rates, default margin, rounding and overhead. A shop that never set up
+  customer quoting still gets one. Where a computer cannot price that way it
+  answers 200 `{"ok":false,"reason":"not-configured","missing":"printer"|"material"}`
+  rather than a 0.
+- Slicer numbers recorded on the model are used as they are, with `exact:
+  true`; otherwise the file in the vault is measured.
+- `plate=N` prices that plate's recorded figures (`parsed.plates[index == N]`);
+  a plate with none is 200 `no-numbers` — the whole file is not measured for one plate.
+- On every refusal `price`, `grams` and `hours` are null and `exact` is false.
+
+Refusals: **404** `{"ok":false,"reason":"not-found"}` (no such model or plate),
+**409** `"no-file"` (nothing in the vault), **415** `"unsupported"`, **413**
+`"too-large"`, **503** `"busy"` with `Retry-After` (estimates share the intake
+limit). `{id}` is percent-encoded.
 
 ### `GET /api/queue`
 

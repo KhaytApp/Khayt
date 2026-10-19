@@ -22,6 +22,25 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   for, and your default margin, the same as the Mac's "Quote this model". It
   doesn't need the customer intake form to be set up. Only you can do this,
   with the PIN or a phone already paired.
+- **iPhone: price a model from the shop's library.** Home has a Library
+  row (and "Price from the library" in its + menu). Search the whole
+  library or browse its folders, with thumbnails. Open a model to see its
+  material, plates and print notes, and get the computer's own price for
+  it at any quantity, for every plate or one plate. Turn that price into
+  a quote, or open the calculator with the model's weight and time filled
+  in. The library stays on the computer (`GET /api/library`,
+  `POST /api/library/{id}/estimate`), so this needs a Mac or desktop that
+  serves those routes. The sample shop has a small library of its own.
+- **Desktop: a paired iPhone sends the LAN PIN once, then signs its
+  requests.** The LAN is plain http, so a PIN sent with every request could be
+  read by anything on the same Wi-Fi. A phone now enrols once with the PIN
+  (`POST /api/devices`) and gets a key of its own, agreed with this computer
+  and confirmed by its identity key. Every request after that carries a
+  signature over the request and its body instead of the PIN, so a captured
+  request cannot be replayed or turned back into the PIN. The keys are kept
+  sealed beside the identity key, never in the book. Changing the LAN PIN
+  removes every enrolled phone, and a phone that cannot enrol keeps sending
+  the PIN as before.
 - **Mac: a paired phone stops sending the LAN PIN on every request.**
   - A phone enrols once with the PIN (`POST /api/devices`), then signs each
     request with a key of its own. Someone on the same Wi-Fi can no longer

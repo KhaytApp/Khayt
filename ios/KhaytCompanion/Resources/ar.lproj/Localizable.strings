@@ -776,3 +776,29 @@
 
 "Price a part" = "تسعير قطعة";
 "home.calculator.sub" = "تكلفة القطعة عليك، وكم تطلب مقابلها";
+
+/* Library */
+"library.title" = "المكتبة";
+"library.price" = "تسعير من المكتبة";
+"home.library.sub" = "ابحث عن نموذج طبعته من قبل وسعّره.";
+"library.search" = "ابحث في النماذج والمجلدات والوسوم";
+"library.folders" = "المجلدات";
+"library.models" = "النماذج";
+"library.found" = "%d نتيجة";
+"library.more" = "عرض المزيد";
+"library.empty" = "لا توجد نماذج في هذا المجلد.";
+"library.no_match" = "لا توجد نماذج مطابقة.";
+"library.favorite" = "مفضّل";
+"library.printed" = "طُبع %d مرة";
+"library.plate" = "اللوح";
+"library.plate.all" = "كل الألواح";
+"library.plate.n" = "اللوح %d";
+"library.calculator" = "افتح في الحاسبة";
+"library.notes" = "ملاحظات من طباعته";
+"library.not_estimable" = "يسعّر الماك نماذج STL وOBJ و3MF وG-code. استخدم الحاسبة لهذا النموذج.";
+"library.needs_mac" = "التسعير من المكتبة يحتاج الماك على شبكة الورشة بإصدار من خيط يدعمه. الحاسبة تعمل على أي حال.";
+"library.reason.no-file" = "النموذج مسجّل على الماك لكن ملفه غير موجود.";
+"library.reason.not-found" = "هذا النموذج لم يعد في المكتبة.";
+"quote.file.unreliable" = "هذا النموذج خارج النطاق الذي يصلح له التقدير. راجع الرقم قبل إرساله.";
+"library.reason.not-configured" = "اضبط التسعير الفوري على الكمبيوتر أولًا: طابعة وخامة للتقدير.";
+"library.sample" = "الورشة التجريبية بلا ماك يقيس النماذج. افتحه في الحاسبة لتسعيره من وزنه ووقته المسجّلين.";

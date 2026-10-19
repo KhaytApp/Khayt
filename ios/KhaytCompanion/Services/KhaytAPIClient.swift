@@ -885,6 +885,11 @@ final class KhaytAPIClient: ObservableObject {
         let hours: Double?
         /// True when a slicer measured it; false for an estimate off the geometry.
         let exact: Bool?
+        /// False when the geometry estimate is outside the range it is good
+        /// for — a figure to check before sending.
+        var reliable: Bool? = nil
+        /// With `not-configured`: what the shop has not set up yet.
+        var missing: String? = nil
     }
 
     /// The Mac's 32 MB ceiling (`LanServer.maxUpload`), checked here so a big
@@ -919,6 +924,59 @@ final class KhaytAPIClient: ObservableObject {
         if http.statusCode == 401 || http.statusCode == 404 { throw KhaytAPIError.server(L10n.tr("quote.file.needs_mac")) }
         // Refusals come back as { ok: false, reason } with a 4xx/5xx; read them.
         if let answer = try? JSONDecoder().decode(ModelEstimate.self, from: body) { return answer }
+        throw try decodeAPIError(body, status: http.statusCode)
+    }
+
+    // MARK: - The shop's library
+
+    /// The built-in sample shop is open: nothing here talks to a Mac.
+    var isSampleShop: Bool { settings.isSampleShop }
+
+    /// One page of the library (`GET /api/library`). The library stays on the
+    /// Mac — ten thousand models in a real shop — so searching and paging
+    /// happen there.
+    func fetchLibrary(query: String, folder: String, offset: Int = 0, limit: Int = 50) async throws -> LibraryPage {
+        if settings.isSampleShop { return SampleLibrary.page(query: query, folder: folder, offset: offset, limit: limit) }
+        var q = URLComponents()
+        q.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "folder", value: folder),
+                        URLQueryItem(name: "offset", value: String(offset)), URLQueryItem(name: "limit", value: String(limit))]
+        let (data, response) = try await request(path: "/api/library?" + (q.percentEncodedQuery ?? ""),
+                                                 method: "GET", body: nil, requiresPin: true)
+        guard let http = response as? HTTPURLResponse else { throw KhaytAPIError.transport(URLError(.badServerResponse)) }
+        if http.statusCode == 404 { throw KhaytAPIError.server(L10n.tr("library.needs_mac")) }
+        guard (200...299).contains(http.statusCode) else { throw try decodeAPIError(data, status: http.statusCode) }
+        return try JSONDecoder().decode(LibraryPage.self, from: data)
+    }
+
+    private let thumbs = NSCache<NSString, NSData>()
+
+    /// A model's thumbnail, or nil when it has none. Kept in memory for the
+    /// session: a list scrolls back over the same ones.
+    func libraryThumb(id: String) async -> Data? {
+        if let hit = thumbs.object(forKey: id as NSString) { return hit as Data }
+        guard let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(["/"])),
+              let (data, response) = try? await request(path: "/api/library/\(encoded)/thumb", method: "GET",
+                                                        body: nil, requiresPin: true),
+              (response as? HTTPURLResponse)?.statusCode == 200, !data.isEmpty, data.count < 4_000_000 else { return nil }
+        thumbs.setObject(data as NSData, forKey: id as NSString)
+        return data
+    }
+
+    /// What a library model would cost, measured and priced on the Mac.
+    func estimate(libraryId id: String, qty: Int, plate: Int?) async throws -> ModelEstimate {
+        // No Mac to measure with: the screen offers the calculator instead.
+        if settings.isSampleShop { throw KhaytAPIError.server(L10n.tr("library.needs_mac")) }
+        guard let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(["/"])) else {
+            throw KhaytAPIError.invalidURL
+        }
+        var q = URLComponents()
+        q.queryItems = [URLQueryItem(name: "qty", value: String(max(1, min(1000, qty))))]
+            + (plate.map { [URLQueryItem(name: "plate", value: String($0))] } ?? [])
+        let (body, response) = try await request(path: "/api/library/\(encoded)/estimate?" + (q.percentEncodedQuery ?? ""),
+                                                 method: "POST", body: nil, requiresPin: true)
+        guard let http = response as? HTTPURLResponse else { throw KhaytAPIError.transport(URLError(.badServerResponse)) }
+        if let answer = try? JSONDecoder().decode(ModelEstimate.self, from: body) { return answer }
+        if http.statusCode == 404 { throw KhaytAPIError.server(L10n.tr("library.needs_mac")) }
         throw try decodeAPIError(body, status: http.statusCode)
     }
 
