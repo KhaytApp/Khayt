@@ -1445,7 +1445,8 @@ final class Shop {
                                                settings: settings, range: "month",
                                                language: words.language,
                                                inventory: Self.rows(root, "inventory"),
-                                               consumables: Self.rows(root, "consumables"))
+                                               consumables: Self.rows(root, "consumables"),
+                                               currencies: Invoice.currencyTable(self))
         guard ticket == loadGeneration else { return }
         thisMonthRevenue = monthKpis?.revenue ?? 0
         kpiOrders = orders
@@ -1480,7 +1481,8 @@ final class Shop {
         let answer = try? await engine.kpis(orders: kpiOrders, clients: kpiClients,
                                             settings: kpiSettings, range: kpiRange,
                                             language: words.language, inventory: inventoryRows,
-                                            consumables: consumableRows)
+                                            consumables: consumableRows,
+                                            currencies: Invoice.currencyTable(self))
         guard ticket == loadGeneration else { return }
         kpis = answer
     }
@@ -1548,6 +1550,10 @@ final class Shop {
     /// A test hands in its own: a dataless placeholder cannot be made in one,
     /// and a scan of ten thousand "local" files reads every one of them.
     var linkedIsOnline: @Sendable (URL) -> Bool = { LinkedCloud.isOnlineOnly($0) }
+    /// Phones paired with this Mac (`Shop+PairedPhones`), as last read.
+    var pairedPhones: [LanDevices.Listed] = []
+    /// A test's own device store; the app uses the Keychain's (`.shared`).
+    var lanDevicesForTests: LanDevices?
     /// Hands a linked file the app fetched back to its cloud drive, so its
     /// space is freed (`OnlineMeasure`). A test hands in its own: there is no
     /// drive in one to hand a file back to.

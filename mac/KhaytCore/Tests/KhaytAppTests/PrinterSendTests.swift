@@ -162,5 +162,7 @@ struct PrinterSendTests {
         let shop = MenuCoverageTests.source("Shop.swift")
         #expect(shop.contains("await PrinterControl.key(for: machine, build: source.build)"))
         #expect(shop.contains("try await PrinterSend.send(file, to: machine, key: key,"))
+        let send = MenuCoverageTests.source("PrinterSend.swift")
+        #expect(send.contains("let body = try await PinWork.run"), "the file is read and the body built off the main thread")
     }
 }

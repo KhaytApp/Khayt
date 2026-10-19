@@ -256,8 +256,10 @@ private struct Detail: View {
     private var money: some View {
         DetailSection(shop.words.callIt("mac.money")) {
             // Billed, not the bare price: on a shop that adds tax on top this
-            // read "Total 100" over "Paid 110" (Oct 2026 review).
-            DetailLine(shop.words.callIt("common.total"), Money.text(job.figures?.billed ?? job.price, job.currency))
+            // read "Total 100" over "Paid 110" (Oct 2026 review). And `due`,
+            // not billed: a job paid in full before tax on top was owed was
+            // settled at its price, and read "Total 115, Paid 100, Owed 0".
+            DetailLine(shop.words.callIt("common.total"), Money.text(job.figures?.due ?? job.price, job.currency))
             if let split {
                 // Only shown for a registered shop: an unregistered one has no
                 // split, and inventing a zero-rate line would imply otherwise.

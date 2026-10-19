@@ -185,6 +185,38 @@ struct LanDeviceKeysTests {
     }
 
     final class Writes: @unchecked Sendable { var n = 0 }
+    final class Kept: @unchecked Sendable { var data: Data? }
+
+    @Test("signing one phone out: listed without its key, refused device-revoked, the others kept, remembered")
+    func signOutOne() throws {
+        let saved = Kept()
+        let store = LanDevices(loaded: nil, persist: { saved.data = $0 })
+        let mac = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: Self.d(V.macPrivate))
+        _ = try store.enrol(phonePublic: V.phonePublic, name: "Lost phone", pin: Self.pin, identity: .init(),
+                            now: Self.at, serverKey: mac, deviceId: V.deviceId)
+        let other = try store.enrol(phonePublic: Curve25519.KeyAgreement.PrivateKey().publicKey.rawRepresentation
+                                        .base64EncodedString(),
+                                    name: "Desk iPad", pin: Self.pin, identity: .init(), now: Self.at.addingTimeInterval(10))
+        #expect(store.list().map(\.name) == ["Desk iPad", "Lost phone"], "the one seen most recently first")
+
+        #expect(store.remove(V.deviceId))
+        #expect(!store.remove(V.deviceId), "already gone")
+        #expect(store.list().map(\.id) == [other.deviceId], "the other phone stays signed in")
+        let key = Self.d(V.key)
+        let n = String(repeating: "a1", count: 16)
+        let c = LanDevices.canonical(method: "GET", target: "/api/store", time: "1792396800", nonce: n, body: Data())
+        let h = Self.signed(V.deviceId, mac: LanDevices.mac(key: key, canonical: c).base64EncodedString(), nonce: n)
+        #expect(store.verify(headers: h, method: "GET", target: "/api/store", body: Data(), pin: Self.pin, now: Self.at)
+                == .refused("device-revoked", now: nil),
+                "revoked, not unknown: the phone must not quietly enrol again with the PIN it kept")
+
+        // Kept across a relaunch, and a store saved before `revoked` existed still reads.
+        let reread = LanDevices(loaded: saved.data, persist: nil)
+        #expect(reread.verify(headers: h, method: "GET", target: "/api/store", body: Data(), pin: Self.pin, now: Self.at)
+                == .refused("device-revoked", now: nil))
+        let old = try JSONSerialization.data(withJSONObject: ["salt": Data(count: 32).base64EncodedString(), "devices": []])
+        #expect(LanDevices(loaded: old, persist: { _ in }).keeps, "an older store decodes")
+    }
 
     @Test("what is stored but unreadable is never written over; nothing stored starts a list that is kept")
     func unreadableIsKept() throws {

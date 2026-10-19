@@ -140,6 +140,50 @@ enum WhatsAppReports {
     static func remember(_ since: Int?, _ shopId: String, _ defaults: UserDefaults = .standard) {
         if let since { defaults.set(since, forKey: key(shopId)) } else { defaults.removeObject(forKey: key(shopId)) }
     }
+
+    // MARK: - What this Mac has been told
+    //
+    // ── A DELIVERY REPORT IS NOT AN EDIT ─────────────────────────────────
+    //
+    // A report moves a line in a customer's communication log, and the book
+    // syncs whole records, last write wins. Written as an edit (stamped), a
+    // "read" arriving here could beat the shop's own change to that customer
+    // on another device — a new phone number, lost to a tick (Oct 2026
+    // review). So reports are written UNSTAMPED: they never win a merge.
+    // What a merge brings back is then the other copy, without them — so
+    // every report this Mac applied is kept here, the latest per message, and
+    // laid over the book again on every poll (`lib/whatsapp-status.js` only
+    // moves forward, so laying it twice changes nothing).
+
+    static let keptMax = 5000
+    static let rank = ["sent": 1, "delivered": 2, "read": 3, "failed": 4]
+
+    static func keptKey(_ shopId: String) -> String { "khayt.whatsappReports.kept." + shopId }
+
+    static func kept(_ shopId: String, _ defaults: UserDefaults = .standard) -> [JSONValue] {
+        guard let data = defaults.data(forKey: keptKey(shopId)),
+              let items = try? JSONDecoder().decode([JSONValue].self, from: data) else { return [] }
+        return items
+    }
+
+    /// `items` folded into what is kept: the highest report per message, the
+    /// newest `keptMax` messages.
+    static func keep(_ items: [JSONValue], _ shopId: String, _ defaults: UserDefaults = .standard) {
+        guard !items.isEmpty else { return }
+        func field(_ v: JSONValue, _ k: String) -> String {
+            if case .object(let o) = v, case .string(let s)? = o[k] { return s }
+            return ""
+        }
+        var latest: [String: JSONValue] = [:]
+        for item in kept(shopId, defaults) + items {
+            let id = field(item, "messageId")
+            guard !id.isEmpty, let r = rank[field(item, "status")] else { continue }
+            if let had = latest[id], (rank[field(had, "status")] ?? 0) >= r { continue }
+            latest[id] = item
+        }
+        let newest = latest.values.sorted { field($0, "at") > field($1, "at") }.prefix(keptMax)
+        if let data = try? JSONEncoder().encode(Array(newest)) { defaults.set(data, forKey: keptKey(shopId)) }
+    }
 }
 
 extension Shop {
@@ -247,29 +291,34 @@ extension Shop {
                 let page = try await WhatsAppReports.statuses(connection, token: token, since: since) {
                     try await session.data(for: $0)
                 }
-                // Tried on the book in memory first: a page that moves nothing
-                // (most of them, until this Mac sends through Meta) must not
-                // rewrite the whole book.
-                if !page.items.isEmpty,
-                   try await engine.applyWhatsAppStatuses(clients: clientRows, items: page.items).changed > 0 {
-                    let items = page.items
-                    var moved = 0
-                    try await StoreWriter.update(
-                        storeURL: build.storeURL,
-                        owns: { StoreLock.weOwnIt(build) },
-                        whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
-                    ) { root in
-                        guard case .array(let clients)? = root["clients"] else { return }
-                        let applied = try await engine.applyWhatsAppStatuses(clients: clients, items: items)
-                        moved = applied.changed
-                        if applied.changed > 0 { root["clients"] = .array(applied.clients) }
-                    }
-                    if moved > 0 { await load(source) }
-                }
+                WhatsAppReports.keep(page.items, connection.shopId)
                 let next = WhatsAppReports.seq(page.nextSince)
                 if let next { WhatsAppReports.remember(next, connection.shopId) }
                 guard let next, next != since, page.items.count >= 500 else { break }
                 since = next
+            }
+            // Everything this Mac was told, laid over the book: the new
+            // reports, and any a merge took back off (see `keep`). Tried on
+            // the book in memory first, so a poll that moves nothing — most of
+            // them — does not rewrite the book.
+            let items = WhatsAppReports.kept(connection.shopId)
+            if !items.isEmpty,
+               try await engine.applyWhatsAppStatuses(clients: clientRows, items: items).changed > 0 {
+                var moved = 0
+                // UNSTAMPED (`recordingDeletes: false` leaves revs alone): a
+                // report must never win a merge over a person's edit.
+                try await StoreWriter.update(
+                    storeURL: build.storeURL,
+                    owns: { StoreLock.weOwnIt(build) },
+                    whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
+                    recordingDeletes: false
+                ) { root in
+                    guard case .array(let clients)? = root["clients"] else { return }
+                    let applied = try await engine.applyWhatsAppStatuses(clients: clients, items: items)
+                    moved = applied.changed
+                    if applied.changed > 0 { root["clients"] = .array(applied.clients) }
+                }
+                if moved > 0 { await load(source) }
             }
             if !whatsAppReportsAsStaff { whatsAppHookProblem = nil }
         } catch CloudReader.Failure.notConnected {

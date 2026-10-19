@@ -59,17 +59,22 @@ enum PrinterSend {
                                                                   startPrint: startPrint)
         else { throw Problem.unsupported(type) }
         let base = try await PrinterWatch.baseURL(machine, engine: engine)
-        let bytes = try Data(contentsOf: file, options: .mappedIfSafe)
         var headers = request.headers
-        let body: Data
-        if request.body.kind == "multipart", let part = request.body.file {
-            let boundary = "khayt-" + UUID().uuidString
-            body = multipart(file: bytes, name: name, part: part,
-                             fields: request.body.fields ?? [], boundary: boundary)
-            headers["Content-Type"] = "multipart/form-data; boundary=\(boundary)"
-        } else {
-            body = bytes
-        }
+        // ── OFF THE MAIN THREAD ──────────────────────────────────────────
+        // This type is @MainActor, and reading a sliced plate and copying it
+        // into a multipart body is a whole file's worth of work — a 200 MB
+        // G-code held the window while it was assembled (Oct 2026 review).
+        let multipartPart = request.body.kind == "multipart" ? request.body.file : nil
+        let fields = request.body.fields ?? []
+        let boundary = "khayt-" + UUID().uuidString
+        let body = try await PinWork.run { () -> Result<Data, any Error> in
+            Result {
+                let bytes = try Data(contentsOf: file, options: .mappedIfSafe)
+                guard let part = multipartPart else { return bytes }
+                return multipart(file: bytes, name: name, part: part, fields: fields, boundary: boundary)
+            }
+        }.get()
+        if multipartPart != nil { headers["Content-Type"] = "multipart/form-data; boundary=\(boundary)" }
         try await PrinterWatch.upload(base, path: request.path, method: request.method,
                                       headers: headers, body: body, fetch: fetch)
         return Sent(remoteName: name, started: startPrint)
@@ -77,7 +82,7 @@ enum PrinterSend {
 
     /// `multipart/form-data`, the file part first and then each field in
     /// order — the order Electron's FormData has always sent them in.
-    static func multipart(file: Data, name: String, part: KhaytEngine.UploadRequest.FilePart,
+    nonisolated static func multipart(file: Data, name: String, part: KhaytEngine.UploadRequest.FilePart,
                           fields: [[String]], boundary: String) -> Data {
         var out = Data()
         func line(_ s: String) { out.append(Data((s + "\r\n").utf8)) }

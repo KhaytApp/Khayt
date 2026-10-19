@@ -4,6 +4,43 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: sending a large sliced file to a printer no longer freezes the
+  window.** The file was read and the upload assembled on the main thread;
+  it is now done in the background.
+
+- **Mac: a job's filament lot is the lot in force when it was printed.** The
+  job inspector's "Filament used" and the lot search named a spool's CURRENT
+  lot for a draw that recorded none, even when the spool had been refilled
+  with a new lot after the job. They now follow the shared rule
+  (`lib/lot-trace.js`): the lot of the receipt in force on the day. A print
+  that took twice off one spool is no longer listed twice.
+
+- **Mac: a WhatsApp delivery report no longer overwrites a customer edit.**
+  A report ("delivered", "read") moved a line in the customer's log and was
+  saved as an edit of the whole customer, so it could beat a change made to
+  that customer on another device. Reports are now saved without counting as
+  an edit, and the Mac keeps what it was told and lays it over the book again
+  on every check, so a sync that brings back an older copy is put right.
+
+- **Mac: sign out one paired phone.** Settings → Online lists the phones
+  paired with this Mac and when each was last seen. "Sign out…" removes one
+  phone's key; the others stay signed in. Until now the only way to cut off
+  a lost phone was to change the LAN PIN, which signs out every phone. A
+  signed-out phone is told `device-revoked` (docs/LAN_API.md), so an iPhone
+  that knows the reason forgets its PIN and asks to pair again rather than
+  quietly pairing with the PIN it kept.
+
+- **Mac: one month, one revenue figure.** The revenue-goal tile and the
+  dashboard's figures read a job in a currency the shop does not list at face
+  value, while Reports and the month's revenue at the top of the dashboard read
+  it in its customer's currency. They now read it the same way.
+
+- **Mac: a job paid before tax on top was charged shows the total it was
+  settled at.** On a shop that adds tax on top, a job paid in full before
+  that rule (alpha.58) read "Total 115, Paid 100, Owed 0". Its Total, and the
+  paid bar in the jobs table, now use what it was settled against. Invoices
+  and the ledger still show what was billed.
+
 - **Mac: measure the models a cloud drive keeps online.** A linked Google
   Drive (or Dropbox, OneDrive, iCloud Drive) is indexed without downloading
   anything, so a model nobody opened was never measured and could not be
@@ -42,6 +79,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   shared estimate from the model's measured shape, then the shop's spools,
   rates and default margin. A model in several colours is costed on one
   spool there. The sample shop has a small library of its own.
+
 - **Mac: a paired phone stops sending the LAN PIN on every request.**
   - A phone enrols once with the PIN (`POST /api/devices`), then signs each
     request with a key of its own. Someone on the same Wi-Fi can no longer
