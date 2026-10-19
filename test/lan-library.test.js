@@ -36,17 +36,19 @@ function cubeStl(s) {
 const rec = (id, extra = {}) => ({ id, name: id, sourceFile: { filename: `${id}.stl`, ext: 'stl', size: 1000 }, ...extra });
 
 const baseStore = () => ({
-  inventory: [],
-  printers: [{ id: 'P1', name: 'A1', wearRate: 0.75, powerDraw: 150, elecRate: 0.18, laborRate: 90, failureRate: 10, prepTime: 0.25, postTime: 0.5 }],
+  inventory: [
+    { id: 'S-pla', material: 'PLA Basic', cost: 80, spoolWeight: 1000 },
+    { id: 'S-petg', material: 'PETG HF', cost: 120, spoolWeight: 1000 },
+  ],
   settings: {
     currency: 'SAR',
-    // Customers cannot price here (enabled false); the owner still can.
-    lanApi: { intakeToken: 'tok', intakeQuote: { enabled: false, presetId: 'P1', spoolCost: 90, spoolWeight: 1000, marginPct: 40 } },
+    // The customer intake form is NOT set up: the owner's price does not need it.
+    lanApi: { intakeToken: 'tok' },
   },
   printLog: [], machines: [], clients: [],
   printFiles: [
     rec('PF-lantern', { name: 'Lantern', folder: 'Home', tags: ['gift'], favorite: false, timesPrinted: 6,
-      parsed: { printTimeMins: 318, filamentGrams: 154, slicer: 'OrcaSlicer',
+      parsed: { printTimeMins: 318, filamentGrams: 154, slicer: 'OrcaSlicer', filamentType: 'PETG',
         plates: [{ index: 1, name: 'Body', printTimeMins: 205, filamentGrams: 112 }, { index: 2, printTimeMins: 113, filamentGrams: 42 }] },
       colors: [{ hex: '#0F5257', grams: 88 }], thumbFile: 'thumb.png' }),
     rec('PF-cube', { name: 'Cube', folder: 'Saudi Kings/Large' }),
@@ -184,7 +186,9 @@ test('recorded slicer figures are priced as they are, exact', async () => {
   assert.equal(body.ok, true);
   assert.equal(body.exact, true);
   assert.equal(body.qty, 2);
-  assert.equal(body.hours, 5.3);
+  assert.equal(body.hours, 5.3, 'per piece');
+  assert.equal(body.grams, 154, 'per piece');
+  assert.equal(body.reliable, true);
   assert.equal(body.currency, 'SAR');
   assert.ok(body.price > 0);
   const plate = await (await estimate('PF-lantern', '?plate=2')).json();
@@ -219,15 +223,43 @@ test('refusals say why', async () => {
   }
 });
 
-test('a shop with no pricing basis is told so, not quoted 0', async () => {
-  const saved = store.settings.lanApi.intakeQuote.presetId;
-  store.settings.lanApi.intakeQuote.presetId = '';
+test('the owner\'s price is the calculator\'s: the shop\'s rates, its spool of the material, its margin', async () => {
+  const L = LanLibrary;
+  const deps = {
+    partPatch: require(path.join(ROOT, 'lib/part-from-print-file.js')).partPatch,
+    ratesFor: require(path.join(ROOT, 'lib/print-rates.js')).ratesFor,
+    computePartBaseCost: require(path.join(ROOT, 'lib/calculator-cost.js')).computePartBaseCost,
+    quoteTotal: require(path.join(ROOT, 'lib/pricing.js')).quoteTotal,
+    overheadPerHour: 0,
+  };
+  const lantern = store.printFiles[0];
+  assert.equal(L.spoolFor('PETG', store.inventory).id, 'S-petg', 'the material it was sliced for');
+  assert.equal(L.spoolFor('ASA', store.inventory).id, 'S-pla', 'else the first spool with a cost');
+  assert.equal(L.spoolFor('PLA', [{ id: 'x', material: 'PLA', cost: 0 }]), null);
+  const at = (margin) => L.ownerQuote({ rec: lantern, plate: null, measured: null, qty: 1, deps,
+    store: { ...store, settings: { ...store.settings, ...(margin == null ? {} : { defaultMargin: margin }) } } });
+  const thirty = at(null), zero = at(0);
+  assert.ok(thirty.ok && zero.ok);
+  assert.equal(Math.round((thirty.price / zero.price) * 1000) / 1000, 1.3, 'thirty per cent when the shop has said nothing');
+  assert.ok(Math.abs(at(50).price - zero.price * 1.5) <= 0.01, 'the shop\'s own margin');
+  // Over HTTP, the same number.
+  const http = await (await estimate('PF-lantern')).json();
+  assert.equal(http.price, thirty.price);
+  // Multi-colour weights are the slicer's, as the calculator reads them.
+  const multi = L.ownerQuote({ rec: { id: 'm', colors: [{ hex: '#000', grams: 30 }, { hex: '#fff', grams: 20 }], parsed: { printTimeMins: 90 } },
+    plate: null, measured: null, qty: 1, deps, store });
+  assert.equal(multi.grams, 50);
+  assert.equal(multi.exact, true);
+});
+
+test('no spool on the shelf is still a price (labour, power, wear), never 0 and never not-configured', async () => {
+  const saved = store.inventory;
+  store.inventory = [];
   try {
     const body = await (await estimate('PF-lantern')).json();
-    assert.equal(body.ok, false);
-    assert.equal(body.reason, 'not-configured');
-    assert.equal(body.missing, 'printer');
-  } finally { store.settings.lanApi.intakeQuote.presetId = saved; }
+    assert.equal(body.ok, true);
+    assert.ok(body.price > 0);
+  } finally { store.inventory = saved; }
 });
 
 test('a model file is read only from its own folder', async () => {

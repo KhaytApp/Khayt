@@ -17,9 +17,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   now search this computer's library, see the pictures, and get a price for
   any model and quantity. The price uses what the slicer recorded for the
   model (or one plate of it) when there is a figure, and otherwise measures
-  the file here, so the model never leaves the computer. It is priced on the
-  same basis as the customer intake form (printer, filament and margin in
-  Settings), even when that form is off for customers. Only you can do this,
+  the file here, so the model never leaves the computer. The price is the
+  calculator's: your rates, your spool of the material the model was sliced
+  for, and your default margin, the same as the Mac's "Quote this model". It
+  doesn't need the customer intake form to be set up. Only you can do this,
   with the PIN or a phone already paired.
 - **Mac: a paired phone stops sending the LAN PIN on every request.**
   - A phone enrols once with the PIN (`POST /api/devices`), then signs each
