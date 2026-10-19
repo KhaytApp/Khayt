@@ -79,6 +79,12 @@ final class LanServer {
         /// test can shorten it for ITS OWN server rather than for every server
         /// running at the same time.
         var readTimeout: TimeInterval = 15
+        /// The phones enrolled to sign their requests instead of sending the
+        /// PIN. The app hands over the Keychain's; a test gets its own.
+        var devices: LanDevices = .inMemory()
+        /// This Mac's identity key (`LanIdentity`), asked for when a route
+        /// needs it. A test hands its own, so parallel tests never share one.
+        var identity: @Sendable () -> Curve25519.Signing.PrivateKey? = { LanIdentity.key() }
         /// The calendar subscription token (`settings.lanApi.calendarToken`),
         /// opened. Empty means the feed opens to nobody — never to the owner PIN.
         var calendarToken: String = ""
@@ -179,6 +185,9 @@ final class LanServer {
         let headers: [String: String]   // lower-cased names
         let body: Data
         let remote: String
+        /// The request-target exactly as on the request line, still
+        /// percent-encoded: what a signed request signs (`LanDevices`).
+        var target: String = ""
     }
 
     struct Response {
@@ -676,7 +685,7 @@ final class LanServer {
         var query: [String: String] = [:]
         for item in components?.queryItems ?? [] { query[item.name] = item.value ?? "" }
         return Request(method: requestLine[0].uppercased(), path: components?.path ?? target,
-                       query: query, headers: headers, body: body, remote: remote)
+                       query: query, headers: headers, body: body, remote: remote, target: target)
     }
 
     /// What one phase of reading a request came back with.
@@ -824,7 +833,7 @@ final class LanServer {
     nonisolated static let endpoints = [
         "/", "/session", "/intake", "/manifest.json", "/sw.js",
         "/api/status", "/api/queue", "/api/machines/live", "/api/store", "/api/store/deltas",
-        "/api/identity", "/api/proof",
+        "/api/identity", "/api/proof", "/api/devices",
         "/api/intake", "/api/intake/estimate", "/api/survey",
         "/order/:id", "/order/:id/quote", "/order/:id/approve", "/status/:id",
         "/calendar.ics",
@@ -866,15 +875,31 @@ final class LanServer {
         // the PIN, which is why the second route may be open.
         case ("/api/identity", true):
             if let refused = await pinGate(request) { return refused }
-            guard let key = LanIdentity.publicKey() else { return .json(503, #"{"error":"no_identity"}"#) }
+            guard let key = LanIdentity.publicKey(host.identity()) else { return .json(503, #"{"error":"no_identity"}"#) }
             return .json(200, #"{"alg":"ed25519","publicKey":"\#(key)"}"#)
 
         case ("/api/proof", true):
             guard let nonce = request.query["nonce"], LanIdentity.plausibleNonce(nonce) else {
                 return .json(400, #"{"error":"nonce"}"#)
             }
-            guard let sig = LanIdentity.proof(nonce: nonce) else { return .json(503, #"{"error":"no_identity"}"#) }
+            guard let sig = LanIdentity.proof(nonce: nonce, key: host.identity()) else { return .json(503, #"{"error":"no_identity"}"#) }
             return .json(200, #"{"alg":"ed25519","sig":"\#(sig)"}"#)
+
+        // ── A PHONE ENROLS, AND THE PIN STOPS TRAVELLING (see `LanDevices`) ──
+        case ("/api/devices", false) where request.method == "POST":
+            if let refused = await pinGate(request) { return refused }
+            guard let identity = host.identity() else { return .json(503, #"{"error":"no_identity"}"#) }
+            guard case .object(let asked)? = try? JSONDecoder().decode(JSONValue.self, from: request.body),
+                  case .string(let publicKey)? = asked["publicKey"] else {
+                return .json(400, #"{"error":"publicKey"}"#)
+            }
+            var name = ""
+            if case .string(let given)? = asked["name"] { name = given }
+            guard let enrolled = try? host.devices.enrol(phonePublic: publicKey, name: name, pin: host.pin,
+                                                         identity: identity, now: host.now()) else {
+                return .json(400, #"{"error":"publicKey"}"#)
+            }
+            return .json(200, #"{"deviceId":"\#(enrolled.deviceId)","publicKey":"\#(enrolled.publicKey)","sig":"\#(enrolled.sig)"}"#)
 
         case ("/api/queue", true):
             if let refused = await pinGate(request) { return refused }
@@ -995,7 +1020,7 @@ final class LanServer {
                 return sessionResponse(to: "/")
             }
             if !(Self.hostIsLocal(request.headers["host"]) && hasSession(request)) {
-                if request.headers["x-khayt-pin"] == nil { return Self.pinForm() }
+                if request.headers["x-khayt-pin"] == nil, !LanDevices.isSigned(request.headers) { return Self.pinForm() }
                 if let refused = await pinGate(request) { return refused }
             }
             let html = (try? await engine.lanQueuePage(store: store, now: host.nowText())) ?? ""
@@ -1180,8 +1205,8 @@ final class LanServer {
     func largeUploadRefusal(headers: [String: String], remote: String) async -> Response? {
         let probe = Request(method: "POST", path: "/api/intake/estimate", query: [:],
                             headers: headers, body: Data(), remote: remote)
-        if probe.headers["x-khayt-pin"] != nil {
-            return await pinGate(probe).map(Self.openToAnyOrigin)
+        if probe.headers["x-khayt-pin"] != nil || LanDevices.isSigned(probe.headers) {
+            return await pinGate(probe, headOnly: true).map(Self.openToAnyOrigin)
         }
         if hasIntakeToken(probe) { return nil }
         let limits = try? await host.engine.lanIntakeLimits()
@@ -2041,7 +2066,7 @@ final class LanServer {
     /// with `pinGate`'s answer when it does not — 429 when locked out, so the
     /// phone can say "wait" rather than "wrong PIN".
     private func ownerPinRefusal(_ request: Request) async -> Response?? {
-        guard request.headers["x-khayt-pin"] != nil else { return nil }
+        guard request.headers["x-khayt-pin"] != nil || LanDevices.isSigned(request.headers) else { return nil }
         return .some(await pinGate(request))
     }
 
@@ -2054,7 +2079,13 @@ final class LanServer {
     /// accepted, read or write: it was accepted on every GET, so the PIN sat
     /// in the address of every phone-made link, in clear over plain HTTP.
     /// The phone sends the header and always has. Oct 2026 review.
-    private func pinGate(_ request: Request, formPin: String? = nil) async -> Response? {
+    ///
+    /// A request carrying the device headers is judged by them alone
+    /// (`LanDevices`), wherever the PIN would have been: the same host and
+    /// PIN-configured checks first, and no wrong-PIN count, since a 256-bit
+    /// key is not a thing to guess. `headOnly` is the large-upload head,
+    /// which has no body to check the signature over yet.
+    private func pinGate(_ request: Request, formPin: String? = nil, headOnly: Bool = false) async -> Response? {
         // DNS REBINDING: a web page the owner visits can point its own name at
         // this Mac and read the book through the owner's browser, same-origin.
         // A phone or a browser reaching the shop's book uses an address, a
@@ -2076,6 +2107,14 @@ final class LanServer {
         // sets a new one; the app says so in the Online pane. Oct 2026 review.
         guard !Self.pinTooShort(host.pin) else {
             return .json(401, #"{"reason":"pin-too-short","error":"The LAN PIN is too short. Set a new one of at least 8 characters in Khayt settings to access this data"}"#)
+        }
+        if formPin == nil, LanDevices.isSigned(request.headers) {
+            let length = Int(request.headers["content-length"] ?? "") ?? 0
+            let verdict = host.devices.verify(headers: request.headers, method: request.method,
+                                              target: request.target.isEmpty ? request.path : request.target,
+                                              body: Data(request.body.prefix(max(0, length))), pin: host.pin,
+                                              now: host.now(), headOnly: headOnly)
+            return verdict == .pass ? nil : .json(401, LanDevices.body(verdict))
         }
         let provided = (formPin ?? Self.pinProvided(request)).trimmingCharacters(in: .whitespaces)
         // Under the counter lock: see `lockCounters`.
@@ -2428,6 +2467,7 @@ extension Shop {
         var host = LanServer.Host(store: { [weak self] in self?.lanBook ?? [:] }, pin: pin, engine: engine)
         host.intakeToken = intakeToken
         host.calendarToken = calendarToken
+        host.devices = .shared
         var secrets: [String: String] = [:]
         for (platform, sealed) in config.storefrontSecrets where !sealed.isEmpty {
             secrets[platform] = (try? await Secrets.open(sealed, for: source)) ?? ""
