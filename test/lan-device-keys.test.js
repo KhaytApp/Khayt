@@ -130,6 +130,43 @@ test('an unknown device, and every device after a PIN change, is device-unknown'
   assert.equal(devs.list().length, 0);
 });
 
+test('a phone signed out is device-revoked, and the others stay paired', () => {
+  let t = VEC_MS;
+  const keyPath = path.join(tmp, 'revoke.key');
+  const mk = () => Devices.createLanDevices({ fs, keyPath, seal, unseal, now: () => t, newKeyPair: fixedPair });
+  const devs = mk();
+  const phone = () => crypto.createPublicKey(crypto.generateKeyPairSync('x25519').privateKey).export({ type: 'spki', format: 'der' }).subarray(12).toString('base64');
+  const a = devs.enrol({ publicKey: phone(), name: 'A', pin: PIN, sign: () => 's' }).deviceId;
+  t += 1000;
+  const b2 = devs.enrol({ publicKey: phone(), name: 'B', pin: PIN, sign: () => 's' }).deviceId;
+  assert.deepEqual(devs.list().map(d => d.name), ['B', 'A'], 'the one seen most recently first');
+  assert.equal(devs.remove(a), true);
+  assert.equal(devs.remove(a), false, 'only once');
+  assert.equal(devs.remove('dev_neverPairedHere0'), false);
+  assert.deepEqual(devs.list().map(d => d.deviceId), [b2]);
+  const asA = patchReq({ headers: { 'x-khayt-device': a } });
+  assert.equal(devs.verify(asA).reason, 'device-revoked');
+  assert.equal(mk().verify(asA).reason, 'device-revoked', 'and after a restart');
+  assert.equal(devs.verify(patchReq({ headers: { 'x-khayt-device': 'dev_somebodyElse01' } })).reason, 'device-unknown', 'never paired is still unknown');
+  assert.ok(!fs.readFileSync(keyPath, 'utf8').includes(a), 'the signed-out ids are sealed too');
+});
+
+test('at most 256 signed-out ids are kept, the oldest go first', () => {
+  let t = VEC_MS, n = 0;
+  const devs = Devices.createLanDevices({ fs, keyPath: path.join(tmp, 'revoke-many.key'), seal, unseal, now: () => (t += 1000),
+    newDeviceId: () => `dev_revoked${String(n++).padStart(6, '0')}` });
+  const ids = [];
+  for (let i = 0; i < Devices.MAX_REVOKED + 1; i++) {
+    const id = devs.enrol({ publicKey: V.phonePublic, name: 'P', pin: PIN, sign: () => 's' }).deviceId;
+    devs.remove(id);
+    ids.push(id);
+  }
+  const reason = (id) => devs.verify(patchReq({ headers: { 'x-khayt-device': id } })).reason;
+  assert.equal(reason(ids[0]), 'device-unknown', 'the oldest was forgotten');
+  assert.equal(reason(ids[1]), 'device-revoked');
+  assert.equal(reason(ids[Devices.MAX_REVOKED]), 'device-revoked');
+});
+
 test('at most 32 devices: the 33rd replaces the one seen longest ago', () => {
   let n = 0, t = VEC_MS;
   const devs = Devices.createLanDevices({ fs, keyPath: path.join(tmp, 'many.key'), seal, unseal, now: () => (t += 1000) });
@@ -281,6 +318,21 @@ test('the queue page takes a signed request instead of the PIN form', async () =
   const res = await fetch(`${BASE}/`, { headers: sign(dev, 'GET', '/') });
   assert.equal(res.status, 200);
   assert.doesNotMatch(await res.text(), /action="\/session"/);
+});
+
+test('Settings lists the paired phones and signs one out: it is told device-revoked', async () => {
+  const dev = await enrolPhone();
+  const other = await enrolPhone();
+  const listed = await handlers.get('hub:lan-devices-list')(null);
+  assert.equal(listed.ok, true);
+  assert.ok(listed.devices.some(d => d.deviceId === dev.out.deviceId && d.name === 'Test iPhone'));
+  assert.ok(listed.devices.every(d => !('key' in d)), 'never the key');
+  assert.deepEqual(await handlers.get('hub:lan-device-remove')(null, dev.out.deviceId), { ok: true });
+  assert.deepEqual(await handlers.get('hub:lan-device-remove')(null, { not: 'an id' }), { ok: false });
+  const gone = await fetch(`${BASE}/api/orders`, { headers: sign(dev, 'GET', '/api/orders') });
+  assert.deepEqual([gone.status, await gone.json()], [401, { reason: 'device-revoked' }]);
+  assert.equal((await fetch(`${BASE}/api/orders`, { headers: sign(other, 'GET', '/api/orders') })).status, 200, 'the other phone stays paired');
+  assert.ok(!(await handlers.get('hub:lan-devices-list')(null)).devices.some(d => d.deviceId === dev.out.deviceId));
 });
 
 test('changing the PIN removes every device', async () => {

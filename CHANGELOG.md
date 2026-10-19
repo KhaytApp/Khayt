@@ -56,6 +56,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   paid bar in the jobs table, now use what it was settled against. Invoices
   and the ledger still show what was billed.
 
+- **Desktop: sign out one paired phone.** Settings → Online → LAN API now
+  lists the phones paired with this computer, each with when it was last
+  seen, and "Sign out…" cuts off one of them; the others stay paired. Until now the
+  only way to cut off a lost phone was to change the LAN PIN, which signs
+  every phone out. A phone that was signed out is told so
+  (`{"reason":"device-revoked"}`), drops the PIN it kept, and asks for it
+  again rather than pairing itself back in. The same as the Mac's Settings →
+  Online → Paired phones.
+
 - **Mac: measure the models a cloud drive keeps online.** A linked Google
   Drive (or Dropbox, OneDrive, iCloud Drive) is indexed without downloading
   anything, so a model nobody opened was never measured and could not be

@@ -325,6 +325,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   startLanServer: (config) => ipcRenderer.invoke('hub:start-lan-server', config),
   stopLanServer:  ()       => ipcRenderer.invoke('hub:stop-lan-server'),
   getLanUrl:      ()       => ipcRenderer.invoke('hub:get-lan-url'),
+  listLanDevices: ()       => ipcRenderer.invoke('hub:lan-devices-list'),
+  removeLanDevice: (id)    => ipcRenderer.invoke('hub:lan-device-remove', id),
 
   // iOS companion: live reload when phone adds a spool or changes an order
   onLanSpoolAdded:      (() => { let _cb=null; ipcRenderer.on('lan-spool-added',      (_e,d)=>{ if(_cb) _cb(d); }); return cb=>{ _cb=cb; }; })(),
