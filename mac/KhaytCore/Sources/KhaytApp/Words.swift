@@ -2543,7 +2543,7 @@ final class Words {
         "mac.phones_seen": ["en": "Last seen {date}", "ar": "آخر ظهور {date}"],
         "mac.phones_sign_out": ["en": "Sign out", "ar": "تسجيل الخروج"],
         "mac.phones_sign_out_q": ["en": "Sign out “{name}”?", "ar": "تسجيل خروج «{name}»؟"],
-        "mac.phones_sign_out_note": ["en": "It can no longer reach this Mac until someone enters the LAN PIN on it again. Your other phones stay signed in. If the phone was lost, change the LAN PIN as well.", "ar": "لن يتمكن من الوصول إلى هذا الماك حتى يُدخَل رمز الشبكة المحلية عليه من جديد. جوالاتك الأخرى تبقى مسجّلة الدخول. إن كان الجوال مفقودًا فغيّر رمز الشبكة المحلية أيضًا."],
+        "mac.phones_sign_out_note": ["en": "It can no longer reach this Mac until someone enters the LAN PIN on it again. Your other phones stay signed in. If the phone was lost, also change the LAN PIN, and sign it out of Khayt Cloud if it uses it: this does not reach the cloud.", "ar": "لن يتمكن من الوصول إلى هذا الماك حتى يُدخَل رمز الشبكة المحلية عليه من جديد. جوالاتك الأخرى تبقى مسجّلة الدخول. إن كان الجوال مفقودًا فغيّر رمز الشبكة المحلية أيضًا، وسجّل خروجه من Khayt Cloud إن كان يستخدمها: هذا الإجراء لا يصل إلى السحابة."],
         "mac.phones_hint": ["en": "A phone pairs once with the LAN PIN and signs its requests after that. Changing the PIN signs every phone out.", "ar": "يقترن الجوال مرة واحدة برمز الشبكة المحلية ثم يوقّع طلباته بعد ذلك. تغيير الرمز يسجّل خروج كل الجوالات."],
         "mac.linked_regrouped": ["en": "Regrouped from their folders: {n}. Groups you set yourself were left alone.", "ar": "أُعيد تجميعها حسب مجلداتها: {n}. المجموعات التي اخترتها بنفسك بقيت كما هي."],
         "mac.linked_sort": ["en": "Sort linked folders…", "ar": "فرز المجلدات المرتبطة…"],
