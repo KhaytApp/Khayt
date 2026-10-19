@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import KhaytCore
 
@@ -96,13 +97,15 @@ final class KhaytAPIClient: ObservableObject {
         return (200...299).contains(http.statusCode)
     }
 
-    init(settings: ConnectionSettings) {
+    /// `protocols` is for tests: URL protocols that answer in place of the Mac.
+    init(settings: ConnectionSettings, protocols: [AnyClass] = []) {
         self.settings = settings
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 30
-        // Every request to the Mac carries the PIN, so none may follow a
-        // redirect to another host — see `NoRedirects`.
+        if !protocols.isEmpty { config.protocolClasses = protocols + (config.protocolClasses ?? []) }
+        // Every request to the Mac carries the PIN or this phone's signature,
+        // so none may follow a redirect to another host — see `NoRedirects`.
         self.session = URLSession(configuration: config, delegate: NoRedirects(), delegateQueue: nil)
         let opened = try? CompanionBook.inSharedContainer()
         self.book = opened
@@ -1239,7 +1242,41 @@ final class KhaytAPIClient: ObservableObject {
     @discardableResult
     private func request(path: String, method: String, body: Data?, requiresPin: Bool) async throws -> (Data, URLResponse) {
         let url = try makeURL(path: path)
+        guard requiresPin else { return try await send(url, method: method, body: body, auth: .none) }
+        guard let device = usableDevice else { return try await send(url, method: method, body: body, auth: .pin) }
 
+        let (data, response) = try await send(url, method: method, body: body, auth: .device(device))
+        guard (response as? HTTPURLResponse)?.statusCode == 401 else { return (data, response) }
+        switch DeviceKey.refusal(data) {
+        case .unknown?:
+            // Removed on the Mac (its PIN changed, or it was let go): back to
+            // the PIN for this one, and enrol again from scratch.
+            settings.device = nil
+            enrolNotBefore = nil
+            return try await send(url, method: method, body: body, auth: .pin)
+        case .clock(let now)?:
+            clockOffset = TimeInterval(now) - Date().timeIntervalSince1970
+            return try await send(url, method: method, body: body, auth: .device(device))
+        case .replay?:
+            return try await send(url, method: method, body: body, auth: .device(device))
+        case nil:
+            return (data, response)
+        }
+    }
+
+    private enum Auth { case none, pin, device(DeviceKey.Credential) }
+
+    /// The enrolment, while the identity that signed it is still the pinned one.
+    private var usableDevice: DeviceKey.Credential? {
+        guard let device = settings.device, !device.identityKey.isEmpty,
+              device.identityKey == settings.macIdentityKey else { return nil }
+        return device
+    }
+
+    /// The Mac's clock minus this phone's, once the Mac has said (`device-clock`).
+    private var clockOffset: TimeInterval = 0
+
+    private func send(_ url: URL, method: String, body: Data?, auth: Auth) async throws -> (Data, URLResponse) {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -1247,9 +1284,21 @@ final class KhaytAPIClient: ObservableObject {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = body
         }
-        let pin = settings.pin.trimmingCharacters(in: .whitespacesAndNewlines)
-        if requiresPin, !pin.isEmpty {
-            req.setValue(pin, forHTTPHeaderField: "x-khayt-pin")
+        switch auth {
+        case .none:
+            break
+        case .pin:
+            let pin = settings.pin.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !pin.isEmpty { req.setValue(pin, forHTTPHeaderField: "x-khayt-pin") }
+        case .device(let device):
+            guard let h = DeviceKey.headers(device, method: method, url: url, body: body,
+                                            now: Date().addingTimeInterval(clockOffset)) else {
+                throw KhaytAPIError.unauthorized
+            }
+            req.setValue(h.device, forHTTPHeaderField: "x-khayt-device")
+            req.setValue(h.time, forHTTPHeaderField: "x-khayt-time")
+            req.setValue(h.nonce, forHTTPHeaderField: "x-khayt-nonce")
+            req.setValue(h.mac, forHTTPHeaderField: "x-khayt-mac")
         }
 
         do {
@@ -1257,6 +1306,61 @@ final class KhaytAPIClient: ObservableObject {
         } catch {
             throw KhaytAPIError.transport(error)
         }
+    }
+
+    // MARK: - Enrolling this phone
+
+    enum Enrolment: Equatable { case enrolled, unsupported, failed }
+
+    private struct EnrolAnswer: Decodable { let deviceId: String; let publicKey: String; let sig: String }
+
+    /// Not before then: a Mac without the route is asked again a day later,
+    /// a failed try an hour later.
+    private(set) var enrolNotBefore: Date?
+
+    /// Whether this phone should enrol now: paired, the identity pinned, no
+    /// enrolment for it yet, and not asked too recently.
+    func wantsEnrolment(now: Date = Date()) -> Bool {
+        guard settings.isPaired, !settings.isSampleShop, !settings.macIdentityKey.isEmpty,
+              usableDevice == nil else { return false }
+        return enrolNotBefore.map { now >= $0 } ?? true
+    }
+
+    /// Enrol with the PIN, once, so later requests are signed instead.
+    /// Needs the Mac's identity key pinned first: that is what proves the
+    /// answer came from the Mac.
+    @discardableResult
+    func enrolDevice(name: String, now: Date = Date()) async -> Enrolment {
+        let result = await enrol(name: name)
+        switch result {
+        case .enrolled: enrolNotBefore = nil
+        case .unsupported: enrolNotBefore = now.addingTimeInterval(86_400)
+        case .failed: enrolNotBefore = now.addingTimeInterval(3600)
+        }
+        return result
+    }
+
+    private func enrol(name: String) async -> Enrolment {
+        let identity = settings.macIdentityKey
+        guard !identity.isEmpty, let url = try? makeURL(path: "/api/devices") else { return .failed }
+        let phone = Curve25519.KeyAgreement.PrivateKey()
+        let ask: [String: String] = [
+            "publicKey": phone.publicKey.rawRepresentation.base64EncodedString(),
+            "name": String(name.prefix(60)),
+        ]
+        guard let body = try? JSONEncoder().encode(ask),
+              let (data, response) = try? await send(url, method: "POST", body: body, auth: .pin),
+              let status = (response as? HTTPURLResponse)?.statusCode else { return .failed }
+        if [404, 405, 503].contains(status) { return .unsupported }
+        guard status == 200,
+              let answer = try? JSONDecoder().decode(EnrolAnswer.self, from: data),
+              // The PIN or the Mac may have changed while this was in flight.
+              settings.macIdentityKey == identity,
+              let credential = DeviceKey.credential(deviceId: answer.deviceId, macPublic: answer.publicKey,
+                                                    sig: answer.sig, phonePrivate: phone,
+                                                    identityKey: identity) else { return .failed }
+        settings.device = credential
+        return .enrolled
     }
 
     private func ensureOK(_ data: Data, _ response: URLResponse) throws {

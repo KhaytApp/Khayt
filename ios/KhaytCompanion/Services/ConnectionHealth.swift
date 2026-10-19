@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 enum ConnectionHealthState: String, Sendable {
     case unknown
@@ -96,7 +97,7 @@ final class ConnectionHealth: ObservableObject {
             do {
                 let queue = try await api.fetchQueue()
                 state = .connected
-                if macInReach { await pinMacIdentity() }
+                if macInReach { await pinMacIdentity(); await enrolThisPhone() }
                 await refreshWidgetsAndAlerts(status: status, queue: queue)
             } catch let err as KhaytAPIError {
                 lastStatus = nil
@@ -180,6 +181,13 @@ final class ConnectionHealth: ObservableObject {
         if let last = lastIdentityTry, now.timeIntervalSince(last) < 3600 { return }
         lastIdentityTry = now
         if let key = await api.fetchIdentityKey() { settings.macIdentityKey = key }
+    }
+
+    /// Once the key is pinned: enrol, so the PIN stops crossing the Wi-Fi
+    /// (`DeviceKey`). The client paces retries.
+    private func enrolThisPhone() async {
+        guard api.wantsEnrolment() else { return }
+        await api.enrolDevice(name: UIDevice.current.name)
     }
 
     /// Ask about `address`, unless the person already said no to it.
