@@ -85,6 +85,12 @@ final class LanServer {
         /// This Mac's identity key (`LanIdentity`), asked for when a route
         /// needs it. A test hands its own, so parallel tests never share one.
         var identity: @Sendable () -> Curve25519.Signing.PrivateKey? = { LanIdentity.key() }
+        /// The shop's library for the phone (`Shop+PhoneLibrary`): a page of
+        /// it, a model's picture, a model's price. Unset, the routes are not
+        /// here at all, and the phone reads the 404 as "this Mac predates it".
+        var library: (@MainActor (_ q: String, _ folder: String, _ offset: Int, _ limit: Int) -> JSONValue)? = nil
+        var libraryThumb: (@MainActor (_ id: String) async -> (Data, String)?)? = nil
+        var libraryEstimate: (@MainActor (_ id: String, _ plate: Int?, _ qty: Int) async -> (Int, String))? = nil
         /// The calendar subscription token (`settings.lanApi.calendarToken`),
         /// opened. Empty means the feed opens to nobody — never to the owner PIN.
         var calendarToken: String = ""
@@ -842,6 +848,7 @@ final class LanServer {
         "/", "/session", "/intake", "/manifest.json", "/sw.js",
         "/api/status", "/api/queue", "/api/machines/live", "/api/store", "/api/store/deltas",
         "/api/identity", "/api/proof", "/api/devices",
+        "/api/library", "/api/library/:id/thumb", "/api/library/:id/estimate",
         "/api/intake", "/api/intake/estimate", "/api/survey",
         "/order/:id", "/order/:id/quote", "/order/:id/approve", "/status/:id",
         "/calendar.ics",
@@ -1060,6 +1067,37 @@ final class LanServer {
 
         case (_, false) where request.method == "POST" && Self.approvePath(path) != nil:
             return await quoteApprove(request, id: Self.approvePath(path)!, store: store)
+
+        // ── THE LIBRARY, FOR THE OWNER'S PHONE (see `Shop+PhoneLibrary`) ──
+        case ("/api/library", true) where host.library != nil:
+            if let refused = await pinGate(request) { return refused }
+            let page = host.library!(request.query["q"] ?? "", request.query["folder"] ?? "",
+                                     Int(request.query["offset"] ?? "") ?? 0, Int(request.query["limit"] ?? "") ?? 50)
+            let body = (try? String(decoding: JSONEncoder().encode(page), as: UTF8.self)) ?? "{}"
+            return .json(200, body)
+
+        case (_, true) where host.libraryThumb != nil && Self.libraryPath(path)?.action == "thumb":
+            if let refused = await pinGate(request) { return refused }
+            guard let found = await host.libraryThumb!(Self.libraryPath(path)!.id) else {
+                return .json(404, #"{"error":"no-thumbnail"}"#)
+            }
+            return Response(status: 200, headers: ["Content-Type": found.1,
+                                                   "Cache-Control": "private, max-age=86400"], body: found.0)
+
+        case (_, false) where request.method == "POST" && host.libraryEstimate != nil
+                && Self.libraryPath(path)?.action == "estimate":
+            if let refused = await pinGate(request) { return refused }
+            guard measuring < Self.maxMeasuring else {
+                var busy = Response.json(503, #"{"ok":false,"reason":"busy"}"#)
+                busy.headers["Retry-After"] = "5"
+                return busy
+            }
+            measuring += 1
+            defer { measuring -= 1 }
+            let plate = request.query["plate"].flatMap { Int($0) }
+            let qty = Int(request.query["qty"] ?? "1") ?? 1
+            let (status, body) = await host.libraryEstimate!(Self.libraryPath(path)!.id, plate, qty)
+            return .json(status, body)
 
         case (_, true) where Self.trackingPath(path) != nil:
             return await trackingPage(request, id: Self.trackingPath(path)!, store: store)
@@ -1398,6 +1436,14 @@ final class LanServer {
     ///
     /// The `.html` suffix is stripped because Node strips it, and a customer
     /// who has the link has whichever form was generated.
+    /// `/api/library/{id}/{action}`, with the id as the path decoded it.
+    nonisolated static func libraryPath(_ path: String) -> (id: String, action: String)? {
+        guard path.hasPrefix("/api/library/") else { return nil }
+        let parts = path.dropFirst("/api/library/".count).split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 2, !parts[0].isEmpty, ["thumb", "estimate"].contains(String(parts[1])) else { return nil }
+        return (String(parts[0]), String(parts[1]))
+    }
+
     nonisolated static func statusPath(_ path: String) -> String? {
         guard path.hasPrefix("/status/") else { return nil }
         var raw = String(path.dropFirst("/status/".count))
@@ -2475,6 +2521,13 @@ extension Shop {
         host.intakeToken = intakeToken
         host.calendarToken = calendarToken
         host.devices = .shared
+        host.library = { [weak self] q, folder, offset, limit in
+            self?.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit) ?? .object([:])
+        }
+        host.libraryThumb = { [weak self] id in await self?.phoneLibraryThumb(id) }
+        host.libraryEstimate = { [weak self] id, plate, qty in
+            await self?.phoneLibraryEstimate(id, plate: plate, qty: qty) ?? (503, #"{"ok":false,"reason":"busy"}"#)
+        }
         var secrets: [String: String] = [:]
         for (platform, sealed) in config.storefrontSecrets where !sealed.isEmpty {
             secrets[platform] = (try? await Secrets.open(sealed, for: source)) ?? ""

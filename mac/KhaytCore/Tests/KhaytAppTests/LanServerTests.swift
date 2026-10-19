@@ -58,6 +58,11 @@ struct LanServerTests {
             host.intakeToken = intakeToken
             host.calendarToken = calendarToken
             host.identity = { identity }
+            host.library = { [shop] q, folder, offset, limit in
+                shop.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit)
+            }
+            host.libraryThumb = { [shop] id in await shop.phoneLibraryThumb(id) }
+            host.libraryEstimate = { [shop] id, plate, qty in await shop.phoneLibraryEstimate(id, plate: plate, qty: qty) }
             // The pricing inputs, from the same bench book — the app hands the
             // server `Shop.pricingBook` here; see `PricingBookTests` for why.
             host.pricing = { book.value }

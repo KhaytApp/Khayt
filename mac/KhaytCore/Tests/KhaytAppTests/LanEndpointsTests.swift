@@ -51,6 +51,7 @@ struct LanEndpointsTests {
                 || LanServer.quotePath(concrete) != nil
                 || LanServer.approvePath(concrete) != nil
                 || LanServer.statusPath(concrete) != nil
+                || LanServer.libraryPath(concrete) != nil
             #expect(recognised,
                     Comment(rawValue: "the 404 offers \(endpoint), which no route parses"))
         }
