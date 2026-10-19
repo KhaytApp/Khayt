@@ -192,6 +192,8 @@ extension Shop {
             guard Self.phoneMeasurable.contains(ext) else { return refuse(415, "unsupported") }
             let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
             guard size <= Self.phoneMeasureLimit else { return refuse(413, "too-large") }
+            // Asked BEFORE the read below, which is what makes a drive fetch it.
+            let wasOnline = linkedIsOnline(url)
             let measured: (volume: Double, area: Double, x: Double, y: Double, z: Double)? =
                 await withCheckedContinuation { done in
                     LanServer.measureQueue.async {
@@ -214,6 +216,7 @@ extension Shop {
                 // the figures out again: it is the one the Mac would measure.
                 estimates[file.id] = estimate
                 calc = await calculator(for: file, plate: plate)
+                rememberMeasured(file, at: url, wasOnline: wasOnline)
             }
         }
         guard let calc else {
@@ -235,5 +238,27 @@ extension Shop {
         ]
         let body = (try? String(decoding: JSONEncoder().encode(JSONValue.object(answer)), as: UTF8.self)) ?? "{}"
         return (200, body)
+    }
+
+    /// The phone's measurement, kept: written to the book the way a model
+    /// brought down by hand is (`fillDownloaded`), so a model is fetched and
+    /// measured once rather than on every price asked — and handed back to
+    /// its drive when it was online only, so pricing from the phone leaves
+    /// the disk as it found it (`OnlineMeasure`). Best-effort, in the
+    /// background: the phone has its answer already.
+    func rememberMeasured(_ file: LibraryFile, at url: URL, wasOnline: Bool) {
+        guard (file.geometryKey ?? "").isEmpty, let build = source.build, StoreLock.weOwnIt(build),
+              let engine, let roots = libraryRoots else { return }
+        // A linked model's picture goes in its vault folder, never the shop's.
+        let pictures = file.externalPath.map { _ in Self.vaultFolder(file.id, roots: roots) }
+        let evict = linkedEvict
+        phoneMeasureWrite = Task {
+            if let pictures { try? FileManager.default.createDirectory(at: pictures, withIntermediateDirectories: true) }
+            // lock: system — a model the library already lists, measured for a phone's price.
+            _ = try? await Self.fillDownloaded(id: file.id, file: url, pictures: pictures, storeURL: build.storeURL,
+                                               engine: engine, owns: { StoreLock.weOwnIt(build) },
+                                               whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
+            if wasOnline { await PinWork.run { evict(url) } }
+        }
     }
 }

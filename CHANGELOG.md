@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: measure the models a cloud drive keeps online.** A linked Google
+  Drive (or Dropbox, OneDrive, iCloud Drive) is indexed without downloading
+  anything, so a model nobody opened was never measured and could not be
+  priced, on the Mac or from the phone. Settings → Library now says how many
+  such models there are and how much they weigh, and "Measure online models…"
+  downloads them one at a time, measures each, and hands it back to the drive,
+  so the disk holds one model at a time. It writes to the book in batches, can
+  be stopped, and carries on from where it stopped. A model priced from the
+  phone is now measured once: its measurement is written to the book, and the
+  file is handed back to the drive if it was online only.
+
 - **iPhone: send a library price to the customer.** A priced model has a
   "Send the price" button, as the calculator does. It shares the model's
   name (and plate), the total and the price per piece, through WhatsApp,

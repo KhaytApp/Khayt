@@ -1548,6 +1548,16 @@ final class Shop {
     /// A test hands in its own: a dataless placeholder cannot be made in one,
     /// and a scan of ten thousand "local" files reads every one of them.
     var linkedIsOnline: @Sendable (URL) -> Bool = { LinkedCloud.isOnlineOnly($0) }
+    /// Hands a linked file the app fetched back to its cloud drive, so its
+    /// space is freed (`OnlineMeasure`). A test hands in its own: there is no
+    /// drive in one to hand a file back to.
+    var linkedEvict: @Sendable (URL) -> Void = { try? FileManager.default.evictUbiquitousItem(at: $0) }
+    /// A phone's measurement being written to the book (`rememberMeasured`),
+    /// so a test can wait for it.
+    var phoneMeasureWrite: Task<Void, Never>?
+    /// Linked models never measured, and their size — what "Measure online
+    /// models" offers (`countOnlineUnmeasured`).
+    var onlineUnmeasured: (count: Int, bytes: Int) = (0, 0)
     /// The books whose own library folder this launch has already looked through.
     var storageScannedBooks: Set<String> = []
     /// That pass in flight, so Stop can cancel it.

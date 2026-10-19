@@ -748,7 +748,31 @@ extension Shop {
     static func fillDownloaded(id: String, file: URL, pictures: URL? = nil, storeURL: URL, engine: KhaytEngine,
                                owns: @escaping @Sendable () -> Bool,
                                whoHasIt: @escaping @Sendable () -> String?) async throws -> String? {
-        // lock: callers — bringDownOnline, fillNowLocal, bringDownLinked
+        // lock: callers — bringDownOnline, fillNowLocal, bringDownLinked, rememberMeasured
+        let read = try await readDownloaded(file: file, pictures: pictures, engine: engine)
+        // Off the main actor: the whole book is read and written for one record.
+        return try await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
+            applyDownloaded([id: read], to: &book)[id]
+        }
+    }
+
+    /// What `fillDownloaded` writes, read from the file and not yet written —
+    /// so a pass over thousands of models can write them a batch at a time
+    /// (`Shop.measureOnlineModels`) rather than the whole book per model.
+    struct DownloadedRead: Sendable {
+        let hash: String
+        let key: String?
+        let reader: Int?
+        let colours: [JSONValue]
+        let swapCount: Int
+        let thumbFile: String?
+        let parsed: [String: JSONValue]
+        let size: Int
+        let designer: String?
+        let licence: String?
+    }
+
+    static func readDownloaded(file: URL, pictures: URL?, engine: KhaytEngine) async throws -> DownloadedRead {
         let ext = file.pathExtension.lowercased()
         let hash = await LibraryImport.offMain { try? LibraryImport.contentHash(of: file) } ?? nil
         // NOT READ, NOTHING WRITTEN. A drive that is offline, or refuses the
@@ -761,40 +785,49 @@ extension Shop {
         }
         let a = await LibraryImport.analyse(file, ext: ext, dir: pictures ?? file.deletingLastPathComponent(),
                                             engine: engine, analyseRisk: false)
-        let key = a.key, reader = a.reader, colours = a.colours, swapCount = a.swapCount
-        let thumbFile = a.thumbFile, parsed = a.parsed, size = a.size
-        let designer = a.provenance?.designer
-        let licence = a.provenance.flatMap { ModelLicence.fromFile($0.licence)?.id }
-        // Off the main actor: the whole book is read and written for one record.
-        return try await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
-            var duplicateOf: String?
-            var rows = Shop.rows(book, "printFiles")
-            for (i, row) in rows.enumerated() {
-                guard case .object(var o) = row else { continue }
-                if Shop.recordId(row) != id {
-                    if case .string(hash)? = o["contentHash"], case .string(let n)? = o["name"] { duplicateOf = n }
-                    continue
-                }
-                func empty(_ k: String) -> Bool {
-                    switch o[k] { case nil, .null?: true; case .string(let s)?: s.isEmpty
-                                  case .array(let x)?: x.isEmpty; case .object(let x)?: x.isEmpty; default: false }
-                }
-                o["contentHash"] = .string(hash)
-                if let key { o["geometryKey"] = .string(key) }
-                if let reader { o["geometryReader"] = .number(Double(reader)) }
-                if empty("colors") { o["colors"] = .array(colours); o["swapCount"] = .number(Double(swapCount)) }
-                if empty("thumbFile"), let thumbFile { o["thumbFile"] = .string(thumbFile); o["thumbSource"] = .string("embedded") }
-                if empty("parsed") { o["parsed"] = .object(parsed) }
-                if empty("source"), let designer { o["source"] = .string(designer) }
-                if empty("licence"), let licence { o["licence"] = .string(licence) }
-                if case .object(var sf)? = o["sourceFile"] { sf["size"] = .number(Double(size)); o["sourceFile"] = .object(sf) }
-                // Read now: no longer a record of what the drive listed.
-                o.removeValue(forKey: "indexedOnline")
-                rows[i] = .object(o)
-            }
-            book["printFiles"] = .array(rows)
-            return duplicateOf
+        return DownloadedRead(hash: hash, key: a.key, reader: a.reader, colours: a.colours, swapCount: a.swapCount,
+                              thumbFile: a.thumbFile, parsed: a.parsed, size: a.size,
+                              designer: a.provenance?.designer,
+                              licence: a.provenance.flatMap { ModelLicence.fromFile($0.licence)?.id })
+    }
+
+    /// The reads, written onto their records. Returns, by record id, the
+    /// title of another record that already holds the same bytes.
+    @discardableResult
+    nonisolated static func applyDownloaded(_ reads: [String: DownloadedRead],
+                                            to book: inout [String: JSONValue]) -> [String: String] {
+        var titleByHash: [String: String] = [:]
+        var rows = Shop.rows(book, "printFiles")
+        for row in rows {
+            guard case .object(let o) = row, let id = Shop.recordId(row), reads[id] == nil,
+                  case .string(let h)? = o["contentHash"], case .string(let n)? = o["name"] else { continue }
+            titleByHash[h] = n
         }
+        var duplicates: [String: String] = [:]
+        for (i, row) in rows.enumerated() {
+            guard case .object(var o) = row, let id = Shop.recordId(row), let read = reads[id] else { continue }
+            if let same = titleByHash[read.hash] { duplicates[id] = same }
+            func empty(_ k: String) -> Bool {
+                switch o[k] { case nil, .null?: true; case .string(let s)?: s.isEmpty
+                              case .array(let x)?: x.isEmpty; case .object(let x)?: x.isEmpty; default: false }
+            }
+            o["contentHash"] = .string(read.hash)
+            if let key = read.key { o["geometryKey"] = .string(key) }
+            if let reader = read.reader { o["geometryReader"] = .number(Double(reader)) }
+            if empty("colors") { o["colors"] = .array(read.colours); o["swapCount"] = .number(Double(read.swapCount)) }
+            if empty("thumbFile"), let thumbFile = read.thumbFile {
+                o["thumbFile"] = .string(thumbFile); o["thumbSource"] = .string("embedded")
+            }
+            if empty("parsed") { o["parsed"] = .object(read.parsed) }
+            if empty("source"), let designer = read.designer { o["source"] = .string(designer) }
+            if empty("licence"), let licence = read.licence { o["licence"] = .string(licence) }
+            if case .object(var sf)? = o["sourceFile"] { sf["size"] = .number(Double(read.size)); o["sourceFile"] = .object(sf) }
+            // Read now: no longer a record of what the drive listed.
+            o.removeValue(forKey: "indexedOnline")
+            rows[i] = .object(o)
+        }
+        book["printFiles"] = .array(rows)
+        return duplicates
     }
 
     // MARK: - Photos for models already in the library
