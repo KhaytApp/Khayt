@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a WhatsApp delivery report no longer overwrites a customer edit.**
+  A report ("delivered", "read") moved a line in the customer's log and was
+  saved as an edit of the whole customer, so it could beat a change made to
+  that customer on another device. Reports are now saved without counting as
+  an edit, and the Mac keeps what it was told and lays it over the book again
+  on every check, so a sync that brings back an older copy is put right.
+
 - **Mac: measure the models a cloud drive keeps online.** A linked Google
   Drive (or Dropbox, OneDrive, iCloud Drive) is indexed without downloading
   anything, so a model nobody opened was never measured and could not be
