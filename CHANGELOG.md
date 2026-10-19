@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a WhatsApp delivery report no longer overwrites a customer edit.**
+  A report ("delivered", "read") moved a line in the customer's log and was
+  saved as an edit of the whole customer, so it could beat a change made to
+  that customer on another device. Reports are now saved without counting as
+  an edit, and the Mac keeps what it was told and lays it over the book again
+  on every check, so a sync that brings back an older copy is put right.
 - **Mac: sign out one paired phone.** Settings → Online lists the phones
   paired with this Mac and when each was last seen. "Sign out…" removes one
   phone's key; the others stay signed in. Until now the only way to cut off
