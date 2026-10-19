@@ -263,7 +263,7 @@ struct PairingView: View {
             foot(L10n.tr("pair.pin.foot")).padding(.top, 10)
             Spacer(minLength: 18)
             primary(L10n.tr("pair.connect"), busy: isConnecting,
-                    disabled: settings.pin.count < 4 || isConnecting) {
+                    disabled: settings.pin.trimmingCharacters(in: .whitespacesAndNewlines).count < 8 || isConnecting) {
                 Task { await connect() }
             }
             secondary(L10n.tr("pair.back")) { step = .find }
