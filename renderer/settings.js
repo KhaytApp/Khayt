@@ -4044,6 +4044,27 @@ function saveEstimatorSettingsFromForm() {
   Object.keys(settings.estimator).forEach((k) => settings.estimator[k] === undefined && delete settings.estimator[k]);
 }
 
+/** Settings → LAN: the phones paired with this computer, each with a sign-out button. */
+async function renderLanPairedPhones() {
+  const box = document.getElementById('lanPairedPhones');
+  if (!box) return;
+  const res = await window.hubAPI?.listLanDevices?.().catch(() => null);
+  const devices = res?.devices || [];
+  if (!devices.length) {
+    box.innerHTML = `<div style="color:var(--text-muted);">${escapeHtml(t('lan.phones_none'))}</div>`;
+    return;
+  }
+  const day = (iso) => { try { return new Date(iso).toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return ''; } };
+  box.innerHTML = devices.map((d) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">
+      <div style="flex:1;min-width:0;">
+        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(d.name || t('lan.phones_unnamed'))}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('lan.phones_seen', { date: day(d.lastSeenAt) }))}</div>
+      </div>
+      <button type="button" class="btn ghost small" data-sign-out="${escapeHtml(d.deviceId)}" data-name="${escapeHtml(d.name || '')}">${escapeHtml(t('lan.phones_sign_out'))}…</button>
+    </div>`).join('');
+}
+
 function renderLanApiSettings() {
   const el = $('#lanApiSection');
   if (!el) return;
@@ -4163,6 +4184,11 @@ function renderLanApiSettings() {
     </div>
     <div id="lanStatusRow" style="margin:12px 0;padding:10px 12px;background:var(--bg-elev);border-radius:var(--radius);font-size:13px;">${lan.enabled ? '🟢 Server active' : '⚫ Server stopped'}</div>
     <div id="lanQrWrap" style="margin-bottom:12px;display:${lan.enabled ? 'block' : 'none'};"></div>
+    <div style="margin:12px 0;">
+      <label>${escapeHtml(t('lan.phones_title'))}</label>
+      <div id="lanPairedPhones" style="font-size:13px;"></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${escapeHtml(t('lan.phones_hint'))}</div>
+    </div>
     <div id="lanWebhookSection" style="display:${lan.enabled && lan.webhookToken ? 'block' : 'none'};margin:10px 0;">
       <label data-i18n="lan.printer_webhook">Printer Webhook URL</label>
       <button type="button" style="font-size:11px;color:var(--text-muted);padding:8px 10px;background:var(--bg-elev);border:none;border-radius:var(--radius);word-break:break-all;cursor:pointer;text-align:start;width:100%;" id="webhookUrlDisplay" data-i18n-title="lan.click_to_copy" data-i18n-aria="lan.click_to_copy" title="Click to copy" aria-label="Click to copy">—</button>
@@ -4216,6 +4242,16 @@ function renderLanApiSettings() {
   });
   el.querySelector('#lan_iq_filament')?.dispatchEvent(new Event('change'));
   el.querySelector('#btnStartLan')?.addEventListener('click', startLanServer);
+  renderLanPairedPhones();
+  el.querySelector('#lanPairedPhones')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-sign-out]');
+    if (!btn) return;
+    const name = btn.dataset.name || t('lan.phones_unnamed');
+    if (!confirm(t('lan.phones_sign_out_q', { name }) + '\n\n' + t('lan.phones_sign_out_note'))) return;
+    const res = await window.hubAPI?.removeLanDevice?.(btn.dataset.signOut);
+    if (!res?.ok) toast(t('lan.phones_sign_out_failed'), 'error');
+    renderLanPairedPhones();
+  });
   el.querySelector('#btnStopLan')?.addEventListener('click', async () => {
     await window.hubAPI?.stopLanServer?.();
     el.querySelector('#lanStatusRow').textContent = '⚫ Server stopped';
