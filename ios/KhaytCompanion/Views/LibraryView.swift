@@ -252,6 +252,16 @@ struct LibraryItemPage: View {
                     ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
                 } else if let answer, answer.ok, answer.price != nil {
                     EstimateCard(answer: answer)
+                    if let text = Self.shareText(item, plate: plate, qty: qty, answer: answer) {
+                        ShareLink(item: text) {
+                            Label(L10n.tr("calc.share"), systemImage: "square.and.arrow.up")
+                                .font(.khayt(15.5, .semibold, relativeTo: .body))
+                                .foregroundStyle(KhaytDesign.brand)
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                                .background(KhaytDesign.brand.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(KhaytDesign.brand, lineWidth: 1))
+                        }
+                    }
                     V2PrimaryButton(title: L10n.tr("quote.file.make_quote")) { makingQuote = true }
                 }
                 if let problem { V2Note(text: problem, tone: problemIsQuiet ? KhaytDesign.note : KhaytDesign.late) }
@@ -292,6 +302,23 @@ struct LibraryItemPage: View {
         if let g = item.grams { bits.append(L10n.grams(Int(g.rounded()))) }
         if let material = item.material { bits.append(material) }
         return bits.count > (item.material == nil ? 0 : 1) ? bits.joined(separator: " · ") : nil
+    }
+
+    /// What goes to the customer: the model (and plate), and the price in
+    /// the calculator's own words. The figures behind it stay with the shop.
+    static func shareText(_ item: LibraryItem, plate: Int?, qty: Int,
+                          answer: KhaytAPIClient.ModelEstimate) -> String? {
+        guard answer.ok, let total = answer.price, total > 0 else { return nil }
+        var title = item.name
+        if let p = plate.flatMap({ p in item.plates.first { $0.index == p } }) {
+            title += " — " + (p.name ?? L10n.format("library.plate.n", p.index))
+        }
+        var lines = [title, L10n.format("calc.share.price", Money.text(total, answer.currency))]
+        let pieces = answer.qty ?? qty
+        if pieces > 1 {
+            lines.append(L10n.format("calc.share.each", pieces, Money.text(total / Double(pieces), answer.currency)))
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// The calculator's start: the Mac's figures when it gave some, else what

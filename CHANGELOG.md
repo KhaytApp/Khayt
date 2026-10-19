@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: send a library price to the customer.** A priced model has a
+  "Send the price" button, as the calculator does. It shares the model's
+  name (and plate), the total and the price per piece, through WhatsApp,
+  Messages or any other app. The weight and hours stay with the shop.
+
 - **Mac: a paired iPhone can search the library and price a model from it.**
   The library stays on the Mac (on a real shop it is ten thousand models).
   The phone asks for a page of it, searching every folder and matching any
