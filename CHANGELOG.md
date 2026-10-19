@@ -39,6 +39,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   erased or deleted, or put back with Undo, rather than on the next upload
   ten minutes later.
 
+- **iPhone: printers under service or retired read the same as on the Mac.**
+  A printer an older book marks with `status: "offline"` now counts as under
+  service on the phone too, so it is no longer offered for new orders. An
+  empty retirement date no longer hides a printer that is still in use.
+
 - **iPhone: a Mac that changes address is followed again, once it proves
   who it is.** The phone keeps the Mac's identity key from a connection it
   already trusts. When the Mac turns up at a new address, the phone asks it
