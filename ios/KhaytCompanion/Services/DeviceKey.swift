@@ -114,6 +114,9 @@ enum DeviceKey {
         case clock(now: Int)
         /// The nonce was seen already; a fresh one will do.
         case replay
+        /// The owner signed this phone out on the Mac: no key and no PIN
+        /// until somebody pairs it again.
+        case revoked
     }
 
     static func refusal(_ body: Data) -> Refusal? {
@@ -125,6 +128,7 @@ enum DeviceKey {
         case "device-unknown", "device-auth": return .unknown
         case "device-clock": return answer.now.map { .clock(now: $0) }
         case "device-replay": return .replay
+        case "device-revoked": return .revoked
         default: return nil
         }
     }

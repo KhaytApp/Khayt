@@ -118,6 +118,7 @@ final class ConnectionSettings: ObservableObject {
             KeychainHelper.set(pin, for: Keys.pinKeychain)
             // A new PIN may be a new Mac: pin its key again from there.
             if pin != oldValue { macIdentityKey = ""; device = nil }
+            if !pin.isEmpty { signedOutByMac = false }
         }
     }
     /// The paired Mac's Ed25519 public key, base64 — pinned while the phone
@@ -145,6 +146,11 @@ final class ConnectionSettings: ObservableObject {
     }
     @Published var isPaired: Bool {
         didSet { UserDefaults.standard.set(isPaired, forKey: Keys.paired) }
+    }
+    /// The Mac signed this phone out (`device-revoked`). The pairing screen
+    /// says so, until a PIN is typed again.
+    @Published var signedOutByMac: Bool {
+        didSet { UserDefaults.standard.set(signedOutByMac, forKey: Keys.signedOutByMac) }
     }
     @Published var shopLabel: String {
         didSet { UserDefaults.standard.set(shopLabel, forKey: Keys.shopLabel) }
@@ -213,6 +219,7 @@ final class ConnectionSettings: ObservableObject {
         static let notifyPrintDone = "khayt.notify.printdone"
         static let liveActivities = "khayt.liveActivities"
         static let sampleShop = "khayt.sampleShop"
+        static let signedOutByMac = "khayt.signedOutByMac"
     }
 
     init() {
@@ -222,6 +229,7 @@ final class ConnectionSettings: ObservableObject {
         shopLabel = defaults.string(forKey: Keys.shopLabel) ?? "My Shop"
         serviceName = defaults.string(forKey: Keys.serviceName) ?? ""
         isPaired = defaults.bool(forKey: Keys.paired)
+        signedOutByMac = defaults.bool(forKey: Keys.signedOutByMac)
         pin = KeychainHelper.get(Keys.pinKeychain) ?? ""
         macIdentityKey = defaults.string(forKey: Keys.macIdentity) ?? ""
         device = KeychainHelper.get(Keys.deviceKeychain).flatMap {
@@ -277,6 +285,24 @@ final class ConnectionSettings: ObservableObject {
 
     var isConfigured: Bool { baseURL != nil }
 
+    /// The Mac signed this phone out. Its key and the PIN go, so nothing
+    /// enrols again by itself: only a person who knows the PIN pairs it back.
+    ///
+    /// The book stays. A 401 on the shop's Wi-Fi is not signed, so a reply
+    /// that only pretends to be the Mac must not be able to delete edits this
+    /// phone has not delivered yet. Unpair, in Settings, still clears it.
+    /// A phone set up from Khayt Cloud keeps that sign-in, which the Mac's
+    /// sign-out does not reach, and stays on its shop; one paired with the
+    /// Mac alone has no shop left and goes back to pairing.
+    func forgetMac(keepShop: Bool) {
+        pin = ""
+        macIdentityKey = ""
+        device = nil
+        KeychainHelper.delete(Keys.pinKeychain)
+        signedOutByMac = true
+        if !keepShop { isPaired = false }
+    }
+
     func unpair() {
         isPaired = false
         isSampleShop = false
@@ -284,6 +310,7 @@ final class ConnectionSettings: ObservableObject {
         pin = ""
         macIdentityKey = ""
         device = nil
+        signedOutByMac = false
         KeychainHelper.delete(Keys.pinKeychain)
         // The offline cache holds the shop's client list, orders and inventory.
         // Dropping the PIN while leaving that on disk would mean "unpaired" only

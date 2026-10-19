@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: a phone signed out on the Mac stays signed out.** When the Mac
+  answers that it signed this phone out, the phone deletes its key and the
+  owner PIN, and doesn't pair again by itself. A phone paired with the Mac
+  alone goes back to the pairing screen, which says the Mac signed it out.
+  A phone also signed in to Khayt Cloud stays on its shop, because the Mac's
+  sign-out doesn't cover that. The phone's copy of the shop's data stays
+  until Unpair, so a fake reply on the Wi-Fi can't delete edits the phone
+  hasn't sent yet.
+
 - **Mac: sending a large sliced file to a printer no longer freezes the
   window.** The file was read and the upload assembled on the main thread;
   it is now done in the background.
