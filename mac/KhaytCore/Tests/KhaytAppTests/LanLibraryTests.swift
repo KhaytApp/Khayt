@@ -84,7 +84,7 @@ struct LanLibraryTests {
         let photo = try await bench.get("/api/library/PF-sample-king-7/thumb", headers: Self.pin)
         #expect(photo.status == 200)
         #expect(photo.headers["content-type"]?.hasPrefix("image/") == true)
-        #expect(photo.headers["cache-control"] == "private, max-age=86400")
+        #expect(photo.headers["cache-control"] == "private, max-age=300")
         #expect(!photo.body.isEmpty)
         #expect(try await bench.get("/api/library/PF-sample-king-1/thumb", headers: Self.pin).status == 404)
     }

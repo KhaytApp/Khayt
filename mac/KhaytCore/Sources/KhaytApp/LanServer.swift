@@ -307,6 +307,12 @@ final class LanServer {
     /// three at once is a shop's machine given over to strangers.
     private var measuring = 0
     nonisolated static let maxMeasuring = 3
+    /// The owner's phone pricing from the library, counted apart: a model a
+    /// drive keeps online is downloaded to be measured, and that must not take
+    /// the slots a customer's intake estimate needs (alpha.84 review). One at
+    /// a time — it is one person's phone.
+    private var libraryMeasuring = 0
+    nonisolated static let maxLibraryMeasuring = 1
     /// Where an upload is measured: dispatch's threads, never the cooperative
     /// pool — see `estimate`. Concurrent, and bounded by `maxMeasuring`.
     nonisolated static let measureQueue = DispatchQueue(label: "khayt.lan.measure", qos: .utility,
@@ -1082,18 +1088,18 @@ final class LanServer {
                 return .json(404, #"{"error":"no-thumbnail"}"#)
             }
             return Response(status: 200, headers: ["Content-Type": found.1,
-                                                   "Cache-Control": "private, max-age=86400"], body: found.0)
+                                                   "Cache-Control": "private, max-age=300"], body: found.0)
 
         case (_, false) where request.method == "POST" && host.libraryEstimate != nil
                 && Self.libraryPath(path)?.action == "estimate":
             if let refused = await pinGate(request) { return refused }
-            guard measuring < Self.maxMeasuring else {
+            guard libraryMeasuring < Self.maxLibraryMeasuring else {
                 var busy = Response.json(503, #"{"ok":false,"reason":"busy"}"#)
                 busy.headers["Retry-After"] = "5"
                 return busy
             }
-            measuring += 1
-            defer { measuring -= 1 }
+            libraryMeasuring += 1
+            defer { libraryMeasuring -= 1 }
             let plate = request.query["plate"].flatMap { Int($0) }
             let qty = Int(request.query["qty"] ?? "1") ?? 1
             let (status, body) = await host.libraryEstimate!(Self.libraryPath(path)!.id, plate, qty)

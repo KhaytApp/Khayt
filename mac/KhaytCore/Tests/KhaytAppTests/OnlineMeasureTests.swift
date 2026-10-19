@@ -69,6 +69,23 @@ struct OnlineMeasureTests {
         #expect(dupes == ["b": "Old egg"])
     }
 
+    @Test("a thumbnail is a name in the model's folder, never a path out of it")
+    func thumbStaysInFolder() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "khayt-thumb-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dir = root.appending(path: LibraryLocation.itemDirName("PF-t"))
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: dir.appending(path: "thumb.png"))
+        try Data("secret".utf8).write(to: root.appending(path: "outside.png"))
+        func file(_ thumb: String) throws -> LibraryFile {
+            try JSONDecoder().decode(LibraryFile.self, from: JSONEncoder().encode(JSONValue.object(
+                ["id": .string("PF-t"), "name": .string("t"), "thumbFile": .string(thumb)])))
+        }
+        #expect(Shop.thumbnailOnDisk(try file("thumb.png"), roots: [root.path]) != nil)
+        #expect(Shop.thumbnailOnDisk(try file("../outside.png"), roots: [root.path]) == nil)
+        #expect(Shop.thumbnailOnDisk(try file(".."), roots: [root.path]) == nil)
+    }
+
     @Test("wired: Settings offers it with the size, and it asks first")
     func wired() throws {
         let settings = try LockRound3Tests.source("LibraryLocationSettings.swift")
@@ -78,6 +95,8 @@ struct OnlineMeasureTests {
         let pass = try LockRound3Tests.source("Shop+MeasureOnline.swift")
         #expect(pass.contains("defer { libraryMoveBusy = false; libraryMoveProgress = nil; libraryScanStop = nil }"))
         #expect(try LockRound3Tests.source("Shop+PhoneLibrary.swift").contains("rememberMeasured(file, at: url, wasOnline: wasOnline)"))
+        #expect(try LockRound3Tests.source("LanServer.swift").contains("guard libraryMeasuring < Self.maxLibraryMeasuring"),
+                "the phone's library pricing has its own slot, not the customers' intake ones")
     }
 }
 
@@ -166,6 +185,20 @@ extension LibraryEditPerfTests {
             let o = try #require(try diskRows(url).first.flatMap { if case .object(let o) = $0 { o } else { nil } })
             #expect(o["geometryKey"] != nil && o["geometryKey"] != .null)
             #expect(evicted.urls.map(\.lastPathComponent) == ["dragon.stl"])
+        }
+    }
+
+    @Test("a phone price never reads a file outside the book's folders, whatever a synced record says")
+    func phoneMeasureStaysInFolders() async throws {
+        let drive = FileManager.default.temporaryDirectory.appending(path: "khayt-online-\(UUID().uuidString)/My Drive")
+        let outside = drive.deletingLastPathComponent().appending(path: "Elsewhere/secret.stl")
+        defer { try? FileManager.default.removeItem(at: drive.deletingLastPathComponent()) }
+        try LinkedScanTests.model(outside, size: 10)
+        try FileManager.default.createDirectory(at: drive, withIntermediateDirectories: true)
+        try await Self.withOnlineBook(drive, rows: [Self.onlineRow("PF-x", outside)]) { shop, url, evicted in
+            let (status, body) = await shop.phoneLibraryEstimate("PF-x", plate: nil, qty: 1)
+            #expect(status == 409 && body.contains("no-file"), "\(status) \(body)")
+            #expect(evicted.urls.isEmpty)
         }
     }
 }
