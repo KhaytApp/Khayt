@@ -3509,7 +3509,8 @@ public actor KhaytEngine {
     public func kpis(orders: [JSONValue], clients: [JSONValue],
                      settings: [String: JSONValue], range: String,
                      language: String, inventory: [JSONValue] = [],
-                     consumables: [JSONValue] = []) throws -> Kpis {
+                     consumables: [JSONValue] = [],
+                     currencies: [String: JSONValue] = [:]) throws -> Kpis {
         // `kpi-rows` still runs in JavaScript: it reads `order-money`,
         // `order-payment` and `content-languages`, none of which have moved
         // yet, and the money function it takes cannot cross the bridge. Adding
@@ -3517,7 +3518,7 @@ public actor KhaytEngine {
         let rows: [JSONValue] = try runtime.call2(
             KPI_SCRIPT, [.array(orders), .array(clients), .object(settings),
                          .string(range), .string("\u{2014}"), .string(language), .array(inventory),
-                         .array(consumables)],
+                         .array(consumables), .object(currencies)],
             as: [JSONValue].self)
         let summary = Kpi.compute(Kpi.rows(rows))
         return Kpis(orderCount: summary.orderCount, completedCount: summary.completedCount,
@@ -10767,8 +10768,14 @@ public actor KhaytEngine {
         public let tax: Double
         /// What is still owed, in the order's own currency (`orderOwedRaw`).
         public let owed: Double
-        public init(billed: Double, net: Double, tax: Double, owed: Double) {
-            self.billed = billed; self.net = net; self.tax = tax; self.owed = owed
+        /// What the order is settled against (`orderDueRaw`): `billed`, except
+        /// for an order paid in full before tax on top was owed, which was
+        /// settled at its price. The Total a screen shows beside Paid and
+        /// Owed — `billed` there read "Total 115, Paid 100, Owed 0" on those
+        /// orders (Oct 2026 review). Documents keep `billed`.
+        public let due: Double
+        public init(billed: Double, net: Double, tax: Double, owed: Double, due: Double? = nil) {
+            self.billed = billed; self.net = net; self.tax = tax; self.owed = owed; self.due = due ?? billed
         }
     }
 
@@ -10793,7 +10800,7 @@ public actor KhaytEngine {
                 var split = T.computeTax(+o.price || 0, profile);
                 out[o.id] = {
                   billed: M.orderGrossRaw(o, ctx), net: split.subtotal,
-                  tax: split.taxTotal, owed: M.orderOwedRaw(o, ctx),
+                  tax: split.taxTotal, owed: M.orderOwedRaw(o, ctx), due: M.orderDueRaw(o, ctx),
                 };
               }
               return out;
@@ -13704,6 +13711,11 @@ private let MOVE_SCRIPT = """
 private let KPI_SCRIPT = """
 (function () {
   var ctx = { settings: ARG2, clients: ARG1 };
+  // The currencies the shop knows, as the P&L is handed them: a job whose
+  // code is not among them is read in its customer's currency there, and was
+  // read at face value here — so the goal tile and the month's revenue at the
+  // top of the dashboard came to two figures for one month (Oct 2026 review).
+  var known = (ARG8 && Object.keys(ARG8).length) ? ARG8 : null;
   var M = globalThis.KhaytOrderMoney;
   var b = globalThis.KhaytKpiRows.bounds(ARG3);
   return globalThis.KhaytKpiRows.kpiRows({
@@ -13714,7 +13726,7 @@ private let KPI_SCRIPT = """
     settings: ARG2,
     money: function (o) {
       return {
-        revenue: M.orderNetRevenueBase(o, ctx),
+        revenue: M.orderNetRevenueBase(o, ctx, known),
         // The shared rule (`KhaytKpiRows.orderCost`), the one Khayt's
         // dashboard is to use too. This summed `unitCost × qty` — which only
         // a line priced from a product carries — and left shipping out, so a
@@ -13723,8 +13735,9 @@ private let KPI_SCRIPT = """
         // it this host priced them at the cost written on the line while the
         // desktop, which has the shelf as a global, priced them at today's.
         cost: globalThis.KhaytKpiRows.orderCost(o,
-          { settings: ARG2, inventory: ARG6 || [], clients: ARG1, consumables: ARG7 || [] }),
-        outstanding: M.orderOwedBase(o, ctx)
+          { settings: ARG2, inventory: ARG6 || [], clients: ARG1, consumables: ARG7 || [],
+            known: known || undefined }),
+        outstanding: M.orderOwedBase(o, ctx, known)
       };
     },
     // Resolved from `clientId` through the content-language rule, exactly as

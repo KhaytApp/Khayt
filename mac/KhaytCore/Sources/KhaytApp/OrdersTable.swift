@@ -159,11 +159,12 @@ struct OrdersTable: View {
                 // reads money from, beside a figure summary and a dashboard
                 // that both carry the mark, read as a count of something. The
                 // job's own currency, since a book can price in more than one.
-                // What the customer is BILLED: on a shop that adds tax on
-                // top, the price plus the tax — the figure the Paid and Owed
-                // beside it are measured against.
+                // What the job is settled AGAINST (`due`): on a shop that adds
+                // tax on top, the price plus the tax — the figure the Paid and
+                // Owed beside it are measured against — except on a job paid
+                // in full before tax on top was owed, settled at its price.
                 if job.price > 0 {
-                    Text(Money.text(job.figures?.billed ?? job.price,
+                    Text(Money.text(job.figures?.due ?? job.price,
                                     job.currency.isEmpty ? shop.currency : job.currency))
                         .moneyStyle()
                 } else {
@@ -615,8 +616,9 @@ private struct Owed: View {
     @Environment(\.accessibilityReduceMotion) private var reduced
 
     private var paidFraction: Double {
-        // Against what the job is BILLED — price + tax on an exclusive shop.
-        let billed = job.figures?.billed ?? job.price
+        // Against what the job is settled against — price + tax on an
+        // exclusive shop, the price on one settled before that (`due`).
+        let billed = job.figures?.due ?? job.price
         guard billed > 0 else { return 0 }
         return min(1, max(0, job.paidAmount / billed))
     }

@@ -1445,7 +1445,8 @@ final class Shop {
                                                settings: settings, range: "month",
                                                language: words.language,
                                                inventory: Self.rows(root, "inventory"),
-                                               consumables: Self.rows(root, "consumables"))
+                                               consumables: Self.rows(root, "consumables"),
+                                               currencies: Invoice.currencyTable(self))
         guard ticket == loadGeneration else { return }
         thisMonthRevenue = monthKpis?.revenue ?? 0
         kpiOrders = orders
@@ -1480,7 +1481,8 @@ final class Shop {
         let answer = try? await engine.kpis(orders: kpiOrders, clients: kpiClients,
                                             settings: kpiSettings, range: kpiRange,
                                             language: words.language, inventory: inventoryRows,
-                                            consumables: consumableRows)
+                                            consumables: consumableRows,
+                                            currencies: Invoice.currencyTable(self))
         guard ticket == loadGeneration else { return }
         kpis = answer
     }

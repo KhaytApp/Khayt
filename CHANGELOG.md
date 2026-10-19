@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: one month, one revenue figure.** The revenue-goal tile and the
+  dashboard's figures read a job in a currency the shop does not list at face
+  value, while Reports and the month's revenue at the top of the dashboard read
+  it in its customer's currency. They now read it the same way.
+- **Mac: a job paid before tax on top was charged shows the total it was
+  settled at.** On a shop that adds tax on top, a job paid in full before
+  that rule (alpha.58) read "Total 115, Paid 100, Owed 0". Its Total, and the
+  paid bar in the jobs table, now use what it was settled against. Invoices
+  and the ledger still show what was billed.
+
 - **Mac: measure the models a cloud drive keeps online.** A linked Google
   Drive (or Dropbox, OneDrive, iCloud Drive) is indexed without downloading
   anything, so a model nobody opened was never measured and could not be
