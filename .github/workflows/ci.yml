@@ -291,6 +291,9 @@ jobs:
       - name: E2E smoke (scoped API tokens)
         run: xvfb-run -a npm run test:e2e:apitokens
 
+      - name: E2E smoke (sign out one paired phone)
+        run: xvfb-run -a npm run test:e2e:phones
+
       # CI has no printers on its network, so this proves the IPC contract and the
       # timeout bound; on a developer LAN it additionally validates real results.
       - name: E2E smoke (printer discovery)

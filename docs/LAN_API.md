@@ -169,7 +169,7 @@ computer refuses, with **401**:
 | Body | When | The phone |
 |---|---|---|
 | `{"reason":"device-unknown"}` | no such device, or removed | forgets it, retries once with the PIN, enrols again |
-| `{"reason":"device-revoked"}` | the shop signed this phone out (Mac: Settings → Online → Paired phones) | forgets its key AND the PIN, and asks the person to pair again; never enrols by itself |
+| `{"reason":"device-revoked"}` | the shop signed this phone out (Mac: Settings → Online → Paired phones; Windows and Linux: Settings → Online → LAN API → Paired phones) | forgets its key AND the PIN, and asks the person to pair again; never enrols by itself |
 | `{"reason":"device-clock","now":<unix seconds>}` | `time` more than 120 s from the computer's clock | keeps the difference and retries once |
 | `{"reason":"device-replay"}` | the nonce was seen for this device in the last 300 s | fails the request |
 | `{"reason":"device-auth"}` | anything else: a bad MAC, missing or malformed headers | fails the request |
