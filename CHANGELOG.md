@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a paired iPhone can search the library and price a model from it.**
+  The library stays on the Mac (on a real shop it is ten thousand models).
+  The phone asks for a page of it, searching every folder and matching any
+  case or Arabic spelling, and gets each model's picture. Asked for a price,
+  the Mac quotes it the way "Quote this model…" does, from the slicer's
+  figures when there are some. Otherwise it measures the file in the library
+  folder. Only the owner can use it, with the PIN or a signed request.
+
 - **Desktop: a paired iPhone sends the LAN PIN once, then signs its
   requests.** The LAN is plain http, so a PIN sent with every request could be
   read by anything on the same Wi-Fi. A phone now enrols once with the PIN
