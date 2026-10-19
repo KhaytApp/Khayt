@@ -333,12 +333,38 @@ public enum StoreWriter {
     /// Not a lease the main thread holds while it runs `work` itself: the
     /// main thread can be inside `chain.sync` (any synchronous `update`)
     /// behind such a lease, waiting for a chain that waits for it.
+    ///
+    /// ── LET GO OF `work` BEFORE WAKING THE CALLER ────────────────────────
+    ///
+    /// `update` hands in closures it holds under `withoutActuallyEscaping`,
+    /// and the runtime traps if one is still referenced when that block
+    /// ends. A dispatch block is released only AFTER it returns — so a block
+    /// that resumed its caller from inside itself could still be holding
+    /// `work` (and the closures it captures) when the caller woke and left
+    /// the block: "closure argument was escaped in withoutActuallyEscaping
+    /// block", signal 5, now and then on a loaded CI runner (Oct 2026). The
+    /// closure is taken out of a box and dropped before the resume.
     static func onChain<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
         _ = chainKeyed
+        let hand = Hand(work)
         return try await withCheckedThrowingContinuation { done in
             chain.async {
-                do { done.resume(returning: try work()) } catch { done.resume(throwing: error) }
+                let result: Result<T, any Error> = {
+                    guard let work = hand.take() else { return .failure(CancellationError()) }
+                    return Result { try work() }
+                }()
+                done.resume(with: result)
             }
+        }
+    }
+
+    /// One closure, given up exactly once (`onChain`).
+    private final class Hand<T>: @unchecked Sendable {
+        private let lock = NSLock()
+        private var work: (@Sendable () throws -> T)?
+        init(_ work: @escaping @Sendable () throws -> T) { self.work = work }
+        func take() -> (@Sendable () throws -> T)? {
+            lock.withLock { defer { work = nil }; return work }
         }
     }
 

@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a rare crash while saving is fixed.** A save could be stopped by a
+  runtime check ("closure argument was escaped") when the Mac was busy: the
+  save's background step still held on to its checks for a moment after
+  waking the screen. It now lets go of them first. This was also the
+  "signal 5" that made the Mac tests fail now and then.
+
 - **iPhone: a phone signed out on the Mac stays signed out.** When the Mac
   answers that it signed this phone out, the phone deletes its key and the
   owner PIN, and doesn't pair again by itself. A phone paired with the Mac
