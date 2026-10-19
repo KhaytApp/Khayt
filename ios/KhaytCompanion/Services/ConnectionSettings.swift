@@ -117,14 +117,31 @@ final class ConnectionSettings: ObservableObject {
         didSet {
             KeychainHelper.set(pin, for: Keys.pinKeychain)
             // A new PIN may be a new Mac: pin its key again from there.
-            if pin != oldValue { macIdentityKey = "" }
+            if pin != oldValue { macIdentityKey = ""; device = nil }
         }
     }
     /// The paired Mac's Ed25519 public key, base64 — pinned while the phone
     /// talks to it with the PIN, so a moved Mac can prove itself without the
     /// PIN being sent anywhere new. See `MacIdentity`. Empty until pinned.
     @Published var macIdentityKey: String {
-        didSet { UserDefaults.standard.set(macIdentityKey, forKey: Keys.macIdentity) }
+        didSet {
+            UserDefaults.standard.set(macIdentityKey, forKey: Keys.macIdentity)
+            // A device key is only as good as the identity that signed it.
+            if macIdentityKey != oldValue { device = nil }
+        }
+    }
+    /// This phone's enrolment with the Mac (`DeviceKey`): with it, requests
+    /// are signed and the PIN stays on the phone. Nil until enrolled, and
+    /// whenever the PIN or the pinned identity changes.
+    @Published var device: DeviceKey.Credential? {
+        didSet {
+            guard device != oldValue else { return }
+            if let device, let json = try? JSONEncoder().encode(device) {
+                KeychainHelper.set(String(decoding: json, as: UTF8.self), for: Keys.deviceKeychain)
+            } else {
+                KeychainHelper.delete(Keys.deviceKeychain)
+            }
+        }
     }
     @Published var isPaired: Bool {
         didSet { UserDefaults.standard.set(isPaired, forKey: Keys.paired) }
@@ -187,6 +204,7 @@ final class ConnectionSettings: ObservableObject {
         static let pinKeychain = "khayt.lanPin"
         static let paired = "khayt.paired"
         static let macIdentity = "khayt.macIdentity"
+        static let deviceKeychain = "khayt.lanDevice"
         static let language = "khayt.language"
         static let notifyQueue = "khayt.notify.queue"
         static let notifyConnection = "khayt.notify.connection"
@@ -206,6 +224,9 @@ final class ConnectionSettings: ObservableObject {
         isPaired = defaults.bool(forKey: Keys.paired)
         pin = KeychainHelper.get(Keys.pinKeychain) ?? ""
         macIdentityKey = defaults.string(forKey: Keys.macIdentity) ?? ""
+        device = KeychainHelper.get(Keys.deviceKeychain).flatMap {
+            try? JSONDecoder().decode(DeviceKey.Credential.self, from: Data($0.utf8))
+        }
         let langRaw = defaults.string(forKey: Keys.language) ?? AppLanguage.system.rawValue
         appLanguage = AppLanguage(rawValue: langRaw) ?? .system
         notifyQueueChanges = defaults.object(forKey: Keys.notifyQueue) as? Bool ?? true
@@ -262,6 +283,7 @@ final class ConnectionSettings: ObservableObject {
         serviceName = ""
         pin = ""
         macIdentityKey = ""
+        device = nil
         KeychainHelper.delete(Keys.pinKeychain)
         // The offline cache holds the shop's client list, orders and inventory.
         // Dropping the PIN while leaving that on disk would mean "unpaired" only

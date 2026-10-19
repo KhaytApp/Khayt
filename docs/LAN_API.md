@@ -113,6 +113,74 @@ The key is made once per computer and kept out of the book (sealed by the
 keychain), so a restored backup or a second computer does not claim to be this
 one. Nothing on the open route depends on the PIN.
 
+### `POST /api/devices` and signed requests — the PIN crosses the network once
+
+The LAN is plain http, so a PIN sent on every request can be read by anything
+on the same Wi-Fi. A phone that has paired with the PIN enrols once and then
+**signs** each request with a key of its own instead. Nothing it sends after
+that can be replayed or turned back into the PIN.
+
+**Enrolment** — `POST /api/devices` (owner PIN, the last time it is sent):
+
+```json
+{ "publicKey": "<base64 of a fresh raw 32-byte X25519 public key>", "name": "Turki's iPhone" }
+```
+
+**200** → `{"deviceId":"dev_…","publicKey":"<base64 X25519, the computer's, fresh per enrolment>","sig":"<base64>"}`
+
+- `deviceId`: made by the computer, `dev_` + 12–40 of `[A-Za-z0-9_-]`.
+- `sig`: Ed25519, by the `/api/identity` key, over the ASCII bytes
+  `khayt-enrol:` + deviceId + `:` + the computer's publicKey + `:` + the phone's
+  publicKey (both base64 exactly as they appear in the JSON). The phone refuses
+  an enrolment whose signature does not check against the key it pinned.
+- Both sides then hold `key = HKDF-SHA256(ikm: X25519(shared), salt: "khayt-device-v1",
+  info: deviceId, length: 32)`. The computer keeps `{deviceId, name, key,
+  createdAt, lastSeenAt}` with its identity key — sealed, out of the book, so a
+  backup or a synced second computer never carries it — and forgets its
+  X25519 private key straight away.
+- `name` is trimmed to 60 characters. At most 32 devices; a 33rd replaces the
+  one seen longest ago.
+- **Changing the PIN removes every device.** The phone also drops its enrolment
+  when the PIN is edited on it, when it is unpaired, and when the identity key
+  it pinned changes.
+- **404/405** → a computer that predates this; the phone keeps sending the PIN and asks
+  again a day later. **503** (no identity key) → the same.
+
+**A signed request** carries, in place of `x-khayt-pin`:
+
+| Header | Value |
+|---|---|
+| `x-khayt-device` | the `deviceId` |
+| `x-khayt-time` | Unix seconds, an integer |
+| `x-khayt-nonce` | 32 lower-case hex, fresh per request |
+| `x-khayt-mac` | base64 HMAC-SHA256(key, canonical) |
+
+```
+canonical = "khayt-req-v1" \n METHOD \n request-target \n time \n nonce \n hex(SHA-256(body))
+```
+
+`METHOD` in upper case; `request-target` exactly as on the request line (path
+plus `?query`, still percent-encoded); the hash of the body bytes as sent, the
+hash of nothing for a request without one; lower-case hex; `\n` a single LF.
+
+A valid signature is accepted **wherever the owner PIN is**, and only there. The
+computer refuses, with **401**:
+
+| Body | When | The phone |
+|---|---|---|
+| `{"reason":"device-unknown"}` | no such device, or removed | forgets it, retries once with the PIN, enrols again |
+| `{"reason":"device-clock","now":<unix seconds>}` | `time` more than 120 s from the computer's clock | keeps the difference and retries once |
+| `{"reason":"device-replay"}` | the nonce was seen for this device in the last 300 s | fails the request |
+| `{"reason":"device-auth"}` | anything else: a bad MAC, missing or malformed headers | fails the request |
+
+Compare the MAC in constant time. A request with both `x-khayt-pin` and the
+device headers is judged by the device headers alone.
+
+Shared test values for all three implementations are in
+[`lan-device-keys.vectors.json`](lan-device-keys.vectors.json): fixed X25519
+and Ed25519 keys, the derived key, an enrolment signature and two signed
+requests. Each side's tests should reproduce every value in it.
+
 ### `GET /api/queue`
 
 Active kanban orders (`pending`, `printing`, `post`, `qc`). **Requires owner PIN** when configured.

@@ -47,6 +47,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   erased or deleted, or put back with Undo, rather than on the next upload
   ten minutes later.
 
+- **iPhone: the LAN PIN crosses the Wi-Fi once, not on every request.** Once
+  the phone has paired and pinned the Mac's identity key, it enrols with
+  `POST /api/devices`. The Mac answers with half of a key exchange, signed
+  by its identity key, and from then on the phone signs each request with
+  a key of its own (time, nonce and body included) instead of sending the
+  PIN, so a request read off the network can be neither replayed nor
+  turned back into the PIN. A Mac or desktop without the route keeps
+  getting the PIN as before. Changing the PIN, unpairing, or a new
+  identity key drops the enrolment. The spec and the shared test values
+  are in `docs/LAN_API.md` and `docs/lan-device-keys.vectors.json`.
+- **iPhone: pairing asks for a PIN of 8 characters or more**, the length
+  the Mac and the desktop now require, rather than letting a shorter one
+  be typed and then refused.
+
 - **iPhone: printers under service or retired read the same as on the Mac.**
   A printer an older book marks with `status: "offline"` now counts as under
   service on the phone too, so it is no longer offered for new orders. An
