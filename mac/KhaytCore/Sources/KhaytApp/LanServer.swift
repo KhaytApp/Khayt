@@ -1087,7 +1087,11 @@ final class LanServer {
         case (_, false) where request.method == "POST" && host.libraryEstimate != nil
                 && Self.libraryPath(path)?.action == "estimate":
             if let refused = await pinGate(request) { return refused }
-            guard measuring < Self.maxMeasuring else { return .json(503, #"{"ok":false,"reason":"busy"}"#) }
+            guard measuring < Self.maxMeasuring else {
+                var busy = Response.json(503, #"{"ok":false,"reason":"busy"}"#)
+                busy.headers["Retry-After"] = "5"
+                return busy
+            }
             measuring += 1
             defer { measuring -= 1 }
             let plate = request.query["plate"].flatMap { Int($0) }

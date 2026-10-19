@@ -97,6 +97,7 @@ struct LanLibraryTests {
                                                         headers: Self.pin))
         #expect(sliced["ok"] as? Bool == true)
         #expect(sliced["exact"] as? Bool == true)
+        #expect(sliced["reliable"] as? Bool == true)
         let price = try #require(sliced["price"] as? Double)
         let lantern = try #require(bench.shop.files.first { $0.id == "PF-sample-lantern" })
         let mac = try #require(await bench.shop.calculator(for: lantern, plate: nil))
@@ -117,6 +118,7 @@ struct LanLibraryTests {
                                                           headers: Self.pin))
         #expect(measured["ok"] as? Bool == true && measured["exact"] as? Bool == false,
                 "nothing sliced it: the mesh is measured, and it says so")
+        #expect(measured["reliable"] is Bool)
 
         let missing = try await bench.post("/api/library/PF-nobody/estimate", json: "", headers: Self.pin)
         #expect(missing.status == 404 && missing.text.contains("not-found"))

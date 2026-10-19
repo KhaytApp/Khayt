@@ -229,6 +229,9 @@ extension Shop {
             "qty": .number(Double(calc.qty)),
             "grams": .number(calc.gramsValue), "hours": .number(calc.hoursValue),
             "exact": .bool(source == .sliced),
+            // A slice is always stood behind; a measured mesh only when the
+            // estimator says its shell model describes it.
+            "reliable": .bool(source == .sliced || !(estimates[file.id]?.shellUnreliable ?? false)),
         ]
         let body = (try? String(decoding: JSONEncoder().encode(JSONValue.object(answer)), as: UTF8.self)) ?? "{}"
         return (200, body)
