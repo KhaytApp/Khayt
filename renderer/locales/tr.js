@@ -579,7 +579,7 @@
   "lan.phones_seen": "Son görülme {date}",
   "lan.phones_sign_out": "Oturumu kapat",
   "lan.phones_sign_out_q": "“{name}” oturumu kapatılsın mı?",
-  "lan.phones_sign_out_note": "Biri üzerinde LAN PIN'ini yeniden girene kadar bu bilgisayara bağlanamaz. Diğer telefonlarınız oturumda kalır. Telefon kaybolduysa LAN PIN'ini de değiştirin.",
+  "lan.phones_sign_out_note": "Biri üzerinde LAN PIN'ini yeniden girene kadar bu bilgisayara bağlanamaz. Diğer telefonlarınız oturumda kalır. Telefon kaybolduysa LAN PIN'ini de değiştirin ve Khayt Cloud kullanıyorsa oradan da oturumunu kapatın: bu işlem buluta ulaşmaz.",
   "lan.phones_sign_out_failed": "Telefonun oturumu kapatılamadı. Yeniden deneyin.",
   "lan.phones_hint": "Bir telefon LAN PIN'iyle bir kez eşleşir, sonra isteklerini kendi anahtarıyla imzalar. Kaybolan veya eski bir telefonun oturumunu buradan kapatın; PIN'i değiştirmek tüm telefonların oturumunu kapatır.",
   "common.secret_unchanged": "(değişmedi)",

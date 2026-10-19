@@ -579,7 +579,7 @@
   "lan.phones_seen": "上次连接 {date}",
   "lan.phones_sign_out": "退出登录",
   "lan.phones_sign_out_q": "让“{name}”退出登录？",
-  "lan.phones_sign_out_note": "在有人再次在它上面输入局域网 PIN 之前，它将无法连接这台电脑。你的其他手机保持登录。如果手机丢失，请同时更改局域网 PIN。",
+  "lan.phones_sign_out_note": "在有人再次在它上面输入局域网 PIN 之前，它将无法连接这台电脑。你的其他手机保持登录。如果手机丢失，请同时更改局域网 PIN；如果它使用 Khayt Cloud，也请让它从云端退出登录：此操作不会影响云端。",
   "lan.phones_sign_out_failed": "无法让该手机退出登录，请重试。",
   "lan.phones_hint": "手机用局域网 PIN 配对一次，之后用自己的密钥为请求签名。可在此让丢失或不再使用的手机退出登录；更改 PIN 会让所有手机退出登录。",
   "common.secret_unchanged": "留空以保留当前值",

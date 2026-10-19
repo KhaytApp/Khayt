@@ -579,7 +579,7 @@
   "lan.phones_seen": "Visto por última vez {date}",
   "lan.phones_sign_out": "Cerrar sesión",
   "lan.phones_sign_out_q": "¿Cerrar la sesión de «{name}»?",
-  "lan.phones_sign_out_note": "No podrá conectarse a este equipo hasta que alguien vuelva a introducir el PIN de la red local en él. Tus otros teléfonos siguen conectados. Si el teléfono se perdió, cambia también el PIN de la red local.",
+  "lan.phones_sign_out_note": "No podrá conectarse a este equipo hasta que alguien vuelva a introducir el PIN de la red local en él. Tus otros teléfonos siguen conectados. Si el teléfono se perdió, cambia también el PIN de la red local y cierra su sesión en Khayt Cloud si la usa: esto no llega a la nube.",
   "lan.phones_sign_out_failed": "No se pudo cerrar la sesión del teléfono. Inténtalo de nuevo.",
   "lan.phones_hint": "Un teléfono se vincula una vez con el PIN de la red local y después firma sus solicitudes. Cierra aquí la sesión de un teléfono perdido o antiguo; cambiar el PIN cierra la sesión de todos.",
   "common.secret_unchanged": "Dejar en blanco para mantener el actual",

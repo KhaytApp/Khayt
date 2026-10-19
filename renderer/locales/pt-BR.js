@@ -580,7 +580,7 @@
   "lan.phones_seen": "Visto pela última vez em {date}",
   "lan.phones_sign_out": "Desconectar",
   "lan.phones_sign_out_q": "Desconectar “{name}”?",
-  "lan.phones_sign_out_note": "Ele não poderá mais acessar este computador até que alguém digite o PIN da rede local nele de novo. Seus outros celulares continuam conectados. Se o celular foi perdido, troque também o PIN da rede local.",
+  "lan.phones_sign_out_note": "Ele não poderá mais acessar este computador até que alguém digite o PIN da rede local nele de novo. Seus outros celulares continuam conectados. Se o celular foi perdido, troque também o PIN da rede local e desconecte-o do Khayt Cloud se ele usar: isto não chega à nuvem.",
   "lan.phones_sign_out_failed": "Não foi possível desconectar o celular. Tente de novo.",
   "lan.phones_hint": "Um celular pareia uma vez com o PIN da rede local e depois assina suas solicitações. Desconecte aqui um celular perdido ou antigo; trocar o PIN desconecta todos.",
   "common.secret_unchanged": "Deixe em branco para manter o atual",

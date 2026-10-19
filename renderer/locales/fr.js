@@ -579,7 +579,7 @@
   "lan.phones_seen": "Vu pour la dernière fois le {date}",
   "lan.phones_sign_out": "Déconnecter",
   "lan.phones_sign_out_q": "Déconnecter « {name} » ?",
-  "lan.phones_sign_out_note": "Il ne pourra plus joindre cet ordinateur tant que quelqu’un n’y aura pas saisi à nouveau le code PIN du réseau local. Vos autres téléphones restent connectés. Si le téléphone a été perdu, changez aussi le code PIN.",
+  "lan.phones_sign_out_note": "Il ne pourra plus joindre cet ordinateur tant que quelqu’un n’y aura pas saisi à nouveau le code PIN du réseau local. Vos autres téléphones restent connectés. Si le téléphone a été perdu, changez aussi le code PIN et déconnectez-le de Khayt Cloud s’il l’utilise : ceci n’atteint pas le cloud.",
   "lan.phones_sign_out_failed": "Impossible de déconnecter le téléphone. Réessayez.",
   "lan.phones_hint": "Un téléphone s’associe une fois avec le code PIN du réseau local, puis signe ses requêtes. Déconnectez ici un téléphone perdu ou ancien ; changer le code PIN les déconnecte tous.",
   "common.secret_unchanged": "Laisser vide pour conserver l'actuel",
