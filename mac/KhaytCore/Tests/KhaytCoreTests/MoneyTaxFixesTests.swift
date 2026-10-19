@@ -171,7 +171,8 @@ import Testing
         #expect(try await engine.owedRaw(order: old, settings: Self.salesTax) == 0,
                 "a settled order moved into receivables owing the tax")
         let figures = try await engine.orderFigures([old], settings: Self.salesTax, clients: [])
-        #expect(figures["old"] == .init(billed: 108.25, net: 100, tax: 8.25, owed: 0))
+        #expect(figures["old"] == .init(billed: 108.25, net: 100, tax: 8.25, owed: 0, due: 100),
+                "the Total a screen shows is what it was settled against, not 108.25 over Paid 100")
         #expect(try await engine.cashDue(order: old, settings: Self.salesTax).cash == 100,
                 "the payment sheet would preview the tax as owed")
 
