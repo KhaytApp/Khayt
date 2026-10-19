@@ -4,6 +4,9 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: sending a large sliced file to a printer no longer freezes the
+  window.** The file was read and the upload assembled on the main thread;
+  it is now done in the background.
 - **Mac: a job's filament lot is the lot in force when it was printed.** The
   job inspector's "Filament used" and the lot search named a spool's CURRENT
   lot for a draw that recorded none, even when the spool had been refilled
