@@ -78,13 +78,21 @@ final class LanDevices: @unchecked Sendable {
     private var seen: [String: [String: Date]] = [:]
     private let persist: (@Sendable (Data) -> Void)?
 
+    /// False when the Keychain could not be read, or held something this
+    /// build cannot decode: phones still enrol, for this run only, and what is
+    /// stored is left alone rather than overwritten with an empty list.
+    let keeps: Bool
+
     init(loaded: Data?, persist: (@Sendable (Data) -> Void)?) {
         if let loaded, let kept = try? JSONDecoder().decode(Saved.self, from: loaded) {
             saved = kept
+            self.persist = persist
         } else {
             saved = Saved(salt: SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }, devices: [])
+            // Something is stored but unreadable: never write over it.
+            self.persist = loaded == nil ? persist : nil
         }
-        self.persist = persist
+        keeps = self.persist != nil
     }
 
     /// A store that lives and dies with the server: tests, and a Mac whose
@@ -109,15 +117,27 @@ final class LanDevices: @unchecked Sendable {
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var out: CFTypeRef?
-        let loaded = SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess ? out as? Data : nil
+        let status = SecItemCopyMatching(q as CFDictionary, &out)
+        // Only "nothing stored" starts a fresh list that is saved. A denied
+        // or locked Keychain is not "no phones": it is enrolment for this run
+        // only, with what is stored left as it was.
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            NSLog("Khayt LAN devices: Keychain read failed (%d); enrolments will not be kept", status)
+            return LanDevices(loaded: nil, persist: nil)
+        }
+        let loaded = status == errSecSuccess ? (out as? Data ?? Data()) : nil
         return LanDevices(loaded: loaded, persist: { data in
             let update = [kSecValueData as String: data] as CFDictionary
-            if SecItemUpdate(keychainBase as CFDictionary, update) == errSecItemNotFound {
+            var result = SecItemUpdate(keychainBase as CFDictionary, update)
+            if result == errSecItemNotFound {
                 var add = keychainBase
                 add[kSecValueData as String] = data
                 add[kSecAttrLabel as String] = "Khayt LAN devices"
                 add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-                SecItemAdd(add as CFDictionary, nil)
+                result = SecItemAdd(add as CFDictionary, nil)
+            }
+            if result != errSecSuccess {
+                NSLog("Khayt LAN devices: Keychain write failed (%d)", result)
             }
         })
     }()

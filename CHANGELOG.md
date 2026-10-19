@@ -7968,6 +7968,32 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.83] - 2026-10-19
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+A paired iPhone sends the LAN PIN once, then signs its requests.
+
+### Security
+
+- **The LAN PIN crosses the Wi-Fi once.** The LAN is plain http, so a PIN
+  sent with every request could be read by anything on the same network. A
+  phone now enrols once with the PIN (`POST /api/devices`) and gets a key of
+  its own, agreed with this Mac and confirmed by its identity key. Every
+  request after that is signed instead, so a captured one can neither be
+  replayed nor turned back into the PIN.
+- The phone keys are kept in this Mac's Keychain, never in the book or a
+  backup. Up to 32 phones. Changing the LAN PIN, on this Mac or in the other
+  app, signs every phone out.
+- A phone that cannot enrol, or an older one, keeps sending the PIN as before.
+- A request whose length is negative or not a number is refused, and only
+  the bytes it declared are read, so the body a phone signed is the body
+  the Mac acts on.
+- If the Keychain can't be read, phones still enrol, but only until the app
+  quits, and the phones already stored are left as they were rather than
+  replaced by an empty list.
+
 ## [4.0.0-alpha.82] - 2026-10-19
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
