@@ -4425,6 +4425,14 @@ registerLanServer({
     seal: (s) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(s) : null),
     unseal: (b) => safeStorage.decryptString(b),
   }),
+  // Per-phone keys, so a phone sends the PIN once and signs every request
+  // after it (lib/lan-devices.js). Beside the identity key, out of the book.
+  lanDevices: require('./lib/lan-devices').createLanDevices({
+    fs,
+    keyPath: path.join(app.getPath('userData'), 'khayt-lan-devices.key'),
+    seal: (s) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(s) : null),
+    unseal: (b) => safeStorage.decryptString(b),
+  }),
 });
 
 /**
