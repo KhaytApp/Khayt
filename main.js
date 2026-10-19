@@ -4433,6 +4433,9 @@ registerLanServer({
     seal: (s) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(s) : null),
     unseal: (b) => safeStorage.decryptString(b),
   }),
+  // The library's own folders, so a paired phone can price a model without
+  // the file leaving this computer. Rehydrate fetches back a tiered model.
+  printLibrary: { itemDir: printLibItemDir, rehydrate: printLibRehydrate },
 });
 
 /**
