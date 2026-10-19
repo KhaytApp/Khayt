@@ -6015,6 +6015,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
 
+## [3.11.17] - 2026-10-19
+
+A paired iPhone sends the LAN PIN once, then signs its requests, since 3.11.16.
+Individual entries are kept below; this is what changed for you.
+
+The LAN server lets a paired iPhone register once with the PIN and sign every request after that, so the PIN no longer crosses the shop's Wi-Fi with each request.
+
+- **Desktop: a paired iPhone sends the LAN PIN once, then signs its
+  requests.** The LAN is plain http, so a PIN sent with every request could be
+  read by anything on the same Wi-Fi. A phone on the new iPhone build now
+  registers once with the PIN and gets a key of its own, agreed with this
+  computer and confirmed by its identity key. Every request after that carries
+  a signature instead of the PIN, so a captured request cannot be replayed or
+  turned back into the PIN. The keys are kept sealed beside the identity key,
+  never in the book. Changing the LAN PIN removes every registered phone, and
+  a phone that has not registered keeps sending the PIN as before.
+
 ## [3.11.16] - 2026-10-19
 
 ### Before you update
