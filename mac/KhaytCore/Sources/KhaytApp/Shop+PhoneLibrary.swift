@@ -80,6 +80,11 @@ extension Shop {
     /// The file in the library folder, when it is on this Mac's disk now.
     func libraryFileOnDisk(_ file: LibraryFile) -> URL? {
         if let path = file.externalPath, !path.isEmpty {
+            // Only under a folder this book links or keeps its library in:
+            // `externalPath` arrives by sync, and a path anywhere else on this
+            // Mac is not read for a phone (as `fillNowLocal`, `OnlineMeasure`).
+            let places = linkedFolders + (libraryRoots.map { $0.roots + [$0.primary] } ?? [])
+            guard places.contains(where: { !$0.isEmpty && LibraryMove.under(path, $0) }) else { return nil }
             return FileManager.default.fileExists(atPath: path) ? URL(fileURLWithPath: path) : nil
         }
         guard let roots = libraryRoots, let name = file.sourceFile?.filename, !name.isEmpty,
@@ -194,6 +199,12 @@ extension Shop {
             guard size <= Self.phoneMeasureLimit else { return refuse(413, "too-large") }
             // Asked BEFORE the read below, which is what makes a drive fetch it.
             let wasOnline = linkedIsOnline(url)
+            // Handed back to the drive here unless `rememberMeasured` took the
+            // file on — whatever went wrong between, a price asked from the
+            // phone does not leave a drive's model downloaded (alpha.84 review).
+            var handedOn = false
+            let evict = linkedEvict
+            defer { if wasOnline, !handedOn { Task { await PinWork.run { evict(url) } } } }
             let measured: (volume: Double, area: Double, x: Double, y: Double, z: Double)? =
                 await withCheckedContinuation { done in
                     LanServer.measureQueue.async {
@@ -216,7 +227,7 @@ extension Shop {
                 // the figures out again: it is the one the Mac would measure.
                 estimates[file.id] = estimate
                 calc = await calculator(for: file, plate: plate)
-                rememberMeasured(file, at: url, wasOnline: wasOnline)
+                if rememberMeasured(file, at: url, wasOnline: wasOnline) { handedOn = true }
             }
         }
         guard let calc else {
@@ -246,13 +257,19 @@ extension Shop {
     /// its drive when it was online only, so pricing from the phone leaves
     /// the disk as it found it (`OnlineMeasure`). Best-effort, in the
     /// background: the phone has its answer already.
-    func rememberMeasured(_ file: LibraryFile, at url: URL, wasOnline: Bool) {
-        guard (file.geometryKey ?? "").isEmpty, let build = source.build, StoreLock.weOwnIt(build),
-              let engine, let roots = libraryRoots else { return }
+    /// True when it took the file on (and will hand it back to its drive).
+    /// One at a time: a write still going means this model is measured again
+    /// the next time it is priced, not that a second whole read runs beside it.
+    @discardableResult
+    func rememberMeasured(_ file: LibraryFile, at url: URL, wasOnline: Bool) -> Bool {
+        guard (file.geometryKey ?? "").isEmpty, phoneMeasureWriting == false, let build = source.build,
+              StoreLock.weOwnIt(build), let engine, let roots = libraryRoots else { return false }
         // A linked model's picture goes in its vault folder, never the shop's.
         let pictures = file.externalPath.map { _ in Self.vaultFolder(file.id, roots: roots) }
         let evict = linkedEvict
+        phoneMeasureWriting = true
         phoneMeasureWrite = Task {
+            defer { phoneMeasureWriting = false }
             if let pictures { try? FileManager.default.createDirectory(at: pictures, withIntermediateDirectories: true) }
             // lock: system — a model the library already lists, measured for a phone's price.
             _ = try? await Self.fillDownloaded(id: file.id, file: url, pictures: pictures, storeURL: build.storeURL,
@@ -260,5 +277,6 @@ extension Shop {
                                                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) })
             if wasOnline { await PinWork.run { evict(url) } }
         }
+        return true
     }
 }

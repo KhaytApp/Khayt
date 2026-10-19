@@ -8014,6 +8014,38 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-alpha.84] - 2026-10-19
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Your phone can price the library, and the models a cloud drive keeps online
+can be measured.
+
+### Added
+
+- **A paired iPhone can search the library and price a model from it.** The
+  phone asks for a page of the library at a time, searching every folder in
+  any case or Arabic spelling, with each model's picture. A price is the one
+  "Quote this model…" gives: the slicer's figures when there are some,
+  otherwise the measured file. Owner only, with the PIN or a signed request.
+- **Measure online models.** A linked Google Drive (or Dropbox, OneDrive,
+  iCloud Drive) is indexed without downloading anything, so a model nobody
+  opened was never measured and could not be priced. Settings → Library now
+  shows how many there are and their total size. "Measure online models…"
+  downloads them one at a time, measures each and hands it back to the drive,
+  so the disk only ever holds one. It can be stopped and carries on where it
+  stopped.
+- A model priced from the phone is measured once: the measurement is kept in
+  the book, and a file the drive kept online is handed back afterwards.
+
+### Security
+
+- Pricing from the phone has its own slot, so it never takes the ones a
+  customer's intake estimate needs, even while it downloads a large model.
+- The phone's pricing reads only files inside the book's linked or library
+  folders, and a model's thumbnail is always a file in its own folder.
+
 ## [4.0.0-alpha.83] - 2026-10-19
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see

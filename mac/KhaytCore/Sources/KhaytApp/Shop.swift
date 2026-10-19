@@ -1555,6 +1555,7 @@ final class Shop {
     /// A phone's measurement being written to the book (`rememberMeasured`),
     /// so a test can wait for it.
     var phoneMeasureWrite: Task<Void, Never>?
+    var phoneMeasureWriting = false
     /// Linked models never measured, and their size — what "Measure online
     /// models" offers (`countOnlineUnmeasured`).
     var onlineUnmeasured: (count: Int, bytes: Int) = (0, 0)

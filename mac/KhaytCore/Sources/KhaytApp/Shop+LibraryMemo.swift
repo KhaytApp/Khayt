@@ -227,7 +227,11 @@ extension Shop {
 
     nonisolated static func thumbnailOnDisk(_ file: LibraryFile, roots: [String]?) -> ThumbnailSource? {
         guard let roots, let dir = LibraryLocation.directory(for: file.id, roots: roots) else { return nil }
-        let url = dir.appending(path: file.thumbFile ?? "thumb.jpg")
+        // A name in the model's own folder, never a path: `thumbFile` arrives
+        // by sync, and the phone's thumbnail route serves what this finds.
+        let name = file.thumbFile ?? "thumb.jpg"
+        guard !name.isEmpty, !name.contains("/"), name != "..", name != "." else { return nil }
+        let url = dir.appending(path: name)
         return FileManager.default.fileExists(atPath: url.path) ? .file(url) : nil
     }
 
