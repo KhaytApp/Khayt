@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a paired iPhone sends the LAN PIN once, then signs its
+  requests.** The LAN is plain http, so a PIN sent with every request could be
+  read by anything on the same Wi-Fi. A phone now enrols once with the PIN
+  (`POST /api/devices`) and gets a key of its own, agreed with this computer
+  and confirmed by its identity key. Every request after that carries a
+  signature over the request and its body instead of the PIN, so a captured
+  request cannot be replayed or turned back into the PIN. The keys are kept
+  sealed beside the identity key, never in the book. Changing the LAN PIN
+  removes every enrolled phone, and a phone that cannot enrol keeps sending
+  the PIN as before.
+
 - **Mac: fixes from the pre-release review.**
   - **Uploads:** a customer's 3MF upload is unpacked off the window's thread
     and capped at 64 MB, so a large one can't freeze the app.
