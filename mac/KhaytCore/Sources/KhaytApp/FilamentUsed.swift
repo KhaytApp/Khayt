@@ -18,7 +18,9 @@ import KhaytCore
 ///      before `materialDrawn` existed, and failed attempts.
 ///
 /// A draw with no lot of its own takes the spool's CURRENT lot and is shown
-/// "(inferred)": the lot may have been typed after the job, or edited since.
+/// "(inferred)": the lot may have been typed after the job, or edited since —
+/// unless it is dated before the receipt that brought that lot in, when it
+/// takes the lot then in force (`presumedLot`).
 enum FilamentUsed {
     struct Row: Hashable, Identifiable {
         /// Position: one job can draw twice from one spool.
@@ -39,33 +41,69 @@ enum FilamentUsed {
     static func rows(for order: Order, spools: [Spool]) -> [Row] {
         let byId = Dictionary(spools.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var out: [Row] = []
-        var covered: [String: Int] = [:]
-        func key(_ spoolId: String, _ grams: Double) -> String {
-            spoolId + "|" + String(round2(grams))
-        }
-        func add(_ spoolId: String, _ grams: Double, own: String?) {
+        // What the completion's record accounts for, as a TOTAL per spool —
+        // `allDraws`' rule: a print that took twice off one spool has one
+        // merged draw but two history rows, and a gram-for-gram match covers
+        // neither and counts the job twice.
+        var covered: [String: Double] = [:]
+        func add(_ spoolId: String, _ grams: Double, own: String?, date: String) {
             let spool = byId[spoolId]
             let mine = (own ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let current = (spool?.lot ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             out.append(Row(index: out.count, spoolId: spoolId, name: name(of: spool, id: spoolId),
                            color: spool?.color.flatMap { $0.isEmpty ? nil : $0 },
-                           lot: mine.isEmpty ? current : mine,
+                           lot: mine.isEmpty ? presumedLot(spool, date: date) : mine,
                            grams: round2(grams), inferred: mine.isEmpty))
         }
 
+        let finished = day(order.completedAt).isEmpty ? day(order.date) : day(order.completedAt)
         for d in order.materialDrawn?.spools ?? [] where d.grams > 0 {
-            add(d.spoolId, d.grams, own: d.lot)
-            covered[key(d.spoolId, d.grams), default: 0] += 1
+            add(d.spoolId, d.grams, own: d.lot, date: finished)
+            covered[d.spoolId] = round2((covered[d.spoolId] ?? 0) + round2(d.grams))
         }
         for spool in spools {
             for h in spool.usageHistory ?? [] {
                 guard h.orderId == order.id, h.type != "received", h.weightUsed > 0 else { continue }
-                let k = key(spool.id, h.weightUsed)
-                if let left = covered[k], left > 0 { covered[k] = left - 1; continue }
-                add(spool.id, h.weightUsed, own: h.lot)
+                let left = covered[spool.id] ?? 0
+                let grams = round2(h.weightUsed - left)
+                covered[spool.id] = max(0, round2(left - h.weightUsed))
+                guard grams > 0 else { continue }
+                add(spool.id, grams, own: h.lot, date: day(h.date))
             }
         }
         return out
+    }
+
+    /// `presumedLot` in lib/lot-trace.js: the lot a draw with none of its own
+    /// is presumed to be from. The spool's current lot — except for a draw
+    /// dated BEFORE the run of receipts that brought that lot in (an empty
+    /// spool refilled with a new lot keeps its id), which takes the lot of the
+    /// receipt then in force, or none. Taking the current lot for those named
+    /// the wrong lot in a recall (Oct 2026 review).
+    static func presumedLot(_ spool: Spool?, date: String) -> String {
+        let current = (spool?.lot ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let spool, !date.isEmpty, !current.isEmpty else { return current }
+        let receipts = (spool.usageHistory ?? []).filter { $0.type == "received" && !day($0.date).isEmpty }
+        var since = ""
+        for h in receipts {
+            guard sameLot(h.lot, current) else { break }
+            since = day(h.date)
+        }
+        if since.isEmpty || date >= since { return current }
+        let then = receipts.first { day($0.date) <= date }
+        return (then?.lot ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Trimmed, case folded; two blanks are NOT the same lot.
+    static func sameLot(_ a: String?, _ b: String?) -> Bool {
+        let x = (a ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return !x.isEmpty && x == (b ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    /// `dayOf`: the `YYYY-MM-DD` a stamp starts with, or empty.
+    static func day(_ v: String?) -> String {
+        let s = v ?? ""
+        guard s.count >= 10, s.prefix(10).wholeMatch(of: /\d{4}-\d{2}-\d{2}/) != nil else { return "" }
+        return String(s.prefix(10))
     }
 
     /// Every job a lot was drawn into — RECORDED on the job's own draws, or
@@ -91,7 +129,8 @@ enum FilamentUsed {
         for s in spools {
             for h in s.usageHistory ?? [] where h.type != "received" && !h.orderId.isEmpty
                 && out[h.orderId] == nil {
-                let lot = h.lot ?? s.lot ?? ""
+                let own = (h.lot ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                let lot = own.isEmpty ? presumedLot(s, date: day(h.date)) : own
                 if !lot.isEmpty, lot.lowercased().contains(q) { out[h.orderId] = lot }
             }
         }

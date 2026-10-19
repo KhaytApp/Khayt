@@ -74,6 +74,50 @@ struct FilamentUsedTests {
         #expect(compared > 0, "the sample book must draw something to compare")
     }
 
+    /// A spool emptied and refilled with a new lot keeps its id; a job drawn
+    /// before the refill, with no lot of its own, was named the NEW lot.
+    /// And a print that took twice off one spool is one merged draw but two
+    /// history rows. Both against the rule itself (Oct 2026 review).
+    @Test("a draw before a refill takes the lot then in force; two history rows under one draw are not counted twice")
+    func refillAndSplitRowsMatchTheRule() async throws {
+        let engine = try KhaytEngine()
+        let spool: JSONValue = .object([
+            "id": .string("sp-1"), "material": .string("PLA"), "lot": .string("NEW-2"),
+            "usageHistory": .array([
+                .object(["date": .string("2026-10-10"), "project": .string(""), "orderId": .string(""),
+                         "weightUsed": .number(-1000), "type": .string("received"), "lot": .string("NEW-2")]),
+                .object(["date": .string("2026-09-01"), "project": .string(""), "orderId": .string(""),
+                         "weightUsed": .number(-1000), "type": .string("received"), "lot": .string("OLD-1")]),
+                .object(["date": .string("2026-09-20"), "project": .string("Old"), "orderId": .string("J-old"),
+                         "weightUsed": .number(40)]),
+                .object(["date": .string("2026-10-12"), "project": .string("Two"), "orderId": .string("J-two"),
+                         "weightUsed": .number(30)]),
+                .object(["date": .string("2026-10-12"), "project": .string("Two"), "orderId": .string("J-two"),
+                         "weightUsed": .number(20)]),
+            ]),
+        ])
+        let jobs: [JSONValue] = [
+            .object(["id": .string("J-old"), "date": .string("2026-09-20"), "project": .string("Old")]),
+            .object(["id": .string("J-two"), "date": .string("2026-10-12"), "project": .string("Two"),
+                     "completedAt": .string("2026-10-12T10:00:00Z"),
+                     "materialDrawn": .object(["spools": .array([.object(["spoolId": .string("sp-1"),
+                                                                          "grams": .number(50)])])])]),
+        ]
+        let spools = [try JSONDecoder().decode(Spool.self, from: JSONEncoder().encode(spool))]
+        for job in jobs {
+            let order = try JSONDecoder().decode(Order.self, from: JSONEncoder().encode(job))
+            let swift = FilamentUsed.rows(for: order, spools: spools)
+                .map { "\($0.spoolId)|\($0.lot)|\($0.grams)|\($0.inferred)" }
+            let js = try await engine.lotsForJob(order: job, inventory: [spool])
+                .map { "\($0.spoolId)|\($0.lot)|\($0.grams)|\($0.inferred)" }
+            #expect(swift == js, "\(order.id)")
+        }
+        let old = try JSONDecoder().decode(Order.self, from: JSONEncoder().encode(jobs[0]))
+        #expect(FilamentUsed.rows(for: old, spools: spools).map(\.lot) == ["OLD-1"], "the lot in force then, not today's")
+        let two = try JSONDecoder().decode(Order.self, from: JSONEncoder().encode(jobs[1]))
+        #expect(FilamentUsed.rows(for: two, spools: spools).map(\.grams) == [50], "one draw, not 50 + 30 + 20")
+    }
+
     @Test("typing a lot in the search box finds the jobs that drew from it")
     func searchFindsLot() async throws {
         let shop = try await sample()

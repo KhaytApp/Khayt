@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a job's filament lot is the lot in force when it was printed.** The
+  job inspector's "Filament used" and the lot search named a spool's CURRENT
+  lot for a draw that recorded none, even when the spool had been refilled
+  with a new lot after the job. They now follow the shared rule
+  (`lib/lot-trace.js`): the lot of the receipt in force on the day. A print
+  that took twice off one spool is no longer listed twice.
 - **Mac: a WhatsApp delivery report no longer overwrites a customer edit.**
   A report ("delivered", "read") moved a line in the customer's log and was
   saved as an edit of the whole customer, so it could beat a change made to
