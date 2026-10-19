@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: sign out one paired phone.** Settings → Online lists the phones
+  paired with this Mac and when each was last seen. "Sign out…" removes one
+  phone's key; the others stay signed in. Until now the only way to cut off
+  a lost phone was to change the LAN PIN, which signs out every phone. A
+  signed-out phone is told `device-revoked` (docs/LAN_API.md), so an iPhone
+  that knows the reason forgets its PIN and asks to pair again rather than
+  quietly pairing with the PIN it kept.
 - **Mac: one month, one revenue figure.** The revenue-goal tile and the
   dashboard's figures read a job in a currency the shop does not list at face
   value, while Reports and the month's revenue at the top of the dashboard read

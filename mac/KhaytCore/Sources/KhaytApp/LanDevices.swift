@@ -44,6 +44,11 @@ final class LanDevices: @unchecked Sendable {
     struct Saved: Codable {
         var salt: Data
         var devices: [Device]
+        /// Phones the shop signed out, by id, with when. Answered
+        /// `device-revoked` rather than `device-unknown`, so the phone drops
+        /// its PIN and asks for it again instead of quietly enrolling anew
+        /// with the one it kept. Optional: a store saved before it has none.
+        var revoked: [String: Date]? = nil
     }
 
     /// What the server answers a signed request.
@@ -60,6 +65,9 @@ final class LanDevices: @unchecked Sendable {
     }
 
     static let maxDevices = 32
+    /// Signed-out ids remembered; the oldest go first. An id is random, so a
+    /// forgotten one is only a phone told `device-unknown` instead.
+    static let maxRevoked = 256
     static let maxName = 60
     static let skew: TimeInterval = 120
     static let replayWindow: TimeInterval = 300
@@ -152,6 +160,42 @@ final class LanDevices: @unchecked Sendable {
     var count: Int {
         lock.lock(); defer { lock.unlock() }
         return saved.devices.count
+    }
+
+    /// A paired phone as Settings lists it: never its key.
+    struct Listed: Equatable, Sendable, Identifiable {
+        let id: String
+        let name: String
+        let createdAt: Date
+        let lastSeenAt: Date
+    }
+
+    /// Every paired phone, the one seen most recently first.
+    func list() -> [Listed] {
+        lock.lock(); defer { lock.unlock() }
+        return saved.devices
+            .map { Listed(id: $0.id, name: $0.name, createdAt: $0.createdAt, lastSeenAt: $0.lastSeenAt) }
+            .sorted { $0.lastSeenAt > $1.lastSeenAt }
+    }
+
+    /// Sign one phone out: its key is forgotten, so its next signed request
+    /// is refused `device-revoked` (and the phone asks for the PIN again). The other phones keep theirs — the PIN
+    /// change that was the only way to cut off a lost phone signed out all
+    /// of them. Returns whether it was paired.
+    @discardableResult
+    func remove(_ id: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let at = saved.devices.firstIndex(where: { $0.id == id }) else { return false }
+        saved.devices.remove(at: at)
+        seen[id] = nil
+        var revoked = saved.revoked ?? [:]
+        revoked[id] = Date()
+        while revoked.count > Self.maxRevoked, let oldest = revoked.min(by: { $0.value < $1.value }) {
+            revoked[oldest.key] = nil
+        }
+        saved.revoked = revoked
+        save()
+        return true
     }
 
     func removeAll() {
@@ -261,7 +305,7 @@ final class LanDevices: @unchecked Sendable {
 
         lock.lock(); defer { lock.unlock() }
         guard let at = saved.devices.firstIndex(where: { $0.id == id }) else {
-            return .refused("device-unknown", now: nil)
+            return .refused(saved.revoked?[id] != nil ? "device-revoked" : "device-unknown", now: nil)
         }
         guard saved.devices[at].pinTag == tag(pin) else {
             saved.devices.remove(at: at)
