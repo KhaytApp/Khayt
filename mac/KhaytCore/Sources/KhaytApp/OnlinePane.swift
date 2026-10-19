@@ -356,6 +356,7 @@ struct OnlinePane: View {
                     Text(shop.words.callIt("mac.lan_restart_note"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    PairedPhones(shop: shop)
 
                     // ── WHAT THE STOREFRONT WAS LAST TOLD ─────────────────
                     //

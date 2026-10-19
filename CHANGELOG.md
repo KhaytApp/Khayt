@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: sign out one paired phone.** Settings → Online lists the phones
+  paired with this Mac and when each was last seen. "Sign out…" removes one
+  phone's key; the others stay signed in. Until now the only way to cut off
+  a lost phone was to change the LAN PIN, which signs out every phone. A
+  signed-out phone is told `device-revoked` (docs/LAN_API.md), so an iPhone
+  that knows the reason forgets its PIN and asks to pair again rather than
+  quietly pairing with the PIN it kept.
+
 - **Mac: measure the models a cloud drive keeps online.** A linked Google
   Drive (or Dropbox, OneDrive, iCloud Drive) is indexed without downloading
   anything, so a model nobody opened was never measured and could not be

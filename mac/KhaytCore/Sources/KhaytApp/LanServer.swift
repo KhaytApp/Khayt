@@ -2520,7 +2520,7 @@ extension Shop {
         var host = LanServer.Host(store: { [weak self] in self?.lanBook ?? [:] }, pin: pin, engine: engine)
         host.intakeToken = intakeToken
         host.calendarToken = calendarToken
-        host.devices = .shared
+        host.devices = lanDeviceStore
         host.library = { [weak self] q, folder, offset, limit in
             self?.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit) ?? .object([:])
         }
