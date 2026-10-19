@@ -7987,6 +7987,12 @@ A paired iPhone sends the LAN PIN once, then signs its requests.
   backup. Up to 32 phones. Changing the LAN PIN, on this Mac or in the other
   app, signs every phone out.
 - A phone that cannot enrol, or an older one, keeps sending the PIN as before.
+- A request whose length is negative or not a number is refused, and only
+  the bytes it declared are read, so the body a phone signed is the body
+  the Mac acts on.
+- If the Keychain can't be read, phones still enrol, but only until the app
+  quits, and the phones already stored are left as they were rather than
+  replaced by an empty list.
 
 ## [4.0.0-alpha.82] - 2026-10-19
 

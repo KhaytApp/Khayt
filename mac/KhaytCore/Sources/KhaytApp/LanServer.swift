@@ -647,7 +647,12 @@ final class LanServer {
             headers[name] = value
         }
         var body = Data(buffer[headRange.upperBound...])
-        let length = Int(headers["content-length"] ?? "0") ?? 0
+        // A length that is not a number, or is negative, is refused rather
+        // than read as zero: a signed request hashes exactly `length` bytes,
+        // and every byte the route reads must be one that was signed.
+        guard let length = Int(headers["content-length"] ?? "0"), length >= 0 else {
+            throw URLError(.badServerResponse)
+        }
         if length > Self.maxBody {
             // Only the upload route reads past a megabyte, and the slot is
             // taken BEFORE the first byte of body is awaited — with no
@@ -679,6 +684,9 @@ final class LanServer {
             let left = readTimeout - headPhase.waited
             body = try await Self.gather(connection, on: queue, from: body, timeout: left) { $0.count >= length }.data
         }
+        // Bytes past the stated length (a pipelined request, or a client
+        // that over-sent) are not this request's body.
+        if body.count > length { body = Data(body.prefix(length)) }
         // The target: path and query, the query percent-decoded.
         let target = requestLine[1]
         let components = URLComponents(string: target.hasPrefix("/") ? "http://localhost\(target)" : target)
@@ -2109,10 +2117,9 @@ final class LanServer {
             return .json(401, #"{"reason":"pin-too-short","error":"The LAN PIN is too short. Set a new one of at least 8 characters in Khayt settings to access this data"}"#)
         }
         if formPin == nil, LanDevices.isSigned(request.headers) {
-            let length = Int(request.headers["content-length"] ?? "") ?? 0
             let verdict = host.devices.verify(headers: request.headers, method: request.method,
                                               target: request.target.isEmpty ? request.path : request.target,
-                                              body: Data(request.body.prefix(max(0, length))), pin: host.pin,
+                                              body: request.body, pin: host.pin,
                                               now: host.now(), headOnly: headOnly)
             return verdict == .pass ? nil : .json(401, LanDevices.body(verdict))
         }

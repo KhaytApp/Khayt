@@ -184,6 +184,23 @@ struct LanDeviceKeysTests {
         }
     }
 
+    final class Writes: @unchecked Sendable { var n = 0 }
+
+    @Test("what is stored but unreadable is never written over; nothing stored starts a list that is kept")
+    func unreadableIsKept() throws {
+        let writes = Writes()
+        let garbled = LanDevices(loaded: Data("not json".utf8), persist: { _ in writes.n += 1 })
+        #expect(!garbled.keeps)
+        _ = try garbled.enrol(phonePublic: V.phonePublic, name: "p", pin: Self.pin, identity: .init(), now: Self.at)
+        #expect(writes.n == 0, "an empty list must not replace phones this build could not read")
+        #expect(garbled.count == 1, "the phone still works for this run")
+
+        let fresh = LanDevices(loaded: nil, persist: { _ in writes.n += 1 })
+        #expect(fresh.keeps)
+        _ = try fresh.enrol(phonePublic: V.phonePublic, name: "p", pin: Self.pin, identity: .init(), now: Self.at)
+        #expect(writes.n == 1)
+    }
+
     @Test("over the wire: enrol with the PIN, then sign instead of sending it")
     func overTheWire() async throws {
         let identity = Curve25519.Signing.PrivateKey()
