@@ -56,15 +56,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   paid bar in the jobs table, now use what it was settled against. Invoices
   and the ledger still show what was billed.
 
-- **Desktop: sign out one paired phone.** Settings → Online → LAN API now
-  lists the phones paired with this computer, each with when it was last
-  seen, and "Sign out…" cuts off one of them; the others stay paired. Until now the
-  only way to cut off a lost phone was to change the LAN PIN, which signs
-  every phone out. A phone that was signed out is told so
-  (`{"reason":"device-revoked"}`), drops the PIN it kept, and asks for it
-  again rather than pairing itself back in. The same as the Mac's Settings →
-  Online → Paired phones.
-
 - **Mac: measure the models a cloud drive keeps online.** A linked Google
   Drive (or Dropbox, OneDrive, iCloud Drive) is indexed without downloading
   anything, so a model nobody opened was never measured and could not be
@@ -6104,6 +6095,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.19] - 2026-10-20
+
+A paired phone can be signed out on its own, since 3.11.18.
+Individual entries are kept below; this is what changed for you.
+
+Settings → Online → LAN API lists the phones paired with this computer, and "Sign out…" cuts off one of them: it is told it was signed out and asks for the LAN PIN again, while the other phones stay paired. Before, the only way to cut off a lost phone was to change the PIN, which signs out every phone.
+
+- **Desktop: sign out one paired phone.** Settings → Online → LAN API now
+  lists the phones paired with this computer, each with when it was last
+  seen, and "Sign out…" cuts off one of them; the others stay paired. Until now the
+  only way to cut off a lost phone was to change the LAN PIN, which signs
+  every phone out. A phone that was signed out is told so
+  (`{"reason":"device-revoked"}`), drops the PIN it kept, and asks for it
+  again rather than pairing itself back in. The same as the Mac's Settings →
+  Online → Paired phones.
 
 ## [3.11.18] - 2026-10-19
 
