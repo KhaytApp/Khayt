@@ -7,14 +7,24 @@ import KhaytCore
 /// consumables and settings — through the same rules as the Mac's calculator
 /// (`PhoneCalculator`). A phone that does not keep the book (paired before the
 /// offline work, or never synced) gets the older sheet that asks the Mac.
+/// Figures to start the calculator from — a library model's weight and time.
+struct CalculatorSeed: Equatable {
+    var grams: Double?
+    var hours: Double?
+    var qty = 1
+    /// The model's material: the first spool of it is picked, when there is one.
+    var material: String?
+}
+
 struct CalculatorScreen: View {
     /// A sheet has a Close button; the sidebar tab does not.
     var asSheet = false
+    var seed: CalculatorSeed?
     @EnvironmentObject private var api: KhaytAPIClient
 
     var body: some View {
         if api.holdsBook, let reader = api.reader {
-            CalculatorView(reader: reader, asSheet: asSheet)
+            CalculatorView(reader: reader, asSheet: asSheet, seed: seed)
         } else {
             QuoteSheet()
         }
@@ -24,6 +34,7 @@ struct CalculatorScreen: View {
 struct CalculatorView: View {
     let reader: BookReader
     var asSheet = false
+    var seed: CalculatorSeed?
 
     @EnvironmentObject private var api: KhaytAPIClient
     @Environment(\.dismiss) private var dismiss
@@ -73,6 +84,7 @@ struct CalculatorView: View {
             .task {
                 await model.load(reader)
                 machines = (try? await reader.machines()) ?? []
+                if let seed { model.apply(seed) }
                 #if DEBUG
                 // `-KhaytCalc "120:4"` on the launch line: grams and hours, for screenshots.
                 if let fill = UserDefaults.standard.string(forKey: "KhaytCalc") {

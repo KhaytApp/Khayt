@@ -280,6 +280,22 @@ final class PhoneCalculator {
 
     func resetRates() { rates = [:] }
 
+    /// Start from a model's figures. Written the way they would be typed, in
+    /// Western digits, so the fields read back what the calculator prices.
+    func apply(_ seed: CalculatorSeed) {
+        func typed(_ v: Double) -> String { v.formatted(.number.precision(.fractionLength(0...1)).grouping(.never).locale(Locale(identifier: "en_US_POSIX"))) }
+        if let g = seed.grams, g > 0 { lines[0].grams = typed(g) }
+        if let h = seed.hours, h > 0 { hours = typed(h) }
+        qty = max(1, seed.qty)
+        if let material = seed.material?.trimmingCharacters(in: .whitespaces).lowercased(), !material.isEmpty,
+           let spool = shelf.spools.first(where: { s in
+               let m = s.costing.material.lowercased()
+               return !m.isEmpty && (m == material || material.hasPrefix(m) || m.hasPrefix(material))
+           }) {
+            lines[0].spoolId = spool.id
+        }
+    }
+
     var question: CalculatorQuestion {
         CalculatorQuestion(
             lines: lines.map { line in

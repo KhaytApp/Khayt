@@ -33,22 +33,8 @@ struct QuoteFileSheet: View {
                     }
                     if asking {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
-                    } else if let answer, answer.ok, let price = answer.price {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(Money.text(price, answer.currency))
-                                .font(.khayt(30, .semibold, relativeTo: .largeTitle).monospacedDigit())
-                                .foregroundStyle(KhaytDesign.ink)
-                            HStack(spacing: 14) {
-                                if let g = answer.grams { Text(L10n.grams(Int(g.rounded()))) }
-                                if let h = answer.hours {
-                                    Text(L10n.format("quote.file.hours", h.formatted(.number.precision(.fractionLength(0...1)).locale(L10n.locale))))
-                                }
-                            }
-                            .font(.khayt(14, relativeTo: .subheadline)).foregroundStyle(KhaytDesign.note)
-                            Text(L10n.tr(answer.exact == true ? "quote.file.exact" : "quote.file.estimated"))
-                                .font(.khayt(12, relativeTo: .caption)).foregroundStyle(KhaytDesign.note)
-                        }
-                        .padding(14).frame(maxWidth: .infinity, alignment: .leading).card()
+                    } else if let answer, answer.ok, answer.price != nil {
+                        EstimateCard(answer: answer)
                         V2PrimaryButton(title: L10n.tr("quote.file.make_quote")) { makingQuote = true }
                     }
                     if let problem { V2Note(text: problem, tone: KhaytDesign.late) }

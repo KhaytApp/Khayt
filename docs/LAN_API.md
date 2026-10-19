@@ -181,6 +181,71 @@ Shared test values for all three implementations are in
 and Ed25519 keys, the derived key, an enrolment signature and two signed
 requests. Each side's tests should reproduce every value in it.
 
+### `GET /api/library`, its thumbnails, and `POST /api/library/{id}/estimate` — pricing a model from the phone
+
+The shop's library (`printFiles`) stays on the computer: it is a quarter of a
+real book and is left out of the phone's working set. These routes let the
+phone search it and have a model priced the way the intake form prices a
+customer's file, without moving the file. All three need the owner (the PIN
+or a signed request).
+
+**`GET /api/library?q=&folder=&offset=0&limit=50`**
+
+- `q` — words matched against `name`, `originalName`, `folder`, `tags` and
+  `category`, ignoring case and diacritics; every word must match. With a `q`
+  the whole library is searched and `folders` is empty.
+- `folder` — without `q`: the models filed directly in that folder path (`""`
+  is the top), and in `folders` its immediate sub-folders.
+- `limit` 1–200 (default 50). Favourites first, then by `name`.
+
+```json
+{
+  "total": 7, "offset": 0,
+  "folders": [ { "path": "Saudi Kings/Large", "name": "Large", "count": 12 } ],
+  "items": [ {
+    "id": "PF-sample-lantern", "name": "Lantern", "folder": "Home", "category": "Decor",
+    "tags": ["gift"], "material": "PLA Silk", "ext": "3mf", "size": 2400000,
+    "favorite": false, "timesPrinted": 6, "lastPrinted": "2026-08-12",
+    "thumb": true, "estimable": true,
+    "printTimeMins": 318, "grams": 154,
+    "plates": [ { "index": 1, "name": "Body", "printTimeMins": 205, "grams": 112 } ],
+    "colors": [ { "hex": "#0F5257", "grams": 88 } ],
+    "testedNotes": "…"
+  } ]
+}
+```
+
+`count` is every model at or under that folder. `printTimeMins`/`grams` are
+what a slicer recorded, or null. `estimable` means the computer has the file and
+can measure it (`stl`, `obj`, `3mf`, `gcode`). Leave out anything the book does
+not have; send null rather than a made-up 0.
+
+**`GET /api/library/{id}/thumb`** → the thumbnail (`image/jpeg`, `image/png` or
+`image/webp`) with `Cache-Control: private, max-age=86400`; **404** when there is none.
+
+**`POST /api/library/{id}/estimate?qty=1&plate=`** (no body) → the same answer
+as `POST /api/intake/estimate`: `{ok, reason, price, currency, qty, grams,
+hours, exact}`, plus optional `reliable` (false when a geometry estimate is
+outside the range it is good for — the phone shows a warning) and `missing`.
+`price` is for the whole `qty`; `grams` and `hours` are for one piece.
+
+- **The price is the owner's**, not the public intake figure: what the
+  computer's own "quote this model" calculator gives — the shop's spools,
+  rates, default margin, rounding and overhead. A shop that never set up
+  customer quoting still gets one. Where a computer cannot price that way it
+  answers 200 `{"ok":false,"reason":"not-configured","missing":"printer"|"material"}`
+  rather than a 0.
+- Slicer numbers recorded on the model are used as they are, with `exact:
+  true`; otherwise the file in the vault is measured.
+- `plate=N` prices that plate's recorded figures (`parsed.plates[index == N]`);
+  a plate with none is 200 `no-numbers` — the whole file is not measured for one plate.
+- On every refusal `price`, `grams` and `hours` are null and `exact` is false.
+
+Refusals: **404** `{"ok":false,"reason":"not-found"}` (no such model or plate),
+**409** `"no-file"` (nothing in the vault), **415** `"unsupported"`, **413**
+`"too-large"`, **503** `"busy"` with `Retry-After` (estimates share the intake
+limit). `{id}` is percent-encoded.
+
 ### `GET /api/queue`
 
 Active kanban orders (`pending`, `printing`, `post`, `qc`). **Requires owner PIN** when configured.
