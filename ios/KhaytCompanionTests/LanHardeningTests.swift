@@ -74,4 +74,16 @@ final class LanHardeningTests: XCTestCase {
         XCTAssertEqual(m.name, "Saturn")
         XCTAssertTrue(m.isAssignable)
     }
+
+    func testMachineStateMatchesTheSharedRule() throws {
+        let legacy = try machine(#"{"id":"m6","status":"offline"}"#)
+        XCTAssertTrue(legacy.isUnderService, "an older book marks a paused printer by status")
+        XCTAssertFalse(legacy.isAssignable)
+        let blank = try machine(#"{"id":"m7","status":"idle","retiredAt":"  "}"#)
+        XCTAssertFalse(blank.isRetired, "an empty retiredAt is not a retirement")
+        XCTAssertTrue(blank.isAssignable)
+        let both = try machine(#"{"id":"m8","status":"retired","retiredAt":"2026-10-18","isOffline":true}"#)
+        XCTAssertTrue(both.isRetired)
+        XCTAssertFalse(both.isUnderService, "retired says it all")
+    }
 }

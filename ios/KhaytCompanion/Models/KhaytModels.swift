@@ -165,9 +165,18 @@ struct MachineInfo: Codable, Identifiable, Sendable {
     var retiredAt: String?
 
     /// Gone from the shop: kept only so past orders can still name it.
-    var isRetired: Bool { status?.lowercased() == "retired" || retiredAt != nil }
+    /// The same rule as `lib/machine-status.js` `isRetired`: an empty
+    /// `retiredAt` is not a retirement.
+    var isRetired: Bool {
+        stateWord == "retired" || !(retiredAt ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+    }
+    /// Temporarily out (`isUnderService` in `lib/machine-status.js`): the flag
+    /// set on the Mac, or an older book's `status: "offline"`.
+    var isUnderService: Bool { !isRetired && (isOffline == true || stateWord == "offline") }
     /// Whether a new order, or a reassignment, may be put on this machine.
-    var isAssignable: Bool { !isRetired && isOffline != true }
+    var isAssignable: Bool { !isRetired && !isUnderService }
+
+    private var stateWord: String { (status ?? "").trimmingCharacters(in: .whitespaces).lowercased() }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, type, status, hasPrinterApi, printerApi, isOffline, retiredAt

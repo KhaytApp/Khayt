@@ -31,7 +31,7 @@ struct MachinesView: View {
     }
 
     private var offline: Set<String> {
-        Set(machines.filter { $0.isOffline == true }.map(\.id))
+        Set(machines.filter(\.isUnderService).map(\.id))
     }
 
     private var statusById: [String: String] {
