@@ -98,4 +98,32 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(other.qty, 1)
         XCTAssertNil(other.lines[0].spoolId)
     }
+
+    func testTheCustomerGetsTheModelAndThePriceNotTheFigures() throws {
+        let item = try JSONDecoder().decode(LibraryItem.self, from: Data(#"""
+        {"id":"PF-1","name":"Lantern","grams":154,"printTimeMins":318,"plates":[{"index":2,"name":"Lid"},{"index":3}]}
+        """#.utf8))
+        func answer(_ json: String) throws -> KhaytAPIClient.ModelEstimate {
+            try JSONDecoder().decode(KhaytAPIClient.ModelEstimate.self, from: Data(json.utf8))
+        }
+        let three = try answer(#"{"ok":true,"price":90,"currency":"SAR","qty":3,"grams":154,"hours":5.3,"exact":true}"#)
+        let text = try XCTUnwrap(LibraryItemPage.shareText(item, plate: nil, qty: 3, answer: three))
+        XCTAssertEqual(text.components(separatedBy: "\n"), [
+            "Lantern",
+            L10n.format("calc.share.price", Money.text(90, "SAR")),
+            L10n.format("calc.share.each", 3, Money.text(30, "SAR")),
+        ])
+        XCTAssertFalse(text.contains("154"), "grams and hours stay with the shop")
+
+        let one = try answer(#"{"ok":true,"price":12.5,"currency":"SAR","qty":1}"#)
+        XCTAssertEqual(LibraryItemPage.shareText(item, plate: 2, qty: 1, answer: one)?.components(separatedBy: "\n").first,
+                       "Lantern — Lid")
+        XCTAssertEqual(LibraryItemPage.shareText(item, plate: 3, qty: 1, answer: one)?.components(separatedBy: "\n").first,
+                       "Lantern — " + L10n.format("library.plate.n", 3))
+        XCTAssertEqual(LibraryItemPage.shareText(item, plate: nil, qty: 1, answer: one)?.components(separatedBy: "\n").count, 2,
+                       "one piece needs no each-line")
+
+        XCTAssertNil(LibraryItemPage.shareText(item, plate: nil, qty: 1, answer: try answer(#"{"ok":false,"reason":"busy"}"#)))
+        XCTAssertNil(LibraryItemPage.shareText(item, plate: nil, qty: 1, answer: try answer(#"{"ok":true,"price":0}"#)))
+    }
 }
