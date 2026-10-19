@@ -56,6 +56,9 @@ struct LibraryFolderPage: View {
             if let problem {
                 Section { V2Note(text: problem, tone: KhaytDesign.late).listRowBackground(Color.clear) }
             }
+            if page?.fromCopy == true {
+                Section { V2Note(text: L10n.tr("library.from_copy")).listRowBackground(Color.clear) }
+            }
             if let page, !page.folders.isEmpty {
                 Section(L10n.tr("library.folders")) {
                     ForEach(page.folders) { f in
@@ -368,6 +371,10 @@ struct EstimateCard: View {
             .font(.khayt(14, relativeTo: .subheadline)).foregroundStyle(KhaytDesign.note)
             Text(L10n.tr(answer.exact == true ? "quote.file.exact" : "quote.file.estimated"))
                 .font(.khayt(12, relativeTo: .caption)).foregroundStyle(KhaytDesign.note)
+            if answer.onPhone == true {
+                Text(L10n.tr("library.priced_here"))
+                    .font(.khayt(12, relativeTo: .caption)).foregroundStyle(KhaytDesign.note)
+            }
             if answer.reliable == false {
                 Label(L10n.tr("quote.file.unreliable"), systemImage: "exclamationmark.triangle")
                     .font(.khayt(12.5, .medium, relativeTo: .footnote)).foregroundStyle(KhaytDesign.attention)

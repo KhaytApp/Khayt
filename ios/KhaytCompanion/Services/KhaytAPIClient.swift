@@ -890,6 +890,8 @@ final class KhaytAPIClient: ObservableObject {
         var reliable: Bool? = nil
         /// With `not-configured`: what the shop has not set up yet.
         var missing: String? = nil
+        /// Worked out on this phone from the library copy, not by the Mac.
+        var onPhone: Bool? = nil
     }
 
     /// The Mac's 32 MB ceiling (`LanServer.maxUpload`), checked here so a big
@@ -937,6 +939,44 @@ final class KhaytAPIClient: ObservableObject {
     /// happen there.
     func fetchLibrary(query: String, folder: String, offset: Int = 0, limit: Int = 50) async throws -> LibraryPage {
         if settings.isSampleShop { return SampleLibrary.page(query: query, folder: folder, offset: offset, limit: limit) }
+        do {
+            return try await libraryFromMac(query: query, folder: folder, offset: offset, limit: limit)
+        } catch {
+            // Away from the shop: the copy that came with the cloud sync.
+            guard Self.isUnreachable(error) || isMissingRoute(error) else { throw error }
+            guard let rows = book?.library() else {
+                throw Self.isUnreachable(error) ? KhaytAPIError.server(L10n.tr("library.no_copy")) : error
+            }
+            var page = SampleLibrary.page(LibraryCopy.items(rows), query: query, folder: folder, offset: offset, limit: limit)
+            page.fromCopy = true
+            return page
+        }
+    }
+
+    /// When the Mac last failed to answer: for a minute after, the library
+    /// goes straight to the phone's copy rather than wait on every letter typed.
+    private var libraryMacDownSince: Date?
+
+    private func isMissingRoute(_ error: Error) -> Bool {
+        if case KhaytAPIError.server(let said) = error { return said == L10n.tr("library.needs_mac") }
+        return false
+    }
+
+    private func libraryFromMac(query: String, folder: String, offset: Int, limit: Int) async throws -> LibraryPage {
+        if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60, book?.hasLibrary == true {
+            throw KhaytAPIError.transport(URLError(.cannotConnectToHost))
+        }
+        do {
+            let page = try await libraryPage(query: query, folder: folder, offset: offset, limit: limit)
+            libraryMacDownSince = nil
+            return page
+        } catch {
+            if Self.isUnreachable(error) { libraryMacDownSince = Date() }
+            throw error
+        }
+    }
+
+    private func libraryPage(query: String, folder: String, offset: Int, limit: Int) async throws -> LibraryPage {
         var q = URLComponents()
         q.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "folder", value: folder),
                         URLQueryItem(name: "offset", value: String(offset)), URLQueryItem(name: "limit", value: String(limit))]
@@ -962,10 +1002,52 @@ final class KhaytAPIClient: ObservableObject {
         return data
     }
 
-    /// What a library model would cost, measured and priced on the Mac.
+    /// What a library model would cost: measured and priced on the Mac, or —
+    /// away from the shop — worked out here from the library copy.
     func estimate(libraryId id: String, qty: Int, plate: Int?) async throws -> ModelEstimate {
         // No Mac to measure with: the screen offers the calculator instead.
         if settings.isSampleShop { throw KhaytAPIError.server(L10n.tr("library.needs_mac")) }
+        do {
+            if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60, book?.hasLibrary == true {
+                throw KhaytAPIError.transport(URLError(.cannotConnectToHost))
+            }
+            return try await estimateOnMac(libraryId: id, qty: qty, plate: plate)
+        } catch {
+            guard Self.isUnreachable(error) || isMissingRoute(error),
+                  let local = await estimateHere(libraryId: id, qty: qty, plate: plate) else { throw error }
+            return local
+        }
+    }
+
+    /// The same question, answered on this phone from the library copy and the
+    /// book's spools, rates and margin. Nil when the copy cannot answer it.
+    func estimateHere(libraryId id: String, qty: Int, plate: Int?) async -> ModelEstimate? {
+        guard let reader, let rows = book?.library(),
+              let row = rows.first(where: { if case .object(let o) = $0, case .string(let i)? = o["id"] { return i == id } else { return false } }),
+              let store = try? await reader.wholeBook(), let engine = try? await reader.sharedEngine() else { return nil }
+        let settings: [String: JSONValue] = { if case .object(let o)? = store["settings"] { return o } else { return [:] } }()
+        let orders: [JSONValue] = { if case .array(let r)? = store["printLog"] { return r } else { return [] } }()
+        let refused = { (why: String) in
+            ModelEstimate(ok: false, reason: why, price: nil, currency: nil, qty: nil, grams: nil, hours: nil,
+                          exact: false, onPhone: true)
+        }
+        guard let figures = await LibraryCopy.figures(row, plate: plate, engine: engine, settings: settings, orders: orders)
+        else { return refused("no-numbers") }
+        let shelf = CalculatorShelf.from(store)
+        let spool = LibraryCopy.spool(for: figures.material, among: shelf.spools)
+        let pieces = max(1, min(1000, qty))
+        let question = CalculatorQuestion(
+            lines: [CalculatorPart.Line(spool: spool?.costing, grams: figures.grams)],
+            purge: 0, hours: figures.hours, qty: pieces, machineId: nil,
+            presetId: shelf.presets.count == 1 ? shelf.presets[0].id : nil,
+            rates: [:], pieces: [], margin: LibraryCopy.defaultMargin(settings), discount: 0, rush: false)
+        guard let answer = try? await reader.calculate(question), answer.quoted.total > 0 else { return refused("no-price") }
+        return ModelEstimate(ok: true, reason: nil, price: answer.quoted.total, currency: shelf.currency,
+                             qty: pieces, grams: figures.grams, hours: figures.hours, exact: figures.exact,
+                             reliable: figures.reliable, onPhone: true)
+    }
+
+    private func estimateOnMac(libraryId id: String, qty: Int, plate: Int?) async throws -> ModelEstimate {
         guard let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(["/"])) else {
             throw KhaytAPIError.invalidURL
         }

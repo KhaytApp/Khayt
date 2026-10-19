@@ -168,7 +168,9 @@ struct CloudSync {
 
     func pull(_ session: CloudSession, now: Date = Date()) async throws -> (CloudSession, Pulled) {
         var s = session
-        let warm = s.seenRev != nil && book.exists
+        // A phone with no library copy yet takes the whole book once, which is
+        // the only pull that carries all of `printFiles`.
+        let warm = s.seenRev != nil && book.exists && book.hasLibrary
         let reply: CloudReader.Reply
         do {
             reply = try await CloudReader.pull(connection(s), token: s.token,
@@ -183,6 +185,7 @@ struct CloudSync {
             let whole = try await CloudReader.store(reply, dek: s.dek, engine: engine)
             let taken = BookScope.take(from: whole.store, now: now)
             try await BookReader(book: book).adopt(taken.store, scope: taken.taken)
+            try? book.replaceLibrary(LibraryCopy.slimAll(whole.store["printFiles"]))
             s.seenRev = reply.rev
             return (s, .whole(records: CompanionAPIRecordCount.of(taken.store)))
         }
@@ -192,6 +195,12 @@ struct CloudSync {
             return (s, .changes(0))
         }
         let payloads = try reply.deltas.map { try SyncCrypto.store($0.blob, dek: s.dek) }
+        // The library copy takes the same changes, by the same rule.
+        if let rows = book.library() {
+            let lib = try? await engine.foldDeltas(base: ["printFiles": .array(rows), "tombstones": .array([])],
+                                                   deltas: payloads)
+            if let lib { try? book.replaceLibrary(LibraryCopy.slimAll(lib.store["printFiles"])) }
+        }
         // Into the book, where edits made here win or lose by rev as usual —
         // swapped in only if nothing was written here while the engine folded.
         // See `CompanionBook.swap`.

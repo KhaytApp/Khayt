@@ -29,8 +29,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   it at any quantity, for every plate or one plate. Turn that price into
   a quote, or open the calculator with the model's weight and time filled
   in. The library stays on the computer (`GET /api/library`,
-  `POST /api/library/{id}/estimate`), so this needs a Mac or desktop that
-  serves those routes. The sample shop has a small library of its own.
+  `POST /api/library/{id}/estimate`) when the phone can reach it. **Away
+  from the shop** the phone uses a copy of the library it keeps from the
+  Khayt Cloud sync (about 4.7 MB for a 10,000-model shop) and works the
+  price out itself: the slicer's figures when recorded, otherwise the
+  shared estimate from the model's measured shape, then the shop's spools,
+  rates and default margin. A model in several colours is costed on one
+  spool there. The sample shop has a small library of its own.
 - **Desktop: a paired iPhone sends the LAN PIN once, then signs its
   requests.** The LAN is plain http, so a PIN sent with every request could be
   read by anything on the same Wi-Fi. A phone now enrols once with the PIN

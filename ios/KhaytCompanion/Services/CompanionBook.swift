@@ -185,6 +185,23 @@ struct CompanionBook {
         scope()?.isWhole(collection) ?? false
     }
 
+    /// The shop's library, cut down (`LibraryCopy.slim`), from what Khayt
+    /// Cloud already sends. Beside the book rather than in it, for the reason
+    /// `scopeURL` gives: the library is not part of the working set, and a
+    /// collection in the store is one the sync would try to send back.
+    var libraryURL: URL { directory.appending(path: "library.json") }
+
+    var hasLibrary: Bool { FileManager.default.fileExists(atPath: libraryURL.path) }
+
+    func library() -> [JSONValue]? {
+        guard let data = try? Data(contentsOf: libraryURL) else { return nil }
+        return try? JSONDecoder().decode([JSONValue].self, from: data)
+    }
+
+    func replaceLibrary(_ rows: [JSONValue]) throws {
+        try JSONEncoder().encode(rows).write(to: libraryURL, options: .atomic)
+    }
+
     /// The whole book, as the engine wants it.
     func read() throws -> [String: JSONValue] {
         guard let data = try? Data(contentsOf: url) else { throw Failure.notYetPulled }
@@ -359,6 +376,7 @@ struct CompanionBook {
         // The baseline is a second full copy of the shop's records — same client
         // list, same prices. It goes with everything else.
         try? FileManager.default.removeItem(at: baselineURL)
+        try? FileManager.default.removeItem(at: libraryURL)
         try? FileManager.default.removeItem(at: scopeURL)
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(at: url.appendingPathExtension("prev"))

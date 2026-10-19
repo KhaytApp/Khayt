@@ -6,6 +6,8 @@ struct LibraryPage: Decodable, Equatable, Sendable {
     let offset: Int
     let folders: [LibraryFolder]
     let items: [LibraryItem]
+    /// Read from the phone's copy because the Mac could not be reached.
+    var fromCopy = false
 
     private enum CodingKeys: String, CodingKey { case total, offset, folders, items }
 

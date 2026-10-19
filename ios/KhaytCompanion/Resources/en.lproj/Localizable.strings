@@ -802,3 +802,6 @@
 "quote.file.unreliable" = "This model is outside what the estimate is good for. Check the figure before sending it.";
 "library.reason.not-configured" = "Set up instant quotes on the computer first: a printer and a filament for the estimate.";
 "library.sample" = "The sample shop has no Mac to measure models with. Open it in the calculator to price it from its recorded weight and time.";
+"library.from_copy" = "Away from the shop: this is your library as of the last Khayt Cloud sync, and prices are worked out on this phone.";
+"library.priced_here" = "Worked out on this phone with your prices. A model in several colours is costed on one spool, so the Mac's figure can differ a little.";
+"library.no_copy" = "The Mac can't be reached. Sign in to Khayt Cloud in Settings and sync once, and your library comes with you.";

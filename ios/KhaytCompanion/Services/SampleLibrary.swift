@@ -20,6 +20,11 @@ enum SampleLibrary {
     }()
 
     static func page(query: String, folder: String, offset: Int = 0, limit: Int = 50) -> LibraryPage {
+        page(items, query: query, folder: folder, offset: offset, limit: limit)
+    }
+
+    /// Any library held on the phone, paged as the Mac pages it.
+    static func page(_ items: [LibraryItem], query: String, folder: String, offset: Int = 0, limit: Int = 50) -> LibraryPage {
         let (folders, found) = search(items, query: query, folder: folder)
         let slice = Array(found.dropFirst(offset).prefix(limit))
         return LibraryPage(total: found.count, offset: offset, folders: folders, items: slice)
