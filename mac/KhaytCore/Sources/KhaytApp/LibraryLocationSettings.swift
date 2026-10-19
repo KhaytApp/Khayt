@@ -16,6 +16,9 @@ struct LibraryLocationSettings: View {
     @AppStorage(Shop.importMovesOriginalsKey) private var movesOriginals = false
     /// The linked folder chosen for Unlink, held until the shop answers.
     @State private var unlinking: String?
+    /// "Measure online models" pressed, held until the shop answers: it is a
+    /// download of everything the drive kept online (`OnlineMeasure`).
+    @State private var askMeasure = false
 
     private var here: String { shop.libraryRoots?.primary ?? "" }
     private var inICloud: Bool {
@@ -91,6 +94,23 @@ struct LibraryLocationSettings: View {
             Text(shop.words.callIt("mac.linked_hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            // ── MODELS THE DRIVE KEEPS ONLINE ONLY ───────────────────────
+            // Unmeasured, so unpriced — on the Mac and on the phone. Hidden
+            // while anything runs, when the progress below says what is.
+            if !shop.linkedFolders.isEmpty, !shop.libraryMoveBusy, shop.onlineUnmeasured.count > 0 {
+                let due = shop.onlineUnmeasured
+                Group {
+                    LabeledContent(shop.words.callIt("mac.measure_online_title")) {
+                        Button(shop.words.callIt("mac.measure_online") + "\u{2026}") { askMeasure = true }
+                            .disabled(!shop.canMoveJobs)
+                    }
+                    Text(shop.words.callIt("mac.measure_online_hint",
+                                           ["n": .string(Format.count(due.count)),
+                                            "size": .string(Format.bytes(Double(due.bytes)))]))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             HStack(spacing: 8) {
                 if let p = shop.libraryMoveProgress {
                     ProgressView(value: Double(p.done), total: Double(max(p.total, 1))) {
@@ -138,6 +158,18 @@ struct LibraryLocationSettings: View {
         } message: {
             Text(shop.words.callIt("mac.libmove_confirm_body",
                                    ["path": .string(((pending?.path ?? "") as NSString).abbreviatingWithTildeInPath)]))
+        }
+        // Counted again after every load (a pass writes, then reloads), off
+        // the main actor.
+        .task(id: shop.loadGeneration) { await shop.countOnlineUnmeasured() }
+        .confirmationDialog(shop.words.callIt("mac.measure_online_q"), isPresented: $askMeasure) {
+            Button(shop.words.callIt("mac.measure_online")) { Task { await shop.measureOnlineModels() } }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: {
+            let due = shop.onlineUnmeasured
+            Text(shop.words.callIt("mac.measure_online_body",
+                                   ["n": .string(Format.count(due.count)),
+                                    "size": .string(Format.bytes(Double(due.bytes)))]))
         }
         // Unlinking drops every model indexed from the folder — with the tags,
         // notes and pictures the shop gave them — and there is no undo.
