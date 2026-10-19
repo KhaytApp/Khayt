@@ -1399,6 +1399,11 @@ final class KhaytAPIClient: ObservableObject {
             return try await send(url, method: method, body: body, auth: .device(device))
         case .replay?:
             return try await send(url, method: method, body: body, auth: .device(device))
+        case .revoked?:
+            // Signed out on the Mac: never back to the PIN, never enrol.
+            settings.forgetMac(keepShop: cloud != nil)
+            enrolNotBefore = nil
+            throw KhaytAPIError.server(L10n.tr("pair.signed_out"))
         case nil:
             return (data, response)
         }
@@ -1461,7 +1466,7 @@ final class KhaytAPIClient: ObservableObject {
     /// Whether this phone should enrol now: paired, the identity pinned, no
     /// enrolment for it yet, and not asked too recently.
     func wantsEnrolment(now: Date = Date()) -> Bool {
-        guard settings.isPaired, !settings.isSampleShop, !settings.macIdentityKey.isEmpty,
+        guard settings.isPaired, !settings.pin.isEmpty, !settings.isSampleShop, !settings.macIdentityKey.isEmpty,
               usableDevice == nil else { return false }
         return enrolNotBefore.map { now >= $0 } ?? true
     }

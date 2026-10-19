@@ -94,6 +94,7 @@ final class DeviceKeyTests: XCTestCase {
         XCTAssertEqual(r(#"{"reason":"device-clock","now":1792396800}"#), .clock(now: 1_792_396_800))
         XCTAssertNil(r(#"{"reason":"device-clock"}"#))
         XCTAssertEqual(r(#"{"reason":"device-replay"}"#), .replay)
+        XCTAssertEqual(r(#"{"reason":"device-revoked"}"#), .revoked)
         XCTAssertNil(r(#"{"reason":"pin-too-short"}"#), "a PIN refusal is not a device one")
         XCTAssertNil(r("not json"))
     }
@@ -112,7 +113,7 @@ final class DeviceKeyTests: XCTestCase {
         guard let saved else { return }
         let s = ConnectionSettings()
         s.host = saved.host; s.port = saved.port; s.pin = saved.pin; s.isPaired = saved.paired; s.isSampleShop = saved.sample
-        s.macIdentityKey = saved.identity; s.device = saved.device
+        s.macIdentityKey = saved.identity; s.device = saved.device; s.signedOutByMac = false
         StubMac.reset()
     }
 
@@ -151,6 +152,27 @@ final class DeviceKeyTests: XCTestCase {
         XCTAssertEqual(StubMac.seen.suffix(2).map { $0.pin != nil }, [false, true])
         XCTAssertNil(s.device)
         XCTAssertTrue(api.wantsEnrolment())
+    }
+
+    func testAPhoneSignedOutOnTheMacForgetsThePinAndDoesNotComeBackByItself() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        _ = await api.enrolDevice(name: "Test iPhone")
+        StubMac.revoked = true
+        let before = StubMac.seen.count
+        let fetched = await api.fetchIdentityKey()
+        XCTAssertNil(fetched)
+        XCTAssertEqual(StubMac.seen.count, before + 1, "no second try with the PIN")
+        XCTAssertNil(StubMac.seen.last?.pin)
+        XCTAssertEqual(s.pin, "")
+        XCTAssertNil(s.device)
+        XCTAssertEqual(s.macIdentityKey, "")
+        XCTAssertTrue(s.signedOutByMac)
+        XCTAssertEqual(s.isPaired, api.cloud != nil, "without a cloud sign-in there is no shop left")
+        XCTAssertEqual(ConnectionSettings().pin, "", "gone from the Keychain too")
+        XCTAssertFalse(api.wantsEnrolment(), "nothing enrols without a PIN")
+        s.pin = "12345678"
+        XCTAssertFalse(s.signedOutByMac, "typing the PIN again clears the note")
     }
 
     func testAMacWithAnotherClockIsBelievedOnce() async throws {
@@ -202,13 +224,14 @@ final class StubMac: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var seen: [Seen] = []
     nonisolated(unsafe) static var hasRoute = true
     nonisolated(unsafe) static var knowsDevice = true
+    nonisolated(unsafe) static var revoked = false
     nonisolated(unsafe) static var clockAhead: TimeInterval = 0
     nonisolated(unsafe) static var key: SymmetricKey?
     static let identity = Curve25519.Signing.PrivateKey()
     static let deviceId = "dev_stubPhone0001"
 
     static func reset() {
-        seen = []; hasRoute = true; knowsDevice = true; clockAhead = 0; key = nil
+        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil
     }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-stub.invalid" }
@@ -227,7 +250,9 @@ final class StubMac: URLProtocol, @unchecked Sendable {
             let time = Int(request.value(forHTTPHeaderField: "x-khayt-time") ?? "") ?? 0
             let nonce = request.value(forHTTPHeaderField: "x-khayt-nonce") ?? ""
             let mac = request.value(forHTTPHeaderField: "x-khayt-mac") ?? ""
-            if !Self.knowsDevice || device != Self.deviceId || Self.key == nil {
+            if Self.revoked && device == Self.deviceId {
+                answer = (401, ["reason": "device-revoked"])
+            } else if !Self.knowsDevice || device != Self.deviceId || Self.key == nil {
                 answer = (401, ["reason": "device-unknown"])
             } else if abs(now - TimeInterval(time)) > 120 {
                 answer = (401, ["reason": "device-clock", "now": Int(now)])

@@ -63,6 +63,10 @@ struct PairingView: View {
                 .accessibilityHidden(true)
             title(L10n.tr("pair.find.title"))
             lead(L10n.tr("pair.find.body"))
+            if settings.signedOutByMac {
+                V2Note(text: L10n.tr("pair.signed_out"), tone: KhaytDesign.attention)
+                    .padding(.top, 14)
+            }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 9) {

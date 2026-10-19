@@ -454,6 +454,7 @@
 "pair.manual.title" = "The Mac’s address";
 "pair.manual.body" = "Khayt prints both on the desktop, under Settings → LAN API.";
 "pair.manual.port" = "Port";
+"pair.signed_out" = "The Mac signed this phone out. Pair it again with the owner PIN.";
 "pair.pin.title" = "The owner PIN";
 "pair.pin.body" = "The owner PIN from Settings → LAN API on the Mac, 8 characters or more. The intake PIN will not work here.";
 "pair.pin.foot" = "Kept in the iPhone Keychain, never sent anywhere but this Mac.";
