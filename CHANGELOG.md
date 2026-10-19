@@ -12,16 +12,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   figures when there are some. Otherwise it measures the file in the library
   folder. Only the owner can use it, with the PIN or a signed request.
 
-- **Desktop: a paired iPhone sends the LAN PIN once, then signs its
-  requests.** The LAN is plain http, so a PIN sent with every request could be
-  read by anything on the same Wi-Fi. A phone now enrols once with the PIN
-  (`POST /api/devices`) and gets a key of its own, agreed with this computer
-  and confirmed by its identity key. Every request after that carries a
-  signature over the request and its body instead of the PIN, so a captured
-  request cannot be replayed or turned back into the PIN. The keys are kept
-  sealed beside the identity key, never in the book. Changing the LAN PIN
-  removes every enrolled phone, and a phone that cannot enrol keeps sending
-  the PIN as before.
+- **Desktop: price a model from the library on your phone.** A customer asks
+  what something costs while you are away from the desk: a paired iPhone can
+  now search this computer's library, see the pictures, and get a price for
+  any model and quantity. The price uses what the slicer recorded for the
+  model (or one plate of it) when there is a figure, and otherwise measures
+  the file here, so the model never leaves the computer. It is priced on the
+  same basis as the customer intake form (printer, filament and margin in
+  Settings), even when that form is off for customers. Only you can do this,
+  with the PIN or a phone already paired.
 - **Mac: a paired phone stops sending the LAN PIN on every request.**
   - A phone enrols once with the PIN (`POST /api/devices`), then signs each
     request with a key of its own. Someone on the same Wi-Fi can no longer
