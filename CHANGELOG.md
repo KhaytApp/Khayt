@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: dates follow your language again.** On Windows and Linux every
+  date in the app showed in US English ("Oct 20, 2026") whatever language
+  you picked, because the language table loaded after the code that read it.
+  Dates now follow the chosen language: Arabic reads "20 أكتوبر 2026", still
+  on the Gregorian calendar with Western digits, and German, French, Japanese
+  and the rest use their own month names and order.
+
 - **Mac: Arabic invoices are dated in the Gregorian calendar.** The Mac
   printed an Arabic invoice's date as Hijri ("09 جمادى الأولى، 1448 هـ"
   for 20 October 2026), unlike the desktop app and the rest of the Mac.
