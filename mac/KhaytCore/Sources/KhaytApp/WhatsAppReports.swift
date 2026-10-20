@@ -141,6 +141,13 @@ enum WhatsAppReports {
         if let since { defaults.set(since, forKey: key(shopId)) } else { defaults.removeObject(forKey: key(shopId)) }
     }
 
+    /// Everything this Mac holds for a shop's reports: its place and what it
+    /// kept. When the hook comes down or the Mac signs out of the cloud.
+    static func forget(_ shopId: String, _ defaults: UserDefaults = .standard) {
+        remember(nil, shopId, defaults)
+        defaults.removeObject(forKey: keptKey(shopId))
+    }
+
     // MARK: - What this Mac has been told
     //
     // ── A DELIVERY REPORT IS NOT AN EDIT ─────────────────────────────────
@@ -174,8 +181,19 @@ enum WhatsAppReports {
             if case .object(let o) = v, case .string(let s)? = o[k] { return s }
             return ""
         }
+        // Only what `lib/whatsapp-status.js apply` reads, the title capped as
+        // it caps it: whatever else the cloud sends (a recipient's number,
+        // say) is never written to this Mac's preferences (alpha.85 review).
+        func slim(_ v: JSONValue) -> JSONValue? {
+            guard case .object(let o) = v else { return nil }
+            var out: [String: JSONValue] = [:]
+            for k in ["messageId", "status", "at"] { if case .string(let s)? = o[k] { out[k] = .string(s) } }
+            if case .number(let n)? = o["errorCode"] { out["errorCode"] = .number(n) }
+            if case .string(let t)? = o["errorTitle"] { out["errorTitle"] = .string(String(t.prefix(200))) }
+            return .object(out)
+        }
         var latest: [String: JSONValue] = [:]
-        for item in kept(shopId, defaults) + items {
+        for item in (kept(shopId, defaults) + items).compactMap(slim) {
             let id = field(item, "messageId")
             guard !id.isEmpty, let r = rank[field(item, "status")] else { continue }
             if let had = latest[id], (rank[field(had, "status")] ?? 0) >= r { continue }
@@ -252,7 +270,7 @@ extension Shop {
             whatsAppHook = try await WhatsAppReports.hook(
                 connection, token: token, method: appSecret == nil ? "DELETE" : "PUT", appSecret: appSecret
             ) { try await session.data(for: $0) }
-            if appSecret == nil { WhatsAppReports.remember(nil, connection.shopId) }
+            if appSecret == nil { WhatsAppReports.forget(connection.shopId) }
             whatsAppHookProblem = nil
             whatsAppHookFor = connection.shopId
             startPollingWhatsAppReports()

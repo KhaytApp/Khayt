@@ -10,7 +10,12 @@ import KhaytCore
 /// alone.
 extension Shop {
     /// The store the LAN server checks signatures against.
-    var lanDeviceStore: LanDevices { lanDevicesForTests ?? .shared }
+    /// Outside the app — a test runner, which has no business in this Mac's
+    /// Keychain — a store of its own in memory: a render that reached
+    /// `.shared` read the shop's real paired phones (alpha.85 review).
+    var lanDeviceStore: LanDevices { lanDevicesForTests ?? (Self.inTheApp ? .shared : Self.outsideTheApp) }
+    nonisolated static let inTheApp = Bundle.main.bundlePath.hasSuffix(".app")
+    nonisolated static let outsideTheApp = LanDevices.inMemory()
 
     func refreshPairedPhones() {
         pairedPhones = lanDeviceStore.list()
@@ -45,7 +50,9 @@ struct PairedPhones: View {
                             }
                             Button(shop.words.callIt("mac.phones_sign_out") + "\u{2026}") { signingOut = phone }
                                 .controlSize(.small)
-                                .disabled(!shop.permitted("settings", "edit"))
+                                // `lockAllows`, not `permitted`: asking must not
+                                // set a "not allowed" problem just by drawing.
+                                .disabled(!shop.lockAllows("settings", "edit"))
                         }
                     }
                 }

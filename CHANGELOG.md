@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: fixes from the alpha.85 pre-release review.** WhatsApp delivery
+  reports kept on this Mac hold only what they need and are forgotten when
+  the hook comes down or the Mac signs out of Khayt Cloud. A download that
+  fails a check, or a move that fails across disks, leaves nothing behind.
+  Bucket and Drive transfers share one network session. "1 model" in the
+  measure-online text. Drawing the paired-phones list no longer reports "not
+  allowed" to staff who may not sign phones out.
+
 - **Mac: STL files from Materialise Magics are measured.** Magics writes
   more bytes after a model's triangles than its header counts. The Mac read
   that as "not a model", so those files were never priced. It now reads the
@@ -8122,6 +8130,52 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-alpha.85] - 2026-10-20
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Sign out one phone, Gregorian dates on Arabic invoices, and the money,
+stock and cloud fixes from the October review.
+
+### Added
+
+- **Sign out one paired phone.** Settings → Online lists the phones paired
+  with this Mac and when each was last seen. Sign out cuts off one of them
+  without changing the LAN PIN, so the others stay signed in.
+
+### Fixed
+
+- **Arabic invoices are dated in the Gregorian calendar.** They printed a
+  Hijri date ("09 جمادى الأولى، 1448 هـ" for 20 October 2026). They now
+  print "20 أكتوبر، 2026", as the desktop app does.
+- **STL files from Materialise Magics are measured.** They carry more bytes
+  than their header counts and were read as "not a model", so they were
+  never priced. Models the Mac tried and couldn't measure are tried once more
+  the next time "Measure online models…" runs (Settings → Preferences →
+  Where the library lives).
+- **One month, one revenue figure.** The revenue-goal tile and the monthly
+  report now agree when a job is in a currency other than the shop's.
+- **A job paid before tax on top was charged shows the total it was
+  charged**, in the orders list and on the job's paid bar.
+- **A job's filament lot is the lot in force when it was printed**, not the
+  spool's current one.
+- **A WhatsApp delivery report no longer overwrites a customer edit** made on
+  another device.
+- **Bringing a model back from the cloud no longer holds it in memory.** It
+  goes straight to a file and is checked there, so a gigabyte model no longer
+  needs a gigabyte of memory.
+- **Sending a large sliced file to a printer no longer freezes the window.**
+- **A rare crash while saving is fixed.**
+
+### Security
+
+- Delivery reports this Mac keeps hold only what it needs (the message, its
+  status, the time and any error), and are forgotten when the WhatsApp hook
+  is taken down or the Mac signs out of Khayt Cloud.
+- One network session for every bucket and Drive transfer; a session per
+  request was never released.
 
 ## [4.0.0-alpha.84] - 2026-10-19
 

@@ -235,6 +235,37 @@ struct LibraryStorageGapsTests {
         #expect(!left.contains { $0.contains(".part-") }, "\(left)")
     }
 
+    @Test("a move that fails leaves no .part, and the download is removed")
+    func placeCleansUp() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "place-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let download = dir.appending(path: "dl")
+        try Data("model".utf8).write(to: download)
+        // The model's folder does not exist: the move fails.
+        let model = dir.appending(path: "gone/m.stl")
+        #expect(throws: (any Error).self) { try CloudLibrary.place(download, at: model) }
+        #expect(!FileManager.default.fileExists(atPath: download.path))
+        let left = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+        #expect(!left.contains { $0.contains(".part-") }, "\(left)")
+        // And the ordinary case lands the bytes.
+        let again = dir.appending(path: "dl2")
+        try Data("model".utf8).write(to: again)
+        let here = dir.appending(path: "m.stl")
+        try CloudLibrary.place(again, at: here)
+        #expect(try Data(contentsOf: here) == Data("model".utf8))
+    }
+
+    @Test("one session for every bucket and Drive request, and a refused check removes its download")
+    func oneSessionNoLeftovers() {
+        let cloud = MenuCoverageTests.source("CloudLibrary.swift")
+        #expect(!cloud.contains("URLSession(configuration: .ephemeral, delegate: NoRedirects(), delegateQueue: nil)\n            ."),
+                "a session per request leaks its delegate")
+        #expect(cloud.contains("bucketSession.data(for: request)") && cloud.contains("bucketSession.download(for: request)"))
+        #expect(cloud.contains("catch { try? fm.removeItem(at: file); throw error }"),
+                "a verify that throws must not leave the download behind")
+    }
+
     @Test("bring-down, bring-back and the read-back proof never GET a model into memory whole")
     func noWholeObjectGets() {
         let library = MenuCoverageTests.source("LibraryStorage.swift")

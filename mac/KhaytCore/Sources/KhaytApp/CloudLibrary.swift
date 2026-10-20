@@ -314,17 +314,18 @@ enum CloudLibrary {
     /// Requests to a bucket. No redirects: a signed request followed somewhere
     /// else would carry its Authorization there. A `var` so the tests can put
     /// a bucket that lies in its place.
-    static var fetch: S3.Fetch = { request in
-        try await URLSession(configuration: .ephemeral, delegate: NoRedirects(), delegateQueue: nil)
-            .data(for: request)
-    }
+    static var fetch: S3.Fetch = { request in try await bucketSession.data(for: request) }
+
+    /// One session for every bucket and Drive request. A session keeps its
+    /// delegate until it is invalidated, so the one-per-request this was
+    /// leaked a session and a delegate on every call — thousands over a
+    /// library's worth of transfers (alpha.85 review).
+    nonisolated static let bucketSession = URLSession(configuration: .ephemeral, delegate: NoRedirects(),
+                                                      delegateQueue: nil)
 
     /// A model's bytes from a bucket or a Drive, straight to a file — the
     /// same no-redirect session as `fetch`. A `var` for the same reason.
-    static var download: S3.Download = { request in
-        try await URLSession(configuration: .ephemeral, delegate: NoRedirects(), delegateQueue: nil)
-            .download(for: request)
-    }
+    static var download: S3.Download = { request in try await bucketSession.download(for: request) }
 
     /// A downloaded file put where `model` goes: moved to a `.part` beside it
     /// (a copy when the download sits on another volume), then renamed over —
@@ -336,7 +337,15 @@ enum CloudLibrary {
             .appending(path: model.lastPathComponent + ".part-\(ProcessInfo.processInfo.processIdentifier)")
         defer { try? fm.removeItem(at: file) }
         try? fm.removeItem(at: part)
-        try fm.moveItem(at: file, to: part)
+        do {
+            try fm.moveItem(at: file, to: part)
+        } catch {
+            // Across volumes the move is a copy, and a copy that fails (a
+            // full disk, a drive pulled) can leave half a `.part` behind —
+            // named for this process, so no later run would clear it.
+            try? fm.removeItem(at: part)
+            throw error
+        }
         if rename(part.path, model.path) != 0 {
             try? fm.removeItem(at: part)
             throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
@@ -472,7 +481,9 @@ enum CloudLibrary {
                     try? fm.removeItem(at: file)
                     throw POSIXError(.EIO)
                 }
-                let verdict = try await engine.verifyRehydrate(side, size: got.size, sha256: got.sha256)
+                let verdict: KhaytEngine.Verdict
+                do { verdict = try await engine.verifyRehydrate(side, size: got.size, sha256: got.sha256) }
+                catch { try? fm.removeItem(at: file); throw error }
                 guard verdict.ok else {
                     try? fm.removeItem(at: file)
                     problem = Failure.badDownload(verdict.error); continue
