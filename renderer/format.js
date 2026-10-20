@@ -64,16 +64,27 @@
    */
   // The table lives in lib/print-date.js, because the invoice's own date
   // formatter needs it and the Mac app has no renderer to read it from.
-  const DATES = (typeof globalThis !== 'undefined' && globalThis.KhaytPrintDate)
-    || (() => { try { return require('../lib/print-date.js'); } catch (e) { return null; } })();
-  const LOCALE_TAGS = DATES ? DATES.LOCALE_TAGS : { en: 'en-US' };
+  //
+  // Looked up on every call, not once at load: index.html loads this file
+  // ~200 scripts BEFORE print-date.js, so a lookup at load found nothing and
+  // every date on Windows and Linux came out in US English whatever the
+  // language.
+  function dates() {
+    if (typeof globalThis !== 'undefined' && globalThis.KhaytPrintDate) return globalThis.KhaytPrintDate;
+    try { return require('../lib/print-date.js'); } catch (e) { return null; }
+  }
 
   function localeTag() {
     const lang = (typeof i18n !== 'undefined' && i18n && i18n.current) || 'en';
-    return DATES ? DATES.localeTagFor(lang) : 'en-US';
+    const d = dates();
+    return d ? d.localeTagFor(lang) : 'en-US';
   }
 
-  const api = { num, clampPositive, fmtMoney, fmtCount, computeUnitPrice, csvFormulaNeutralize, localeTag, LOCALE_TAGS };
+  const api = { num, clampPositive, fmtMoney, fmtCount, computeUnitPrice, csvFormulaNeutralize, localeTag };
+  Object.defineProperty(api, 'LOCALE_TAGS', {
+    enumerable: true,
+    get() { const d = dates(); return d ? d.LOCALE_TAGS : { en: 'en-US' }; },
+  });
 
   global.KhaytFormat = api;
   global.num = num;

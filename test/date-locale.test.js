@@ -159,3 +159,37 @@ test('no hardcoded English weekday or month name arrays remain', () => {
   assert.deepEqual(offenders, [],
     `hardcoded English date names — use Intl with localeTag():\n  ${offenders.join('\n  ')}`);
 });
+
+test('localeTag answers in the chosen language in the real script order', () => {
+  // index.html loads format.js long before lib/print-date.js. format.js used to
+  // look the table up once, at load, found nothing, and answered 'en-US' for
+  // every language — so Arabic dates on Windows and Linux read "Oct 20, 2026".
+  // Run both files in a browser-like sandbox (no `require`) in page order.
+  const vm = require('vm');
+  const html = fs.readFileSync(path.join(RENDERER, 'index.html'), 'utf8');
+  const order = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
+  const fmtAt = order.indexOf('format.js');
+  const datesAt = order.indexOf('../lib/print-date.js');
+  assert.ok(fmtAt >= 0 && datesAt >= 0, 'both scripts are on the page');
+
+  const sandbox = { i18n: { current: 'ar' } };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  for (const f of fmtAt < datesAt
+    ? ['format.js', '../lib/print-date.js']
+    : ['../lib/print-date.js', 'format.js']) {
+    vm.runInContext(fs.readFileSync(path.join(RENDERER, f), 'utf8'), sandbox);
+  }
+  const tag = sandbox.KhaytFormat.localeTag();
+  assert.equal(tag, sandbox.KhaytPrintDate.localeTagFor('ar'));
+
+  // Arabic stays on the Gregorian calendar with Arabic month names (Turki,
+  // Oct 20 2026). Electron's ICU defaults ar-SA to Gregorian; JavaScriptCore
+  // defaults it to Umm al-Qura, so this pins what the desktop shows.
+  const shown = new Date(Date.UTC(2026, 9, 20)).toLocaleDateString(tag, {
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+  });
+  assert.match(shown, /20/);
+  assert.match(shown, /2026/);
+  assert.ok(/[؀-ۿ]/.test(shown), 'month name should be Arabic');
+});
