@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: Arabic invoices are dated in the Gregorian calendar.** The Mac
+  printed an Arabic invoice's date as Hijri ("09 جمادى الأولى، 1448 هـ"
+  for 20 October 2026), unlike the desktop app and the rest of the Mac.
+  It now prints "20 أكتوبر، 2026": Gregorian, Arabic month names, Western
+  digits.
+
 - **Mac: bringing a model back from the cloud no longer holds it in
   memory.** Bring Back, a first download of a model placed in a bucket by
   hand, and the check that reads an upload back now write the download
