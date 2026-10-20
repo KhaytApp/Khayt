@@ -68,7 +68,7 @@ enum CloudLibrary {
                           provider: c.endpoint, tier: tier, tierEnabled: tierOn)
         case .drive:
             guard let d = drive else { return nil }
-            return Config(remote: .drive(DriveClient(d.config, fetch: fetch)), prefix: d.prefix,
+            return Config(remote: .drive(DriveClient(d.config, fetch: fetch, download: download)), prefix: d.prefix,
                           backsUp: driveBacksUp(section(library, "gdrive")), provider: "gdrive",
                           tier: tier, tierEnabled: tierOn)
         case .none:
@@ -319,6 +319,30 @@ enum CloudLibrary {
             .data(for: request)
     }
 
+    /// A model's bytes from a bucket or a Drive, straight to a file — the
+    /// same no-redirect session as `fetch`. A `var` for the same reason.
+    static var download: S3.Download = { request in
+        try await URLSession(configuration: .ephemeral, delegate: NoRedirects(), delegateQueue: nil)
+            .download(for: request)
+    }
+
+    /// A downloaded file put where `model` goes: moved to a `.part` beside it
+    /// (a copy when the download sits on another volume), then renamed over —
+    /// so a model is never half there. The download is gone either way.
+    nonisolated static func place(_ file: URL, at model: URL) throws {
+        // lock: system — moves its own download into the model's place; removes only that download and its own .part.
+        let fm = FileManager.default
+        let part = model.deletingLastPathComponent()
+            .appending(path: model.lastPathComponent + ".part-\(ProcessInfo.processInfo.processIdentifier)")
+        defer { try? fm.removeItem(at: file) }
+        try? fm.removeItem(at: part)
+        try fm.moveItem(at: file, to: part)
+        if rename(part.path, model.path) != 0 {
+            try? fm.removeItem(at: part)
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+    }
+
     final class NoRedirects: NSObject, URLSessionTaskDelegate {
         func urlSession(_ session: URLSession, task: URLSessionTask,
                         willPerformHTTPRedirection response: HTTPURLResponse,
@@ -364,13 +388,14 @@ enum CloudLibrary {
     @discardableResult
     static func ensureInBucket(_ c: LibraryRemote, key: String, file: URL,
                                engine: KhaytEngine) async throws -> (sha256: String, size: Int) {
-        try await ensureInBucket(c, key: key, file: file, engine: engine, fetch: fetch)
+        try await ensureInBucket(c, key: key, file: file, engine: engine, fetch: fetch, download: download)
     }
 
     /// The same, through a given transport — so a caller (and its test) need
     /// not swap the shared one.
     static func ensureInBucket(_ c: LibraryRemote, key: String, file: URL,
-                               engine: KhaytEngine, fetch: @escaping S3.Fetch) async throws -> (sha256: String, size: Int) {
+                               engine: KhaytEngine, fetch: @escaping S3.Fetch,
+                               download: S3.Download? = nil) async throws -> (sha256: String, size: Int) {
         let local = try await Task.detached { try Self.digests(of: file) }.value
         if let there = try await c.head(key, fetch: fetch), there.size == local.size,
            try await engine.etagVerdict(etag: there.etag, md5: local.md5) == "match" {
@@ -388,8 +413,12 @@ enum CloudLibrary {
         case "match": break
         case "mismatch": throw Failure.hashMismatch
         default:
-            guard let back = try await c.get(key, fetch: fetch),
-                  S3.sha256Hex(back) == local.sha256 else {
+            // Read back to a file and hashed from it, as a bring-back is.
+            guard let back = try await c.getFile(key, download: download ?? S3.download(over: fetch)) else {
+                throw Failure.readBackDiffers
+            }
+            defer { try? FileManager.default.removeItem(at: back) }
+            guard try await Task.detached(operation: { try Self.digests(of: back) }).value.sha256 == local.sha256 else {
                 throw Failure.readBackDiffers
             }
         }
@@ -437,16 +466,18 @@ enum CloudLibrary {
         for remote in candidates {
             do {
                 // The key the SIDECAR recorded, not one rebuilt from today's prefix.
-                guard let data = try await remote.get(side.key, fetch: fetch) else { continue }
-                let verdict = try await engine.verifyRehydrate(side, size: data.count, sha256: S3.sha256Hex(data))
-                guard verdict.ok else { problem = Failure.badDownload(verdict.error); continue }
-                let part = model.deletingLastPathComponent()
-                    .appending(path: model.lastPathComponent + ".part-\(ProcessInfo.processInfo.processIdentifier)")
-                try data.write(to: part, options: .atomic)
-                if rename(part.path, model.path) != 0 {
-                    try? fm.removeItem(at: part)
-                    throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                guard let file = try await remote.getFile(side.key, download: download) else { continue }
+                // Hashed from the file, four megabytes at a time (`digests`).
+                guard let got = try? await Task.detached(operation: { try Self.digests(of: file) }).value else {
+                    try? fm.removeItem(at: file)
+                    throw POSIXError(.EIO)
                 }
+                let verdict = try await engine.verifyRehydrate(side, size: got.size, sha256: got.sha256)
+                guard verdict.ok else {
+                    try? fm.removeItem(at: file)
+                    problem = Failure.badDownload(verdict.error); continue
+                }
+                try place(file, at: model)
                 try? fm.removeItem(at: sideURL)
                 return
             } catch let e as POSIXError {
@@ -805,7 +836,7 @@ extension Shop {
                 if let c = await CloudLibrary.libraryBucket(settings: settings, build: build) { out.append(.bucket(c)) }
             case .drive:
                 if let d = await CloudLibrary.libraryDrive(settings: settings, build: build) {
-                    out.append(.drive(DriveClient(d.config, fetch: CloudLibrary.fetch)))
+                    out.append(.drive(DriveClient(d.config, fetch: CloudLibrary.fetch, download: CloudLibrary.download)))
                 }
             case .none: break
             }
@@ -854,7 +885,7 @@ extension Shop {
             return words.callIt("mac.cloudlib_not_set_up")
         }
         do {
-            let model = try await Shop.bringDown(marker, config: c, engine: engine, fetch: CloudLibrary.fetch)
+            let model = try await Shop.bringDown(marker, config: c, engine: engine, download: CloudLibrary.download)
             if let same = try await Shop.fillDownloaded(id: id, file: model, storeURL: build.storeURL, engine: engine,
                                                         owns: { StoreLock.weOwnIt(build) },
                                                         whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) {
@@ -1001,7 +1032,7 @@ extension Shop {
         guard let d = await CloudLibrary.libraryDrive(settings: settingsDict, build: source.build) else {
             cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return
         }
-        let drive = LibraryRemote.drive(DriveClient(d.config, fetch: CloudLibrary.fetch))
+        let drive = LibraryRemote.drive(DriveClient(d.config, fetch: CloudLibrary.fetch, download: CloudLibrary.download))
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false }
         var restored = 0
@@ -1238,7 +1269,7 @@ extension Shop {
             return nil
         }
         do {
-            let about = try await DriveClient(d.config, fetch: CloudLibrary.fetch).about()
+            let about = try await DriveClient(d.config, fetch: CloudLibrary.fetch, download: CloudLibrary.download).about()
             let used = (try? await engine.formatBytes(about.usage)) ?? ""
             var limit: String?
             if let l = about.limit { limit = try? await engine.formatBytes(l) }
