@@ -10,13 +10,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   least recently seen pictures are dropped first. A picture is asked for
   again after a day. Unpair deletes them.
 
-- **Desktop: dates follow your language again.** On Windows and Linux every
-  date in the app showed in US English ("Oct 20, 2026") whatever language
-  you picked, because the language table loaded after the code that read it.
-  Dates now follow the chosen language: Arabic reads "20 أكتوبر 2026", still
-  on the Gregorian calendar with Western digits, and German, French, Japanese
-  and the rest use their own month names and order.
-
 - **Mac: Arabic invoices are dated in the Gregorian calendar.** The Mac
   printed an Arabic invoice's date as Hijri ("09 جمادى الأولى، 1448 هـ"
   for 20 October 2026), unlike the desktop app and the rest of the Mac.
@@ -6121,6 +6114,20 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.20] - 2026-10-20
+
+Dates follow your language on Windows and Linux, since 3.11.19.
+Individual entries are kept below; this is what changed for you.
+
+Every date in the app now reads in the language you chose. Until now they all showed in US English ("Oct 20, 2026") whatever the language. Arabic reads "20 أكتوبر 2026", on the Gregorian calendar with Western digits as before.
+
+- **Desktop: dates follow your language again.** On Windows and Linux every
+  date in the app showed in US English ("Oct 20, 2026") whatever language
+  you picked, because the language table loaded after the code that read it.
+  Dates now follow the chosen language: Arabic reads "20 أكتوبر 2026", still
+  on the Gregorian calendar with Western digits, and German, French, Japanese
+  and the rest use their own month names and order.
 
 ## [3.11.19] - 2026-10-20
 
