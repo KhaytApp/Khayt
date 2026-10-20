@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: only someone who can change Settings can sign a phone out.**
+  With the operator lock on, a manager can read Settings but not change
+  them, yet still saw "Sign out…" next to each paired phone. The button now
+  shows only for a role that can change Settings, as on the Mac.
+
 - **Mac: fixes from the alpha.85 pre-release review.** WhatsApp delivery
   reports kept on this Mac hold only what they need and are forgotten when
   the hook comes down or the Mac signs out of Khayt Cloud. A download that
