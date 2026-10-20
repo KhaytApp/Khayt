@@ -86,6 +86,24 @@ try {
   await window.waitForTimeout(300);
   ok((await signedGet(kept, '/api/orders')).status === 200, 'cancelling leaves the phone paired');
 
+  // A manager can read Settings but not change them, so no Sign out.
+  await window.evaluate(() => {
+    operators.push({ id: 'e2e-mgr', name: 'Manager', roleKey: 'manager' });
+    settings.operatorLockEnabled = true;
+    settings.activeOperatorId = 'e2e-mgr';
+  });
+  await openLanSettings(window);
+  const mgr = await window.evaluate(() => ({
+    listed: document.getElementById('lanPairedPhones').innerText,
+    buttons: document.querySelectorAll('#lanPairedPhones [data-sign-out]').length,
+  }));
+  ok(/Workshop iPhone/.test(mgr.listed) && mgr.buttons === 0, `a manager sees the phones but cannot sign one out (${mgr.buttons} buttons)`);
+  await window.evaluate(() => {
+    settings.operatorLockEnabled = false;
+    settings.activeOperatorId = null;
+    operators.splice(operators.findIndex((o) => o.id === 'e2e-mgr'), 1);
+  });
+
   // ---- Arabic ----
   await window.evaluate(() => { settings.lang = 'ar'; i18n.set('ar'); });
   await openLanSettings(window);

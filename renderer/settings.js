@@ -4045,6 +4045,13 @@ function saveEstimatorSettingsFromForm() {
 }
 
 /** Settings → LAN: the phones paired with this computer, each with a sign-out button. */
+// Signing a phone out changes the shop's settings, so it needs settings
+// 'edit' — a manager can read Settings but not this (the Mac's
+// signOutPhone asks the same). The role lives in this window, not in main.
+function canSignOutPhones() {
+  return typeof operatorCan !== 'function' || operatorCan('settings', 'edit');
+}
+
 async function renderLanPairedPhones() {
   const box = document.getElementById('lanPairedPhones');
   if (!box) return;
@@ -4055,13 +4062,14 @@ async function renderLanPairedPhones() {
     return;
   }
   const day = (iso) => { try { return new Date(iso).toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return ''; } };
+  const canSignOut = canSignOutPhones();
   box.innerHTML = devices.map((d) => `
     <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">
       <div style="flex:1;min-width:0;">
         <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(d.name || t('lan.phones_unnamed'))}</div>
         <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('lan.phones_seen', { date: day(d.lastSeenAt) }))}</div>
       </div>
-      <button type="button" class="btn ghost small" data-sign-out="${escapeHtml(d.deviceId)}" data-name="${escapeHtml(d.name || '')}">${escapeHtml(t('lan.phones_sign_out'))}…</button>
+      ${canSignOut ? `<button type="button" class="btn ghost small" data-sign-out="${escapeHtml(d.deviceId)}" data-name="${escapeHtml(d.name || '')}">${escapeHtml(t('lan.phones_sign_out'))}…</button>` : ''}
     </div>`).join('');
 }
 
@@ -4245,7 +4253,7 @@ function renderLanApiSettings() {
   renderLanPairedPhones();
   el.querySelector('#lanPairedPhones')?.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-sign-out]');
-    if (!btn) return;
+    if (!btn || !canSignOutPhones()) return;
     const name = btn.dataset.name || t('lan.phones_unnamed');
     if (!confirm(t('lan.phones_sign_out_q', { name }) + '\n\n' + t('lan.phones_sign_out_note'))) return;
     const res = await window.hubAPI?.removeLanDevice?.(btn.dataset.signOut);
