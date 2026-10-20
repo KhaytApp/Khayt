@@ -76,18 +76,35 @@ struct McpBooksTests {
 
     // MARK: - Open orders
 
+    @Test("the dashboard's facts take the caller's clock: a day later, every late job is a day later")
+    func dashboardFactsTakeTheClock() async throws {
+        let book = try Self.sample()
+        let engine = try KhaytEngine()
+        let orders = Self.rows(book, "printLog"), settings = Self.settings(book)
+        let now = Date()
+        let today = try await engine.dashboardFacts(orders: orders, machines: [], settings: settings, now: now)
+        let later = try await engine.dashboardFacts(orders: orders, machines: [], settings: settings,
+                                                    now: now.addingTimeInterval(86_400))
+        let a = Dictionary(uniqueKeysWithValues: today.attn.items.filter { $0.kind == "order" }.map { ($0.id, $0.daysLate) })
+        let b = Dictionary(uniqueKeysWithValues: later.attn.items.filter { $0.kind == "order" }.map { ($0.id, $0.daysLate) })
+        #expect(!a.isEmpty, "the sample shop has late work")
+        for (id, days) in a { #expect(b[id] == days.map { $0 + 1 }, "\(id)") }
+    }
+
     @Test("open orders are the dashboard's active jobs, late as attention says, owing as order-money says")
     func openOrdersMatchTheRules() async throws {
         let book = try Self.sample()
         let engine = try KhaytEngine()
-        // `dashboardFacts` reads today off the clock, so this one runs at today.
+        // Today, and the SAME today for both: `dashboardFacts` read its own
+        // clock, and a run that crossed midnight between the two calls
+        // counted every late job a day apart (CI, 20 Oct 2026, 48 vs 49).
         let now = Date()
         let server = Self.server(try JSONEncoder().encode(book), engine: engine, now: now)
         let out = await Self.call(server, "open_orders", ["limit": 100])
         let rows = out["orders"] as? [[String: Any]] ?? []
 
         let orders = Self.rows(book, "printLog"), settings = Self.settings(book)
-        let facts = try await engine.dashboardFacts(orders: orders, machines: [], settings: settings)
+        let facts = try await engine.dashboardFacts(orders: orders, machines: [], settings: settings, now: now)
         #expect(out["count"] as? Int == facts.activeCount)
         #expect(rows.count == facts.activeCount)
         #expect(rows.count > 3, "the sample shop has open work; a tool that finds none is broken")
