@@ -44,4 +44,24 @@ struct WhatsAppStatusRaceTests {
         #expect(source.contains("recordingDeletes: false"), "written unstamped, so it never wins a merge")
         #expect(source.contains("let items = WhatsAppReports.kept(connection.shopId)"), "laid over on every poll")
     }
+
+    @Test("only what the rule reads is kept, and taking the hook down or signing out forgets it")
+    func keptSlimAndForgotten() throws {
+        let defaults = try #require(UserDefaults(suiteName: "wa-slim-\(UUID().uuidString)"))
+        WhatsAppReports.keep([.object([
+            "messageId": .string("w1"), "status": .string("failed"), "at": .string("2026-10-19T10:00:00Z"),
+            "errorCode": .number(131026), "errorTitle": .string(String(repeating: "x", count: 500)),
+            "recipient_id": .string("966500000001"),
+        ])], "s1", defaults)
+        WhatsAppReports.remember(42, "s1", defaults)
+        guard case .object(let o)? = WhatsAppReports.kept("s1", defaults).first else { Issue.record("nothing kept"); return }
+        #expect(Set(o.keys) == ["messageId", "status", "at", "errorCode", "errorTitle"], "\(o.keys)")
+        if case .string(let t)? = o["errorTitle"] { #expect(t.count == 200) }
+        WhatsAppReports.forget("s1", defaults)
+        #expect(WhatsAppReports.kept("s1", defaults).isEmpty)
+        #expect(WhatsAppReports.since("s1", defaults) == nil)
+        let cloud = try LockRound3Tests.source("Shop+Cloud.swift")
+        #expect(cloud.contains("WhatsAppReports.forget(shopId)"), "signing out of the cloud forgets them")
+        #expect(try LockRound3Tests.source("WhatsAppReports.swift").contains("WhatsAppReports.forget(connection.shopId)"))
+    }
 }

@@ -29,4 +29,15 @@ struct PairedPhonesTests {
         #expect(try LockRound3Tests.source("OnlinePane.swift").contains("PairedPhones(shop: shop)"))
         #expect(try LockRound3Tests.source("Shop+PairedPhones.swift").contains(".askFirst($signingOut"))
     }
+
+    @Test("outside the app the store is in memory: a test never reads this Mac's Keychain")
+    func notTheKeychainInTests() throws {
+        let shop = Shop()
+        #expect(!Shop.inTheApp)
+        #expect(shop.lanDeviceStore === Shop.outsideTheApp)
+        #expect(!shop.lanDeviceStore.keeps)
+        let view = try LockRound3Tests.source("Shop+PairedPhones.swift")
+        #expect(view.contains(".disabled(!shop.lockAllows(\"settings\", \"edit\"))"),
+                "drawing the button must not set a not-allowed problem")
+    }
 }

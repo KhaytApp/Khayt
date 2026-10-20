@@ -104,7 +104,7 @@ struct LibraryLocationSettings: View {
                         Button(shop.words.callIt("mac.measure_online") + "\u{2026}") { askMeasure = true }
                             .disabled(!shop.canMoveJobs)
                     }
-                    Text(shop.words.callIt("mac.measure_online_hint",
+                    Text(shop.words.callIt(due.count == 1 ? "mac.measure_online_hint_one" : "mac.measure_online_hint",
                                            ["n": .string(Format.count(due.count)),
                                             "size": .string(Format.bytes(Double(due.bytes)))]))
                         .font(.caption).foregroundStyle(.secondary)
@@ -167,7 +167,7 @@ struct LibraryLocationSettings: View {
             Button(shop.words.callIt("common.cancel"), role: .cancel) {}
         } message: {
             let due = shop.onlineUnmeasured
-            Text(shop.words.callIt("mac.measure_online_body",
+            Text(shop.words.callIt(due.count == 1 ? "mac.measure_online_body_one" : "mac.measure_online_body",
                                    ["n": .string(Format.count(due.count)),
                                     "size": .string(Format.bytes(Double(due.bytes)))]))
         }

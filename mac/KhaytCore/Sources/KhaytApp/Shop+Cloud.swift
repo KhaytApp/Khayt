@@ -237,6 +237,7 @@ extension Shop {
     func signOutOfCloud() async {
         guard permitted("cloud", "edit") else { return }
         forgetCloudKey()
+        if let shopId = cloudShopId { WhatsAppReports.forget(shopId) }
         guard let build = source.build else { return }
         do {
             try await StoreWriter.updateOffMain(build) { root in Self.markSignedOut(&root) }
