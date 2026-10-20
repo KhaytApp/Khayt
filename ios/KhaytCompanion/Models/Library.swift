@@ -5,7 +5,7 @@ struct LibraryPage: Decodable, Equatable, Sendable {
     let total: Int
     let offset: Int
     let folders: [LibraryFolder]
-    let items: [LibraryItem]
+    var items: [LibraryItem]
     /// Read from the phone's copy because the Mac could not be reached.
     var fromCopy = false
 
@@ -69,7 +69,7 @@ struct LibraryItem: Decodable, Equatable, Hashable, Sendable, Identifiable {
     let favorite: Bool
     let timesPrinted: Int?
     let lastPrinted: String?
-    let thumb: Bool
+    var thumb: Bool
     let estimable: Bool
     let printTimeMins: Double?
     let grams: Double?

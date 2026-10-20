@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: library pictures away from the shop.** Every thumbnail the
+  Mac sends is kept on the phone, so a model you've seen on the shop's
+  Wi-Fi shows its picture on mobile data too. Up to 80 MB is kept, and the
+  least recently seen pictures are dropped first. A picture is asked for
+  again after a day. Unpair deletes them.
+
 - **Desktop: dates follow your language again.** On Windows and Linux every
   date in the app showed in US English ("Oct 20, 2026") whatever language
   you picked, because the language table loaded after the code that read it.
