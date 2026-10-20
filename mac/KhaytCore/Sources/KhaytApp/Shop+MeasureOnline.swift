@@ -38,14 +38,16 @@ enum OnlineMeasure {
         let size: Int
     }
 
-    /// Linked models never read: no measurement, and no hash — a record that
-    /// was read and still has no key is one this reader cannot measure, and
-    /// fetching it again would not change that. Only files under a folder
+    /// Linked models with no measurement: never read (no hash), or read by a
+    /// mesh reader older than today's and left unmeasured (`meshTried`) — a
+    /// model this reader has already failed on is not fetched again, because
+    /// that would not change. Only files under a folder
     /// this book links: `externalPath` arrives by sync, and a path anywhere
     /// else on this Mac is not read unasked (as `fillNowLocal`).
     nonisolated static func due(_ files: [LibraryFile], linked: [String]) -> [Due] {
         files.compactMap { file in
-            guard !file.isArchived, (file.geometryKey ?? "").isEmpty, (file.contentHash ?? "").isEmpty,
+            guard !file.isArchived, (file.geometryKey ?? "").isEmpty,
+                  (file.contentHash ?? "").isEmpty || (file.meshTried ?? 0) < Mesh.readerGeneration,
                   let path = file.externalPath, !path.isEmpty,
                   measurable.contains(Shop.libraryExt(file)),
                   linked.contains(where: { !$0.isEmpty && LibraryMove.under(path, $0) }) else { return nil }

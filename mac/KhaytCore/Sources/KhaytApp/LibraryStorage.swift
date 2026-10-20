@@ -813,6 +813,9 @@ extension Shop {
             }
             o["contentHash"] = .string(read.hash)
             if let key = read.key { o["geometryKey"] = .string(key) }
+            // Read and not measured: by which reader, so a better one tries again.
+            if read.key == nil { o["meshTried"] = .number(Double(Mesh.readerGeneration)) }
+            else { o.removeValue(forKey: "meshTried") }
             if let reader = read.reader { o["geometryReader"] = .number(Double(reader)) }
             if empty("colors") { o["colors"] = .array(read.colours); o["swapCount"] = .number(Double(read.swapCount)) }
             if empty("thumbFile"), let thumbFile = read.thumbFile {
