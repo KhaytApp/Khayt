@@ -922,13 +922,13 @@ enum Mesh {
         // THE FORMATS ARE TOLD APART BY ARITHMETIC, not by the word "solid".
         // An ASCII STL starts with "solid" and so do plenty of binary ones,
         // because the exporter wrote a name into the 80-byte header. The length
-        // is the honest test: a binary file is exactly 84 + 50n bytes.
-        guard claimed > 0, claimed <= mostTriangles, size == 84 + claimed * 50 else {
+        // is the honest test: a binary file is 84 + 50n bytes (`binaryEnd`).
+        guard let end = binaryEnd(handle, size: size, claimed: claimed) else {
             return try measureAsciiSTL(url)
         }
 
         var m = Measurement()
-        try streamBinarySTL(handle, size: size) { ax, ay, az, bx, by, bz, cx, cy, cz in
+        try streamBinarySTL(handle, size: end) { ax, ay, az, bx, by, bz, cx, cy, cz in
             m.add(ax, ay, az, bx, by, bz, cx, cy, cz)
         }
         return m.finished()
@@ -990,9 +990,38 @@ enum Mesh {
                         | UInt32(header[header.startIndex + 1]) << 8
                         | UInt32(header[header.startIndex + 2]) << 16
                         | UInt32(header[header.startIndex + 3]) << 24)
-        guard claimed > 0, claimed <= mostTriangles, size == 84 + claimed * 50 else { return false }
-        try streamBinarySTL(handle, size: size, body)
+        guard let end = binaryEnd(handle, size: size, claimed: claimed) else { return false }
+        try streamBinarySTL(handle, size: end, body)
         return true
+    }
+
+    /// Where a binary STL's facets end, or nil when the file is not one.
+    ///
+    /// Exactly 84 + 50n bytes is binary. LONGER than that is binary too
+    /// unless it reads as text: Materialise Magics writes a "COLOR=… MATERIAL=…"
+    /// header and then more bytes than its count says. A shop's Drive held two
+    /// such models (Oct 2026), and both read as "not a mesh" here, so they
+    /// were downloaded and never priced. The desktop app's reader
+    /// (`lib/stl-parse.js parseStl`, "best-effort binary read") reads the
+    /// facets the header counts when the file is not text, and so does this.
+    /// Shorter than the count is never binary: facets would be missing.
+    /// The Mac's mesh readers, numbered: raised when a fix lets them measure
+    /// a file they could not before, so a model read and left unmeasured is
+    /// read once more (`LibraryFile.meshTried`). 2: binary STLs with bytes
+    /// after their facets (`binaryEnd`).
+    nonisolated static let readerGeneration = 2
+
+    static func binaryEnd(_ handle: FileHandle, size: Int, claimed: Int) -> Int? {
+        guard claimed > 0, claimed <= mostTriangles else { return nil }
+        let end = 84 + claimed * 50
+        if size == end { return end }
+        guard size > end else { return nil }
+        // An ASCII STL is UTF-8 with facets in its first lines; binary facets
+        // are floats, which are almost never valid UTF-8 for long.
+        guard (try? handle.seek(toOffset: 0)) != nil,
+              let head = try? handle.read(upToCount: 4096) else { return nil }
+        if String(decoding: head, as: UTF8.self).contains("facet") { return nil }
+        return end
     }
 
     /// An OBJ's triangle count and the box it sits in.

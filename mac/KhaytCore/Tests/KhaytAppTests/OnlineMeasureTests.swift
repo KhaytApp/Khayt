@@ -12,13 +12,14 @@ import KhaytCore
 struct OnlineMeasureTests {
 
     static func file(_ id: String, _ path: String, ext: String = "stl", key: String? = nil, hash: String? = nil,
-                     archived: Bool = false) throws -> LibraryFile {
+                     archived: Bool = false, tried: Int? = nil) throws -> LibraryFile {
         var o: [String: JSONValue] = [
             "id": .string(id), "name": .string(id), "externalPath": .string(path),
             "sourceFile": .object(["filename": .string("m.\(ext)"), "ext": .string(ext), "size": .number(1000)]),
         ]
         if let key { o["geometryKey"] = .string(key) }
         if let hash { o["contentHash"] = .string(hash) }
+        if let tried { o["meshTried"] = .number(Double(tried)) }
         if archived { o["archivedAt"] = .string("2026-10-01T00:00:00Z") }
         return try JSONDecoder().decode(LibraryFile.self, from: JSONEncoder().encode(JSONValue.object(o)))
     }
@@ -30,15 +31,20 @@ struct OnlineMeasureTests {
             Self.file("a", drive + "/a/m.stl"),
             Self.file("b", drive + "/b/m.3mf", ext: "3mf"),
             Self.file("measured", drive + "/c/m.stl", key: "12:1.0:1x1x1"),
-            // Read already and nothing came back: fetching it again changes nothing.
-            Self.file("hashed", drive + "/d/m.stl", hash: "abc"),
+            // Read already by TODAY's reader and nothing came back: fetching
+            // it again changes nothing.
+            Self.file("hashed", drive + "/d/m.stl", hash: "abc", tried: Mesh.readerGeneration),
+            // Read by an older reader, or before readers were numbered: a
+            // fix since may measure it (Magics STLs with a tail, Oct 2026).
+            Self.file("older", drive + "/g/m.stl", hash: "def", tried: Mesh.readerGeneration - 1),
+            Self.file("unnumbered", drive + "/h/m.stl", hash: "ghi"),
             Self.file("archived", drive + "/e/m.stl", archived: true),
             Self.file("step", drive + "/f/m.step", ext: "step"),
             // Arrived by sync, pointing somewhere this book does not link.
             Self.file("elsewhere", "/Users/x/Desktop/m.stl"),
         ]
         let due = OnlineMeasure.due(files, linked: [drive])
-        #expect(due.map(\.id) == ["a", "b"])
+        #expect(due.map(\.id) == ["a", "b", "older", "unnumbered"])
         #expect(due.allSatisfy { $0.size == 1000 })
         #expect(OnlineMeasure.due(files, linked: []).isEmpty, "no linked folder, nothing read")
     }
@@ -65,6 +71,8 @@ struct OnlineMeasureTests {
         #expect(rows[0]["sourceFile"] == .object(["size": .number(2048)]))
         #expect(rows[1]["geometryKey"] == nil && rows[1]["contentHash"] == .string("h-egg"),
                 "read and unmeasurable: hashed, so it is not fetched again")
+        #expect(rows[1]["meshTried"] == .number(Double(Mesh.readerGeneration)), "by today's reader")
+        #expect(rows[0]["meshTried"] == nil, "measured: nothing to try again")
         #expect(rows[3]["indexedOnline"] != nil, "a record not in the batch is not touched")
         #expect(dupes == ["b": "Old egg"])
     }

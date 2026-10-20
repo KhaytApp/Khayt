@@ -123,6 +123,32 @@ struct MeshTests {
         #expect(abs(m.volumeMm3 - 1000) < 0.01)
     }
 
+    /// Materialise Magics writes "COLOR=… MATERIAL=…" into the header and
+    /// then MORE bytes than its count says: two models on a shop's Drive
+    /// (Oct 2026), 2,450 and 62,800 bytes over, both "not a mesh" here and so
+    /// never priced. The facets the header counts are read; the tail is not.
+    @Test("a binary STL with bytes after its facets is read for the facets it counts")
+    func binaryWithATail() throws {
+        let dir = try Self.tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appending(path: "magics.stl")
+        var data = Self.binarySTL(Self.boxFacets(10, 10, 10), header: "COLOR=\u{7f}\u{7f}\u{7f} MATERIAL=\u{7f}\u{7f}\u{7f}")
+        data.append(Data((0..<2450).map { UInt8(truncatingIfNeeded: $0 &* 37 &+ 200) }))
+        try data.write(to: url)
+
+        let m = try #require(try Mesh.measureSTL(url))
+        #expect(m.triangleCount == 12)
+        #expect(abs(m.volumeMm3 - 1000) < 0.01)
+        var drawn = 0
+        #expect(try Mesh.eachSTLTriangle(url) { _, _, _, _, _, _, _, _, _ in drawn += 1 })
+        #expect(drawn == 12, "the preview reads the same facets")
+
+        // SHORTER than its count is not binary: facets would be missing.
+        let short = dir.appending(path: "short.stl")
+        try Self.binarySTL(Self.boxFacets(10, 10, 10)).dropLast(50).write(to: short)
+        #expect(try !Mesh.eachSTLTriangle(short) { _, _, _, _, _, _, _, _, _ in })
+    }
+
     /// The origin is not inside this box, and the answer is the same.
     /// That is what the SIGNED sum buys: the outside faces cancel.
     @Test("a mesh far from the origin measures the same as one around it")

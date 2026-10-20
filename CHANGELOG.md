@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: STL files from Materialise Magics are measured.** Magics writes
+  more bytes after a model's triangles than its header counts. The Mac read
+  that as "not a model", so those files were never priced. It now reads the
+  triangles the header counts and ignores the rest, as the desktop app does.
+  Models the Mac already tried and couldn't measure are tried once more the
+  next time "Measure online models" runs.
+
 - **iPhone: library pictures away from the shop.** Every thumbnail the
   Mac sends is kept on the phone, so a model you've seen on the shop's
   Wi-Fi shows its picture on mobile data too. Up to 80 MB is kept, and the

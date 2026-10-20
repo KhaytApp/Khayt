@@ -71,6 +71,11 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// Which reader wrote `geometryKey` (`lib/geometry-key.js` READER). Absent
     /// on a record written before readers were numbered, which counts as due.
     let geometryReader: Int?
+    /// A model that was read and gave no measurement: the Mac's mesh reader
+    /// generation that tried (`Mesh.readerGeneration`). Below today's, it is
+    /// worth reading again (`OnlineMeasure.due`); absent with a hash and no
+    /// key is a record from before the number existed, and counts as below.
+    let meshTried: Int?
     /// Where the model came from — a URL, a designer, or "my own design".
     let source: String?
     /// When the shop put this model on its Print next list; absent when it is
