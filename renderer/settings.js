@@ -5721,7 +5721,7 @@ async function openRestoreBackupModal() {
  *  Disaster recovery beyond the dated auto-backups (separate, non-pruned set). */
 async function openRestorePointsModal() {
   if (!window.hubAPI?.listRestorePoints) { toast(t('rp.unavailable') || 'Restore points unavailable', 'error'); return; }
-  const fmtWhen = (ms) => { try { return new Date(ms).toLocaleString(i18n.current === 'ar' ? 'ar-SA-u-nu-latn' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return ''; } };
+  const fmtWhen = (ms) => { try { return new Date(ms).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return ''; } };
   const render = async (modal) => {
     let list = [];
     try { list = await window.hubAPI.listRestorePoints() || []; } catch (e) { /* ignore */ }
@@ -5795,7 +5795,7 @@ async function applyCloudSnapshotRestore(store) {
 
 async function openCloudSnapshotsModal() {
   if (!window.hubAPI?.cloudSnapshotsList) { toast(t('cloud.snapshots_unavailable') || 'Snapshot history unavailable', 'error'); return; }
-  const fmtWhen = (ms) => { try { return new Date(ms).toLocaleString(i18n.current === 'ar' ? 'ar-SA-u-nu-latn' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return ''; } };
+  const fmtWhen = (ms) => { try { return new Date(ms).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return ''; } };
   const fmtBytes = (n) => (n >= 1024 * 1024 ? (n / (1024 * 1024)).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
   const render = async (modal) => {
     const body = modal.querySelector('#csBody');
