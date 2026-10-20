@@ -4,11 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: only someone who can change Settings can sign a phone out.**
-  With the operator lock on, a manager can read Settings but not change
-  them, yet still saw "Sign out…" next to each paired phone. The button now
-  shows only for a role that can change Settings, as on the Mac.
-
 - **Mac: fixes from the alpha.85 pre-release review.** WhatsApp delivery
   reports kept on this Mac hold only what they need and are forgotten when
   the hook comes down or the Mac signs out of Khayt Cloud. A download that
@@ -6134,6 +6129,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.21] - 2026-10-20
+
+Only someone who can change Settings can sign a phone out, since 3.11.20.
+Individual entries are kept below; this is what changed for you.
+
+With the operator lock on, "Sign out…" next to a paired phone now shows only for a role that can change Settings. A manager, who can read Settings but not change them, sees the phones but can no longer sign one out.
+
+- **Desktop: only someone who can change Settings can sign a phone out.**
+  With the operator lock on, a manager can read Settings but not change
+  them, yet still saw "Sign out…" next to each paired phone. The button now
+  shows only for a role that can change Settings, as on the Mac.
 
 ## [3.11.20] - 2026-10-20
 
