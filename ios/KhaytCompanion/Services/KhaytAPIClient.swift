@@ -949,6 +949,9 @@ final class KhaytAPIClient: ObservableObject {
             }
             var page = SampleLibrary.page(LibraryCopy.items(rows), query: query, folder: folder, offset: offset, limit: limit)
             page.fromCopy = true
+            // The pictures the Mac already sent, kept on the phone.
+            let kept = await thumbShelf.kept(page.items.map(\.id))
+            for i in page.items.indices where kept.contains(page.items[i].id) { page.items[i].thumb = true }
             return page
         }
     }
@@ -989,17 +992,39 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     private let thumbs = NSCache<NSString, NSData>()
+    var thumbShelf = LibraryThumbs.shared
 
     /// A model's thumbnail, or nil when it has none. Kept in memory for the
-    /// session: a list scrolls back over the same ones.
+    /// session, since a list scrolls back over the same ones, and on disk
+    /// (`LibraryThumbs`) for away from the shop. One the Mac sent within the
+    /// day (its `max-age`) is not asked for again.
     func libraryThumb(id: String) async -> Data? {
         if let hit = thumbs.object(forKey: id as NSString) { return hit as Data }
-        guard let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(["/"])),
-              let (data, response) = try? await request(path: "/api/library/\(encoded)/thumb", method: "GET",
-                                                        body: nil, requiresPin: true),
-              (response as? HTTPURLResponse)?.statusCode == 200, !data.isEmpty, data.count < 4_000_000 else { return nil }
-        thumbs.setObject(data as NSData, forKey: id as NSString)
-        return data
+        let kept = await thumbShelf.get(id)
+        func use(_ data: Data) -> Data { thumbs.setObject(data as NSData, forKey: id as NSString); return data }
+        if let kept, kept.age < 86_400 { return use(kept.data) }
+        // The Mac did not answer a moment ago: do not wait on it once per row.
+        if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60 { return kept.map { use($0.data) } }
+        guard let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(["/"])) else { return nil }
+        let answer: (Data, URLResponse)
+        do {
+            answer = try await request(path: "/api/library/\(encoded)/thumb", method: "GET", body: nil, requiresPin: true)
+        } catch {
+            if Self.isUnreachable(error) { libraryMacDownSince = Date() }
+            return kept.map { use($0.data) }
+        }
+        let (data, response) = answer
+        switch (response as? HTTPURLResponse)?.statusCode {
+        case 200? where !data.isEmpty && data.count < 4_000_000:
+            await thumbShelf.put(id, data)
+            return use(data)
+        case 404?:
+            // The model has no picture any more.
+            await thumbShelf.remove(id)
+            return nil
+        default:
+            return kept.map { use($0.data) }
+        }
     }
 
     /// What a library model would cost: measured and priced on the Mac, or —
