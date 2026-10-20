@@ -95,6 +95,7 @@ struct CloudLibraryTests {
     func honest() async throws {
         let bucket = FakeBucket()
         CloudLibrary.fetch = bucket.fetch
+        CloudLibrary.download = S3.download(over: bucket.fetch)
         let engine = try KhaytEngine()
         let url = try model()
         let proved = try await CloudLibrary.ensureInBucket(.bucket(config), key: "print-files/PF-1/Benchy.3mf", file: url, engine: engine)
@@ -110,6 +111,7 @@ struct CloudLibraryTests {
         let bucket = FakeBucket()
         bucket.lie = lie
         CloudLibrary.fetch = bucket.fetch
+        CloudLibrary.download = S3.download(over: bucket.fetch)
         let engine = try KhaytEngine()
         let url = try model()
         await #expect(throws: (any Error).self) {
@@ -122,6 +124,7 @@ struct CloudLibraryTests {
     func roundTrip() async throws {
         let bucket = FakeBucket()
         CloudLibrary.fetch = bucket.fetch
+        CloudLibrary.download = S3.download(over: bucket.fetch)
         let engine = try KhaytEngine()
         let url = try model()
         let original = try Data(contentsOf: url)

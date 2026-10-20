@@ -4,6 +4,19 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: Arabic invoices are dated in the Gregorian calendar.** The Mac
+  printed an Arabic invoice's date as Hijri ("09 جمادى الأولى، 1448 هـ"
+  for 20 October 2026), unlike the desktop app and the rest of the Mac.
+  It now prints "20 أكتوبر، 2026": Gregorian, Arabic month names, Western
+  digits.
+
+- **Mac: bringing a model back from the cloud no longer holds it in
+  memory.** Bring Back, a first download of a model placed in a bucket by
+  hand, and the check that reads an upload back now write the download
+  straight to a file and hash it from there, four megabytes at a time. A
+  gigabyte model used to be held in memory whole. A download that fails its
+  check is removed, with no part-file left behind.
+
 - **Mac: a rare crash while saving is fixed.** A save could be stopped by a
   runtime check ("closure argument was escaped") when the Mac was busy: the
   save's background step still held on to its checks for a moment after

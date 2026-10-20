@@ -58,14 +58,19 @@ public actor DriveClient {
 
     let config: Config
     let fetch: S3.Fetch
+    /// A model's bytes, straight to a file (`S3.Download`); over `fetch`
+    /// unless the caller has a real one.
+    let download: S3.Download
     let now: @Sendable () -> Date
     private var access = ""
     private var expires = Date.distantPast
     private var folderId: String?
 
-    public init(_ config: Config, fetch: @escaping S3.Fetch, now: @escaping @Sendable () -> Date = { Date() }) {
+    public init(_ config: Config, fetch: @escaping S3.Fetch, download: S3.Download? = nil,
+                now: @escaping @Sendable () -> Date = { Date() }) {
         self.config = config
         self.fetch = fetch
+        self.download = download ?? S3.download(over: fetch)
         self.now = now
     }
 
@@ -260,6 +265,13 @@ public actor DriveClient {
         return data
     }
 
+    /// The bytes in a file of their own, or nil when nothing carries that key.
+    public func getFile(_ key: String) async throws -> URL? {
+        guard let f = try await find(key) else { return nil }
+        return try S3.downloaded("download", try await download(try await request("\(Self.api)/files/\(f.id)?alt=media", timeout: 600)),
+                                 failure: { Failure.http($0, $1) })
+    }
+
     /// Size and MD5, in the S3 client's shape.
     public func head(_ key: String) async throws -> S3.Head? {
         guard let f = try await find(key) else { return nil }
@@ -350,6 +362,14 @@ public enum LibraryRemote: Sendable {
         switch self {
         case .bucket(let c): try await S3.get(c, key: key, fetch: fetch)
         case .drive(let d): try await d.get(key)
+        }
+    }
+    /// The bytes in a file of their own — the bucket's through `download`,
+    /// a Drive's through the client's own.
+    public func getFile(_ key: String, download: S3.Download) async throws -> URL? {
+        switch self {
+        case .bucket(let c): try await S3.getFile(c, key: key, download: download)
+        case .drive(let d): try await d.getFile(key)
         }
     }
     public func head(_ key: String, fetch: S3.Fetch) async throws -> S3.Head? {

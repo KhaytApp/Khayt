@@ -169,6 +169,36 @@ public enum S3 {
 
     static func status(_ response: URLResponse) -> Int { (response as? HTTPURLResponse)?.statusCode ?? 0 }
 
+    /// A GET whose body lands in a file, never in memory: a model can be a
+    /// gigabyte, and a whole one held in memory to be hashed and written is
+    /// what a Mac with little to spare runs out on. The file is the caller's
+    /// to move or remove.
+    public typealias Download = @Sendable (URLRequest) async throws -> (URL, URLResponse)
+
+    /// A `Download` over a transport that has only `Fetch` — the tests' fake
+    /// buckets. The body is in memory once on the way to the file.
+    public static func download(over fetch: @escaping Fetch) -> Download {
+        { request in
+            let (data, response) = try await fetch(request)
+            let file = FileManager.default.temporaryDirectory.appending(path: "khayt-get-\(UUID().uuidString)")
+            try data.write(to: file)
+            return (file, response)
+        }
+    }
+
+    /// What a `Download` brought: the file when the answer was a 2xx, nil for
+    /// a 404, and the file removed either way when it is not handed back.
+    static func downloaded(_ op: String, _ got: (URL, URLResponse), failure: (String, Int) -> Error) throws -> URL? {
+        let (file, response) = got
+        let code = status(response)
+        guard (200..<300).contains(code) else {
+            try? FileManager.default.removeItem(at: file)
+            if code == 404 { return nil }
+            throw failure(op, code)
+        }
+        return file
+    }
+
     public static func put(_ c: S3Config, key: String, data: Data, fetch: Fetch) async throws {
         let (_, response) = try await fetch(try request(c, method: "PUT", key: key, body: data))
         let code = status(response)
@@ -182,6 +212,12 @@ public enum S3 {
         if code == 404 { return nil }
         guard (200..<300).contains(code) else { throw Failure.http("GET", code) }
         return data
+    }
+
+    /// The object in a file of its own (`Download`), or nil when it is not there.
+    public static func getFile(_ c: S3Config, key: String, download: Download) async throws -> URL? {
+        try downloaded("GET", try await download(try request(c, method: "GET", key: key, body: nil)),
+                       failure: { Failure.http($0, $1) })
     }
 
     public struct Head: Sendable, Equatable {

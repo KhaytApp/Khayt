@@ -188,6 +188,7 @@ extension CloudLibraryTests {
     func bringBackFromWhereItWent() async throws {
         let bucket = FakeBucket()
         CloudLibrary.fetch = bucket.fetch
+        CloudLibrary.download = S3.download(over: bucket.fetch)
         let engine = try KhaytEngine()
         let old = S3Config(endpoint: "https://old.r2.cloudflarestorage.com", bucket: "old", accessKeyId: "k", secretAccessKey: "s")
         let new = S3Config(endpoint: "https://new.r2.cloudflarestorage.com", bucket: "new", accessKeyId: "k", secretAccessKey: "s")

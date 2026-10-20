@@ -710,23 +710,23 @@ extension Shop {
     /// listing said: the size, and the ETag where it is a plain MD5. Written
     /// beside the marker and the marker removed — the record then has a file.
     static func bringDown(_ marker: URL, config c: S3Config, engine: KhaytEngine,
-                          fetch: @escaping S3.Fetch) async throws -> URL {
+                          download: @escaping S3.Download) async throws -> URL {
         // lock: system — fetches a model the shop asked for, into its own folder; removes only its marker and half-written .part.
         let data = try Data(contentsOf: marker)
         let m = try JSONDecoder().decode(OnlineMarker.self, from: data)
-        guard let bytes = try await S3.get(c, key: m.key, fetch: fetch) else { throw CloudLibrary.Failure.notThere }
-        guard bytes.count == m.size else { throw CloudLibrary.Failure.wrongSize(there: bytes.count, here: m.size) }
-        let md5 = CloudLibrary.md5(bytes)
-        if try await engine.etagVerdict(etag: m.etag, md5: md5) == "mismatch" { throw CloudLibrary.Failure.hashMismatch }
+        // To a file and hashed from it: a model is never held in memory whole.
+        guard let file = try await S3.getFile(c, key: m.key, download: download) else { throw CloudLibrary.Failure.notThere }
+        do {
+            let got = try await Task.detached { try CloudLibrary.digests(of: file) }.value
+            guard got.size == m.size else { throw CloudLibrary.Failure.wrongSize(there: got.size, here: m.size) }
+            if try await engine.etagVerdict(etag: m.etag, md5: got.md5) == "mismatch" { throw CloudLibrary.Failure.hashMismatch }
+        } catch {
+            try? FileManager.default.removeItem(at: file)
+            throw error
+        }
         let model = marker.deletingLastPathComponent()
             .appending(path: String(marker.lastPathComponent.dropLast(onlineExt.count)))
-        let part = model.deletingLastPathComponent()
-            .appending(path: model.lastPathComponent + ".part-\(ProcessInfo.processInfo.processIdentifier)")
-        try bytes.write(to: part, options: .atomic)
-        if rename(part.path, model.path) != 0 {
-            try? FileManager.default.removeItem(at: part)
-            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
-        }
+        try CloudLibrary.place(file, at: model)
         try? FileManager.default.removeItem(at: marker)
         return model
     }

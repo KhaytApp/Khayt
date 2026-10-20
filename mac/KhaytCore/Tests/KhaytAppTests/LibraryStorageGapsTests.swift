@@ -194,7 +194,7 @@ struct LibraryStorageGapsTests {
         let dir = bench.library.appending(path: LibraryLocation.itemDirName(id))
         let marker = dir.appending(path: "dragon.stl" + Shop.onlineExt)
         let engine = try KhaytEngine()
-        let model = try await Shop.bringDown(marker, config: config, engine: engine, fetch: bucket.fetch)
+        let model = try await Shop.bringDown(marker, config: config, engine: engine, download: S3.download(over: bucket.fetch))
         #expect(try Data(contentsOf: model) == stl(12))
         #expect(!FileManager.default.fileExists(atPath: marker.path))
         try await Shop.fillDownloaded(id: id, file: model, storeURL: bench.store, engine: engine,
@@ -217,10 +217,34 @@ struct LibraryStorageGapsTests {
         bucket.seed("/lib/Dragons/dragon.stl", stl(13))      // changed since the listing
         let marker = bench.library.appending(path: LibraryLocation.itemDirName(id))
             .appending(path: "dragon.stl" + Shop.onlineExt)
+        // The download lands in a file (never the whole model in memory), and
+        // a refused one leaves nothing behind: no download, no `.part`.
+        let landed = Landed()
+        let inner = S3.download(over: bucket.fetch)
         await #expect(throws: (any Error).self) {
-            _ = try await Shop.bringDown(marker, config: config, engine: try KhaytEngine(), fetch: bucket.fetch)
+            _ = try await Shop.bringDown(marker, config: config, engine: try KhaytEngine(), download: { request in
+                let got = try await inner(request)
+                landed.add(got.0)
+                return got
+            })
         }
         #expect(FileManager.default.fileExists(atPath: marker.path))
+        #expect(landed.files.count == 1)
+        #expect(landed.files.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) }, "the download was left behind")
+        let left = try FileManager.default.contentsOfDirectory(atPath: marker.deletingLastPathComponent().path)
+        #expect(!left.contains { $0.contains(".part-") }, "\(left)")
+    }
+
+    @Test("bring-down, bring-back and the read-back proof never GET a model into memory whole")
+    func noWholeObjectGets() {
+        let library = MenuCoverageTests.source("LibraryStorage.swift")
+        let from = library.range(of: "static func bringDown(")?.lowerBound ?? library.endIndex
+        let bringDown = String(library[from...]).components(separatedBy: "/// What a model's own bytes say")[0]
+        #expect(bringDown.contains("S3.getFile("))
+        #expect(!bringDown.contains("S3.get("))
+        let cloud = MenuCoverageTests.source("CloudLibrary.swift")
+        #expect(!cloud.contains("remote.get(side.key"), "bring-back must use getFile")
+        #expect(!cloud.contains("c.get(key, fetch: fetch)"), "the read-back proof must use getFile")
     }
 
     @Test("a bucket model's photo is a small picture beside it — fetched, the model not")
@@ -308,4 +332,12 @@ struct LibraryStorageGapsTests {
         guard case .object(let o)? = try T.rows(bench).first else { return }
         #expect(o["photoLookedFor"] == nil)
     }
+}
+
+/// The files a test's download handed back.
+final class Landed: @unchecked Sendable {
+    private let lock = NSLock()
+    private var urls: [URL] = []
+    func add(_ url: URL) { lock.withLock { urls.append(url) } }
+    var files: [URL] { lock.withLock { urls } }
 }

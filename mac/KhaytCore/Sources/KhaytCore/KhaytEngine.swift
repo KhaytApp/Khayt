@@ -1895,7 +1895,8 @@ public actor KhaytEngine {
     public func dashboardFacts(orders: [JSONValue], machines: [JSONValue],
                                settings: [String: JSONValue],
                                statusCache: [String: JSONValue] = [:],
-                               inventory: [JSONValue] = []) throws -> DashboardFacts {
+                               inventory: [JSONValue] = [],
+                               now: Date? = nil) throws -> DashboardFacts {
         // `nozzleWear` IS PASSED IN, and the whole nozzle category depends on
         // it: `attention` is pure and refuses to reach for a global, so a
         // caller that does not supply it gets no nozzle warnings at all — not
@@ -1921,9 +1922,13 @@ public actor KhaytEngine {
                         + " inventory: ARG4,"
                         + " deduction: globalThis.KhaytOrderDeduction,"
                         + " units: globalThis.KhaytInventoryUnits,"
-                        + " attention: globalThis.KhaytAttention})",
+                        + " attention: globalThis.KhaytAttention,"
+                        // The clock, when the caller has one to agree with:
+                        // nothing (`null`) is the module's own `Date.now()`.
+                        + " now: ARG5})",
                           [.array(orders), .array(machines), .object(settings),
-                           .object(statusCache), .array(inventory)],
+                           .object(statusCache), .array(inventory),
+                           now.map { .number($0.timeIntervalSince1970 * 1000) } ?? .null],
                           as: DashboardFacts.self)
     }
 
