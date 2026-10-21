@@ -598,6 +598,10 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// the jobs the accountant's export lists, where `revenue` is finished
     /// work only.
     public let vatCollected: Double
+    /// The sales `vatCollected` was charged on, net of it — every invoice
+    /// issued in the period, where `revenue` is finished work only. Optional
+    /// because an older bundle has no such field.
+    public let taxableSales: Double?
     /// Tax the shop paid on its purchases and can reclaim. Only the expenses
     /// that recorded one contribute; an expense entered before Khayt asked
     /// carries none and reclaims nothing.

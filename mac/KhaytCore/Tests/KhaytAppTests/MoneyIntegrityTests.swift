@@ -65,11 +65,17 @@ struct PnlAddsUpTests {
     func revenueIsNet() async throws {
         let rows = try await Self.rows()
         for row in rows where row.vatCollected > 0 {
-            #expect(row.revenue > 0)
-            // What was charged is revenue plus the tax held for ZATCA, so the
-            // tax is a strictly smaller figure than the revenue it sat inside.
-            #expect(row.vatCollected < row.revenue,
-                    "\(row.period): tax \(row.vatCollected) against revenue \(row.revenue)")
+            // The tax is on every invoice ISSUED in the period, finished or
+            // not, so it sits inside `taxableSales` — revenue counts finished
+            // work only, and a quarter of open invoices taxes more than it
+            // has earned yet (beta.1 review).
+            let sales = try #require(row.taxableSales)
+            #expect(sales > 0)
+            #expect(sales >= row.revenue - 0.01, "\(row.period): finished work is invoiced work")
+            // What was charged is the sale plus the tax held for ZATCA, so the
+            // tax is a strictly smaller figure than the sale it sat inside.
+            #expect(row.vatCollected < sales,
+                    "\(row.period): tax \(row.vatCollected) against sales \(sales)")
         }
     }
 }
