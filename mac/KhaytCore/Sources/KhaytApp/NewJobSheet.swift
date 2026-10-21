@@ -311,7 +311,7 @@ struct NewJobSheet: View {
                     .focused($focused)
             }
             GridRow {
-                Text(shop.words.callIt("doc.client")).gridColumnAlignment(.trailing)
+                Text(shop.words.callIt("mac.customer")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)
                 Picker("", selection: $clientId) {
                     // A walk-in is a real answer, and the commonest one for a

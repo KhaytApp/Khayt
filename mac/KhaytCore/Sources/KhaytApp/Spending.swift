@@ -22,7 +22,7 @@ struct Expenses: View {
             // ways. The whole screen says it once, with the way in. A filter
             // that matches nothing still keeps the split: there IS a summary.
             if shop.expenses.isEmpty {
-                EmptyHere(title: shop.words.callIt("exp.empty"), mark: .expenses) {
+                EmptyHere(title: shop.words.callIt("mac.expenses_empty"), mark: .expenses) {
                     HStack(spacing: 10) {
                         Button(shop.words.callIt("exp.add_title")) { shop.addingExpense = true }
                             .buttonStyle(.borderedProminent)
@@ -30,6 +30,8 @@ struct Expenses: View {
                         Button(shop.words.callIt("mac.receipt_add") + "\u{2026}") { shop.startReadingReceipt() }
                             .disabled(!shop.canMoveJobs)
                     }
+                    // Why the buttons are grey, as Customers says it.
+                    WhyLockedNote(shop: shop)
                 }
             } else {
                 HSplitView {
@@ -101,7 +103,7 @@ struct Expenses: View {
         .scrollContentBackground(.hidden)
         .overlay {
             if rows.isEmpty {
-                EmptyHere(title: shop.words.callIt(shop.expenses.isEmpty ? "exp.empty" : "exp.empty_filter"), mark: .expenses)
+                EmptyHere(title: shop.words.callIt(shop.expenses.isEmpty ? "mac.expenses_empty" : "exp.empty_filter"), mark: .expenses)
             }
         }
     }
@@ -207,6 +209,7 @@ struct Waste: View {
                     Button(shop.words.callIt("waste.add")) { shop.loggingWaste = true }
                         .buttonStyle(.borderedProminent)
                         .disabled(!shop.canMoveJobs)
+                    WhyLockedNote(shop: shop)
                 }
             } else {
                 HSplitView {

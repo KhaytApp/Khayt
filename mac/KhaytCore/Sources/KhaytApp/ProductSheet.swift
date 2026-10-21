@@ -483,6 +483,7 @@ struct ProductSheet: View {
                         }
                         .buttonStyle(.borderless)
                         .help(shop.words.callIt("common.delete"))
+                        .accessibilityLabel(shop.words.callIt("common.delete"))
                     }
                 }
                 Text(shop.words.callIt("cat.tiers_hint"))
@@ -532,6 +533,7 @@ struct ProductSheet: View {
                         }
                         .buttonStyle(.borderless)
                         .help(shop.words.callIt("common.delete"))
+                        .accessibilityLabel(shop.words.callIt("common.delete"))
                     }
                 }
                 Text(shop.words.callIt("pdoc.hint"))

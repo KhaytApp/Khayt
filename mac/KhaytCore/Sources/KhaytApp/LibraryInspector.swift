@@ -216,6 +216,7 @@ struct LibraryInspector: View {
                     }
                     .buttonStyle(.plain)
                     .help(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite"))
+                    .accessibilityLabel(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite"))
                 } else if file.isFavourite {
                     Image(systemName: "star.fill").foregroundStyle(Khayt.marked)
                 }

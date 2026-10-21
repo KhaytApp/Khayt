@@ -17,7 +17,7 @@ struct CustomersTable: View {
         Table(rows, selection: Binding(get: { shop.customerSelections }, set: { shop.selectCustomers($0) }),
               sortOrder: $order,
               columnCustomization: $columns) {
-            TableColumn(shop.words.callIt("doc.client"), value: \.name) { person in
+            TableColumn(shop.words.callIt("mac.customer"), value: \.name) { person in
                 HStack(spacing: 6) {
                     if person.overdueCount > 0 {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -269,7 +269,7 @@ struct CustomerInspector: View {
                     // instead it would say "Not written down yet" about
                     // somebody who is.
                     if let record = person.record, record.hasContactDetails {
-                        DetailSection(shop.words.callIt("doc.client")) {
+                        DetailSection(shop.words.callIt("mac.customer")) {
                             if !record.phone.isEmpty {
                                 DetailLine(shop.words.callIt("ce.phone"), record.phone)
                                 // Opens a chat with nothing typed — the number

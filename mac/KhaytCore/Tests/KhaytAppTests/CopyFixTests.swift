@@ -100,4 +100,62 @@ struct CopyFixTests {
         #expect(ar.counting(2, "mac.webhooks_sent") == "أُبلغ نظامان آخران.")
         #expect(ar.counting(5, "mac.cloud_lost_edits").hasPrefix("أُلغيت 5 تغييرات"))
     }
+
+    // MARK: - Smaller things the review read
+
+    @Test("dashboard counts are grouped and in the shop's digits, not a bare \\(n)")
+    func dashboardCounts() {
+        let dashboard = EmptyStateTests.source("Dashboard.swift")
+        #expect(!dashboard.contains("value: \"\\("), "a Stat value interpolates a raw number")
+        #expect(dashboard.contains("value: Money.quantity(Double(facts.printingCount), decimals: 0)"))
+    }
+
+    @Test("one word for the person a job is for: Customer, not Client")
+    func customerNotClient() async throws {
+        for file in ["CustomersTable.swift", "OrdersTable.swift", "NewJobSheet.swift"] {
+            #expect(!EmptyStateTests.source(file).contains("callIt(\"doc.client\")"), "\(file)")
+        }
+        #expect(Words().callIt("mac.customer") == "Customer")
+        let ar = try await Self.arabic()
+        #expect(ar.callIt("mac.customer") == ar.callIt("doc.client"), "Arabic already said one word")
+    }
+
+    @Test("an empty expenses or waste log says why its buttons are grey, and its title has no full stop")
+    func emptyLogs() async throws {
+        let spending = EmptyStateTests.source("Spending.swift")
+        #expect(spending.components(separatedBy: "WhyLockedNote(shop: shop)").count - 1 == 2)
+        let ar = try await Self.arabic()
+        for words in [Words(), ar] {
+            for key in ["mac.expenses_empty", "mac.waste_empty", "mac.no_customers"] {
+                #expect(!words.callIt(key).hasSuffix("."), "\(key)")
+            }
+        }
+    }
+
+    @Test("the WhatsApp report hint says Meta tells Khayt Cloud")
+    func waHookHint() {
+        #expect(Words().callIt("mac.wa_hook_hint").hasPrefix("Meta tells Khayt Cloud whether each WhatsApp message was delivered and read"))
+    }
+
+    @Test("an icon-only button says its name to VoiceOver, not only on hover")
+    func iconButtonsAreNamed() throws {
+        let sites: [(String, String)] = [
+            ("LibraryInspector.swift", "shop.words.callIt(file.isFavourite ? \"mac.unmake_favourite\" : \"mac.make_favourite\")"),
+            ("SettingsWindow.swift", "shop.words.callIt(\"mac.slicer_make_default\")"),
+            ("SettingsWindow.swift", "shop.words.callIt(\"mac.slicer_remove\")"),
+            ("FixedCostsSettings.swift", "shop.words.callIt(\"mac.fixed_remove\")"),
+            ("ProductSheet.swift", "shop.words.callIt(\"common.delete\")"),
+            ("WebStore.swift", "w.callIt(\"common.delete\")"),
+            ("Calculator.swift", "shop.words.callIt(\"common.delete\")"),
+            ("ModelConsumables.swift", "shop.words.callIt(\"common.delete\")"),
+            ("Operators.swift", "words.callIt(\"common.delete\")"),
+            ("ShopFloor.swift", "shop.words.callIt(\"cons.add_title\")"),
+        ]
+        for (file, said) in sites {
+            let source = EmptyStateTests.source(file)
+            let pair = try Regex("\\.help\\(" + NSRegularExpression.escapedPattern(for: said)
+                                 + "\\)\\n\\s*\\.accessibilityLabel\\(" + NSRegularExpression.escapedPattern(for: said) + "\\)")
+            #expect(source.contains(pair), "\(file): \(said)")
+        }
+    }
 }

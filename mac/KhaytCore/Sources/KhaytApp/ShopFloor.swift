@@ -1111,6 +1111,7 @@ struct ConsumablesCard: View {
                     }
                     .buttonStyle(.borderless)
                     .help(shop.words.callIt("cons.add_title"))
+                    .accessibilityLabel(shop.words.callIt("cons.add_title"))
                 }
             }
             if shop.consumables.isEmpty {

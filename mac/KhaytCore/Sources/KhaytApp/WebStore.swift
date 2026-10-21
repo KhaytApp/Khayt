@@ -943,6 +943,7 @@ struct WebStoreSheet: View {
                 }
                 .buttonStyle(.borderless)
                 .help(w.callIt("common.delete"))
+                .accessibilityLabel(w.callIt("common.delete"))
             }
         }
         Button("+ " + w.callIt("store.add_shipping")) { store.shipping.append(.init()) }
@@ -968,6 +969,7 @@ struct WebStoreSheet: View {
                 }
                 .buttonStyle(.borderless)
                 .help(w.callIt("common.delete"))
+                .accessibilityLabel(w.callIt("common.delete"))
             }
         }
         Button("+ " + w.callIt("store.add_promo")) { store.promos.append(.init()) }

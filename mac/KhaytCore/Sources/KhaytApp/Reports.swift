@@ -1188,7 +1188,7 @@ struct Reports: View {
                             }
                         }
                         .width(min: 120, ideal: 200)
-                        TableColumn(shop.words.callIt("an.aged_col_client"), value: \.client) { row in
+                        TableColumn(shop.words.callIt("mac.customer"), value: \.client) { row in
                             Text(row.client.isEmpty ? "—" : row.client)
                                 .foregroundStyle(row.client.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
                                 .lineLimit(1)

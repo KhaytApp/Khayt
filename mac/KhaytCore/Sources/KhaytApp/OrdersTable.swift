@@ -104,7 +104,7 @@ struct OrdersTable: View {
             // whose own book this is, four columns of the six carried nothing.
             // The column comes back the moment one job has a client, because
             // the test is the data rather than a setting somebody has to find.
-            TableColumn(shop.words.callIt("doc.client"), value: \.client) { job in
+            TableColumn(shop.words.callIt("mac.customer"), value: \.client) { job in
                 Text(job.client.isEmpty ? "—" : job.client)
                     .foregroundStyle(job.client.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
                     .lineLimit(1)

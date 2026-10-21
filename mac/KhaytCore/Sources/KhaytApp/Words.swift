@@ -737,7 +737,9 @@ final class Words {
         // The expenses table's order column. The shared `exp.order_ref` is the
         // sheet's field label, "(optional)" and all, and did not fit a column.
         "mac.expense_order_col": ["en": "Order", "ar": "الطلب"],
-        "mac.waste_empty":     ["en": "No waste logged yet.", "ar": "لم يُسجَّل أي هدر بعد."],
+        // Titles, so no full stop — as "No customers yet".
+        "mac.waste_empty":     ["en": "No waste logged yet", "ar": "لم يُسجَّل أي هدر بعد"],
+        "mac.expenses_empty":  ["en": "No expenses recorded yet", "ar": "لا توجد مصروفات مسجلة بعد"],
         "mac.library":       ["en": "Library",       "ar": "المكتبة"],
         "mac.all_models":    ["en": "Library",       "ar": "المكتبة"],
         "mac.people":        ["en": "People",        "ar": "الأشخاص"],
@@ -2815,7 +2817,7 @@ final class Words {
         "mac.cr_deleted":    ["en": "Deleted from Khayt Cloud.", "ar": "حُذف من سحابة خيط."],
         // WhatsApp delivery reports by way of Khayt Cloud (WhatsAppReports.swift).
         "mac.wa_hook_title": ["en": "WhatsApp delivery reports", "ar": "تقارير تسليم واتساب"],
-        "mac.wa_hook_hint":  ["en": "Meta reports whether each WhatsApp message was delivered and read to Khayt Cloud, and Khayt shows it on the customer's log beside each message sent through Meta. A message opened in the WhatsApp app is not reported. Paste your Meta app's secret, then enter the address and verify token below in Meta (WhatsApp → Configuration → Webhook) and subscribe to \"messages\".",
+        "mac.wa_hook_hint":  ["en": "Meta tells Khayt Cloud whether each WhatsApp message was delivered and read, and Khayt shows it on the customer's log beside each message sent through Meta. A message opened in the WhatsApp app is not reported. Paste your Meta app's secret, then enter the address and verify token below in Meta (WhatsApp → Configuration → Webhook) and subscribe to \"messages\".",
                               "ar": "يبلّغ Meta سحابة خيط بوصول كل رسالة واتساب وقراءتها، ويعرض خيط ذلك في سجل العميل بجانب كل رسالة أُرسلت عبر Meta. الرسالة التي تُفتح في تطبيق واتساب لا يصل عنها تقرير. الصق السر الخاص بتطبيقك في Meta، ثم أدخل العنوان ورمز التحقق أدناه في Meta (WhatsApp ← Configuration ← Webhook) واشترك في \"messages\"."],
         "mac.wa_app_secret": ["en": "Meta app secret", "ar": "سر تطبيق Meta"],
         "mac.wa_hook_connect": ["en": "Connect", "ar": "ربط"],
@@ -3034,6 +3036,10 @@ final class Words {
                                    "ar": "عُدّل هنا، واستُبدل بنسخة جهاز آخر"],
         "mac.losses_kept_deleted": ["en": "Deleted here; another device's later change was dropped",
                                        "ar": "حُذف هنا؛ وأُسقط تغيير لاحق من جهاز آخر"],
+        // The Mac's one word for the person a job is for. Khayt's `doc.client`
+        // is "Client" — right on its printed documents — and the tables and
+        // the New Job sheet said that beside a sidebar of "Customers".
+        "mac.customer": ["en": "Customer", "ar": "العميل"],
         // What kind of record each loss was — never the store's own key.
         "mac.losses_kind_job": ["en": "Job", "ar": "عمل"],
         "mac.losses_kind_customer": ["en": "Customer", "ar": "عميل"],
