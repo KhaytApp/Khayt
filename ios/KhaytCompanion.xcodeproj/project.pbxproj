@@ -76,6 +76,7 @@
 				Info.plist,
 				KhaytAlerts.entitlements,
 				NotificationService.swift,
+				PrivacyInfo.xcprivacy,
 			);
 			target = T10000000000000000000001 /* KhaytCompanion */;
 		};
@@ -94,6 +95,7 @@
 				KhaytQueueWidget.swift,
 				KhaytWidget.entitlements,
 				PrintActivityWidget.swift,
+				PrivacyInfo.xcprivacy,
 				ShopControlWidgets.swift,
 			);
 			target = T10000000000000000000001 /* KhaytCompanion */;

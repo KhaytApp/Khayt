@@ -4,6 +4,82 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: anonymous daily install count.** The iPhone sends the
+  same once-a-day count as the Mac, through KhaytCore's shared rules. It
+  sends six fields: platform `ios`, channel (TestFlight → beta, App Store →
+  stable), version, and whether this is the install's first day this week,
+  this month or ever. There's no id and nothing about the shop. A Settings
+  switch, "Count this install (anonymous)", turns it off. It's described
+  at khaytapp.com/privacy#active-count and counts nothing until the cloud
+  route is switched on. The app and its widget and alerts now carry Apple
+  privacy manifests that declare the count.
+
+- **Mac: the anonymous daily install count, built and held.** Once a day
+  the Mac would send only its platform, version and release channel, and
+
+- **Desktop: a full customer erase takes their tracking pages down.**
+  Fully erasing a customer now also takes down every tracking page they were
+  sent from Khayt Cloud, invoiced and paid jobs included, as the privacy
+  policy promises. The erase sheet says how many. A page the cloud could not
+  take down right away is tried again at launch and every ten minutes, and
+  can't be published again in the meantime. "Unlink" takes nothing down. The
+  same as the Mac.
+
+- **A printer retired by its date alone is out of the lead time and the
+  overhead rate.** A printer can be marked retired by its status or by a
+  retire date. The published lead time and the overhead rate looked only at
+  the status, so a printer with just the date (left by a sync or an older
+  build) still counted as capacity and still spread the shop's overhead.
+  Both now read either one, like every other place that asks.
+
+- **Desktop: an anonymous count of installs in use.** Once a day the app
+  tells Khayt Cloud only its platform, version and release channel, and
+  whether this is its first day this week, this month or ever. There is no
+  id and nothing about the shop (khaytapp.com/privacy, "The anonymous install
+  count"). It is on unless "Count this install (anonymous)" is switched off in
+  Settings → Crash Reports & Usage, and that switch belongs to this computer.
+  Settings no longer says Khayt sends nothing by default.
+
+- **Desktop: Khayt asks once about crash reports.** A card at the top of the
+  window asks whether to share crash reports, with usage counts as an extra
+  tick. "Not Now" puts it away for good on this computer and turns nothing
+  on; "Share Crash Reports" turns them on. It never covers anything, waits
+  until the first-run setup is done, and only asks someone who may change
+  Settings. Settings → Crash Reports & Usage still has both switches. Until
+  now the switches were the only way in, so nothing was ever shared. The
+  same card as on the Mac.
+
+- **Mac and desktop: fixes from the beta.1 review.** Ten reviews of the
+  whole app (security, money, jobs and printers, stock, library, data
+  integrity, customers, and the interface in English and Arabic), each fix
+  checked twice more. Shared rules changed for both apps:
+  - **Money.** A standing order's new job no longer copies the last run's
+    credit notes, payments, survey, shipping, parts' progress or web-store
+    link. It keeps the site, the reference and "not business". The AI's "you
+    usually make X%" is applied as a margin, not a markup. The invoice's VAT
+    row no longer says "(incl.)" on a shop that adds tax. The rows on a
+    discounted invoice add up to its Subtotal. Machine and product profit
+    charge an expense net of the VAT the shop reclaims. Loyalty credit is
+    rounded to the halala. Clearing a payment is refused while an instalment
+    plan has collected rows. A product with no margin uses the shop's default
+    everywhere. The accounting export uses the invoice number, so an accepted
+    quote now exports as INV-…, not QUO-…; re-importing an earlier period can
+    duplicate those rows. Daftra expenses carry their VAT for a shop that
+    reclaims it.
+  - **Stock.** A supplier price list matches the closest material name
+    (PLA-CF beats PLA) before the cheapest. Deleting a QC-failure waste row
+    takes back exactly its own usage lines. Refilling an empty spool re-prices
+    it. Spools counted in sheets or ml are ordered in their own unit.
+  - **Privacy.** Crash reports remove whole file paths, including ones with
+    spaces, quotes or no leading slash. A customer's data export and full erase
+    cover their gift cards and loyalty points. A card with a balance keeps
+    their name, because the shop owes it. Camera addresses with a password in
+    them are refused.
+  - **Sync.** A full activity log's trimmed rows have their own tombstone
+    allowance, so they can never push a real delete out of the list.
+  - **Printers.** A finished print is recognised by its time and file, so it
+    is no longer seen as new on every poll.
+
 - **iPhone: the calculator costs spools without the VAT you reclaim.** For
   a VAT-registered shop, the phone's calculator and its library prices
   charged each spool at its price with VAT, so a 115 roll with 15 VAT made

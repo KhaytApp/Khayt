@@ -39,6 +39,8 @@ struct KhaytCompanionApp: App {
     private let alerts: PrintAlertCenter
     /// Held for the life of the app, like `alerts`: it follows the readings.
     private let activities: PrintActivities
+    /// The anonymous daily install count.
+    private let activeCount: ActiveCountSender
 
     init() {
         let s = ConnectionSettings()
@@ -54,6 +56,7 @@ struct KhaytCompanionApp: App {
         let center = PrintAlertCenter(api: apiClient, settings: s, printers: printers)
         alerts = center
         activities = PrintActivities(printers: printers, settings: s, api: apiClient)
+        activeCount = ActiveCountSender(settings: s)
         channel.onEvent = { kind, at, ciphertext, session in
             await center.receive(kind: kind, ciphertext: ciphertext, dek: session.dek, at: at)
         }
@@ -134,11 +137,15 @@ struct KhaytCompanionApp: App {
                     // A token registration is fire-and-forget: one lost to a
                     // dropped connection left the Mac's pushes reaching nobody
                     // for the rest of the print. Each opening hands them over again.
-                    if phase == .active { Task { await activities.push.sendAll() } }
+                    if phase == .active {
+                        Task { await activities.push.sendAll() }
+                        Task { await activeCount.tick() }
+                    }
                 }
                 // Signing in or out of the cloud opens or closes the stream.
                 .onChange(of: api.cloud) { _, _ in channel.setActive(scenePhase == .active) }
                 .task { channel.setActive(true) }
+                .task { await activeCount.tick() }
         }
     }
 }
