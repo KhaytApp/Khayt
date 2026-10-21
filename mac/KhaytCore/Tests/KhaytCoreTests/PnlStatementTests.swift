@@ -185,6 +185,39 @@ import Testing
         #expect(abs(due - vat.net) < 0.005, "the summary and the table disagree")
     }
 
+    /// The tax point is the invoice (beta.1 review). The summary counted only
+    /// finished jobs while the accountant's export (`AccountingRows`) listed
+    /// every issued invoice, so this October read 15.00 output VAT on the
+    /// screen and 45.00 in the file. Both cover the same two jobs now; the
+    /// quote is in neither, and revenue is still the finished job alone.
+    @Test("a printing job with an invoice is in the VAT summary and the export; a quote is in neither")
+    func vatFollowsTheInvoice() async throws {
+        let engine = try KhaytEngine()
+        let orders: [JSONValue] = [
+            Self.job("INV-1", "2026-10-02", 115),
+            .object(["id": .string("INV-2"), "status": .string("printing"), "date": .string("2026-10-05"),
+                     "price": .number(230), "invoiceNumber": .string("INV-2")]),
+            .object(["id": .string("QUO-1"), "status": .string("quote"), "date": .string("2026-10-06"),
+                     "price": .number(345)]),
+        ]
+        let out = try await engine.pnlStatement(PnlInputs(
+            orders: orders, expenses: [], settings: Self.vat15, now: Self.october16,
+            granularity: "month", from: "2026-10-01", to: "2026-10-31"))
+        #expect(out.vat.output == 45, "15 on the finished job + 30 on the one printing")
+        #expect(out.vat.sales == 300)
+        #expect(out.rows.first?.revenue == 100, "revenue waits for the work to finish")
+
+        let exported = AccountingRows.invoiceRows(orders: orders, settings: Self.vat15, clients: [],
+                                                  tax: AccountingRows.Tax(rate: 15, mode: "inclusive"))
+        let prices = exported.compactMap { row -> Double? in
+            guard case .object(let r) = row, case .number(let n)? = r["price"] else { return nil }
+            return n
+        }
+        #expect(prices.sorted() == [115, 230])
+        let exportVat = prices.reduce(0) { $0 + $1 - $1 / 1.15 }
+        #expect(abs(exportVat - out.vat.output) < 0.005)
+    }
+
     @Test("VAT, added on TOP: the price is revenue and the tax is extra")
     func vatExclusive() async throws {
         let engine = try KhaytEngine()

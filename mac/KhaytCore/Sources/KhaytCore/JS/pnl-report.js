@@ -34,6 +34,34 @@
    * wasted is in cogs already. */
   const wasteCostOf = (w) => Math.max(0, +(w && w.cost) || 0);
 
+  /* ── VAT IS DUE WHEN THE INVOICE IS ISSUED, NOT WHEN THE JOB IS FINISHED ──
+   *
+   * Revenue here follows the job: it is earned when the work is finished. The
+   * TAX does not. Under ZATCA the tax point is the earlier of supply, payment
+   * or the tax invoice, and Khayt issues a job's invoice number when the job
+   * is booked (`lib/order-new.js`) — so a job still printing, invoice in the
+   * customer's hands, owes its VAT in the period it is dated.
+   *
+   * The VAT summary counted only finished jobs while the accountant's invoice
+   * export (`lib/accounting-rows.js isInvoice`) listed every issued invoice,
+   * pending and printing included, so the same quarter's output VAT came to
+   * two figures (beta.1 review). Both now cover the SAME jobs: this is
+   * `isInvoice`, written out so this module stands alone — the Mac runs the
+   * export rule natively (`AccountingRows.swift`) and does not bundle that
+   * file. `test/pnl-vat-tax-point.test.js` holds the two to one answer.
+   *
+   * Not a QUOTE (no invoice yet), not CANCELLED, not VOIDED, not CREDITED IN
+   * FULL, not NOT-BUSINESS, not a SPLIT PARENT (its sub-orders carry its
+   * price). */
+  function isTaxPoint(o) {
+    if (!o || typeof o !== 'object') return false;
+    if (o.status === 'quote' || o.status === 'cancelled') return false;
+    if (o.voidedAt || o.creditedAt) return false;
+    if (o.nonBusiness === true) return false;
+    if (o.status === 'split' && Array.isArray(o.splitInto) && o.splitInto.length > 0) return false;
+    return true;
+  }
+
   /* ── COST OF GOODS IS WHAT WAS STOCKED ─────────────────────────────────────
    *
    * A job's cost (lib/calculator-cost.js) is built for PRICING: material,
@@ -466,7 +494,10 @@
    * rule rather than from arithmetic of their own beside it.
    *
    * Returns rows newest first: `{ period, orders, revenue, shipping, expenses,
-   * fixed, vatCollected, vatReclaimable, vatDue, net, cogs, marginPct }`.
+   * fixed, vatCollected, taxableSales, vatReclaimable, vatDue, net, cogs,
+   * marginPct }`. The tax figures cover every issued invoice in the period;
+   * revenue and cost only the finished work (see VAT IS DUE WHEN THE INVOICE
+   * IS ISSUED).
    *
    * `net` = revenue − cogs − expenses − waste − fixed − depreciation −
    * labour, the same arithmetic as `computePnl`'s `netProfit`.
@@ -545,7 +576,7 @@
       if (!byQuarter[key]) {
         byQuarter[key] = {
           period: key, orders: 0, revenue: 0, shipping: 0, expenses: 0, inventory: 0, capital: 0, waste: 0,
-          vatCollected: 0, vatReclaimable: 0, cogs: 0, unpriced: 0, labour: 0, payrollExpense: false,
+          vatCollected: 0, taxableSales: 0, vatReclaimable: 0, cogs: 0, unpriced: 0, labour: 0, payrollExpense: false,
         };
       }
       return byQuarter[key];
@@ -557,7 +588,13 @@
       // rule hold `status: 'delivered'` outright, and those are finished work
       // too. A P&L that skipped them under-reported every quarter of an
       // older book — the sample shop's own Q3 by thirteen jobs.
-      if (!o || !FINISHED.has(o.status) || o.voidedAt) continue;
+      if (!o) continue;
+      const finished = FINISHED.has(o.status) && !o.voidedAt;
+      // An issued invoice owes its VAT whatever the job's stage — see VAT IS
+      // DUE WHEN THE INVOICE IS ISSUED. Such a job reaches the tax lines
+      // below and nothing else: its revenue and cost wait for it to finish.
+      const taxPoint = isTaxPoint(o);
+      if (!finished && !taxPoint) continue;
       // NOT BUSINESS. A test print, a gift, a bracket for the shop's own shelf:
       // `lib/business-scope.js` exists to keep them "OUT of revenue, order
       // counts and reports", and ten reports ask it — this one did not, so a
@@ -567,9 +604,15 @@
       if (scope && !scope.countsForBusiness(o)) continue;
       const key = quarterOf(o.date);
       if (!key || !inSpan(o.date)) continue;
-      const row = at(key);
       // WHAT THE CUSTOMER PAID, which is not what the shop earned.
       const charged = money ? money.orderNetRevenueBase(o, moneyCtx, known) : (+o.price || 0);
+      // On what was CHARGED, not on the net figure below — computing tax on a
+      // figure the tax has already been taken out of understates it.
+      const vat = (taxPoint && tax && profile) ? tax.computeTax(charged, profile).taxTotal : 0;
+      // Unfinished work with no tax on it has nothing to say here, and must
+      // not open a period row of zeros (an unregistered shop's pending job).
+      if (!finished && !(vat > 0)) continue;
+      const row = at(key);
       // REVENUE IS NET OF TAX. ZATCA and IFRS 15 both treat tax collected on a
       // sale as money held for the government — a liability until it is
       // remitted, and never income. This report showed the charged figure as
@@ -585,6 +628,13 @@
       // figure and comes back unchanged, and a shop that is not registered has
       // nothing to take out.
       const revenue = (tax && profile) ? tax.netOfTax(charged, profile) : charged;
+      if (taxPoint) {
+        row.vatCollected += vat;
+        // The sales that tax was charged on, net of it: the VAT return's
+        // sales box, on the same jobs as its output tax.
+        row.taxableSales += revenue;
+      }
+      if (!finished) continue;
       row.orders += 1;
       row.revenue += revenue;
       // Finished, charged nothing, and cost something to make: a gift, a test
@@ -600,9 +650,6 @@
       row.shipping += money
         ? money.convertToBase(+o.shippingCost || 0, money.orderCurrency(o, moneyCtx, known), moneyCtx)
         : (+o.shippingCost || 0);
-      // On what was CHARGED, not on the net figure above — computing tax on a
-      // figure the tax has already been taken out of understates it.
-      row.vatCollected += (tax && profile) ? tax.computeTax(charged, profile).taxTotal : 0;
     }
     // Machines bought that the depreciation line below already spreads out —
     // see A MACHINE IS PAID FOR ONCE. Judged on the WHOLE expense list and
@@ -771,6 +818,9 @@
         // fixed cost: possibly the same money twice. Said, never subtracted.
         labourOverlap: row.labour > 0 && (row.payrollExpense || (payrollOverhead && fixed > 0)),
         vatCollected: round2(row.vatCollected),
+        // Net of tax, on the jobs `vatCollected` covers (every issued
+        // invoice), where `revenue` covers only finished work.
+        taxableSales: round2(row.taxableSales),
         vatReclaimable: round2(row.vatReclaimable),
         // What the shop actually owes the authority for the quarter: the tax it
         // charged, less the tax it paid. Negative means a refund is due, which
@@ -992,7 +1042,7 @@
       + '</div>';
   }
 
-  const api = { computePnl, pnlToCsv, pnlByPeriod, isInventoryPurchase, INVENTORY_CATEGORIES, stockShare,
+  const api = { computePnl, pnlToCsv, pnlByPeriod, isInventoryPurchase, INVENTORY_CATEGORIES, stockShare, isTaxPoint,
     reclaimableTaxOf, expenseNetOf,
     capitalPurchases, CAPITAL_CATEGORIES,
     labourCostOf, labourCounts, looksLikePayroll, payrollFixedCosts,

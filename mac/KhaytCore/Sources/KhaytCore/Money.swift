@@ -593,7 +593,10 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// in progress, so it is not billed a full quarter's rent on day three.
     public let fixed: Double
     /// Tax charged on this quarter's sales — money held for the authority, and
-    /// the reason `revenue` above is net of it.
+    /// the reason `revenue` above is net of it. On every invoice ISSUED in the
+    /// period, finished or not: the invoice is the tax point, so this covers
+    /// the jobs the accountant's export lists, where `revenue` is finished
+    /// work only.
     public let vatCollected: Double
     /// Tax the shop paid on its purchases and can reclaim. Only the expenses
     /// that recorded one contribute; an expense entered before Khayt asked
