@@ -72,19 +72,43 @@
   const CODE_FILE_RE = /\.(?:js|mjs|cjs|ts|json|html|css|node)$/i;
 
   function safeBasename(name) {
-    const base = String(name || '');
+    const base = String(name || '').trim();
     if (CODE_FILE_RE.test(base)) return base;
-    const dot = base.lastIndexOf('.');
-    return dot > 0 ? '<file>' + base.slice(dot) : '<file>';
+    // Only a real extension is kept. Since a path runs on through spaces, the
+    // last segment can carry the words after it ("lamp.3mf failed"), and a
+    // dot inside a folder or person's name ("Nouf.v2 Aldossari") is no
+    // extension either; either way the whole name goes.
+    const ext = /\.[A-Za-z0-9]{1,10}$/.exec(base);
+    return ext ? '<file>' + ext[0] : '<file>';
+  }
+
+  /**
+   * A path token. It starts at `/` (a `file://` URL included) or at a drive
+   * letter `X:\`, and runs THROUGH SPACES, because shops' folders have them:
+   * "My Drive/Nouf Aldossari/lamp.3mf" stopped at the first space used to
+   * leak "Drive" and "Aldossari". It ends at a `:<line>` (or a colon before
+   * a space or the end), a closing parenthesis, a quote or a newline. A POSIX
+   * path only starts after a space, an opening bracket, a quote, `=` or `:`,
+   * so "and/or" in a sentence is not read as a path that swallows the rest.
+   *
+   * `\x28` and `\x29` are `(` and `)` inside the character classes, spelled
+   * so this file's bracket count stays balanced for
+   * test/bundled-modules-are-wrapped.test.js.
+   */
+  const POSIX_PATH_RE = /(^|[\s\x28\['"`=:,])((?:file:\/\/)?\/(?![\s\x29])(?:[^\n:\x29'"`\u2018\u2019\u201C\u201D]|:(?![\d\s]|$))*)/g;
+  const WINDOWS_PATH_RE = /\b[A-Za-z]:\\(?:[^\n:\x29'"`\u2018\u2019\u201C\u201D]|:(?![\d\s]|$))*/g;
+
+  /** The last segment of a path token, the only part kept. */
+  function lastSegment(token) {
+    return token.split(/[\\/]/).map((s) => s.trim()).filter(Boolean).pop();
   }
 
   /** Collapse any filesystem path to a basename, so home dirs and usernames never leak. */
   function scrubPath(str) {
     if (typeof str !== 'string') return str;
     return str
-      // file:// and absolute POSIX/Windows paths → <path>/basename
-      .replace(/(?:file:\/\/)?(?:\/[^\s:()]+)+/g, (m) => '<path>/' + safeBasename(m.split('/').filter(Boolean).pop()))
-      .replace(/[A-Za-z]:\\(?:[^\s:()\\]+\\)*([^\s:()\\]+)/g, (m, base) => '<path>/' + safeBasename(base));
+      .replace(WINDOWS_PATH_RE, (m) => '<path>/' + safeBasename(lastSegment(m)))
+      .replace(POSIX_PATH_RE, (m, lead, token) => lead + '<path>/' + safeBasename(lastSegment(token)));
   }
 
   /** Strip PII value shapes out of any free text. */

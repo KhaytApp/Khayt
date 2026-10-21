@@ -228,3 +228,22 @@ test('a quoted value is redacted, a quoted code name is kept', () => {
     "No client '<redacted>' for '<redacted>'", 'one word, and a file name, are data too');
   assert.equal(T.scrubText("x 'order.items.length'"), "x 'order.items.length'");
 });
+
+test('a path with spaces is collapsed whole, not up to its first space', () => {
+  // The privacy policy says a path is reduced to a file name. Stopping at a space
+  // left the folder words after it in the report: "Drive", a customer's surname.
+  const drive = S.scrubText('ENOENT /Users/turki/Library/CloudStorage/GoogleDrive-x@y.com/My Drive/Nouf Aldossari/lamp.3mf');
+  assert.ok(!/turki|Drive|Nouf|Aldossari|lamp/.test(drive), `folder words leaked: ${drive}`);
+  assert.ok(drive.includes('<path>/<file>.3mf'), drive);
+  const win = S.scrubText('open C:\\Users\\Turki Alballaa\\AppData\\Roaming\\Khayt\\store.json');
+  assert.ok(!/Turki|Alballaa|AppData|Roaming/.test(win), `windows path leaked: ${win}`);
+  assert.equal(win, 'open <path>/store.json');
+});
+
+test('a stack frame through a folder with spaces keeps its module, line and column', () => {
+  assert.equal(S.scrubText('    at foo (/Users/x y/app/lib/a.js:12:3)'), '    at foo (<path>/a.js:12:3)');
+  assert.equal(S.scrubText('    at /Users/x y/app/lib/a.js:12:3'), '    at <path>/a.js:12:3');
+  assert.equal(S.scrubText('at load (C:\\Users\\Turki A\\app\\store.js:3:1)'), 'at load (<path>/store.js:3:1)');
+  // A slash inside a sentence is not a path that swallows the rest of it.
+  assert.equal(S.scrubText('either/or 50 / 100'), 'either/or 50 / 100');
+});
