@@ -28,6 +28,54 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   now the switches were the only way in, so nothing was ever shared. The
   same card as on the Mac.
 
+- **Mac and desktop: fixes from the beta.1 review.** Ten reviews of the
+  whole app (security, money, jobs and printers, stock, library, data
+  integrity, customers, and the interface in English and Arabic), each fix
+  checked twice more. Shared rules changed for both apps:
+  - **Money.** A standing order's new job no longer copies the last run's
+    credit notes, payments, survey, shipping, parts' progress or web-store
+    link. It keeps the site, the reference and "not business". The AI's "you
+    usually make X%" is applied as a margin, not a markup. The invoice's VAT
+    row no longer says "(incl.)" on a shop that adds tax. The rows on a
+    discounted invoice add up to its Subtotal. Machine and product profit
+    charge an expense net of the VAT the shop reclaims. Loyalty credit is
+    rounded to the halala. Clearing a payment is refused while an instalment
+    plan has collected rows. A product with no margin uses the shop's default
+    everywhere. The accounting export uses the invoice number, so an accepted
+    quote now exports as INV-…, not QUO-…; re-importing an earlier period can
+    duplicate those rows. Daftra expenses carry their VAT for a shop that
+    reclaims it.
+  - **Stock.** A supplier price list matches the closest material name
+    (PLA-CF beats PLA) before the cheapest. Deleting a QC-failure waste row
+    takes back exactly its own usage lines. Refilling an empty spool re-prices
+    it. Spools counted in sheets or ml are ordered in their own unit.
+  - **Privacy.** Crash reports remove whole file paths, including ones with
+    spaces, quotes or no leading slash. A customer's data export and full erase
+    cover their gift cards and loyalty points. A card with a balance keeps
+    their name, because the shop owes it. Camera addresses with a password in
+    them are refused.
+  - **Sync.** A full activity log's trimmed rows have their own tombstone
+    allowance, so they can never push a real delete out of the list.
+  - **Printers.** A finished print is recognised by its time and file, so it
+    is no longer seen as new on every poll.
+
+- **Mac: beta.1 review, Mac only.** Two crashes that would repeat on every
+  launch are fixed: a model file with a NaN coordinate, and a duplicated
+  product id. A huge web-store quantity no longer crashes either. A printer's
+  key is sent to its camera only at an address checked to be on this network.
+  Guessing the LAN PIN is limited across the whole network. A full customer
+  erase takes their tracking pages off Khayt Cloud, and keeps retrying until
+  each one is gone. Disconnecting Google Drive revokes Khayt's access at
+  Google. Editing a job's price on a shop that adds tax keeps the payments
+  recorded. Spools are costed net of reclaimed VAT everywhere. Customer,
+  product and supplier sheets no longer undo a change synced in while they
+  were open. Linked-folder deletes stay deleted. Text model files are read
+  bit by bit, not whole. Late jobs update at midnight. Printers taken out of
+  service stop showing as printing. Arabic lines with figures read right to
+  left. Counts use proper Arabic forms. Parts edited on the Mac before this
+  release with a quantity above one keep a per-piece base cost until that
+  part is edited again.
+
 - **Mac: fixes from the alpha.86 pre-release review.** The daily install
   count sends fixed headers only: no cookies, and not the Mac's languages,
   region or build number. A crash report keeps only the "Namespace, Code" part
@@ -8252,6 +8300,49 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.1] - 2026-10-21
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+The first beta. Ten reviews of the whole app, every fix checked twice more,
+before it was cut. mac/BETA.md records what was and was not met.
+
+### Fixed
+
+- **Two crashes that repeated on every launch.** A model file with a NaN
+  coordinate in a linked folder, and two products sharing an id, each stopped
+  the app as it opened.
+- **A huge web-store quantity no longer crashes the app.** It is capped.
+- **Money.** Editing a job's price on a shop that adds tax kept the
+  payments. Spools are costed net of the VAT the shop reclaims everywhere,
+  including assistant quotes. A standing order's new job no longer starts
+  credited, paid, surveyed or shipped. The AI price suggestion applies your
+  usual margin as a margin. The invoice's VAT row says "(incl.)" only when
+  prices include tax. Customer Billed − Paid equals Owed. Break-even leaves
+  out test prints. The ledger's margin counts credit notes. Loyalty rates
+  save. The accounting export uses the invoice number.
+- **Stock.** New spools keep their unit, colour variant and settings, and
+  store no reorder point you didn't type. Supplier prices match the closest
+  material. A QC failure's waste row deletes cleanly. Refilling an empty
+  spool re-prices it.
+- **Library.** Deleted linked-folder models stay deleted. Unlinking a folder
+  keeps a still-linked folder inside it. Importing an archive no longer fills
+  the Trash with copies. Delete Completely clears every online copy. Large
+  OBJ and text STL files are read without loading them whole.
+- **Security and privacy.** The printer's key goes to its camera only at a
+  checked address on this network. LAN PIN guessing is limited. Crash reports
+  remove whole file paths. A full customer erase takes their tracking pages
+  down from Khayt Cloud. Disconnecting Google Drive revokes access at Google.
+- **Printers and jobs.** The book is no longer rewritten every ten seconds
+  after a print finishes. Printers taken out of service stop counting as
+  printing. Late jobs update at midnight. A schedule never assigns work to a
+  printer that is out of service.
+- **Arabic and English.** Lines with figures read in the right order in
+  Arabic. Counts use the one, two, few and none forms. Supplier phone numbers
+  are no longer reversed. Quarters are named in the shop's language. Icon
+  buttons are named for VoiceOver.
 
 ## [4.0.0-alpha.86] - 2026-10-21
 
