@@ -4,6 +4,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **The catalogue now counts each part's quantity in a product's cost.** A part used three times in a product was costed once, so the catalogue suggested a price well under what a job made from that product costs. The catalogue and a job now agree. Saved product prices do not change by themselves: a product's price moves only when you open it, edit it and save. The catalogue's margin column now shows the real margin, so a product priced under the old rule may show a thin or negative margin. Review those products and re-save any you want re-priced.
+
+- **Mac: a product part with no spool linked keeps its own spool cost.** Editing the grams of such a part did not re-price the product, because the sheet dropped the part's spool cost when it saved.
+
 - **iPhone: a quote moved on from the phone counts as accepted.** When the
   phone moved a quote to Pending (or any stage but Cancelled) in its own
   copy of the book, it didn't record the acceptance day. The quote then
@@ -8357,6 +8361,19 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.4] - 2026-10-21
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Before you update
+
+- **The catalogue now counts each part's quantity in a product's cost.** A part used three times in a product was costed once, so the catalogue suggested a price well under what a job made from that product costs. The catalogue and a job now agree. Saved product prices do not change by themselves: a product's price moves only when you open it, edit it and save. The catalogue's margin column now shows the real margin, so a product priced under the old rule may show a thin or negative margin. Review those products and re-save any you want re-priced.
+
+### Fixed
+
+- **A product part with no spool linked keeps its own spool cost.** Editing its grams now re-prices the product.
 
 ## [4.0.0-beta.3] - 2026-10-21
 
