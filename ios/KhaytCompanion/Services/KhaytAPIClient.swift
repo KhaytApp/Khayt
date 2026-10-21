@@ -1058,7 +1058,7 @@ final class KhaytAPIClient: ObservableObject {
         }
         guard let figures = await LibraryCopy.figures(row, plate: plate, engine: engine, settings: settings, orders: orders)
         else { return refused("no-numbers") }
-        let shelf = CalculatorShelf.from(store)
+        let shelf = await reader.shelf(store)
         let spool = LibraryCopy.spool(for: figures.material, among: shelf.spools)
         let pieces = max(1, min(1000, qty))
         let question = CalculatorQuestion(

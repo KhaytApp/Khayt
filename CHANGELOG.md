@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: the calculator costs spools without the VAT you reclaim.** For
+  a VAT-registered shop, the phone's calculator and its library prices
+  charged each spool at its price with VAT, so a 115 roll with 15 VAT made
+  a 200 g part cost 23.00 instead of 20.00. It now nets the tax off as the
+  Mac, the desktop and the web and AI quotes do. A shop that doesn't
+  reclaim VAT still pays the full price.
+
 - **Mac: beta.1 review, Mac only.** Two crashes that would repeat on every
   launch are fixed: a model file with a NaN coordinate, and a duplicated
   product id. A huge web-store quantity no longer crashes either. A printer's

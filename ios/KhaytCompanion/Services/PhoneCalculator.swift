@@ -45,7 +45,12 @@ struct CalculatorShelf: Sendable, Equatable {
 
     /// Read out of a book. Spools are the store's spelling (`spoolWeight`, or
     /// the wire's `weightTotal`); a row with no id is skipped.
-    static func from(_ store: [String: JSONValue]) -> CalculatorShelf {
+    ///
+    /// A spool is costed at what it costs a JOB (`CalculatorPart.netCost`):
+    /// net of the tax on its receipt when the shop reclaims tax, as the Mac,
+    /// the desktop and the LAN and AI quotes cost it. Gross, a VAT-registered
+    /// shop's every price carried the tax it gets back.
+    static func from(_ store: [String: JSONValue], reclaimsTax: Bool) -> CalculatorShelf {
         func rows(_ key: String) -> [[String: JSONValue]] {
             guard case .array(let r)? = store[key] else { return [] }
             return r.compactMap { if case .object(let o) = $0 { return o } else { return nil } }
@@ -66,7 +71,9 @@ struct CalculatorShelf: Sendable, Equatable {
         shelf.spools = rows("inventory").compactMap { o in
             guard let id = text(o["id"]) else { return nil }
             let material = text(o["material"]) ?? text(o["materialType"]) ?? ""
-            let costing = CalculatorPart.Spool(id: id, material: material, cost: number(o["cost"]),
+            let paid = number(o["cost"])
+            let cost = paid.map { CalculatorPart.netCost(paid: $0, vatAmount: number(o["vatAmount"]), reclaims: reclaimsTax) }
+            let costing = CalculatorPart.Spool(id: id, material: material, cost: cost,
                                                spoolWeight: number(o["spoolWeight"]) ?? number(o["weightTotal"]),
                                                color: text(o["color"]))
             let label = [text(o["brand"]), material.isEmpty ? nil : material, text(o["colorName"])]
@@ -131,7 +138,16 @@ struct CalculatorAnswer: Sendable, Equatable {
 extension BookReader {
 
     /// What the calculator can choose from.
-    func calculatorShelf() throws -> CalculatorShelf { CalculatorShelf.from(try wholeBook()) }
+    func calculatorShelf() async throws -> CalculatorShelf { await shelf(try wholeBook()) }
+
+    /// The shelf of `store`, costed by whether the shop reclaims tax.
+    func shelf(_ store: [String: JSONValue]) async -> CalculatorShelf {
+        var reclaims = false
+        if case .object(let s)? = store["settings"], let engine = try? sharedEngine() {
+            reclaims = (try? await engine.taxProfile(settings: s))?.isRegistered ?? false
+        }
+        return CalculatorShelf.from(store, reclaimsTax: reclaims)
+    }
 
     /// What a part WOULD be costed at for this preset and machine, before
     /// anything is typed over it — `lib/print-rates.js`, never restated here.
@@ -146,7 +162,7 @@ extension BookReader {
     /// for the overhead rate; a parameter so a test can pin it.
     func calculate(_ q: CalculatorQuestion, now: Date = Date()) async throws -> CalculatorAnswer {
         let store = try wholeBook()
-        let shelf = CalculatorShelf.from(store)
+        let shelf = await self.shelf(store)
         let settings = Self.settings(store)
         let pieces = CalculatorPart.consumableRows(q.pieces, shelf: shelf.consumables)
         let part = CalculatorPart.input(lines: q.lines, purge: q.purge, hours: q.hours, qty: q.qty,
