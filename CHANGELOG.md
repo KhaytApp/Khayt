@@ -4,14 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: a manager can read Settings but no longer change them.** With
-  the operator lock on, a manager's role was always meant to read Settings
-  only, but every control still worked: the LAN PIN, the LAN server, VAT,
-  prices and Save. Settings now show their values to a manager with every
-  control greyed out and a line saying only the owner can change them. Save
-  refuses too. "Switch operator" still works, so the owner can take over.
-  Without the operator lock nothing changes. The same as the Mac.
-
 - **iPhone: anonymous daily install count.** The iPhone sends the
   same once-a-day count as the Mac, through KhaytCore's shared rules. It
   sends six fields: platform `ios`, channel (TestFlight → beta, App Store →
@@ -21,75 +13,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   at khaytapp.com/privacy#active-count and counts nothing until the cloud
   route is switched on. The app and its widget and alerts now carry Apple
   privacy manifests that declare the count.
-
-- **Desktop: a full customer erase takes their tracking pages down.**
-  Fully erasing a customer now also takes down every tracking page they were
-  sent from Khayt Cloud, invoiced and paid jobs included, as the privacy
-  policy promises. The erase sheet says how many. A page the cloud could not
-  take down right away is tried again at launch and every ten minutes, and
-  can't be published again in the meantime. "Unlink" takes nothing down. The
-  same as the Mac.
-
-- **A printer retired by its date alone is out of the lead time and the
-  overhead rate.** A printer can be marked retired by its status or by a
-  retire date. The published lead time and the overhead rate looked only at
-  the status, so a printer with just the date (left by a sync or an older
-  build) still counted as capacity and still spread the shop's overhead.
-  Both now read either one, like every other place that asks.
-
-- **Desktop: an anonymous count of installs in use.** Once a day the app
-  tells Khayt Cloud only its platform, version and release channel, and
-  whether this is its first day this week, this month or ever. There is no
-  id and nothing about the shop (khaytapp.com/privacy, "The anonymous install
-  count"). It is on unless "Count this install (anonymous)" is switched off in
-  Settings → Crash Reports & Usage, and that switch belongs to this computer.
-  Settings no longer says Khayt sends nothing by default.
-
-- **Desktop: Khayt asks once about crash reports.** A card at the top of the
-  window asks whether to share crash reports, with usage counts as an extra
-  tick. "Not Now" puts it away for good on this computer and turns nothing
-  on; "Share Crash Reports" turns them on. It never covers anything, waits
-  until the first-run setup is done, and only asks someone who may change
-  Settings. Settings → Crash Reports & Usage still has both switches. Until
-  now the switches were the only way in, so nothing was ever shared. The
-  same card as on the Mac.
-
-- **Mac and desktop: fixes from the beta.1 review.** Ten reviews of the
-  whole app (security, money, jobs and printers, stock, library, data
-  integrity, customers, and the interface in English and Arabic), each fix
-  checked twice more. Shared rules changed for both apps:
-  - **Money.** A standing order's new job no longer copies the last run's
-    credit notes, payments, survey, shipping, parts' progress or web-store
-    link. It keeps the site, the reference and "not business". The AI's "you
-    usually make X%" is applied as a margin, not a markup. The invoice's VAT
-    row no longer says "(incl.)" on a shop that adds tax. The rows on a
-    discounted invoice add up to its Subtotal. Machine and product profit
-    charge an expense net of the VAT the shop reclaims. Loyalty credit is
-    rounded to the halala. Clearing a payment is refused while an instalment
-    plan has collected rows. A product with no margin uses the shop's default
-    everywhere. The accounting export uses the invoice number, so an accepted
-    quote now exports as INV-…, not QUO-…; re-importing an earlier period can
-    duplicate those rows. Daftra expenses carry their VAT for a shop that
-    reclaims it.
-  - **Stock.** A supplier price list matches the closest material name
-    (PLA-CF beats PLA) before the cheapest. Deleting a QC-failure waste row
-    takes back exactly its own usage lines. Refilling an empty spool re-prices
-    it. Spools counted in sheets or ml are ordered in their own unit.
-  - **Privacy.** Crash reports remove whole file paths, including ones with
-    spaces, quotes or no leading slash. A customer's data export and full erase
-    cover their gift cards and loyalty points. A card with a balance keeps
-    their name, because the shop owes it. Camera addresses with a password in
-    them are refused.
-  - **Sync.** A full activity log's trimmed rows have their own tombstone
-    allowance, so they can never push a real delete out of the list.
-  - **Printers.** A finished print is recognised by its time and file, so it
-    is no longer seen as new on every poll.
-
-- **VAT is now counted when the invoice is issued, not when the job is finished.** In Saudi Arabia VAT is due when the invoice is issued, and every booked job gets an invoice number. The VAT summary, the P&L's VAT, the ZATCA VAT return export and the tax summary CSV now include jobs that are still pending or printing. A quarter can therefore show more VAT payable than before, and a quarter that used to show a refund may now show a payment. Quotes, a quote still waiting for the customer's approval, and cancelled, voided or fully credited jobs are not counted. Revenue and cost of goods still count finished work only. Check the VAT figures for any quarter you have not filed yet. A return re-exported for a quarter you already filed can differ from what you filed, so keep the copy you submitted.
-
-- **Gross margin no longer counts shipping as a cost.** Shipping is part of the price the customer pays, and the courier's bill is recorded as an expense, so the dashboard and the P&L now show the same gross margin. A job with shipping shows a higher margin than before.
-
-- **The custom report's Price column is now revenue excluding tax.** It is called "Revenue (excl. tax)" and is net of credit notes, as in the P&L. The balance column is called "Balance due (incl. tax)". Saved reports still open, but a filter or sort on Price now uses the new figure.
 
 - **Mac: a large library is faster.** Spotlight now updates only the models that changed, off the main thread, instead of rebuilding all of them after every edit (127 ms down to about 1 ms for 10,000 models). Model files are found off the main thread at launch, so a NAS or Google Drive library no longer stalls the window. A 3MF whose parts are reused by many components is unpacked once instead of once per component. Imports no longer tie up the shared thread pool. Every percentage and live count follows the digits setting.
 
@@ -6270,6 +6193,29 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.25] - 2026-10-21
+
+### Before you update
+
+- **VAT is now counted when the invoice is issued, not when the job is finished.** In Saudi Arabia VAT is due when the invoice is issued, and every booked job gets an invoice number. The VAT summary, the P&L's VAT, the ZATCA VAT return export and the tax summary CSV now include jobs that are still pending or printing. A quarter can therefore show more VAT payable than before, and a quarter that used to show a refund may now show a payment. Quotes, a quote still waiting for the customer's approval, and cancelled, voided or fully credited jobs are not counted. Revenue and cost of goods still count finished work only. Check the VAT figures for any quarter you have not filed yet. A return re-exported for a quarter you already filed can differ from what you filed, so keep the copy you submitted.
+- **Gross margin no longer counts shipping as a cost.** Shipping is part of the price the customer pays, and the courier's bill is recorded as an expense, so the dashboard and the P&L now show the same gross margin. A job with shipping shows a higher margin than before.
+- **The custom report's Price column is now revenue excluding tax.** It is called "Revenue (excl. tax)" and is net of credit notes, as in the P&L. The balance column is called "Balance due (incl. tax)". Saved reports still open, but a filter or sort on Price now uses the new figure.
+
+### Changed
+
+VAT is counted when the invoice is issued, and a manager can no longer change Settings, since 3.11.24.
+Individual entries are kept below; this is what changed for you.
+
+VAT now follows the issued invoice, so a quarter can show more VAT than before: check any quarter you have not filed, and keep the copy of any return you already filed. Gross margin no longer counts shipping as a cost, and the custom report's Price column is revenue excluding tax. With the operator lock on, a manager can read Settings but no longer change them.
+
+- **Desktop: a manager can read Settings but no longer change them.** With
+  the operator lock on, a manager's role was always meant to read Settings
+  only, but every control still worked: the LAN PIN, the LAN server, VAT,
+  prices and Save. Settings now show their values to a manager with every
+  control greyed out and a line saying only the owner can change them. Save
+  refuses too. "Switch operator" still works, so the owner can take over.
+  Without the operator lock nothing changes. The same as the Mac.
 
 ## [3.11.24] - 2026-10-21
 
