@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a locked-out PIN guesser stays locked out.** When the LAN
+  server's table of failed attempts filled up, it made room by dropping the
+  oldest entries, live lockouts included. Someone able to fill it (easy
+  behind the remote tunnel, where each request can claim a new address)
+  could wipe their own lockout and keep guessing. A live lockout is now
+  never dropped; it leaves when it expires. An IPv6 client is also counted
+  by its /64 network rather than by each address it uses, since a single
+  device can use a fresh address for every request. The same as the Mac.
+
 - **Desktop: a printer's key only goes to a printer on your own network.**
   Before sending a printer's API key or Bambu access code, Khayt checked only
   how the printer's address was written, and any name passed. A printer

@@ -145,3 +145,33 @@ test('HTML that reaches a page is escaped', () => {
   assert.equal(auth.lanEscapeHtml('<script>"x"&y'), '&lt;script&gt;&quot;x&quot;&amp;y');
   assert.equal(auth.lanEscapeHtml(null), '');
 });
+
+test('filling the table never evicts a live lockout', () => {
+  // An attacker who can mint keys (one spoofed X-Forwarded-For per request behind
+  // the tunnel) used to fill the table and push their own lockout out of it.
+  const map = new Map();
+  map.set('attacker', { count: 10, resetAt: 9_999 });   // locked out
+  for (let i = 0; i < 20; i++) map.set('noise' + i, { count: 1, resetAt: 9_999 });
+  auth.sweepFailedAttempts(map, 1_000, 5);
+  assert.equal(map.has('attacker'), true, 'the lockout survives');
+  assert.ok(auth.isLockedOut(map.get('attacker'), 1_000));
+  assert.equal(map.size, 5);
+
+  // Even when every entry is a live lockout, none is dropped; they expire by themselves.
+  const locked = new Map();
+  for (let i = 0; i < 8; i++) locked.set('l' + i, { count: 10, resetAt: 9_999 });
+  auth.sweepFailedAttempts(locked, 1_000, 5);
+  assert.equal(locked.size, 8);
+  auth.sweepFailedAttempts(locked, 10_000, 5);
+  assert.equal(locked.size, 0, 'and go once they expire');
+});
+
+test('an IPv6 client is counted by its /64, an IPv4 one by its address', () => {
+  assert.equal(auth.lockoutKeyOf('192.168.1.5'), '192.168.1.5');
+  assert.equal(auth.lockoutKeyOf('::ffff:10.0.0.2'), '10.0.0.2');
+  const a = auth.lockoutKeyOf('2001:db8:1:2:aaaa::1');
+  assert.equal(a, '2001:db8:1:2::/64');
+  assert.equal(auth.lockoutKeyOf('2001:DB8:1:2::ffff'), a, 'a fresh address in the same /64 is the same client');
+  assert.notEqual(auth.lockoutKeyOf('2001:db8:1:3::1'), a);
+  assert.equal(auth.lockoutKeyOf('fe80::1%en0'), auth.lockoutKeyOf('fe80::2'));
+});
