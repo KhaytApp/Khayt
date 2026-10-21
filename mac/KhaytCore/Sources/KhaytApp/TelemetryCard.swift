@@ -86,7 +86,7 @@ struct TelemetrySettings: View {
     var body: some View {
         let consent = shop.telemetryConsent
         Section(shop.words.callIt("tel.section")) {
-            Text(shop.words.callIt("tel.hint"))
+            Text(shop.words.callIt(ActiveCountSender.READY ? "tel.hint_count" : "tel.hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             // Each switch says only its own stream. The other is read off the
@@ -208,11 +208,5 @@ enum TelemetryWords {
                              "ar": "نسخة التطوير لا ترسل شيئًا."],
         "mac.tel_test_failed": ["en": "The test report was not sent.",
                                 "ar": "لم يُرسل التقرير التجريبي."],
-        // The same words in the desktop and iPhone apps and on
-        // khaytapp.com/privacy #active-count.
-        "mac.active_count": ["en": "Count this install (anonymous)",
-                             "ar": "احتساب هذا التثبيت (دون هوية)"],
-        "mac.active_count_hint": ["en": "Once a day, sends only the app's platform, version and release channel, and whether this is its first day this week, this month or ever. No id, nothing about your shop.",
-                                  "ar": "مرة في اليوم، يُرسل نوع الجهاز وإصدار التطبيق وقناة إصداره فقط، وهل هذا أول يوم له في هذا الأسبوع أو الشهر أو على الإطلاق. لا معرّف، ولا شيء عن مطبعتك."],
     ]
 }

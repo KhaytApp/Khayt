@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: fixes from the alpha.86 pre-release review.** The daily install
+  count sends fixed headers only: no cookies, and not the Mac's languages,
+  region or build number. A crash report keeps only the "Namespace, Code" part
+  of macOS's reason, because the rest can quote file paths. A clock set back
+  counts nothing twice. The test report respects the server's "slow down".
+  The first-run card and Settings name the install count instead of saying
+  nothing is sent.
+
 - **Mac: crash reports include Swift crashes, and Settings can send a test
   report.** Until now the Mac reported only the crashes it could catch itself:
   failed rules and AppKit exceptions. A Swift crash, like the Settings ▸
@@ -8193,6 +8201,35 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-alpha.86] - 2026-10-21
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+Crash reports that include Swift crashes, and an anonymous daily install count.
+
+### Added
+
+- **An anonymous daily install count.** Once a day the app sends only its
+  platform, version and release channel, and whether this is its first day
+  this week, this month or ever. There is no identifier and nothing about the
+  shop. It is on unless you turn off **Count this install (anonymous)** in
+  Settings → Preferences. The privacy policy describes it
+  (khaytapp.com/privacy, "The anonymous install count").
+- **Send a Test Report.** With crash reports on, Settings → Preferences can
+  send one test report now and say whether it got through.
+
+### Fixed
+
+- **Swift crashes are reported.** Crash reports used to cover only the
+  failures the app caught itself, so a crash like the Settings → Overhead one
+  in alpha.77 sent nothing. macOS now hands the app its own crash report at
+  the next launch. What is sent is the exception, the signal, the build that
+  crashed and the crashing thread's code offsets, scrubbed as before, and only
+  with crash reports switched on.
+- **The privacy wording is exact.** The first-run card and Settings now name
+  the install count rather than saying nothing is sent by default.
 
 ## [4.0.0-alpha.85] - 2026-10-20
 

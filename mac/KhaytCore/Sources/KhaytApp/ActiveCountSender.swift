@@ -136,8 +136,8 @@ struct ActiveCountSettings: View {
         Section {
             Toggle(isOn: $sender.enabled) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(shop.words.callIt("mac.active_count"))
-                    Text(shop.words.callIt("mac.active_count_hint"))
+                    Text(shop.words.callIt("tel.active"))
+                    Text(shop.words.callIt("tel.active_hint"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
