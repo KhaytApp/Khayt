@@ -158,9 +158,14 @@ struct MachineBandView: View {
                             .fixedSize()
                             // First and last hug their edges; the rest centre on
                             // the tick, or the row's ends lose their labels.
-                            .alignmentGuide(.leading) { d in
-                                minute == 0 ? 0 : (minute >= band.minutes ? d.width : d.width / 2)
-                            }
+                            //
+                            // On a frame of no width, not with `alignmentGuide`:
+                            // a centred label hung half its width left of the
+                            // ZStack's origin, the ZStack grew to take it in,
+                            // and every label landed half a label (~14 pt) right
+                            // of its gridline.
+                            .frame(width: 0, alignment: minute == 0 ? .leading
+                                   : (minute >= band.minutes ? .trailing : .center))
                             .offset(x: x)
                     }
                 }
@@ -579,7 +584,7 @@ struct MachineBandView: View {
         let total = Hours.spell(band.freeMinutes)
         if known.count > 4 {
             return words.callIt("mac.band_free_across",
-                                ["hours": .string(total), "n": .number(Double(known.count))])
+                                ["hours": .string(total), "machines": .string(words.counting(known.count, "mac.band_machines"))])
         }
         let parts = known.map { Hours.spell($0.freeMinutes) }
         let joined = parts.count > 1 ? parts.joined(separator: " + ") + " = " + total : total

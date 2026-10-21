@@ -678,7 +678,7 @@ struct Cell: View {
         // shop running in Arabic was reading an English sentence on every card
         // in its library.
         if file.printCount > 0 {
-            bits.append(words.callIt("cat.printed_n", ["n": .number(Double(file.printCount))]))
+            bits.append(words.counting(file.printCount, "mac.printed_n"))
         }
         // A model that is neither printed nor attributed still says something
         // rather than nothing — and for those the size IS the only fact there

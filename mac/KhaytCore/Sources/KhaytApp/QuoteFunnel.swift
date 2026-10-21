@@ -50,14 +50,14 @@ struct QuoteFunnelCard: View {
                 Steps(shop: shop, steps: report.steps)
 
                 if let days = report.totals.medianDaysToDecide {
-                    Text(words.callIt("mac.qf_decide", ["n": .number(days.rounded())]))
+                    Text(words.counting(Int(days.rounded()), "mac.qf_decide"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if report.totals.openCount > 0 {
                     Text(words.callIt("mac.qf_open", [
-                        "n": .number(Double(report.totals.openCount)),
+                        "quotes": .string(words.counting(report.totals.openCount, "mac.qf_quotes")),
                         "amount": .string(Money.text(report.totals.openValue, shop.currency)),
-                        "days": .number(Double(report.totals.oldestOpenDays ?? 0)),
+                        "days": .string(words.counting(report.totals.oldestOpenDays ?? 0, "mac.qf_days")),
                     ]))
                     .font(.callout)
                     .foregroundStyle((report.totals.oldestOpenDays ?? 0) > 14

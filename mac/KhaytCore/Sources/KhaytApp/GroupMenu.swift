@@ -49,7 +49,7 @@ struct GroupMenu: View {
         } label: {
             let title = !chosenGroups.isEmpty
                 ? shop.words.callIt("mac.group_n_groups",
-                                    ["groups": .string(shop.words.counting(chosenGroups.count, "mac.n_groups"))])
+                                    ["groups": .string(shop.words.counting(chosenGroups.count, "mac.n_groups_of"))])
                 : count > 1
                 ? shop.words.callIt("mac.group_n_models", ["n": .number(Double(count))])
                 : shop.words.callIt("mac.group")

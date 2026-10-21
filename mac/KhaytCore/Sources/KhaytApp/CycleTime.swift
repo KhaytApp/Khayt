@@ -23,7 +23,7 @@ struct CycleTimeCard: View {
                     .foregroundStyle(Khayt.brand)
                 Spacer()
                 if let avg = cycle?.avgDays {
-                    Text(Self.days(avg) + " " + words.callIt("an.days"))
+                    Text(Self.said(avg, words))
                         .font(.callout.weight(.medium)).monospacedDigit()
                 }
             }
@@ -77,6 +77,13 @@ struct CycleTimeCard: View {
     }
 
     /// `3.5`, `11` — a day and a half is worth saying, a tenth is not.
+    /// "3 days", "يومان", "0.7 يوم": a whole average is counted, a
+    /// fraction is a measure and takes the singular in Arabic.
+    static func said(_ v: Double, _ words: Words) -> String {
+        if v == v.rounded() { return words.counting(Int(v), "mac.avg_days") }
+        return words.callIt("mac.avg_days_fraction").replacingOccurrences(of: "{n}", with: Money.quantity(v, decimals: 1))
+    }
+
     static func days(_ v: Double) -> String {
         v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v)
     }

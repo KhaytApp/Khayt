@@ -388,11 +388,12 @@ struct Reports: View {
             TableColumn(shop.words.callIt("an.pnl_period"), value: \.period) { r in
                 // A row the chosen span cuts short — this month under the
                 // quarter view — is marked, and says which days it holds.
-                Text(r.isPartial ? r.period + "*" : r.period)
+                let said = MonthLabel.period(r.period, words: shop.words)
+                Text(verbatim: r.isPartial ? said + "*" : said)
                     .font(.body.weight(.semibold)).monospacedDigit()
                     .help(r.isPartial ? Self.days(r) : "")
             }
-            .width(min: 64, ideal: 64, max: 160)
+            .width(min: 64, ideal: 96, max: 160)
             TableColumn(shop.words.callIt("an.pnl_orders"), value: \.orders) { r in
                 Text("\(r.orders)").monospacedDigit()
             }
@@ -1313,8 +1314,8 @@ struct Reports: View {
                     // the row short: "2026-Q4" over this month's figures
                     // would name a quarter they do not cover.
                     Text(shop.words.callIt("mac.quarter_drawn", ["q": .string(
-                        row.isPartial ? Figure.isolated(row.period) + " · " + Reports.days(row)
-                                      : Figure.isolated(row.period))]))
+                        row.isPartial ? MonthLabel.period(row.period, words: shop.words) + " · " + Reports.days(row)
+                                      : MonthLabel.period(row.period, words: shop.words))]))
                         .font(.system(size: 11, weight: .semibold))
                         .textCase(.uppercase).tracking(0.5)
                         .foregroundStyle(.secondary)
@@ -1490,8 +1491,9 @@ struct Reports: View {
                     }
 
                     if let latest = rows.first {
-                        DetailSection(latest.isPartial ? latest.period + " · " + Reports.days(latest)
-                                                       : latest.period) {
+                        DetailSection(latest.isPartial
+                                      ? MonthLabel.period(latest.period, words: shop.words) + " · " + Reports.days(latest)
+                                      : MonthLabel.period(latest.period, words: shop.words)) {
                             VStack(spacing: 6) {
                                 DetailLine(shop.words.callIt("an.pnl_orders"), "\(latest.orders)")
                                 DetailLine(shop.words.callIt("an.revenue"),

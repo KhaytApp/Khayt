@@ -198,7 +198,10 @@ final class Words {
         // "day" and wants its numeral, `آلة واحدة` already has one. Checking
         // for the word rather than assuming by language is what keeps the
         // first of those working.
-        if n == 1, said.contains("واحد") { return said }
+        //
+        // A literal (UTF-16) search, not `contains`: in "يومًا واحدًا" the
+        // tanween joins the last letter into one grapheme, which hides واحد.
+        if n == 1, said.range(of: "واحد", options: .literal) != nil { return said }
         // A plain space, not a non-breaking one. Binding the numeral to the
         // word is tempting and wrong here: eight existing tests read this
         // output back and compare it to "2 days", and a caller that has to
@@ -393,8 +396,12 @@ final class Words {
         // When NONE of them can be timed the band has nothing to draw, so it is
         // not drawn: one line saying what is missing beats three empty lanes and
         // a legend for marks that do not appear.
-        "mac.band_free_across": ["en": "{hours} free across {n} machines",
-                                 "ar": "{hours} متفرغة على {n} طابعات"],
+        "mac.band_free_across": ["en": "{hours} free across {machines}",
+                                 "ar": "{hours} متفرغة على {machines}"],
+        "mac.band_machines": ["en": "{n} machines", "ar": "{n} طابعة"],
+        "mac.band_machines_one": ["en": "{n} machine", "ar": "طابعة واحدة"],
+        "mac.band_machines_two": ["en": "2 machines", "ar": "طابعتين"],
+        "mac.band_machines_few": ["en": "{n} machines", "ar": "{n} طابعات"],
         "mac.band_none":     ["en": "Khayt cannot time any of these printers yet",
                               "ar": "لا يستطيع خيط تقدير أي من هذه الطابعات بعد"],
         "mac.band_none_why": ["en": "Connect a printer and the next 48 hours fill themselves in — what is running, when each machine comes free, and what is waiting on filament.",
@@ -796,7 +803,10 @@ final class Words {
         "mac.cm_title":      ["en": "Where the work comes from", "ar": "من أين يأتي العمل"],
         "mac.cm_new":        ["en": "New customers",  "ar": "عملاء جدد"],
         "mac.cm_returning":  ["en": "Coming back",    "ar": "عملاء عائدون"],
-        "mac.cm_people":     ["en": "{n} people",     "ar": "{n} أشخاص"],
+        "mac.cm_people":     ["en": "{n} people",     "ar": "{n} شخصًا"],
+        "mac.cm_people_one": ["en": "{n} person",     "ar": "شخص واحد"],
+        "mac.cm_people_two": ["en": "2 people",       "ar": "شخصان"],
+        "mac.cm_people_few": ["en": "{n} people",     "ar": "{n} أشخاص"],
         "mac.cm_first":      ["en": "A new customer's first order is worth {amount} on average.",
                               "ar": "أول طلب لعميل جديد يساوي {amount} في المتوسط."],
         // Which products actually earn.
@@ -843,8 +853,21 @@ final class Words {
         "mac.qf_by_count":   ["en": "of the quotes",  "ar": "من عدد العروض"],
         "mac.qf_decide":     ["en": "{n} days to decide, typically",
                               "ar": "{n} يومًا للبتّ عادةً"],
-        "mac.qf_open":       ["en": "{n} quotes still open, worth {amount}. The oldest has been waiting {days} days.",
-                              "ar": "{n} عروض ما زالت مفتوحة بقيمة {amount}. أقدمها ينتظر منذ {days} يومًا."],
+        "mac.qf_decide_one": ["en": "{n} day to decide, typically", "ar": "يوم واحد للبتّ عادةً"],
+        "mac.qf_decide_two": ["en": "2 days to decide, typically", "ar": "يومان للبتّ عادةً"],
+        "mac.qf_decide_few": ["en": "{n} days to decide, typically", "ar": "{n} أيام للبتّ عادةً"],
+        // Two counts in one sentence, each counted on its own: Arabic says
+        // "3 عروض" but "11 عرضًا", and "منذ يومين" rather than "منذ 2 يومًا".
+        "mac.qf_open":       ["en": "{quotes} still open, worth {amount}. The oldest has been waiting {days}.",
+                              "ar": "لم يُبتّ بعد في {quotes} بقيمة {amount}. أقدمها ينتظر منذ {days}."],
+        "mac.qf_quotes":     ["en": "{n} quotes", "ar": "{n} عرضًا"],
+        "mac.qf_quotes_one": ["en": "{n} quote", "ar": "عرض واحد"],
+        "mac.qf_quotes_two": ["en": "2 quotes", "ar": "عرضين"],
+        "mac.qf_quotes_few": ["en": "{n} quotes", "ar": "{n} عروض"],
+        "mac.qf_days":       ["en": "{n} days", "ar": "{n} يومًا"],
+        "mac.qf_days_one":   ["en": "{n} day", "ar": "يوم واحد"],
+        "mac.qf_days_two":   ["en": "2 days", "ar": "يومين"],
+        "mac.qf_days_few":   ["en": "{n} days", "ar": "{n} أيام"],
         // Whether the shop can take another job.
         "mac.cap_clear_days": ["en": "clear in {n} days", "ar": "يخلو خلال {n} يومًا"],
         "mac.cap_clear_days_one": ["en": "clear in {n} day", "ar": "يخلو خلال يوم واحد"],
@@ -1311,8 +1334,10 @@ final class Words {
         "mac.attn_unpriced_one": ["en": "{n} finished job was charged nothing", "ar": "عمل منجز واحد لم يُحتسب عليه شيء"],
         "mac.charged_nothing": ["en": "Finished at a price of 0. A test, a gift or for the shop itself?", "ar": "أُنجز بسعر صفر. تجربة أو هدية أو للمحل نفسه؟"],
         "mac.mark_all_not_business": ["en": "Mark all Not business", "ar": "اجعلها كلها «ليس عملًا تجاريًا»"],
-        "mac.days_over": ["en": "{n} days over", "ar": "متأخر {n} أيام"],
-        "mac.days_over_one": ["en": "{n} day over", "ar": "متأخر يومًا"],
+        "mac.days_over": ["en": "{n} days over", "ar": "متأخر {n} يومًا"],
+        "mac.days_over_one": ["en": "{n} day over", "ar": "متأخر يومًا واحدًا"],
+        "mac.days_over_two": ["en": "2 days over", "ar": "متأخر يومين"],
+        "mac.days_over_few": ["en": "{n} days over", "ar": "متأخر {n} أيام"],
         "mac.past_its_date": ["en": "Past its due date", "ar": "تجاوز تاريخ التسليم"],
         "mac.grams_left": ["en": "{n} g left", "ar": "بقي {n} غ"],
         "mac.out_of_stock": ["en": "None left on the shelf", "ar": "لا شيء على الرف"],
@@ -1740,9 +1765,13 @@ final class Words {
         // The last backup is a DAY, so the strip says the day, not a time.
         "mac.saved_today":   ["en": "saved today",   "ar": "حُفظ اليوم"],
         "mac.saved_yesterday": ["en": "saved yesterday", "ar": "حُفظ أمس"],
-        "mac.n_machines":    ["en": "{n} machines", "ar": "{n} آلات"],
+        "mac.n_machines":    ["en": "{n} machines", "ar": "{n} آلة"],
+        "mac.n_machines_two": ["en": "2 machines", "ar": "آلتان"],
+        "mac.n_machines_few": ["en": "{n} machines", "ar": "{n} آلات"],
         "mac.n_machines_one": ["en": "{n} machine", "ar": "آلة واحدة"],
-        "mac.n_people":      ["en": "{n} people",   "ar": "{n} أشخاص"],
+        "mac.n_people":      ["en": "{n} people",   "ar": "{n} شخصًا"],
+        "mac.n_people_two":  ["en": "2 people",     "ar": "شخصان"],
+        "mac.n_people_few":  ["en": "{n} people",   "ar": "{n} أشخاص"],
         "mac.n_people_one":  ["en": "{n} person",   "ar": "شخص واحد"],
         // ── AND THE TWO AXES THE GROUPING MENU NEVER HAD ─────────────────
         //
@@ -2056,13 +2085,27 @@ final class Words {
         "mac.not_measured": ["en": "Not measured", "ar": "غير مقاس"],
         "mac.pct_over":     ["en": "{pct}% over",  "ar": "{pct}% زيادة"],
         "mac.pct_under":    ["en": "{pct}% under", "ar": "{pct}% أقل"],
-        "mac.prints_word_one": ["en": "print",  "ar": "طبعة"],
-        "mac.prints_word":     ["en": "prints", "ar": "طبعات"],
+        "mac.prints_word_one": ["en": "print",  "ar": "طبعة واحدة"],
+        "mac.prints_word":     ["en": "prints", "ar": "طبعة"],
+        "mac.prints_word_few": ["en": "{n} prints", "ar": "{n} طبعات"],
         // English has no dual, so its `_two` is just the plural — as every other
         // `_two` key here carries one. `counting` only reaches for this form in
         // Arabic; the English side exists so the both-languages guard means
         // what it says rather than growing an exception.
         "mac.prints_word_two": ["en": "prints", "ar": "طبعتين"],
+        // A model's print count, Mac-own so Arabic can count it: the shared
+        // `cat.printed_n` has one form, and drew "طُبع 9 مرة".
+        "mac.printed_n":     ["en": "printed {n}×", "ar": "طُبع {n} مرة"],
+        "mac.printed_n_one": ["en": "printed {n}×", "ar": "طُبع مرة واحدة"],
+        "mac.printed_n_two": ["en": "printed 2×", "ar": "طُبع مرتين"],
+        "mac.printed_n_few": ["en": "printed {n}×", "ar": "طُبع {n} مرات"],
+        // An average in days. A whole number is counted; a fraction takes the
+        // singular in Arabic ("0.7 يوم"), as a measure rather than a count.
+        "mac.avg_days":      ["en": "{n} days", "ar": "{n} يومًا"],
+        "mac.avg_days_one":  ["en": "{n} day", "ar": "يوم واحد"],
+        "mac.avg_days_two":  ["en": "2 days", "ar": "يومان"],
+        "mac.avg_days_few":  ["en": "{n} days", "ar": "{n} أيام"],
+        "mac.avg_days_fraction": ["en": "{n} days", "ar": "{n} يوم"],
         "mac.quoting_advice_filament": ["en": "Quoted {pct}% short on filament — the price is under what this costs.",
                                         "ar": "التسعير أقل بـ{pct}% في الخيط — السعر دون تكلفته الفعلية."],
         "mac.quoting_advice_time":     ["en": "Takes {pct}% longer than quoted — the machine time is under-charged.",
@@ -2198,9 +2241,15 @@ final class Words {
         "mac.nozzle":        ["en": "Nozzle",          "ar": "الفوهة"],
         "mac.colours":       ["en": "Colours",         "ar": "الألوان"],
         "mac.extruder":      ["en": "Extruder",        "ar": "الباثق"],
+        "mac.extruder_direct": ["en": "Direct drive", "ar": "دفع مباشر"],
+        "mac.extruder_bowden": ["en": "Bowden", "ar": "بودن"],
         "mac.power":         ["en": "Power",           "ar": "الطاقة"],
         "mac.address":       ["en": "Address",         "ar": "العنوان"],
         "mac.quarter_drawn": ["en": "Where {q} went",  "ar": "أين ذهب {q}"],
+        "mac.quarter_1": ["en": "Q1 {year}", "ar": "الربع الأول {year}"],
+        "mac.quarter_2": ["en": "Q2 {year}", "ar": "الربع الثاني {year}"],
+        "mac.quarter_3": ["en": "Q3 {year}", "ar": "الربع الثالث {year}"],
+        "mac.quarter_4": ["en": "Q4 {year}", "ar": "الربع الرابع {year}"],
         "mac.idle":          ["en": "Idle",            "ar": "متوقفة"],
         "mac.cannot_ask":    ["en": "Khayt cannot ask this machine",
                               "ar": "لا تستطيع خيط سؤال هذه الآلة"],
@@ -2311,8 +2360,10 @@ final class Words {
         // number first — "3 " + noun — which is right for "3 jobs" and wrong
         // here, because Arabic says متأخر before the count. So the placeholder
         // stays inside the sentence and the SENTENCE has a singular.
-        "mac.days_late":     ["en": "{n} days late",   "ar": "متأخر {n} يوماً"],
-        "mac.days_late_one": ["en": "{n} day late",    "ar": "متأخر {n} يوماً"],
+        "mac.days_late":     ["en": "{n} days late",   "ar": "متأخر {n} يومًا"],
+        "mac.days_late_one": ["en": "{n} day late",    "ar": "متأخر يومًا واحدًا"],
+        "mac.days_late_two": ["en": "2 days late",     "ar": "متأخر يومين"],
+        "mac.days_late_few": ["en": "{n} days late",   "ar": "متأخر {n} أيام"],
         "mac.no_figures":    ["en": "No figures yet",  "ar": "لا أرقام بعد"],
         // The FIRST screen this app ever shows a shop. Not "0.00 revenue",
         // which is what a quiet month looks like — this is a shop that has not
@@ -3221,6 +3272,12 @@ final class Words {
         "mac.n_groups_one":  ["en": "{n} group",       "ar": "مجموعة واحدة"],
         "mac.n_groups_two":  ["en": "{n} groups",      "ar": "مجموعتان"],
         "mac.n_groups_few":  ["en": "{n} groups",      "ar": "{n} مجموعات"],
+        // After a verbal noun ("نقل مجموعتين", "تجميع مجموعتين") the dual is
+        // genitive; `mac.n_groups_two` is the nominative.
+        "mac.n_groups_of":      ["en": "{n} groups",      "ar": "{n} مجموعةً"],
+        "mac.n_groups_of_one":  ["en": "{n} group",       "ar": "مجموعة واحدة"],
+        "mac.n_groups_of_two":  ["en": "{n} groups",      "ar": "مجموعتين"],
+        "mac.n_groups_of_few":  ["en": "{n} groups",      "ar": "{n} مجموعات"],
         "mac.move_into_group": ["en": "Move into Group\u{2026}", "ar": "نقل إلى مجموعة\u{2026}"],
         "mac.move_n_groups_into": ["en": "Move {groups} into Group\u{2026}",
                                    "ar": "نقل {groups} إلى مجموعة\u{2026}"],

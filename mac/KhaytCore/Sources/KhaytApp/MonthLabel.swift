@@ -75,3 +75,19 @@ extension MonthLabel {
         return from + " – " + long(last, language: language)
     }
 }
+
+extension MonthLabel {
+
+    /// A P&L period as the shop reads it. Khayt keys a quarter `2026-Q3`,
+    /// which an Arabic shop was reading as is; it says "Q3 2026" or
+    /// "الربع الثالث 2026" now. A month or a year key is already readable and
+    /// comes back unchanged, as does anything this does not recognise.
+    @MainActor
+    static func period(_ key: String, words: Words) -> String {
+        let parts = key.split(separator: "-")
+        guard parts.count == 2, let year = Int(parts[0]), parts[1].hasPrefix("Q"),
+              let q = Int(parts[1].dropFirst()), (1...4).contains(q) else { return key }
+        return words.callIt("mac.quarter_\(q)", ["year": .string(Figure.isolated(year.formatted(.number.grouping(.never).locale(words.locale))))])
+    }
+}
+

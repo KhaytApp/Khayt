@@ -166,6 +166,18 @@ struct Machines: View {
 }
 
 struct MachineCard: View {
+
+    /// The extruder in the shop's language. The printer facts store their
+    /// English label ("Direct Drive", `lib/printer-facts.js` EXTRUDER_KINDS),
+    /// which an Arabic shop was reading as is; a value Khayt does not know is
+    /// shown as typed.
+    static func extruderWord(_ value: String, _ words: Words) -> String {
+        switch value.lowercased() {
+        case "direct drive", "direct": return words.callIt("mac.extruder_direct")
+        case "bowden": return words.callIt("mac.extruder_bowden")
+        default: return value
+        }
+    }
     /// The stills, refetched on their own timer — see `Camera`.
     @Environment(Camera.self) private var camera
     let machine: Machine
@@ -395,7 +407,7 @@ struct MachineCard: View {
                     DetailLine(shop.words.callIt("mac.colours"), "\(n)")
                 }
                 if let e = machine.extruderType, shows("extruderType") {
-                    DetailLine(shop.words.callIt("mac.extruder"), e)
+                    DetailLine(shop.words.callIt("mac.extruder"), Self.extruderWord(e, shop.words))
                 }
                 if let w = machine.powerDraw { DetailLine(shop.words.callIt("mac.power"), "\(Int(saturating: w)) \(shop.words.callIt("mac.unit_watts"))") }
                 if let address = machine.address {
@@ -663,17 +675,21 @@ struct Upkeep: View {
     ///
     /// The sign is left on rather than turned into a word. There is no locale
     /// key for "ago", and inventing one would mean nine translations to say
-    /// what a minus sign already says; `formatted` places the sign correctly in
-    /// Arabic, which a hand-built "-" prefix would not.
+    /// what a minus sign already says.
     private var left: String? {
         if let h = task.hoursRemaining { return Self.amount(h, shop, "common.hours_short") }
         if let d = task.daysRemaining { return Self.amount(d, shop, "common.days") }
         return nil
     }
 
-    private static func amount(_ v: Double, _ shop: Shop, _ unit: String) -> String {
-        let n = v.rounded().formatted(.number.precision(.fractionLength(0)).locale(shop.words.locale))
-        return "\(n) \(shop.words.callIt(unit))"
+    /// The figure in the shop's digits and ISOLATED. Formatted with the
+    /// Arabic locale, "-7" came back with a left-to-right mark in front of the
+    /// sign, and that mark turned the whole line left to right: "-7 س" read
+    /// unit-first. Isolated, the figure keeps its sign and the line runs the
+    /// way its word does.
+    static func amount(_ v: Double, _ shop: Shop, _ unit: String) -> String {
+        let n = Figure.isolated(Money.quantity(v.rounded(), decimals: 0))
+        return n + " " + shop.words.callIt(unit)
     }
 }
 

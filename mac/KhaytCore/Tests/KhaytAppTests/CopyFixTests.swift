@@ -158,4 +158,89 @@ struct CopyFixTests {
             #expect(source.contains(pair), "\(file): \(said)")
         }
     }
+
+    // MARK: - Arabic counts
+
+    @Test("counted sentences take Arabic's one, two, few and many forms")
+    func arabicCounts() async throws {
+        let ar = try await Self.arabic()
+        #expect(ar.counting(1, "mac.days_late") == "متأخر يومًا واحدًا")
+        #expect(ar.counting(2, "mac.days_late") == "متأخر يومين")
+        #expect(ar.counting(5, "mac.days_late") == "متأخر 5 أيام")
+        #expect(ar.counting(14, "mac.days_late") == "متأخر 14 يومًا")
+        #expect(ar.counting(1, "mac.days_over") == "متأخر يومًا واحدًا", "no numeral prepended to the one form")
+        #expect(ar.counting(2, "mac.days_over") == "متأخر يومين")
+        #expect(ar.counting(9, "mac.printed_n") == "طُبع 9 مرات")
+        #expect(ar.counting(2, "mac.printed_n") == "طُبع مرتين")
+        #expect(ar.counting(18, "mac.cm_people") == "18 شخصًا")
+        #expect(ar.counting(4, "mac.cm_people") == "4 أشخاص")
+        #expect(ar.counting(1, "mac.prints_word") == "طبعة واحدة")
+        #expect(ar.counting(12, "mac.prints_word") == "12 طبعة")
+        #expect(ar.counting(2, "mac.n_groups_of") == "مجموعتين")
+        #expect(ar.counting(12, "mac.band_machines") == "12 طابعة")
+        let en = Words()
+        #expect(en.counting(1, "mac.days_late") == "1 day late")
+        #expect(en.counting(1, "mac.printed_n") == "printed 1×")
+    }
+
+    @Test("a quote funnel's open line counts quotes and days on their own")
+    func quoteFunnelOpen() async throws {
+        let ar = try await Self.arabic()
+        let said = ar.callIt("mac.qf_open", ["quotes": .string(ar.counting(2, "mac.qf_quotes")),
+                                              "amount": .string("100"),
+                                              "days": .string(ar.counting(2, "mac.qf_days"))])
+        #expect(said.contains("عرضين") && said.contains("منذ يومين"), "\(said)")
+        #expect(EmptyStateTests.source("QuoteFunnel.swift").contains("words.counting(report.totals.openCount, \"mac.qf_quotes\")"))
+    }
+
+    @Test("an average in days: counted when whole, the singular for a fraction")
+    func cycleDays() async throws {
+        let ar = try await Self.arabic()
+        #expect(CycleTimeCard.said(0.7, ar) == "0.7 يوم")
+        #expect(CycleTimeCard.said(2, ar) == "يومان")
+        #expect(CycleTimeCard.said(1, Words()) == "1 day")
+        #expect(CycleTimeCard.said(2.5, Words()) == "2.5 days")
+    }
+
+    // MARK: - Smaller Arabic fixes
+
+    @Test("a P&L quarter is named, not keyed")
+    func quarterLabels() async throws {
+        #expect(MonthLabel.period("2026-Q3", words: Words()) == "Q3 " + Figure.isolated("2026"))
+        let ar = try await Self.arabic()
+        #expect(MonthLabel.period("2026-Q3", words: ar) == "الربع الثالث " + Figure.isolated("2026"))
+        #expect(MonthLabel.period("2026-08", words: ar) == "2026-08")
+        #expect(MonthLabel.period("2026-Q9", words: ar) == "2026-Q9")
+    }
+
+    @Test("the extruder type is a word in the shop's language")
+    func extruderWords() async throws {
+        let ar = try await Self.arabic()
+        #expect(MachineCard.extruderWord("Direct Drive", ar) == "دفع مباشر")
+        #expect(MachineCard.extruderWord("Bowden", ar) == "بودن")
+        #expect(MachineCard.extruderWord("Something else", ar) == "Something else")
+    }
+
+    @Test("move along points the way the board reads")
+    func moveAlongArrow() {
+        #expect(JobMenu.arrow(along: true, rtl: false) == .rightArrow)
+        #expect(JobMenu.arrow(along: false, rtl: false) == .leftArrow)
+        #expect(JobMenu.arrow(along: true, rtl: true) == .leftArrow)
+        #expect(JobMenu.arrow(along: false, rtl: true) == .rightArrow)
+    }
+
+    @Test("time left is isolated, so a negative figure does not turn the Arabic line around")
+    func negativeTimeLeft() {
+        let floor = EmptyStateTests.source("ShopFloor.swift")
+        #expect(floor.contains("let n = Figure.isolated(Money.quantity(v.rounded(), decimals: 0))"))
+        #expect(!floor.contains(".locale(shop.words.locale))\n        return \"\\(n)"))
+    }
+
+    @Test("band tick labels sit on zero-width frames, not alignment guides that grow the ruler")
+    func bandTicks() {
+        let band = EmptyStateTests.source("MachineBand.swift")
+        #expect(band.contains(".frame(width: 0, alignment: minute == 0 ? .leading"))
+        #expect(!band.contains("minute == 0 ? 0 : (minute >= band.minutes ? d.width : d.width / 2)"))
+    }
 }
+
