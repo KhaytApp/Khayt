@@ -3096,6 +3096,10 @@
   "tel.nothing": "Es wird nichts erfasst — beide Optionen sind aus.",
   "tel.consented": "Zugestimmt",
   "tel.saved": "Telemetrie-Einstellungen gespeichert",
+  "tel.active": "Diese Installation zählen (anonym)",
+  "tel.active_hint": "Sendet einmal täglich nur Plattform, Version und Release-Kanal der App und ob dies ihr erster Tag in dieser Woche, diesem Monat oder überhaupt ist. Keine Kennung, nichts über Ihren Betrieb.",
+  "tel.hint_count": "Abgesehen von einer anonymen täglichen Zählung dieser Installation, die Sie unten abschalten können, sendet Khayt standardmäßig nichts. Sie können außerdem Absturzberichte und anonyme Nutzungszahlen teilen, um Fehler zu beheben. Nie Ihre Aufträge, Kunden, Preise oder Dateien.",
+
   "tel.ask_title": "Helfen Sie, Khayt besser zu machen?",
   "tel.ask_body": "Khayt sendet nichts, solange Sie es nicht erlauben. Ein Absturzbericht zeigt uns, was schiefging – ohne E-Mail-Adressen, Telefonnummern, lange Zahlen und Dateipfade. Nie Ihre Aufträge, Kunden, Preise oder Dateien.",
   "tel.ask_usage": "Auch Nutzungszahlen teilen",

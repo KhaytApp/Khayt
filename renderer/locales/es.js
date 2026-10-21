@@ -3096,6 +3096,10 @@
   "tel.nothing": "No se recopila nada: ambas opciones están desactivadas.",
   "tel.consented": "Consentido",
   "tel.saved": "Preferencias de telemetría guardadas",
+  "tel.active": "Contar esta instalación (anónimo)",
+  "tel.active_hint": "Una vez al día, envía solo la plataforma, la versión y el canal de la app, y si es su primer día esta semana, este mes o de siempre. Sin identificador, nada sobre tu taller.",
+  "tel.hint_count": "Aparte de un recuento anónimo diario de esta instalación, que puedes desactivar abajo, Khayt no envía nada por defecto. También puedes compartir informes de fallos y recuentos de uso anónimos para ayudar a corregir errores. Nunca tus pedidos, clientes, precios ni archivos.",
+
   "tel.ask_title": "¿Nos ayudas a mejorar Khayt?",
   "tel.ask_body": "Khayt no envía nada si no lo permites. Un informe de fallo nos dice qué salió mal, sin correos, teléfonos, números largos ni rutas de archivos. Nunca tus pedidos, clientes, precios ni archivos.",
   "tel.ask_usage": "Compartir también los recuentos de uso",

@@ -47,6 +47,16 @@ telemetry: { crashOptIn: false, usageOptIn: false, installId: '', consentAt: '' 
 - **Opt out anytime:** unchecking sets the flag false, **flushes and deletes** the local queue immediately (§7), and stops all collection that session — no restart required.
 - **Consent timestamp** (`consentAt`) recorded for audit (security-model §3 "every read audited"); cleared on opt-out.
 
+### The one exception: the anonymous active-install count
+
+"Nothing is sent by default" has **one** exception, decided by Turki on 2026-10-21: the anonymous active-install count (`lib/active-count.js`, khayt-cloud `POST /v1/active`, described at khaytapp.com/privacy#active-count-en once that is live). Crash reports and usage telemetry above stay opt-in.
+
+- **On by default**, with a switch in Settings → Crash Reports & Usage ("Count this install (anonymous)"). The switch belongs to the computer, not the shop: it is kept in `userData/active-count.json`, never in the book, which syncs between machines.
+- **Six fields, nothing else:** `platform`, `channel`, `version`, `firstThisWeek`, `firstThisMonth`, `firstEver`. **No id** — not the telemetry `installId`, not a shop, user, locale or device name. The cloud stores counters only (per day, platform, channel, version), never the message or the address.
+- **At most once a UTC day.** The flags come from the last *counted* day kept on the computer: first counted day of this ISO week (Monday, UTC), this UTC month, ever. Only a 200 counts; 404, 5xx or offline is tried again within the hour; a 422 ends the day.
+- **Off** sends nothing and keeps the stored dates, so turning it back on is not a new install.
+- Ships held (`READY = false`) until the privacy page describes it. While held, nothing is sent and the switch is hidden.
+
 ## 4. Scrubbing pipeline (`lib/telemetry-scrub.js`, runs before anything leaves the device)
 
 Every payload passes through the scrubber; **unscrubbed sends are impossible by construction** (transport only accepts scrubber output). Reuses the project's existing redaction vocabulary:

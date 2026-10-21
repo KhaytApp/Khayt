@@ -3096,6 +3096,10 @@
   "tel.nothing": "Rien n’est collecté — les deux options sont désactivées.",
   "tel.consented": "Consenti",
   "tel.saved": "Préférences de télémétrie enregistrées",
+  "tel.active": "Compter cette installation (anonyme)",
+  "tel.active_hint": "Une fois par jour, envoie seulement la plateforme, la version et le canal de l'app, et s'il s'agit de son premier jour cette semaine, ce mois-ci ou jamais. Aucun identifiant, rien sur votre atelier.",
+  "tel.hint_count": "En dehors d'un comptage anonyme quotidien de cette installation, que vous pouvez désactiver ci-dessous, Khayt n'envoie rien par défaut. Vous pouvez aussi partager les rapports d'erreur et des compteurs d'utilisation anonymes pour aider à corriger les bugs. Jamais vos commandes, clients, prix ou fichiers.",
+
   "tel.ask_title": "Nous aider à améliorer Khayt ?",
   "tel.ask_body": "Khayt n'envoie rien sans votre accord. Un rapport d'erreur nous dit ce qui s'est mal passé, sans e-mails, numéros de téléphone, longs numéros ni chemins de fichiers. Jamais vos commandes, clients, prix ou fichiers.",
   "tel.ask_usage": "Partager aussi les compteurs d'utilisation",

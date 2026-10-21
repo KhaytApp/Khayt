@@ -3097,6 +3097,10 @@
   "tel.nothing": "Nothing is collected — both options are off.",
   "tel.consented": "Consented",
   "tel.saved": "Telemetry preferences saved",
+  "tel.active": "Count this install (anonymous)",
+  "tel.active_hint": "Once a day, sends only the app's platform, version and release channel, and whether this is its first day this week, this month or ever. No id, nothing about your shop.",
+  "tel.hint_count": "Apart from an anonymous once-a-day install count, which you can turn off below, Khayt sends nothing by default. You can also share crash reports and anonymous usage counts to help fix bugs. Never your orders, customers, prices or files.",
+
   "tel.ask_title": "Help make Khayt better?",
   "tel.ask_body": "Khayt sends nothing unless you allow it. A crash report tells us what went wrong, with emails, phone numbers, long numbers and file paths taken out. Never your orders, customers, prices or files.",
   "tel.ask_usage": "Also share usage counts",

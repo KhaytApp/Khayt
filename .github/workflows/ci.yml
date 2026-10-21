@@ -294,6 +294,9 @@ jobs:
       - name: E2E smoke (sign out one paired phone)
         run: xvfb-run -a npm run test:e2e:phones
 
+      - name: E2E smoke (anonymous active-install count)
+        run: xvfb-run -a npm run test:e2e:activecount
+
       - name: E2E smoke (one-time crash-report ask)
         run: xvfb-run -a npm run test:e2e:telemetry-ask
 

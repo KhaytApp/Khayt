@@ -1904,6 +1904,74 @@ async function flushTelemetry() {
   } catch (_) { /* telemetry must never break or crash the app */ }
 }
 
+// ── Anonymous active-install count (lib/active-count.js) ────────────────────
+// Its own file in userData, never the shop's book: the book syncs between
+// machines, and this is one install's switch and one install's dates.
+const ActiveCount = require('./lib/active-count.js');
+const ACTIVE_COUNT_FILE = () => path.join(app.getPath('userData'), 'active-count.json');
+let activeCountSending = false;
+// scripts/e2e-active-count-smoke.mjs points the sender at its own loopback
+// server. Honoured for 127.0.0.1 only, so it can never redirect a real count.
+const ACTIVE_COUNT_E2E = /^http:\/\/127\.0\.0\.1:\d+\//.test(process.env.KHAYT_ACTIVE_COUNT_E2E || '')
+  ? process.env.KHAYT_ACTIVE_COUNT_E2E : '';
+const activeCountReady = () => ActiveCount.READY || !!ACTIVE_COUNT_E2E;
+
+function readActiveCount() {
+  try {
+    const s = JSON.parse(fs.readFileSync(ACTIVE_COUNT_FILE(), 'utf8'));
+    return s && typeof s === 'object' && !Array.isArray(s) ? s : {};
+  } catch (_) { return {}; }
+}
+
+function writeActiveCount(s) {
+  try {
+    const f = ACTIVE_COUNT_FILE();
+    fs.writeFileSync(f + '.tmp', JSON.stringify({ off: !!s.off, lastCounted: s.lastCounted || null, doneDay: s.doneDay || null }));
+    fs.renameSync(f + '.tmp', f);
+  } catch (e) { console.warn('[active-count] could not save:', e && e.message); }
+}
+
+async function sendActiveCount() {
+  if (activeCountSending) return;
+  const today = ActiveCount.utcDay(Date.now());
+  const state = readActiveCount();
+  if (!ActiveCount.due(state, today, activeCountReady())) return;
+  const body = ActiveCount.buildBody({ platform: process.platform, version: app.getVersion(), lastCounted: state.lastCounted, today });
+  if (!body) { writeActiveCount(ActiveCount.after(state, today, 422)); return; }
+  activeCountSending = true;
+  let status = 0;
+  try {
+    const res = await fetch(ACTIVE_COUNT_E2E || ActiveCount.ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000),
+    });
+    status = res.status;
+    if (status === 422) console.warn('[active-count] refused as malformed:', await res.text().catch(() => ''));
+  } catch (_) { status = 0; /* offline: tried again within the hour */ }
+  finally { activeCountSending = false; }
+  // Read again: the switch may have moved while the request was out.
+  writeActiveCount(ActiveCount.after(readActiveCount(), today, status));
+}
+
+// On launch, then hourly — which also catches the UTC day turning over in an
+// app left open, and retries a launch that was offline. Unref'd: never the
+// reason the app does not quit.
+function startActiveCount() {
+  if (!activeCountReady()) return;
+  setTimeout(() => { sendActiveCount().catch(() => {}); }, ACTIVE_COUNT_E2E ? 500 : 30 * 1000).unref?.();
+  setInterval(() => { sendActiveCount().catch(() => {}); }, 60 * 60 * 1000).unref?.();
+}
+
+ipcMain.handle('hub:active-count-get', async () => ({ ready: activeCountReady(), on: !readActiveCount().off }));
+ipcMain.handle('hub:active-count-set', async (_e, on) => {
+  // Off keeps the dates, so turning it back on does not count this as new.
+  writeActiveCount({ ...readActiveCount(), off: !on });
+  if (on) sendActiveCount().catch(() => {});
+  return { ok: true, on: !!on };
+});
+
 // Once shortly after launch — late enough that it is never racing the window
 // onto the screen — and then hourly. The interval is unref'd so it can never be
 // the reason the app does not quit.
@@ -6822,6 +6890,7 @@ app.whenReady().then(() => {
   // ingest is dormant — it 404s, keeps the queue and waits. See the block above
   // TELEMETRY_QUEUE_FILE.
   startTelemetryFlush();
+  startActiveCount();
   startLeadTimePublisher();
 
   const { session } = require('electron');
