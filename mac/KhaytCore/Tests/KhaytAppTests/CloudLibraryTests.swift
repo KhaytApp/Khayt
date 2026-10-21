@@ -218,4 +218,28 @@ struct GoogleDriveRevokeTests {
         #expect(!between.contains("return"), "a failed revoke can stop the disconnect")
         #expect(!src.contains("Only Google can withdraw"))
     }
+
+    @Test("a new sign-in revokes the old token only for a different account, both known")
+    func supersededToken() {
+        #expect(CloudLibrary.supersededToken(old: "rt-a", new: "rt-b", oldAccount: "a@x.com", newAccount: "b@x.com") == "rt-a")
+        // The same account: its old token shares the new grant.
+        #expect(CloudLibrary.supersededToken(old: "rt-a", new: "rt-b", oldAccount: "A@x.com", newAccount: "a@x.com") == nil)
+        // Not known: never guessed.
+        #expect(CloudLibrary.supersededToken(old: "rt-a", new: "rt-b", oldAccount: nil, newAccount: "b@x.com") == nil)
+        #expect(CloudLibrary.supersededToken(old: "rt-a", new: "rt-b", oldAccount: "", newAccount: "b@x.com") == nil)
+        #expect(CloudLibrary.supersededToken(old: "", new: "rt-b", oldAccount: "a@x.com", newAccount: "b@x.com") == nil)
+        #expect(CloudLibrary.supersededToken(old: "rt-a", new: "rt-a", oldAccount: "a@x.com", newAccount: "b@x.com") == nil)
+    }
+
+    @Test("connect reads the old sign-in before writing, and revokes it before the new token is stored")
+    func connectRevokesTheOld() throws {
+        let src = try QuoteSheetStatusTests.source("CloudLibrary.swift")
+        let body = try #require(src.range(of: "func connectGoogleDrive(").map { String(src[$0.lowerBound...]) })
+        let read = try #require(body.range(of: "let before = await CloudLibrary.libraryDrive("))
+        let firstWrite = try #require(body.range(of: "try await writeDrive(clientId:"))
+        let revoke = try #require(body.range(of: "revokeAtGoogle(old"))
+        let store = try #require(body.range(of: "writeDrive(refreshToken: refresh"))
+        #expect(read.lowerBound < firstWrite.lowerBound)
+        #expect(revoke.lowerBound < store.lowerBound)
+    }
 }
