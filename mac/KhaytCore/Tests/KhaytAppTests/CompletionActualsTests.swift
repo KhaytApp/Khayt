@@ -41,9 +41,10 @@ struct CompletionActualsTests {
     /// what comes back, so actuals written afterwards would land on a copy the
     /// book has already replaced.
     ///
-    /// NOT because the deduction reads them — it does not, in either app. See
-    /// `MoveJobTests.theShelfStillFollowsTheEstimate`, which pins that and says
-    /// why it is left alone.
+    /// And the deduction reads them off that record (`actualGrams:
+    /// order.actualWeight`), so written afterwards the shelf would lose the
+    /// estimate rather than what the job used — `MoveJobTests.theShelfFollowsTheActual`
+    /// pins the grams themselves.
     @Test("the actuals are written onto the job before the move is applied")
     func actualsLandBeforeTheDeduction() {
         let shop = Self.source("Shop.swift")
@@ -52,7 +53,7 @@ struct CompletionActualsTests {
             Issue.record("applyMove no longer has both halves"); return
         }
         #expect(written.lowerBound < moved.lowerBound,
-                "the move runs first, so the shelf is deducted against the estimate")
+                "the move runs first, so the actuals land on a replaced copy and the shelf loses the estimate")
     }
 
     /// A record with actuals and no `actualsSource` reads as measured to

@@ -102,6 +102,15 @@ struct MachineLifeTests {
         let all = try await engine.machineDeleteVerdicts(book: book, ids: ["M-A", "M-N"])
         #expect(all["M-A"]?.ok == false && all["M-N"]?.ok == true)
 
+        // A finished print's figures, where both apps keep them: at the top of
+        // the book, not under settings. Only that names M-N, and it is history.
+        var measured = book
+        measured["printerCompletions"] = .object(["M-N": .array([.object(["at": .number(1)])])])
+        let kept = try await engine.machineCanDelete(book: measured, id: "M-N")
+        #expect(!kept.ok && kept.by["printerCompletions"] == 1)
+        #expect(Shop.referenceKeys["printerCompletions"] == "mac.life_ref_completions",
+                "the sentence would call it \"1 other record\"")
+
         let refused = try await engine.removeMachine(book: book, id: "M-A")
         #expect(!refused.ok && refused.removed == nil && refused.machines.count == 4)
         let removed = try await engine.removeMachine(book: book, id: "M-N")
@@ -288,6 +297,26 @@ struct MachineLifeTests {
         // A job naming a printer no longer in the book says so in words.
         #expect(shop.machineName(forId: "M-GONE") == shop.words.callIt("mac.life_deleted_printer"))
         #expect(shop.machineName(forId: "M-R") == "Printer M-R")
+    }
+
+    @Test("applying a schedule skips a printer taken out of service since it was proposed")
+    func scheduleSkipsOutOfService() async throws {
+        let url = try Self.tempStore([
+            "machines": .array([.object(Self.active), .object(Self.service), .object(Self.retired)]),
+            "printLog": .array(["J-A", "J-S", "J-R"].map {
+                .object(["id": .string($0), "project": .string($0), "status": .string("pending")])
+            }),
+            "settings": .object([:]),
+        ])
+        var moved = 0
+        try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+            moved = Shop.writeSchedule(into: &root, wanted: ["J-A": "M-A", "J-S": "M-S", "J-R": "M-R"])
+        }
+        let after = try Self.read(url)
+        #expect(moved == 1)
+        #expect(Self.row(after, "printLog", "J-A")?["machineId"] == .string("M-A"))
+        #expect(Self.row(after, "printLog", "J-S")?["machineId"] == nil, "a printer under service was given work")
+        #expect(Self.row(after, "printLog", "J-R")?["machineId"] == nil, "a retired printer was given work")
     }
 
     @Test("the dashboard fleet drops the retired and counts under service as down")

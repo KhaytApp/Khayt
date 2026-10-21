@@ -1146,26 +1146,7 @@ extension Shop {
                                 uniquingKeysWith: { first, _ in first })
         do {
             let moved = try await StoreWriter.updateOffMain(build) { root -> Int in
-                // Read INSIDE the write: the book on disk may have moved since
-                // the proposal was drawn, and a job somebody assigned by hand in
-                // the meantime must not be overwritten by a stale suggestion.
-                var moved = 0
-                let orders = Self.rows(root, "printLog")
-                var out: [JSONValue] = []
-                out.reserveCapacity(orders.count)
-                for row in orders {
-                    guard case .object(var o) = row,
-                          let id = Self.plainString(o["id"]),
-                          let machine = wanted[id],
-                          (Self.plainString(o["machineId"]) ?? "").isEmpty else {
-                        out.append(row); continue
-                    }
-                    o["machineId"] = .string(machine)
-                    out.append(.object(o))
-                    moved += 1
-                }
-                root["printLog"] = .array(out)
-                return moved
+                Self.writeSchedule(into: &root, wanted: wanted)
             }
             scheduleApplied = moved
             schedulePlan = nil
@@ -1176,6 +1157,43 @@ extension Shop {
         } catch {
             scheduleProblem = self.said(error)
         }
+    }
+
+    /// The schedule's write: each wanted job gets its printer, unless the job
+    /// was given one meanwhile or the printer can no longer take work. Static,
+    /// on the root inside the write, so a test drives it against a book.
+    nonisolated static func writeSchedule(into root: inout [String: JSONValue],
+                                          wanted: [String: String]) -> Int {
+        // Read INSIDE the write: the book on disk may have moved since
+        // the proposal was drawn, and a job somebody assigned by hand in
+        // the meantime must not be overwritten by a stale suggestion.
+        var moved = 0
+        // And the printer must still be one that may be given work. A
+        // proposal drawn before somebody put a printer under service or
+        // retired it would otherwise hand that printer jobs it cannot
+        // run — `lib/machine-status.js`'s rule, as `Machine` reads it.
+        let working = Set(Self.rows(root, "machines").compactMap { row -> String? in
+            guard let data = try? JSONEncoder().encode(row),
+                  let m = try? JSONDecoder().decode(Machine.self, from: data),
+                  m.inService else { return nil }
+            return m.id
+        })
+        let orders = Self.rows(root, "printLog")
+        var out: [JSONValue] = []
+        out.reserveCapacity(orders.count)
+        for row in orders {
+            guard case .object(var o) = row,
+                  let id = Self.plainString(o["id"]),
+                  let machine = wanted[id], working.contains(machine),
+                  (Self.plainString(o["machineId"]) ?? "").isEmpty else {
+                out.append(row); continue
+            }
+            o["machineId"] = .string(machine)
+            out.append(.object(o))
+            moved += 1
+        }
+        root["printLog"] = .array(out)
+        return moved
     }
 
     /// Put the proposal out of mind.
@@ -2251,14 +2269,12 @@ extension Shop {
         // back, so actuals written afterwards would be written onto a copy the
         // book has already replaced.
         //
-        // AND NOT BECAUSE THE DEDUCTION READS THEM. It does not, in either
-        // app: `deductForOrder` takes an `actualGrams` — "what the PRINTER says
-        // the job used" — and nobody passes it, `renderer/inventory.js`'s
-        // `deductionContext()` included. So a job that used 260 g against a
-        // 160 g quote still takes 160 g off the shelf. That is a gap in the
-        // shared rule rather than in this app, and closing it here alone would
-        // make the two disagree about a shop's shelf, so it is left alone and
-        // pinned by `MoveJobTests.theShelfStillFollowsTheEstimate`.
+        // AND THE DEDUCTION READS THEM. The move's `deduct_filament` passes
+        // `actualGrams: order.actualWeight` to `deductForOrder`, off this very
+        // record — so a job that used 260 g against a 160 g quote takes 260 g
+        // off the shelf, and written after the move the shelf would follow the
+        // estimate instead. Pinned by `MoveJobTests.theShelfFollowsTheActual`
+        // and `aShortJobTakesLess`.
         //
         // Both figures and their provenance travel together. A record with
         // actuals and no `actualsSource` reads as measured to anything that
