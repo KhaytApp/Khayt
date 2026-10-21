@@ -94,10 +94,14 @@ final class CalculatorModel {
     /// so "1,200" g was 1.2 g and "0,5" kWh was 5. Now a comma followed by
     /// exactly three digits is a thousands separator ("1,200" → 1200,
     /// "1,234,567.5" → 1234567.5) and any other comma is the decimal point
-    /// ("0,5" → 0.5, "12,75" → 12.75).
+    /// ("0,5" → 0.5, "12,75" → 12.75). A comma after a zero integer part is
+    /// ALWAYS the decimal point — nobody writes thousands after a nought, and
+    /// "0,125" g or "0,180" per kWh read as 125 and 180 otherwise.
     static func number(_ text: String) -> Double {
         var said = text.trimmingCharacters(in: .whitespaces)
-        said = said.replacing(/,(?=\d{3}(?!\d))/, with: "")
+        let whole = said.prefix { $0 != "," }
+        let zeroWhole = said.contains(",") && whole.allSatisfy { $0 == "0" || $0 == "-" || $0 == "+" }
+        if !zeroWhole { said = said.replacing(/,(?=\d{3}(?!\d))/, with: "") }
         said = said.replacingOccurrences(of: ",", with: ".")
         return max(0, Double(said) ?? 0)
     }

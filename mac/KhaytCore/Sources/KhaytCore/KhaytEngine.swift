@@ -2236,7 +2236,10 @@ public actor KhaytEngine {
                            from: String = "", to: String = "") throws -> String {
         try runtime.call2(
             "KhaytAccountingExport.buildExpenseCsv(ARG0, ARG1)",
-            [.array(expenses), .object(Self.accountingOptions(settings, format: format, from: from, to: to))],
+            // With the settings: an expense's VAT is reclaimable only for a
+            // shop that reclaims (the P&L's rule).
+            [.array(expenses), .object(Self.accountingOptions(settings, format: format, from: from, to: to)
+                .merging(["settings": .object(settings)]) { a, _ in a })],
             as: String.self)
     }
 

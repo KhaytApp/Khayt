@@ -70,7 +70,23 @@ struct AccountingSaudiFormatsTests {
         #expect(wafeq[1] == "2026-08-02,Cost of Goods Sold,,SAR,57.50,inc. tax,PLA")
         let daftra = Self.lines(try await engine.expenseCsv(
             [Self.expense], format: "daftra", settings: Self.settings))
-        #expect(daftra[1] == "02/08/2026,57.50,SAR,Cost of Goods Sold,PLA")
+        #expect(daftra[0] == "Date,Amount,Currency,Category,Description,Taxes")
+        #expect(daftra[1] == "02/08/2026,57.50,SAR,Cost of Goods Sold,PLA,")
+    }
+
+    @Test("Daftra: an expense's recorded VAT goes as reclaimable only on a shop that reclaims")
+    func daftraExpenseVat() async throws {
+        let engine = try KhaytEngine()
+        guard case .object(var e) = Self.expense else { return }
+        e["amount"] = .number(115); e["vatAmount"] = .number(15)
+        let registered = Self.lines(try await engine.expenseCsv(
+            [.object(e)], format: "daftra", settings: Self.settings))
+        #expect(registered[1] == "02/08/2026,100.00,SAR,Cost of Goods Sold,PLA,VAT on Sales")
+        var off = Self.settings
+        off["enableVat"] = .bool(false); off["vatRate"] = .number(0)
+        let unregistered = Self.lines(try await engine.expenseCsv(
+            [.object(e)], format: "daftra", settings: off))
+        #expect(unregistered[1] == "02/08/2026,115.00,SAR,Cost of Goods Sold,PLA,")
     }
 
     @Test("both notes exist in English and Arabic")

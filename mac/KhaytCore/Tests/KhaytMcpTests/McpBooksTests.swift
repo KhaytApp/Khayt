@@ -267,6 +267,43 @@ struct McpBooksTests {
 
     // MARK: - Quote draft
 
+    @Test("a quote draft costs the spool net of the VAT a registered shop reclaims, as the calculator")
+    func quoteDraftSpoolIsNet() async throws {
+        let engine = try KhaytEngine()
+        func perUnit(registered: Bool) async throws -> (draft: Double?, net: Double, gross: Double) {
+            var book = try Self.sample()
+            var inventory = Self.rows(book, "inventory")
+            for i in inventory.indices {
+                if case .object(var o) = inventory[i], o["id"] == .string("sp-1") {
+                    o["cost"] = .number(115); o["vatAmount"] = .number(15); o["spoolWeight"] = .number(1000)
+                    inventory[i] = .object(o)
+                }
+            }
+            book["inventory"] = .array(inventory)
+            var settings = Self.settings(book)
+            if !registered {
+                settings["enableVat"] = .bool(false); settings["vatRate"] = .number(0)
+                settings.removeValue(forKey: "tax")
+                book["settings"] = .object(settings)
+            }
+            let server = Self.server(try JSONEncoder().encode(book), engine: engine)
+            let out = await Self.call(server, "quote_draft", ["grams": 200, "hours": 1, "spool_id": "sp-1"])
+            func cost(_ spoolCost: Double) async throws -> Double {
+                let part: [String: JSONValue] = ["printWeight": .number(200), "printTime": .number(1),
+                                                 "qty": .number(1), "filamentId": .string("sp-1"),
+                                                 "spoolCost": .number(spoolCost), "spoolWeight": .number(1000)]
+                return try await engine.costPart(.object(part), inventory: Self.rows(book, "inventory"),
+                                                 settings: settings, consumables: Self.rows(book, "consumables")).cost
+            }
+            return ((out["cost"] as? [String: Any])?["per_unit"] as? Double, try await cost(100), try await cost(115))
+        }
+        let reg = try await perUnit(registered: true)
+        #expect(Self.close(reg.draft, reg.net), "the reclaimable 15 was charged to the job")
+        #expect(abs(reg.net - reg.gross) > 1)
+        let unreg = try await perUnit(registered: false)
+        #expect(Self.close(unreg.draft, unreg.gross), "a shop that reclaims nothing pays the tax")
+    }
+
     @Test("a quote draft is the calculator's cost and price, and saves nothing")
     func quoteMatchesTheCalculator() async throws {
         let book = try Self.sample()
@@ -282,9 +319,14 @@ struct McpBooksTests {
         guard case .object(let spool)? = Self.rows(book, "inventory").first(where: {
             if case .object(let o) = $0 { return o["id"] == .string("sp-1") } else { return false }
         }) else { Issue.record("no sp-1"); return }
+        // At what the spool costs a JOB: net of the VAT this registered shop
+        // reclaims, as the calculator costs it (`CalculatorPart.netCost`).
+        let net = CalculatorPart.netCost(paid: { if case .number(let n)? = spool["cost"] { n } else { nil } }(),
+                                         vatAmount: { if case .number(let n)? = spool["vatAmount"] { n } else { nil } }(),
+                                         reclaims: true)
         var part: [String: JSONValue] = ["printWeight": .number(120), "printTime": .number(5.5),
                                          "qty": .number(3), "filamentId": .string("sp-1"),
-                                         "spoolCost": spool["cost"] ?? .number(0),
+                                         "spoolCost": .number(net),
                                          "spoolWeight": spool["spoolWeight"] ?? .number(1000)]
         part["material"] = spool["material"]
         let settings = Self.settings(book)
