@@ -32,6 +32,11 @@ struct SettingsView: View {
                         // its owner opts in there, off by default (matches /privacy).
                         foot(L10n.tr("settings.live_activities.mac"))
                     }
+                    if ActiveCountSender.ready {
+                        eyebrow(L10n.tr("settings.privacy"))
+                        VStack(spacing: 0) { toggleRow(L10n.tr("settings.count_install"), $settings.countInstall) }.card()
+                        foot(L10n.tr("settings.count_install.hint"))
+                    }
                     eyebrow(L10n.tr("cloud.title"))
                     cloudCard
                     eyebrow(L10n.tr("settings.connection"))

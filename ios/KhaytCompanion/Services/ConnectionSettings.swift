@@ -198,6 +198,11 @@ final class ConnectionSettings: ObservableObject {
         didSet { UserDefaults.standard.set(notifyPrintDone, forKey: Keys.notifyPrintDone) }
     }
     /// Prints in progress as Live Activities (Lock Screen, Dynamic Island).
+    /// The anonymous once-a-day install count (`ActiveCountSender`). On by
+    /// default; off sends nothing and keeps the dates it counted on.
+    @Published var countInstall: Bool {
+        didSet { UserDefaults.standard.set(countInstall, forKey: Keys.countInstall) }
+    }
     @Published var liveActivities: Bool {
         didSet { UserDefaults.standard.set(liveActivities, forKey: Keys.liveActivities) }
     }
@@ -218,6 +223,7 @@ final class ConnectionSettings: ObservableObject {
         static let notifyLowStock = "khayt.notify.lowstock"
         static let notifyPrintDone = "khayt.notify.printdone"
         static let liveActivities = "khayt.liveActivities"
+        static let countInstall = "khayt.countInstall"
         static let sampleShop = "khayt.sampleShop"
         static let signedOutByMac = "khayt.signedOutByMac"
     }
@@ -243,6 +249,7 @@ final class ConnectionSettings: ObservableObject {
         notifyLowStock = defaults.object(forKey: Keys.notifyLowStock) as? Bool ?? true
         notifyPrintDone = defaults.object(forKey: Keys.notifyPrintDone) as? Bool ?? true
         liveActivities = defaults.object(forKey: Keys.liveActivities) as? Bool ?? true
+        countInstall = defaults.object(forKey: Keys.countInstall) as? Bool ?? true
         isSampleShop = defaults.bool(forKey: Keys.sampleShop)
         L10n.setLanguage(appLanguage)
     }
