@@ -296,7 +296,7 @@ test('the SDCP branch sits behind the host guard, like every other adapter', () 
   assert.ok(at > 0, 'fetchPrinterStatus moved — this guard is now checking nothing');
   const body = mainJs.slice(at, at + 4000);
 
-  const guard = body.indexOf('isAllowedPrinterHost(printerHost)');
+  const guard = body.indexOf('resolvePrinterTarget(host)');
   const branch = body.indexOf("if (type === 'sdcp')");
   assert.ok(guard > 0, 'the host guard is not in fetchPrinterStatus');
   assert.ok(branch > 0, 'the SDCP branch is not in fetchPrinterStatus');
