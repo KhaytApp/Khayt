@@ -4,30 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **A printer retired by its date alone is out of the lead time and the
-  overhead rate.** A printer can be marked retired by its status or by a
-  retire date. The published lead time and the overhead rate looked only at
-  the status, so a printer with just the date (left by a sync or an older
-  build) still counted as capacity and still spread the shop's overhead.
-  Both now read either one, like every other place that asks.
-
-- **Desktop: an anonymous count of installs in use.** Once a day the app
-  tells Khayt Cloud only its platform, version and release channel, and
-  whether this is its first day this week, this month or ever. There is no
-  id and nothing about the shop (khaytapp.com/privacy, "The anonymous install
-  count"). It is on unless "Count this install (anonymous)" is switched off in
-  Settings → Crash Reports & Usage, and that switch belongs to this computer.
-  Settings no longer says Khayt sends nothing by default.
-
-- **Desktop: Khayt asks once about crash reports.** A card at the top of the
-  window asks whether to share crash reports, with usage counts as an extra
-  tick. "Not Now" puts it away for good on this computer and turns nothing
-  on; "Share Crash Reports" turns them on. It never covers anything, waits
-  until the first-run setup is done, and only asks someone who may change
-  Settings. Settings → Crash Reports & Usage still has both switches. Until
-  now the switches were the only way in, so nothing was ever shared. The
-  same card as on the Mac.
-
 - **Mac: crash reports include Swift crashes, and Settings can send a test
   report.** Until now the Mac reported only the crashes it could catch itself:
   failed rules and AppKit exceptions. A Swift crash, like the Settings ▸
@@ -6173,6 +6149,37 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.22] - 2026-10-21
+
+Khayt asks once about crash reports, and counts installs anonymously, since 3.11.21.
+Individual entries are kept below; this is what changed for you.
+
+A card at the top of the window asks once whether to share crash reports; "Not Now" puts it away for good and turns nothing on. Once a day the app now tells Khayt Cloud only its platform, version and release channel, and whether this is its first day this week, this month or ever: no id, nothing about your shop (khaytapp.com/privacy, "The anonymous install count"). Switch it off in Settings → Crash Reports & Usage → "Count this install (anonymous)". A printer retired by its date alone no longer counts toward your lead time or overhead rate.
+
+- **Desktop: Khayt asks once about crash reports.** A card at the top of the
+  window asks whether to share crash reports, with usage counts as an extra
+  tick. "Not Now" puts it away for good on this computer and turns nothing
+  on; "Share Crash Reports" turns them on. It never covers anything, waits
+  until the first-run setup is done, and only asks someone who may change
+  Settings. Settings → Crash Reports & Usage still has both switches. Until
+  now the switches were the only way in, so nothing was ever shared. The
+  same card as on the Mac.
+
+- **Desktop: an anonymous count of installs in use.** Once a day the app
+  tells Khayt Cloud only its platform, version and release channel, and
+  whether this is its first day this week, this month or ever. There is no
+  id and nothing about the shop (khaytapp.com/privacy, "The anonymous install
+  count"). It is on unless "Count this install (anonymous)" is switched off in
+  Settings → Crash Reports & Usage, and that switch belongs to this computer.
+  Settings no longer says Khayt sends nothing by default.
+
+- **A printer retired by its date alone is out of the lead time and the
+  overhead rate.** A printer can be marked retired by its status or by a
+  retire date. The published lead time and the overhead rate looked only at
+  the status, so a printer with just the date (left by a sync or an older
+  build) still counted as capacity and still spread the shop's overhead.
+  Both now read either one, like every other place that asks.
 
 ## [3.11.21] - 2026-10-20
 

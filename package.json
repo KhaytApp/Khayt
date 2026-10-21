@@ -1,6 +1,6 @@
 {
   "name": "khayt",
-  "version": "3.11.21",
+  "version": "3.11.22",
   "description": "Khayt - 3D printing production management, invoicing and analytics. Free and open to all makers worldwide.",
   "main": "main.js",
   "author": {
@@ -37,7 +37,6 @@
     "test:e2e:lots": "node scripts/e2e-lot-recall-smoke.mjs",
     "test:e2e:phones": "node scripts/e2e-paired-phones-smoke.mjs",
     "test:e2e:activecount": "node scripts/e2e-active-count-smoke.mjs",
-
     "test:e2e:telemetry-ask": "node scripts/e2e-telemetry-ask-smoke.mjs",
     "test:e2e:telemetry": "node scripts/e2e-telemetry-smoke.mjs",
     "test:e2e:webhookretry": "node scripts/e2e-webhook-durable-smoke.mjs",
