@@ -2188,14 +2188,23 @@ final class LanServer {
         if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
             return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
         }
-        if let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: false), g.blocked {
+        // ── THE MAC ITSELF IS NOT ON THE WHOLE-SERVER BUDGET ──────────────
+        //
+        // A home network is one /64, so a guesser on the Wi-Fi can hold that
+        // budget shut — and with it the owner's own browser on this Mac (the
+        // queue page's PIN-for-cookie exchange). Loopback never draws from it
+        // and never spends it. It keeps its OWN per-address lockout, not
+        // skipped: a tunnel or proxy the shop runs arrives as loopback too.
+        let fromThisMac = Self.isLoopback(request.remote)
+        if !fromThisMac,
+           let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: false), g.blocked {
             return .json(429, #"{"error":"Too many attempts — try again later"}"#)
         }
         guard Self.constantTimeEqual(provided, host.pin) else {
             if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
                 failures[key] = bumped
             }
-            if let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: true) {
+            if !fromThisMac, let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: true) {
                 throttle = Self.backedOff(g.state, was: throttle, trips: &throttleTrips, now: now)
             }
             sweepFailures(now: now)
@@ -2204,6 +2213,15 @@ final class LanServer {
         failures.removeValue(forKey: key)
         throttleTrips = 0
         return nil
+    }
+
+    /// Is this remote address this Mac — `127.0.0.0/8`, `::1`, or IPv4-mapped loopback?
+    nonisolated static func isLoopback(_ remote: String) -> Bool {
+        let bare = String(remote.split(separator: "%", maxSplits: 1).first ?? "")
+        if let v4 = IPv4Address(bare) { return v4.isLoopback }
+        guard let v6 = IPv6Address(bare) else { return false }
+        if let v4 = v6.asIPv4 { return v4.isLoopback }
+        return v6.isLoopback
     }
 
     /// The PIN a request carries: the header, and nothing else.

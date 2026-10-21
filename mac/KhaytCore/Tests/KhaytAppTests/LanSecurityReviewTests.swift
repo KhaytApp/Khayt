@@ -105,6 +105,33 @@ struct LanSecurityReviewTests {
         #expect(phone.status == 200, "an enrolled phone was locked out by a neighbour's guesses")
     }
 
+    /// A guesser on the Wi-Fi can hold the whole-server budget shut; the
+    /// owner's browser on this Mac is not on it. Its own lockout still holds.
+    @Test("the Mac itself is not locked out by the Wi-Fi's guesses, and keeps its own lockout")
+    func loopbackSkipsTheWholeServerBudget() async throws {
+        let server = try await Self.server(now: Date(timeIntervalSince1970: 1_788_000_000))
+        for i in 0..<50 {
+            _ = await server.respond(to: Self.get("/api/queue", from: "192.168.0.\(i + 2)",
+                                                  headers: ["x-khayt-pin": "wrong-\(i)"]))
+        }
+        let wifi = await server.respond(to: Self.get("/api/queue", from: "192.168.1.200",
+                                                     headers: ["x-khayt-pin": "24682468"]))
+        #expect(wifi.status == 429)
+        for remote in ["127.0.0.1", "::1", "::ffff:127.0.0.1"] {
+            let mac = await server.respond(to: Self.get("/api/queue", from: remote,
+                                                        headers: ["x-khayt-pin": "24682468"]))
+            #expect(mac.status == 200, "\(remote) was locked out by the Wi-Fi")
+        }
+        for i in 0..<10 {
+            _ = await server.respond(to: Self.get("/api/queue", from: "127.0.0.1",
+                                                  headers: ["x-khayt-pin": "local-\(i)"]))
+        }
+        let locked = await server.respond(to: Self.get("/api/queue", from: "127.0.0.1",
+                                                       headers: ["x-khayt-pin": "24682468"]))
+        #expect(locked.status == 429, "loopback guessing must still lock itself out")
+        #expect(!LanServer.isLoopback("192.168.1.5") && !LanServer.isLoopback("fe80::1%lo0"))
+    }
+
     @Test("each time the whole-server budget trips again, the cooldown doubles")
     func globalCooldownBacksOff() {
         var trips = 0
