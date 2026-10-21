@@ -170,7 +170,7 @@ test('on time is judged on the shop\'s local day, as the On-time card judges it'
   }
 });
 
-test('a job\'s cost: the parts as costed, stocked share only, plus shipping — one rule for both apps', () => {
+test('a job\'s cost: the parts as costed, stocked share only — one rule for both apps', () => {
   const settings = { currency: 'SAR', exchangeRates: { USD: 3.75 } };
   // A part with costing inputs, and a part priced only from a product's unit
   // cost (the LAN and public-quote paths write those) — the Mac used to count
@@ -183,6 +183,40 @@ test('a job\'s cost: the parts as costed, stocked share only, plus shipping — 
     ],
   };
   const cost = R.orderCost(o, { settings, inventory: [] });
-  // 2 × 20 (material) + 3 × 5 + 10 USD shipping at 3.75 = 55 + 37.5
-  assert.equal(Math.round(cost * 100) / 100, 92.5);
+  // 2 × 20 (material) + 3 × 5 = 55. The 10 USD of shipping is NOT a cost of
+  // goods — it is charged in the price, as the P&L reads it.
+  assert.equal(Math.round(cost * 100) / 100, 55);
+});
+
+test('the dashboard\'s gross margin is the P&L\'s, shipping and all (beta.1 review)', () => {
+  // One finished 100 SAR job: 20 of material from a product's unit cost, and
+  // 15 of delivery charged inside the price. Before: the dashboard took the
+  // 15 off as a cost and read 65%, while the P&L read 80% — both labelled
+  // "Gross margin". After: 80% on both.
+  require('../lib/business-scope.js');
+  const K = require('../lib/kpi.js');
+  const P = require('../lib/pnl-report.js');
+  const M = require('../lib/order-money.js');
+  const settings = { currency: 'SAR' };
+  const job = {
+    id: 'S', date: '2026-09-02', status: 'completed', completedAt: '2026-09-03',
+    price: 100, paidAmount: 100, currency: 'SAR', shippingCost: 15, costBasis: 20,
+    parts: [{ unitCost: 20, baseCost: 20, qty: 1 }],
+  };
+  const ctx = { settings, clients: [] };
+  const rows = R.kpiRows({
+    orders: [job], from: '2026-09-01', to: '2026-09-30', settings,
+    money: (o) => ({
+      revenue: M.orderNetRevenueBase(o, ctx),
+      cost: R.orderCost(o, { settings, inventory: [] }),
+      outstanding: 0,
+    }),
+  });
+  const dash = K.computeKpis(rows);
+  const pnl = P.pnlByPeriod([job], [], { settings, now: new Date('2026-09-30T12:00:00'),
+    range: { from: '2026-09-01', to: '2026-09-30' } });
+  assert.equal(dash.cost, 20);
+  assert.equal(pnl[0].cogs, 20);
+  assert.equal(dash.grossMargin, 80);
+  assert.equal(pnl[0].marginPct, 80);
 });

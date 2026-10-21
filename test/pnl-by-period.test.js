@@ -171,17 +171,54 @@ test('the module and the original agree, every figure, over 2000 generated books
   for (let i = 0; i < 2000; i++) {
     const { orders, expenses, settings, clients } = someBook(r);
     const now = new Date(2024 + Math.floor(r() * 3), Math.floor(r() * 12), 1 + Math.floor(r() * 28));
-    const theirs = originalRows(runOriginal(orders, expenses, settings, clients, now));
-    const ours = pnlByPeriod(orders, expenses, { settings, clients, currencies: CURRENCIES, now });
+    const theirsAll = originalRows(runOriginal(orders, expenses, settings, clients, now));
+    const ours0 = pnlByPeriod(orders, expenses, { settings, clients, currencies: CURRENCIES, now });
+
+    // VAT DIFFERS ON PURPOSE TOO: the tax point is the issued invoice, not the
+    // finished job (pnl-report.js, VAT IS DUE WHEN THE INVOICE IS ISSUED). A
+    // pending or printing job owes its VAT in its period, and the original
+    // counted only finished ones. Worked out here from the generator's own
+    // fields — unvoided, not completed, dated — rather than by asking the
+    // module, and a period that holds ONLY such tax opens a row the original
+    // never had (orders, revenue and expenses all zero).
+    const profileNow = KhaytTax.profileFromSettings(settings);
+    const mctx = { settings, clients };
+    const extraVat = {};
+    for (const o of orders) {
+      if (o.status === 'completed' || o.voidedAt) continue;
+      const d = new Date((o.date || '') + 'T00:00:00');
+      if (isNaN(d)) continue;
+      const k = `${d.getFullYear()}-Q${Math.ceil((d.getMonth() + 1) / 3)}`;
+      const v = KhaytTax.computeTax(money.orderNetRevenueBase(o, mctx, CURRENCIES), profileNow).taxTotal;
+      if (v > 0) extraVat[k] = (extraVat[k] || 0) + v;
+    }
+    const theirPeriods = new Set(theirsAll.map((t) => t.period));
+    const ours = [];
+    for (const row of ours0) {
+      if (theirPeriods.has(row.period)) { ours.push(row); continue; }
+      assert.ok(extraVat[row.period] > 0, `case ${i}: a row only for unfinished tax`);
+      assert.equal(row.orders, 0);
+      assert.equal(row.revenue, 0);
+      assert.equal(row.expenses, 0);
+      assert.ok(Math.abs(row.vatCollected - extraVat[row.period]) <= 0.01, `case ${i}: its VAT`);
+    }
+    const theirs = theirsAll;
     assert.equal(ours.length, theirs.length, `case ${i}: row count`);
     for (let j = 0; j < ours.length; j++) {
       for (const field of ['period', 'orders']) {
         assert.equal(ours[j][field], theirs[j][field], `case ${i} row ${j} ${field}`);
       }
-      for (const field of ['shipping', 'expenses', 'fixed', 'vatCollected']) {
+      for (const field of ['shipping', 'expenses', 'fixed']) {
         // The module rounds to the cent where the original handed raw floats
         // to fmtMoney; comparing at that precision is comparing what is printed.
         assert.equal(ours[j][field], round2(theirs[j][field]), `case ${i} row ${j} ${field}`);
+      }
+      const extra = extraVat[ours[j].period] || 0;
+      if (extra) {
+        assert.ok(Math.abs(ours[j].vatCollected - (theirs[j].vatCollected + extra)) <= 0.01,
+                  `case ${i} row ${j} vatCollected with unfinished invoices`);
+      } else {
+        assert.equal(ours[j].vatCollected, round2(theirs[j].vatCollected), `case ${i} row ${j} vatCollected`);
       }
 
       // REVENUE AND NET DIFFER ON PURPOSE, AND BY EXACTLY THE TAX.

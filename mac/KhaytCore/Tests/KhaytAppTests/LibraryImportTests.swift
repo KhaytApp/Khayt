@@ -707,3 +707,19 @@ struct LibraryIdTests {
         #expect(Shop.uid("SL").hasPrefix("SL-") && !Shop.uid("SL").hasPrefix("SL--"))
     }
 }
+
+/// An import's hash, measurement and preview are seconds of blocking reads.
+/// Inside `Task.detached` each held a cooperative-pool thread for all of it —
+/// three of them on a CI runner — so they run on a dispatch queue now.
+@MainActor
+struct LibraryImportOffPoolTests {
+    @Test("an import's blocking reads never hold a cooperative thread")
+    func offMainIsADispatchQueue() async throws {
+        let src = try QuoteSheetStatusTests.source("LibraryImport.swift")
+        #expect(!src.contains("await Task.detached"), "an import step runs inside Task.detached again")
+        #expect(src.contains("await PinWork.run(work)"))
+        // And it still answers, off the main thread.
+        let onMain = await LibraryImport.offMain { Thread.isMainThread }
+        #expect(onMain == false)
+    }
+}

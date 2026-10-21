@@ -511,7 +511,7 @@ final class PrinterWatch {
         // NaN, and a percentage outside 0-100 is not one — a printer reporting
         // 5000 would have printed "5000%" on the shop floor.
         if alert.progress > 0 {
-            parts.append("\(Int(min(100, max(0, alert.progress.isFinite ? alert.progress : 0))))%")
+            parts.append(shop.words.numeral(Int(min(100, max(0, alert.progress.isFinite ? alert.progress : 0)))) + "%")
         }
         if parts.isEmpty { parts.append(alert.state) }
         return parts.joined(separator: " · ")

@@ -57,13 +57,19 @@ public enum AccountingRows {
     /// Is this record an invoice the accountant should see? `isInvoice` in
     /// `lib/accounting-rows.js`, line for line.
     ///
-    /// Not a QUOTE, not a CANCELLED job, not a VOIDED invoice, not one CREDITED
+    /// Not a QUOTE (nor one on hold awaiting its answer), not a CANCELLED job, not a VOIDED invoice, not one CREDITED
     /// IN FULL, not a print marked NOT BUSINESS, and not a SPLIT PARENT — its
     /// sub-orders carry its price between them, so exporting it as well
     /// invoiced the job twice.
     public static func isInvoice(_ o: [String: JSONValue]) -> Bool {
         let status: String? = { if case .string(let s)? = o["status"] { return s }; return nil }()
         if status == "quote" || status == "cancelled" { return false }
+        // A quote parked ON HOLD, its yes not yet recorded, is still a quote
+        // (`awaitingApproval` in lib/order-new.js): no invoice number yet.
+        if status == "on_hold", JSSemantics.truthy(o["hasQuote"]),
+           !JSSemantics.truthy(o["quoteAcceptedAt"]), !JSSemantics.truthy(o["clientApprovedAt"]) {
+            return false
+        }
         if JSSemantics.truthy(o["voidedAt"]) || JSSemantics.truthy(o["creditedAt"]) { return false }
         if case .bool(true)? = o["nonBusiness"] { return false }
         if status == "split", case .array(let into)? = o["splitInto"], !into.isEmpty { return false }

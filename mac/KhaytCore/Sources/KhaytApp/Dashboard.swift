@@ -288,7 +288,7 @@ private struct FloorStrip: View {
                             // The one moving thing on a still floor, and only
                             // when something is actually being made.
                             Circle().fill(Khayt.hot).frame(width: 6, height: 6).alive()
-                            Text("\(status?.progress ?? 0)")
+                            Text(verbatim: shop.words.numeral(status?.progress ?? 0))
                                 .font(.system(size: 17, weight: .semibold, design: .rounded))
                                 .monospacedDigit()
                                 .contentTransition(.numericText())
@@ -562,7 +562,7 @@ private struct Goal: View {
                         Text(Money.text(goal, shop.currency))
                             .monospacedDigit().foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(Int((done / goal * 100).rounded()))%")
+                        Text(verbatim: shop.words.numeral(Int((done / goal * 100).rounded())) + "%")
                             .monospacedDigit()
                             .contentTransition(.numericText())
                             .foregroundStyle(done >= goal ? AnyShapeStyle(Khayt.done)
@@ -877,7 +877,7 @@ private struct RunningNow: View {
                         Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left, shop.words))
                             .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                     }
-                    Text("\(status.progress)%")
+                    Text(verbatim: shop.words.numeral(status.progress) + "%")
                         // The tile on the floor strip already rolls this
                         // figure; this one snapped. Two screens showing the
                         // same reading, disagreeing about whether it moved.

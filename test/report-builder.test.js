@@ -17,7 +17,7 @@ const RECORDS = [
 
 test('selects chosen fields in order + applies date range', () => {
   const r = buildReport(RECORDS, { fields: ['id', 'client', 'price'], from: '2026-06-01', to: '2026-06-30' });
-  assert.deepEqual(r.headers, ['Order #', 'Client', 'Price']);
+  assert.deepEqual(r.headers, ['Order #', 'Client', 'Revenue (excl. tax)']);
   assert.equal(r.count, 2); // A + B (C is in July)
   assert.deepEqual(r.rows[0], ['A', 'Acme', 100]);
 });
@@ -89,4 +89,32 @@ test('the picker offers every stage a job can actually be reported in', () => {
                        'completed', 'shipped', 'delivered']) {
     assert.ok(offered.includes(stage), `the report picker cannot select ${stage}`);
   }
+});
+
+test('each money column says its basis: revenue as the P&L counts it, balance as receivables do (beta.1 review)', () => {
+  // An inclusive-VAT shop at 15%: a 115 job, 23 credited, nothing paid yet.
+  // Before: Price 115 (gross, before the credit) beside Balance 92 — a figure
+  // neither the P&L nor the receivables would print. After: Revenue (excl.
+  // tax) 80 — the P&L's net-of-tax, after-credit figure — and Balance due
+  // (incl. tax) 92, what the customer still owes.
+  require('../lib/tax.js');
+  require('../lib/business-scope.js');
+  const settings = { currency: 'SAR', enableVat: true, vatRate: 15 };
+  const order = { id: 'V', date: '2026-06-05', status: 'completed', price: 115, paidAmount: 0,
+    currency: 'SAR', creditNotes: [{ amount: 23 }] };
+  const ctx = { settings, clients: [] };
+  const [rec] = reportRecords([order], { ...DEPS(), ctx });
+  assert.equal(rec.price, Math.round(money.orderEarnedBase(order, ctx)));
+  assert.equal(rec.price, 80);
+  assert.equal(rec.balance, Math.round(money.orderOwedBase(order, ctx)));
+  assert.equal(rec.balance, 92);
+  const r = buildReport([rec], { fields: ['price', 'paidAmount', 'balance'] });
+  assert.deepEqual(r.headers, ['Revenue (excl. tax)', 'Paid', 'Balance due (incl. tax)']);
+  // The desktop's words say the same in both languages the Mac ships.
+  require('../renderer/locales/en.js');
+  require('../renderer/locales/ar.js');
+  const E = globalThis.KhaytLocales.en, A = globalThis.KhaytLocales.ar;
+  assert.equal(E['rb.f_price'], 'Revenue (excl. tax)');
+  assert.equal(E['rb.f_balance'], 'Balance due (incl. tax)');
+  assert.notEqual(A['rb.f_price'], 'السعر');
 });

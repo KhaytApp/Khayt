@@ -334,7 +334,7 @@ struct KioskCardView: View {
                 .frame(height: 10 * scale)
                 .padding(.vertical, 4 * scale)
             HStack(spacing: 6 * scale) {
-                Text("\(Int(pct.rounded()))%")
+                Text(verbatim: words.numeral(Int(pct.rounded())) + "%")
                     .font(.system(size: 22 * scale, weight: .bold).monospacedDigit())
                 if card.overrunMinutes > 0 {
                     Text(words.callIt("mac.kiosk_over", ["time": .string(Figure.isolated(KioskTime.spell(card.overrunMinutes, words.language)))]))

@@ -136,7 +136,13 @@
       <li><strong>Right to rectification</strong> — every customer field is editable.</li>
       <li><strong>Right to erasure</strong> — deleting a customer offers a clear choice: unlink
         (keep the order records you may be legally required to retain) or full erase (also remove
-        the name from those orders and purge intake submissions and communication logs).</li>
+        the name from those orders and purge intake submissions and communication logs). Orders
+        that carry an invoice or a payment keep the customer's name even then, because tax invoices
+        must be kept as issued. So does a gift card with a balance left, because that balance is
+        money the shop still owes them; a used-up gift card loses the name, and their loyalty points
+        are unlinked from them. A full erase also takes the customer's order tracking pages down from
+        Khayt Cloud, those of invoiced and paid orders included; if Khayt Cloud cannot be reached at
+        that moment, the app keeps trying until it can.</li>
       <li><strong>Storage limitation</strong> — an optional retention setting anonymizes the contact
         details on old intake submissions while keeping the operational record.</li>
     </ul>
@@ -162,7 +168,9 @@
     <p>
       We <strong>never</strong> collect your orders, customers, prices, margins, inventory,
       files, or any secret (API keys, PINs, tokens). There is no account or user id — only a
-      random install identifier created when you opt in, and erased the moment you opt out.
+      random install identifier created when you opt in. Opting out removes it from your shop's
+      data straight away; backups made before then still hold it until they are replaced, and
+      reports already sent keep it until Khayt Cloud deletes them on its regular schedule.
       Turning an option off deletes anything queued locally straight away, without a restart.
       You can inspect exactly what would be sent at any time via <em>"View what's collected"</em>.
     </p>

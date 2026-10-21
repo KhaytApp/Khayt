@@ -13812,9 +13812,9 @@ private let MOVE_SCRIPT = """
 
 /// The one expression that puts the three modules together.
 ///
-/// `cost` is `KhaytKpiRows.orderCost` — the parts as costed, the stocked
-/// share, and shipping in the base currency — so both apps' dashboards price
-/// a job the same way.
+/// `cost` is `KhaytKpiRows.orderCost` — the parts as costed and the stocked
+/// share, not shipping (the P&L's cost of goods) — so both apps' dashboards
+/// price a job the same way, and the same way the P&L does.
 private let KPI_SCRIPT = """
 (function () {
   var ctx = { settings: ARG2, clients: ARG1 };

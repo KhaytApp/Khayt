@@ -135,11 +135,37 @@ struct MastheadNetTests {
             // And the time log: logged labour is a line of the P&L.
             timeEntries: shop.timeEntryRows)
         let row = rows.first { $0.period == DateRange.localMonth(shop.now) }
-        let expected = row.map { $0.revenue + $0.vatCollected }
+        // Revenue grossed up by ITS OWN tax. `+ vatCollected` would add the
+        // tax on invoices still printing, which revenue does not hold.
+        let expected = row.map(\.grossRevenue)
         let said = shop.monthGross.map { "\($0)" } ?? "nil"
         let theirs = expected.map { "\($0)" } ?? "nil"
         #expect(shop.monthGross == expected,
                 Comment(rawValue: "masthead gross \(said) vs Reports' charged \(theirs)"))
+    }
+
+    /// Since the invoice became the tax point, `vatCollected` holds the tax on
+    /// jobs still printing, so the GROSS tile, read as revenue + vatCollected,
+    /// showed a finished 115 and a printing 230 (15% inclusive) as 145. The
+    /// finished work as billed is 115 (beta.2 review).
+    @Test("the gross is the finished work as billed, not plus the open invoices' tax")
+    func grossLeavesOpenInvoicesOut() async throws {
+        let engine = try KhaytEngine()
+        let rows = try await engine.pnlByPeriod(
+            orders: [
+                .object(["id": .string("A"), "status": .string("completed"),
+                         "date": .string("2026-10-02"), "price": .number(115)]),
+                .object(["id": .string("B"), "status": .string("printing"),
+                         "date": .string("2026-10-05"), "price": .number(230),
+                         "invoiceNumber": .string("INV-2")]),
+            ],
+            expenses: [],
+            settings: ["currency": .string("SAR"), "enableVat": .bool(true), "vatRate": .number(15)],
+            clients: [], currencies: [:], now: Date(timeIntervalSince1970: 1_792_000_000.0),
+            granularity: "month")
+        let row = try #require(rows.first { $0.period == "2026-10" })
+        #expect(row.vatCollected == 45)
+        #expect(row.grossRevenue == 115, "was \(row.revenue + row.vatCollected)")
     }
 
     @Test("the note explaining the dash is gone once there is a number")

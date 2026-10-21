@@ -17,12 +17,17 @@ require('../lib/assembly.js');
 const status = require('../lib/order-status.js');
 
 const AT = Date.parse('2026-09-06T10:00:00.000Z');
+// The shop's LOCAL day of that instant: quoteAcceptedAt is the VAT tax point
+// (pnl-report taxPointDate), so it is written as the day the shop saw. In
+// UTC+14, which CI runs under, 10:00Z on the 6th is already the 7th.
+const AT_DAY = (() => { const d = new Date(AT);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
 
 test('a quote dragged out of the quote column is stamped accepted', () => {
   for (const to of ['pending', 'printing', 'post', 'qc', 'completed', 'on_hold']) {
     const order = { id: 'Q1', status: 'quote', quoteSentAt: '2026-09-01', parts: [] };
     status.apply(order, to, { now: AT });
-    assert.equal(order.quoteAcceptedAt, '2026-09-06', `moving a quote to ${to} accepts it`);
+    assert.equal(order.quoteAcceptedAt, AT_DAY, `moving a quote to ${to} accepts it`);
   }
 });
 

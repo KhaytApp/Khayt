@@ -487,7 +487,7 @@ struct Calculator: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 5) {
                 Text(label).font(.caption).foregroundStyle(.secondary)
-                Text("\(Int(value.wrappedValue))%").font(.caption).monospacedDigit()
+                Text(verbatim: shop.words.numeral(Int(value.wrappedValue)) + "%").font(.caption).monospacedDigit()
             }
             Slider(value: value, in: range, step: 1).frame(width: 190)
         }

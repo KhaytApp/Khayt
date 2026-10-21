@@ -259,3 +259,61 @@ struct SpotlightRevealTests {
         #expect(shop.showingLibrary == false, "the app opened somewhere nobody asked for")
     }
 }
+
+/// After every library write the index is brought up to date — and for a
+/// library of ten thousand models that has to mean the one that changed, not
+/// all of them again on the main actor (Oct 2026: 127 ms a write, measured).
+@MainActor
+struct SpotlightIncrementalTests {
+    let files = (1...5).map { SpotlightTests.file(id: "PF-\($0)", name: "Model \($0)") }
+
+    @Test("the first pass withdraws everything and describes every model")
+    func firstPassIsWhole() {
+        let plan = Spotlight.plan(before: nil, files: files)
+        #expect(plan.everything)
+        #expect(plan.changed.map(\.id) == files.map(\.id))
+        #expect(plan.now.count == 5)
+    }
+
+    @Test("an unchanged library is no work at all")
+    func unchangedIsNothing() {
+        let before = Spotlight.plan(before: nil, files: files).now
+        #expect(Spotlight.plan(before: before, files: files).isEmpty)
+    }
+
+    @Test("one edited model is the only one described again")
+    func oneEditIsOneItem() {
+        let before = Spotlight.plan(before: nil, files: files).now
+        var edited = files
+        edited[2] = SpotlightTests.file(id: "PF-3", name: "Model 3 renamed")
+        let plan = Spotlight.plan(before: before, files: edited)
+        #expect(!plan.everything)
+        #expect(plan.changed.map(\.id) == ["PF-3"])
+        #expect(plan.removed.isEmpty)
+    }
+
+    @Test("a deleted model is withdrawn by name, so the index loses what the book lost")
+    func deleteIsWithdrawn() {
+        let before = Spotlight.plan(before: nil, files: files).now
+        let plan = Spotlight.plan(before: before, files: files.filter { $0.id != "PF-4" })
+        #expect(plan.changed.isEmpty)
+        #expect(plan.removed == [Spotlight.itemId(for: "PF-4")])
+        #expect(!plan.everything)
+    }
+
+    @Test("the rebuild runs on Spotlight's own queue, not the main actor")
+    func rebuildIsOffMain() throws {
+        // Source-read: an index cannot be asserted about from a test without
+        // writing into this Mac's own Spotlight.
+        let here = URL(fileURLWithPath: #filePath)
+        let src = try String(contentsOf: here.deletingLastPathComponent()
+            .appending(path: "../../Sources/KhaytApp/Spotlight.swift").standardized, encoding: .utf8)
+        let reindex = try #require(src.range(of: "func reindex(shop: Shop)"))
+        let body = src[reindex.upperBound...].prefix(2_500)
+        let queued = try #require(body.range(of: "Self.queue.async"))
+        let onMain = body[..<queued.lowerBound]
+        #expect(!onMain.contains("Self.plan(") && !onMain.contains("Self.indexable(")
+                && !onMain.contains("thumbnail"))
+        #expect(body[queued.lowerBound...].contains("Self.plan("))
+    }
+}

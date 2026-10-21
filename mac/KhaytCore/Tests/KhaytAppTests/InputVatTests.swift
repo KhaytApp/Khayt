@@ -60,9 +60,22 @@ struct InputVatTests {
 
     /// And a quarter that spent more than it billed says so with a negative,
     /// rather than clamping to nought and quietly overstating what is owed.
+    ///
+    /// ITS OWN BOOK, not the sample's. The sample's Q3 refunded only while
+    /// VAT followed finished jobs; it holds eleven open invoices, and since
+    /// the invoice is the tax point (beta.1 review) their tax is owed in the
+    /// quarter they were issued, which leaves it payable.
     @Test("a refund position is reported as one")
     func refundIsNotClamped() async throws {
-        let rows = try await Self.rows()
+        let engine = try KhaytEngine()
+        let rows = try await engine.pnlByPeriod(
+            orders: [.object(["id": .string("A"), "status": .string("completed"),
+                              "date": .string("2026-08-10"), "price": .number(115)])],
+            expenses: [.object(["id": .string("e"), "date": .string("2026-08-12"),
+                                "amount": .number(230), "vatAmount": .number(30),
+                                "category": .string("other")])],
+            settings: ["currency": .string("SAR"), "enableVat": .bool(true), "vatRate": .number(15)],
+            clients: [], currencies: [:], now: Date(timeIntervalSince1970: 1_788_000_000.0))
         let refund = rows.filter { $0.vatDue < 0 }
         #expect(!refund.isEmpty,
                 "no quarter is in a refund position, so that case is undrawn")

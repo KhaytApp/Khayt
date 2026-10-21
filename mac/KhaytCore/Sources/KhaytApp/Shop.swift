@@ -1456,7 +1456,10 @@ final class Shop {
         // net of tax, which on a month of 50.00 billed and 35.91 of material
         // put "NET 50.00" beside Reports' "NET INCOME 14.09".
         monthNetIncome = month?.net
-        monthGrossRevenue = month.map { $0.revenue + $0.vatCollected }
+        // The month's finished work as billed: revenue plus ITS tax. Not
+        // `+ vatCollected`, which since the invoice became the tax point also
+        // holds the tax on jobs still printing (beta.2 review).
+        monthGrossRevenue = month.map(\.grossRevenue)
         // The masthead's cost figure, off the same row: Reports' "Cost of
         // goods sold" for this month, so the two screens name one figure
         // one way.

@@ -13,8 +13,8 @@
  *
  * So a shop's custom report existed in one app and could not exist in the other
  * without writing those twenty lines a second time — and they are not twenty
- * lines of formatting. `price` is revenue converted to the shop's base
- * currency, `balance` is what is still owed after credits, `paymentStatus` is
+ * lines of formatting. `price` is revenue as the P&L counts it, in the shop's
+ * base currency, `balance` is what is still owed after credits, `paymentStatus` is
  * the rule that decides what "paid" means. Reimplementing those is how two apps
  * come to disagree about a shop's money, which is the one thing this codebase
  * spends most of its comments preventing.
@@ -94,7 +94,18 @@ function reportRecords(orders, deps = {}) {
         // Rounded to whole units, as the renderer has always shown them: a
         // report is read across a row, and two decimal places on every money
         // column is noise in a table nobody sums by hand.
-        price: Math.round(money.orderRevenueBase(o, ctx)),
+        //
+        // TWO BASES, EACH NAMED IN ITS HEADER. `price` is REVENUE as the P&L
+        // counts it (`orderEarnedBase`): net of tax, less credit notes, and
+        // nothing for a job marked not-business — headed "Revenue (excl.
+        // tax)". `paidAmount` and `balance` are what the customer was asked to
+        // PAY and still owes (`orderOwedBase`, the receivables rule): tax
+        // included, after credit notes and gift cards — headed "Balance due
+        // (incl. tax)". This column was the raw invoiced price, before credit
+        // notes and, on an inclusive shop, with the tax in it, so a 115 job
+        // with 23 credited read Price 115 beside Balance 92 and agreed with
+        // neither the P&L (80) nor the receivables (beta.1 review).
+        price: Math.round(money.orderEarnedBase(o, ctx)),
         paidAmount: Math.round(money.convertToBase(+o.paidAmount || 0, money.orderCurrency(o, ctx), ctx)),
         balance: Math.round(money.orderOwedBase(o, ctx)),
         paymentStatus: payment.statusOf(o, ctx),

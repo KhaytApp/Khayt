@@ -385,7 +385,7 @@ private struct StageCell: View {
                 Circle().fill(Khayt.hot).frame(width: 6, height: 6).alive()
                 LayerProgress(progress: Double(live.progress) / 100, height: 14)
                     .frame(width: 32)
-                Text("\(live.progress)%")
+                Text(verbatim: shop.words.numeral(live.progress) + "%")
                     .monospacedDigit()
                     // A print gains a percent every few minutes and the figure
                     // used to be a different number with no moment in between.
@@ -396,7 +396,7 @@ private struct StageCell: View {
             .help(tooltip(stage: stage, live: live))
             // The bar and the dot are pictures; this is what the row says.
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(shop.words.callIt(stage.key) + " · \(live.progress)%")
+            .accessibilityLabel(shop.words.callIt(stage.key) + " · " + shop.words.numeral(live.progress) + "%")
         } else if let stage {
             HStack(spacing: 6) {
                 Circle()
@@ -422,7 +422,7 @@ private struct StageCell: View {
 
     /// The word the bar replaced, and the two facts a shop asks next.
     private func tooltip(stage: Stage, live: KhaytEngine.PrinterStatus) -> String {
-        var said = shop.words.callIt(stage.key) + " · \(live.progress)%"
+        var said = shop.words.callIt(stage.key) + " · " + shop.words.numeral(live.progress) + "%"
         if let left = live.timeRemaining, left > 0 {
             said += " · " + PrinterWatch.spell(left, shop.words)
         }

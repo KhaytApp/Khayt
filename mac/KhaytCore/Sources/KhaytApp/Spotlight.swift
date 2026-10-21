@@ -41,16 +41,16 @@ final class Spotlight {
 
     /// Everything this app indexes lives under one domain, so it can all be
     /// withdrawn in one call.
-    static let domain = "app.khayt.mac.library"
+    nonisolated static let domain = "app.khayt.mac.library"
     /// Prefixed so a Spotlight identifier cannot be mistaken for a record id
     /// anywhere it is passed around.
-    static let prefix = "khayt.library."
-    static let defaultsKey = "mac.spotlight"
+    nonisolated static let prefix = "khayt.library."
+    nonisolated static let defaultsKey = "mac.spotlight"
 
     /// Mac-local, like the menu bar item and for the same reason: whether this
     /// Mac's search knows about the library is not the shop's business and must
     /// not follow the book to another machine.
-    static var wanted: Bool {
+    nonisolated static var wanted: Bool {
         UserDefaults.standard.object(forKey: defaultsKey) as? Bool ?? true
     }
 
@@ -61,7 +61,7 @@ final class Spotlight {
         return id.isEmpty ? nil : id
     }
 
-    static func itemId(for recordId: String) -> String { prefix + recordId }
+    nonisolated static func itemId(for recordId: String) -> String { prefix + recordId }
 
     /// What one model looks like as a search result, as plain values.
     ///
@@ -84,7 +84,7 @@ final class Spotlight {
     /// it belongs to, what it is made of, and whether it has been printed. Not
     /// the file size, not the triangle count — a search result is read at a
     /// glance, and a figure nobody is looking for crowds out the two they are.
-    static func card(for file: LibraryFile, printedTimes: String? = nil) -> Card {
+    nonisolated static func card(for file: LibraryFile, printedTimes: String? = nil) -> Card {
         var parts: [String] = []
         if let group = file.groupName, !group.isEmpty { parts.append(group) }
         if let material = file.material, !material.isEmpty { parts.append(material) }
@@ -117,14 +117,64 @@ final class Spotlight {
 
     // MARK: - Keeping the index up to date
 
-    /// What was last handed to Spotlight. A book that reloads unchanged — which
-    /// is most reloads — does no work at all.
-    private var lastSignature: String?
+    /// What was last handed to Spotlight, record by record: each item's
+    /// identifier and the signature of the record it was made from. A book
+    /// that reloads unchanged — which is most reloads — does no work at all,
+    /// and one that changed re-describes only what changed. Nil when the index
+    /// is in an unknown state (never filled, emptied, or a write failed), and
+    /// then the next pass withdraws everything and starts again.
+    ///
+    /// Read and written ONLY on `queue`, where the passes run in order — so
+    /// the diff is always against what the pass before it handed over.
+    private final class Ledger: @unchecked Sendable {
+        var indexed: [String: String]?
+    }
+    private nonisolated static let ledger = Ledger()
+
+    /// One pass's worth of work, decided on `queue` from plain values.
+    struct Plan: Equatable, Sendable {
+        /// Every record now in the index, by item identifier.
+        var now: [String: String]
+        /// The records to (re)describe — new, or changed in a way a card shows.
+        var changed: [LibraryFile]
+        /// Item identifiers to withdraw: records no longer in the book.
+        var removed: [String]
+        /// Withdraw the whole domain first: nothing is known about what is there.
+        var everything: Bool
+        var isEmpty: Bool { changed.isEmpty && removed.isEmpty && !everything }
+    }
+
+    /// What has to change in the index to go from `before` to `files`.
+    ///
+    /// ONLY WHAT CHANGED, because this ran after every library write and
+    /// re-described all ten thousand of one shop's models each time, on the
+    /// main actor — 127 ms of frozen window per edit on a local disk, base64
+    /// photo decoding included, and more on a NAS (measured Oct 2026). A
+    /// deleted record is withdrawn BY IDENTIFIER, so the index still loses
+    /// what the book lost.
+    nonisolated static func plan(before: [String: String]?, files: [LibraryFile]) -> Plan {
+        var now: [String: String] = [:]
+        now.reserveCapacity(files.count)
+        var changed: [LibraryFile] = []
+        for file in files {
+            let id = itemId(for: file.id)
+            let signature = recordSignature(file)
+            // Two records with one id are both handed over, and the later
+            // replaces the earlier in the index — as when the whole list went.
+            if before?[id] != signature { changed.append(file) }
+            now[id] = signature
+        }
+        guard let before else {
+            return Plan(now: now, changed: changed, removed: [], everything: true)
+        }
+        let removed = before.keys.filter { now[$0] == nil }.sorted()
+        return Plan(now: now, changed: changed, removed: removed, everything: false)
+    }
 
     /// Re-describe the library to Spotlight.
     ///
-    /// Safe to call on every load: it compares first, and an unchanged library
-    /// costs one string comparison.
+    /// Safe to call on every load: it compares first, off the main actor, and
+    /// an unchanged library costs one signature per record there.
     /// What belongs in the index for this book, or nil for "nothing, and take
     /// out whatever is there".
     ///
@@ -142,76 +192,130 @@ final class Spotlight {
     /// the Mac, signed in or not, so the library's names in it were the book
     /// behind the lock. nil also EMPTIES the index, so switching the lock on
     /// takes out what was there (alpha.62 re-check, round 3).
-    static func indexable(source: Shop.Source, files: [LibraryFile],
+    nonisolated static func indexable(source: Shop.Source, files: [LibraryFile],
                           wanted: Bool = Spotlight.wanted,
                           lockOn: Bool = false) -> [LibraryFile]? {
         guard wanted, source.isReal, !lockOn else { return nil }
         return files.filter { !$0.isArchived }
     }
 
+
+    /// Where the index is written. One SERIAL queue, so passes reach
+    /// Spotlight in the order they were decided — an incremental pass must
+    /// never land before the full rebuild it was diffed against — and a
+    /// dispatch queue rather than a task, because what runs on it blocks
+    /// (thumbnail stats, photo decoding, waiting on the index): blocking work
+    /// on the cooperative pool starves it (see `PinWork`).
+    private nonisolated static let queue = DispatchQueue(label: "app.khayt.mac.spotlight",
+                                                         qos: .utility)
+
     func reindex(shop: Shop) {
-        guard let files = Self.indexable(source: shop.source, files: shop.files,
-                                         lockOn: shop.lockSwitchedOn) else {
-            // Not an early return with nothing done: a book that WAS indexed
-            // and is now the sample must stop being findable, or a shop that
-            // closed its book still has it in Spotlight.
-            forget()
-            return
-        }
-        let signature = Self.signature(of: files)
-        guard signature != lastSignature else { return }
-        lastSignature = signature
-
-        let items = files.map { file -> CSSearchableItem in
-            // The same phrase the tile in the library prints under the same
-            // model, so a result and the thing it opens agree.
-            let printed = file.printCount > 0
-                ? shop.words.counting(file.printCount, "mac.printed_n")
-                : nil
-            let card = Self.card(for: file, printedTimes: printed)
-            let attributes = CSSearchableItemAttributeSet(contentType: .content)
-            attributes.title = card.title
-            attributes.displayName = card.title
-            attributes.contentDescription = card.subtitle
-            attributes.keywords = card.keywords
-            attributes.contentModificationDate = file.updatedAtDate
-            // A picture, because a library is recognised by sight. Given as a
-            // URL wherever the thumbnail is a file on disk — handing over 209
-            // decoded images would be megabytes held for no reason — and as
-            // data only for the inline `data:` photographs a shop took itself.
-            switch shop.thumbnail(for: file) {
-            case .file(let url): attributes.thumbnailURL = url
-            case .inlineData(let uri): attributes.thumbnailData = Self.bytes(ofDataURI: uri)
-            case nil: break
-            }
-            let item = CSSearchableItem(uniqueIdentifier: card.itemId,
-                                        domainIdentifier: Self.domain,
-                                        attributeSet: attributes)
-            return item
-        }
-
-        // `await` on the main actor rather than completion handlers, so
-        // nothing non-`Sendable` crosses an actor boundary — `CSSearchableItem`
-        // and the index itself are both AppKit-era classes that do not conform.
-        Task { @MainActor [items] in
-            let index = CSSearchableIndex.default()
-            do {
-                // Withdraw first. A model deleted from the book has to leave
-                // the index, and comparing identifiers to work out which would
-                // be more machinery than re-describing two hundred rows is
-                // worth.
-                try await index.deleteSearchableItems(withDomainIdentifiers: [Self.domain])
-                if !items.isEmpty { try await index.indexSearchableItems(items) }
-            } catch {
-                // Spotlight declining is not worth a banner — nobody asked for
-                // this, it happens in the background, and the app is entirely
-                // usable without it. But the signature must go back, or the
-                // failure is remembered as a success and the library stays out
-                // of search until something else changes.
-                lastSignature = nil
-                problem = String(describing: error)
+        // Only plain values are read here. Choosing what is indexable walks
+        // the whole library, so even that is done on the queue.
+        let gate = (source: shop.source, lockOn: shop.lockSwitchedOn, wanted: Self.wanted)
+        let all = shop.files
+        // The same phrase the tile in the library prints under the same
+        // model, so a result and the thing it opens agree. Worded here, once
+        // per distinct count, because `Words` lives on the main actor.
+        var printed: [Int: String] = [:]
+        if gate.wanted, gate.source.isReal {
+            for file in all where file.printCount > 0 && printed[file.printCount] == nil {
+                printed[file.printCount] = shop.words.counting(file.printCount, "mac.printed_n")
             }
         }
+        let roots = shop.libraryRoots?.roots
+        let wording = printed
+        Self.queue.async {
+            guard let files = Self.indexable(source: gate.source, files: all,
+                                             wanted: gate.wanted, lockOn: gate.lockOn) else {
+                // Not an early return with nothing done: a book that WAS
+                // indexed and is now the sample must stop being findable, or
+                // a shop that closed its book still has it in Spotlight.
+                Self.withdrawAll()
+                return
+            }
+            let plan = Self.plan(before: Self.ledger.indexed, files: files)
+            guard !plan.isEmpty else { return }
+            Self.ledger.indexed = plan.now
+            let failed = Self.write(plan, printed: wording, roots: roots)
+            guard let failed else { return }
+            // Spotlight declining is not worth a banner — nobody asked for
+            // this, it happens in the background, and the app is entirely
+            // usable without it. But what was indexed must be forgotten, or
+            // the failure is remembered as a success and the library stays
+            // out of search until something else changes.
+            Self.ledger.indexed = nil
+            Task { @MainActor in
+                Spotlight.shared.problem = failed
+            }
+        }
+    }
+
+    /// The plan, handed to the index, on `queue`. Returns why it failed, or
+    /// nil.
+    ///
+    /// Everything here touches the disk or the index, which is why it is not
+    /// on the main actor: a thumbnail on a NAS is a round trip, and an inline
+    /// photo is a base64 decode of up to a few hundred kilobytes.
+    private nonisolated static func write(_ plan: Plan, printed: [Int: String],
+                                          roots: [String]?) -> String? {
+        let items = plan.changed.map {
+            item(for: $0, printedTimes: printed[$0.printCount], roots: roots)
+        }
+        let index = CSSearchableIndex.default()
+        let outcome = Outcome()
+        func wait(_ call: (@escaping @Sendable (Error?) -> Void) -> Void) {
+            guard outcome.error == nil else { return }
+            let done = DispatchSemaphore(value: 0)
+            call { error in
+                if let error { outcome.error = String(describing: error) }
+                done.signal()
+            }
+            done.wait()
+        }
+        // Withdraw first, so a model deleted from the book leaves the index.
+        if plan.everything {
+            wait { index.deleteSearchableItems(withDomainIdentifiers: [domain], completionHandler: $0) }
+        } else if !plan.removed.isEmpty {
+            let removed = plan.removed
+            wait { index.deleteSearchableItems(withIdentifiers: removed, completionHandler: $0) }
+        }
+        if !items.isEmpty {
+            wait { index.indexSearchableItems(items, completionHandler: $0) }
+        }
+        return outcome.error
+    }
+
+    /// Where a completion handler leaves its error for the queue that is
+    /// waiting on it. Written before the semaphore is signalled and read after
+    /// it is waited on, so the semaphore orders every access.
+    private final class Outcome: @unchecked Sendable {
+        var error: String?
+    }
+
+    nonisolated static func item(for file: LibraryFile, printedTimes: String?,
+                                 roots: [String]?) -> CSSearchableItem {
+        let card = card(for: file, printedTimes: printedTimes)
+        let attributes = CSSearchableItemAttributeSet(contentType: .content)
+        attributes.title = card.title
+        attributes.displayName = card.title
+        attributes.contentDescription = card.subtitle
+        attributes.keywords = card.keywords
+        attributes.contentModificationDate = file.updatedAtDate
+        // A picture, because a library is recognised by sight. Given as a
+        // URL wherever the thumbnail is a file on disk — handing over 209
+        // decoded images would be megabytes held for no reason — and as
+        // data only for the inline `data:` photographs a shop took itself.
+        // The same choice `Shop.thumbnail(for:)` makes, read without its
+        // main-actor memo.
+        if let photo = file.userPhoto, photo.hasPrefix("data:") {
+            attributes.thumbnailData = bytes(ofDataURI: photo)
+        } else if case .file(let url)? = Shop.thumbnailOnDisk(file, roots: roots) {
+            attributes.thumbnailURL = url
+        }
+        return CSSearchableItem(uniqueIdentifier: card.itemId,
+                                domainIdentifier: domain,
+                                attributeSet: attributes)
     }
 
     /// Why the last attempt did not work, for the one place that asks: nothing
@@ -220,12 +324,18 @@ final class Spotlight {
     private(set) var problem: String?
 
     /// Take the library out of Spotlight — switched off, or the book closed.
+    /// On the same queue as the writes, so it lands after any still waiting.
     func forget() {
-        lastSignature = nil
-        Task { @MainActor in
-            try? await CSSearchableIndex.default()
-                .deleteSearchableItems(withDomainIdentifiers: [Self.domain])
-        }
+        Self.queue.async { Self.withdrawAll() }
+    }
+
+    /// Everything out, on `queue`.
+    private nonisolated static func withdrawAll() {
+        ledger.indexed = nil
+        let done = DispatchSemaphore(value: 0)
+        CSSearchableIndex.default()
+            .deleteSearchableItems(withDomainIdentifiers: [domain]) { _ in done.signal() }
+        done.wait()
     }
 
     /// Everything that would change what a result says, and nothing else.
@@ -234,16 +344,19 @@ final class Spotlight {
     /// card, and including it would re-index the library every time a print
     /// finished.
     static func signature(of files: [LibraryFile]) -> String {
-        files.map { file in
-            [file.id, file.title, file.groupName ?? "", file.material ?? "",
-             file.category ?? "", (file.tags ?? []).joined(separator: ","),
-             file.originalName ?? "", file.thumbFile ?? "",
-             String(file.printCount), file.updatedAt ?? ""].joined(separator: "\u{1F}")
-        }.joined(separator: "\u{1E}")
+        files.map(recordSignature).joined(separator: "\u{1E}")
+    }
+
+    /// One record's part of `signature(of:)`.
+    nonisolated static func recordSignature(_ file: LibraryFile) -> String {
+        [file.id, file.title, file.groupName ?? "", file.material ?? "",
+         file.category ?? "", (file.tags ?? []).joined(separator: ","),
+         file.originalName ?? "", file.thumbFile ?? "",
+         String(file.printCount), file.updatedAt ?? ""].joined(separator: "\u{1F}")
     }
 
     /// The bytes inside a `data:` URI, or nil if it is not one.
-    static func bytes(ofDataURI uri: String) -> Data? {
+    nonisolated static func bytes(ofDataURI uri: String) -> Data? {
         guard uri.hasPrefix("data:"), let comma = uri.firstIndex(of: ",") else { return nil }
         let header = uri[uri.startIndex..<comma]
         let body = String(uri[uri.index(after: comma)...])

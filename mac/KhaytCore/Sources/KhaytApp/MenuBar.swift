@@ -227,7 +227,8 @@ private struct MachineLine: View {
                 Text(machine.name).font(.callout.weight(.medium)).lineLimit(1)
                 Spacer(minLength: 6)
                 if let status, status.progress > 0 {
-                    Text(verbatim: "\(status.progress)%")
+                    // In the shop's digits, as the window's own figures are.
+                    Text(verbatim: shop.words.numeral(status.progress) + "%")
                         .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
             }
