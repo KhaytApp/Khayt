@@ -23,10 +23,11 @@ final class ActiveCountSender {
     static let doneDayKey = "activeCount.doneDay"
     static let retryAfter: TimeInterval = 3600
 
-    /// HELD until khaytapp.com/privacy `#active-count` (khayt-website #60) is
-    /// live and the cloud route is switched on: nothing is sent, and the
-    /// switch is not shown. The desktop's sender (#1993) is held the same way.
-    nonisolated static let READY = false
+    /// The policy is live (khayt-website #60, khaytapp.com/privacy
+    /// `#active-count-en`, 21 October 2026). Until Khayt Cloud switches the
+    /// route on it answers 404, which is a retry an hour later — nothing is
+    /// counted and nothing is lost. False sends nothing and hides the switch.
+    nonisolated static let READY = true
 
     @ObservationIgnored let defaults: UserDefaults
     @ObservationIgnored var now: () -> Date = Date.init

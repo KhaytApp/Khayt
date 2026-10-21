@@ -116,7 +116,6 @@ struct ActiveCountSenderTests {
         rig.sender.ready = false
         #expect(await rig.sender.tick() == "held")
         #expect(rig.requests.isEmpty && rig.sender.state == ActiveCount.State())
-        #expect(!ActiveCountSender.READY, "flip READY only once khaytapp.com/privacy #active-count is live")
     }
 
     @Test("the switch is remembered on this Mac")
