@@ -80,6 +80,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - **Printers.** A finished print is recognised by its time and file, so it
     is no longer seen as new on every poll.
 
+- **VAT is now counted when the invoice is issued, not when the job is finished.** In Saudi Arabia VAT is due when the invoice is issued, and every booked job gets an invoice number. The VAT summary, the P&L's VAT, the ZATCA VAT return export and the tax summary CSV now include jobs that are still pending or printing. A quarter can therefore show more VAT payable than before, and a quarter that used to show a refund may now show a payment. Quotes, a quote still waiting for the customer's approval, and cancelled, voided or fully credited jobs are not counted. Revenue and cost of goods still count finished work only. Check the VAT figures for any quarter you have not filed yet.
+
+- **Gross margin no longer counts shipping as a cost.** Shipping is part of the price the customer pays, and the courier's bill is recorded as an expense, so the dashboard and the P&L now show the same gross margin. A job with shipping shows a higher margin than before.
+
+- **The custom report's Price column is now revenue excluding tax.** It is called "Revenue (excl. tax)" and is net of credit notes, as in the P&L. The balance column is called "Balance due (incl. tax)". Saved reports still open, but a filter or sort on Price now uses the new figure.
+
+- **Mac: a large library is faster.** Spotlight now updates only the models that changed, off the main thread, instead of rebuilding all of them after every edit (127 ms down to about 1 ms for 10,000 models). Model files are found off the main thread at launch, so a NAS or Google Drive library no longer stalls the window. A 3MF whose parts are reused by many components is unpacked once instead of once per component. Imports no longer tie up the shared thread pool. Every percentage and live count follows the digits setting.
+
 - **iPhone: the calculator costs spools without the VAT you reclaim.** For
   a VAT-registered shop, the phone's calculator and its library prices
   charged each spool at its price with VAT, so a 115 roll with 15 VAT made
@@ -8374,6 +8382,25 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.2] - 2026-10-21
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Before you update
+
+- **VAT is now counted when the invoice is issued, not when the job is finished.** In Saudi Arabia VAT is due when the invoice is issued, and every booked job gets an invoice number. The VAT summary, the P&L's VAT, the ZATCA VAT return export and the tax summary CSV now include jobs that are still pending or printing. A quarter can therefore show more VAT payable than before, and a quarter that used to show a refund may now show a payment. Quotes, a quote still waiting for the customer's approval, and cancelled, voided or fully credited jobs are not counted. Revenue and cost of goods still count finished work only. Check the VAT figures for any quarter you have not filed yet.
+- **Gross margin no longer counts shipping as a cost.** Shipping is part of the price the customer pays, and the courier's bill is recorded as an expense, so the dashboard and the P&L now show the same gross margin. A job with shipping shows a higher margin than before.
+- **The custom report's Price column is now revenue excluding tax.** It is called "Revenue (excl. tax)" and is net of credit notes, as in the P&L. The balance column is called "Balance due (incl. tax)". Saved reports still open, but a filter or sort on Price now uses the new figure.
+
+### Changed
+
+- **A large library is faster.** Spotlight updates only the models that changed, off the main thread. Model files are found off the main thread at launch. A 3MF with reused parts is unpacked once. Imports no longer tie up the shared thread pool.
+
+### Fixed
+
+- **Every percentage and live count follows the digits setting.**
 
 ## [4.0.0-beta.1] - 2026-10-21
 
