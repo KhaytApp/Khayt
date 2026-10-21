@@ -449,14 +449,8 @@ private struct PrintCommands: View {
 /// chain, and asking `gate()` per item on every menu draw would run the WIP
 /// arithmetic seven times for a menu nobody opened. The refusal already says
 /// exactly why — a disabled item says nothing at all.
-struct JobMenu: View {
+private struct JobMenu: View {
     @Environment(Shop.self) private var shop
-
-    /// The arrow that moves a job along (or back), pointing the way the
-    /// board reads in this language.
-    static func arrow(along: Bool, rtl: Bool) -> KeyEquivalent {
-        along != rtl ? .rightArrow : .leftArrow
-    }
 
     private var job: Order? { shop.selection.flatMap { id in shop.orders.first { $0.id == id } } }
     private var canMove: Bool { shop.canMoveJobs && job != nil }
@@ -486,18 +480,21 @@ struct JobMenu: View {
         // board or reading the list and picking the right word.
         //
         // ⌘→ / ⌘← rather than a letter: the arrows say direction, so they
-        // point the way the board reads. In Arabic the board is mirrored —
-        // the next stage is to the LEFT, and the board's own arrow keys turn
-        // with it (`Kanban`) — so "along" is ⌘← there. `Stage.progression` is
-        // still the order of work; only the key that says it follows the page.
+        // point the way the board reads. In Arabic the board is mirrored and
+        // the next stage is to the LEFT — and the SYSTEM turns these keys with
+        // it: arrow-key equivalents are mirrored in a right-to-left interface
+        // (`KeyboardShortcut.Localization.automatic`, NSMenuItem's
+        // `allowsAutomaticKeyEquivalentMirroring`, macOS 12+), so "along" shows
+        // and acts as ⌘← there. Written as ⌘→ here; flipping it by hand as
+        // well would turn it back (beta.1 review).
         //
         // Both go through `questionFor` and `moveJob` exactly as the stage
         // buttons above do. Nothing about what a move means is decided here.
         Button(Words.upfront("mac.move_along")) { step(by: 1) }
-            .keyboardShortcut(Self.arrow(along: true, rtl: shop.words.isRTL), modifiers: .command)
+            .keyboardShortcut(.rightArrow, modifiers: .command, localization: .automatic)
             .disabled(stepTarget(1) == nil)
         Button(Words.upfront("mac.move_back")) { step(by: -1) }
-            .keyboardShortcut(Self.arrow(along: false, rtl: shop.words.isRTL), modifiers: .command)
+            .keyboardShortcut(.leftArrow, modifiers: .command, localization: .automatic)
             .disabled(stepTarget(-1) == nil)
 
         Divider()

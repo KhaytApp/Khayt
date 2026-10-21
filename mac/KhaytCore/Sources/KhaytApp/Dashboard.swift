@@ -530,9 +530,9 @@ struct ToChase: View {
     /// overdue, it has expired.
     private func age(_ row: Chase, overdue: Bool) -> String {
         guard let days = row.days else { return "" }
-        if overdue { return shop.words.callIt("mac.chase_days_over", ["n": .number(Double(days))]) }
+        if overdue { return shop.words.counting(days, "mac.chase_days_over") }
         if days <= 0 { return shop.words.callIt("mac.chase_expired") }
-        return shop.words.callIt("mac.chase_days_left", ["n": .number(Double(days))])
+        return shop.words.counting(days, "mac.chase_days_left")
     }
 }
 
@@ -713,8 +713,7 @@ private struct NeedsAttention: View {
                 if let late = item.daysLate, late > 0 {
                     // Said in words, not by colour alone. This is the line that
                     // decides whether someone gets a phone call today.
-                    Text(shop.words.callIt(late == 1 ? "mac.days_late_one" : "mac.days_late",
-                                           ["n": .number(Double(late))]))
+                    Text(shop.words.counting(late, "mac.days_late"))
                         .font(.callout).monospacedDigit().foregroundStyle(ink)
                 } else if let grams = item.grams {
                     // In the item's OWN unit. The shelf learned to count in

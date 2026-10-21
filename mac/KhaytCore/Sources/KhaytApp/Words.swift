@@ -162,6 +162,14 @@ final class Words {
         if language == "ar", n == 2, let dual = Self.own[key + "_two"]?["ar"], !dual.isEmpty {
             return dual
         }
+        // ── AND NONE, WHERE THE WORD HAS BEEN GIVEN IT ───────────────────
+        //
+        // The 11-and-over form a key falls back to reads badly for nothing:
+        // "0 آلة", "منذ 0 يومًا". Arabic says none in words. Opt-in, like
+        // the dual: only a key with a `_zero`.
+        if language == "ar", n == 0, let none = Self.own[key + "_zero"]?["ar"], !none.isEmpty {
+            return none
+        }
         // ── THE VALUE MAY CARRY ITS OWN `{n}` ────────────────────────────
         //
         // Two shapes, because the catalogue has both. A value written as
@@ -807,6 +815,7 @@ final class Words {
         "mac.cm_people_one": ["en": "{n} person",     "ar": "شخص واحد"],
         "mac.cm_people_two": ["en": "2 people",       "ar": "شخصان"],
         "mac.cm_people_few": ["en": "{n} people",     "ar": "{n} أشخاص"],
+        "mac.cm_people_zero": ["en": "No people", "ar": "لا أحد"],
         "mac.cm_first":      ["en": "A new customer's first order is worth {amount} on average.",
                               "ar": "أول طلب لعميل جديد يساوي {amount} في المتوسط."],
         // Which products actually earn.
@@ -856,6 +865,7 @@ final class Words {
         "mac.qf_decide_one": ["en": "{n} day to decide, typically", "ar": "يوم واحد للبتّ عادةً"],
         "mac.qf_decide_two": ["en": "2 days to decide, typically", "ar": "يومان للبتّ عادةً"],
         "mac.qf_decide_few": ["en": "{n} days to decide, typically", "ar": "{n} أيام للبتّ عادةً"],
+        "mac.qf_decide_zero": ["en": "Decided the same day, typically", "ar": "يُبتّ فيها في اليوم نفسه عادةً"],
         // Two counts in one sentence, each counted on its own: Arabic says
         // "3 عروض" but "11 عرضًا", and "منذ يومين" rather than "منذ 2 يومًا".
         "mac.qf_open":       ["en": "{quotes} still open, worth {amount}. The oldest has been waiting {days}.",
@@ -868,6 +878,7 @@ final class Words {
         "mac.qf_days_one":   ["en": "{n} day", "ar": "يوم واحد"],
         "mac.qf_days_two":   ["en": "2 days", "ar": "يومين"],
         "mac.qf_days_few":   ["en": "{n} days", "ar": "{n} أيام"],
+        "mac.qf_days_zero":  ["en": "today", "ar": "اليوم"],
         // Whether the shop can take another job.
         "mac.cap_clear_days": ["en": "clear in {n} days", "ar": "يخلو خلال {n} يومًا"],
         "mac.cap_clear_days_one": ["en": "clear in {n} day", "ar": "يخلو خلال يوم واحد"],
@@ -1768,10 +1779,12 @@ final class Words {
         "mac.n_machines":    ["en": "{n} machines", "ar": "{n} آلة"],
         "mac.n_machines_two": ["en": "2 machines", "ar": "آلتان"],
         "mac.n_machines_few": ["en": "{n} machines", "ar": "{n} آلات"],
+        "mac.n_machines_zero": ["en": "No machines", "ar": "لا آلات"],
         "mac.n_machines_one": ["en": "{n} machine", "ar": "آلة واحدة"],
         "mac.n_people":      ["en": "{n} people",   "ar": "{n} شخصًا"],
         "mac.n_people_two":  ["en": "2 people",     "ar": "شخصان"],
         "mac.n_people_few":  ["en": "{n} people",   "ar": "{n} أشخاص"],
+        "mac.n_people_zero": ["en": "No people", "ar": "لا أحد"],
         "mac.n_people_one":  ["en": "{n} person",   "ar": "شخص واحد"],
         // ── AND THE TWO AXES THE GROUPING MENU NEVER HAD ─────────────────
         //
@@ -2088,6 +2101,7 @@ final class Words {
         "mac.prints_word_one": ["en": "print",  "ar": "طبعة واحدة"],
         "mac.prints_word":     ["en": "prints", "ar": "طبعة"],
         "mac.prints_word_few": ["en": "{n} prints", "ar": "{n} طبعات"],
+        "mac.prints_word_zero": ["en": "No prints", "ar": "لا طبعات"],
         // English has no dual, so its `_two` is just the plural — as every other
         // `_two` key here carries one. `counting` only reaches for this form in
         // Arabic; the English side exists so the both-languages guard means
@@ -2105,6 +2119,7 @@ final class Words {
         "mac.avg_days_one":  ["en": "{n} day", "ar": "يوم واحد"],
         "mac.avg_days_two":  ["en": "2 days", "ar": "يومان"],
         "mac.avg_days_few":  ["en": "{n} days", "ar": "{n} أيام"],
+        "mac.avg_days_zero": ["en": "Under a day", "ar": "أقل من يوم"],
         "mac.avg_days_fraction": ["en": "{n} days", "ar": "{n} يوم"],
         "mac.quoting_advice_filament": ["en": "Quoted {pct}% short on filament — the price is under what this costs.",
                                         "ar": "التسعير أقل بـ{pct}% في الخيط — السعر دون تكلفته الفعلية."],
@@ -2216,8 +2231,14 @@ final class Words {
         // narrower list than either: past due, still owing, not nudged
         // recently and not nudged too often already.
         "mac.chase_invoices": ["en": "Invoices to chase", "ar": "فواتير للمتابعة"],
-        "mac.chase_days_over": ["en": "{n}d overdue", "ar": "متأخرة {n} يوم"],
-        "mac.chase_days_left": ["en": "expires in {n}d", "ar": "تنتهي خلال {n} يوم"],
+        "mac.chase_days_over": ["en": "{n}d overdue", "ar": "متأخرة {n} يومًا"],
+        "mac.chase_days_over_one": ["en": "{n}d overdue", "ar": "متأخرة يومًا واحدًا"],
+        "mac.chase_days_over_two": ["en": "2d overdue", "ar": "متأخرة يومين"],
+        "mac.chase_days_over_few": ["en": "{n}d overdue", "ar": "متأخرة {n} أيام"],
+        "mac.chase_days_left": ["en": "expires in {n}d", "ar": "تنتهي خلال {n} يومًا"],
+        "mac.chase_days_left_one": ["en": "expires in {n}d", "ar": "تنتهي خلال يوم واحد"],
+        "mac.chase_days_left_two": ["en": "expires in 2d", "ar": "تنتهي خلال يومين"],
+        "mac.chase_days_left_few": ["en": "expires in {n}d", "ar": "تنتهي خلال {n} أيام"],
         "mac.chase_expired":   ["en": "expired", "ar": "منتهية"],
         "mac.reveal":        ["en": "Reveal",        "ar": "إظهار"],
         "mac.open":          ["en": "Open",          "ar": "فتح"],

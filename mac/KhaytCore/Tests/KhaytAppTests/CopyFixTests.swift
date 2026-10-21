@@ -221,12 +221,14 @@ struct CopyFixTests {
         #expect(MachineCard.extruderWord("Something else", ar) == "Something else")
     }
 
-    @Test("move along points the way the board reads")
+    @Test("move along is ⌘→ and left to the system to mirror in Arabic")
     func moveAlongArrow() {
-        #expect(JobMenu.arrow(along: true, rtl: false) == .rightArrow)
-        #expect(JobMenu.arrow(along: false, rtl: false) == .leftArrow)
-        #expect(JobMenu.arrow(along: true, rtl: true) == .leftArrow)
-        #expect(JobMenu.arrow(along: false, rtl: true) == .rightArrow)
+        // AppKit mirrors arrow key equivalents in a right-to-left interface;
+        // a hand flip on top of that turned "along" back into "back".
+        let menus = EmptyStateTests.source("Menus.swift")
+        #expect(menus.contains(".keyboardShortcut(.rightArrow, modifiers: .command, localization: .automatic)"))
+        #expect(menus.contains(".keyboardShortcut(.leftArrow, modifiers: .command, localization: .automatic)"))
+        #expect(!menus.contains("isRTL"), "the menu flips an arrow the system already flips")
     }
 
     @Test("time left is isolated, so a negative figure does not turn the Arabic line around")
@@ -241,6 +243,37 @@ struct CopyFixTests {
         let band = EmptyStateTests.source("MachineBand.swift")
         #expect(band.contains(".frame(width: 0, alignment: minute == 0 ? .leading"))
         #expect(!band.contains("minute == 0 ? 0 : (minute >= band.minutes ? d.width : d.width / 2)"))
+    }
+
+    // MARK: - Second pass
+
+    @Test("the dashboard's day counts go through counting(), so Arabic gets its dual and 3-10 forms")
+    func dashboardDays() async throws {
+        let dashboard = EmptyStateTests.source("Dashboard.swift")
+        #expect(dashboard.contains("shop.words.counting(late, \"mac.days_late\")"))
+        #expect(!dashboard.contains("\"mac.days_late_one\""), "a hand-picked singular skips the other forms")
+        #expect(dashboard.contains("shop.words.counting(days, \"mac.chase_days_over\")"))
+        let ar = try await Self.arabic()
+        #expect(ar.counting(2, "mac.chase_days_over") == "متأخرة يومين")
+        #expect(ar.counting(4, "mac.chase_days_left") == "تنتهي خلال 4 أيام")
+    }
+
+    @Test("none, in Arabic words, where the word has a zero form; English is untouched")
+    func zeroCounts() async throws {
+        let ar = try await Self.arabic()
+        #expect(ar.counting(0, "mac.n_machines") == "لا آلات")
+        #expect(ar.counting(0, "mac.cm_people") == "لا أحد")
+        #expect(ar.counting(0, "mac.qf_days") == "اليوم")
+        #expect(ar.counting(0, "mac.avg_days") == "أقل من يوم")
+        #expect(Words().counting(0, "mac.n_machines") == "0 machines")
+    }
+
+    @Test("counts in word lines take the shop's digits, not a bare \\(Int)")
+    func numeralsInLines() {
+        let floor = EmptyStateTests.source("ShopFloor.swift")
+        #expect(floor.contains("shop.words.numeral(low) + \" \" + shop.words.callIt(\"cons.low\")"))
+        #expect(floor.contains("shop.words.numeral(Int(saturating: wear.wear))"))
+        #expect(EmptyStateTests.source("RatingTrend.swift").contains("words.numeral(trend.responses)"))
     }
 }
 

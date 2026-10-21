@@ -437,7 +437,7 @@ struct MachineCard: View {
                     HStack(alignment: .center, spacing: 11) {
                         WearGauge(pct: wear.pct)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(verbatim: "\(Int(saturating: wear.wear)) / \(Int(saturating: wear.threshold)) \(shop.words.callIt("common.grams"))")
+                            Text(verbatim: shop.words.numeral(Int(saturating: wear.wear)) + " / " + shop.words.numeral(Int(saturating: wear.threshold)) + " " + shop.words.callIt("common.grams"))
                                 .font(.callout).monospacedDigit()
                             if wear.over {
                                 Text(shop.words.callIt("mac.nozzle_due"))
@@ -1111,7 +1111,7 @@ struct ConsumablesCard: View {
                 // Packaging still wants to know the IPA has run out.
                 let low = shop.consumables.filter(\.isLow).count
                 if low > 0 {
-                    Text(verbatim: "\(low) \(shop.words.callIt("cons.low"))")
+                    Text(verbatim: shop.words.numeral(low) + " " + shop.words.callIt("cons.low"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Khayt.attention)
                 }
