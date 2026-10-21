@@ -61,6 +61,41 @@ struct UnwatchedMachineTests {
         #expect(rec.requests.count == 1)
     }
 
+    @Test("a printer deleted from the book is forgotten too, and its Live Activity ended")
+    func deleted() async throws {
+        let (shop, rec) = await LiveActivityPushTests.shop(cloud: LiveActivityPushTests.connected)
+        let a = try MachineLifeTests.machine(MachineLifeTests.active)
+        let gone = try MachineLifeTests.machine(MachineLifeTests.record("M-GONE"))
+        shop.machines = [a, gone]
+        let watch = shop.printers
+        let status = try Self.printing()
+        for id in ["M-A", "M-GONE"] {
+            watch.setReadingForTesting(id, .init(status: status, problem: nil, at: Date(), lastGood: status))
+        }
+        let engine = try #require(shop.engine)
+        let live = JSONValue.object(["state": .string("printing"), "progress": .number(42),
+                                     "filename": .string("bracket.gcode")])
+        _ = await watch.finishCamera.observe("M-GONE", status: live, engine: engine)
+        shop.liveActivities.shopId = "shop_1"
+        shop.liveActivities.running["M-GONE"] = .init(phase: .printing, job: "bracket.gcode", progress: 42,
+                                                      startedAt: Date(), endsAt: nil)
+        // Nothing to drop while it is in the book and watched.
+        #expect(!watch.forgetUnwatched(shop: shop))
+
+        shop.machines = [a]   // deleted, mid-print
+        #expect(watch.forgetUnwatched(shop: shop))
+        #expect(watch.readings["M-A"] != nil)
+        #expect(watch.readings["M-GONE"] == nil && watch.statusCache["M-GONE"] == nil)
+        #expect(!watch.finishCamera.remembers("M-GONE"))
+
+        await LiveActivityPushTests.settle(rec, count: 1)
+        let sent = try #require(rec.requests.first, "the deleted printer's Live Activity was never ended")
+        let body = try LiveActivityPushTests.body(sent)
+        #expect(body["event"] as? String == "end" && body["machineId"] as? String == "M-GONE")
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(shop.liveActivities.running["M-GONE"] == nil)
+    }
+
     @Test("stopping the watch drops its readings")
     func stopClears() throws {
         let watch = PrinterWatch()

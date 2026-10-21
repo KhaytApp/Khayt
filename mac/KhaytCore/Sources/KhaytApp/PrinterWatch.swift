@@ -430,15 +430,27 @@ final class PrinterWatch {
     /// when it came back into service its first poll was taken for that old
     /// print's end — a finish event and a power reading spanning the repair.
     /// What it says next starts from nothing, as a machine just added does.
+    ///
+    /// A machine DELETED from the book is forgotten the same way. A new printer
+    /// with no history may be deleted even mid-print, and walking only the
+    /// book's machines never reached it again: its reading stayed in every
+    /// count and its Live Activity stayed on the phone.
     /// True when anything was dropped.
     @discardableResult
     func forgetUnwatched(shop: Shop) -> Bool {
+        let inBook = Set(shop.machines.map(\.id))
+        var ids = Set(shop.machines.filter { Self.notWatched($0) != nil }.map(\.id))
+        ids.formUnion(Set(readings.keys).union(pollCache.keys).union(finishCamera.machineIds)
+            .union(shop.liveActivities.running.keys).subtracting(inBook))
         var forgot = false
-        for machine in shop.machines where Self.notWatched(machine) != nil {
-            let id = machine.id
+        for id in ids {
             if readings[id] != nil { readings[id] = nil; forgot = true }
             pollCache[id] = nil
             finishCamera.forget(id)
+            // The alert module's memory too, or a printer back in service
+            // starts with an offline count or a stall clock from before.
+            previous[id] = nil
+            if case .object(var o) = alertState, o[id] != nil { o[id] = nil; alertState = .object(o) }
             shop.printerUnwatched(id)
         }
         return forgot

@@ -34,6 +34,12 @@ final class FinishCamera {
         memo = .object(o)
     }
 
+    /// Every machine the rule holds anything for.
+    var machineIds: Set<String> {
+        if case .object(let o) = memo { return Set(o.keys) }
+        return []
+    }
+
     /// Whether the rule holds anything for this machine. For the tests.
     func remembers(_ machineId: String) -> Bool {
         if case .object(let o) = memo { return o[machineId] != nil }
