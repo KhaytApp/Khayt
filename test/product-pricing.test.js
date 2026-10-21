@@ -93,3 +93,65 @@ test('a product with no margin of its own is priced at the shop default, as a sa
   assert.equal(pricing.priceProduct({ parts: [part], defaultMargin: 0 }, { settings: { defaultMargin: 50 } }).basePrice, 100,
     'a margin of 0 is a margin, not a blank');
 });
+
+/* ── The catalogue and a job taken from the product are one price ────────── */
+
+// The owner's case: a stand at 19.80 a piece, three to a product, 30% on cost.
+// The catalogue costed the part ONCE (19.80, priced 25.74); a job from the
+// same product counts all three (59.40, priced 77.22).
+const STAND = { name: 'Stand', material: 'PLA', printWeight: 180, printTime: 2,
+                spoolCost: 110, spoolWeight: 1000, qty: 3 };
+
+test('a part ×3 is costed three times, as a job from the product costs it', () => {
+  const out = pricing.priceProduct({ defaultMargin: 30, parts: [STAND] }, {});
+  assert.equal(out.cost, 59.4, 'three pieces at 19.80');
+  assert.equal(out.basePrice, 77.22);
+  const one = pricing.priceProduct({ defaultMargin: 30, parts: [Object.assign({}, STAND, { qty: 1 })] }, {});
+  assert.equal(one.cost, 19.8);
+  assert.equal(one.basePrice, 25.74);
+  const blank = pricing.priceProduct({ defaultMargin: 30, parts: [Object.assign({}, STAND, { qty: undefined })] }, {});
+  assert.equal(blank.cost, 19.8, 'no qty is one piece, as the job reads it');
+});
+
+// A job taken from a product the way both apps take one: each part costed as a
+// LINE (`partTotalCost`, renderer/inventory.js `appendProductParts`; the Mac's
+// `Shop.partRows` writes piece cost × qty), the product's components and
+// `assemblyQty`, and its margin.
+function jobFrom(product, ctx) {
+  const CC = require('../lib/calculator-cost.js');
+  require('../lib/pricing.js');
+  const N = require('../lib/order-new.js');
+  const parts = (product.parts || []).map((p) => Object.assign({}, p, { baseCost: CC.partTotalCost(p, ctx) }));
+  return N.newOrder({
+    parts, project: 'From the catalogue', margin: product.defaultMargin,
+    components: product.components, assemblyQty: product.assemblyQty,
+  }, {
+    settings: ctx.settings || {}, orders: [], now: new Date(2026, 9, 1),
+    tokens: { tracking: new Uint8Array(16), quoteApproval: new Uint8Array(16) },
+    consumables: ctx.consumables || [],
+  });
+}
+
+test('the catalogue prices a product exactly as a job from it does, on every shape', () => {
+  const consumables = [{ id: 'mag', cost: 0.35 }, { id: 'box', cost: 2.1 }];
+  const settings = { defaultPackagingCost: 1.5 };
+  const comps = [{ consumableId: 'mag', qtyPerUnit: 4 }, { consumableId: 'box', qtyPerUnit: 1 }];
+  const second = { name: 'Lid', material: 'PETG', printWeight: 42.5, supportWeight: 3, printTime: 0.75,
+                   spoolCost: 95, spoolWeight: 750, qty: 2, laborRate: 20, postTime: 0.1, failureRate: 5 };
+  const shapes = {
+    'one piece': { defaultMargin: 30, parts: [Object.assign({}, STAND, { qty: 1 })] },
+    'one part ×3': { defaultMargin: 30, parts: [STAND] },
+    'two parts, ×3 and ×2': { defaultMargin: 45, parts: [STAND, second] },
+    'components': { defaultMargin: 30, parts: [STAND], components: comps },
+    'components, assemblyQty 2': { defaultMargin: 30, parts: [STAND, second], components: comps, assemblyQty: 2 },
+    'assemblyQty with no components': { defaultMargin: 25, parts: [STAND], assemblyQty: 3 },
+  };
+  for (const [name, product] of Object.entries(shapes)) {
+    const ctx = { inventory: [], settings, consumables };
+    const listed = pricing.priceProduct(product, ctx);
+    const job = jobFrom(product, ctx);
+    const jobCost = job.parts.reduce((s, p) => s + p.baseCost, 0) + (job.componentsCost || 0);
+    assert.equal(listed.price, job.price, `${name}: catalogue ${listed.price} vs job ${job.price}`);
+    assert.equal(listed.cost, +jobCost.toFixed(2), `${name}: catalogue cost ${listed.cost} vs job ${jobCost}`);
+  }
+});

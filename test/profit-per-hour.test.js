@@ -192,3 +192,20 @@ test('empty and junk input answer, rather than throw', () => {
   assert.equal(j.rows.length, 1);
   assert.equal(j.rows[0].missing, 'price');
 });
+
+test('a product saved under the old one-piece cost shows its real, thinner margin', () => {
+  // A stand ×3 saved when the catalogue costed one piece: baseCost 19.80 and
+  // price 25.74 on the record. Its three pieces cost 59.40, so it loses
+  // money on every sale — and the planned figure has to say so, from the
+  // stored price, without the price itself being moved.
+  require('../lib/calculator-cost.js');
+  require('../lib/product-pricing.js');
+  const p = { id: 's', name: 'Stand', basePrice: 25.74, price: 25.74, baseCost: 19.8, defaultMargin: 30,
+              parts: [{ printWeight: 180, printTime: 2, spoolCost: 110, spoolWeight: 1000, qty: 3 }] };
+  const r = productRates({ products: [p] }, deps);
+  assert.equal(of(r, 's').price, 25.74, 'the stored price, as stored');
+  assert.equal(of(r, 's').cost, 59.4, 'costed by its parts, all three of them');
+  assert.ok(of(r, 's').profit < 0, 'a loss, not 30%');
+  assert.equal(p.price, 25.74, 'and nothing was written to the record');
+  assert.equal(p.baseCost, 19.8);
+});

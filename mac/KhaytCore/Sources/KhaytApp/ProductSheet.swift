@@ -1022,6 +1022,7 @@ struct ProductSheet: View {
         pricing = await shop.priceProduct(parts: effectiveParts.map { $0.record(spools: shop.spools, reclaimsTax: shop.reclaimsTax) },
                                           margin: draft.margin,
                                           components: draft.rest["components"],
+                                          assemblyQty: draft.rest["assemblyQty"],
                                           rule: rule)
     }
 

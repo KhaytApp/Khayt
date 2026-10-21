@@ -2438,7 +2438,7 @@ extension Shop {
                   case .array(let parts)? = product["parts"],
                   let fixed = spoolSizesFixed(parts, sizes: sizes) else { continue }
             var input: [String: JSONValue] = ["parts": .array(fixed)]
-            for key in ["defaultMargin", "components", "priceRound", "priceOverride"] {
+            for key in ["defaultMargin", "components", "assemblyQty", "priceRound", "priceOverride"] {
                 if let v = product[key] { input[key] = v }
             }
             var next = product
