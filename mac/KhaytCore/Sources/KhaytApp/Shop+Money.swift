@@ -909,6 +909,7 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+                undo = []  // the book moved and this runs again: one entry, not two
                 let orders = Self.rows(root, "printLog")
                 let changed = try await Self.markedNotBusiness(orders, ids: ids, engine: engine)
                 Self.write(&root, "printLog", changed: changed, before: orders, into: &undo)
@@ -1292,6 +1293,7 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+                undo = []  // the book moved and this runs again: one entry, not two
                 let orders = Self.rows(root, "printLog")
                 guard let target = orders.first(where: { Self.recordId($0) == id }) else {
                     throw MoveRefused(sentence: self.words.callIt("mac.move_gone"))

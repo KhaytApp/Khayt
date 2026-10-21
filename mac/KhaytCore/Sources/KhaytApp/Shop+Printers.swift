@@ -872,6 +872,7 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+                undo = []  // the book moved and this runs again: one entry, not two
                 do {
                     if let was = try await Self.writeMachine(into: &root, input: input, id: id,
                                                              catalogId: catalogId, opened: opened,

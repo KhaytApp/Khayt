@@ -1436,6 +1436,7 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+                undo = []  // the book moved and this runs again: one entry, not two
                 var shelf = Self.rows(root, "inventory")
                 if let id {
                     guard let at = shelf.firstIndex(where: { Self.recordId($0) == id }),
@@ -1549,6 +1550,7 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+                undo = []  // the book moved and this runs again: one entry, not two
                 var shelf = Self.rows(root, "consumables")
                 if let id {
                     guard let at = shelf.firstIndex(where: { Self.recordId($0) == id }),

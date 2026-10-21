@@ -145,6 +145,12 @@ public enum StoreWriter {
     /// either file I/O the synchronous version already does on this thread or a
     /// hop to the engine actor. Leaving it nonisolated only means handing three
     /// closures across an isolation boundary they have no reason to cross.
+    /// TESTS ONLY: run between a change being worked out and the swap, so a
+    /// test can move the book under it and make the change run again — the
+    /// retry every caller's closure has to survive (an undo list that kept
+    /// growing on each run put stock back twice). Nothing in the app sets it.
+    @MainActor public static var afterMutateForTests: ((URL) -> Void)?
+
     @MainActor
     public static func update(storeURL url: URL,
                        owns: @Sendable () -> Bool,
@@ -185,6 +191,7 @@ public enum StoreWriter {
 
             var root = decoded
             try await mutate(&root)
+            afterMutateForTests?(url)
             let changed = root
             let next = try await offMain { () throws -> Data in
                 var root = changed
