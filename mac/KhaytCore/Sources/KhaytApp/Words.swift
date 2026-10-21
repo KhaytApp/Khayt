@@ -2235,6 +2235,7 @@ final class Words {
         "mac.chase_days_over_one": ["en": "{n}d overdue", "ar": "متأخرة يومًا واحدًا"],
         "mac.chase_days_over_two": ["en": "2d overdue", "ar": "متأخرة يومين"],
         "mac.chase_days_over_few": ["en": "{n}d overdue", "ar": "متأخرة {n} أيام"],
+        "mac.chase_days_over_zero": ["en": "Due today", "ar": "مستحقة اليوم"],
         "mac.chase_days_left": ["en": "expires in {n}d", "ar": "تنتهي خلال {n} يومًا"],
         "mac.chase_days_left_one": ["en": "expires in {n}d", "ar": "تنتهي خلال يوم واحد"],
         "mac.chase_days_left_two": ["en": "expires in 2d", "ar": "تنتهي خلال يومين"],

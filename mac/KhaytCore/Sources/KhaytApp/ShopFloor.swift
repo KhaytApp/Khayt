@@ -373,7 +373,10 @@ struct MachineCard: View {
                 // against the biggest bed on the floor it is compared by
                 // looking, which is what somebody standing in front of the
                 // bench actually wants to know.
-                if let bed = machine.bedSize, let x = machine.bed?.x, let y = machine.bed?.y {
+                // In the shop's digits, isolated so "x × y × z" keeps its order
+                // inside an Arabic line.
+                if let bed = machine.bedSize(numeral: shop.words.numeral).map({ Figure.isolated($0) }),
+                   let x = machine.bed?.x, let y = machine.bed?.y {
                     HStack(alignment: .center, spacing: 12) {
                         BedPlan(x: x, y: y, widest: shop.widestBed, deepest: shop.deepestBed)
                         VStack(alignment: .leading, spacing: 2) {

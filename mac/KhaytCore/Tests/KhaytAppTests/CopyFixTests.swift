@@ -275,5 +275,15 @@ struct CopyFixTests {
         #expect(floor.contains("shop.words.numeral(Int(saturating: wear.wear))"))
         #expect(EmptyStateTests.source("RatingTrend.swift").contains("words.numeral(trend.responses)"))
     }
+
+    @Test("the bed size takes the shop's digits; an overdue chase at 0 days says today")
+    func thirdPass() async throws {
+        let floor = EmptyStateTests.source("ShopFloor.swift")
+        #expect(floor.contains("machine.bedSize(numeral: shop.words.numeral)"))
+        // `every` already goes through Money.quantity, the shop's digits.
+        #expect(floor.contains("let n = Figure.isolated(Money.quantity(v.rounded(), decimals: 0))"))
+        let ar = try await Self.arabic()
+        #expect(ar.counting(0, "mac.chase_days_over") == "مستحقة اليوم")
+    }
 }
 
