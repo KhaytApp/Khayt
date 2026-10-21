@@ -171,23 +171,32 @@ extension Shop {
         for case .object(let rec) in fileRows {
             if case .string(let id)? = rec["id"], rowsById[id] == nil { rowsById[id] = rec }
         }
-        let wanted: [(id: String, url: URL, ext: String, linked: Bool)] = files.compactMap { file in
-            guard let rec = rowsById[file.id], let url = modelFile(for: file) else { return nil }
-            let ext = url.pathExtension.lowercased()
-            guard ["3mf", "gcode", "gco"].contains(ext) else { return nil }
-            // Empty, or a 3MF read before plates were read one by one (its
-            // time was one plate's and its grams every plate's).
-            guard Self.slicerFiguresDue(rec["parsed"], ext: ext) else { return nil }
-            return (file.id, url, ext, file.isLinked)
+        let candidates: [(file: LibraryFile, parsed: JSONValue?)] = files.compactMap { file in
+            guard let rec = rowsById[file.id] else { return nil }
+            return (file, rec["parsed"])
         }
-        guard !wanted.isEmpty else { return }
+        guard !candidates.isEmpty else { return }
+        let roots = libraryRoots?.roots
         let isOnline = linkedIsOnline
         Task { [weak self] in
+            // Where each model is, found off the main actor: a stat per root
+            // per model, ten thousand models, and on a NAS or a cloud drive
+            // each one a round trip — on the main actor that was the window
+            // frozen at launch (Oct 2026).
             // Not a file the cloud would have to download to be read: a
             // linked Drive's online models are read when they are here. Asked
             // off the main actor — a cloud drive answers slowly.
-            let due = await PinWork.run {
-                wanted.filter { !($0.linked && isOnline($0.url)) }.map { (id: $0.id, url: $0.url, ext: $0.ext) }
+            let due: [(id: String, url: URL, ext: String)] = await PinWork.run {
+                candidates.compactMap { c in
+                    guard let url = Shop.modelFile(for: c.file, roots: roots) else { return nil }
+                    let ext = url.pathExtension.lowercased()
+                    guard ["3mf", "gcode", "gco"].contains(ext) else { return nil }
+                    // Empty, or a 3MF read before plates were read one by one (its
+                    // time was one plate's and its grams every plate's).
+                    guard Shop.slicerFiguresDue(c.parsed, ext: ext) else { return nil }
+                    if c.file.isLinked && isOnline(url) { return nil }
+                    return (c.file.id, url, ext)
+                }
             }
             guard !due.isEmpty else { return }
             var found: [String: [String: JSONValue]] = [:]
@@ -1437,20 +1446,19 @@ extension Shop {
         // Read first, write once, and read OFF the main thread: this opens
         // up to a few hundred model zips, and doing that on the MainActor
         // froze the window just after launch.
-        let jobs: [(id: LibraryFile.ID, url: URL, linked: Bool)] = candidates.compactMap { file in
-            guard let url = modelFile(for: file) else { return nil }
-            return (file.id, url, file.isLinked)
-        }
+        let roots = libraryRoots?.roots
         let isOnline = linkedIsOnline
         // On a dispatch queue, not a detached task holding a cooperative
-        // thread for a few hundred zips.
+        // thread for a few hundred zips. Where each model is, too: finding
+        // it is a stat per root, a round trip each on a NAS or a cloud drive.
         let read: [LibraryFile.ID: (designer: String, licence: String)] = await PinWork.run {
             var out: [LibraryFile.ID: (designer: String, licence: String)] = [:]
-            for job in jobs {
+            for file in candidates {
+                guard let url = Shop.modelFile(for: file, roots: roots) else { continue }
                 // Never a linked file the cloud would have to download first.
-                if job.linked, isOnline(job.url) { continue }
-                guard let said = Mesh.provenance(of: job.url) else { continue }
-                out[job.id] = (said.designer, said.licence)
+                if file.isLinked, isOnline(url) { continue }
+                guard let said = Mesh.provenance(of: url) else { continue }
+                out[file.id] = (said.designer, said.licence)
             }
             return out
         }

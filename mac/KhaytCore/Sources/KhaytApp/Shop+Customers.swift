@@ -966,12 +966,21 @@ extension Shop {
     /// survive rather than shrug at, so a single model file in the folder is
     /// taken as the model.
     func modelFile(for file: LibraryFile) -> URL? {
+        Self.modelFile(for: file, roots: libraryRoots?.roots)
+    }
+
+    /// The same answer, off the main actor. Each call is a stat per library
+    /// root and maybe a folder listing — nothing on a local disk, a round
+    /// trip each on a NAS or a File Provider drive — so a pass over the whole
+    /// library (ten thousand models in one shop) resolves them with this in
+    /// `PinWork` rather than one by one on the main actor at launch.
+    nonisolated static func modelFile(for file: LibraryFile, roots: [String]?) -> URL? {
         // A linked model is where the shop keeps it, or not reachable right
         // now (a drive unplugged, a NAS asleep) — never a vault file instead.
         if let path = file.externalPath, !path.isEmpty {
             return FileManager.default.fileExists(atPath: path) ? URL(fileURLWithPath: path) : nil
         }
-        guard let dir = directory(for: file) else { return nil }
+        guard let roots, let dir = LibraryLocation.directory(for: file.id, roots: roots) else { return nil }
         if let named = file.sourceFile?.filename, !named.isEmpty {
             let url = dir.appending(path: named)
             if FileManager.default.fileExists(atPath: url.path) { return url }
@@ -990,7 +999,7 @@ extension Shop {
     /// cloud answered with the PDF, and "Open in slicer" handed the slicer a
     /// document. A `.cloud` note is a few hundred bytes of JSON, and a partial
     /// download (`.part-`) is not a file yet.
-    static func soleModel(in contents: [URL]) -> URL? {
+    nonisolated static func soleModel(in contents: [URL]) -> URL? {
         let models = contents.filter {
             LibraryImport.kinds.contains($0.pathExtension.lowercased())
                 && !$0.lastPathComponent.contains(".part-")
