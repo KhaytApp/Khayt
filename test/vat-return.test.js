@@ -30,6 +30,9 @@ const ROOT = path.join(__dirname, '..');
 const KhaytTax = require(path.join(ROOT, 'lib/tax.js'));
 // 'delivered' is finished too — the return counts both spellings of a sale.
 const KhaytOrderStatus = require(path.join(ROOT, 'lib/order-status.js'));
+// Which jobs are declared: every issued invoice (the tax point), the rule the
+// P&L and the invoice export share.
+const KhaytPnl = require(path.join(ROOT, 'lib/pnl-report.js'));
 
 /**
  * Run exportGaztVatReturn with the globals it reads, and capture the HTML it
@@ -42,6 +45,7 @@ function runReturn({ orders, expenses = [], settings = { enableVat: true, vatRat
   const sandbox = {
     KhaytTax,
     KhaytOrderStatus,
+    KhaytPnl,
     settings,
     printLog: orders,
     expenses,
@@ -119,11 +123,20 @@ test('a delivered sale is declared, exactly like a completed one', () => {
   assert.equal(box(delivered, 3), '45652.18');
 });
 
-test('a job that is not finished is still not declared', () => {
-  for (const status of ['quote', 'pending', 'printing', 'post', 'qc', 'on_hold']) {
-    const html = runReturn({ orders: [sale(200000, { status })] });
-    assert.equal(box(html, 1), '0.00', status);
-    assert.equal(box(html, 3), '0.00', status);
+test('an issued invoice is declared whatever its stage; a quote is not (beta.2 review)', () => {
+  // The invoice is the tax point. This declared finished jobs only, so a job
+  // still printing — its tax invoice already in the customer's hands — was
+  // missing from the return while the invoice export and the VAT summary
+  // carried it.
+  for (const status of ['pending', 'printing', 'post', 'qc', 'on_hold']) {
+    const html = runReturn({ orders: [sale(1150, { status })] });
+    assert.equal(box(html, 3), '150.00', status);
+  }
+  // Not yet an invoice: a quote, or a quote parked on hold awaiting its yes.
+  for (const extra of [{ status: 'quote' }, { status: 'on_hold', hasQuote: true }, { status: 'cancelled' }]) {
+    const html = runReturn({ orders: [sale(200000, extra)] });
+    assert.equal(box(html, 1), '0.00', JSON.stringify(extra));
+    assert.equal(box(html, 3), '0.00', JSON.stringify(extra));
   }
 });
 
@@ -152,7 +165,7 @@ test('a credit note reverses the sale and its VAT together', () => {
   assert.equal(box(credited, 3), expected.taxTotal.toFixed(2));
 });
 
-test('only completed orders in the period are counted', () => {
+test('only invoices in the period are counted', () => {
   const html = runReturn({
     orders: [
       sale(1000),

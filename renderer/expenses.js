@@ -865,9 +865,25 @@ function _doExportTaxSummary(periodLabel, fromDate, toDate) {
     monthMap[month].orders++;
     monthMap[month].revenue += orderNetRevenueBase(o);
     monthMap[month].shipping += convertToBase(+o.shippingCost || 0, orderCurrency(o));
-    // orderNetRevenueBase is net of credit notes, not of tax — still gross.
-    monthMap[month].vatCollected += KhaytTax.computeTax(
-      orderNetRevenueBase(o), KhaytTax.profileFromSettings(settings)).taxTotal;
+  }
+  // VAT FOLLOWS THE INVOICE, NOT THE FINISHED JOB. The tax point is the issued
+  // invoice, so a job still printing owes its VAT in the month it is dated —
+  // the rule the P&L, the Mac's VAT summary and the accountant's invoice
+  // export all use (lib/pnl-report.js, VAT IS DUE WHEN THE INVOICE IS
+  // ISSUED). This file summed finished jobs only and disagreed with all
+  // three. Read off pnlByPeriod's own month rows rather than worked out a
+  // fourth time; a month holding only an open invoice gets a line for its tax.
+  const vatRows = KhaytPnl.pnlByPeriod(printLog, [], {
+    settings, clients, currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
+    now: new Date(), granularity: 'month', range: { from: fromDate || '', to: toDate || '' },
+    // Only the VAT is read here, but every caller hands over the time log
+    // (test/pnl-labour.test.js) so a net read off these rows is never short.
+    timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : []),
+  });
+  for (const r of vatRows) {
+    if (!(r.vatCollected > 0)) continue;
+    if (!monthMap[r.period]) monthMap[r.period] = { orders: 0, revenue: 0, vatCollected: 0, shipping: 0 };
+    monthMap[r.period].vatCollected = r.vatCollected;
   }
   // Group expenses by YYYY-MM
   const expMap = {};

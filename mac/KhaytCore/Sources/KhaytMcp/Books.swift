@@ -251,8 +251,11 @@ struct Books: Sendable {
             "count": shown.count,
             "truncated": page.truncated,
             "note": """
-                Revenue is net of VAT, as on the Reports screen; the VAT is \
-                vat_collected. Filament bought is stock (inventory_bought), not \
+                Revenue is net of VAT and counts finished jobs, as on the \
+                Reports screen. vat_collected is the tax on every invoice issued \
+                in the period, open jobs included (the invoice is the tax point); \
+                taxable_sales is the sales it was charged on, and revenue_vat the \
+                part of it on the finished revenue. Filament bought is stock (inventory_bought), not \
                 an expense — it reaches the P&L as cost of goods when a job uses it.
                 """,
             "periods": page.items.map(Self.period),
@@ -271,6 +274,8 @@ struct Books: Sendable {
             "vat_collected": money(p.vatCollected), "vat_reclaimable": money(p.vatReclaimable),
             "vat_due": money(p.vatDue), "net": money(p.net),
         ]
+        if let v = p.taxableSales { row["taxable_sales"] = money(v) }
+        if let v = p.revenueVat { row["revenue_vat"] = money(v) }
         if let v = p.cogs { row["cost_of_goods"] = money(v) }
         if let v = p.marginPct { row["margin_pct"] = money(v) }
         if let v = p.unpriced, v > 0 { row["unpriced_jobs"] = v }

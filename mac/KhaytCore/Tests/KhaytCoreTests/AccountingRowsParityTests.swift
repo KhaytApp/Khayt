@@ -48,6 +48,13 @@ struct AccountingRowsParityTests {
          .object(["id": .string("A-6"), "status": .string("completed"),
                   "price": .number(-10)]),
          .object(["id": .string("A-7"), "status": .string("completed")]),
+         // A quote parked on hold, no yes recorded: still a quote, no invoice.
+         // And the same job once accepted: an invoice (beta.2 review).
+         .object(["id": .string("QUO-8"), "status": .string("on_hold"), "price": .number(345),
+                  "hasQuote": .bool(true)]),
+         .object(["id": .string("QUO-9"), "status": .string("on_hold"), "price": .number(345),
+                  "hasQuote": .bool(true), "quoteAcceptedAt": .string("2026-09-03"),
+                  "invoiceNumber": .string("INV-9")]),
          .null, .string("x"), .number(1), .bool(false), .array([])]
     }
 

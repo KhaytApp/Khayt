@@ -71,16 +71,18 @@ test('a quote alone owes nothing and opens no period', () => {
 test('the P&L\'s tax-point rule IS the export\'s isInvoice, over every shape of job', () => {
   const statuses = ['quote', 'pending', 'printing', 'completed', 'delivered', 'cancelled', 'split', 'on_hold'];
   for (const status of statuses) {
+   for (const quote of [{}, { hasQuote: true }, { hasQuote: true, quoteAcceptedAt: 'x' }, { hasQuote: true, clientApprovedAt: 'x' }]) {
     for (const voidedAt of [undefined, '2026-10-01']) {
       for (const creditedAt of [undefined, '2026-10-01']) {
         for (const nonBusiness of [undefined, true]) {
           for (const splitInto of [undefined, [], ['a']]) {
-            const o = { status, voidedAt, creditedAt, nonBusiness, splitInto };
+            const o = { status, voidedAt, creditedAt, nonBusiness, splitInto, ...quote };
             assert.equal(isTaxPoint(o), isInvoice(o), JSON.stringify(o));
           }
         }
       }
     }
+   }
   }
 });
 
@@ -106,4 +108,64 @@ test('over generated books, the summary\'s output VAT is the export\'s', () => {
     const { vat } = summaryOf(orders, settings);
     assert.ok(Math.abs(vat.output - exportVat(orders, settings)) <= 0.01, `case ${i}`);
   }
+});
+
+test('a quote parked on hold, not yet accepted, is no invoice and owes no VAT (beta.2 review)', () => {
+  // Before: a 345 on-hold quote with no yes recorded passed both rules and
+  // read 45 VAT, though it has no invoice number (order-new invoiceNumberOwed).
+  const parked = { id: 'QUO-2', status: 'on_hold', hasQuote: true, date: '2026-10-07', price: 345 };
+  assert.equal(isInvoice(parked), false);
+  assert.equal(isTaxPoint(parked), false);
+  assert.deepEqual(ordersToInvoiceRows([parked], { settings: VAT15, KhaytTax }), []);
+  assert.equal(summaryOf([parked], VAT15).vat.output, 0);
+  // Accepted, it is an invoice: in both.
+  const accepted = { ...parked, quoteAcceptedAt: '2026-10-08', invoiceNumber: 'INV-3' };
+  assert.equal(summaryOf([accepted], VAT15).vat.output, 45);
+  assert.equal(Math.round(exportVat([accepted], VAT15) * 100) / 100, 45);
+});
+
+test('revenue grosses up by its OWN tax: the open invoice\'s VAT is not in it (beta.2 review)', () => {
+  // The Mac's GROSS tile was revenue + vatCollected: finished 115 + printing
+  // 230 read 100 + 45 = 145. It is revenue + revenueVat = 115.
+  const { rows } = summaryOf(ORDERS, VAT15);
+  assert.equal(rows[0].vatCollected, 45);
+  assert.equal(rows[0].revenueVat, 15);
+  assert.equal(rows[0].revenue + rows[0].revenueVat, 115);
+});
+
+test('the desktop Tax summary CSV reads its VAT off pnlByPeriod, not finished jobs of its own', () => {
+  const fs = require('fs');
+  const src = fs.readFileSync(require('path').join(__dirname, '../renderer/expenses.js'), 'utf8');
+  const start = src.indexOf('function _doExportTaxSummary');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  assert.ok(start > 0);
+  assert.match(body, /KhaytPnl\.pnlByPeriod\(/);
+  assert.doesNotMatch(body, /KhaytTax\.computeTax\(/);
+});
+
+test('computePnl: an open invoice adds its VAT and nothing else (beta.2 review)', () => {
+  // The desktop's P&L CSV hands computePnl the finished jobs, plus each open
+  // invoice as a `taxOnly` row, so its "VAT collected" is the P&L table's.
+  const { computePnl } = require('../lib/pnl-report.js');
+  const s = computePnl({ orders: [
+    { revenue: 100, cogs: 20, vat: 15 },
+    { taxOnly: true, revenue: 0, cogs: 0, vat: 30 },
+  ], expenses: [] });
+  assert.equal(s.vatCollected, 45);
+  assert.equal(s.revenue, 100);
+  assert.equal(s.orderCount, 1);
+  assert.equal(s.grossProfit, 80);
+});
+
+test('the desktop P&L builder and VAT return use the tax-point rule, and shipping is not cost', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const an = fs.readFileSync(path.join(__dirname, '../renderer/analytics.js'), 'utf8');
+  const at = an.indexOf('function pnlInputsForRange');
+  const body = an.slice(at, an.indexOf('\nfunction ', at + 10));
+  assert.match(body, /KhaytPnl\.isTaxPoint\(o\)/);
+  assert.match(body, /taxOnly: true/);
+  assert.doesNotMatch(body, /shippingCost/);
+  const ops = fs.readFileSync(path.join(__dirname, '../renderer/operations-extras.js'), 'utf8');
+  assert.match(ops, /KhaytPnl\.isTaxPoint\(o\) && o\.date >= fromDate/);
 });

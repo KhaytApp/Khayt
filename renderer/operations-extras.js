@@ -440,8 +440,13 @@ function exportGaztVatReturn(period) {
   else if (period === 'q4') { fromDate = `${now.getFullYear()}-10-01`; toDate = `${now.getFullYear()}-12-31`; }
   else { fromDate = `${now.getFullYear()}-01-01`; toDate = `${now.getFullYear()}-12-31`; }
 
+  // EVERY ISSUED INVOICE, not every finished job: the invoice is the tax point,
+  // so a job still printing owes its tax in the period it is dated — the rule
+  // the P&L, the VAT summary and the accountant's invoice export share
+  // (lib/pnl-report.js isTaxPoint). Finished-only, this return declared less
+  // output tax than the invoices the shop had already handed out.
   const periodOrders = printLog.filter(o =>
-    KhaytOrderStatus.isFinished(o) && o.date >= fromDate && o.date <= toDate
+    KhaytPnl.isTaxPoint(o) && o.date >= fromDate && o.date <= toDate
   );
   // Boxes 1-3 used to read `o.vatAmount` and `o.vatRate`. NEITHER FIELD IS EVER
   // WRITTEN — not by the order form, not by the invoice, not by any importer.

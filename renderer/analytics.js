@@ -2851,12 +2851,21 @@ function pnlInputsForRange() {
       const revenue = orderNetRevenueBase(o);
       // Only what was STOCKED (lib/pnl-report.js stockShare): power, wear and
       // labour reach the P&L as the bills and fixed costs the shop records.
+      // Not shipping: it is charged inside the price, and the courier is an
+      // expense — as pnlByPeriod and the dashboard (kpi-rows orderCost) read it.
       const cogs = (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0)
-          * KhaytPnl.stockShare(o, { inventory, settings })
-        + convertToBase(+o.shippingCost || 0, orderCurrency(o));
+          * KhaytPnl.stockShare(o, { inventory, settings });
       // `revenue` here is gross — see lib/tax.js.
       return { revenue, cogs, vat: KhaytTax.computeTax(revenue, taxProfile).taxTotal };
-    });
+    })
+    // Issued invoices whose jobs are not finished: their VAT is owed now (the
+    // invoice is the tax point, lib/pnl-report.js isTaxPoint), their revenue
+    // and cost when the work is done. `taxOnly` tells computePnl so.
+    .concat((printLog || [])
+      .filter(o => !KhaytOrderStatus.isFinished(o) && KhaytPnl.isTaxPoint(o) && inRange(o.date, analyticsRange, 'analytics'))
+      .map(o => ({ taxOnly: true, revenue: 0, cogs: 0,
+                   vat: KhaytTax.computeTax(orderNetRevenueBase(o), taxProfile).taxTotal }))
+      .filter(r => r.vat > 0));
   const expenseRows = (expenses || [])
     .filter(e => inRange(e.date, analyticsRange, 'analytics'))
     // Date and receipt tax travel too: lib/pnl-report.js recognises a machine

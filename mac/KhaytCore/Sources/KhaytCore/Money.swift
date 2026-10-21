@@ -602,6 +602,15 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// issued in the period, where `revenue` is finished work only. Optional
     /// because an older bundle has no such field.
     public let taxableSales: Double?
+    /// The part of `vatCollected` charged on the FINISHED work `revenue`
+    /// counts, so `revenue + revenueVat` is what those jobs were billed.
+    /// Optional because an older bundle has no such field.
+    public let revenueVat: Double?
+    /// Revenue grossed back up by its own tax: the finished jobs as billed.
+    /// Not `revenue + vatCollected`, which adds the open invoices' tax to
+    /// sales that do not include them. An older bundle, whose VAT followed
+    /// finished jobs only, falls back to that sum.
+    public var grossRevenue: Double { revenue + (revenueVat ?? vatCollected) }
     /// Tax the shop paid on its purchases and can reclaim. Only the expenses
     /// that recorded one contribute; an expense entered before Khayt asked
     /// carries none and reclaims nothing.

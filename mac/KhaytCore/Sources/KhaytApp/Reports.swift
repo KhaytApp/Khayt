@@ -1455,9 +1455,11 @@ struct Reports: View {
                                        Money.cost(rows.reduce(0) { $0 + $1.expenses + $1.fixed }, shop.currency))
                             // Ruled off from the two above it, because it is
                             // NOT a third subtraction — it is what the shop
-                            // owes ZATCA, and it has already been taken out of
-                            // the revenue line by the time that figure is
-                            // printed. Listed flush with the others it read as
+                            // owes ZATCA, and revenue above is already net of
+                            // tax. It is the tax on every invoice ISSUED in
+                            // the span, open ones included (the invoice is the
+                            // tax point), so it can exceed the tax inside the
+                            // finished revenue. Listed flush with the others it read as
                             // a cost, and the obvious arithmetic came out four
                             // thousand short of the net income beside it.
                             LayerRule()

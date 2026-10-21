@@ -50,12 +50,16 @@
    * export rule natively (`AccountingRows.swift`) and does not bundle that
    * file. `test/pnl-vat-tax-point.test.js` holds the two to one answer.
    *
-   * Not a QUOTE (no invoice yet), not CANCELLED, not VOIDED, not CREDITED IN
+   * Not a QUOTE (no invoice yet) or one on hold awaiting its answer, not CANCELLED, not VOIDED, not CREDITED IN
    * FULL, not NOT-BUSINESS, not a SPLIT PARENT (its sub-orders carry its
    * price). */
   function isTaxPoint(o) {
     if (!o || typeof o !== 'object') return false;
     if (o.status === 'quote' || o.status === 'cancelled') return false;
+    // A quote parked ON HOLD, its yes not yet recorded, is still a quote
+    // (`KhaytOrderNew.awaitingApproval`, written out): it has no invoice
+    // number until the customer accepts (`invoiceNumberOwed`), so no invoice.
+    if (o.status === 'on_hold' && o.hasQuote && !o.quoteAcceptedAt && !o.clientApprovedAt) return false;
     if (o.voidedAt || o.creditedAt) return false;
     if (o.nonBusiness === true) return false;
     if (o.status === 'split' && Array.isArray(o.splitInto) && o.splitInto.length > 0) return false;
@@ -327,7 +331,10 @@
 
   /**
    * @param {object} input
-   * @param {Array<{revenue:number, cogs:number, vat?:number}>} input.orders base-currency per order
+   * @param {Array<{revenue:number, cogs:number, vat?:number, taxOnly?:boolean}>} input.orders
+   *   base-currency per order. A `taxOnly` row is an issued invoice whose job is
+   *   not finished: its `vat` is collected (the invoice is the tax point — see
+   *   VAT IS DUE WHEN THE INVOICE IS ISSUED) and nothing else of it is counted.
    * @param {Array<{amount:number, category?:string}>} input.expenses base-currency
    * @param {string} [input.label] period label (e.g. "This month")
    * @returns {object} summary with totals + expenses grouped by category
@@ -337,8 +344,10 @@
     const orders = Array.isArray(input.orders) ? input.orders : [];
     const expenses = Array.isArray(input.expenses) ? input.expenses : [];
 
-    let revenue = 0, cogs = 0, vatCollected = 0;
+    let revenue = 0, cogs = 0, vatCollected = 0, orderCount = 0;
     for (const o of orders) {
+      if (o && o.taxOnly) { vatCollected += +o.vat || 0; continue; }
+      orderCount += 1;
       revenue += +o.revenue || 0;
       cogs += +o.cogs || 0;
       vatCollected += +o.vat || 0;
@@ -376,7 +385,7 @@
     const netProfit = grossProfit - expensesTotal - waste - depreciation - labour;
     return {
       label: input.label || '',
-      orderCount: orders.length,
+      orderCount,
       revenue: round2(revenue),
       cogs: round2(cogs),
       grossProfit: round2(grossProfit),
@@ -494,7 +503,7 @@
    * rule rather than from arithmetic of their own beside it.
    *
    * Returns rows newest first: `{ period, orders, revenue, shipping, expenses,
-   * fixed, vatCollected, taxableSales, vatReclaimable, vatDue, net, cogs,
+   * fixed, vatCollected, taxableSales, revenueVat, vatReclaimable, vatDue, net, cogs,
    * marginPct }`. The tax figures cover every issued invoice in the period;
    * revenue and cost only the finished work (see VAT IS DUE WHEN THE INVOICE
    * IS ISSUED).
@@ -576,7 +585,7 @@
       if (!byQuarter[key]) {
         byQuarter[key] = {
           period: key, orders: 0, revenue: 0, shipping: 0, expenses: 0, inventory: 0, capital: 0, waste: 0,
-          vatCollected: 0, taxableSales: 0, vatReclaimable: 0, cogs: 0, unpriced: 0, labour: 0, payrollExpense: false,
+          vatCollected: 0, taxableSales: 0, revenueVat: 0, vatReclaimable: 0, cogs: 0, unpriced: 0, labour: 0, payrollExpense: false,
         };
       }
       return byQuarter[key];
@@ -637,6 +646,10 @@
       if (!finished) continue;
       row.orders += 1;
       row.revenue += revenue;
+      // The tax on the FINISHED work alone, so revenue can be grossed back up
+      // on its own jobs (the Mac's GROSS tile): revenue + vatCollected would
+      // add the open invoices' tax to sales that do not include them.
+      if (taxPoint) row.revenueVat += vat;
       // Finished, charged nothing, and cost something to make: a gift, a test
       // or a job nobody priced. Counted so the screen can SAY why a margin is
       // negative instead of printing -495.8% and leaving the shop to guess.
@@ -821,6 +834,9 @@
         // Net of tax, on the jobs `vatCollected` covers (every issued
         // invoice), where `revenue` covers only finished work.
         taxableSales: round2(row.taxableSales),
+        // The part of `vatCollected` charged on the finished work `revenue`
+        // counts: revenue + revenueVat is what those jobs were billed.
+        revenueVat: round2(row.revenueVat),
         vatReclaimable: round2(row.vatReclaimable),
         // What the shop actually owes the authority for the quarter: the tax it
         // charged, less the tax it paid. Negative means a refund is due, which

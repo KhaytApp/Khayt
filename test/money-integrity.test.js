@@ -350,16 +350,16 @@ test('every VAT figure is derived from the netted revenue', () => {
   assert.equal(credited.vatCollected, 78.26,
     'and the tax collected with it — VAT must follow the netted revenue, never the gross price');
 
-  const checks = [
-    ['renderer/expenses.js',  /vatCollected \+= KhaytTax\.computeTax\(\s*orderNetRevenueBase\(o\)/],
-  ];
-  for (const [rel] of checks) {
-    assert.doesNotMatch(read(rel), /vatCollected \+= [^\n]*\bo\.price\b/,
-      `${rel}: VAT collected must never be taken from the gross price`);
-  }
-  for (const [rel, re] of checks) {
-    assert.match(read(rel), re, `${rel}: VAT collected must follow revenue, not the gross price`);
-  }
+  // The desktop's Tax summary CSV took it itself until beta.2; it now reads
+  // its VAT off pnlByPeriod's month rows — the netted revenue proven above,
+  // and the issued-invoice tax point — so there is no formula of its own left
+  // to pin, only the absence of one.
+  assert.doesNotMatch(read('renderer/expenses.js'), /vatCollected \+= [^\n]*\bo\.price\b/,
+    'renderer/expenses.js: VAT collected must never be taken from the gross price');
+  assert.doesNotMatch(read('renderer/expenses.js'), /vatCollected \+= KhaytTax\.computeTax/,
+    'renderer/expenses.js: the Tax summary must take its VAT from lib/pnl-report.js, not work it out again');
+  assert.match(read('renderer/expenses.js'), /monthMap\[r\.period\]\.vatCollected = r\.vatCollected/,
+    'renderer/expenses.js: the Tax summary reads pnlByPeriod\'s VAT');
   assert.doesNotMatch(read('renderer/analytics.js'), /vatCollected \+=/,
     'renderer/analytics.js must not total VAT itself any more — lib/pnl-report.js does');
   // The ZATCA/GAZT return's sales boxes must net credits too — and, since a
