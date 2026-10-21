@@ -218,6 +218,30 @@ import Testing
         #expect(abs(exportVat - out.vat.output) < 0.005)
     }
 
+    /// An accepted quote's invoice is numbered when the customer says yes,
+    /// so its tax point is that day, not the quote's own date. A September
+    /// quote accepted on 3 October put its VAT in September (beta.2 review);
+    /// its revenue stays September's.
+    @Test("an accepted quote's VAT is in its acceptance month; its revenue is not moved")
+    func vatFollowsTheAcceptance() async throws {
+        let engine = try KhaytEngine()
+        let orders: [JSONValue] = [
+            .object(["id": .string("QUO-2026-0007"), "status": .string("completed"),
+                     "date": .string("2026-09-20"), "price": .number(1150),
+                     "quoteAcceptedAt": .string("2026-10-03"), "invoiceNumber": .string("INV-0042")]),
+        ]
+        let input = { (from: String, to: String) in
+            PnlInputs(orders: orders, expenses: [], settings: Self.vat15, now: Self.october16,
+                      granularity: "month", from: from, to: to)
+        }
+        let sep = try await engine.pnlStatement(input("2026-09-01", "2026-09-30"))
+        let oct = try await engine.pnlStatement(input("2026-10-01", "2026-10-31"))
+        #expect(sep.vat.output == 0)
+        #expect(oct.vat.output == 150)
+        #expect(sep.rows.first?.revenue == 1000)
+        #expect(sep.rows.first?.grossRevenue == 1150, "the GROSS tile still reads the job as billed")
+    }
+
     @Test("VAT, added on TOP: the price is revenue and the tax is extra")
     func vatExclusive() async throws {
         let engine = try KhaytEngine()

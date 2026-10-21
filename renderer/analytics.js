@@ -2855,14 +2855,21 @@ function pnlInputsForRange() {
       // expense — as pnlByPeriod and the dashboard (kpi-rows orderCost) read it.
       const cogs = (o.parts || []).reduce((s, p) => s + partTotalCost(p), 0)
           * KhaytPnl.stockShare(o, { inventory, settings });
-      // `revenue` here is gross — see lib/tax.js.
-      return { revenue, cogs, vat: KhaytTax.computeTax(revenue, taxProfile).taxTotal };
+      // `revenue` here is gross — see lib/tax.js. Its VAT counts when the
+      // INVOICE's day is in range (KhaytPnl.taxPointDate: an accepted quote's
+      // acceptance), which for a plain job is the same day as its revenue.
+      const vat = inRange(KhaytPnl.taxPointDate(o), analyticsRange, 'analytics')
+        ? KhaytTax.computeTax(revenue, taxProfile).taxTotal : 0;
+      return { revenue, cogs, vat };
     })
-    // Issued invoices whose jobs are not finished: their VAT is owed now (the
-    // invoice is the tax point, lib/pnl-report.js isTaxPoint), their revenue
-    // and cost when the work is done. `taxOnly` tells computePnl so.
+    // Issued invoices whose tax point is in range but whose revenue is not
+    // here — the job is not finished, or (an accepted quote) its own date is
+    // outside the range: their VAT is owed now (the invoice is the tax point,
+    // lib/pnl-report.js isTaxPoint), their revenue and cost when and where
+    // the work is. `taxOnly` tells computePnl so.
     .concat((printLog || [])
-      .filter(o => !KhaytOrderStatus.isFinished(o) && KhaytPnl.isTaxPoint(o) && inRange(o.date, analyticsRange, 'analytics'))
+      .filter(o => KhaytPnl.isTaxPoint(o) && inRange(KhaytPnl.taxPointDate(o), analyticsRange, 'analytics')
+        && !(KhaytOrderStatus.isFinished(o) && inRange(o.date, analyticsRange, 'analytics')))
       .map(o => ({ taxOnly: true, revenue: 0, cogs: 0,
                    vat: KhaytTax.computeTax(orderNetRevenueBase(o), taxProfile).taxTotal }))
       .filter(r => r.vat > 0));
