@@ -8371,6 +8371,10 @@ missing its dot. And a Prusa can be sent binary G-code.
 
 - **The catalogue now counts each part's quantity in a product's cost.** A part used three times in a product was costed once, so the catalogue suggested a price well under what a job made from that product costs. The catalogue and a job now agree. Saved product prices do not change by themselves: a product's price moves only when you open it, edit it and save. The catalogue's margin column now shows the real margin, so a product priced under the old rule may show a thin or negative margin. Review those products and re-save any you want re-priced.
 
+### Changed
+
+- **The product sheet says when a saved price is out of date.** It shows the saved price with "Saved price kept; today's costs give X", and after an edit "was X → now Y".
+
 ### Fixed
 
 - **A product part with no spool linked keeps its own spool cost.** Editing its grams now re-prices the product.
