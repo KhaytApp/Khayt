@@ -1346,6 +1346,13 @@ final class Shop {
         // Kept whole, not just on the rows: `payment-reminder` asks what each
         // order still owes, converted, and this is the converted answer.
         owedByOrderId = owed
+        // What each job billed and was paid on the same terms, so a customer's
+        // Billed − Paid is the Owed beside it (`Customer.billed`).
+        if let billedPaid = try? await engine.billedAndPaidByOrder(
+            rows, settings: Self.settings(root), clients: clients,
+            currencies: Invoice.currencyTable(self)), ticket == loadGeneration {
+            for i in orders.indices { orders[i].billedPaidResolved = billedPaid[orders[i].id] }
+        }
         // And each job's figures in its OWN currency, for the rows that print
         // money beside the job's currency mark — owed, billed, and the price
         // net of tax a margin is worked on. Same crossing pattern: once a load.

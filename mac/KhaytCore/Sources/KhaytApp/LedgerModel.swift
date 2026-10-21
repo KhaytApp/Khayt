@@ -122,14 +122,18 @@ extension Shop {
         let cost = order.costBasis + order.componentsCost
         let net = order.figures?.net ?? order.price
         let tax = order.figures?.tax ?? 0
+        // The margin is on what the shop KEPT: the price less its credit
+        // notes, net of tax — the figure Reports' margin is on. `net` above is
+        // the invoice's split, which a credit note does not change.
+        let earned = order.figures?.earnedOrNet ?? order.price
         return LedgerMoney(
             charged: order.figures?.billed ?? order.price,
             // Only for a shop that charges tax: an unregistered shop has no
             // split, and a zero tax line would claim one.
             net: tax > 0 ? net : nil,
             vat: tax > 0 ? tax : nil,
-            margin: costKnown && net > 0 ? (net - cost) / net : nil,
-            marginMoney: costKnown ? net - cost : nil)
+            margin: costKnown && earned > 0 ? (earned - cost) / earned : nil,
+            marginMoney: costKnown ? earned - cost : nil)
     }
 
     private func line(for order: Order) -> LedgerLine {

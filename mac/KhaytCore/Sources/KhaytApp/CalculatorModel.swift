@@ -88,8 +88,17 @@ final class CalculatorModel {
 
     // MARK: - Reading what was typed
 
+    /// A typed figure, read ONE way in every field of this screen.
+    ///
+    /// The weights read a comma as a decimal point and the rates threw it away,
+    /// so "1,200" g was 1.2 g and "0,5" kWh was 5. Now a comma followed by
+    /// exactly three digits is a thousands separator ("1,200" → 1200,
+    /// "1,234,567.5" → 1234567.5) and any other comma is the decimal point
+    /// ("0,5" → 0.5, "12,75" → 12.75).
     static func number(_ text: String) -> Double {
-        let said = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        var said = text.trimmingCharacters(in: .whitespaces)
+        said = said.replacing(/,(?=\d{3}(?!\d))/, with: "")
+        said = said.replacingOccurrences(of: ",", with: ".")
         return max(0, Double(said) ?? 0)
     }
 
@@ -105,10 +114,9 @@ final class CalculatorModel {
 
     /// One typed rate, or what the preset and machine resolved to.
     func typed(_ key: String) -> Double {
-        let said = (rates[key] ?? "").replacingOccurrences(of: ",", with: "")
-            .trimmingCharacters(in: .whitespaces)
+        let said = (rates[key] ?? "").trimmingCharacters(in: .whitespaces)
         if said.isEmpty { return resolved[key] ?? 0 }
-        return max(0, Double(said) ?? 0)
+        return Self.number(said)
     }
 
     var ratesEdited: Bool {
@@ -248,7 +256,8 @@ final class CalculatorModel {
     /// to a record without standing up a screen.
     static func costInput(lines: [FilamentLine], purge: Double, hours: Double, qty: Int,
                           spools: [Spool], consumables: [ConsumableLine],
-                          shelf: [Consumable], extra: [String: JSONValue] = [:]) -> JSONValue {
+                          shelf: [Consumable], reclaimsTax: Bool = false,
+                          extra: [String: JSONValue] = [:]) -> JSONValue {
         // The shape is KhaytCore's (`CalculatorPart`), shared with the phone's
         // calculator: one copy of how purge, colours and pieces become a part.
         let spool: (String?) -> Spool? = { id in id.flatMap { id in spools.first { $0.id == id } } }
@@ -256,7 +265,7 @@ final class CalculatorModel {
             line.consumableId.map { (id: $0, qty: line.qty) }
         }, shelf: shelf)
         return CalculatorPart.input(
-            lines: lines.map { CalculatorPart.Line(spool: spool($0.spoolId)?.costing,
+            lines: lines.map { CalculatorPart.Line(spool: spool($0.spoolId)?.costing(reclaimsTax: reclaimsTax),
                                                    grams: number($0.grams), hex: $0.hex) },
             purge: purge, hours: hours, qty: qty, pieces: pieces, extra: extra)
     }
@@ -292,7 +301,7 @@ final class CalculatorModel {
         }
         return Self.costInput(lines: lines, purge: purgeValue, hours: hoursValue, qty: qty,
                               spools: shop.spools, consumables: consumableLines,
-                              shelf: shop.consumables, extra: extra)
+                              shelf: shop.consumables, reclaimsTax: shop.reclaimsTax, extra: extra)
     }
 
     func recompute(_ shop: Shop) async {
@@ -395,8 +404,17 @@ final class CalculatorModel {
 }
 
 extension Spool {
-    /// This spool, as far as costing needs it — `CalculatorPart.Spool`.
-    var costing: CalculatorPart.Spool {
-        CalculatorPart.Spool(id: id, material: material, cost: cost, spoolWeight: spoolWeight, color: color)
+    /// This spool, as far as costing needs it — `CalculatorPart.Spool`, at
+    /// what it costs a job (`jobCost`).
+    func costing(reclaimsTax: Bool) -> CalculatorPart.Spool {
+        CalculatorPart.Spool(id: id, material: material, cost: jobCost(reclaimsTax: reclaimsTax),
+                             spoolWeight: spoolWeight, color: color)
+    }
+
+    /// What this spool costs a job: net of the tax a registered shop reclaims
+    /// (`CalculatorPart.netCost`). Every `spoolCost` a part is written with is
+    /// this, never `cost`, which is what left the bank.
+    func jobCost(reclaimsTax: Bool) -> Double {
+        CalculatorPart.netCost(paid: cost, vatAmount: vatAmount, reclaims: reclaimsTax)
     }
 }

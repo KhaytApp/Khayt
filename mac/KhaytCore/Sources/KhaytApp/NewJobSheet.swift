@@ -796,8 +796,12 @@ struct NewJobSheet: View {
                              "pct": .number(median),
                              "material": .string(c.material)]))
                             .font(.caption).foregroundStyle(.secondary)
-                        if abs(margin - median) >= 0.05 {
-                            Button(shop.words.callIt("mac.use_it")) { margin = median }
+                        // The figure is a margin on PRICE; the field is a
+                        // markup on cost (`lib/pricing.js`). Typing the
+                        // median in priced 30% as 23.1%, so the field gets
+                        // the markup that earns it.
+                        if let markup = c.suggestedMarkup, abs(margin - markup) >= 0.05 {
+                            Button(shop.words.callIt("mac.use_it")) { margin = markup }
                                 .buttonStyle(.link).font(.caption)
                         }
                         // The OPTIONAL second opinion. The median above was
@@ -1043,7 +1047,7 @@ struct NewJobSheet: View {
         switch await shop.recommendMargin(comparables: c, raw: raw, cost: cost,
                                           grams: grams, hours: hours, material: material) {
         case .advised(let said):
-            margin = said.margin
+            margin = said.markup
             // The REASON, always. A margin that changed with no sentence beside
             // it is a number a shop cannot argue with when a customer does.
             advice = said.rationale.isEmpty

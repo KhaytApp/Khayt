@@ -17,8 +17,17 @@ struct Customer: Identifiable, Hashable, Sendable {
     let orders: [Order]
 
     var jobCount: Int { orders.count }
-    var billed: Double { orders.reduce(0) { $0 + $1.price } }
-    var paid: Double { orders.reduce(0) { $0 + $1.paidAmount } }
+    /// Billed and Paid on Owed's terms: only jobs that can owe, gross of tax
+    /// on top, net of credit notes, in the shop's currency — so for a customer
+    /// in one currency Billed − Paid = Owed. They were raw sums of every job's
+    /// price and payment, quotes and cancelled work included. The fallback, with
+    /// no engine, is the same raw figure on the jobs that can owe.
+    var billed: Double {
+        orders.reduce(0) { $0 + ($1.billedPaidResolved?.billed ?? ($1.owesAtAll ? $1.price : 0)) }
+    }
+    var paid: Double {
+        orders.reduce(0) { $0 + ($1.billedPaidResolved?.paid ?? ($1.owesAtAll ? $1.paidAmount : 0)) }
+    }
     var owed: Double { orders.filter { !$0.isSettled }.reduce(0) { $0 + $1.owed } }
     var overdueCount: Int { orders.count { $0.isOverdue() } }
     var isSettled: Bool { owed < 0.005 }

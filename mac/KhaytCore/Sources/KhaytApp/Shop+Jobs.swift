@@ -645,7 +645,7 @@ extension Shop {
     private func partFor(spoolId: String?, grams: Double, hours: Double, qty: Int,
                          extra: [String: JSONValue] = [:]) -> JSONValue {
         Self.costInput(spool: spoolId.flatMap { id in spools.first { $0.id == id } },
-                       grams: grams, hours: hours, qty: qty, extra: extra)
+                       grams: grams, hours: hours, qty: qty, reclaimsTax: reclaimsTax, extra: extra)
     }
 
     /// The part the shared cost model is handed. `extra` is the part as the
@@ -654,8 +654,9 @@ extension Shop {
     /// other app costs the same part — and the four measured fields are
     /// written over it. Static so a test can hold it to a record.
     static func costInput(spool: Spool?, grams: Double, hours: Double, qty: Int,
-                          extra: [String: JSONValue] = [:]) -> JSONValue {
-        CalculatorPart.single(spool: spool.map(\.costing), grams: grams, hours: hours, qty: qty, extra: extra)
+                          reclaimsTax: Bool = false, extra: [String: JSONValue] = [:]) -> JSONValue {
+        CalculatorPart.single(spool: spool.map { $0.costing(reclaimsTax: reclaimsTax) },
+                              grams: grams, hours: hours, qty: qty, extra: extra)
     }
 
     /// What one part costs to make, through the shared cost model.

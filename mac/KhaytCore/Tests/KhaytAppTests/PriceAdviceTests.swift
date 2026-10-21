@@ -57,6 +57,9 @@ struct PriceAdviceTests {
         #expect(c.medianMarginPct == 50,
                 Comment(rawValue: "median came out \(c.medianMarginPct ?? -1) — the gross is 56.5"))
         #expect(c.count == 3)
+        // The job's margin field is a MARKUP on cost: 50% of the price is
+        // 100% on cost, and typing 50 there would have earned 33.3%.
+        #expect(c.suggestedMarkup == 100)
     }
 
     @Test("a shop with no priced history is told so, not shown a median of nothing")
@@ -161,6 +164,7 @@ struct PriceAdviceTests {
                                                fallbackMargin: 50)
         #expect(out.ok)
         #expect(out.suggestedMargin == 44)
+        #expect(out.suggestedMarkup == 78.6, "44% of the price is 44/56 on cost")
         #expect(out.rationale?.contains("comparables") == true)
     }
 }
@@ -187,6 +191,15 @@ struct PriceAdviceWiringTests {
         // cannot argue with when a customer does.
         #expect(sheet.contains("mac.advice_no_reason"),
                 "a recommendation with no rationale would change the margin silently")
+    }
+
+    @Test("the sheet types the MARKUP into the margin field, never the margin")
+    func appliesTheMarkup() throws {
+        let sheet = try Self.source("NewJobSheet.swift")
+        #expect(sheet.contains("margin = markup }"))
+        #expect(sheet.contains("margin = said.markup"))
+        #expect(!sheet.contains("margin = median"))
+        #expect(!sheet.contains("margin = said.margin"))
     }
 
     @Test("the comparables are shown without any of this")

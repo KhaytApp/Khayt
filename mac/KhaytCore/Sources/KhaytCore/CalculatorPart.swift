@@ -30,6 +30,22 @@ public enum CalculatorPart {
         }
     }
 
+    /// What a spool costs a JOB, which is not what it cost the shop —
+    /// `KhaytSpoolEdit.netCost`, the rule Electron's calculator, the LAN quote
+    /// and the AI quote already cost with.
+    ///
+    /// A shop that reclaims tax gets back the tax it paid on the roll, so the
+    /// tax is not part of what a print consumes; charging it to the job
+    /// understated every margin quoted on the Mac. A shop that reclaims
+    /// nothing pays every riyal, and a spool with no tax recorded costs what
+    /// it cost — no tax is invented on a receipt nobody described.
+    public static func netCost(paid: Double?, vatAmount: Double?, reclaims: Bool) -> Double {
+        let cost = max(0, paid.flatMap { $0.isFinite ? $0 : nil } ?? 0)
+        guard reclaims else { return cost }
+        let tax = max(0, vatAmount.flatMap { $0.isFinite ? $0 : nil } ?? 0)
+        return max(0, cost - min(cost, tax))
+    }
+
     /// One filament line: a spool and the grams printed from it.
     public struct Line: Sendable, Equatable {
         public let spool: Spool?

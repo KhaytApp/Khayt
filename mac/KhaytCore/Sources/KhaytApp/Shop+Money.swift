@@ -93,7 +93,7 @@ extension Shop {
     /// catalogue product) so the preview and the record agree.
     func overheadHours(of parts: [NewJobSheet.Draft], productId: String? = nil) async -> Double {
         guard overheadPerHour > 0, let engine else { return 0 }
-        let rows = Self.partRows(parts, spools: spools, unnamed: "")
+        let rows = Self.partRows(parts, spools: spools, reclaimsTax: reclaimsTax, unnamed: "")
         return (try? await engine.overheadHours(rows, productId: productId)) ?? 0
     }
 
@@ -108,7 +108,7 @@ extension Shop {
                                   "purgeGrams", "supportWeight"]
 
     static func partRows(_ parts: [NewJobSheet.Draft], spools: [Spool],
-                         unnamed: String) -> [JSONValue] {
+                         reclaimsTax: Bool = false, unnamed: String) -> [JSONValue] {
         var rows: [JSONValue] = []
         for p in parts {
             var row: [String: JSONValue] = [
@@ -146,7 +146,7 @@ extension Shop {
             if let spoolId = p.spoolId, let spool = spools.first(where: { $0.id == spoolId }) {
                 row["filamentId"] = .string(spool.id)
                 row["material"] = .string(spool.material)
-                row["spoolCost"] = .number(spool.cost ?? 0)
+                row["spoolCost"] = .number(spool.jobCost(reclaimsTax: reclaimsTax))
                 row["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
             }
             // ── WHAT A PART FROM A MODEL OR THE CALCULATOR BRINGS ─────────
@@ -203,7 +203,7 @@ extension Shop {
                      overheadPerHour: Double = 0,
                      carried: [String: JSONValue] = [:]) -> [String: JSONValue] {
         var input: [String: JSONValue] = [
-            "parts": .array(Self.partRows(parts, spools: spools,
+            "parts": .array(Self.partRows(parts, spools: spools, reclaimsTax: reclaimsTax,
                                           unnamed: words.callIt("mac.a_part"))),
             "project": .string(project),
             "margin": .number(margin),
@@ -864,9 +864,11 @@ extension Shop {
     /// `fields` holds only what the shop changed — `EditJobSheet.fields`.
     func editJob(_ id: Order.ID, fields: [String: JSONValue]) async {
         guard permitted("orders", "edit") else { return }
-        await writeToOneOrder(id, named: words.callIt("mac.edit_job"), as: .person("orders", "edit")) { order, engine, _ in
+        await writeToOneOrder(id, named: words.callIt("mac.edit_job"), as: .person("orders", "edit")) { order, engine, root in
+            // The shop's settings, so a typed price caps the payment at the
+            // new price plus its tax and paid/partial is read from that gross.
             let out = try await engine.editJob(
-                order: order, fields: fields,
+                order: order, fields: fields, settings: Self.settings(root),
                 now: Date(), editId: Self.uid("edit"))
             // Nothing moved: return the order untouched so the write path finds
             // no change, stamps nothing and syncs nothing.
@@ -971,7 +973,8 @@ extension Shop {
 
         await writeToOneOrder(orderId, named: words.callIt("mac.edit_part"), as: .person("orders", "edit")) { order, _, _ in
             OneOrderEdit(order: Self.orderWithPartEdited(
-                order, partId: partId, now, opened: opened, spool: spool, costed: costed))
+                order, partId: partId, now, opened: opened, spool: spool, costed: costed,
+                reclaimsTax: self.reclaimsTax))
         }
     }
 
@@ -1034,11 +1037,12 @@ extension Shop {
     /// book spells it — 12.34567 g is not rounded to the 12.35 the box shows.
     static func orderWithPartEdited(_ order: JSONValue, partId: String,
                                     _ now: EditPartSheet.Opened, opened: EditPartSheet.Opened?,
-                                    spool: Spool?, costed: KhaytEngine.CostedPart?) -> JSONValue {
+                                    spool: Spool?, costed: KhaytEngine.CostedPart?,
+                                    reclaimsTax: Bool = false) -> JSONValue {
         guard let opened else {
             return orderWithPartEdited(order, partId: partId, name: now.name, spool: spool,
                                        grams: Double(now.grams) ?? 0, hours: Double(now.hours) ?? 0,
-                                       qty: now.qty, costed: costed)
+                                       qty: now.qty, costed: costed, reclaimsTax: reclaimsTax)
         }
         guard case .object(var record) = order,
               case .array(var rows)? = record["parts"] else { return order }
@@ -1056,13 +1060,16 @@ extension Shop {
             if let spool {
                 part["filamentId"] = .string(spool.id)
                 part["material"] = .string(spool.material)
-                part["spoolCost"] = .number(spool.cost ?? 0)
+                part["spoolCost"] = .number(spool.jobCost(reclaimsTax: reclaimsTax))
                 // At least one gram: the cost model divides by this.
                 part["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
             }
             if let costed {
+                // `costed.cost` is ONE piece; `baseCost` is the line, as every
+                // other path writes it (`partRows`) and the reports sum it.
+                let pieces = max(1, Self.plainNumber(part["qty"]) ?? 1)
                 part["unitCost"] = .number(costed.cost)
-                part["baseCost"] = .number(costed.cost)
+                part["baseCost"] = .number(costed.cost * pieces)
                 for (key, value) in costed.rates.fields { part[key] = value }
             }
             rows[i] = .object(part)
@@ -1079,7 +1086,7 @@ extension Shop {
     /// here (re-costing, and writing the rates back) with no test at all.
     static func orderWithPartEdited(_ order: JSONValue, partId: String, name: String,
                                     spool: Spool?, grams: Double, hours: Double, qty: Int,
-                                    costed: KhaytEngine.CostedPart?) -> JSONValue {
+                                    costed: KhaytEngine.CostedPart?, reclaimsTax: Bool = false) -> JSONValue {
         guard case .object(var record) = order,
               case .array(var rows)? = record["parts"] else { return order }
 
@@ -1095,13 +1102,16 @@ extension Shop {
             if let spool {
                 part["filamentId"] = .string(spool.id)
                 part["material"] = .string(spool.material)
-                part["spoolCost"] = .number(spool.cost ?? 0)
+                part["spoolCost"] = .number(spool.jobCost(reclaimsTax: reclaimsTax))
                 // At least one gram: the cost model divides by this.
                 part["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
             }
             if let costed {
+                // `costed.cost` is ONE piece; `baseCost` is the line, as every
+                // other path writes it (`partRows`) and the reports sum it.
+                let pieces = max(1, Self.plainNumber(part["qty"]) ?? 1)
                 part["unitCost"] = .number(costed.cost)
-                part["baseCost"] = .number(costed.cost)
+                part["baseCost"] = .number(costed.cost * pieces)
                 for (key, value) in costed.rates.fields { part[key] = value }
             }
             rows[i] = .object(part)
@@ -1238,10 +1248,16 @@ extension Shop {
     }
 
     /// Undo a payment: the money was never received, or was recorded against
-    /// the wrong job. Nothing leaves the shop, so nothing is refused.
+    /// the wrong job. Nothing leaves the shop; the one refusal is a payment
+    /// plan with rows marked collected (`lib/order-payment.js` says why), and
+    /// the sentence tells the shop to untick them first.
     func clearPayment(_ id: Order.ID) async {
         let wrote = await writeToOneOrder(id, named: words.callIt("mac.clear_payment"), as: .person("invoicing", "edit")) { order, engine, _ in
-            OneOrderEdit(order: try await engine.clearPayment(order: order).order)
+            let out = try await engine.clearPayment(order: order)
+            if out.refused != nil {
+                throw MoveRefused(sentence: self.words.callIt("pay.clear_plan_first"))
+            }
+            return OneOrderEdit(order: out.order)
         }
         // The customer's page showed it paid, as recording it republished it.
         if wrote { await republishPortalIfPublished(id) }

@@ -400,6 +400,11 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// this machine has either field, which is why nothing showed.
     var owedResolved: Double?
 
+    /// What this job billed and was paid, in the shop's currency, on the
+    /// terms `owedResolved` is on (`KhaytEngine.billedAndPaidByOrder`) — so a
+    /// customer's Billed − Paid is its Owed. Nil until a load resolves it.
+    var billedPaidResolved: KhaytEngine.BilledAndPaid?
+
     /// The shared answer when there is one, and a subtraction when there is
     /// not. A dead engine must not blank the money column — but it is the LAST
     /// resort, and it is wrong in the two ways above.

@@ -10,7 +10,8 @@ import Testing
 @MainActor
 struct AccountingRowsParityTests {
 
-    private func js() throws -> JSModule { try JSModule(["accounting-rows"]) }
+    // The document's own numbering rule, which the rows now carry.
+    private func js() throws -> JSModule { try JSModule(["order-new", "invoice-document", "accounting-rows"]) }
 
     private func check(_ orders: [JSONValue], settings: [String: JSONValue],
                        clients: [JSONValue], tax: AccountingRows.Tax,
@@ -55,6 +56,35 @@ struct AccountingRowsParityTests {
         .object(["id": .string("C-2"), "name": .string("")]),
         .null, .string("x"),
     ]
+
+    @Test("an accepted quote is exported under the number its invoice prints, not its QUO- id")
+    func documentNumber() throws {
+        let js = try js()
+        let orders: [JSONValue] = [
+            .object(["id": .string("QUO-7"), "status": .string("completed"), "price": .number(100),
+                     "invoiceNumber": .string("INV-2026-0042"), "quoteAcceptedAt": .string("2026-10-01")]),
+            // A QUO- id with no invoice number yet keeps the id.
+            .object(["id": .string("QUO-8"), "status": .string("completed"), "price": .number(100)]),
+            // Accepted with the old spelling.
+            .object(["id": .string("X-1"), "status": .string("completed"), "price": .number(100),
+                     "clientApprovedAt": .string("2026-10-01"), "invoiceNum": .string("INV-9")]),
+            // Never a quote: its id IS its number, whatever it carries.
+            .object(["id": .string("INV-1"), "status": .string("completed"), "price": .number(100),
+                     "invoiceNumber": .string("ignored")]),
+            .object(["id": .number(5), "status": .string("completed"), "price": .number(100)]),
+            .object(["id": .null, "status": .string("completed"), "price": .number(100)]),
+            .object(["status": .string("completed"), "price": .number(100)]),
+            // A shop's own quote prefix.
+            .object(["id": .string("Q-3"), "status": .string("completed"), "price": .number(100),
+                     "invoiceNumber": .string("INV-3")]),
+        ]
+        for settings: [String: JSONValue] in [[:], ["quotePrefix": .string("Q")]] {
+            try check(orders, settings: settings, clients: [], tax: vat, "numbering \(settings)", js)
+        }
+        let rows = AccountingRows.invoiceRows(orders: orders, settings: [:], clients: [], tax: vat)
+        guard case .object(let first)? = rows.first else { Issue.record("no row"); return }
+        #expect(first["id"] == .string("INV-2026-0042"))
+    }
 
     @Test("a quote is not an invoice, and an order with no price is not one either")
     func scopeMatches() throws {

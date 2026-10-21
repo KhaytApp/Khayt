@@ -89,6 +89,31 @@ public enum AccountingRows {
         return max(0, ((price - credited) * 100).rounded() / 100)
     }
 
+    /// The number an order's invoice prints — `KhaytInvoiceDocument
+    /// .documentNumber`, with `KhaytOrderNew.beganAsQuote` inside it.
+    ///
+    /// A job that began as a quote (accepted, or still carrying a `QUO-` id)
+    /// is invoiced under the number it was given when the customer said yes;
+    /// every other job's id IS its invoice number.
+    public static func documentNumber(_ o: [String: JSONValue], settings: [String: JSONValue]) -> String {
+        let id: String
+        switch o["id"] {
+        case .none, .null?: id = ""
+        case let value?: id = JSSemantics.text(value)
+        }
+        if o["status"] == .string("quote") { return id }
+        var began = JSSemantics.truthy(o["quoteAcceptedAt"]) || JSSemantics.truthy(o["clientApprovedAt"])
+        if !began {
+            let prefix = (JSSemantics.truthy(settings["quotePrefix"])
+                          ? JSSemantics.text(settings["quotePrefix"]) : "QUO") + "-"
+            if case .string(let s)? = o["id"], s.hasPrefix(prefix) { began = true }
+        }
+        guard began else { return id }
+        if JSSemantics.truthy(o["invoiceNumber"]) { return JSSemantics.text(o["invoiceNumber"]) }
+        if JSSemantics.truthy(o["invoiceNum"]) { return JSSemantics.text(o["invoiceNum"]) }
+        return id
+    }
+
     /// The whole print log in; the rows that come back are the ones that are
     /// invoices.
     ///
@@ -152,7 +177,11 @@ public enum AccountingRows {
             // original writes `o.id` whatever it is, and a field that is not
             // there at all disappears from the row when it is written out
             // rather than arriving as a null.
-            if let id = o["id"] { row["id"] = id }
+            //
+            // The number the INVOICE prints, not the record's id: an accepted
+            // quote is invoiced as `INV-…` and its id is still `QUO-…`
+            // (`documentNumber`, `KhaytInvoiceDocument.documentNumber`).
+            if o["id"] != nil { row["id"] = .string(documentNumber(o, settings: settings)) }
             if let status = o["status"] { row["status"] = status }
             // `undefined` disappears from the row entirely when there is no
             // converter, rather than arriving as a null the exporter would

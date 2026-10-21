@@ -153,7 +153,7 @@ struct ProductSheet: View {
 
         /// The record shape a product's `parts` list holds: what was there,
         /// with this sheet's five fields written over it.
-        func record(spools: [Spool]) -> JSONValue {
+        func record(spools: [Spool], reclaimsTax: Bool = false) -> JSONValue {
             var o = raw
             o["name"] = .string(name)
             o["printWeight"] = .number(max(0, Double(grams) ?? 0))
@@ -163,7 +163,7 @@ struct ProductSheet: View {
             if let spoolId, let spool = spools.first(where: { $0.id == spoolId }) {
                 o["filamentId"] = .string(spool.id)
                 o["material"] = .string(spool.material)
-                o["spoolCost"] = .number(spool.cost ?? 0)
+                o["spoolCost"] = .number(spool.jobCost(reclaimsTax: reclaimsTax))
                 o["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
             } else if spoolId == nil {
                 // The shop took the filament off: the part is not made of it any more.
@@ -966,16 +966,17 @@ struct ProductSheet: View {
     }
 
     static func payload(draft: Product, parts: [PartRow], tiers: [TierRow],
-                        docs: [ProductDocs.Attached], spools: [Spool]) -> Payload {
+                        docs: [ProductDocs.Attached], spools: [Spool],
+                        reclaimsTax: Bool = false) -> Payload {
         Payload(product: draft,
-                parts: parts.map { $0.record(spools: spools) },
+                parts: parts.map { $0.record(spools: spools, reclaimsTax: reclaimsTax) },
                 tiers: tiers.compactMap { $0.record },
                 docs: docs.map { $0.record })
     }
 
-    static func payload(_ opened: Opened, spools: [Spool]) -> Payload {
+    static func payload(_ opened: Opened, spools: [Spool], reclaimsTax: Bool = false) -> Payload {
         payload(draft: opened.draft, parts: opened.parts, tiers: opened.tiers,
-                docs: opened.docs, spools: spools)
+                docs: opened.docs, spools: spools, reclaimsTax: reclaimsTax)
     }
 
     /// What Save writes — the pictures, the parts, the tiers and the docs.
@@ -984,7 +985,7 @@ struct ProductSheet: View {
         let staged = pictures
         let unlink = removedPictures
         let sent = Self.payload(draft: saving, parts: effectiveParts, tiers: tiers,
-                                docs: docs, spools: shop.spools)
+                                docs: docs, spools: shop.spools, reclaimsTax: shop.reclaimsTax)
         let rows = sent.parts
         let tierRows = sent.tiers
         let docRows = sent.docs
@@ -1013,7 +1014,7 @@ struct ProductSheet: View {
 
     /// Price what is in the list, through the shared rule.
     private func reprice() async {
-        pricing = await shop.priceProduct(parts: effectiveParts.map { $0.record(spools: shop.spools) },
+        pricing = await shop.priceProduct(parts: effectiveParts.map { $0.record(spools: shop.spools, reclaimsTax: shop.reclaimsTax) },
                                           margin: draft.margin,
                                           components: draft.rest["components"],
                                           rule: rule)

@@ -109,6 +109,20 @@ struct SettingsReachDiskTests {
         #expect(costs.count == 2, "the monthly costs did not survive the write")
     }
 
+    @Test("the Payments pane's loyalty rates reach the file")
+    func loyaltyRatesReachTheFile() async throws {
+        // `settings-edit.js` had no handler for either, so the pane's two
+        // boxes changed nothing on disk and reopened on the defaults.
+        let url = try Self.scratchBook()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try await Self.save(["loyaltyEnabled": .bool(true),
+                             "loyaltyPointsPerUnit": .number(2),
+                             "loyaltyRedeemRate": .number(0.05)], to: url)
+        let settings = try Self.settingsOnDisk(url)
+        #expect(settings["loyaltyPointsPerUnit"] == .number(2))
+        #expect(settings["loyaltyRedeemRate"] == .number(0.05))
+    }
+
     /// A second save must not undo the first — the shape that would make a
     /// shop enter the same thing twice.
     @Test("saving one pane leaves the other two alone on disk")

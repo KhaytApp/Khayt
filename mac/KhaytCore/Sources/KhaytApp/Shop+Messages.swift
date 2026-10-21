@@ -456,7 +456,7 @@ extension Shop {
         var storedParts: JSONValue?
         if case .object(let stored)? = productRows.first(where: { Self.recordId($0) == product.id }) {
             let opened = ProductSheet.payload(ProductSheet.opening(Product.from(stored, keys: keys)),
-                                              spools: spools)
+                                              spools: spools, reclaimsTax: reclaimsTax)
             openedPayload = opened
             storedParts = stored["parts"]
             var b = opened.product.record(keys: keys)

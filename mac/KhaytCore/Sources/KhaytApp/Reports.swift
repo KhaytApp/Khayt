@@ -578,6 +578,21 @@ struct Reports: View {
         await recomputeSpending()
     }
 
+    /// The jobs a break-even margin is learned from: finished, unvoided and
+    /// BUSINESS (`BusinessScope.countsForBusiness`), as the other app's
+    /// `renderBreakEvenCard` filters them. A test print or a gift earns nothing
+    /// (`orderEarnedBase`) but its plastic was still counted as a cost, so
+    /// every one of them dragged the margin down and pushed the target up.
+    static func breakEvenJobs(_ rows: [JSONValue]) -> [JSONValue] {
+        rows.filter { row in
+            guard case .object(let o) = row else { return false }
+            guard case .string(let status)? = o["status"],
+                  Shop.finishedStatuses.contains(status) else { return false }
+            if case .string(let voided)? = o["voidedAt"], !voided.isEmpty { return false }
+            return BusinessScope.countsForBusiness(row)
+        }
+    }
+
     private func recomputeBreakEven() async {
         guard let engine = shop.engine else { return }
         // NINETY DAYS, and the same window the other app uses. Long enough that
@@ -596,13 +611,7 @@ struct Reports: View {
         // Finished, unvoided, and business — the same set the quarters count,
         // because a target derived from one set of jobs and drawn beside a
         // figure derived from another is two answers pretending to be one.
-        let completed = shop.orderRows.filter { row in
-            guard case .object(let o) = row else { return false }
-            guard case .string(let status)? = o["status"],
-                  Shop.finishedStatuses.contains(status) else { return false }
-            if case .string(let voided)? = o["voidedAt"], !voided.isEmpty { return false }
-            return true
-        }
+        let completed = Self.breakEvenJobs(shop.orderRows)
         var costs: [JSONValue] = []
         if case .array(let stored)? = shop.settingsDict["fixedCosts"] { costs = stored }
 
