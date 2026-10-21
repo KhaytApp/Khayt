@@ -356,6 +356,15 @@ extension Shop {
         }
     }
 
+    /// Whether this order restocks a consumable rather than a spool, by the
+    /// rule's reading (absent `kind` is filament). False when the order or the
+    /// engine is not there, which is the reading every older order takes.
+    func ordersAConsumable(_ id: String) async -> Bool {
+        guard let engine,
+              let row = purchaseOrderRows.first(where: { Self.recordId($0) == id }) else { return false }
+        return (try? await engine.isConsumableOrder(row)) ?? false
+    }
+
     /// Does this bill agree with what the order said it would cost?
     ///
     /// "matched", "mismatch", or "none" when nothing has been typed yet —
@@ -1384,7 +1393,25 @@ extension Shop {
     static func writeNewSpool(into root: inout [String: JSONValue], input: [String: JSONValue],
                               engine: KhaytEngine, newId: String, today: String) async throws -> Bool {
         let made = try await engine.newSpool(input, id: newId, today: today)
-        guard let record = made.spool else { return false }
+        guard var record = made.spool else { return false }
+        // EVERYTHING ELSE THE FORM SAID. `newSpool` writes the roll itself —
+        // material, price, weight, colour, lot, branch — and nothing more, so
+        // the unit, the colour variant, the reorder point and quantity and the
+        // print settings were dropped: a 10-sheet pack of ply saved as 10 g and
+        // was flagged low at once. The edit rule writes the rest, as Edit
+        // would; the keys `newSpool` already wrote are left out because the
+        // edit rule clamps some of them differently (a weight of nothing).
+        let alreadyWritten: Set<String> = ["material", "cost", "vatAmount", "weight", "color",
+                                           "materialType", "lot", "locationId"]
+        let rest = input.filter { !alreadyWritten.contains($0.key) }
+        if !rest.isEmpty {
+            let out = try await engine.editSpool(record, input: rest, settings: settings(root),
+                                                 today: today)
+            record = out.spool
+            // The colour library learns the variant in the same swap, or the
+            // next editor offers a list that has forgotten it.
+            if out.colourAdded != nil { root["settings"] = .object(out.settings) }
+        }
         root["inventory"] = .array(rows(root, "inventory") + [record])
         return true
     }
