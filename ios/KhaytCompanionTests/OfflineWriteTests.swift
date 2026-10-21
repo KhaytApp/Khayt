@@ -36,6 +36,10 @@ final class OfflineWriteTests: XCTestCase {
                          "project": .string("Bracket"), "date": .string("2026-09-19"),
                          "machineId": .string("M-1"), "machine": .string("Bambu X1C"),
                          "rev": .number(3)]),
+                .object(["id": .string("Q-1"), "status": .string("quote"), "rev": .number(1)]),
+                .object(["id": .string("Q-2"), "status": .string("quote"),
+                         "quoteAcceptedAt": .string("2026-10-01"), "rev": .number(1)]),
+                .object(["id": .string("Q-3"), "status": .string("quote"), "rev": .number(1)]),
             ]),
             "inventory": .array([
                 .object(["id": .string("S-1"), "material": .string("PLA"),
@@ -213,6 +217,23 @@ final class OfflineWriteTests: XCTestCase {
         // The job is still on the printer it was on.
         XCTAssertEqual(try record("printLog", "O-1")["machineId"], .string("M-1"))
         XCTAssertEqual(try record("printLog", "O-1")["machine"], .string("Bambu X1C"))
+    }
+
+    func testAQuoteMovedOnIsStampedAcceptedOnTheLocalDay() throws {
+        // 22:30 UTC is already the next day in Riyadh: the stamp is the local
+        // day, as the Mac's Approve button and `lib/order-status.js` write it.
+        let now = ISO8601DateFormatter().date(from: "2026-10-21T22:30:00Z")!
+        try writer.setOrderStatus(orderId: "Q-1", to: "pending", now: now)
+        XCTAssertEqual(try record("printLog", "Q-1")["quoteAcceptedAt"], .string(BookWriter.localDay(now)))
+
+        try writer.setOrderStatus(orderId: "Q-2", to: "pending", now: now)
+        XCTAssertEqual(try record("printLog", "Q-2")["quoteAcceptedAt"], .string("2026-10-01"), "an earlier yes stays")
+
+        try writer.setOrderStatus(orderId: "Q-3", to: "cancelled", now: now)
+        XCTAssertNil(try record("printLog", "Q-3")["quoteAcceptedAt"], "a cancelled quote was not accepted")
+
+        try writer.setOrderStatus(orderId: "O-1", to: "qc", now: now)
+        XCTAssertNil(try record("printLog", "O-1")["quoteAcceptedAt"], "only a quote is accepted")
     }
 
     func testTwoEditsToOneRecordTravelAsOne() async throws {

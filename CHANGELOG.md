@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: a quote moved on from the phone counts as accepted.** When the
+  phone moved a quote to Pending (or any stage but Cancelled) in its own
+  copy of the book, it didn't record the acceptance day. The quote then
+  counted as never accepted in the conversion rate and had no VAT tax point.
+  It now stamps the local day once, as the Mac does, and keeps an earlier
+  acceptance date.
+
 - **Mac: adding a photo to a model is easy to find.** Right-click a model for Add a photo…, Replace photo… or Remove photo, or drag a picture straight onto its tile. The Photo section now sits near the top of the model's panel instead of at the bottom. Dropping a model file onto a tile still imports it.
 
 - **Desktop: a manager can read Settings but no longer change them.** With
