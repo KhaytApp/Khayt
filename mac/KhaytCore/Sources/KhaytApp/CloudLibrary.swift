@@ -275,7 +275,7 @@ enum CloudLibrary {
         }
         let t = section(library, "tier")
         o.tierOn = on(t)
-        if case .number(let n)? = t["keepDays"], n >= 1 { o.keepDays = Int(n) }
+        if case .number(let n)? = t["keepDays"], n >= 1 { o.keepDays = Int(saturating: n) }
         return o
     }
 

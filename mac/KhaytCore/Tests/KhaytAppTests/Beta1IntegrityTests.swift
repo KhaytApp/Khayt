@@ -114,6 +114,16 @@ struct Beta1IntegrityTests {
         #expect(ProductSheet.trim(1e300) == String(1e300))
         #expect(ProductSheet.trim(30) == "30")
         #expect(ProductSheet.PartRow.from(.object(["plate": .number(.infinity)]))?.plate ?? 0 == 0)
+        // Second pass: three more readers of book numbers.
+        let tier: [String: JSONValue] = ["printLibrary": .object(["tier": .object(["keepDays": .number(1e300)])])]
+        #expect(CloudLibrary.options(tier).keepDays == Int.saturationLimit)
+        let marks: [String: JSONValue] = ["printLibrary": .object([SortFailures.settingsKey: .object([
+            "sig": .object(["count": .number(-1e300), "last": .string("2026-10-01")]),
+        ])])]
+        #expect(SortFailures.read(marks)["sig"]?.count == -Int.saturationLimit)
+        #expect(EmailClient.smtpPort(.number(1e300)) == 587)
+        #expect(EmailClient.smtpPort(.number(.nan)) == 587)
+        #expect(EmailClient.smtpPort(.number(465)) == 465)
     }
 }
 
