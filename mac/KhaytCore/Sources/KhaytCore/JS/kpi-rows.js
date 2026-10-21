@@ -141,9 +141,19 @@
    * Per part: its cost as costed (`lib/calculator-cost.js`), or — a line with
    * no costing inputs, priced from a product's unit cost — `unitCost` (else the
    * frozen `baseCost`) × qty. Then the P&L's stocked share
-   * (`lib/pnl-report.js stockShare`), then shipping in the base currency.
+   * (`lib/pnl-report.js stockShare`).
    *
-   * `ctx`: `{ settings, inventory, clients, known, consumables }`.
+   * NOT SHIPPING. `shippingCost` is what the job CHARGES for delivery — it is
+   * inside the price (`lib/pricing.js quoteTotal`), so it is already in
+   * revenue — and the P&L, the reference for every money figure, leaves it
+   * out of cost of goods: what the courier was paid reaches the P&L once, as
+   * a `shipping` expense, below gross profit. This rule added it as a cost,
+   * so a 100 job with 20 of material and 15 of delivery read 65% here and 80%
+   * on the P&L, both labelled "Gross margin" (beta.1 review). The cost of a
+   * job is the same figure on both screens now.
+   *
+   * `ctx`: `{ settings, inventory, consumables }`. (`clients` and `known` were
+   * for converting shipping; a host still passing them is harmless.)
    * `consumables` is the shelf a part's own consumables (magnets, inserts) are
    * priced from; a host without one in reach leaves it out and each line is
    * priced at the `unitCost` written on it (`calculator-cost`). The Mac hands
@@ -159,7 +169,6 @@
     const order = o || {};
     const CC = sibling('KhaytCalculatorCost', './calculator-cost.js');
     const P = sibling('KhaytPnl', './pnl-report.js');
-    const M = sibling('KhaytOrderMoney', './order-money.js');
     const costCtx = { inventory: c.inventory || [], settings: c.settings || {} };
     if (Array.isArray(c.consumables)) costCtx.consumables = c.consumables;
     let parts = 0;
@@ -179,11 +188,7 @@
       parts += each * qty;
     }
     const share = (P && typeof P.stockShare === 'function') ? P.stockShare(order, costCtx) : 1;
-    const moneyCtx = { settings: c.settings || {}, clients: c.clients || [] };
-    const shipping = M
-      ? M.convertToBase(+order.shippingCost || 0, M.orderCurrency(order, moneyCtx, c.known), moneyCtx)
-      : (+order.shippingCost || 0);
-    return parts * share + shipping;
+    return parts * share;
   }
 
   /**

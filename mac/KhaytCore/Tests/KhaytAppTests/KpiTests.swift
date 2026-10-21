@@ -79,10 +79,15 @@ struct KpiTests {
     }
 
     /// A cancelled job is not an order and is owed by nobody; a costed part
-    /// with no `unitCost` costs what it was costed at; shipping is a cost.
-    /// The Mac counted the first, priced the second at zero and dropped the
-    /// third — Khayt did none of those, so one book showed two margins.
-    @Test("cancelled jobs are not counted, costed parts and shipping are cost")
+    /// with no `unitCost` costs what it was costed at. The Mac counted the
+    /// first and priced the second at zero — Khayt did neither, so one book
+    /// showed two margins.
+    ///
+    /// Shipping is NOT a cost of goods: it is charged inside the price, and
+    /// the P&L leaves it out of cogs (what the courier was paid is an expense).
+    /// Both dashboards counted it as cost, so a job read a lower "Gross
+    /// margin" here than on the P&L (beta.1 review).
+    @Test("cancelled jobs are not counted, costed parts are cost, shipping is not")
     func cancelledAndCost() async throws {
         let now = Date()
         var (orders, clients) = Self.book(now: now)
@@ -102,7 +107,7 @@ struct KpiTests {
                                                language: "en")
         #expect(out.orderCount == 4, "the cancelled job is not an order")
         #expect(out.outstanding == 1499, "nor is it 5000 owed")
-        #expect(out.cost == 265, "90 + 110 + 2 × 25 g-cost + 15 shipping")
+        #expect(out.cost == 250, "90 + 110 + 2 × 25 g-cost — the 15 shipping is charged, not a cost")
     }
 
     /// The failure mode this file exists for: every one of these returns a

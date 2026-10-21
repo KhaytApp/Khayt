@@ -2663,8 +2663,9 @@ function openExecutiveSummary() {
       money: (o) => ({
         revenue: orderNetRevenueBase(o),
         // Cost of goods by the shared rule (lib/kpi-rows.js orderCost): only
-        // what was stocked (stockShare) plus shipping, as the Mac costs it, or
-        // the dashboard's margin and the P&L's disagree about the same jobs.
+        // what was stocked (stockShare), as the Mac and the P&L cost it.
+        // Shipping is not a cost of goods — it is charged in the price, and
+        // what the courier was paid is an expense.
         cost: KhaytKpiRows.orderCost(o, {
           inventory, settings, clients,
           known: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
