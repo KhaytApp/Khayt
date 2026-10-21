@@ -469,6 +469,8 @@ async function deleteClient(clientId) {
   // Show what erasure will touch, and let the owner choose whether order records survive.
   const plan = P ? P.planClientErasure(clientId, { clients, printLog, waitingList, waitingListHistory, giftCards, loyaltyLedger }, 'full') : null;
   let fullErase = false;
+  // What a FULL erase would take down from Khayt Cloud, said before it is chosen.
+  const fullTakedowns = printLog.filter(o => o && o.clientId === clientId && o.cloudPublished && o.trackingToken).length;
   // Gift cards and loyalty rows count too: a customer with only those still
   // has something a full erase would take, and must be offered it.
   const hasCards = giftCards.some(g => g && g.issuedTo === clientId);
@@ -484,6 +486,7 @@ async function deleteClient(clientId) {
             t('priv.erase_summary', { orders: plan.counts.orders, intake: plan.counts.intake, comms: plan.counts.communications })
             || `This customer has ${plan.counts.orders} order(s), ${plan.counts.intake} intake submission(s) and ${plan.counts.communications} logged communication(s).`)}</p>
           ${plan.counts.keptNames ? `<p style="font-size:12.5px;color:var(--text-muted);margin:-4px 0 12px;">${escapeHtml(t('priv.erase_keeps_invoiced', { n: plan.counts.keptNames }))}</p>` : ''}
+          ${fullTakedowns ? `<p style="font-size:12.5px;color:var(--text-muted);margin:-4px 0 12px;">${escapeHtml(t('priv.erase_takes_down', { n: fullTakedowns }))}</p>` : ''}
           ${plan.counts.keptCards ? `<p style="font-size:12.5px;color:var(--text-muted);margin:-4px 0 12px;">${escapeHtml(t(plan.counts.keptCards === 1 ? 'priv.erase_keeps_cards_one' : 'priv.erase_keeps_cards', { n: plan.counts.keptCards }))}</p>` : ''}
           <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;cursor:pointer;margin-bottom:8px;">
             <input type="radio" name="eraseMode" value="unlink" checked style="width:auto;margin-top:3px;">
@@ -526,12 +529,22 @@ async function deleteClient(clientId) {
   // Marked, so a job that keeps the name is never matched BY that name to
   // another customer who happens to share it (the Mac's Customer.swift).
   const erasedAt = new Date().toISOString();
+  let takedowns = 0;
   for (const o of printLog) {
     if (o.clientId === clientId) {
       unlinked.push(o);
       o.clientId = null;
       o.clientErasedAt = erasedAt;
       if (blank.has(o.id)) { priorNames.set(o.id, o.client); o.client = ''; }
+      // A full erase takes the customer's tracking pages down from Khayt Cloud,
+      // invoiced and paid jobs included (/privacy §10). Marked in THIS write, so
+      // the job is never republished; the mark comes off only once the cloud
+      // has said yes (runPortalTakedowns). The Mac's applyCustomerErase.
+      if (fullErase && o.cloudPublished && o.trackingToken) {
+        o.cloudPublished = false;
+        o.portalTakedownPending = true;
+        takedowns += 1;
+      }
     }
   }
   // Full erase: the holder comes off a SPENT gift card, and the link off the
@@ -563,6 +576,7 @@ async function deleteClient(clientId) {
   }
   saveAll();   // cloud-on: this re-push propagates the erasure to the server copy
   renderClients();
+  if (takedowns) runPortalTakedowns();
   toast(fullErase ? (t('priv.erased_full') || 'Customer fully erased') : t('ce.deleted'), 'success', 5000, removed ? {
     undo: () => {
       clients.splice(Math.min(Math.max(idx, 0), clients.length), 0, removed);
@@ -573,12 +587,48 @@ async function deleteClient(clientId) {
       }
       for (const [g, to, name] of priorCards) { g.issuedTo = to; g.issuedToName = name; }
       for (const r of priorLedger) r.clientId = clientId;
+      // Tracking pages are NOT put back: a page may already be gone, and one
+      // still pending is finished off. The owner can publish again once it is.
       if (removedIntake.length) waitingList = waitingList.concat(removedIntake);
       if (removedHistory.length) waitingListHistory = waitingListHistory.concat(removedHistory);
       saveAll();
       renderClients();
     },
   } : {});
+}
+
+/**
+ * Take down the tracking pages a full erase marked (portalTakedownPending).
+ *
+ * Best effort and one at a time: a failure leaves that job marked, and it is
+ * tried again at launch and every ten minutes (app-boot.js). The mark comes
+ * off only after the cloud answers yes. It is read back off the job as it is
+ * NOW, because a sync can replace printLog while a request is out.
+ */
+let _portalTakedownsRunning = false;
+async function runPortalTakedowns() {
+  if (_portalTakedownsRunning) return;
+  const c = settings.cloud || {};
+  if (!(c.enabled && c.shopId && c.url) || !window.hubAPI?.cloudUnpublish) return;
+  const due = printLog.filter(o => o && o.portalTakedownPending && o.trackingToken)
+    .map(o => ({ id: o.id, token: o.trackingToken }));
+  if (!due.length) return;
+  _portalTakedownsRunning = true;
+  let cleared = 0;
+  try {
+    for (const d of due) {
+      const r = await window.hubAPI.cloudUnpublish({ url: c.url, shopId: c.shopId, token: c.token, pubToken: d.token }).catch(() => null);
+      if (!r || !r.ok) continue;
+      const cur = printLog.find(o => o && o.id === d.id);
+      if (cur && cur.trackingToken === d.token && cur.portalTakedownPending) {
+        delete cur.portalTakedownPending;
+        cleared += 1;
+      }
+    }
+    if (cleared) saveAll();
+  } finally {
+    _portalTakedownsRunning = false;
+  }
 }
 
 function openClientEditor(clientId = null) {
@@ -1551,6 +1601,7 @@ function openCampaignModal() {
     openClientHistory,
     openClientEditor,
     deleteClient,
+    runPortalTakedowns,
     exportClientData,
     checkRecurringOrders,
     checkSubscriptionBilling,
