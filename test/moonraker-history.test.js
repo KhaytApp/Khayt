@@ -126,7 +126,7 @@ test('reading the history is a GET and nothing else', () => {
   const fn = src.slice(src.indexOf('async function fetchPrinterHistory'), src.indexOf('async function sendPrinterCommand'));
   assert.ok(fn.length > 200, 'fetchPrinterHistory has moved — update this test');
   assert.doesNotMatch(fn, /method:\s*['"](POST|PUT|DELETE|PATCH)/i, 'the history read must never write to the printer');
-  assert.match(fn, /isAllowedPrinterHost/, 'and stays behind the same LAN host guard as every other printer call');
+  assert.match(fn, /resolvePrinterTarget\(host\)/, 'and stays behind the same resolved-and-pinned LAN host guard as every other printer call');
   assert.match(fn, /server\/history\/list/);
 });
 

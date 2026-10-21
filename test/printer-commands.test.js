@@ -176,6 +176,6 @@ test('the command path reuses the SSRF host allowlist', () => {
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
   const fn = main.slice(main.indexOf('async function sendPrinterCommand'),
                         main.indexOf("ipcMain.handle('hub:printer-command'"));
-  assert.match(fn, /isAllowedPrinterHost/, 'no host allowlist check');
+  assert.match(fn, /resolvePrinterTarget\(host\)/, 'no resolved-and-pinned LAN host check');
   assert.match(fn, /redirect: 'manual'/, 'redirects are not pinned');
 });

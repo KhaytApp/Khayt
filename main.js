@@ -117,6 +117,7 @@ const { contentHash: modelContentHash } = require('./lib/model-identity');
 const { extract: extractPrintThumb } = require('./lib/thumbnail-extract');
 const bambu = require('./lib/bambu');
 const { bambuFtpUpload } = require('./lib/bambu-ftp');
+const { resolvePrinterTarget } = require('./lib/main/printer-target');
 const printerUpload = require('./lib/printer-upload');
 const { sendSms } = require('./lib/sms');
 const cloudClient = require('./lib/cloud-client');
@@ -1416,8 +1417,11 @@ ipcMain.handle('hub:detect-slicers', async () => {
 // too; this function is the wire.
 async function uploadGcodeToPrinter(machine, gcodePath, startPrint) {
   const { type, host, port, apiKey, accessCode, serial, printerSlug } = (machine && machine.printerApi) || {};
-  const printerHost = sanitizePrinterHost(host);
-  if (!isAllowedPrinterHost(printerHost)) return { ok: false, error: 'Invalid printer host' };
+  // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
+  // address the name resolved to, never to the name looked up again.
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) return { ok: false, error: target.error };
+  const printerHost = target.urlHost;
   const portNum = parseInt(port || defaultPrinterPort(type), 10);
   if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) return { ok: false, error: 'Invalid port' };
   const fit = printerUpload.check(type, gcodePath);
@@ -4994,8 +4998,11 @@ async function fetchPrinterHistory(machine, limit) {
   if (type !== 'moonraker') {
     return { ok: false, error: `Only Klipper/Moonraker printers keep a job history ${FLAVOR_NAME} can read` };
   }
-  const printerHost = sanitizePrinterHost(host);
-  if (!isAllowedPrinterHost(printerHost)) return { ok: false, error: 'Invalid printer host' };
+  // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
+  // address the name resolved to, never to the name looked up again.
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) return { ok: false, error: target.error };
+  const printerHost = target.urlHost;
   const portNum = parseInt(port || defaultPrinterPort(type), 10);
   if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
     return { ok: false, error: 'Invalid port number' };
@@ -5021,8 +5028,11 @@ async function fetchPrinterHistory(machine, limit) {
 
 async function sendPrinterCommand(machine, command) {
   const { type, host, port, apiKey, printerSlug } = (machine && machine.printerApi) || {};
-  const printerHost = sanitizePrinterHost(host);
-  if (!isAllowedPrinterHost(printerHost)) return { ok: false, error: 'Invalid printer host' };
+  // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
+  // address the name resolved to, never to the name looked up again.
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) return { ok: false, error: target.error };
+  const printerHost = target.urlHost;
   const portNum = parseInt(port || defaultPrinterPort(type), 10);
   if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
     return { ok: false, error: 'Invalid port number' };
@@ -5145,8 +5155,11 @@ async function plateObjects(machine) {
   if (type !== 'moonraker') {
     return { ok: false, error: 'Only Klipper/Moonraker printers can drop one object' };
   }
-  const printerHost = sanitizePrinterHost(host);
-  if (!isAllowedPrinterHost(printerHost)) return { ok: false, error: 'Invalid printer host' };
+  // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
+  // address the name resolved to, never to the name looked up again.
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) return { ok: false, error: target.error };
+  const printerHost = target.urlHost;
   const portNum = parseInt(port || defaultPrinterPort(type), 10);
   if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
     return { ok: false, error: 'Invalid port number' };
@@ -5233,11 +5246,12 @@ function stockOptsFor(machine) {
 
 async function fetchPrinterStatus(machine) {
   const { type, host, port, apiKey, accessCode, printerSlug, serial } = machine.printerApi || {};
-  // Strip any characters that aren't valid in a hostname/IP (prevents URL injection via @, /, etc.)
-  const printerHost = sanitizePrinterHost(host);
-  if (!isAllowedPrinterHost(printerHost)) {
-    return { ok: false, error: 'Invalid printer host' };
-  }
+  // sanitizePrinterHost runs inside resolvePrinterTarget (no @, / or : injection).
+  // Resolved and pinned (lib/main/printer-target.js): the key goes to the LAN
+  // address the name resolved to, never to the name looked up again.
+  const target = await resolvePrinterTarget(host);
+  if (!target.ok) return { ok: false, error: target.error };
+  const printerHost = target.urlHost;
   const portNum = parseInt(port || defaultPrinterPort(type), 10);
   if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
     return { ok: false, error: 'Invalid port number' };

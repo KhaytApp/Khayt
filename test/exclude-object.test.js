@@ -123,7 +123,7 @@ test('the plate read reuses the SSRF host allowlist', () => {
   const main = mainJs();
   const fn = main.slice(main.indexOf('async function plateObjects'),
                         main.indexOf("ipcMain.handle('hub:printer-plate'"));
-  assert.match(fn, /isAllowedPrinterHost/, 'no host allowlist check');
+  assert.match(fn, /resolvePrinterTarget\(host\)/, 'no resolved-and-pinned LAN host check');
   assert.match(fn, /redirect: 'manual'/, 'redirects are not pinned');
 });
 
