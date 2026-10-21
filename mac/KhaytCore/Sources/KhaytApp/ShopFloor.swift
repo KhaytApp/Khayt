@@ -1836,7 +1836,7 @@ private struct Live: View {
                             Text(status.filename).lineLimit(1).truncationMode(.middle)
                         }
                         Spacer()
-                        Text("\(status.progress)%").monospacedDigit()
+                        Text(verbatim: shop.words.numeral(status.progress) + "%").monospacedDigit()
                     }
                     .font(.caption)
                     // A BAR, BUT THE RIGHT ONE.
@@ -1861,7 +1861,7 @@ private struct Live: View {
                     }
                     .frame(height: 26)
                     .accessibilityElement()
-                    .accessibilityLabel("\(status.progress)%")
+                    .accessibilityLabel(shop.words.numeral(status.progress) + "%")
                 }
                 // WHICH SIGNAL the percentage came from, because bytes are not
                 // work: on a relief whose detail is all in its upper layers,

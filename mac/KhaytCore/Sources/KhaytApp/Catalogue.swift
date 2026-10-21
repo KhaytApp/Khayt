@@ -293,7 +293,7 @@ struct Catalogue: View {
             // COST. Called "Margin", a product priced at 30% on cost read as
             // 30% of its price when it was 23%.
             TableColumn(shop.words.callIt("mac.markup"), value: \.marginSort) { row in
-                Text(row.margin.map { "\(Int($0))%" } ?? "—")
+                Text(verbatim: row.margin.map { shop.words.numeral(Int($0)) + "%" } ?? "—")
                     .moneyStyle().foregroundStyle(.secondary)
             }
             .width(min: 70, ideal: 88)

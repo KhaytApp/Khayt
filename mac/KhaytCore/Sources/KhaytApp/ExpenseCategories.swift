@@ -94,7 +94,7 @@ struct ExpenseCategoriesCard: View {
                     .frame(width: 78, alignment: .trailing)
                 // The share of the whole, which is what makes a column of
                 // amounts comparable between two periods of different size.
-                Text("\(Int((row.share * 100).rounded()))%")
+                Text(verbatim: shop.words.numeral(Int((row.share * 100).rounded())) + "%")
                     .font(.caption).monospacedDigit()
                     .foregroundStyle(.tertiary)
                     .frame(width: 34, alignment: .trailing)

@@ -352,5 +352,37 @@ struct DigitsLeftoversTests {
         let menu = try QuoteSheetStatusTests.source("MenuBar.swift")
         #expect(!menu.contains("Text(verbatim: \"\\(status.progress)%\")"))
         #expect(menu.contains("shop.words.numeral(status.progress) + \"%\""))
+        // The live print's figure on the dashboard's floor strip, counted bare.
+        let dash = try QuoteSheetStatusTests.source("Dashboard.swift")
+        #expect(!dash.contains("Text(\"\\(status?.progress ?? 0)\")"))
+        #expect(dash.contains("Text(verbatim: shop.words.numeral(status?.progress ?? 0))"))
+    }
+
+    /// Every "N%" the app writes, in every source file: a bare interpolation
+    /// before a `%` — `Text("\\(x)%")` or a string built the same way — is
+    /// Swift's description of the number (or SwiftUI's, in the Mac's locale),
+    /// never the shop's digits. Already-formatted figures (`Money.figure`,
+    /// `Money.quantity`) go through the setting and are allowed.
+    @Test("no percentage anywhere is a raw interpolated number")
+    func noRawPercentages() throws {
+        let dir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+            .filter { $0.hasSuffix(".swift") }
+        #expect(files.count > 50, "found the sources")
+        let raw = try Regex(#"\\\([^"]*\)%"#)
+        var found: [String] = []
+        for name in files {
+            let text = try String(contentsOf: dir.appending(path: name), encoding: .utf8)
+            for (n, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+                let code = line.trimmingCharacters(in: .whitespaces)
+                if code.hasPrefix("//") { continue }
+                guard line.contains(raw) else { continue }
+                if line.contains("Money.figure") || line.contains("Money.quantity") { continue }
+                found.append("\(name):\(n + 1): \(code)")
+            }
+        }
+        #expect(found.isEmpty, Comment(rawValue: found.joined(separator: "\n")))
     }
 }
