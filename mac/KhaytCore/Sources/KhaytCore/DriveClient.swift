@@ -307,8 +307,11 @@ public actor DriveClient {
     /// Bounded, so a Drive that keeps answering with a file it will not trash
     /// cannot hold this for ever.
     public func delete(_ key: String, via: S3.Fetch? = nil) async throws {
+        // An id seen twice is Drive's search lagging behind the trash just
+        // done, not another copy: asked again it would be found again.
+        var trashed = Set<String>()
         for _ in 0..<50 {
-            guard let f = try await find(key, via: via) else { return }
+            guard let f = try await find(key, via: via), trashed.insert(f.id).inserted else { return }
             _ = try await object(try await request("\(Self.api)/files/\(f.id)", method: "PATCH", json: ["trashed": true]),
                                  "trash", via: via)
         }

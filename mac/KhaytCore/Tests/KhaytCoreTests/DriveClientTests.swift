@@ -148,6 +148,27 @@ struct DriveClientTests {
         #expect(google.files.values.filter { $0.trashed && $0.key == key }.count == 2)
     }
 
+    @Test("a delete stops when Drive's search still shows the copy it just trashed")
+    func deleteStopsOnALaggingSearch() async throws {
+        let google = FakeGoogle()
+        let drive0 = DriveClient(.init(clientId: "c", refreshToken: "r"), fetch: google.fetch)
+        try await drive0.put("print-files/PF-5/Bowl.stl", data: Data([1]))
+        final class Patches: @unchecked Sendable { let lock = NSLock(); var n = 0 }
+        let patches = Patches()
+        let inner = google.fetch
+        // The trash is taken, but the search goes on answering with the file.
+        let lagging: S3.Fetch = { r in
+            if r.httpMethod == "PATCH" {
+                patches.lock.withLock { patches.n += 1 }
+                return (Data("{}".utf8), HTTPURLResponse(url: r.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+            }
+            return try await inner(r)
+        }
+        let drive = DriveClient(.init(clientId: "c", refreshToken: "r"), fetch: lagging)
+        try await drive.delete("print-files/PF-5/Bowl.stl")
+        #expect(patches.lock.withLock { patches.n } == 1, "trashed the same file again and again")
+    }
+
     /// The delete question bounds each request to 15 seconds through the
     /// fetch it passes; Drive went out on its own two-minute ones instead.
     @Test("a Drive remote asks through the fetch its caller passes")
