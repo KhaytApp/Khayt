@@ -3118,6 +3118,7 @@
   "priv.mode_full": "Apagar completamente",
   "priv.mode_full_hint": "Também apaga o nome do cliente nos pedidos não faturados e remove as solicitações e o histórico de comunicação. Pedidos com fatura ou pagamento mantêm o nome, porque as faturas devem ser guardadas como emitidas.",
   "priv.erase_keeps_invoiced": "{n} pedido(s) têm fatura ou pagamento. Eles mantêm o nome do cliente, porque as faturas devem ser guardadas como emitidas.",
+  "priv.erase_keeps_cards": "{n} vale(s)-presente ainda têm saldo. Eles mantêm o nome do titular, porque o saldo é dinheiro que a loja deve.",
   "priv.erased_full": "Cliente totalmente apagado",
   "priv.settings_hint": "Os dados dos clientes ficam nesta máquina. Se quiser, anonimize solicitações antigas após um período — os dados de contato são removidos e o registro da solicitação é mantido.",
   "priv.retention_months": "Anonimizar dados de recebimento após (meses)",

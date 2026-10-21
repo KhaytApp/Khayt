@@ -3117,6 +3117,7 @@
   "priv.mode_full": "Effacement complet",
   "priv.mode_full_hint": "Efface aussi le nom du client sur ses commandes non facturées et supprime ses demandes et son journal de communications. Les commandes avec une facture ou un paiement gardent le nom, car les factures doivent être conservées telles qu’émises.",
   "priv.erase_keeps_invoiced": "{n} commande(s) ont une facture ou un paiement. Elles gardent le nom du client, car les factures doivent être conservées telles qu’émises.",
+  "priv.erase_keeps_cards": "{n} carte(s) cadeau ont encore un solde. Elles gardent le nom du titulaire, car le solde est de l’argent que la boutique doit.",
   "priv.erased_full": "Client entièrement effacé",
   "priv.settings_hint": "Les données clients restent sur cet appareil. Vous pouvez anonymiser les anciennes demandes après un délai : les coordonnées sont supprimées, la demande est conservée.",
   "priv.retention_months": "Anonymiser les demandes après (mois)",

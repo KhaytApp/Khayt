@@ -32,8 +32,11 @@ enum RecurringOrders {
         let clients = Shop.rows(root, "clients")
         let orders = Shop.rows(root, "printLog")
         let settings = Shop.settings(root)
+        // A tracking token per job the rule could make (one per customer at
+        // most), so each repeat order gets its own and not the template's.
         let out = try await engine.recurringOrders(clients: clients, orders: orders,
-                                                   settings: settings, now: now)
+                                                   settings: settings, now: now,
+                                                   trackingTokens: clients.map { _ in Shop.randomBytes(16) })
 
         // Stamp what changed and only that: the jobs the rule made, and the
         // schedules it moved. A record stamped without a change is a sync

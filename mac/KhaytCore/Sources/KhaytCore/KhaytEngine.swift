@@ -3761,11 +3761,15 @@ public actor KhaytEngine {
     /// and those are COPIES on this side of the bridge, so all three come
     /// back and the caller writes all three. `now` is a local instant: the
     /// rule turns it into the shop's own day, in this Mac's timezone.
+    /// `trackingTokens`: random bytes for each job it might make — one per
+    /// customer is enough — so every repeat order has its own tracking page.
     public func recurringOrders(clients: [JSONValue], orders: [JSONValue],
-                                settings: [String: JSONValue], now: Date) throws -> RecurringRun {
+                                settings: [String: JSONValue], now: Date,
+                                trackingTokens: [[UInt8]] = []) throws -> RecurringRun {
         try runtime.call2(RECURRING_SCRIPT,
                           [.array(clients), .array(orders), .object(settings),
-                           .number(now.timeIntervalSince1970 * 1000)],
+                           .number(now.timeIntervalSince1970 * 1000),
+                           .array(trackingTokens.map { .array($0.map { .number(Double($0)) }) })],
                           as: RecurringRun.self)
     }
 
@@ -11675,6 +11679,10 @@ public actor KhaytEngine {
             /// Jobs that keep the customer's name on a full erase, because an
             /// invoice or a payment was recorded on them.
             public let keptNames: Int
+            /// Gift cards that keep the holder's name on a full erase, because
+            /// they still carry a balance — money the shop owes.
+            public let keptCards: Int
+            public let loyaltyLedger: Int
             public let intake: Int
             public let communications: Int
         }
@@ -11687,6 +11695,12 @@ public actor KhaytEngine {
         public let purgeIntakeIds: [String]
         public let purgeIntakeHistoryIds: [String]
         public let purgeCommLog: Bool
+        /// Spent cards whose holder a full erase takes off.
+        public let unlinkGiftCardIds: [String]
+        /// Cards with a balance, which keep their holder.
+        public let keepGiftCardIds: [String]
+        /// Whether a full erase blanks `clientId` on the loyalty-ledger rows.
+        public let unlinkLoyaltyLedger: Bool
         public let counts: Counts
     }
 
@@ -13533,7 +13547,8 @@ private let NEW_ORDER_SCRIPT = """
 private let RECURRING_SCRIPT = """
 (function () {
   var clients = ARG0, orders = ARG1, settings = ARG2;
-  var r = KhaytRecurringOrders.run(clients, orders, { settings: settings, now: ARG3 });
+  var tokens = (ARG4 || []).map(function (b) { return { tracking: b }; });
+  var r = KhaytRecurringOrders.run(clients, orders, { settings: settings, now: ARG3, tokens: tokens });
   return { orders: orders, clients: clients, settings: settings,
            created: r.created.map(function (o) { return o.id; }) };
 })()

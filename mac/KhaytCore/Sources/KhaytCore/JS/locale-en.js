@@ -3118,6 +3118,7 @@
   "priv.mode_full": "Full erase",
   "priv.mode_full_hint": "Also blank the customer name on their unbilled orders and purge their intake submissions and communication log. Orders with an invoice or a payment keep the name, because invoices must be kept as issued.",
   "priv.erase_keeps_invoiced": "{n} order(s) have an invoice or a payment. They keep the customer's name, because invoices must be kept as issued.",
+  "priv.erase_keeps_cards": "{n} gift card(s) still have a balance. They keep the holder's name, because the balance is money the shop owes.",
   "priv.erased_full": "Customer fully erased",
   "priv.settings_hint": "Customer data stays on this machine. Optionally anonymize old intake submissions after a set period — their contact details are removed, the request record is kept.",
   "priv.retention_months": "Anonymize intake data after (months)",

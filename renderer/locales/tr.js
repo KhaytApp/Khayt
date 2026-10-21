@@ -3117,6 +3117,7 @@
   "priv.mode_full": "Tamamen sil",
   "priv.mode_full_hint": "Ayrıca faturalanmamış siparişlerindeki müşteri adını siler, talep gönderimlerini ve iletişim kaydını temizler. Faturası veya ödemesi olan siparişler adı korur, çünkü faturalar düzenlendiği gibi saklanmalıdır.",
   "priv.erase_keeps_invoiced": "{n} siparişin faturası veya ödemesi var. Faturalar düzenlendiği gibi saklanması gerektiğinden müşteri adını korurlar.",
+  "priv.erase_keeps_cards": "{n} hediye kartında hâlâ bakiye var. Bakiye mağazanın borçlu olduğu para olduğundan sahibinin adını korurlar.",
   "priv.erased_full": "Müşteri tamamen silindi",
   "priv.settings_hint": "Müşteri verileri bu cihazda kalır. İsteğe bağlı olarak eski talepleri belirli bir süre sonra anonimleştirin — iletişim bilgileri silinir, talep kaydı kalır.",
   "priv.retention_months": "Talep verilerini şu süreden sonra anonimleştir (ay)",

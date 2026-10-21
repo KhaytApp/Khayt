@@ -141,4 +141,35 @@ struct RecurringOrdersTests {
             priceList: [.object(["product": .string("bracket"), "price": .number(45)])])
         #expect(prices == [45, nil, nil])
     }
+
+    @Test("a repeat order leaves the last run's money, links and tokens behind")
+    func cleanJob() async throws {
+        let engine = try KhaytEngine()
+        var root = Self.book(nextDue: "2026-07-15")
+        guard case .array(var log) = root["printLog"], case .object(var t) = log[1] else { Issue.record("no template"); return }
+        t["price"] = .number(100)
+        t["creditNotes"] = .array([.object(["id": .string("CN-1"), "amount": .number(40)])])
+        t["giftCardDiscount"] = .number(20)
+        t["instalments"] = .array([.object(["amount": .number(40), "paidAt": .string("2026-08-01")])])
+        t["survey"] = .object(["rating": .number(5)])
+        t["surveyToken"] = .string("old-survey")
+        t["trackingToken"] = .string("old-tracking")
+        t["shippedAt"] = .string("2026-08-02")
+        t["trackingNumber"] = .string("TN-1")
+        t["sourceOrderId"] = .string("W-9")
+        log[1] = .object(t)
+        root["printLog"] = .array(log)
+
+        let out = try await RecurringOrders.run(&root, engine: engine)
+        let job = Self.objects(root, "printLog")[0]
+        #expect(job["id"] == .string(out.created[0]))
+        for key in ["creditNotes", "giftCardDiscount", "instalments", "survey", "surveyToken",
+                    "shippedAt", "trackingNumber", "sourceOrderId"] {
+            #expect(job[key] == nil, "\(key) rode along onto the new job")
+        }
+        guard case .string(let token)? = job["trackingToken"] else { Issue.record("no tracking token"); return }
+        #expect(token != "old-tracking" && token.count == 32, "its own tracking page")
+        #expect(job["price"] == .number(100))
+        #expect(job["paidAmount"] == .number(0), "a 100 job owes 100 again")
+    }
 }

@@ -438,7 +438,7 @@ async function exportClientData(clientId) {
   if (!P) { toast(t('priv.unavailable') || 'Privacy tools unavailable', 'error'); return; }
   const client = clients.find(c => c.id === clientId);
   if (!client) return;
-  const payload = P.buildClientDataExport(clientId, { clients, printLog, waitingList, waitingListHistory });
+  const payload = P.buildClientDataExport(clientId, { clients, printLog, waitingList, waitingListHistory, giftCards, loyaltyLedger });
   const name = (localName(client) || client.id).replace(/[^\w؀-ۿ -]/g, '').trim() || client.id;
   const fname = `khayt-customer-data-${name}-${localDateStr()}.json`;
   const json = JSON.stringify(payload, null, 2);
@@ -467,7 +467,7 @@ async function deleteClient(clientId) {
   const P = (typeof KhaytPrivacy !== 'undefined') ? KhaytPrivacy : null;
   const client = clients.find(c => c.id === clientId);
   // Show what erasure will touch, and let the owner choose whether order records survive.
-  const plan = P ? P.planClientErasure(clientId, { clients, printLog, waitingList, waitingListHistory }, 'full') : null;
+  const plan = P ? P.planClientErasure(clientId, { clients, printLog, waitingList, waitingListHistory, giftCards, loyaltyLedger }, 'full') : null;
   let fullErase = false;
   if (P && plan && (plan.counts.orders || plan.counts.intake || plan.counts.communications)) {
     const choice = await new Promise((resolve) => {
@@ -480,6 +480,7 @@ async function deleteClient(clientId) {
             t('priv.erase_summary', { orders: plan.counts.orders, intake: plan.counts.intake, comms: plan.counts.communications })
             || `This customer has ${plan.counts.orders} order(s), ${plan.counts.intake} intake submission(s) and ${plan.counts.communications} logged communication(s).`)}</p>
           ${plan.counts.keptNames ? `<p style="font-size:12.5px;color:var(--text-muted);margin:-4px 0 12px;">${escapeHtml(t('priv.erase_keeps_invoiced', { n: plan.counts.keptNames }))}</p>` : ''}
+          ${plan.counts.keptCards ? `<p style="font-size:12.5px;color:var(--text-muted);margin:-4px 0 12px;">${escapeHtml(t('priv.erase_keeps_cards', { n: plan.counts.keptCards }))}</p>` : ''}
           <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;cursor:pointer;margin-bottom:8px;">
             <input type="radio" name="eraseMode" value="unlink" checked style="width:auto;margin-top:3px;">
             <span><b>${escapeHtml(t('priv.mode_unlink') || 'Unlink (recommended)')}</b><br>
@@ -518,11 +519,32 @@ async function deleteClient(clientId) {
   // Only the jobs the plan says may lose the name: an invoiced or paid job keeps
   // its buyer (lib/privacy.js mustKeepBuyer). No plan, no blanking.
   const blank = new Set(fullErase && plan ? plan.blankNameOrderIds || [] : []);
+  // Marked, so a job that keeps the name is never matched BY that name to
+  // another customer who happens to share it (the Mac's Customer.swift).
+  const erasedAt = new Date().toISOString();
   for (const o of printLog) {
     if (o.clientId === clientId) {
       unlinked.push(o);
       o.clientId = null;
+      o.clientErasedAt = erasedAt;
       if (blank.has(o.id)) { priorNames.set(o.id, o.client); o.client = ''; }
+    }
+  }
+  // Full erase: the holder comes off a SPENT gift card, and the link off the
+  // customer's loyalty-ledger rows. A card with a balance keeps its name — it is
+  // money the shop owes (lib/privacy.js planClientErasure).
+  const priorCards = [], priorLedger = [];
+  if (fullErase && plan) {
+    const spent = new Set(plan.unlinkGiftCardIds || []);
+    for (const g of giftCards) {
+      if (!g || !spent.has(g.id)) continue;
+      priorCards.push([g, g.issuedTo, g.issuedToName]);
+      g.issuedTo = null; g.issuedToName = '';
+    }
+    if (plan.unlinkLoyaltyLedger) {
+      for (const r of loyaltyLedger) {
+        if (r && r.clientId === clientId) { priorLedger.push(r); r.clientId = ''; }
+      }
     }
   }
   // Full erase additionally purges the subject's self-submitted intake rows.
@@ -542,8 +564,11 @@ async function deleteClient(clientId) {
       clients.splice(Math.min(Math.max(idx, 0), clients.length), 0, removed);
       for (const o of unlinked) {
         o.clientId = clientId;
+        delete o.clientErasedAt;
         if (priorNames.has(o.id)) o.client = priorNames.get(o.id);
       }
+      for (const [g, to, name] of priorCards) { g.issuedTo = to; g.issuedToName = name; }
+      for (const r of priorLedger) r.clientId = clientId;
       if (removedIntake.length) waitingList = waitingList.concat(removedIntake);
       if (removedHistory.length) waitingListHistory = waitingListHistory.concat(removedHistory);
       saveAll();
@@ -940,7 +965,11 @@ function openClientEditor(clientId = null) {
  */
 function checkRecurringOrders() {
   if (typeof KhaytRecurringOrders === 'undefined') return;
-  const { created } = KhaytRecurringOrders.run(clients, printLog, { settings, now: new Date() });
+  // A tracking token per job it could make — at most one per customer — so
+  // each repeat order gets its own rather than the template's.
+  const bytes = () => { const b = new Uint8Array(16); crypto.getRandomValues(b); return b; };
+  const tokens = clients.map(() => ({ tracking: bytes() }));
+  const { created } = KhaytRecurringOrders.run(clients, printLog, { settings, now: new Date(), tokens });
   if (created.length > 0) {
     saveAll();
     renderKanban(); renderLogs(); renderDashboard();

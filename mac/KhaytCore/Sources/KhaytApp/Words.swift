@@ -3238,6 +3238,10 @@ final class Words {
         // Settings is where they do that, in this app.
         "mac.campaign_needs_email": ["en": "Set up an email provider in Settings before sending a campaign.",
                                      "ar": "اضبط مزوّد البريد في الإعدادات قبل إرسال حملة."],
+        // A campaign goes by email only: this app has no WhatsApp sender for a
+        // list, and a WhatsApp list is phone numbers — mailed, they bounce.
+        "mac.campaign_email_only": ["en": "Campaigns are sent by email only.",
+                                    "ar": "تُرسل الحملات بالبريد الإلكتروني فقط."],
         "mac.whatsapp": ["en": "WhatsApp", "ar": "واتساب"],
         "mac.export_accounting_where": [
             "en": "Two files are written here: one of invoices and one of expenses.",

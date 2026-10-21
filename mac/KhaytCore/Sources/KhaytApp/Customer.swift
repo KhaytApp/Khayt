@@ -84,8 +84,10 @@ struct Customer: Identifiable, Hashable, Sendable {
             // do not each count the same job — which would report a shop twice
             // the customers and twice the revenue it has. The first record in
             // the collection wins, which is stable because the collection is.
+            // Never a job whose customer was erased: it keeps the name for the
+            // invoice, and is nobody else's history.
             let byName = orders.filter {
-                $0.clientId == nil && !name.isEmpty && !claimed.contains($0.id)
+                $0.clientId == nil && !$0.clientErased && !name.isEmpty && !claimed.contains($0.id)
                     && $0.client.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                         == name.lowercased()
             }

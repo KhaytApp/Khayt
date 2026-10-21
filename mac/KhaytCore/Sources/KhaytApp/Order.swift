@@ -81,6 +81,11 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// on a job taken for a walk-in, and on every job in a shop that has never
     /// used the customer screen.
     let clientId: String?
+    /// The job's customer was ERASED (`clientErasedAt`, written by the erase).
+    /// An invoiced job keeps the name with no link, and without this mark it
+    /// was matched by that name to any other customer who shares it — showing
+    /// them the erased person's history.
+    let clientErased: Bool
     /// The catalogue product this job is for, when it was taken from one.
     ///
     /// What the catalogue counts to say a product has been made 14 times and
@@ -159,7 +164,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
-        case machineId, operatorId, clientId, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
+        case machineId, operatorId, clientId, clientErasedAt, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
         case carrier, trackingNumber, shippingService, shippingStatus
         case fromStock
         case nonBusiness
@@ -275,6 +280,8 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         // the shelf existed and most of them since.
         fromStock = (try? c.decodeIfPresent(Bool.self, forKey: .fromStock)) as? Bool ?? false
         clientId = try c.decodeIfPresent(String.self, forKey: .clientId)
+        clientErased = ((try? c.decodeIfPresent(String.self, forKey: .clientErasedAt)) ?? nil)
+            .map { !$0.isEmpty } ?? false
         productId = try c.decodeIfPresent(String.self, forKey: .productId)
         completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
         deliveredAt = try c.decodeIfPresent(String.self, forKey: .deliveredAt)

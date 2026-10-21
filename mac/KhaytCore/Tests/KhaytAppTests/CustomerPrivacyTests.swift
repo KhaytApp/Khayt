@@ -281,6 +281,78 @@ struct CustomerPrivacyTests {
         #expect(write.lowerBound < down.lowerBound)
     }
 
+    @Test("full erase takes the holder off a spent gift card and the link off the ledger; a card with a balance keeps its name")
+    func fullEraseCardsAndLedger() async throws {
+        func o(_ pairs: [String: JSONValue]) -> JSONValue { .object(pairs) }
+        var book = Self.book()
+        book["giftCards"] = .array([
+            o(["id": .string("GC-SPENT"), "code": .string("AAA"), "balance": .number(0),
+               "issuedTo": .string("C1"), "issuedToName": .string("Nouf")]),
+            o(["id": .string("GC-LEFT"), "code": .string("BBB"), "balance": .number(12.5),
+               "issuedTo": .string("C1"), "issuedToName": .string("Nouf")]),
+            o(["id": .string("GC-HIND"), "code": .string("CCC"), "balance": .number(0),
+               "issuedTo": .string("C2"), "issuedToName": .string("Hind")]),
+        ])
+        book["loyaltyLedger"] = .array([
+            o(["id": .string("L1"), "clientId": .string("C1"), "type": .string("redeem"), "points": .number(500)]),
+            o(["id": .string("L2"), "clientId": .string("C2"), "type": .string("redeem"), "points": .number(100)]),
+        ])
+        let engine = try KhaytEngine()
+        let exported = try await engine.clientDataExport(clientId: "C1", collections: Shop.privacyCollections(book))
+        guard case .object(let e) = exported, case .array(let cards)? = e["giftCards"],
+              case .array(let ledger)? = e["loyaltyLedger"] else { Issue.record("no cards in the export"); return }
+        #expect(cards.count == 2 && ledger.count == 1, "the export holds their cards and ledger rows")
+        let plan = try await engine.planClientErasure(clientId: "C1", collections: Shop.privacyCollections(book), full: true)
+        #expect(plan.counts.keptCards == 1, "the sheet says one card keeps its name")
+
+        let url = try DeleteJobsAndCustomersTests.scratch(book)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let erased = try #require(try await Self.erase("C1", full: true, at: url))
+        let after = try DeleteJobsAndCustomersTests.onDisk(url)
+        let spent = try #require(MoveJobTests.row(after, "giftCards", "GC-SPENT"))
+        #expect(spent["issuedTo"] == .null && spent["issuedToName"] == .string(""))
+        let left = try #require(MoveJobTests.row(after, "giftCards", "GC-LEFT"))
+        #expect(left["issuedTo"] == .string("C1") && left["issuedToName"] == .string("Nouf"),
+                "a balance is money owed; the holder stays")
+        #expect(MoveJobTests.row(after, "giftCards", "GC-HIND")?["issuedTo"] == .string("C2"))
+        #expect(MoveJobTests.row(after, "loyaltyLedger", "L1")?["clientId"] == .string(""))
+        #expect(MoveJobTests.row(after, "loyaltyLedger", "L2")?["clientId"] == .string("C2"))
+        for id in ["J-QUOTE", "J-INV", "J-PAID"] {
+            #expect(try Self.job(after, id)["clientErasedAt"] != nil, "\(id) is not marked erased")
+        }
+        #expect(try Self.job(after, "J-HIND")["clientErasedAt"] == nil)
+
+        try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+            Shop.applyCustomerUnerase(to: &root, erased)
+        }
+        let back = try DeleteJobsAndCustomersTests.onDisk(url)
+        let newId = try #require(MoveJobTests.rows(back, "clients")
+            .first { $0["nameEn"] == .string("Nouf") }.flatMap { MoveJobTests.string($0["id"]) })
+        let card = try #require(MoveJobTests.row(back, "giftCards", "GC-SPENT"))
+        #expect(card["issuedToName"] == .string("Nouf"))
+        #expect(card["issuedTo"] == .string("C1") || card["issuedTo"] == .string(newId))
+        let row = try #require(MoveJobTests.row(back, "loyaltyLedger", "L1"))
+        #expect(row["clientId"] == .string("C1") || row["clientId"] == .string(newId))
+        #expect(try Self.job(back, "J-INV")["clientErasedAt"] == nil, "Undo takes the mark off")
+    }
+
+    @Test("a job whose customer was erased is nobody else's history, even under the same name")
+    func erasedJobsAreNotMatchedByName() throws {
+        func order(_ id: String, erased: Bool) throws -> Order {
+            var row: [String: JSONValue] = [
+                "id": .string(id), "date": .string("2026-09-01"), "status": .string("completed"),
+                "project": .string("P"), "client": .string("Nouf"), "price": .number(100),
+                "invoiceNum": .string("INV-1"),
+            ]
+            if erased { row["clientErasedAt"] = .string("2026-10-21T08:00:00Z") }
+            return try JSONDecoder().decode(Order.self, from: JSONEncoder().encode(row))
+        }
+        let people = Customer.from([try order("J-ERASED", erased: true), try order("J-WALKIN", erased: false)],
+                                   clients: [Client(id: "C9", nameEn: "Nouf")])
+        let other = try #require(people.first { $0.clientId == "C9" })
+        #expect(other.orders.map(\.id) == ["J-WALKIN"], "the erased Nouf's invoice landed on another Nouf")
+    }
+
     // MARK: - The lock and the words
 
     @Test("the erase and the export ask the lock, and the erase asks what Delete asks")
@@ -297,7 +369,7 @@ struct CustomerPrivacyTests {
     }
 
     static let keys = ["priv.section", "priv.export_data", "priv.exported", "priv.erase_title",
-                       "priv.erase_summary", "priv.erase_keeps_invoiced", "priv.mode_unlink",
+                       "priv.erase_summary", "priv.erase_keeps_invoiced", "priv.erase_keeps_cards", "priv.mode_unlink",
                        "priv.mode_unlink_hint", "priv.mode_full", "priv.mode_full_hint",
                        "priv.erased_full", "ce.deleted", "mac.erase_customer", "mac.undo_after"]
 
