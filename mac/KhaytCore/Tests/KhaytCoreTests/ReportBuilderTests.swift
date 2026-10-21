@@ -74,6 +74,28 @@ import Testing
         #expect(report.rows.allSatisfy { !$0.contains("A-2") })
     }
 
+    /// Each money column on one stated basis (beta.1 review). An inclusive
+    /// 15% shop, a 115 job with 23 credited: the column was the raw price —
+    /// 115, before the credit and with the tax in it — beside a balance of 92.
+    /// It is the P&L's revenue now (80, net of tax and credit), headed so, and
+    /// the balance is the receivables' figure, headed as tax-inclusive.
+    @Test("revenue is the P&L's and the balance is the receivables', each headed so")
+    func moneyColumnsSayTheirBasis() async throws {
+        let engine = try KhaytEngine()
+        var job = Self.job("A-1", status: "completed", date: "2026-09-01", price: 115, paid: 0)
+        if case .object(var row) = job {
+            row["creditNotes"] = .array([.object(["amount": .number(23)])])
+            job = .object(row)
+        }
+        let report = try await engine.buildReport(
+            orders: [job], clients: Self.clients, machines: [],
+            settings: ["currency": .string("SAR"), "enableVat": .bool(true), "vatRate": .number(15)],
+            language: "en", fields: ["price", "paidAmount", "balance"],
+            statusIn: [], from: "", to: "", labels: [:])
+        #expect(report.headers == ["Revenue (excl. tax)", "Paid", "Balance due (incl. tax)"])
+        #expect(report.rows.first == ["80", "0", "92"])
+    }
+
     @Test("the status chips and the dates both narrow it")
     func theFiltersFilter() async throws {
         let engine = try KhaytEngine()
