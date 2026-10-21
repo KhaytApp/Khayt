@@ -319,7 +319,13 @@
      */
     if (prevStatus === 'quote' && newStatus !== 'quote' && newStatus !== 'cancelled'
         && !order.quoteAcceptedAt) {
-      order.quoteAcceptedAt = nowIso.split('T')[0];
+      // The LOCAL day, as the Approve button writes it: the VAT tax point
+      // (pnl-report taxPointDate) is this day, and a UTC day put an
+      // acceptance made after midnight in Riyadh into the day before.
+      const at = new Date(nowIso);
+      order.quoteAcceptedAt = isNaN(at)
+        ? String(nowIso).split('T')[0]
+        : at.getFullYear() + '-' + String(at.getMonth() + 1).padStart(2, '0') + '-' + String(at.getDate()).padStart(2, '0');
     }
 
     /* ALREADY FINISHED IS NOT FINISHING.
