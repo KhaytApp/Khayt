@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: Khayt asks once about crash reports.** A card at the top of the
+  window asks whether to share crash reports, with usage counts as an extra
+  tick. "Not Now" puts it away for good on this computer and turns nothing
+  on; "Share Crash Reports" turns them on. It never covers anything, waits
+  until the first-run setup is done, and only asks someone who may change
+  Settings. Settings → Crash Reports & Usage still has both switches. Until
+  now the switches were the only way in, so nothing was ever shared. The
+  same card as on the Mac.
+
 - **Mac: crash reports include Swift crashes, and Settings can send a test
   report.** Until now the Mac reported only the crashes it could catch itself:
   failed rules and AppKit exceptions. A Swift crash, like the Settings ▸
