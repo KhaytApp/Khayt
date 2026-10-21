@@ -23,6 +23,8 @@ Two **separately consented** streams. Each is an explicit allowlist — anything
 - Coarse environment flags: `mode` (simple/professional), `businessType` (solo/shop/farm/b2b), VAT on/off, ZATCA on/off, online/LAN on/off — booleans/enums already in `defaultSettings()`.
 - Session count and coarse app-version-on-launch. No timestamps finer than the day; no per-action sequence.
 
+**C. The anonymous install count** (no consent; ON by default with an off switch — decided 21 October 2026, the one exception to "off by default"). Once a UTC day, `POST /v1/active` with exactly six fields: `platform` (mac/win/linux/ios), `channel`, `version`, `firstThisWeek`, `firstThisMonth`, `firstEver`. No install id, no shop, no IP kept; the cloud keeps only daily counters (khayt-cloud #123, `docs/api-contract.md` "Active-install count"), 400 days. The switch, "Count this install (anonymous)", is per install and lives on the machine, never in the book. The rules are `ActiveCount` in KhaytCore (Mac and iPhone) and the desktop's sender. Described at khaytapp.com/privacy `#active-count-en`; the policy's wording is the authority.
+
 ## 2. NEVER collected (hard invariant)
 
 No shop business data of any kind: **no** orders, clients, customer PII (names, phone, email, address), **no** financials (prices, margins, revenue, IBAN), **no** inventory/filament data, **no** file contents (STL/photos/PDFs), **no** secrets (API keys, PINs, tokens, SMTP/webhook secrets, ZATCA CSID/PCSID), **no** free-text the user typed, **no** raw file paths, **no** IP-derived geolocation beyond country (PDPL residency). Maps to security-model §3 ("no PII/line-items/margins") and the redaction surface already enumerated in `renderer/store.js → redactSettingsForExport()`. The **user id is never sent** — only the rotating install id (§5).
@@ -30,6 +32,8 @@ No shop business data of any kind: **no** orders, clients, customer PII (names, 
 ---
 
 ## 3. Consent & control UX
+
+Streams A and B below. Stream C (§1C) is the one exception: sent without asking, switched off in Settings.
 
 Lives in **Settings → Privacy** (`renderer/settings.js`), persisted in `defaultSettings()` (`renderer/app-state.js`) under a new `telemetry` object — defaulting **all false**, alongside existing opt-ins like `betaUpdates` and `quoteFollowUp.enabled`:
 

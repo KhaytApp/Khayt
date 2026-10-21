@@ -65,9 +65,10 @@
       <li>Your API keys, PINs, tokens or other secrets</li>
     </ul>
     <p>
-      Crash reports and anonymous usage counts are <strong>off by default</strong> and are only
-      ever sent if you explicitly turn them on — see <a href="#telemetry">section 8</a> for exactly
-      what those contain.
+      The one thing sent without asking is a once-a-day anonymous count that an install exists,
+      which carries no identifier and which you can switch off. Crash reports and anonymous usage
+      counts are <strong>off by default</strong> and are only ever sent if you explicitly turn them
+      on — see <a href="#telemetry">section 8</a> for exactly what each contains.
     </p>
 
     <h2>3. Where Your Data Lives</h2>
@@ -146,7 +147,7 @@
 
     <h2 id="telemetry">8. Crash Reports and Usage Data</h2>
     <p>
-      Khayt sends <strong>nothing by default</strong>. You may optionally turn on two
+      Apart from the anonymous install count below, Khayt sends <strong>nothing by default</strong>. You may optionally turn on two
       separate, independently revocable options in <strong>Settings → Crash Reports &amp; Usage</strong>:
     </p>
     <ul>
@@ -164,6 +165,9 @@
       random install identifier created when you opt in, and erased the moment you opt out.
       Turning an option off deletes anything queued locally straight away, without a restart.
       You can inspect exactly what would be sent at any time via <em>"View what's collected"</em>.
+    </p>
+    <p id="active-count">
+      <strong>The anonymous install count — on unless you turn it off.</strong> So that we know roughly how many copies of Khayt are in use, each app sends Khayt Cloud one small message at most once a day, without asking first. It holds exactly six things: the platform (Mac, Windows, Linux or iPhone), the release channel (stable, beta or alpha), the app version, and three yes-or-no answers — whether this is the install's first count this week, this month, and ever. It carries no install identifier, shop, account or device name, so one install cannot be told from another, and Khayt Cloud does not store the address it came from. Like any web request, it passes through our network providers (Cloudflare and our hosting provider), which handle it under their own terms. The cloud does not keep the message itself: it adds one to a few daily totals per platform, channel and version, keeps those totals for 400 days, and only Khayt reads them. The count is not linked to you and is never used for tracking or advertising. To stop it, turn off <em>Count this install (anonymous)</em> in Settings; nothing is sent while it is off.
     </p>
 
     <h2>9. Children's Privacy</h2>

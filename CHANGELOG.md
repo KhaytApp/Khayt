@@ -15,6 +15,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   anything. In Settings ▸ Preferences, **Send a Test Report** sends one now
   and says whether it got through.
 
+- **Mac: the anonymous daily install count.** Once a day
+  the Mac sends only its platform, version and release channel, and
+  whether this is its first day this week, this month or ever. There is no
+  id, and nothing about the shop. It is on by default, with **Count this
+  install (anonymous)** in Settings ▸ Preferences to turn it off. The privacy
+  policy describes it (khaytapp.com/privacy, "The anonymous install count").
+  Nothing is counted until Khayt Cloud switches the count on. The day and flag
+  rules live in KhaytCore, so the iPhone counts by the same rule.
+
 - **Mac: fixes from the alpha.85 pre-release review.** WhatsApp delivery
   reports kept on this Mac hold only what they need and are forgotten when
   the hook comes down or the Mac signs out of Khayt Cloud. A download that
