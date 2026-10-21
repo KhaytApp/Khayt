@@ -554,6 +554,7 @@
 "settings.count_install.hint" = "Once a day, sends only the app's platform, version and release channel, and whether this is its first day this week, this month or ever. No id, nothing about your shop.";
 "settings.count_install" = "Count this install (anonymous)";
 "settings.privacy" = "Privacy";
+"settings.privacy_policy" = "Privacy policy";
 "alert.print.finished" = "Print finished";
 "alert.print.failed" = "Print failed";
 "alert.print.cancelled" = "Print cancelled";

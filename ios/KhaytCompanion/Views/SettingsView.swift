@@ -36,6 +36,11 @@ struct SettingsView: View {
                         eyebrow(L10n.tr("settings.privacy"))
                         VStack(spacing: 0) { toggleRow(L10n.tr("settings.count_install"), $settings.countInstall) }.card()
                         foot(L10n.tr("settings.count_install.hint"))
+                        // One page for both languages: each section has its Arabic beside it.
+                        Link(L10n.tr("settings.privacy_policy"), destination: URL(string: "https://khaytapp.com/privacy/")!)
+                            .font(.khayt(13, .medium, relativeTo: .footnote))
+                            .foregroundStyle(KhaytDesign.brand)
+                            .frame(minHeight: 44)
                     }
                     eyebrow(L10n.tr("cloud.title"))
                     cloudCard
