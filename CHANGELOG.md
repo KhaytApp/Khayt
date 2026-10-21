@@ -4,26 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: a locked-out PIN guesser stays locked out.** When the LAN
-  server's table of failed attempts filled up, it made room by dropping the
-  oldest entries, live lockouts included. Someone able to fill it (easy
-  behind the remote tunnel, where each request can claim a new address)
-  could wipe their own lockout and keep guessing. A live lockout is now
-  never dropped; it leaves when it expires. An IPv6 client is also counted
-  by its /64 network rather than by each address it uses, since a single
-  device can use a fresh address for every request. The same as the Mac.
-
-- **Desktop: a printer's key only goes to a printer on your own network.**
-  Before sending a printer's API key or Bambu access code, Khayt checked only
-  how the printer's address was written, and any name passed. A printer
-  record that arrived by sync or a restored backup with an outside name
-  would have had the key sent to it on every status check. Khayt now looks
-  the name up, refuses it unless every address it gives is on your own
-  network, and connects to that address. That covers status checks,
-  sending files, printer commands, job history and the camera. A camera on a
-  different address from its printer no longer gets the printer's key. The
-  same fix as the Mac's.
-
 - **A printer retired by its date alone is out of the lead time and the
   overhead rate.** A printer can be marked retired by its status or by a
   retire date. The published lead time and the overhead rate looked only at
@@ -6201,6 +6181,33 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.23] - 2026-10-21
+
+Two security fixes, since 3.11.22.
+Individual entries are kept below; this is what changed for you.
+
+A printer's API key or Bambu access code is now sent only to a printer whose address is on your own network: Khayt looks the name up and connects to the address it checked. And someone guessing the LAN PIN stays locked out even if they flood the server with attempts from many addresses.
+
+- **Desktop: a printer's key only goes to a printer on your own network.**
+  Before sending a printer's API key or Bambu access code, Khayt checked only
+  how the printer's address was written, and any name passed. A printer
+  record that arrived by sync or a restored backup with an outside name
+  would have had the key sent to it on every status check. Khayt now looks
+  the name up, refuses it unless every address it gives is on your own
+  network, and connects to that address. That covers status checks,
+  sending files, printer commands, job history and the camera. A camera on a
+  different address from its printer no longer gets the printer's key. The
+  same fix as the Mac's.
+
+- **Desktop: a locked-out PIN guesser stays locked out.** When the LAN
+  server's table of failed attempts filled up, it made room by dropping the
+  oldest entries, live lockouts included. Someone able to fill it (easy
+  behind the remote tunnel, where each request can claim a new address)
+  could wipe their own lockout and keep guessing. A live lockout is now
+  never dropped; it leaves when it expires. An IPv6 client is also counted
+  by its /64 network rather than by each address it uses, since a single
+  device can use a fresh address for every request. The same as the Mac.
 
 ## [3.11.22] - 2026-10-21
 
