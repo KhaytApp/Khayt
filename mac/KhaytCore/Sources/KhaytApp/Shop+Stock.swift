@@ -654,11 +654,14 @@ extension Shop {
     /// of the stored row is the baseline (`RoundTrip`). Before, a quote at 0,
     /// a quote with a note, or `leadDays: 0` was rewritten or dropped by
     /// opening the supplier and pressing Save.
-    static func supplierRecord(saving supplier: Supplier,
-                               over was: [String: JSONValue]) -> [String: JSONValue] {
+    ///
+    /// The baseline is drawn from `opened`, the supplier as the sheet opened
+    /// it, when there is one — see `saveSupplier`.
+    static func supplierRecord(saving supplier: Supplier, over was: [String: JSONValue],
+                               opened: Supplier? = nil) -> [String: JSONValue] {
         var record = was
         var edits = supplier.edits
-        if let stored = Supplier(row: .object(was)) {
+        if let stored = opened ?? Supplier(row: .object(was)) {
             let baseline = SupplierSheet.saving(stored, lead: SupplierSheet.leadText(stored)).edits
             edits = RoundTrip.keepUntouched(written: edits, baseline: baseline, stored: was)
         }
@@ -666,7 +669,11 @@ extension Shop {
         return record
     }
 
-    func saveSupplier(_ supplier: Supplier) async {
+    /// `opened` is the supplier as the sheet opened it — nil for a new one, or
+    /// a caller with no sheet. A field the shop did not touch still holds the
+    /// opened value; compared with the row on disk instead, it would read as
+    /// an edit and put that value back over a change sync made meanwhile.
+    func saveSupplier(_ supplier: Supplier, opened: Supplier? = nil) async {
         moveProblem = nil
         guard permitted("inventory", "edit") else { return }
         guard let build = source.build else {
@@ -688,7 +695,7 @@ extension Shop {
                    case .object(let was) = rows[at] {
                     undo.append(ChangedRecord(collection: "suppliers", id: supplier.id,
                                               was: was))
-                    var record = Self.supplierRecord(saving: supplier, over: was)
+                    var record = Self.supplierRecord(saving: supplier, over: was, opened: opened)
                     StoreWriter.stamp(&record)
                     rows[at] = .object(record)
                 } else {

@@ -269,7 +269,14 @@ extension Shop {
     /// A NAME IS THE ONLY THING REQUIRED, in either language, because that is
     /// Khayt's own rule and because a customer with a phone number and no name
     /// is not a customer anyone can find again.
-    func saveCustomer(_ client: Client) async {
+    ///
+    /// `opened` is the customer as the sheet opened it — nil for a new one.
+    /// It, and not the row on disk now, is what an untouched save is compared
+    /// with: a field the shop did not touch still holds the OPENED value, and
+    /// against the disk that reads as an edit and writes the old value over
+    /// whatever sync or the iPhone put there meanwhile — a standing order's
+    /// `lastRun` rolled back is a standing-order job made twice.
+    func saveCustomer(_ client: Client, opened: Client?) async {
         moveProblem = nil
         guard permitted("clients", "edit") else { return }
         guard let build = source.build else {
@@ -292,7 +299,7 @@ extension Shop {
                     // An edit, so it is stamped like any other — and undoable.
                     guard case .object(let was) = rows[at] else { return }
                     undo.append(ChangedRecord(collection: "clients", id: client.id, was: was))
-                    record = Self.customerRecord(saving: client, over: was)
+                    record = Self.customerRecord(saving: client, over: was, opened: opened)
                     StoreWriter.stamp(&record)
                     rows[at] = .object(record)
                 } else {
@@ -320,10 +327,13 @@ extension Shop {
     /// rather than `12`, a price row the other app wrote with a field of its
     /// own — because the sheet's own open→save of the stored row is the
     /// baseline every untouched value is compared with (`RoundTrip`).
-    static func customerRecord(saving client: Client,
-                               over was: [String: JSONValue]) -> [String: JSONValue] {
+    ///
+    /// The baseline is drawn from `opened`, the customer as the sheet opened
+    /// it, when there is one; `was` only stands in for a caller with no sheet.
+    static func customerRecord(saving client: Client, over was: [String: JSONValue],
+                               opened: Client? = nil) -> [String: JSONValue] {
         var record = client.record
-        if let stored = Client.decoding(was) {
+        if let stored = opened ?? Client.decoding(was) {
             let baseline = CustomerSheet.saving(CustomerSheet.opening(stored)).record
             record = RoundTrip.keepUntouched(written: record, baseline: baseline, stored: was)
         }

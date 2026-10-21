@@ -307,6 +307,16 @@ extension Shop {
     /// not editing at all — the components, the storefront fields, anything a
     /// newer build writes — is the shop's, and none of this app's business to
     /// drop.
+    /// What the sheet would save untouched: the product as the SHEET opened
+    /// it, put through its own open→save mapping — `stored` (the row as this
+    /// Mac last read it) only for a caller with no sheet. See `saveProduct`.
+    static func productOpened(_ stored: [String: JSONValue], sheetOpened: Product?,
+                              keys: [Product.LanguageKey], spools: [Spool],
+                              reclaimsTax: Bool = false) -> ProductSheet.Payload {
+        ProductSheet.payload(ProductSheet.opening(sheetOpened ?? Product.from(stored, keys: keys)),
+                             spools: spools, reclaimsTax: reclaimsTax)
+    }
+
     static func productRecord(written: [String: JSONValue], baseline: [String: JSONValue]?,
                               priced: [String: JSONValue],
                               over was: [String: JSONValue]) -> [String: JSONValue] {
@@ -371,11 +381,19 @@ extension Shop {
     /// and is how the last picture is removed. The two were one value in the
     /// first draft and a product with its last photo deleted came back with the
     /// photo still on it.
+    ///
+    /// `opened` is the product as the sheet opened it. The baseline below is
+    /// drawn from it rather than from the row as this Mac last read it: every
+    /// write reloads, so by Save the row on screen may already carry a change
+    /// sync or the iPhone made, and against THAT an untouched field still
+    /// holding the opened value reads as an edit and puts the old value back.
+    /// Nil for a caller with no sheet, which takes the row as last read.
     func saveProduct(_ product: Product, pictures: [StagedPicture]? = nil,
                      unlinking removed: [String] = [],
                      parts: [JSONValue]? = nil,
                      tiers: [JSONValue]? = nil, docs: [JSONValue]? = nil,
-                     unlinkingDocs droppedDocs: [String] = []) async {
+                     unlinkingDocs droppedDocs: [String] = [],
+                     opened sheetOpened: Product? = nil) async {
         moveProblem = nil
         guard permitted("inventory", "edit") else { return }
         // Whether a product is LISTED on the web store is the store's setting,
@@ -455,8 +473,8 @@ extension Shop {
         var openedPayload: ProductSheet.Payload?
         var storedParts: JSONValue?
         if case .object(let stored)? = productRows.first(where: { Self.recordId($0) == product.id }) {
-            let opened = ProductSheet.payload(ProductSheet.opening(Product.from(stored, keys: keys)),
-                                              spools: spools, reclaimsTax: reclaimsTax)
+            let opened = Self.productOpened(stored, sheetOpened: sheetOpened, keys: keys, spools: spools,
+                                                reclaimsTax: reclaimsTax)
             openedPayload = opened
             storedParts = stored["parts"]
             var b = opened.product.record(keys: keys)

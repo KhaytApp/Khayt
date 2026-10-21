@@ -990,10 +990,13 @@ struct ProductSheet: View {
         let tierRows = sent.tiers
         let docRows = sent.docs
         let dropped = removedDocs
+        // The product as this sheet opened it, for what an untouched save
+        // writes (`Shop.saveProduct`): a new one has nothing to compare with.
+        let opened = isNew ? nil : existing
         Task { await shop.saveProduct(saving, pictures: staged,
                                       unlinking: unlink, parts: rows,
                                       tiers: tierRows, docs: docRows,
-                                      unlinkingDocs: dropped) }
+                                      unlinkingDocs: dropped, opened: opened) }
     }
 
     /// True when Save would write a price of zero. Nil pricing — the figure
