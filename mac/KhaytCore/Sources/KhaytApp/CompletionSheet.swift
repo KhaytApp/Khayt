@@ -200,7 +200,7 @@ struct CompletionSheet: View {
 
         var body: some View {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(label) (\(unit))").font(.caption).foregroundStyle(.secondary)
+                Text(verbatim: "\(label) (\(unit))").font(.caption).foregroundStyle(.secondary)
                 TextField("", text: $text)
                     .textFieldStyle(.roundedBorder)
                     .monospacedDigit()
@@ -212,7 +212,7 @@ struct CompletionSheet: View {
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(Khayt.done)
                     }
-                    Text("\(quoted): \(Money.quantity(estimate, decimals: decimals))")
+                    Text(verbatim: "\(quoted): \(Money.quantity(estimate, decimals: decimals))")
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.tertiary)
                 }

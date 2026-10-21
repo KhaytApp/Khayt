@@ -28,6 +28,7 @@ struct CategoryMenu: View {
     @State private var tagging = false
     @State private var typed = ""
     @State private var typedTags = ""
+    @Environment(\.stripCompact) private var compact
 
     private var count: Int { shop.selectedIds.count }
 
@@ -61,10 +62,15 @@ struct CategoryMenu: View {
                 }
             }
         } label: {
-            Label(count > 1
-                  ? shop.words.callIt("mac.category_n_models", ["n": .number(Double(count))])
-                  : shop.words.callIt("mac.category"),
-                  systemImage: "tag")
+            let title = count > 1
+                ? shop.words.callIt("mac.category_n_models", ["n": .number(Double(count))])
+                : shop.words.callIt("mac.category")
+            // Its symbol alone when the strip is narrow — see `GroupMenu`.
+            if compact {
+                Label(title, systemImage: "tag").labelStyle(.iconOnly)
+            } else {
+                Label(title, systemImage: "tag")
+            }
         }
         .disabled(!shop.canWrite || count == 0)
         .help(shop.canWrite

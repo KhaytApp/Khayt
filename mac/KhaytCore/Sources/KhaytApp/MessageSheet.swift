@@ -61,6 +61,32 @@ struct MessageSheet: View {
         choice.hasPrefix("m:") ? String(choice.dropFirst(2)) : nil
     }
 
+    private var messageDirection: LayoutDirection {
+        let templateLang = milestone != nil ? lang
+            : saved.first(where: { "t:" + $0.id == choice })?.lang ?? ""
+        return Self.direction(lang: templateLang, text: text, shopLanguage: shop.words.language)
+    }
+
+    /// Which way the message box runs. The language the message is IN when
+    /// it says (a milestone's, or a saved template's own), else the first
+    /// letter that has a direction — a template written for every customer,
+    /// or a blank box the shop has started typing into — else the shop's own
+    /// language, because a blank box in an Arabic shop is about to get Arabic.
+    static func direction(lang: String, text: String, shopLanguage: String) -> LayoutDirection {
+        if lang == "ar" { return .rightToLeft }
+        if lang == "en" { return .leftToRight }
+        // Hebrew, Arabic and their presentation forms are the right-to-left
+        // letters; any other letter is a left-to-right one. Digits and
+        // punctuation have no say, as in the bidi algorithm's own rule.
+        for scalar in text.unicodeScalars where scalar.properties.isAlphabetic {
+            switch scalar.value {
+            case 0x0590...0x08FF, 0xFB1D...0xFDFF, 0xFE70...0xFEFF: return .rightToLeft
+            default: return .leftToRight
+            }
+        }
+        return shopLanguage == "ar" ? .rightToLeft : .leftToRight
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
@@ -110,8 +136,7 @@ struct MessageSheet: View {
                 // The message's own direction, not the app's: an Arabic
                 // message typed into a left-aligned box puts the cursor on the
                 // wrong side.
-                .environment(\.layoutDirection,
-                             milestone != nil && lang == "ar" ? .rightToLeft : .leftToRight)
+                .environment(\.layoutDirection, messageDirection)
 
             if milestone != nil, isDefault, !edited {
                 Text(shop.words.callIt("mac.wa_default_words"))

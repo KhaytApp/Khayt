@@ -577,7 +577,7 @@ struct NewJobSheet: View {
                             Button {
                                 margin = tier.margin
                             } label: {
-                                Text("\(tier.label) \(Money.quantity(tier.margin))%")
+                                Text(verbatim: "\(tier.label) \(Money.quantity(tier.margin))%")
                                     .font(.caption)
                             }
                             .buttonStyle(.bordered)

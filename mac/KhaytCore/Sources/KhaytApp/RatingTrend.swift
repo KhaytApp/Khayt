@@ -39,7 +39,7 @@ struct RatingTrendCard: View {
                 Spacer(minLength: 8)
                 if let trend, trend.responses > 0, let average = trend.average {
                     // "3 responses · Avg 4.7" — the responses IN THE WINDOW.
-                    Text("\(trend.responses) \(words.callIt("an.nps_responses")) "
+                    Text(verbatim: "\(trend.responses) \(words.callIt("an.nps_responses")) "
                          + Self.oneDecimal(average))
                         .font(.callout.weight(.medium)).monospacedDigit()
                         .foregroundStyle(Self.tint(average))

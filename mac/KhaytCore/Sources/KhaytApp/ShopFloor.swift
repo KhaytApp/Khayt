@@ -367,7 +367,7 @@ struct MachineCard: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(shop.words.callIt("mac.bed"))
                                 .font(.caption).foregroundStyle(.secondary)
-                            Text("\(bed) \(shop.words.callIt("mac.unit_mm"))").font(.callout.weight(.semibold)).monospacedDigit()
+                            Text(verbatim: "\(bed) \(shop.words.callIt("mac.unit_mm"))").font(.callout.weight(.semibold)).monospacedDigit()
                             // The dashed rectangle needs naming, or a small
                             // square inside a big one reads as a rendering
                             // fault rather than as a comparison.
@@ -425,7 +425,7 @@ struct MachineCard: View {
                     HStack(alignment: .center, spacing: 11) {
                         WearGauge(pct: wear.pct)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("\(Int(saturating: wear.wear)) / \(Int(saturating: wear.threshold)) \(shop.words.callIt("common.grams"))")
+                            Text(verbatim: "\(Int(saturating: wear.wear)) / \(Int(saturating: wear.threshold)) \(shop.words.callIt("common.grams"))")
                                 .font(.callout).monospacedDigit()
                             if wear.over {
                                 Text(shop.words.callIt("mac.nozzle_due"))
@@ -577,7 +577,7 @@ struct Upkeep: View {
                                                        : AnyShapeStyle(.primary))
                     .lineLimit(1)
                 if let every {
-                    Text("\(shop.words.callIt("maint.every")) \(every)")
+                    Text(verbatim: "\(shop.words.callIt("maint.every")) \(every)")
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
             }
@@ -1095,7 +1095,7 @@ struct ConsumablesCard: View {
                 // Packaging still wants to know the IPA has run out.
                 let low = shop.consumables.filter(\.isLow).count
                 if low > 0 {
-                    Text("\(low) \(shop.words.callIt("cons.low"))")
+                    Text(verbatim: "\(low) \(shop.words.callIt("cons.low"))")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Khayt.attention)
                 }
@@ -1263,7 +1263,7 @@ struct ConsumablesCard: View {
                     // figure. It refuses when there is no rate and no minimum,
                     // and an invented number there lands on a purchase order.
                     if let need, need.suggestQty > 0 {
-                        Text("\(shop.words.callIt("reorder.suggest")) \(shop.words.amount(Self.qty(need.suggestQty), need.unit))")
+                        Text(verbatim: "\(shop.words.callIt("reorder.suggest")) \(shop.words.amount(Self.qty(need.suggestQty), need.unit))")
                             .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
                     }
                 }
@@ -1705,7 +1705,7 @@ private struct Live: View {
                                        : state?.on == false ? "plug.off" : "plug.unknown"))
                     .font(.callout)
                 if let watts = state?.watts {
-                    Text("\(Money.quantity(watts)) \(shop.words.callIt("mac.unit_watts"))").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                    Text(verbatim: "\(Money.quantity(watts)) \(shop.words.callIt("mac.unit_watts"))").font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
                 Spacer()
                 if state?.on == true {

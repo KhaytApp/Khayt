@@ -122,7 +122,7 @@ struct SuppliersCard: View {
             if !supplier.priceList.isEmpty {
                 parts.append(shop.words.counting(supplier.priceList.count, "mac.quotes_word"))
             }
-            if !supplier.phone.isEmpty { parts.append(supplier.phone) }
+            if !supplier.phone.isEmpty { parts.append(Figure.isolated(supplier.phone)) }
             return parts.joined(separator: " · ")
         }
 

@@ -133,7 +133,7 @@ private struct KitChip: View {
                         Text(Money.text(cost, r.currency ?? shop.currency))
                     }
                     if let off = kit.accuracy?.time {
-                        Text("\(off > 0 ? "+" : "")\(Money.quantity(off))% \(shop.words.callIt("mac.kit_vs_estimate"))")
+                        Text(verbatim: "\(off > 0 ? "+" : "")\(Money.quantity(off))% \(shop.words.callIt("mac.kit_vs_estimate"))")
                             .foregroundStyle(.tertiary)
                     }
                 }
