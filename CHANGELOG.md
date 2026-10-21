@@ -14,9 +14,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   route is switched on. The app and its widget and alerts now carry Apple
   privacy manifests that declare the count.
 
-- **Mac: the anonymous daily install count, built and held.** Once a day
-  the Mac would send only its platform, version and release channel, and
-
 - **Desktop: a full customer erase takes their tracking pages down.**
   Fully erasing a customer now also takes down every tracking page they were
   sent from Khayt Cloud, invoiced and paid jobs included, as the privacy
@@ -80,7 +77,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - **Printers.** A finished print is recognised by its time and file, so it
     is no longer seen as new on every poll.
 
-- **VAT is now counted when the invoice is issued, not when the job is finished.** In Saudi Arabia VAT is due when the invoice is issued, and every booked job gets an invoice number. The VAT summary, the P&L's VAT, the ZATCA VAT return export and the tax summary CSV now include jobs that are still pending or printing. A quarter can therefore show more VAT payable than before, and a quarter that used to show a refund may now show a payment. Quotes, a quote still waiting for the customer's approval, and cancelled, voided or fully credited jobs are not counted. Revenue and cost of goods still count finished work only. Check the VAT figures for any quarter you have not filed yet.
+- **VAT is now counted when the invoice is issued, not when the job is finished.** In Saudi Arabia VAT is due when the invoice is issued, and every booked job gets an invoice number. The VAT summary, the P&L's VAT, the ZATCA VAT return export and the tax summary CSV now include jobs that are still pending or printing. A quarter can therefore show more VAT payable than before, and a quarter that used to show a refund may now show a payment. Quotes, a quote still waiting for the customer's approval, and cancelled, voided or fully credited jobs are not counted. Revenue and cost of goods still count finished work only. Check the VAT figures for any quarter you have not filed yet. A return re-exported for a quarter you already filed can differ from what you filed, so keep the copy you submitted.
 
 - **Gross margin no longer counts shipping as a cost.** Shipping is part of the price the customer pays, and the courier's bill is recorded as an expense, so the dashboard and the P&L now show the same gross margin. A job with shipping shows a higher margin than before.
 
@@ -8390,7 +8387,7 @@ missing its dot. And a Prusa can be sent binary G-code.
 
 ### Before you update
 
-- **VAT is now counted when the invoice is issued, not when the job is finished.** In Saudi Arabia VAT is due when the invoice is issued, and every booked job gets an invoice number. The VAT summary, the P&L's VAT, the ZATCA VAT return export and the tax summary CSV now include jobs that are still pending or printing. A quarter can therefore show more VAT payable than before, and a quarter that used to show a refund may now show a payment. Quotes, a quote still waiting for the customer's approval, and cancelled, voided or fully credited jobs are not counted. Revenue and cost of goods still count finished work only. Check the VAT figures for any quarter you have not filed yet.
+- **VAT is now counted when the invoice is issued, not when the job is finished.** In Saudi Arabia VAT is due when the invoice is issued, and every booked job gets an invoice number. The VAT summary, the P&L's VAT, the ZATCA VAT return export and the tax summary CSV now include jobs that are still pending or printing. A quarter can therefore show more VAT payable than before, and a quarter that used to show a refund may now show a payment. Quotes, a quote still waiting for the customer's approval, and cancelled, voided or fully credited jobs are not counted. Revenue and cost of goods still count finished work only. Check the VAT figures for any quarter you have not filed yet. A return re-exported for a quarter you already filed can differ from what you filed, so keep the copy you submitted.
 - **Gross margin no longer counts shipping as a cost.** Shipping is part of the price the customer pays, and the courier's bill is recorded as an expense, so the dashboard and the P&L now show the same gross margin. A job with shipping shows a higher margin than before.
 - **The custom report's Price column is now revenue excluding tax.** It is called "Revenue (excl. tax)" and is net of credit notes, as in the P&L. The balance column is called "Balance due (incl. tax)". Saved reports still open, but a filter or sort on Price now uses the new figure.
 
