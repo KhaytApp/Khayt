@@ -216,6 +216,7 @@ struct LibraryInspector: View {
                     }
                     .buttonStyle(.plain)
                     .help(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite"))
+                    .accessibilityLabel(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite"))
                 } else if file.isFavourite {
                     Image(systemName: "star.fill").foregroundStyle(Khayt.marked)
                 }
@@ -356,7 +357,7 @@ struct LibraryInspector: View {
                         .font(.callout)
                     Spacer(minLength: 8)
                     if let g = colour.grams {
-                        Text("\(Format.mm(g)) \(shop.words.callIt("common.grams"))")
+                        Text(verbatim: "\(Format.mm(g)) \(shop.words.callIt("common.grams"))")
                             .font(.callout)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)

@@ -110,11 +110,20 @@ import Testing
         let inclusive = try await engine.orderFigures(
             [Self.job("a", price: 115, cost: 80, extra: ["paidAmount": .number(0)])],
             settings: Self.vat15, clients: [])
-        #expect(inclusive["a"] == .init(billed: 115, net: 100, tax: 15, owed: 115))
+        #expect(inclusive["a"] == .init(billed: 115, net: 100, tax: 15, owed: 115, earned: 100))
         let exclusive = try await engine.orderFigures(
             [Self.job("b", price: 100, cost: 80, extra: ["paidAmount": .number(100)])],
             settings: Self.salesTax, clients: [])
-        #expect(exclusive["b"] == .init(billed: 108.25, net: 100, tax: 8.25, owed: 8.25))
+        #expect(exclusive["b"] == .init(billed: 108.25, net: 100, tax: 8.25, owed: 8.25, earned: 100))
+        // A credit note comes off what the shop EARNED, as Reports takes it:
+        // 115 credited 57.50 kept 57.50, 50 of it net of VAT. The invoice's
+        // own split does not move.
+        let credited = try await engine.orderFigures(
+            [Self.job("c", price: 115, cost: 40,
+                      extra: ["creditNotes": .array([.object(["amount": .number(57.5)])])])],
+            settings: Self.vat15, clients: [])
+        #expect(credited["c"]?.net == 100)
+        #expect(credited["c"]?.earned == 50)
     }
 
     // MARK: - 3. owed in the order's own currency
@@ -171,7 +180,7 @@ import Testing
         #expect(try await engine.owedRaw(order: old, settings: Self.salesTax) == 0,
                 "a settled order moved into receivables owing the tax")
         let figures = try await engine.orderFigures([old], settings: Self.salesTax, clients: [])
-        #expect(figures["old"] == .init(billed: 108.25, net: 100, tax: 8.25, owed: 0, due: 100),
+        #expect(figures["old"] == .init(billed: 108.25, net: 100, tax: 8.25, owed: 0, due: 100, earned: 100),
                 "the Total a screen shows is what it was settled against, not 108.25 over Paid 100")
         #expect(try await engine.cashDue(order: old, settings: Self.salesTax).cash == 100,
                 "the payment sheet would preview the tax as owed")

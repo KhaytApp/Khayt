@@ -97,6 +97,7 @@ struct FixedCostsSettings: View {
                     }
                     .buttonStyle(.borderless)
                     .help(shop.words.callIt("mac.fixed_remove"))
+                    .accessibilityLabel(shop.words.callIt("mac.fixed_remove"))
                 }
             }
 

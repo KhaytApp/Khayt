@@ -159,3 +159,38 @@ struct ArchiveImportTests {
                 "the file picker will not offer a zip, so one cannot be chosen")
     }
 }
+
+/// "Move originals" with a zip: the models that come out of it are scratch
+/// copies, and the import put every one of them into ~/.Trash before the
+/// scratch folder was deleted anyway.
+@MainActor
+struct ArchiveScratchNotTrashedTests {
+    @Test("a scratch copy out of an archive is imported, not sent to the Trash")
+    func scratchIsKept() async throws {
+        let engine = try KhaytEngine()
+        let zip = try ArchiveImportTests.makeZip([
+            ("pack/a.stl", MeshTests.binarySTL(MeshTests.boxFacets(10, 10, 10))),
+            ("pack/b.stl", MeshTests.binarySTL(MeshTests.boxFacets(12, 10, 10))),
+        ])
+        defer { try? FileManager.default.removeItem(at: zip.deletingLastPathComponent()) }
+        let out = try await ArchiveImport.expand(zip, engine: engine)
+        defer { try? FileManager.default.removeItem(at: out.scratch) }
+        let bench = try LibraryImportEndToEndTests.bench()
+        defer { try? FileManager.default.removeItem(at: bench.dir) }
+
+        let incoming = ImportGrouping.incoming(archive: out.models, group: out.group, documents: out.documents)
+            .map { var f = $0; f.keepOriginal = true; return f }
+        let report = await LibraryImport.addMany(
+            incoming, storeURL: bench.store, libraryRoot: bench.library, knownHashes: [],
+            nameOfExisting: { _ in nil }, engine: engine, keepOriginal: false,
+            owns: { true }, whoHasIt: { nil })
+        #expect(report.moved == 2, "\(report.failures)")
+        #expect(report.trashed.isEmpty, "scratch copies went to the Trash: \(report.trashed)")
+        for m in out.models {
+            #expect(FileManager.default.fileExists(atPath: m.path), "\(m.lastPathComponent) was trashed")
+        }
+        // And the window's import marks what came out of an archive that way.
+        let src = try QuoteSheetStatusTests.source("Shop+Library.swift")
+        #expect(src.contains(".map { var f = $0; f.keepOriginal = true; return f }"))
+    }
+}

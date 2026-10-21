@@ -40,10 +40,19 @@
   /** No real order has more lines than this. See `lines`. */
   const MAX_LINES = 1000;
 
+  /**
+   * No real line asks for more of one thing than this — the cap
+   * `lib/customer-records.js` puts on a quantity too. An order arrives from
+   * outside, and "- Vase x 99999999999999999999" is a finite number that no
+   * host can hold as an integer: the Mac's `Int(1e20)` traps, and a paid order
+   * that traps when it is read crash-loops the app at every launch.
+   */
+  const MAX_QTY = 100000;
+
   const str = (v) => String(v == null ? '' : v);
   const int = (v) => {
     const n = Math.floor(Number(v));
-    return Number.isFinite(n) ? n : 0;
+    return Number.isFinite(n) ? Math.max(-MAX_QTY, Math.min(MAX_QTY, n)) : 0;
   };
 
   /**
@@ -317,7 +326,7 @@
     return out;
   }
 
-  const api = { key, lines, structuredLines, itemLines, matchLine, matcher, read, readLines, effects, MAX_LINES };
+  const api = { key, lines, structuredLines, itemLines, matchLine, matcher, read, readLines, effects, MAX_LINES, MAX_QTY };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytShelfSale = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

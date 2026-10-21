@@ -271,11 +271,21 @@
     return out;
   }
 
-  /** Did this merge just capture a job that was not there before? */
+  /**
+   * Did this merge just capture a job that was not there before?
+   *
+   * Compared by value, not identity: the Mac hands both entries across a JSON
+   * bridge on every call, so the same completion arrives as two distinct objects
+   * and an identity test called every poll after a machine's first finish "new" —
+   * a full write of the book every thirty seconds per printer. Same instant, same
+   * file is the same event, the rule pushCompletion and mergePersisted use too.
+   */
   function completionIsNew(before, after) {
     const b = before && before.lastCompleted;
     const a = after && after.lastCompleted;
-    return !!a && a !== b;
+    if (!a) return false;
+    if (!b) return true;
+    return a.at !== b.at || String(a.filename || '') !== String(b.filename || '');
   }
 
   const api = {

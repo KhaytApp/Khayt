@@ -745,7 +745,9 @@ function exportAccounting() {
       let csv, name;
       if (dataset === 'expenses') {
         // Expenses carry no currency of their own; Wafeq refuses a row without one.
-        csv = KhaytAccountingExport.buildExpenseCsv(expenses, { format, currency: settings.currency || 'SAR' });
+        // `settings`: an expense's VAT goes to Daftra as reclaimable only for a
+        // shop that reclaims (the P&L's rule).
+        csv = KhaytAccountingExport.buildExpenseCsv(expenses, { format, currency: settings.currency || 'SAR', settings });
         name = `expenses-${format}-${stamp}.csv`;
       } else {
         csv = KhaytAccountingExport.buildInvoiceCsv(ordersToInvoiceRows(), { format, salesAccount, taxCode, currency: settings.currency || 'SAR' });

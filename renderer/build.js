@@ -426,8 +426,11 @@ async function aiSuggestPrice() {
         ${reco.suggestedPrice != null ? `<div><div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('ai.price_suggested') || 'Suggested price')}</div><div style="font-size:22px;font-weight:700;">${escapeHtml(fmtMoney(reco.suggestedPrice))}</div></div>` : ''}
       </div>`,
     onSave() {
+      // The field is a MARKUP on cost (lib/pricing.js); the advice is a margin
+      // on price. Typed as-is, 30% earned 23.1% — not the suggested price above.
       const m = $('#margin');
-      if (m) { m.value = String(reco.suggestedMargin); updateGrandTotal(); }
+      const markup = KhaytAiPrice.markupFromMargin(reco.suggestedMargin);
+      if (m && markup != null) { m.value = String(markup); updateGrandTotal(); }
       toast(t('ai.price_applied') || 'Margin applied', 'success');
       return true;
     },

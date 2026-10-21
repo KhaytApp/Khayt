@@ -228,3 +228,160 @@ test('a quoted value is redacted, a quoted code name is kept', () => {
     "No client '<redacted>' for '<redacted>'", 'one word, and a file name, are data too');
   assert.equal(T.scrubText("x 'order.items.length'"), "x 'order.items.length'");
 });
+
+test('a path with spaces is collapsed whole, not up to its first space', () => {
+  // The privacy policy says a path is reduced to a file name. Stopping at a space
+  // left the folder words after it in the report: "Drive", a customer's surname.
+  const drive = S.scrubText('ENOENT /Users/turki/Library/CloudStorage/GoogleDrive-x@y.com/My Drive/Nouf Aldossari/lamp.3mf');
+  assert.ok(!/turki|Drive|Nouf|Aldossari|lamp/.test(drive), `folder words leaked: ${drive}`);
+  assert.ok(drive.includes('<path>/<file>.3mf'), drive);
+  const win = S.scrubText('open C:\\Users\\Turki Alballaa\\AppData\\Roaming\\Khayt\\store.json');
+  assert.ok(!/Turki|Alballaa|AppData|Roaming/.test(win), `windows path leaked: ${win}`);
+  assert.equal(win, 'open <path>/store.json');
+});
+
+test('a stack frame through a folder with spaces keeps its module, line and column', () => {
+  assert.equal(S.scrubText('    at foo (/Users/x y/app/lib/a.js:12:3)'), '    at foo (<path>/a.js:12:3)');
+  assert.equal(S.scrubText('    at /Users/x y/app/lib/a.js:12:3'), '    at <path>/a.js:12:3');
+  assert.equal(S.scrubText('at load (C:\\Users\\Turki A\\app\\store.js:3:1)'), 'at load (<path>/store.js:3:1)');
+  // A slash inside a sentence is not a path that swallows the rest of it.
+  assert.equal(S.scrubText('either/or 50 / 100'), 'either/or 50 / 100');
+});
+
+// A path is a path whatever comes before it: a JSC frame's `@`, a shell's
+// `|` or `;`, markup's `<`, a brace. The second pass of the space fix only
+// counted one after a space, a bracket or a quote, and leaked these whole.
+const PATH_AFTER_ANY_LEAD = [
+  ['open ~/Nouf Aldossari/lamp.3mf', 'open <path>/<file>.3mf'],
+  ['foo</Users/turki/x.js>', 'foo<<path>/x.js>'],
+  ['x{/Users/Nouf Aldossari/a.stl}', 'x{<path>/<file>.stl}'],
+  ['x|/Users/turki/a.3mf', 'x|<path>/<file>.3mf'],
+  ['x;/Users/turki/a.3mf', 'x;<path>/<file>.3mf'],
+  ['x>/Users/turki/a.3mf', 'x><path>/<file>.3mf'],
+  ['x*/Users/turki/a.3mf', 'x*<path>/<file>.3mf'],
+  ['readStore@/Users/turki/Khayt/lib/x.js:12:3', 'readStore@<path>/x.js:12:3'],
+  ['open ./Nouf/a.3mf', 'open <path>/<file>.3mf'],
+];
+
+// A path right after a word character, `-`, `.` or `$` — no lead the POSIX
+// pass takes — and a RELATIVE path with two slashes or more.
+const PATH_AFTER_A_WORD = [
+  ['Users/nouf/Desktop/order.3mf failed', '<path>/<file>.3mf failed'],
+  ['abc/Users/nouf/a.txt', '<path>/<file>.txt'],
+  ['x-/Users/nouf/a.3mf', '<path>/<file>.3mf'],
+  ['x./Users/nouf/a.3mf', '<path>/<file>.3mf'],
+  ['$HOME/../nouf/b.3mf', '<path>/<file>.3mf'],
+  ['openC:\\Users\\Turki A\\x.3mf', 'open<path>/<file>.3mf'],
+  ['at lib/foo/bar.swift:12', 'at <path>/bar.swift:12'],
+];
+
+// An apostrophe or backtick INSIDE a folder name does not end the path.
+const QUOTE_IN_A_FOLDER = [
+  ["ENOENT /Users/t/Orders/Sa'ad Alghamdi/lamp.3mf", 'ENOENT <path>/<file>.3mf'],
+  ["/Users/nouf/O'Brien/lamp.3mf", '<path>/<file>.3mf'],
+  ['/Users/nouf/a`b/c.3mf', '<path>/<file>.3mf'],
+  ["open '/x/a.3mf' now", "open '<path>/<file>.3mf' now"],
+];
+
+test('a relative path with two slashes is collapsed, one slash is text', () => {
+  for (const [input, want] of PATH_AFTER_A_WORD) assert.equal(S.scrubPath(input), want, input);
+  assert.equal(S.scrubPath('and/or KhaytApp/Shop.swift'), 'and/or KhaytApp/Shop.swift');
+});
+
+test('a quote inside a folder name stays in the path, the closing quote ends it', () => {
+  for (const [input, want] of QUOTE_IN_A_FOLDER) assert.equal(S.scrubPath(input), want, input);
+});
+
+test('a path is collapsed after any character that cannot be inside a word', () => {
+  for (const [input, want] of PATH_AFTER_ANY_LEAD) assert.equal(S.scrubPath(input), want, input);
+  // Words with a slash in them are not paths.
+  assert.equal(S.scrubPath('and/or Trace/BPT KhaytApp/Shop.swift'), 'and/or Trace/BPT KhaytApp/Shop.swift');
+  // The scrubber's own marker is not a path to collapse again.
+  assert.equal(S.scrubPath(S.scrubPath('x>/Users/turki/a.3mf')), 'x><path>/<file>.3mf');
+});
+
+test('the sentence after a file name is kept, a space inside a folder name is not', () => {
+  assert.equal(S.scrubPath('Failed /Users/a/b.3mf because disk full'), 'Failed <path>/<file>.3mf because disk full');
+  assert.equal(S.scrubPath('Fatal error: file /Users/turki/src/KhaytApp/Shop.swift, line 120'),
+    'Fatal error: file <path>/Shop.swift, line 120');
+  assert.equal(S.scrubPath('copy /a/Nouf.v2 Aldossari/x.3mf to /b/c d/e.3mf now'),
+    'copy <path>/<file>.3mf to <path>/<file>.3mf now');
+  assert.equal(S.scrubPath('ENOENT /x/My Drive/Nouf Aldossari/lamp.3mf'), 'ENOENT <path>/<file>.3mf');
+});
+
+// The scrubber before paths ran through spaces, verbatim. Every word it took
+// out of a path must still be out; the only words allowed back are a code
+// file's own name, which a stack frame needs.
+const OLD_CODE = /\.(?:js|mjs|cjs|ts|json|html|css|node)$/i;
+function oldBase(name) {
+  const base = String(name || '');
+  if (OLD_CODE.test(base)) return base;
+  const dot = base.lastIndexOf('.');
+  return dot > 0 ? '<file>' + base.slice(dot) : '<file>';
+}
+function oldScrubPath(str) {
+  return str
+    .replace(/(?:file:\/\/)?(?:\/[^\s:()]+)+/g, (m) => '<path>/' + oldBase(m.split('/').filter(Boolean).pop()))
+    .replace(/[A-Za-z]:\\(?:[^\s:()\\]+\\)*([^\s:()\\]+)/g, (m, base) => '<path>/' + oldBase(base));
+}
+const wordsOf = (s) => new Set(s.match(/[A-Za-z0-9]{2,}/g) || []);
+const codeNameWords = (s) => new Set((s.match(/[\w.-]+\.(?:js|mjs|cjs|ts|json|html|css|node|swift)\b/g) || [])
+  .flatMap((f) => [...wordsOf(f)]));
+/** Words the old scrubber removed from `input` that the new one lets through. */
+function leakedSinceOld(input) {
+  const before = wordsOf(oldScrubPath(input));
+  const now = S.scrubPath(input);
+  const nowWords = wordsOf(now);
+  const allowed = codeNameWords(now);
+  return [...wordsOf(input)].filter((w) => !before.has(w) && nowWords.has(w) && !allowed.has(w));
+}
+
+test('nothing the scrubber used to redact is leaked now', () => {
+  const corpus = [
+    ...SECRETS,
+    ...PATH_AFTER_ANY_LEAD.map(([input]) => input),
+    'ENOENT /Users/turki/Library/CloudStorage/GoogleDrive-x@y.com/My Drive/Nouf Aldossari/lamp.3mf',
+    'open C:\\Users\\Turki Alballaa\\AppData\\Roaming\\Khayt\\store.json',
+    '    at foo (/Users/x y/app/lib/a.js:12:3)',
+    '    at /Users/x y/app/lib/a.js:12:3',
+    'at load (C:\\Users\\Turki A\\app\\store.js:3:1)',
+    'at load (/Users/turki/Library/Application Support/Khayt/khayt-store.json:12:5)',
+    'ENOENT: open /Users/t/Khayt/exports/mohammed-alqahtani-invoice.pdf',
+    'at saveAll (/Users/t/Khayt/renderer/store.js:412:9)',
+    'Error: auth\n    at post (/app/net.js:1:1) token=abcdef1234567890',
+    'GET http://192.168.1.50/api/job?apikey=A1B2C3D4E5F6G7H8I9J0KLMN',
+    'Failed /Users/a/b.3mf because disk full',
+    'Fatal error: file /Users/turki/src/KhaytApp/Shop.swift, line 120',
+    'copy /a/Nouf.v2 Aldossari/x.3mf to /b/c d/e.3mf now',
+    'file:///Users/sara/Desktop/order.3mf',
+    ...PATH_AFTER_A_WORD.map(([input]) => input),
+    ...QUOTE_IN_A_FOLDER.map(([input]) => input),
+  ];
+  for (const input of corpus) assert.deepEqual(leakedSinceOld(input), [], `${input} -> ${S.scrubPath(input)}`);
+});
+
+test('a path after ANY lead, with spaces or apostrophes in it, leaks nothing the old scrubber removed', () => {
+  // Generated, so a lead or a folder shape nobody thought to write down is
+  // still tried.
+  const leads = [...'aZ09_.$~<{|;>*@\'"`( -'];
+  const paths = [
+    '/Users/nouf/Desktop/order.3mf',
+    'Users/nouf/Desktop/order.3mf',
+    '/Users/nouf/My Drive/Nouf Aldossari/lamp.3mf',
+    "/Users/sara/Orders/Sa'ad Alghamdi/lamp.3mf",
+    "/Users/sara/O'Brien/lamp.3mf",
+    '/Users/sara/a`b/c.3mf',
+    '~/Nouf Aldossari/lamp.3mf',
+    '$HOME/../nouf/b.3mf',
+    'C:\\Users\\Turki Alballaa\\AppData\\store.json',
+  ];
+  const tails = ['', ' end', ':12:3', "'", ')'];
+  for (const lead of leads) {
+    for (const path of paths) {
+      for (const tail of tails) {
+        const input = `open${lead}${path}${tail}`;
+        assert.deepEqual(leakedSinceOld(input), [], `${input} -> ${S.scrubPath(input)}`);
+      }
+    }
+  }
+});

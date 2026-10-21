@@ -121,7 +121,9 @@ struct ShellTitleBar: View {
             // exists, no field is the honest answer.
             if shop.canSearch {
                 CommandField(shop: shop, wanted: $searchWanted)
-                    .frame(minWidth: 160, maxWidth: 290)
+                    // Narrower still in a narrow window, where 160 was part of
+                    // what pushed the library's title under the traffic lights.
+                    .frame(minWidth: StripWidth.compact(width) ? 120 : 160, maxWidth: 290)
             }
 
             Spacer(minLength: Space.md)

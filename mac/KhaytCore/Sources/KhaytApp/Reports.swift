@@ -388,8 +388,12 @@ struct Reports: View {
             TableColumn(shop.words.callIt("an.pnl_period"), value: \.period) { r in
                 // A row the chosen span cuts short — this month under the
                 // quarter view — is marked, and says which days it holds.
-                Text(r.isPartial ? r.period + "*" : r.period)
+                let said = MonthLabel.period(r.period, words: shop.words)
+                // Wraps rather than widening the column: "الربع الثالث 2026"
+                // at 96 pushed Net Income off the edge (`ColumnWidthsTests`).
+                Text(verbatim: r.isPartial ? said + "*" : said)
                     .font(.body.weight(.semibold)).monospacedDigit()
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     .help(r.isPartial ? Self.days(r) : "")
             }
             .width(min: 64, ideal: 64, max: 160)
@@ -578,6 +582,21 @@ struct Reports: View {
         await recomputeSpending()
     }
 
+    /// The jobs a break-even margin is learned from: finished, unvoided and
+    /// BUSINESS (`BusinessScope.countsForBusiness`), as the other app's
+    /// `renderBreakEvenCard` filters them. A test print or a gift earns nothing
+    /// (`orderEarnedBase`) but its plastic was still counted as a cost, so
+    /// every one of them dragged the margin down and pushed the target up.
+    static func breakEvenJobs(_ rows: [JSONValue]) -> [JSONValue] {
+        rows.filter { row in
+            guard case .object(let o) = row else { return false }
+            guard case .string(let status)? = o["status"],
+                  Shop.finishedStatuses.contains(status) else { return false }
+            if case .string(let voided)? = o["voidedAt"], !voided.isEmpty { return false }
+            return BusinessScope.countsForBusiness(row)
+        }
+    }
+
     private func recomputeBreakEven() async {
         guard let engine = shop.engine else { return }
         // NINETY DAYS, and the same window the other app uses. Long enough that
@@ -596,13 +615,7 @@ struct Reports: View {
         // Finished, unvoided, and business — the same set the quarters count,
         // because a target derived from one set of jobs and drawn beside a
         // figure derived from another is two answers pretending to be one.
-        let completed = shop.orderRows.filter { row in
-            guard case .object(let o) = row else { return false }
-            guard case .string(let status)? = o["status"],
-                  Shop.finishedStatuses.contains(status) else { return false }
-            if case .string(let voided)? = o["voidedAt"], !voided.isEmpty { return false }
-            return true
-        }
+        let completed = Self.breakEvenJobs(shop.orderRows)
         var costs: [JSONValue] = []
         if case .array(let stored)? = shop.settingsDict["fixedCosts"] { costs = stored }
 
@@ -1179,7 +1192,7 @@ struct Reports: View {
                             }
                         }
                         .width(min: 120, ideal: 200)
-                        TableColumn(shop.words.callIt("an.aged_col_client"), value: \.client) { row in
+                        TableColumn(shop.words.callIt("mac.customer"), value: \.client) { row in
                             Text(row.client.isEmpty ? "—" : row.client)
                                 .foregroundStyle(row.client.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
                                 .lineLimit(1)
@@ -1304,8 +1317,8 @@ struct Reports: View {
                     // the row short: "2026-Q4" over this month's figures
                     // would name a quarter they do not cover.
                     Text(shop.words.callIt("mac.quarter_drawn", ["q": .string(
-                        row.isPartial ? Figure.isolated(row.period) + " · " + Reports.days(row)
-                                      : Figure.isolated(row.period))]))
+                        row.isPartial ? MonthLabel.period(row.period, words: shop.words) + " · " + Reports.days(row)
+                                      : MonthLabel.period(row.period, words: shop.words))]))
                         .font(.system(size: 11, weight: .semibold))
                         .textCase(.uppercase).tracking(0.5)
                         .foregroundStyle(.secondary)
@@ -1481,8 +1494,9 @@ struct Reports: View {
                     }
 
                     if let latest = rows.first {
-                        DetailSection(latest.isPartial ? latest.period + " · " + Reports.days(latest)
-                                                       : latest.period) {
+                        DetailSection(latest.isPartial
+                                      ? MonthLabel.period(latest.period, words: shop.words) + " · " + Reports.days(latest)
+                                      : MonthLabel.period(latest.period, words: shop.words)) {
                             VStack(spacing: 6) {
                                 DetailLine(shop.words.callIt("an.pnl_orders"), "\(latest.orders)")
                                 DetailLine(shop.words.callIt("an.revenue"),

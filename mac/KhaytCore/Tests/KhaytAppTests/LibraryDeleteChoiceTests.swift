@@ -80,6 +80,48 @@ struct LibraryDeleteChoiceTests {
         #expect(lines.contains { $0.contains("One of these 4 is only on this Mac") }, "\(lines)")
     }
 
+    /// A selection was planned one HEAD after another, each with its own
+    /// request timeout: the question waited minutes on a slow remote, and for
+    /// ever on one that never answered.
+    @Test("the backups are asked about a few at a time, and the whole plan is bounded")
+    func planIsConcurrentAndBounded() async throws {
+        let f = try fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        final class Flight: @unchecked Sendable {
+            let lock = NSLock(); var now = 0; var most = 0
+            func enter() { lock.withLock { now += 1; most = max(most, now) } }
+            func leave() { lock.withLock { now -= 1 } }
+        }
+        let flight = Flight()
+        let hangs: S3.Fetch = { _ in
+            flight.enter()
+            defer { flight.leave() }
+            try await Task.sleep(for: .seconds(60))
+            throw CancellationError()
+        }
+        var many = f.files
+        for i in 0..<8 {
+            let id = "PF-x\(i)"
+            let url = f.root.appending(path: "\(id)/x.stl")
+            try LibraryStorageTests.model(url, size: 9)
+            many.append(try record(["id": id, "name": id, "sourceFile": ["filename": "x.stl"]]))
+        }
+        let started = ContinuousClock.now
+        let p = await Shop.planDelete(many, roots: [f.root.path], remote: .bucket(config), prefix: "",
+                                      remoteTag: "bucket:", engine: try KhaytEngine(), fetch: hangs,
+                                      patience: .milliseconds(400),
+                                      modelFile: { file in
+                                          f.paths[file.id] ?? f.root.appending(path: "\(file.id)/x.stl")
+                                      })
+        // Each remote hangs for 60 s; a plan that waited on one would take a
+        // minute. 30 s, not 10: under the whole suite's load the 400 ms
+        // patience alone stretched past 10 (beta.1 batch run).
+        #expect(ContinuousClock.now - started < .seconds(30), "the plan waited on the remote")
+        #expect(flight.most > 1 && flight.most <= Shop.deleteCheckWidth, "\(flight.most) at once")
+        #expect(p.keptOnline.isEmpty, "nothing is kept online on a copy nobody saw")
+        #expect(p.onlyHere.contains("PF-a") && p.ids.count == many.count)
+    }
+
     @Test("Remove from This Mac: the file goes only once the online copy is proved, and the copy stays")
     func removeLocalKeepsOnline() async throws {
         let f = try fixture()
@@ -121,6 +163,29 @@ struct LibraryDeleteChoiceTests {
         #expect(f.bucket.object("/lib/print-files/PF-c/c.stl") == nil)
         #expect(f.bucket.object("/lib/Mine/d.stl") == nil)
         #expect(FileManager.default.fileExists(atPath: f.paths["PF-c"]!.path), "never the shop's own file")
+    }
+
+    /// A backup keeps more than the model under the model's own folder —
+    /// versions, thumbs, guides — and Delete Completely left all of it.
+    @Test("Delete Completely empties the model's own online folder, and only its own")
+    func completeEmptiesTheFolder() async throws {
+        let f = try fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        f.bucket.seed("/lib/print-files/PF-a/versions/v1.stl", Data([1]))
+        f.bucket.seed("/lib/print-files/PF-a/thumb.png", Data([2]))
+        f.bucket.seed("/lib/print-files/PF-ab/x.stl", Data([3]))   // another model, the same first letters
+        f.bucket.seed("/lib/print-files/PF-b/guide.pdf", Data([4])) // PF-b's backup was never found
+        let p = try await plan(f)
+        let r = await Shop.deleteOnlineCopies(p, ids: ["PF-a", "PF-b"], remote: .bucket(config),
+                                              bucket: .bucket(config), remoteTag: "bucket:", prefix: "",
+                                              fetch: f.bucket.fetch)
+        #expect(Set(r.done) == ["PF-a", "PF-b"] && r.failed.isEmpty, "\(r.failed)")
+        for gone in ["/lib/print-files/PF-a/a.stl", "/lib/print-files/PF-a/versions/v1.stl",
+                     "/lib/print-files/PF-a/thumb.png", "/lib/print-files/PF-b/guide.pdf"] {
+            #expect(f.bucket.object(gone) == nil, "\(gone) was left in the bucket")
+        }
+        #expect(f.bucket.object("/lib/print-files/PF-ab/x.stl") != nil, "another model's file went too")
+        #expect(f.bucket.object("/lib/print-files/PF-c/c.stl") != nil, "a model not chosen was touched")
     }
 
     @Test("an online delete that fails keeps that model whole, and the others go")

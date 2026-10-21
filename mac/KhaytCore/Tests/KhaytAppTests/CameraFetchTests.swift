@@ -90,6 +90,93 @@ struct CameraFetchTests {
         #expect(frame == .picture(png))
     }
 
+    /// ── A NAME IS JUDGED BY WHAT IT RESOLVES TO ─────────────────────────
+    ///
+    /// The text rule passes any name, so a synced or restored book naming
+    /// `cam.attacker.example` — as the printer's host, or as the camera's —
+    /// was fetched with the printer's key on every frame. The poller resolved
+    /// and refused it (#1955); the camera did not.
+    @Test("a camera or printer NAME that resolves off this network gets no request")
+    func aPublicNameIsRefused() async throws {
+        let shop = await Self.shop()
+        for (host, snap) in [("cam.attacker.example", "http://cam.attacker.example/snap.jpg"),
+                             ("192.168.1.50", "http://cam.attacker.example/snap.jpg"),
+                             ("192.168.1.50", "http://mixed.example/snap.jpg")] {
+            let machine = try Self.machine(host: host, snapshot: snap, type: "octoprint")
+            var asked = 0
+            let frame = await Camera.fetch(machine, shop: shop, get: { _ in
+                asked += 1
+                return (Data(), HTTPURLResponse())
+            }, lookUp: { name in name == "mixed.example" ? ["192.168.1.9", "93.184.216.34"] : ["93.184.216.34"] })
+            #expect(asked == 0, "\(snap) was fetched")
+            #expect(frame == .failed("refused"))
+        }
+    }
+
+    /// And a LAN name is fetched at the address that was checked, so a name
+    /// that answers differently to `URLSession`'s own lookup (rebinding) is
+    /// never asked.
+    @Test("a camera name on this network is fetched at the checked address")
+    func aLanNameIsPinned() async throws {
+        let shop = await Self.shop()
+        let machine = try Self.machine(host: "voron.local",
+                                       snapshot: "http://voron.local:8080/webcam/?action=snapshot")
+        var seen: [URL] = []
+        _ = await Camera.fetch(machine, shop: shop, get: { request in
+            seen.append(request.url!)
+            return (Data(), HTTPURLResponse())
+        }, lookUp: { _ in ["192.168.1.50"] })
+        #expect(seen.map(\.absoluteString) == ["http://192.168.1.50:8080/webcam/?action=snapshot"])
+    }
+
+    /// A camera password saved before the shared rule refused it is emptied
+    /// on disk, through the real write, and nothing else in the book moves.
+    @Test("a camera URL with credentials already in a book is emptied, once, and nothing else is touched")
+    func credentialsOnDiskAreScrubbed() async throws {
+        let url = try SettingsReachDiskTests.scratchBook()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let engine = try KhaytEngine()
+        let api: JSONValue = .object(["type": .string("octoprint"), "host": .string("192.168.1.50")])
+        func cam(_ snap: String, _ stream: String) -> JSONValue {
+            .object(["enabled": .bool(true), "snapshotUrl": .string(snap), "streamUrl": .string(stream),
+                     "rotate": .number(90)])
+        }
+        // Planted through the writer, as an older build would have saved them.
+        try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+            var rows: [JSONValue] = []
+            if case .array(let had)? = root["machines"] { rows = had }
+            rows.append(.object(["id": .string("CAM1"), "name": .string("Leaky"), "printerApi": api,
+                                 "webcam": cam("http://admin:hunter2@192.168.1.60/snap.jpg",
+                                               "http://192.168.1.60/stream")]))
+            rows.append(.object(["id": .string("CAM2"), "name": .string("Fine"), "printerApi": api,
+                                 "webcam": cam("/snap.jpg?by=a@b", "rtsp://cam@192.168.1.61/live")]))
+            root["machines"] = .array(rows)
+        }
+        let before = try CloudMergeTests.read(url)
+        func scrub() async throws -> Int {
+            var n = 0
+            try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+                n = await Camera.scrubCredentials(&root) { u, a in try? await engine.normalizeWebcamUrl(u, printerApi: a) }
+            }
+            return n
+        }
+        #expect(try await scrub() == 2)
+        let after = try CloudMergeTests.read(url)
+        func webcam(_ root: [String: JSONValue], _ id: String) -> [String: JSONValue] {
+            guard let m = CloudMergeTests.record(root, "machines", id), case .object(let w)? = m["webcam"] else { return [:] }
+            return w
+        }
+        #expect(webcam(after, "CAM1")["snapshotUrl"] == .string(""))
+        #expect(webcam(after, "CAM1")["streamUrl"] == .string("http://192.168.1.60/stream"))
+        #expect(webcam(after, "CAM1")["rotate"] == .number(90) && webcam(after, "CAM1")["enabled"] == .bool(true))
+        #expect(webcam(after, "CAM2")["snapshotUrl"] == .string("/snap.jpg?by=a@b"), "an @ after the host is not a login")
+        #expect(webcam(after, "CAM2")["streamUrl"] == .string(""))
+        // Every other collection exactly as it was.
+        for key in before.keys where key != "machines" { #expect(after[key] == before[key], "\(key) moved") }
+        #expect(!String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("hunter2"))
+        #expect(try await scrub() == 0, "the second load finds nothing to do")
+    }
+
     /// ── THE REDIRECT, AND THE KEY THAT USED TO GO WITH IT ───────────────
     ///
     /// A camera is allowed to be its own device now, and the request to it

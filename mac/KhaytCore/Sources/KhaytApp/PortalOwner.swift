@@ -84,6 +84,8 @@ extension Shop {
         guard let engine else { moveProblem = words.callIt("mac.move_no_engine"); return nil }
         guard portalReachable else { moveProblem = words.callIt("cloud.portal_need_connect"); return nil }
         guard cloudRoleCanWrite else { moveProblem = words.callIt("mac.portal_viewer"); return nil }
+        // An erased customer's page still coming down is not put back up.
+        guard !isPortalTakedownPending(id) else { moveProblem = words.callIt("mac.portal_takedown_pending"); return nil }
         var cloud: [String: JSONValue] = [:]
         if case .object(let c)? = settingsDict["cloud"] { cloud = c }
         guard let gate = try? await engine.portalTrialGate(cloud: cloud, now: Date()) else { return nil }
@@ -164,13 +166,89 @@ extension Shop {
         guard cloudRoleCanWrite, let creds = try? await portalCredentials() else {
             moveProblem = words.callIt("mac.delete_portal_kept"); return
         }
+        let down = await Self.takeDown(tokens) { tok in
+            try await PortalClient.unpublish(pubToken: tok, baseUrl: creds.url, shopId: creds.shopId,
+                                             token: creds.token, engine: engine)
+        }
+        if down != Set(tokens) { moveProblem = words.callIt("mac.delete_portal_kept") }
+    }
+
+    /// Each link in turn, a failure not stopping the rest. The tokens that
+    /// came down.
+    static func takeDown(_ tokens: [String], unpublish: (String) async throws -> Void) async -> Set<String> {
+        var down: Set<String> = []
         for tok in tokens {
+            do { try await unpublish(tok); down.insert(tok) } catch {}
+        }
+        return down
+    }
+
+    // MARK: - Pages an erase asked to take down
+
+    /// The job field that says its page should come down and has not been
+    /// seen to. Set by a full customer erase, cleared only by a DELETE that
+    /// succeeded, so a failed one is never forgotten.
+    nonisolated static let takedownPendingKey = "portalTakedownPending"
+
+    /// This job's page is waiting to come down.
+    func isPortalTakedownPending(_ id: Order.ID) -> Bool {
+        portalRecord(id)?[Self.takedownPendingKey] == .bool(true) && portalToken(id) != nil
+    }
+
+    /// The jobs waiting, with their tokens, in book order.
+    nonisolated static func pendingTakedowns(_ jobs: [JSONValue]) -> [(id: String, token: String)] {
+        jobs.compactMap { row in
+            guard case .object(let o) = row, o[takedownPendingKey] == .bool(true),
+                  case .string(let id)? = o["id"], case .string(let token)? = o["trackingToken"],
+                  !token.isEmpty else { return nil }
+            return (id, token)
+        }
+    }
+
+    /// The write after the DELETEs: the jobs whose pages came down are no
+    /// longer pending (nor published). Any other job is left as it is.
+    nonisolated static func clearTakedowns(_ tokens: Set<String>, in root: inout [String: JSONValue]) {
+        guard !tokens.isEmpty else { return }
+        var log = rows(root, "printLog")
+        var changed = false
+        for i in log.indices {
+            guard case .object(var o) = log[i], o[takedownPendingKey] != nil,
+                  case .string(let token)? = o["trackingToken"], tokens.contains(token) else { continue }
+            o[takedownPendingKey] = nil
+            o["cloudPublished"] = .bool(false)
+            log[i] = .object(o)
+            changed = true
+        }
+        if changed { root["printLog"] = .array(log) }
+    }
+
+    /// Take down every page still pending: straight after an erase (`say`,
+    /// so a page that stays up is told), and again on the customer-records
+    /// loop, at launch and every ten minutes, quietly, until each is down.
+    /// The erase was the person's decision; the retry needs no one signed in.
+    func takeDownPendingLinks(say: Bool) async {
+        let pending = Self.pendingTakedowns(orderRows)
+        guard !pending.isEmpty, let build = source.build, let engine else { return }
+        guard portalReachable, cloudRoleCanWrite, let creds = try? await portalCredentials() else {
+            if say { moveProblem = words.callIt("mac.delete_portal_kept") }
+            return
+        }
+        // lock: system — background: finishing a full erase a person confirmed; the pages must come down.
+        let down = await Self.takeDown(pending.map(\.token)) { tok in
+            try await PortalClient.unpublish(pubToken: tok, baseUrl: creds.url, shopId: creds.shopId,
+                                             token: creds.token, engine: engine)
+        }
+        if !down.isEmpty {
             do {
-                try await PortalClient.unpublish(pubToken: tok, baseUrl: creds.url, shopId: creds.shopId,
-                                                 token: creds.token, engine: engine)
+                try await StoreWriter.updateAsync(build) { root in Self.clearTakedowns(down, in: &root) }
+                await load(source)
             } catch {
-                moveProblem = words.callIt("mac.delete_portal_kept")
+                // Still pending on disk: the next look sends the DELETE again,
+                // which the cloud answers the same for a page already gone.
             }
+        }
+        if say, down.count < Set(pending.map(\.token)).count {
+            moveProblem = words.callIt("mac.delete_portal_kept")
         }
     }
 
@@ -186,6 +264,7 @@ extension Shop {
                                              token: creds.token, engine: engine)
             try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: id) { r in
                 r["cloudPublished"] = .bool(false)
+                r[Self.takedownPendingKey] = nil
             }
             await load(source)
             moveNotices = [words.callIt("cloud.portal_unpublished")]

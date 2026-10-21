@@ -145,7 +145,7 @@ enum EmailClient {
     /// either way. A `0` is the field left empty, not a port.
     static func smtpPort(_ value: JSONValue?) -> UInt16 {
         var raw = 0
-        if case .number(let n)? = value { raw = Int(n) }
+        if case .number(let n)? = value { raw = Int(saturating: n) }
         if case .string(let s)? = value, let n = Int(s) { raw = n }
         guard (1...65535).contains(raw) else { return 587 }
         return UInt16(raw)

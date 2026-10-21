@@ -74,8 +74,11 @@ struct LibraryLocationSettings: View {
                                 .foregroundStyle(here ? AnyShapeStyle(.secondary) : AnyShapeStyle(Khayt.attention))
                             Text(verbatim: (path as NSString).abbreviatingWithTildeInPath)
                                 .font(.callout.monospaced()).lineLimit(1).truncationMode(.middle)
+                            // Not during a scan: one that walked this folder
+                            // would add its models back after the unlink.
                             Button(shop.words.callIt("mac.linked_unlink") + "\u{2026}") { unlinking = path }
                                 .controlSize(.small)
+                                .disabled(shop.libraryMoveBusy)
                         }
                     }
                     HStack {

@@ -91,7 +91,14 @@ function priceProduct(product, opts) {
     : 0;
 
   const cost = partsCost + compCost;
-  const margin = Math.max(0, num(d.defaultMargin, 30));
+  // A product with no margin of its own is priced at the SHOP's default
+  // (`settings.defaultMargin`, else 30) — the figure a job taken from it, a
+  // counter sale and the LAN library quote all use. This read 30 whatever the
+  // shop had set, so a shop at 50 listed a product at cost × 1.3 in the
+  // catalogue and the storefront and recorded cost × 1.5 when it sold one.
+  const shopMargin = (ctx.settings && typeof ctx.settings.defaultMargin === 'number'
+    && Number.isFinite(ctx.settings.defaultMargin)) ? ctx.settings.defaultMargin : 30;
+  const margin = Math.max(0, num(d.defaultMargin, shopMargin));
   const basePrice = +(cost * (1 + margin / 100)).toFixed(2);
 
   // `basePrice` is cost plus margin and stays that. `price` is what the shop

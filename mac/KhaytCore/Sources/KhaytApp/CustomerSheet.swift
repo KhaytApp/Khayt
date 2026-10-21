@@ -128,7 +128,10 @@ struct CustomerSheet: View {
                 Button(shop.words.callIt("common.save")) {
                     let saving = Self.saving(Opened(draft: draft, agreements: agreements,
                                                     schedule: schedule))
-                    Task { await shop.saveCustomer(saving) }
+                    // The customer as it opened, for what an untouched save writes:
+                    // a new one has nothing to compare with.
+                    let opened = isNew ? nil : existing
+                    Task { await shop.saveCustomer(saving, opened: opened) }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!canSave)

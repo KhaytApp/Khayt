@@ -138,6 +138,69 @@ struct EditPartTests {
         }
     }
 
+    @Test("a part of three writes the LINE as its base cost, three pieces, not one")
+    func baseCostIsTheLine() async throws {
+        // Every other path writes `baseCost` as unit × qty (`partRows`), and
+        // the job's cost and the reports sum it: an edited part of three had
+        // two thirds of its cost vanish from the books.
+        let shop = await Self.shop()
+        var raw = Self.spoolPart(filamentId: "INV-9", spoolCost: 50)
+        raw["qty"] = .number(3)
+        let order = Self.orderRecord([.object(raw)])
+        let costed = try #require(await shop.costedPart(spoolId: nil, grams: 60, hours: 1, qty: 3))
+        #expect(costed.cost > 0)
+        let out = Shop.orderWithPartEdited(order, partId: "P1", name: "Bracket", spool: nil,
+                                           grams: 60, hours: 1, qty: 3, costed: costed)
+        let part = try #require(Self.fields(out, partId: "P1"))
+        #expect(part["unitCost"] == .number(costed.cost))
+        #expect(part["baseCost"] == .number(costed.cost * 3))
+        // The sheet's path, qty left as it was: still the line.
+        let opened = EditPartSheet.Opened(name: "Bracket", grams: "30", hours: "1", qty: 3, spoolId: nil)
+        var now = opened
+        now.grams = "60"
+        let edited = Shop.orderWithPartEdited(order, partId: "P1", now, opened: opened,
+                                              spool: nil, costed: costed)
+        let again = try #require(Self.fields(edited, partId: "P1"))
+        #expect(again["baseCost"] == .number(costed.cost * 3))
+    }
+
+    @Test("a shop that reclaims tax costs a part at the spool's price net of it, as the LAN quote does")
+    func spoolCostIsNetOfReclaimedTax() async throws {
+        // 115 paid, 15 of it tax the shop gets back: the roll costs a job 100,
+        // so 200 g of a 1 kg roll is 20.00 — `KhaytSpoolEdit.netCost`, which
+        // Electron's calculator, the LAN quote and the AI quote use.
+        let spool: Spool = try JSONDecoder().decode(Spool.self, from: Data(
+            #"{"id":"V1","material":"PLA","cost":115,"vatAmount":15,"spoolWeight":1000}"#.utf8))
+        let zero: [String: JSONValue] = ["wearRate": .number(0), "powerDraw": .number(0),
+                                         "elecRate": .number(0), "prepTime": .number(0),
+                                         "postTime": .number(0), "laborRate": .number(0),
+                                         "failureRate": .number(0)]
+        let engine = try KhaytEngine()
+        let input = Shop.costInput(spool: spool, grams: 200, hours: 0, qty: 1, reclaimsTax: true, extra: zero)
+        let costed = try await engine.costPart(input, inventory: [], settings: [:])
+        #expect(abs(costed.cost - 20) < 0.005, Comment(rawValue: "cost \(costed.cost)"))
+        let gross = Shop.costInput(spool: spool, grams: 200, hours: 0, qty: 1, reclaimsTax: false, extra: zero)
+        #expect(abs(try await engine.costPart(gross, inventory: [], settings: [:]).cost - 23) < 0.005,
+                "a shop that reclaims nothing pays the tax")
+
+        // And the price is what the part is WRITTEN with, on every path.
+        let order = Self.orderRecord([Self.partRecord("P1", grams: 30, hours: 1, cost: 12)])
+        let edited = Shop.orderWithPartEdited(order, partId: "P1", name: "Bracket", spool: spool,
+                                              grams: 200, hours: 0, qty: 1, costed: nil, reclaimsTax: true)
+        #expect(Self.fields(edited, partId: "P1")?["spoolCost"] == .number(100))
+        var draft = NewJobSheet.Draft()
+        draft.spoolId = "V1"; draft.grams = "200"; draft.hours = "0"
+        guard case .object(let row)? = Shop.partRows([draft], spools: [spool], reclaimsTax: true, unnamed: "x").first
+        else { Issue.record("no row"); return }
+        #expect(row["spoolCost"] == .number(100))
+        var product = try #require(ProductSheet.PartRow.from(.object(Self.spoolPart(filamentId: "V1", spoolCost: 115))))
+        product.spoolId = "V1"
+        guard case .object(let saved) = product.record(spools: [spool], reclaimsTax: true) else {
+            Issue.record("no product part"); return
+        }
+        #expect(saved["spoolCost"] == .number(100))
+    }
+
     @Test("only the named part is touched")
     func othersUntouched() async throws {
         let shop = await Self.shop()

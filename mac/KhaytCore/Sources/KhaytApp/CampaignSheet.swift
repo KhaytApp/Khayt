@@ -252,9 +252,10 @@ struct CampaignSheet: View {
         let text = body_
         let line = subject
         let list = recipients
+        let channel = segment.channel
         sending = true
         Task {
-            result = await shop.sendCampaign(text, subject: line, to: list)
+            result = await shop.sendCampaign(text, subject: line, channel: channel, to: list)
             sending = false
         }
     }

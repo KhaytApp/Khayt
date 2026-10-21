@@ -487,6 +487,17 @@ extension Shop {
 
     // MARK: - Smart plugs
 
+    /// The poller stopped asking this machine (`PrinterWatch.forgetUnwatched`):
+    /// let go of what the plug tick and the meter remembered about its last
+    /// print, and end its Live Activity, so its return to service is a fresh
+    /// start rather than the old print ending.
+    func printerUnwatched(_ machineId: String) {
+        lastPrinterState[machineId] = nil
+        printEndedAt[machineId] = nil
+        energyMeter()?.forget(machineId)
+        liveActivityUnwatched(machineId)
+    }
+
     func energyMeter() -> EnergyMeter? {
         guard let url = source.build?.storeURL else { return nil }
         if let (book, meter) = meterForBook, book == url { return meter }
@@ -861,6 +872,7 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+                undo = []  // the book moved and this runs again: one entry, not two
                 do {
                     if let was = try await Self.writeMachine(into: &root, input: input, id: id,
                                                              catalogId: catalogId, opened: opened,

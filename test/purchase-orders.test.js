@@ -44,6 +44,21 @@ test('a consumable order asks for one, not a kilo of screws', () => {
   assert.equal(po.itemName, 'Kapton tape', 'a consumable is named, not described');
 });
 
+test('a spool counted in sheets or ml is ordered in its own unit, not as 1000 g', () => {
+  const ply = PO.draft({ item: spool({ unit: 'sheet', spoolWeight: 10 }), ask: {}, id: 'PO-5', today: 'T' });
+  assert.equal(ply.unit, 'sheet');
+  assert.equal(ply.qty, 10, 'one more pack, as the last one arrived');
+  assert.equal(ply.kind, undefined, 'still a spool order: the receive restocks inventory');
+  const resin = PO.draft({ item: spool({ unit: 'ml' }), ask: {}, id: 'PO-6', today: 'T' });
+  assert.equal(resin.unit, 'ml');
+  assert.equal(resin.qty, 1000);
+  assert.equal(PO.draft({ item: spool({ unit: 'sheet' }), ask: {}, id: 'PO-7', today: 'T' }).qty, 1);
+  assert.equal(PO.draft({ item: spool({ unit: 'sheet', reorderQty: 4 }), ask: {}, id: 'PO-8', today: 'T' }).qty, 4);
+  // Grams stay unwritten, as every older order is.
+  assert.equal(PO.draft({ item: spool({ unit: 'g', spoolWeight: 500 }), ask: {}, id: 'PO-9', today: 'T' }).unit, undefined);
+  assert.equal(PO.draft({ item: spool({ spoolWeight: 500 }), ask: {}, id: 'PO-9', today: 'T' }).qty, 1000);
+});
+
 test("the item's own reorder quantity wins over the default", () => {
   const po = PO.draft({ item: spool({ reorderQty: 2000 }), ask: {}, id: 'PO-3', today: 'T' });
   assert.equal(po.qty, 2000);
@@ -176,4 +191,24 @@ test('an order written before consumables existed reads as filament', () => {
   // collection depending on this answer.
   assert.equal(PO.isConsumableOrder({ id: 'PO-old' }), false);
   assert.equal(PO.isConsumableOrder({ id: 'PO-new', kind: 'consumable' }), true);
+});
+
+test('an EMPTY roll refilled takes the delivery\'s weight and price, not the old roll\'s', () => {
+  const empty = { id: 'S1', material: 'PLA', weight: 0, spoolWeight: 1000, cost: 80 };
+  // Priced on the order: 250 g at 0.1/g is 25 for a 250 g roll.
+  const priced = PO.receive({ po: { id: 'PO-7', qty: 250, unitPrice: 0.1 }, item: empty,
+                              quantity: 250, today: '2026-09-19' });
+  assert.equal(priced.item.weight, 250);
+  assert.equal(priced.item.spoolWeight, 250);
+  assert.equal(priced.item.cost, 25);
+  // Unpriced: the old roll's price per gram, scaled to what arrived.
+  const unpriced = PO.receive({ po: { id: 'PO-8', qty: 250 }, item: empty,
+                                quantity: 250, today: '2026-09-19' });
+  assert.equal(unpriced.item.spoolWeight, 250);
+  assert.equal(unpriced.item.cost, 20);
+  // A roll with plastic left on it keeps what it weighed and cost.
+  const part = PO.receive({ po: { id: 'PO-9', qty: 250, unitPrice: 0.1 },
+                            item: { ...empty, weight: 100 }, quantity: 250, today: '2026-09-19' });
+  assert.equal(part.item.spoolWeight, 1000);
+  assert.equal(part.item.cost, 80);
 });

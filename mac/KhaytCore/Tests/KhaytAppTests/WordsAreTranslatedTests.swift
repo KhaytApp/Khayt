@@ -331,8 +331,12 @@ struct SingularTests {
             for language in ["en", "ar"] {
                 let singular = try #require(one[language], "\(key)_one has no \(language)")
                 let plural = try #require(many[language], "\(key) has no \(language)")
-                // The count still has somewhere to go in both.
-                #expect(singular.contains("{n}"), "\(language) singular lost its count")
+                // The count still has somewhere to go in both — or, in
+                // Arabic's singular, is spelled out (متأخر يومًا واحدًا), the
+                // one form `test/mac-words.test.js` lets drop `{n}`.
+                #expect(singular.contains("{n}")
+                        || (language == "ar" && singular.range(of: "واحد", options: .literal) != nil),
+                        "\(language) singular lost its count")
                 #expect(plural.contains("{n}"), "\(language) plural lost its count")
             }
             // And in English they actually differ, or the singular is decoration.

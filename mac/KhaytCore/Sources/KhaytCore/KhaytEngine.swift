@@ -2236,7 +2236,10 @@ public actor KhaytEngine {
                            from: String = "", to: String = "") throws -> String {
         try runtime.call2(
             "KhaytAccountingExport.buildExpenseCsv(ARG0, ARG1)",
-            [.array(expenses), .object(Self.accountingOptions(settings, format: format, from: from, to: to))],
+            // With the settings: an expense's VAT is reclaimable only for a
+            // shop that reclaims (the P&L's rule).
+            [.array(expenses), .object(Self.accountingOptions(settings, format: format, from: from, to: to)
+                .merging(["settings": .object(settings)]) { a, _ in a })],
             as: String.self)
     }
 
@@ -3761,11 +3764,15 @@ public actor KhaytEngine {
     /// and those are COPIES on this side of the bridge, so all three come
     /// back and the caller writes all three. `now` is a local instant: the
     /// rule turns it into the shop's own day, in this Mac's timezone.
+    /// `trackingTokens`: random bytes for each job it might make — one per
+    /// customer is enough — so every repeat order has its own tracking page.
     public func recurringOrders(clients: [JSONValue], orders: [JSONValue],
-                                settings: [String: JSONValue], now: Date) throws -> RecurringRun {
+                                settings: [String: JSONValue], now: Date,
+                                trackingTokens: [[UInt8]] = []) throws -> RecurringRun {
         try runtime.call2(RECURRING_SCRIPT,
                           [.array(clients), .array(orders), .object(settings),
-                           .number(now.timeIntervalSince1970 * 1000)],
+                           .number(now.timeIntervalSince1970 * 1000),
+                           .array(trackingTokens.map { .array($0.map { .number(Double($0)) }) })],
                           as: RecurringRun.self)
     }
 
@@ -4548,6 +4555,13 @@ public actor KhaytEngine {
                           [input, printerApi], as: JSONValue.self)
     }
 
+    /// One camera address, normalised: `lib/webcam.js normalizeWebcamUrl`.
+    /// '' is its refusal — a URL with credentials in it among them.
+    public func normalizeWebcamUrl(_ url: String, printerApi: JSONValue) throws -> String {
+        try runtime.call2("globalThis.KhaytWebcam.normalizeWebcamUrl(ARG0, ARG1)",
+                          [.string(url), printerApi], as: String.self)
+    }
+
     /// The addresses a printer of this family might serve a camera on, best
     /// first — plural, because one guess is demonstrably not enough. Checked
     /// against a Snapmaker U1 on stock firmware, the derived
@@ -4924,6 +4938,8 @@ public actor KhaytEngine {
             machines: ARG0, completed: ARG1, expenses: ARG2,
             maintenance: ARG3, unassigned: ARG6, days: ARG7,
             range: ARG8, recentMonthlyHours: ARG9, timeEntries: ARG12,
+            // Linked expenses net of reclaimable tax, as the P&L.
+            settings: ARG4,
           };
           if (Array.isArray(ARG11)) input.orders = ARG11;
           return globalThis.KhaytMachinePL.machineProfit(input, {
@@ -5954,6 +5970,8 @@ public actor KhaytEngine {
           var ctx = { settings: ARG4, clients: ARG5 };
           return globalThis.KhaytProductProfit.productProfit({
             orders: ARG0, products: ARG1, expenses: ARG2, untagged: ARG3,
+            // Linked expenses net of reclaimable tax, as the P&L.
+            settings: ARG4,
           }, {
             revenueOf: function (o) { return globalThis.KhaytOrderMoney.orderEarnedBase(o, ctx); },
             partCostOf: function (p) { return globalThis.KhaytCalculatorCost.partTotalCost(p, ctx); },
@@ -7454,26 +7472,35 @@ public actor KhaytEngine {
     /// is how a sheet says "not this one" — sending the due date it merely
     /// re-read would re-spell a stored instant as a day and log an edit
     /// nobody made.
+    ///
+    /// `settings` is the shop's: a typed price caps what was paid at the new
+    /// price PLUS its tax and re-reads paid/partial from that gross, so a shop
+    /// that adds tax on top keeps a payment that covered the tax (Electron
+    /// passes them too — test/desktop-tax-added-money.test.js).
     public func editJob(order: JSONValue, fields: [String: JSONValue],
+                        settings: [String: JSONValue] = [:],
                         now: Date, editId: String) throws -> JobEdited {
         try runtime.call2(
             "(function(){ var o = ARG0;"
-          + " var r = KhaytOrderEdit.applyEdit(o, ARG1, { now: ARG2, id: ARG3 });"
+          + " var r = KhaytOrderEdit.applyEdit(o, ARG1, { now: ARG2, id: ARG3, settings: ARG4 });"
           + " return { order: o, changed: Object.keys(r.changes).length > 0 }; })()",
-            [order, .object(fields), .number(now.timeIntervalSince1970 * 1000), .string(editId)],
+            [order, .object(fields), .number(now.timeIntervalSince1970 * 1000), .string(editId),
+             settings.isEmpty ? .null : .object(settings)],
             as: JobEdited.self)
     }
 
     public func editJob(order: JSONValue, dueDate: String?, priorityLevel: String,
-                        price: Double? = nil, now: Date, editId: String) throws -> JobEdited {
+                        price: Double? = nil, settings: [String: JSONValue] = [:],
+                        now: Date, editId: String) throws -> JobEdited {
         try runtime.call2(
             "(function(){ var o = ARG0;"
           + " var r = KhaytOrderEdit.applyEdit(o, { dueDate: ARG1, priorityLevel: ARG2, price: ARG5 },"
-          + "                                 { now: ARG3, id: ARG4 });"
+          + "                                 { now: ARG3, id: ARG4, settings: ARG6 });"
           + " return { order: o, changed: Object.keys(r.changes).length > 0 }; })()",
             [order, dueDate.map(JSONValue.string) ?? .null, .string(priorityLevel),
              .number(now.timeIntervalSince1970 * 1000), .string(editId),
-             price.map(JSONValue.number) ?? .null],
+             price.map(JSONValue.number) ?? .null,
+             settings.isEmpty ? .null : .object(settings)],
             as: JobEdited.self)
     }
 
@@ -10779,8 +10806,18 @@ public actor KhaytEngine {
         /// Owed — `billed` there read "Total 115, Paid 100, Owed 0" on those
         /// orders (Oct 2026 review). Documents keep `billed`.
         public let due: Double
-        public init(billed: Double, net: Double, tax: Double, owed: Double, due: Double? = nil) {
+        /// What the shop EARNED, in the order's own currency: the price less
+        /// its credit notes, net of tax — `orderEarnedBase`'s figure before the
+        /// conversion, so a margin here is the margin Reports reads. `net` is
+        /// the document's split and ignores credit notes, which a margin must
+        /// not (a 115 job credited 57.50 kept half of it). Nil from an older
+        /// caller; read it through `earnedOrNet`.
+        public let earned: Double?
+        public var earnedOrNet: Double { earned ?? net }
+        public init(billed: Double, net: Double, tax: Double, owed: Double, due: Double? = nil,
+                    earned: Double? = nil) {
             self.billed = billed; self.net = net; self.tax = tax; self.owed = owed; self.due = due ?? billed
+            self.earned = earned
         }
     }
 
@@ -10803,9 +10840,11 @@ public actor KhaytEngine {
                 var o = rows[i];
                 if (!o || !o.id) continue;
                 var split = T.computeTax(+o.price || 0, profile);
+                var kept = Math.max(0, (+o.price || 0) - M.orderCreditedRaw(o));
                 out[o.id] = {
                   billed: M.orderGrossRaw(o, ctx), net: split.subtotal,
                   tax: split.taxTotal, owed: M.orderOwedRaw(o, ctx), due: M.orderDueRaw(o, ctx),
+                  earned: T.netOfTax(kept, profile),
                 };
               }
               return out;
@@ -10854,6 +10893,45 @@ public actor KhaytEngine {
             """,
                           [.array(orders), .object(settings), .array(clients), .object(currencies)],
                           as: [String: Double].self)
+    }
+
+    /// What each job BILLED and was PAID, in the shop's base currency, on the
+    /// same terms as `owedByOrder` — so a customer's Billed − Paid is the Owed
+    /// printed beside it.
+    ///
+    /// The customer pane summed the raw `price` and `paidAmount` of every job:
+    /// quotes, cancelled and not-business jobs, split parents, foreign
+    /// currencies unconverted, and an exclusive shop's pre-tax price beside an
+    /// Owed that included the tax. Here a job that cannot owe (`owesAtAll`) bills
+    /// nothing, and one that can bills what it is due less its credit notes
+    /// (`orderDueRaw − orderCreditedDueRaw`), paid with cash and gift card —
+    /// the three figures `orderOwedBase` subtracts.
+    public struct BilledAndPaid: Decodable, Sendable, Hashable {
+        public let billed: Double
+        public let paid: Double
+    }
+
+    public func billedAndPaidByOrder(_ orders: [JSONValue], settings: [String: JSONValue],
+                                     clients: [JSONValue],
+                                     currencies: [String: JSONValue]) throws -> [String: BilledAndPaid] {
+        try runtime.call2("""
+            (function (rows, ctx, known) {
+              var M = KhaytOrderMoney, out = {};
+              for (var i = 0; i < rows.length; i++) {
+                var o = rows[i];
+                if (!o || !o.id) continue;
+                if (!M.owesAtAll(o)) { out[o.id] = { billed: 0, paid: 0 }; continue; }
+                var cur = M.orderCurrency(o, ctx, known);
+                out[o.id] = {
+                  billed: M.convertToBase(Math.max(0, M.orderDueRaw(o, ctx) - M.orderCreditedDueRaw(o, ctx)), cur, ctx),
+                  paid: M.convertToBase((+o.paidAmount || 0) + (+o.giftCardDiscount || 0), cur, ctx),
+                };
+              }
+              return out;
+            })(ARG0, {settings: ARG1, clients: ARG2}, ARG3)
+            """,
+                          [.array(orders), .object(settings), .array(clients), .object(currencies)],
+                          as: [String: BilledAndPaid].self)
     }
 
     /// Every customer's name at once, in the shop's own language.
@@ -11555,7 +11633,7 @@ public actor KhaytEngine {
     /// `lib/machine-status.js canDelete`: whether a printer may be deleted, and
     /// when it may not, what in the book still names it. `reason` is
     /// `has_history`, `missing` or nil; `by` is collection → how many records
-    /// (`printLog`, `machMaintLog`, `settings.printerCompletions`, …).
+    /// (`printLog`, `machMaintLog`, `printerCompletions`, …).
     public struct MachineDeleteVerdict: Decodable, Sendable, Equatable {
         public let ok: Bool
         public let reason: String?
@@ -11675,6 +11753,10 @@ public actor KhaytEngine {
             /// Jobs that keep the customer's name on a full erase, because an
             /// invoice or a payment was recorded on them.
             public let keptNames: Int
+            /// Gift cards that keep the holder's name on a full erase, because
+            /// they still carry a balance — money the shop owes.
+            public let keptCards: Int
+            public let loyaltyLedger: Int
             public let intake: Int
             public let communications: Int
         }
@@ -11687,6 +11769,12 @@ public actor KhaytEngine {
         public let purgeIntakeIds: [String]
         public let purgeIntakeHistoryIds: [String]
         public let purgeCommLog: Bool
+        /// Spent cards whose holder a full erase takes off.
+        public let unlinkGiftCardIds: [String]
+        /// Cards with a balance, which keep their holder.
+        public let keepGiftCardIds: [String]
+        /// Whether a full erase blanks `clientId` on the loyalty-ledger rows.
+        public let unlinkLoyaltyLedger: Bool
         public let counts: Counts
     }
 
@@ -12445,6 +12533,10 @@ public actor KhaytEngine {
         public let minMarginPct: Double?
         public let maxMarginPct: Double?
         public let suggestedMargin: Double?
+        /// What to type in the job's margin field — a MARKUP on cost
+        /// (`lib/pricing.js`) — to earn `suggestedMargin` on the price.
+        /// Nil when no markup can (`KhaytAiPrice.markupFromMargin`).
+        public let suggestedMarkup: Double?
         public let examples: [PriceExample]?
 
         /// Enough history to be worth showing at all.
@@ -12512,6 +12604,9 @@ public actor KhaytEngine {
     public struct PriceSuggestion: Decodable, Sendable {
         public let ok: Bool
         public let suggestedMargin: Double?
+        /// The markup on cost that earns `suggestedMargin` — what the job's
+        /// margin field takes.
+        public let suggestedMarkup: Double?
         public let suggestedPrice: Double?
         public let rationale: String?
         public let problem: String?
@@ -12532,6 +12627,7 @@ public actor KhaytEngine {
                 var f = KhaytAiPrice.pickPrice(null, fallback);
                 return f
                   ? { ok: true, suggestedMargin: f.suggestedMargin,
+                      suggestedMarkup: KhaytAiPrice.markupFromMargin(f.suggestedMargin),
                       suggestedPrice: f.suggestedPrice, rationale: f.rationale, problem: null }
                   : { ok: false, suggestedMargin: null, suggestedPrice: null,
                       rationale: null, problem: KhaytAiTools.describeStop(out.stop) };
@@ -12542,6 +12638,7 @@ public actor KhaytEngine {
                          rationale: null, problem: 'no margin in the answer' };
               }
               return { ok: true, suggestedMargin: p.suggestedMargin,
+                       suggestedMarkup: KhaytAiPrice.markupFromMargin(p.suggestedMargin),
                        suggestedPrice: p.suggestedPrice, rationale: p.rationale, problem: null };
             })(ARG0)
             """,
@@ -13173,7 +13270,7 @@ public actor KhaytEngine {
     public func clearPayment(order: JSONValue) throws -> PaymentRecorded {
         try runtime.call2("(function(){var o = ARG0; var r = KhaytOrderPayment.clearPayment(o);"
                         + " return { order: o, effects: r.effects.map(function(e){ return e.type; }),"
-                        + " webhookEffects: [] };})()",
+                        + " webhookEffects: [], refused: r.refused || null };})()",
                           [order], as: PaymentRecorded.self)
     }
 
@@ -13533,7 +13630,12 @@ private let NEW_ORDER_SCRIPT = """
 private let RECURRING_SCRIPT = """
 (function () {
   var clients = ARG0, orders = ARG1, settings = ARG2;
-  var r = KhaytRecurringOrders.run(clients, orders, { settings: settings, now: ARG3 });
+  var tokens = (ARG4 || []).map(function (b) { return { tracking: b }; });
+  // Part ids in the desktop's `uid` shape (renderer/util.js).
+  var uid = function (prefix) {
+    return prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5).toUpperCase();
+  };
+  var r = KhaytRecurringOrders.run(clients, orders, { settings: settings, now: ARG3, tokens: tokens, uid: uid });
   return { orders: orders, clients: clients, settings: settings,
            created: r.created.map(function (o) { return o.id; }) };
 })()

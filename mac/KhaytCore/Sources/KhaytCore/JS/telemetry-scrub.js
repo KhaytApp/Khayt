@@ -69,22 +69,90 @@
   // Basenames worth keeping: a stack frame is useless without its module name. Anything
   // else — a customer's invoice, an exported PDF, a photo — is dropped to its extension,
   // because a filename routinely carries a person's name.
-  const CODE_FILE_RE = /\.(?:js|mjs|cjs|ts|json|html|css|node)$/i;
+  const CODE_FILE_RE = /\.(?:js|mjs|cjs|ts|json|html|css|node|swift)$/i;
 
   function safeBasename(name) {
-    const base = String(name || '');
+    const base = String(name || '').trim();
     if (CODE_FILE_RE.test(base)) return base;
-    const dot = base.lastIndexOf('.');
-    return dot > 0 ? '<file>' + base.slice(dot) : '<file>';
+    // Only a real extension is kept: a dot inside a folder or a person's
+    // name ("Nouf.v2 Aldossari") is no extension, and the whole name goes.
+    const ext = /\.[A-Za-z0-9]{1,10}$/.exec(base);
+    return ext ? '<file>' + ext[0] : '<file>';
+  }
+
+  /**
+   * A path token. It starts at `/`, `~/`, `./` or `../` (a `file://` URL
+   * included) or at a drive letter `X:\`, and runs THROUGH SPACES, because
+   * shops' folders have them: "My Drive/Nouf Aldossari/lamp.3mf" stopped at
+   * the first space used to leak "Drive" and "Aldossari". It ends at a
+   * `:<line>` (or a colon before a space or the end), a closing bracket of
+   * any kind, `>`, a quote or a newline; `pathEnd` then finds where a
+   * sentence carries on after it.
+   *
+   * A POSIX path starts after anything that cannot be inside a word or a
+   * relative path (`readStore@/Users/…`, `x|/…`, `foo</…>` all count), so
+   * "and/or", "Trace/BPT" and "KhaytApp/Shop.swift" stay text and are not
+   * read as a path that swallows the rest of the line.
+   *
+   * `\x28`, `\x29` and `\x7d` are `(`, `)` and `}` inside the character
+   * classes, spelled so this file's bracket count stays balanced for
+   * test/bundled-modules-are-wrapped.test.js.
+   */
+  // An apostrophe or backtick followed by a letter or digit is part of a
+  // folder name ("Sa'ad Alghamdi", "O'Brien"), not the quote that closes the
+  // path, which is followed by a space, punctuation or the end.
+  const PATH_BODY = '(?:[^\\n:\\x29\\]\\x7d>\\x27"\\x60\\u2018\\u2019\\u201C\\u201D]|[\\x27\\x60\\u2019](?=[A-Za-z0-9])|:(?![\\d\\s]|$))*';
+  // The first alternative is this scrubber's own `<path>/`, passed over:
+  // its `>` would otherwise lead a path and the marker be collapsed again.
+  const POSIX_PATH_RE = new RegExp(
+    '(<path>\\/)|(^|[^A-Za-z0-9_./\\\\-])((?:file:\\/\\/)?(?:~|\\.{1,2})?\\/(?![\\s\\x29])' + PATH_BODY + ')', 'g');
+  // No word boundary before the drive letter: "openC:\Users\…" is still a path.
+  const WINDOWS_PATH_RE = new RegExp('[A-Za-z]:\\\\' + PATH_BODY, 'g');
+  // A RELATIVE run with two slashes or more, right after a word or a symbol
+  // the POSIX lead does not take: "Users/nouf/Desktop/order.3mf",
+  // "abc/Users/…", "x-/Users/…", "$HOME/../nouf/b.3mf". One slash
+  // ("and/or", "KhaytApp/Shop.swift") stays text. Past its second slash it
+  // runs on like any other path.
+  const RELATIVE_PATH_RE = new RegExp(
+    '(<path>\\/)|(^|[^A-Za-z0-9_.$~\\/\\\\-])([A-Za-z0-9_.$~-]+\\/[^\\s\\/:\\x29\\]\\x7d>\\x27"\\x60]+\\/(?![\\s\\x29])' +
+    PATH_BODY + ')', 'g');
+
+  /**
+   * Where the path in a token ends and the sentence resumes: at ", ", or at
+   * a space once the segment before it has a file extension and the word
+   * after it is not more path ("…/lamp.3mf because disk full",
+   * "…/Shop.swift, line 120"). A space inside folder names
+   * ("My Drive/Nouf Aldossari/lamp.3mf") is still part of the path.
+   */
+  function pathEnd(token) {
+    for (let i = 0; i < token.length; i++) {
+      if (token.startsWith(', ', i)) return i;
+      if (token[i] !== ' ') continue;
+      const segment = token.slice(Math.max(token.lastIndexOf('/', i), token.lastIndexOf('\\', i)) + 1, i);
+      const next = token.slice(i + 1).split(' ')[0];
+      if (/\.[A-Za-z0-9]{1,10}$/.test(segment) && !/[\\/]/.test(next)) return i;
+    }
+    return token.length;
+  }
+
+  /** The last segment of a path token, the only part kept. */
+  function lastSegment(token) {
+    return token.split(/[\\/]/).map((s) => s.trim()).filter(Boolean).pop();
+  }
+
+  /** A path token reduced to its basename, and the sentence after it scrubbed in turn. */
+  function collapse(token) {
+    const at = pathEnd(token);
+    return '<path>/' + safeBasename(lastSegment(token.slice(0, at))) + scrubPath(token.slice(at));
   }
 
   /** Collapse any filesystem path to a basename, so home dirs and usernames never leak. */
   function scrubPath(str) {
     if (typeof str !== 'string') return str;
     return str
-      // file:// and absolute POSIX/Windows paths → <path>/basename
-      .replace(/(?:file:\/\/)?(?:\/[^\s:()]+)+/g, (m) => '<path>/' + safeBasename(m.split('/').filter(Boolean).pop()))
-      .replace(/[A-Za-z]:\\(?:[^\s:()\\]+\\)*([^\s:()\\]+)/g, (m, base) => '<path>/' + safeBasename(base));
+      .replace(WINDOWS_PATH_RE, (m) => collapse(m))
+      .replace(POSIX_PATH_RE, (m, done, lead, token) => (done ? m : lead + collapse(token)))
+      .replace(RELATIVE_PATH_RE, (m, done, lead, token) => (done ? m : lead + collapse(token)));
   }
 
   /** Strip PII value shapes out of any free text. */

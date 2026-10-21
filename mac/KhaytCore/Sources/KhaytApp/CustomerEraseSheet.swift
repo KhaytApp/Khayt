@@ -32,6 +32,12 @@ struct CustomerEraseSheet: View {
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // A card with a balance is money the shop owes, and keeps its holder.
+            if counts.keptCards > 0 {
+                Text(shop.words.counting(counts.keptCards, "mac.erase_keeps_cards"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             choice(full: false, title: "priv.mode_unlink", hint: "priv.mode_unlink_hint")
             choice(full: true, title: "priv.mode_full", hint: "priv.mode_full_hint")
             Text(shop.words.callIt("mac.undo_after"))

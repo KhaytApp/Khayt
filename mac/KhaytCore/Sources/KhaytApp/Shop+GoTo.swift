@@ -148,7 +148,7 @@ struct GoToBook: Sendable {
             fields += [job.client, job.project]
             fields += job.parts.map(\.name)
             let subtitle = [job.id, job.invoiceNumber ?? "", job.client]
-                .filter { !$0.isEmpty }.joined(separator: " · ")
+                .filter { !$0.isEmpty }.map { Figure.isolated($0) }.joined(separator: " · ")
             entries.append(.init(kind: .job, id: job.id,
                                  title: job.project.isEmpty ? job.id : job.project,
                                  subtitle: subtitle, fields: fields))
@@ -157,7 +157,7 @@ struct GoToBook: Sendable {
             let phone = customer.record?.phone ?? ""
             let email = customer.record?.email ?? ""
             entries.append(.init(kind: .customer, id: customer.id, title: customer.name,
-                                 subtitle: [phone, email].filter { !$0.isEmpty }.joined(separator: " · "),
+                                 subtitle: [phone, email].filter { !$0.isEmpty }.map { Figure.isolated($0) }.joined(separator: " · "),
                                  fields: [customer.name, customer.record?.nameEn ?? "",
                                           customer.record?.nameAr ?? "",
                                           phone, Self.digits(phone), email]))

@@ -673,6 +673,31 @@ final class Shop {
 
     init(source: Source = .sample) {
         self.source = source
+        // LATE IS A FACT ABOUT TODAY, and today moves without the book doing so.
+        // Lateness was worked out only when a book loaded, so a Mac left open
+        // overnight kept yesterday's answer: a job due yesterday vanished from
+        // the widget's Today without joining the late count, and the badge
+        // stayed whatever it was at the last edit. Midnight and a change of
+        // time zone ask again.
+        for name in [Notification.Name.NSCalendarDayChanged, .NSSystemTimeZoneDidChange] {
+            dayObservers.append(NotificationCenter.default.addObserver(
+                forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in await self?.dayChanged() }
+            })
+        }
+    }
+
+    /// The midnight and time-zone observers. Never removed: a `Shop` lives as
+    /// long as its window, and each holds the shop weakly.
+    @ObservationIgnored private var dayObservers: [NSObjectProtocol] = []
+
+    /// The day moved: re-ask which jobs are late, and tell the widget.
+    ///
+    /// From the rows already in hand rather than a reload — nothing on disk
+    /// changed, only the date the rule is asked about.
+    func dayChanged(now day: Date? = nil) async {
+        await resolveLate(orderRows, machines: machineRows, settings: settingsDict, now: day ?? Date())
+        await printersAnswered()
     }
 
     /// `asOf` is the day the book is read on. It defaults to today and is only
@@ -927,11 +952,14 @@ final class Shop {
                 productRows, language: words.language, settings: Self.settings(root))) ?? []
             if overtaken() { return }
             catalogueRows = catalogued
-            productCategories = Dictionary(uniqueKeysWithValues: productRows.compactMap { row in
+            // The first of two products sharing an id wins, as in every other
+            // id-keyed map: a book an older build wrote with a duplicated
+            // product must open, not trap on every launch.
+            productCategories = Dictionary(productRows.compactMap { row in
                 guard case .object(let p) = row, case .string(let id)? = p["id"] else { return nil }
                 if case .string(let c)? = p["category"] { return (id, c) }
                 return (id, "")
-            })
+            }, uniquingKeysWith: { a, _ in a })
             await readCatalogueFacets()
             if overtaken() { return }
             let languages = await Self.catalogueLanguages(Self.settings(root), engine: engine)
@@ -1220,6 +1248,8 @@ final class Shop {
             // outside it races whatever is in flight — and only for a real
             // book, which is the only kind that can have one.
             rescueStrandedServiceLog(next.build)
+            // And a camera password an older build saved in plain text.
+            await scrubWebcamCredentials(next.build)
             // COUNTED, never repaired, on open: see `applySpoolRepair`. A
             // write here re-priced every product on a spool whose size changed,
             // without the shop seeing a single new price.
@@ -1321,6 +1351,13 @@ final class Shop {
         // Kept whole, not just on the rows: `payment-reminder` asks what each
         // order still owes, converted, and this is the converted answer.
         owedByOrderId = owed
+        // What each job billed and was paid on the same terms, so a customer's
+        // Billed − Paid is the Owed beside it (`Customer.billed`).
+        if let billedPaid = try? await engine.billedAndPaidByOrder(
+            rows, settings: Self.settings(root), clients: clients,
+            currencies: Invoice.currencyTable(self)), ticket == loadGeneration {
+            for i in orders.indices { orders[i].billedPaidResolved = billedPaid[orders[i].id] }
+        }
         // And each job's figures in its OWN currency, for the rows that print
         // money beside the job's currency mark — owed, billed, and the price
         // net of tax a margin is worked on. Same crossing pattern: once a load.
@@ -1329,22 +1366,25 @@ final class Shop {
         if let figures {
             for i in orders.indices { orders[i].figures = figures[orders[i].id] }
         }
-        await resolveLate(root)
+        let jobs: [JSONValue]
+        if case .array(let rows)? = root["printLog"] { jobs = rows } else { jobs = [] }
+        let fleet: [JSONValue]
+        if case .array(let m)? = root["machines"] { fleet = m } else { fleet = [] }
+        await resolveLate(jobs, machines: fleet, settings: Self.settings(root), now: Date())
     }
 
     /// Ask the attention engine which jobs are late, and put it on the rows.
     ///
     /// The same answer the dashboard's Late tile already showed, so the badges
     /// and the count stop being two numbers about one book.
-    private func resolveLate(_ root: [String: JSONValue]) async {
+    ///
+    /// At the load's `now` and again at each new day (`dayChanged`).
+    private func resolveLate(_ rows: [JSONValue], machines fleet: [JSONValue],
+                             settings: [String: JSONValue], now: Date) async {
         guard let engine else { return }
         let ticket = loadGeneration
-        let rows: [JSONValue]
-        if case .array(let jobs)? = root["printLog"] { rows = jobs } else { rows = [] }
-        let fleet: [JSONValue]
-        if case .array(let m)? = root["machines"] { fleet = m } else { fleet = [] }
         guard let late = try? await engine.lateOrders(
-            rows, machines: fleet, settings: Self.settings(root)), ticket == loadGeneration else { return }
+            rows, machines: fleet, settings: settings, now: now), ticket == loadGeneration else { return }
         for i in orders.indices { orders[i].isLateResolved = late.contains(orders[i].id) }
     }
 

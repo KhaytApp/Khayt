@@ -57,3 +57,45 @@ import KhaytCore
                                           settings: [:])["rushPct"] == nil)
     }
 }
+
+/// What a spool costs a job (`CalculatorPart.netCost`) is
+/// `KhaytSpoolEdit.netCost`, which Electron, the LAN quote and the AI quote
+/// cost with: the Mac charged the reclaimable tax to every job.
+@Suite struct SpoolNetCostTests {
+
+    @Test("a 115 spool holding 15 of tax costs a reclaiming shop 100, and a 200 g part 20.00")
+    func reclaimed() {
+        #expect(CalculatorPart.netCost(paid: 115, vatAmount: 15, reclaims: true) == 100)
+        #expect(CalculatorPart.netCost(paid: 115, vatAmount: 15, reclaims: false) == 115,
+                "a shop that reclaims nothing pays every riyal")
+        #expect(CalculatorPart.netCost(paid: 115, vatAmount: nil, reclaims: true) == 115,
+                "no tax is invented on a receipt nobody described")
+        let spool = CalculatorPart.Spool(id: "S", material: "PLA",
+                                         cost: CalculatorPart.netCost(paid: 115, vatAmount: 15, reclaims: true),
+                                         spoolWeight: 1000, color: nil)
+        guard case .object(let part) = CalculatorPart.single(spool: spool, grams: 200, hours: 1, qty: 1),
+              case .number(let cost)? = part["spoolCost"], case .number(let weight)? = part["spoolWeight"] else {
+            Issue.record("no part"); return
+        }
+        #expect(abs(cost / weight * 200 - 20) < 1e-9)
+    }
+
+    @Test("it agrees with KhaytSpoolEdit.netCost, awkward figures included")
+    func parity() throws {
+        let context = try Parity.context(loading: ["spool-edit"])
+        let figures: [Double?] = [nil, 0, -5, 15, 115, 200, 0.005, 1.005, 1e20]
+        for paid in figures {
+            for vat in figures {
+                for reclaims in [true, false] {
+                    let js = try Parity.run(context, "KhaytSpoolEdit.netCost(ARG0, ARG1)", [
+                        .object(["cost": paid.map(JSONValue.number) ?? .null,
+                                 "vatAmount": vat.map(JSONValue.number) ?? .null]),
+                        .bool(reclaims),
+                    ])
+                    let swift = CalculatorPart.netCost(paid: paid, vatAmount: vat, reclaims: reclaims)
+                    #expect(js == .number(swift), "paid \(String(describing: paid)) vat \(String(describing: vat)) \(reclaims)")
+                }
+            }
+        }
+    }
+}

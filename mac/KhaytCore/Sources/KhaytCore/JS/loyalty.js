@@ -75,12 +75,15 @@ function earnPoints(exVatAmount, { pointsPerUnit = 1, tierMultiplier = 1 } = {})
  *   credit = points × rate     (e.g. rate 0.01 ⇒ 100 pts = 1 SAR)
  * @param {number} points integer point count
  * @param {number} rate   SAR value of one point
- * @returns {number} credit value in SAR (never negative)
+ * @returns {number} credit value in SAR (never negative), to 2 dp
  */
 function pointsToCredit(points, rate) {
   const p = toInt(points);
   const r = toNum(rate);
-  const val = p * r;
+  // To the halala: credit is money, and 7 × 0.1 is 0.7000000000000001 in
+  // floating point — a balance a ledger, a receipt and a comparison then
+  // carry the tail of.
+  const val = Math.round((p * r + Number.EPSILON) * 100) / 100;
   return val > 0 ? val : 0;
 }
 

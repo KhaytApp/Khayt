@@ -214,6 +214,23 @@ struct CampaignTests {
                 == shop.words.callIt("mac.campaign_needs_email"))
     }
 
+    /// A WhatsApp list is phone numbers, and every send here is a mail. The
+    /// sheet offered WhatsApp and posted the numbers as addresses.
+    @Test("a campaign goes by email only: the sheet offers nothing else and a send refuses")
+    func emailOnly() async throws {
+        #expect(Shop.Segment.channels == ["email"])
+        let shop = Shop()
+        await shop.load(.sample)
+        let recipient = KhaytEngine.Recipient(
+            client: .object(["id": .string("C1"), "nameEn": .string("Acme")]),
+            contact: "+966500000000",
+            stats: .init(completedCount: 0, totalSpend: 0, lastOrderDate: ""))
+        for channel in ["whatsapp", "sms"] {
+            #expect(await shop.sendCampaign("Hello", channel: channel, to: [recipient])
+                    == shop.words.callIt("mac.campaign_email_only"))
+        }
+    }
+
     /// The gap this app carried until SMTP was built.
     ///
     /// A shop on its own relay was refused and told to send the campaign from

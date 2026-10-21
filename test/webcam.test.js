@@ -31,6 +31,13 @@ test('normalizeWebcamUrl resolves relative paths against the printer host', () =
   assert.equal(W.normalizeWebcamUrl('http://other.local/cam', OCTO), 'http://other.local/cam', 'absolute kept as-is');
   assert.equal(W.normalizeWebcamUrl('', OCTO), '');
   assert.equal(W.normalizeWebcamUrl('/cam', {}), '', 'no host → cannot resolve');
+  // Credentials in the URL are refused: the webcam block is stored in plain text.
+  assert.equal(W.normalizeWebcamUrl('http://user:pass@192.168.1.60/snap.jpg', OCTO), '');
+  assert.equal(W.normalizeWebcamUrl('rtsp://admin@192.168.1.60/live', OCTO), '');
+  assert.equal(W.normalizeWebcamUrl('/snap.jpg', { host: 'u:p@192.168.1.50' }), '', 'nor through the printer host');
+  assert.equal(W.normalizeWebcamUrl('http://192.168.1.60/snap.jpg?by=a@b', OCTO), 'http://192.168.1.60/snap.jpg?by=a@b',
+    'an @ after the host is not a login');
+  assert.equal(W.sanitizeWebcam({ enabled: true, snapshotUrl: 'http://u:p@192.168.1.60/s.jpg' }, OCTO).snapshotUrl, '');
 });
 
 test('parseOctoprintSettings prefers the webcams list over the deprecated shim', () => {

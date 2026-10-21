@@ -492,7 +492,7 @@ extension Shop {
         if part["filamentId"] == nil, let spool = Self.spool(for: part, file: rec, among: spools) {
             part["filamentId"] = .string(spool.id)
             part["material"] = .string(spool.material)
-            part["spoolCost"] = .number(spool.cost ?? 0)
+            part["spoolCost"] = .number(spool.jobCost(reclaimsTax: reclaimsTax))
             part["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
             costedWith = spool.material
         }
@@ -663,7 +663,10 @@ extension Shop {
 
     /// A recommended margin, with the reason for it.
     struct PriceAdvice: Sendable {
+        /// The margin on PRICE advised — what the sentence says.
         var margin: Double
+        /// The markup on cost that earns it — what the margin field takes.
+        var markup: Double
         var rationale: String
     }
 
@@ -692,11 +695,11 @@ extension Shop {
             let out = try await AiClient.recommendMargin(
                 comparables: raw, job: job,
                 fallback: comparables.suggestedMargin, shop: self)
-            guard out.ok, let margin = out.suggestedMargin else {
+            guard out.ok, let margin = out.suggestedMargin, let markup = out.suggestedMarkup else {
                 return .refused(out.problem ?? words.callIt("mac.ai_no_draft"))
             }
             Telemetry.feature(.aiMarginSuggested, in: self)
-            return .advised(PriceAdvice(margin: margin,
+            return .advised(PriceAdvice(margin: margin, markup: markup,
                                         rationale: out.rationale ?? ""))
         } catch AiClient.Failure.notConsented {
             return .refused(words.callIt("mac.ai_price_not_consented"))
@@ -792,8 +795,8 @@ extension Shop {
         // its inventory alone entirely; zero means it stocks it and the batch
         // has sold out, which is a state it reverses next week. Reading one as
         // the other moves a customer's quoted date by weeks in whichever
-        // direction is wrong.
-        return Int(n)
+        // direction is wrong. Saturating: a count no `Int` holds traps.
+        return Int(saturating: n)
     }
 
     /// When the shop last counted it. A storefront re-applies a figure only
@@ -1063,6 +1066,15 @@ extension Shop {
     func unit(of spool: Spool) -> KhaytEngine.InventoryUnit? { inventoryUnits[spool.id] }
 
     /// The units the editor can offer.
+    /// The threshold a new spool in `unit` is low at when it carries no
+    /// reorder point of its own — the shared rule's answer, with the shop's
+    /// settings. 200 when the engine is not there, the gram default.
+    func lowThreshold(unit: String) async -> Double {
+        let row: JSONValue = .object(["id": .string(""), "unit": .string(unit)])
+        let out = try? await engine?.inventoryUnits([row], settings: settingsDict)
+        return out?[""]?.low ?? 200
+    }
+
     func inventoryUnitChoices() async -> [KhaytEngine.InventoryUnit] {
         (try? await engine?.inventoryUnitChoices()) ?? []
     }

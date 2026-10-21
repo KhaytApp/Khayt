@@ -359,3 +359,26 @@ test('a logo cannot close its own attribute', () => {
                                    subtotal: '1', subtotalShown: '1', vatRate: 15, shipping: 0 });
   assert.ok(again.area.innerHTML.includes(`src="${good}"`));
 });
+
+test('a shop that adds tax on top prints it as added, not "(incl.)"', () => {
+  assert.match(html('exclusive-tax'), /VAT \(8\.875%\)<\/span>/);
+  assert.doesNotMatch(html('exclusive-tax'), /\(incl\.\)/);
+  assert.match(html('plain-en'), /VAT \(15%\) \(incl\.\)/, 'an inclusive shop still says included');
+});
+
+test('on a discounted job the rows add up to the Subtotal, before the Discount row', () => {
+  const doc = html('discount-rush-shipping');
+  const rows = [...doc.matchAll(/<td class="amount">([\d.]+) /g)].map((m) => +m[1]);
+  const shown = [...doc.matchAll(/class="v">([−\d.]+) /g)].map((m) => m[1]);
+  // Subtotal, Discount, Rush, Shipping, VAT.
+  assert.equal(shown[0], '1162.50');
+  assert.equal(shown[1], '−162.50');
+  assert.ok(Math.abs(rows.reduce((s, n) => s + n, 0) - 1162.5) < 0.005, `rows ${rows}`);
+  // The total is the price, unchanged.
+  assert.match(doc, /1150\.00<span class="unit">/);
+  // And the rule agrees with the Subtotal the case prints.
+  const { invoiceSummary } = require('../lib/invoice-document.js');
+  require('../lib/tax.js');
+  const order = { price: 1150, discountPct: 12.5, priceBeforeDiscount: 1300, rushFeeAmount: 90, shippingCost: 60 };
+  assert.equal(invoiceSummary(order, globalThis.KhaytTax.profileFromSettings({ enableVat: true, vatRate: 15 })).itemsSubtotal, 1162.5);
+});

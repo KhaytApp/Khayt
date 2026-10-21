@@ -291,6 +291,24 @@ const SAUDI_INVOICE_LAYOUTS = {
   },
 };
 
+/**
+ * The tax on an expense the shop gets back, judged as the P&L judges it
+ * (`KhaytPnl.reclaimableTaxOf` over the shop's tax profile). Zero without the
+ * shop's settings, the tax module, or any tax rates.
+ */
+function reclaimableOn(exp, opts) {
+  const g = typeof globalThis !== 'undefined' ? globalThis : {};
+  const T = g.KhaytTax || (typeof require === 'function'
+    ? (() => { try { return require('./tax.js'); } catch (e) { return null; } })() : null);
+  if (!opts || !opts.settings || !T || typeof T.profileFromSettings !== 'function') return 0;
+  const profile = T.profileFromSettings(opts.settings);
+  const P = g.KhaytPnl;
+  if (P && typeof P.reclaimableTaxOf === 'function') return P.reclaimableTaxOf(exp, profile);
+  const paid = +exp.amount || 0;
+  return (profile && profile.rates && profile.rates.length)
+    ? Math.min(paid, Math.max(0, +exp.vatAmount || 0)) : 0;
+}
+
 const SAUDI_EXPENSE_LAYOUTS = {
   wafeq: {
     // "Paid through" is required by Wafeq and is an account Khayt does not
@@ -306,11 +324,31 @@ const SAUDI_EXPENSE_LAYOUTS = {
     ],
   },
   daftra: {
-    columns: ['Date', 'Amount', 'Currency', 'Category', 'Description'],
-    row: (exp, opts) => [
-      neutralize(dayMonthYear(exp.date)), money(exp.amount), neutralize(exp.currency || opts.currency),
-      neutralize(mapCategoryAccount(exp.category)), neutralize(exp.note),
-    ],
+    // Daftra's expense import has a "Taxes" column — "The name of a tax
+    // registered in the system" (docs.daftra.com/en/tutorial/importing-expenses/,
+    // re-read Oct 2026) — and decides from that tax whether the amount holds
+    // it, exactly as on the income side. So an expense whose receipt recorded
+    // its VAT goes as the NET amount with the tax named, and Daftra adds the
+    // VAT back as reclaimable input tax; without the column the whole receipt
+    // was a cost and the reclaim never reached the books. An expense with no
+    // VAT recorded goes as before: the amount paid, no tax.
+    columns: ['Date', 'Amount', 'Currency', 'Category', 'Description', 'Taxes'],
+    //
+    // ONLY FOR A SHOP THAT RECLAIMS: the P&L's rule (`KhaytPnl.reclaimableTaxOf`)
+    // — a shop with tax rates reclaims, one without pays every riyal. A VAT
+    // figure on the receipt of a shop with VAT off is not input tax. No
+    // `opts.settings`, nothing is netted.
+    row: (exp, opts) => {
+      const paid = +exp.amount || 0;
+      const vat = reclaimableOn(exp, opts);
+      const net = paid - vat;
+      const rate = vat > 0 && net > 0 ? roundMoney(vat / net * 100) : 0;
+      return [
+        neutralize(dayMonthYear(exp.date)), money(vat > 0 ? net : paid), neutralize(exp.currency || opts.currency),
+        neutralize(mapCategoryAccount(exp.category)), neutralize(exp.note),
+        neutralize(taxNameCell(rate, opts)),
+      ];
+    },
   },
 };
 

@@ -29,6 +29,14 @@ struct ErasedCustomer: Sendable, Equatable {
     let jobs: [Job]
     let intake: [JSONValue]
     let intakeHistory: [JSONValue]
+    /// The tracking tokens of this customer's jobs whose pages a full erase
+    /// takes down from Khayt Cloud (marked pending until they are down).
+    /// Undo does not put a page back.
+    var takenDown: [String] = []
+    /// The gift cards a full erase took the holder off, as they were.
+    var giftCards: [JSONValue] = []
+    /// The loyalty-ledger rows whose link a full erase blanked, as they were.
+    var loyaltyLedger: [JSONValue] = []
 }
 
 /// A customer's rights over their own data (PDPL): to have it, and to have it
@@ -55,12 +63,14 @@ struct ErasedCustomer: Sendable, Equatable {
 /// jobs and no gift cards.
 extension Shop {
 
-    /// The four collections the privacy rule reads, out of a book.
+    /// The collections the privacy rule reads, out of a book.
     nonisolated static func privacyCollections(_ root: [String: JSONValue]) -> [String: JSONValue] {
         ["clients": .array(rows(root, "clients")),
          "printLog": .array(rows(root, "printLog")),
          "waitingList": .array(rows(root, "waitingList")),
-         "waitingListHistory": .array(rows(root, "waitingListHistory"))]
+         "waitingListHistory": .array(rows(root, "waitingListHistory")),
+         "giftCards": .array(rows(root, "giftCards")),
+         "loyaltyLedger": .array(rows(root, "loyaltyLedger"))]
     }
 
     /// The desktop's file name: `khayt-customer-data-<name>-<day>.json`, the
@@ -160,13 +170,32 @@ extension Shop {
 
         let blank = Set(full ? plan.blankNameOrderIds : [])
         var jobs: [ErasedCustomer.Job] = []
+        var takenDown: [String] = []
         var log = rows(root, "printLog")
+        let erasedAt = JSONValue.string(ISO8601DateFormatter().string(from: Date()))
         for i in log.indices {
             guard case .object(var o) = log[i], case .string(let link)? = o["clientId"], link == clientId,
                   case .string(let id)? = o["id"] else { continue }
             o["clientId"] = .null
+            // Marked, so a job that keeps the name is never matched BY that
+            // name to another customer who shares it (`Customer.swift`).
+            o["clientErasedAt"] = erasedAt
             var was: JSONValue?
             if blank.contains(id) { was = o["client"] ?? .null; o["client"] = .string("") }
+            // A published job's page lives on Khayt Cloud, linked to the
+            // customer's email and holding their messages and photos. A full
+            // erase takes every one down, invoiced and paid jobs included: the
+            // invoice stays in the book, the tracking page was a convenience.
+            // In this write the job stops being published (so neither app
+            // republishes it) and is marked pending; the DELETE follows the
+            // write, and only a DELETE that succeeded clears the mark. One
+            // that failed is retried (`takeDownPendingLinks`).
+            if full, o["cloudPublished"] == .bool(true),
+               case .string(let token)? = o["trackingToken"], !token.isEmpty {
+                takenDown.append(token)
+                o["cloudPublished"] = .bool(false)
+                o[Self.takedownPendingKey] = .bool(true)
+            }
             jobs.append(.init(id: id, blankedName: was))
             log[i] = .object(o)
         }
@@ -188,8 +217,39 @@ extension Shop {
         }
         let intake = full ? purge("waitingList", plan.purgeIntakeIds) : []
         let history = full ? purge("waitingListHistory", plan.purgeIntakeHistoryIds) : []
+
+        // A spent gift card loses its holder; one with a balance keeps it,
+        // because that balance is money the shop owes them (the plan decides).
+        var cardsWere: [JSONValue] = []
+        let spent = Set(full ? plan.unlinkGiftCardIds : [])
+        if !spent.isEmpty {
+            var cards = rows(root, "giftCards")
+            for i in cards.indices {
+                guard case .object(var g) = cards[i], case .string(let id)? = g["id"], spent.contains(id) else { continue }
+                cardsWere.append(cards[i])
+                g["issuedTo"] = .null
+                g["issuedToName"] = .string("")
+                cards[i] = .object(g)
+            }
+            if !cardsWere.isEmpty { root["giftCards"] = .array(cards) }
+        }
+        // The loyalty ledger keeps its points and credit, for the shop's sums,
+        // and loses the link to the person.
+        var ledgerWas: [JSONValue] = []
+        if full && plan.unlinkLoyaltyLedger {
+            var ledger = rows(root, "loyaltyLedger")
+            for i in ledger.indices {
+                guard case .object(var r) = ledger[i], case .string(let link)? = r["clientId"], link == clientId
+                else { continue }
+                ledgerWas.append(ledger[i])
+                r["clientId"] = .string("")
+                ledger[i] = .object(r)
+            }
+            if !ledgerWas.isEmpty { root["loyaltyLedger"] = .array(ledger) }
+        }
         return ErasedCustomer(clientId: clientId, client: client, index: index, jobs: jobs,
-                              intake: intake, intakeHistory: history)
+                              intake: intake, intakeHistory: history, takenDown: takenDown,
+                              giftCards: cardsWere, loyaltyLedger: ledgerWas)
     }
 
     /// Undo's half: the record back where it was, the jobs relinked (and
@@ -212,10 +272,47 @@ extension Shop {
             guard case .object(var o) = log[i], case .string(let id)? = o["id"], let job = byId[id] else { continue }
             switch o["clientId"] { case nil, .null?: break; default: continue }
             o["clientId"] = .string(erased.clientId)
+            o.removeValue(forKey: "clientErasedAt")
             if let name = job.blankedName, o["client"] == .string("") { o["client"] = name }
             log[i] = .object(o)
         }
         root["printLog"] = .array(log)
+        // The cards' holders back, where nobody has named another since.
+        if !erased.giftCards.isEmpty {
+            let was = Dictionary(erased.giftCards.compactMap { row -> (String, [String: JSONValue])? in
+                guard case .object(let g) = row, case .string(let id)? = g["id"] else { return nil }
+                return (id, g)
+            }, uniquingKeysWith: { a, _ in a })
+            var cards = rows(root, "giftCards")
+            for i in cards.indices {
+                guard case .object(var g) = cards[i], case .string(let id)? = g["id"], let before = was[id],
+                      g["issuedTo"] == nil || g["issuedTo"] == .null else { continue }
+                g["issuedTo"] = before["issuedTo"] ?? .null
+                g["issuedToName"] = before["issuedToName"] ?? .string("")
+                cards[i] = .object(g)
+            }
+            root["giftCards"] = .array(cards)
+        }
+        // The ledger rows relinked: each blanked row, found by its content —
+        // a row may have no id, and the write stamped it since.
+        if !erased.loyaltyLedger.isEmpty {
+            func content(_ o: [String: JSONValue]) -> [String: JSONValue] {
+                var c = o
+                for key in ["clientId", "rev", "updatedAt"] { c.removeValue(forKey: key) }
+                return c
+            }
+            var ledger = rows(root, "loyaltyLedger")
+            for case .object(let before) in erased.loyaltyLedger {
+                let wanted = content(before)
+                guard let i = ledger.firstIndex(where: {
+                    if case .object(let r) = $0 { return r["clientId"] == .string("") && content(r) == wanted }
+                    return false
+                }), case .object(var r) = ledger[i] else { continue }
+                r["clientId"] = .string(erased.clientId)
+                ledger[i] = .object(r)
+            }
+            root["loyaltyLedger"] = .array(ledger)
+        }
         for (collection, taken) in [("waitingList", erased.intake), ("waitingListHistory", erased.intakeHistory)]
         where !taken.isEmpty {
             var rowsNow = rows(root, collection)
@@ -248,6 +345,9 @@ extension Shop {
             await load(source)
             moveNotices = [words.callIt(full ? "priv.erased_full" : "ce.deleted")]
             await customersChangedOnCloud()
+            // After the write, as a job delete does: the book is erased either
+            // way, and a page that would not come down is said, not swallowed.
+            if !outcome.takenDown.isEmpty { await takeDownPendingLinks(say: true) }
         } catch {
             moveProblem = self.said(error)
         }

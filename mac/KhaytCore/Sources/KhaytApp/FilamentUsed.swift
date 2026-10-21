@@ -171,7 +171,7 @@ struct FilamentUsedSection: View {
                         }
                     }
                     Spacer(minLength: 8)
-                    Text("\(Money.grams(row.grams)) \(shop.words.callIt("common.grams"))")
+                    Text(verbatim: "\(Money.grams(row.grams)) \(shop.words.callIt("common.grams"))")
                         .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 2)

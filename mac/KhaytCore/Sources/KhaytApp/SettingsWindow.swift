@@ -1734,6 +1734,7 @@ struct SlicersPane: View {
                             }
                             .buttonStyle(.plain)
                             .help(shop.words.callIt("mac.slicer_make_default"))
+                            .accessibilityLabel(shop.words.callIt("mac.slicer_make_default"))
 
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(slicer.name)
@@ -1751,6 +1752,7 @@ struct SlicersPane: View {
                             }
                             .buttonStyle(.plain)
                             .help(shop.words.callIt("mac.slicer_remove"))
+                            .accessibilityLabel(shop.words.callIt("mac.slicer_remove"))
                         }
                     }
                 }

@@ -130,7 +130,7 @@ extension Shop {
         "wasteLog": "mac.life_ref_waste",
         "expenses": "mac.life_ref_expenses",
         "timeEntries": "mac.life_ref_time",
-        "settings.printerCompletions": "mac.life_ref_completions",
+        "printerCompletions": "mac.life_ref_completions",
     ]
 
     /// Read with the book: whether each machine may be deleted. One crossing

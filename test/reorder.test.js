@@ -139,12 +139,52 @@ test('supplierPriceFor picks the cheapest matching price across suppliers', () =
     { id: 's2', name: 'B', priceList: [{ material: 'PLA Premium', pricePerKg: 35 }] },
     { id: 's3', name: 'C', priceList: [{ material: 'ABS', pricePerKg: 0 }] }, // 0 ignored
   ];
+  // "PLA" is a closer name for a PLA Black spool than "PLA Premium", so the
+  // closer match wins over the cheaper one (see the test below).
   const pla = R.supplierPriceFor(suppliers, 'PLA Black');
-  assert.equal(pla.supplierId, 's2');     // 35 < 40
-  assert.equal(pla.pricePerKg, 35);
+  assert.equal(pla.supplierId, 's1');
+  assert.equal(pla.pricePerKg, 40);
+  // Between two equally close names, the cheaper.
+  assert.equal(R.supplierPriceFor(suppliers, 'PLA Silk').pricePerKg, 40);
+  assert.equal(R.supplierPriceFor([...suppliers, { id: 's4', priceList: [{ material: 'pla', pricePerKg: 30 }] }],
+    'PLA Black').pricePerKg, 30);
   assert.equal(R.supplierPriceFor(suppliers, 'PETG').supplierId, 's1');
   assert.equal(R.supplierPriceFor(suppliers, 'TPU'), null);   // no match
   assert.equal(R.supplierPriceFor([], 'PLA'), null);
+});
+
+test('supplierPriceFor: a closer match beats a cheaper looser one', () => {
+  const suppliers = [
+    { id: 's1', name: 'A', priceList: [{ material: 'PLA', pricePerKg: 60 }, { material: 'PC', pricePerKg: 50 }] },
+    { id: 's2', name: 'B', priceList: [{ material: 'pla-cf', pricePerKg: 180 }, { material: 'PCTG', pricePerKg: 90 }] },
+  ];
+  // PLA-CF has its own entry: the cheaper plain PLA must not price it.
+  assert.equal(R.supplierPriceFor(suppliers, 'PLA-CF').pricePerKg, 180);
+  assert.equal(R.supplierPriceFor(suppliers, '  PLA-CF ').supplierId, 's2');
+  // Plain PLA is an exact entry of its own, not the carbon-fibre one.
+  assert.equal(R.supplierPriceFor(suppliers, 'PLA').pricePerKg, 60);
+  // PCTG and PC share letters, not a material.
+  assert.equal(R.supplierPriceFor(suppliers, 'PCTG').pricePerKg, 90);
+  assert.equal(R.supplierPriceFor(suppliers, 'PC').pricePerKg, 50);
+  // With no closer entry, a family match still prices it.
+  assert.equal(R.supplierPriceFor(suppliers, 'PLA Silk').pricePerKg, 60);
+  // Hyphens, underscores and spaces fold alike, and the most specific entry
+  // that the name contains wins over a bare family entry.
+  const cf = [{ id: 'a', priceList: [{ material: 'PLA', pricePerKg: 60 }, { material: 'PLA-CF Black', pricePerKg: 180 }] }];
+  assert.equal(R.supplierPriceFor(cf, 'PLA-CF').pricePerKg, 180);
+  const petg = [{ id: 'b', priceList: [{ material: 'PETG', pricePerKg: 70 }, { material: 'PETG-CF', pricePerKg: 200 }] }];
+  assert.equal(R.supplierPriceFor(petg, 'PETG-CF Matte').pricePerKg, 200);
+  assert.equal(R.supplierPriceFor(petg, 'PETG CF').pricePerKg, 200);
+  assert.equal(R.supplierPriceFor(petg, 'petg_cf').pricePerKg, 200);
+  assert.equal(R.supplierPriceFor(petg, 'PETG Matte').pricePerKg, 70);
+  // A plain spool is not priced from a more specific entry it merely shares a
+  // word with: equally close, so the cheaper.
+  const plain = [{ id: 'd', priceList: [{ material: 'PLA Black', pricePerKg: 40 }, { material: 'PLA-CF Black', pricePerKg: 180 }] }];
+  assert.equal(R.supplierPriceFor(plain, 'PLA').pricePerKg, 40);
+  // PC is not a word inside PCTG, so with no PCTG entry it is only the last resort.
+  assert.equal(R.supplierPriceFor([{ id: 'c', priceList: [{ material: 'PC', pricePerKg: 50 }] }], 'PCTG').pricePerKg, 50);
+  // perGramPriceFor follows the same choice.
+  assert.equal(R.perGramPriceFor({ material: 'PLA-CF' }, suppliers).perG, 0.18);
 });
 
 /* ── runway: how long has this spool got ─────────────────────── */

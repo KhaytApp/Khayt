@@ -356,6 +356,15 @@ extension Shop {
         }
     }
 
+    /// Whether this order restocks a consumable rather than a spool, by the
+    /// rule's reading (absent `kind` is filament). False when the order or the
+    /// engine is not there, which is the reading every older order takes.
+    func ordersAConsumable(_ id: String) async -> Bool {
+        guard let engine,
+              let row = purchaseOrderRows.first(where: { Self.recordId($0) == id }) else { return false }
+        return (try? await engine.isConsumableOrder(row)) ?? false
+    }
+
     /// Does this bill agree with what the order said it would cost?
     ///
     /// "matched", "mismatch", or "none" when nothing has been typed yet —
@@ -645,11 +654,14 @@ extension Shop {
     /// of the stored row is the baseline (`RoundTrip`). Before, a quote at 0,
     /// a quote with a note, or `leadDays: 0` was rewritten or dropped by
     /// opening the supplier and pressing Save.
-    static func supplierRecord(saving supplier: Supplier,
-                               over was: [String: JSONValue]) -> [String: JSONValue] {
+    ///
+    /// The baseline is drawn from `opened`, the supplier as the sheet opened
+    /// it, when there is one — see `saveSupplier`.
+    static func supplierRecord(saving supplier: Supplier, over was: [String: JSONValue],
+                               opened: Supplier? = nil) -> [String: JSONValue] {
         var record = was
         var edits = supplier.edits
-        if let stored = Supplier(row: .object(was)) {
+        if let stored = opened ?? Supplier(row: .object(was)) {
             let baseline = SupplierSheet.saving(stored, lead: SupplierSheet.leadText(stored)).edits
             edits = RoundTrip.keepUntouched(written: edits, baseline: baseline, stored: was)
         }
@@ -657,7 +669,11 @@ extension Shop {
         return record
     }
 
-    func saveSupplier(_ supplier: Supplier) async {
+    /// `opened` is the supplier as the sheet opened it — nil for a new one, or
+    /// a caller with no sheet. A field the shop did not touch still holds the
+    /// opened value; compared with the row on disk instead, it would read as
+    /// an edit and put that value back over a change sync made meanwhile.
+    func saveSupplier(_ supplier: Supplier, opened: Supplier? = nil) async {
         moveProblem = nil
         guard permitted("inventory", "edit") else { return }
         guard let build = source.build else {
@@ -679,7 +695,7 @@ extension Shop {
                    case .object(let was) = rows[at] {
                     undo.append(ChangedRecord(collection: "suppliers", id: supplier.id,
                                               was: was))
-                    var record = Self.supplierRecord(saving: supplier, over: was)
+                    var record = Self.supplierRecord(saving: supplier, over: was, opened: opened)
                     StoreWriter.stamp(&record)
                     rows[at] = .object(record)
                 } else {
@@ -1384,7 +1400,25 @@ extension Shop {
     static func writeNewSpool(into root: inout [String: JSONValue], input: [String: JSONValue],
                               engine: KhaytEngine, newId: String, today: String) async throws -> Bool {
         let made = try await engine.newSpool(input, id: newId, today: today)
-        guard let record = made.spool else { return false }
+        guard var record = made.spool else { return false }
+        // EVERYTHING ELSE THE FORM SAID. `newSpool` writes the roll itself —
+        // material, price, weight, colour, lot, branch — and nothing more, so
+        // the unit, the colour variant, the reorder point and quantity and the
+        // print settings were dropped: a 10-sheet pack of ply saved as 10 g and
+        // was flagged low at once. The edit rule writes the rest, as Edit
+        // would; the keys `newSpool` already wrote are left out because the
+        // edit rule clamps some of them differently (a weight of nothing).
+        let alreadyWritten: Set<String> = ["material", "cost", "vatAmount", "weight", "color",
+                                           "materialType", "lot", "locationId"]
+        let rest = input.filter { !alreadyWritten.contains($0.key) }
+        if !rest.isEmpty {
+            let out = try await engine.editSpool(record, input: rest, settings: settings(root),
+                                                 today: today)
+            record = out.spool
+            // The colour library learns the variant in the same swap, or the
+            // next editor offers a list that has forgotten it.
+            if out.colourAdded != nil { root["settings"] = .object(out.settings) }
+        }
         root["inventory"] = .array(rows(root, "inventory") + [record])
         return true
     }
@@ -1409,6 +1443,7 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+                undo = []  // the book moved and this runs again: one entry, not two
                 var shelf = Self.rows(root, "inventory")
                 if let id {
                     guard let at = shelf.firstIndex(where: { Self.recordId($0) == id }),
@@ -1522,6 +1557,7 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+                undo = []  // the book moved and this runs again: one entry, not two
                 var shelf = Self.rows(root, "consumables")
                 if let id {
                     guard let at = shelf.firstIndex(where: { Self.recordId($0) == id }),

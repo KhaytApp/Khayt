@@ -67,3 +67,17 @@ test('the row shape is the one the formatter reads', () => {
   assert.ok(line.includes('KAUST Prototyping Lab'),
     `the customer did not survive into the CSV: ${line}`);
 });
+
+test('an accepted quote is exported under the number its invoice prints', () => {
+  require('../lib/order-new.js');
+  require('../lib/invoice-document.js');
+  const R = require('../lib/accounting-rows.js');
+  const rows = R.ordersToInvoiceRows([
+    { id: 'QUO-7', status: 'completed', price: 100, invoiceNumber: 'INV-2026-0042', quoteAcceptedAt: '2026-10-01' },
+    { id: 'INV-1', status: 'completed', price: 100 },
+    { status: 'completed', price: 100 },
+  ], { settings: {}, tax: { rate: 15, mode: 'inclusive' } });
+  assert.equal(rows[0].id, 'INV-2026-0042', 'the accountant got QUO-7 for an invoice that says INV-2026-0042');
+  assert.equal(rows[1].id, 'INV-1');
+  assert.equal(rows[2].id, undefined, 'no id stays no id');
+});

@@ -176,8 +176,10 @@ public actor DriveClient {
         return r
     }
 
-    func object(_ r: URLRequest, _ what: String) async throws -> [String: Any] {
-        let (data, response) = try await fetch(r)
+    /// One request's JSON. `via` is the caller's fetch when it has one — a
+    /// shorter timeout, a test's fake — and the client's own otherwise.
+    func object(_ r: URLRequest, _ what: String, via: S3.Fetch? = nil) async throws -> [String: Any] {
+        let (data, response) = try await (via ?? fetch)(r)
         let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
         let code = S3.status(response)
         guard (200..<300).contains(code) else {
@@ -222,9 +224,10 @@ public actor DriveClient {
     /// `trashed` looks in Drive's Trash instead: a model whose only copy is
     /// on Drive, trashed there by hand or by a cleanup, is not LOST until
     /// Drive empties it (30 days), and that is the place to look first.
-    func find(_ key: String, trashed: Bool = false) async throws -> Found? {
+    func find(_ key: String, trashed: Bool = false, via: S3.Fetch? = nil) async throws -> Found? {
         let q = "appProperties has { key='khaytKey' and value=\(Self.quoted(key)) } and trashed=\(trashed)"
-        let r = try await object(try await request(Self.query(q, fields: "files(id,size,md5Checksum)")), "find")
+        let r = try await object(try await request(Self.query(q, fields: "files(id,size,md5Checksum)")), "find",
+                                 via: via)
         guard let f = (r["files"] as? [[String: Any]])?.first, let id = f["id"] as? String else { return nil }
         let size = Int((f["size"] as? String) ?? "") ?? (f["size"] as? Int) ?? 0
         return Found(id: id, size: size, md5: f["md5Checksum"] as? String)
@@ -256,9 +259,10 @@ public actor DriveClient {
     }
 
     /// The bytes, or nil when nothing carries that key.
-    public func get(_ key: String) async throws -> Data? {
-        guard let f = try await find(key) else { return nil }
-        let (data, response) = try await fetch(try await request("\(Self.api)/files/\(f.id)?alt=media", timeout: 600))
+    public func get(_ key: String, via: S3.Fetch? = nil) async throws -> Data? {
+        guard let f = try await find(key, via: via) else { return nil }
+        let (data, response) = try await (via ?? fetch)(try await request("\(Self.api)/files/\(f.id)?alt=media",
+                                                                          timeout: 600))
         let code = S3.status(response)
         if code == 404 { return nil }
         guard (200..<300).contains(code) else { throw Failure.http("download", code) }
@@ -273,39 +277,51 @@ public actor DriveClient {
     }
 
     /// Size and MD5, in the S3 client's shape.
-    public func head(_ key: String) async throws -> S3.Head? {
-        guard let f = try await find(key) else { return nil }
+    public func head(_ key: String, via: S3.Fetch? = nil) async throws -> S3.Head? {
+        guard let f = try await find(key, via: via) else { return nil }
         return S3.Head(size: f.size, etag: f.md5)
     }
 
     /// Size and MD5 of a copy sitting in Drive's Trash under this key, or nil.
-    public func trashedCopy(_ key: String) async throws -> S3.Head? {
-        guard let f = try await find(key, trashed: true) else { return nil }
+    public func trashedCopy(_ key: String, via: S3.Fetch? = nil) async throws -> S3.Head? {
+        guard let f = try await find(key, trashed: true, via: via) else { return nil }
         return S3.Head(size: f.size, etag: f.md5)
     }
 
     /// Take the copy under this key back out of Drive's Trash. False when
     /// there is none there to restore.
     @discardableResult
-    public func restoreFromTrash(_ key: String) async throws -> Bool {
-        guard let f = try await find(key, trashed: true) else { return false }
+    public func restoreFromTrash(_ key: String, via: S3.Fetch? = nil) async throws -> Bool {
+        guard let f = try await find(key, trashed: true, via: via) else { return false }
         _ = try await object(try await request("\(Self.api)/files/\(f.id)", method: "PATCH", json: ["trashed": false]),
-                             "restore")
+                             "restore", via: via)
         return true
     }
 
     /// To Drive's trash, not gone: Drive has an undo, so this uses it.
-    public func delete(_ key: String) async throws {
-        guard let f = try await find(key) else { return }
-        _ = try await object(try await request("\(Self.api)/files/\(f.id)", method: "PATCH", json: ["trashed": true]),
-                             "trash")
+    ///
+    /// EVERY file carrying the key, not the first: two Macs uploading the
+    /// same model at once can each make one (Drive does not refuse a second
+    /// file with the same property), and `find` asks for one at a time. A
+    /// complete delete that trashed only the first left the other behind.
+    /// Bounded, so a Drive that keeps answering with a file it will not trash
+    /// cannot hold this for ever.
+    public func delete(_ key: String, via: S3.Fetch? = nil) async throws {
+        // An id seen twice is Drive's search lagging behind the trash just
+        // done, not another copy: asked again it would be found again.
+        var trashed = Set<String>()
+        for _ in 0..<50 {
+            guard let f = try await find(key, via: via), trashed.insert(f.id).inserted else { return }
+            _ = try await object(try await request("\(Self.api)/files/\(f.id)", method: "PATCH", json: ["trashed": true]),
+                                 "trash", via: via)
+        }
     }
 
     /// Every file in the app's folder whose key starts with `keyPrefix`, in
     /// the bucket's listing shape. `nameContains` narrows the query on Drive's
     /// side (a key's last segment is the file's name); the key prefix is then
     /// checked here, against the `khaytKey` each file was tagged with.
-    public func list(keyPrefix: String, nameContains: String) async throws -> [S3.Listed] {
+    public func list(keyPrefix: String, nameContains: String, via: S3.Fetch? = nil) async throws -> [S3.Listed] {
         let parent = try await ensureFolder()
         var q = "\(Self.quoted(parent)) in parents and trashed=false"
         if !nameContains.isEmpty { q += " and name contains \(Self.quoted(nameContains))" }
@@ -319,7 +335,7 @@ public actor DriveClient {
         var page: String?
         for _ in 0..<50 {
             let url = base + (page.map { "&pageToken=\($0.addingPercentEncoding(withAllowedCharacters: allowed) ?? "")" } ?? "")
-            let r = try await object(try await request(url), "list")
+            let r = try await object(try await request(url), "list", via: via)
             for f in (r["files"] as? [[String: Any]]) ?? [] {
                 guard let key = (f["appProperties"] as? [String: Any])?["khaytKey"] as? String,
                       key.hasPrefix(keyPrefix) else { continue }
@@ -348,20 +364,24 @@ public actor DriveClient {
 /// Wherever the library's remote copy lives: a bucket or a Drive. The same
 /// four calls over the same opaque keys, so backing up, freeing space and
 /// bringing back are written once — as `printLibRemote()` in the other app.
+///
+/// The `fetch` a caller passes reaches Drive too (its token refresh aside):
+/// the delete question's 15-second requests used to go out on the client's
+/// own two-minute ones, so its bound did nothing on Drive.
 public enum LibraryRemote: Sendable {
     case bucket(S3Config)
     case drive(DriveClient)
 
-    public func put(_ key: String, data: Data, fetch: S3.Fetch) async throws {
+    public func put(_ key: String, data: Data, fetch: @escaping S3.Fetch) async throws {
         switch self {
         case .bucket(let c): try await S3.put(c, key: key, data: data, fetch: fetch)
         case .drive(let d): try await d.put(key, data: data)
         }
     }
-    public func get(_ key: String, fetch: S3.Fetch) async throws -> Data? {
+    public func get(_ key: String, fetch: @escaping S3.Fetch) async throws -> Data? {
         switch self {
         case .bucket(let c): try await S3.get(c, key: key, fetch: fetch)
-        case .drive(let d): try await d.get(key)
+        case .drive(let d): try await d.get(key, via: fetch)
         }
     }
     /// The bytes in a file of their own — the bucket's through `download`,
@@ -372,31 +392,38 @@ public enum LibraryRemote: Sendable {
         case .drive(let d): try await d.getFile(key)
         }
     }
-    public func head(_ key: String, fetch: S3.Fetch) async throws -> S3.Head? {
+    public func head(_ key: String, fetch: @escaping S3.Fetch) async throws -> S3.Head? {
         switch self {
         case .bucket(let c): try await S3.head(c, key: key, fetch: fetch)
-        case .drive(let d): try await d.head(key)
+        case .drive(let d): try await d.head(key, via: fetch)
         }
     }
-    public func delete(_ key: String, fetch: S3.Fetch) async throws {
+    public func delete(_ key: String, fetch: @escaping S3.Fetch) async throws {
         switch self {
         case .bucket(let c): try await S3.delete(c, key: key, fetch: fetch)
-        case .drive(let d): try await d.delete(key)
+        case .drive(let d): try await d.delete(key, via: fetch)
         }
     }
     /// A copy in the remote's own trash — Drive has one, a bucket does not.
-    public func trashedCopy(_ key: String, fetch: S3.Fetch) async throws -> S3.Head? {
+    public func trashedCopy(_ key: String, fetch: @escaping S3.Fetch) async throws -> S3.Head? {
         switch self {
         case .bucket: nil
-        case .drive(let d): try await d.trashedCopy(key)
+        case .drive(let d): try await d.trashedCopy(key, via: fetch)
         }
     }
     /// Out of the trash again; false when there is nothing there (or no trash).
     @discardableResult
-    public func restoreFromTrash(_ key: String, fetch: S3.Fetch) async throws -> Bool {
+    public func restoreFromTrash(_ key: String, fetch: @escaping S3.Fetch) async throws -> Bool {
         switch self {
         case .bucket: false
-        case .drive(let d): try await d.restoreFromTrash(key)
+        case .drive(let d): try await d.restoreFromTrash(key, via: fetch)
+        }
+    }
+    /// Every key that starts with `keyPrefix`.
+    public func keys(under keyPrefix: String, fetch: @escaping S3.Fetch) async throws -> [String] {
+        switch self {
+        case .bucket(let c): try await S3.list(c, prefix: keyPrefix, fetch: fetch).map(\.key)
+        case .drive(let d): try await d.list(keyPrefix: keyPrefix, nameContains: "", via: fetch).map(\.key)
         }
     }
     public var isDrive: Bool { if case .drive = self { true } else { false } }

@@ -517,7 +517,7 @@ enum SortFailures {
         var out: [String: Mark] = [:]
         for (sig, v) in map {
             guard case .object(let o) = v, case .number(let n)? = o["count"], case .string(let d)? = o["last"] else { continue }
-            out[sig] = Mark(count: Int(n), last: d)
+            out[sig] = Mark(count: Int(saturating: n), last: d)
         }
         return out
     }

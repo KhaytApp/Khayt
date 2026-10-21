@@ -376,6 +376,7 @@ struct JobStaffSection: View {
                             }
                             .buttonStyle(.borderless)
                             .help(words.callIt("common.delete"))
+                            .accessibilityLabel(words.callIt("common.delete"))
                         }
                     }
                 }

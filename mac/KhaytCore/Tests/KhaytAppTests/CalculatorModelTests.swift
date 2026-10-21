@@ -176,4 +176,25 @@ struct CalculatorModelTests {
         let without = try #require(await shop.costedPart(.object(bare)))
         #expect(withThem.cost > without.cost)
     }
+
+    @Test("a comma is read one way in every field: thousands before three digits, else a decimal point")
+    func oneCommaRule() {
+        #expect(CalculatorModel.number("1,200") == 1200, "1,200 g was read as 1.2 g")
+        #expect(CalculatorModel.number("0,5") == 0.5)
+        #expect(CalculatorModel.number("12,75") == 12.75)
+        #expect(CalculatorModel.number("12,5") == 12.5)
+        #expect(CalculatorModel.number("0,125") == 0.125, "a nought before the comma: always a decimal point")
+        #expect(CalculatorModel.number("0,180") == 0.18)
+        #expect(CalculatorModel.number(",250") == 0.25)
+        #expect(CalculatorModel.number("1,234,567.5") == 1234567.5)
+        #expect(CalculatorModel.number("1200") == 1200)
+        #expect(CalculatorModel.number(" 3.5 ") == 3.5)
+        #expect(CalculatorModel.number("-4") == 0)
+        let model = CalculatorModel(grams: "1,200")
+        model.rates["elecRate"] = "0,5"
+        model.rates["laborRate"] = "1,200"
+        #expect(model.gramsValue == 1200)
+        #expect(model.typed("elecRate") == 0.5, "0,5 was read as 5")
+        #expect(model.typed("laborRate") == 1200)
+    }
 }

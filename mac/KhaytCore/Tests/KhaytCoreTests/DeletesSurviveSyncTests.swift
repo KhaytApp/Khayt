@@ -189,3 +189,104 @@ struct DeletesSurviveSyncTests {
         #expect(id != "PROD-mth8nqkoVJC")
     }
 }
+
+/// The activity log trims its own oldest rows at 2,000, and each trimmed
+/// row is tombstoned — that is what stops a merge sending it back to the end
+/// of the log, where the next trim by position kept it and dropped the newest.
+/// Counted in the one 5,000-cap list, those tombstones pushed out the REAL
+/// delete markers, and an older copy syncing in brought deleted customers and
+/// jobs back; so each capped log's tombstones are evicted among themselves
+/// (`StoreWriter.capTombstones`). `test/sync-capped-logs.test.js` pins the
+/// same rule in `lib/sync.js`.
+extension DeletesSurviveSyncTests {
+
+    static func entry(_ i: Int) -> JSONValue {
+        .object(["id": .string("AL\(i)"), "action": .string("edit"), "rev": .number(1)])
+    }
+
+    static func audit(_ range: Range<Int>) -> JSONValue { .array(range.map(entry)) }
+
+    static func keys(_ root: [String: JSONValue]) -> [String] {
+        tombs(root).compactMap {
+            guard case .string(let c)? = $0["collection"], case .string(let i)? = $0["id"] else { return nil }
+            return c + ":" + i
+        }
+    }
+
+    static func ids(_ value: JSONValue?) -> [String] {
+        guard case .array(let rows)? = value else { return [] }
+        return rows.compactMap { if case .object(let o) = $0, case .string(let id)? = o["id"] { id } else { nil } }
+    }
+
+    @Test("the 2001st audit entry tombstones the trimmed row")
+    func auditTrimIsTombstoned() throws {
+        #expect(StoreWriter.cappedLogs["auditLog"] == 2000)
+        var before = Self.book([])
+        before["auditLog"] = Self.audit(0..<2000)
+        var after = before
+        after["auditLog"] = Self.audit(1..<2001)
+        StoreWriter.recordDeletions(before: before, after: &after)
+        #expect(Self.keys(after) == ["auditLog:AL0"])
+    }
+
+    @Test("a real delete survives six thousand audit trims after it")
+    func realDeleteSurvivesLogTrims() {
+        var root = Self.book(["A"])
+        root["auditLog"] = Self.audit(0..<2000)
+        var next = root
+        next["products"] = .array([])
+        StoreWriter.recordDeletions(before: root, after: &next)
+        root = next
+        // 6,000 more logged actions, written a hundred at a time.
+        var top = 2000
+        for _ in 0..<60 {
+            var after = root
+            after["auditLog"] = Self.audit((top + 100 - 2000)..<(top + 100))
+            top += 100
+            StoreWriter.recordDeletions(before: root, after: &after)
+            root = after
+        }
+        let keys = Self.keys(root)
+        #expect(keys.contains("products:A"), "the delete lost its tombstone to the activity log")
+        let logKeys = keys.filter { $0.hasPrefix("auditLog:") }
+        #expect(logKeys.count == StoreWriter.tombstoneCap)
+        #expect(logKeys.last == "auditLog:AL\(top - 2001)")
+    }
+
+    @Test("other collections keep the 5,000 they always had, oldest going first")
+    func otherCollectionsKeepTheirCap() {
+        var tombs: [JSONValue] = (0..<5000).map {
+            .object(["id": .string("P\($0)"), "collection": .string("products"), "rev": .number(1)])
+        }
+        tombs += (0..<3000).map {
+            .object(["id": .string("AL\($0)"), "collection": .string("auditLog"), "rev": .number(1)])
+        }
+        tombs.append(.object(["id": .string("P5000"), "collection": .string("products"), "rev": .number(1)]))
+        StoreWriter.capTombstones(&tombs)
+        let root: [String: JSONValue] = ["tombstones": .array(tombs)]
+        let products = Self.keys(root).filter { $0.hasPrefix("products:") }
+        #expect(products.count == 5000)
+        #expect(products.first == "products:P1")
+        #expect(products.last == "products:P5000")
+        #expect(Self.keys(root).filter { $0.hasPrefix("auditLog:") }.count == 3000)
+    }
+
+    @Test("a merge from a cloud still holding trimmed rows keeps the newest entries")
+    func mergeKeepsTheNewest() async throws {
+        let engine = try KhaytEngine()
+        // The cloud's copy is older: AL0..AL1999.
+        let server: [String: JSONValue] = ["auditLog": Self.audit(0..<2000), "tombstones": .array([])]
+        // This Mac has logged ten more since: AL10..AL2009, AL0..AL9 tombstoned.
+        var before = Self.book([])
+        before["auditLog"] = Self.audit(0..<2000)
+        var local = before
+        local["auditLog"] = Self.audit(10..<2010)
+        StoreWriter.recordDeletions(before: before, after: &local)
+
+        let merged = try await engine.mergeFromCloud(local: local, server: server).store
+        let ids = Self.ids(merged["auditLog"])
+        #expect(!ids.contains("AL0") && !ids.contains("AL9"), "a trimmed row came back")
+        #expect(ids.count == 2000)
+        #expect(ids.first == "AL10" && ids.last == "AL2009")
+    }
+}

@@ -338,7 +338,7 @@ struct GroupTileActions: View {
     var body: some View {
         let acted = shop.groupsActedOn(from: path)
         Button(acted.count > 1
-               ? shop.words.callIt("mac.move_n_groups_into", ["groups": .string(shop.words.counting(acted.count, "mac.n_groups"))])
+               ? shop.words.callIt("mac.move_n_groups_into", ["groups": .string(shop.words.counting(acted.count, "mac.n_groups_of"))])
                : shop.words.callIt("mac.move_into_group")) {
             shop.movingGroups = GroupMoveRequest(paths: acted, renaming: false)
         }
@@ -408,7 +408,7 @@ struct GroupMoveSheet: View {
             Text(request.renaming
                  ? shop.words.callIt("mac.rename_group_title")
                  : shop.words.callIt("mac.move_groups_title",
-                                     ["groups": .string(shop.words.counting(request.paths.count, "mac.n_groups"))]))
+                                     ["groups": .string(shop.words.counting(request.paths.count, "mac.n_groups_of"))]))
                 .font(.headline)
             if request.renaming { renameField } else { destinationChoice }
             if makesNewParent { GroupKindChoice(words: shop.words, kind: $kind) }

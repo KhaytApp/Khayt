@@ -69,10 +69,16 @@ extension Shop {
     ///   - markerTag: how a hand-placed object's key is written in `online`.
     static func planDelete(_ files: [LibraryFile], roots: [String], remote: LibraryRemote?, prefix: String,
                            remoteTag: String, engine: KhaytEngine, fetch: @escaping S3.Fetch,
+                           patience: Duration = deleteCheckPatience,
                            modelFile: (LibraryFile) -> URL?) async -> LibraryDeletePlan {
         var plan = LibraryDeletePlan()
         let fm = FileManager.default
-        for file in files {
+        // What is on this Mac first, model by model: names in its folder and
+        // where its file is. Then the remote is asked about every backup at
+        // once (`checkBackups`), rather than one model after another.
+        var keysOf: [[String]] = [], markers: [Bool] = [], models: [URL?] = []
+        var asks: [BackupAsk] = []
+        for (i, file) in files.enumerated() {
             plan.ids.append(file.id)
             let dir = LibraryLocation.directory(for: file.id, roots: roots)
             let names = dir.map { (try? fm.contentsOfDirectory(atPath: $0.path)) ?? [] } ?? []
@@ -90,25 +96,25 @@ extension Shop {
             }
             let model = modelFile(file)
             // The library's own backup of the file, where it would be.
-            var proved = false
-            var backupKey: String?
-            if let model, let remote {
+            if let model, remote != nil {
                 let key = S3.objectKey(prefix: prefix, id: LibraryLocation.itemDirName(file.id),
                                        filename: model.lastPathComponent)
-                if let head = try? await remote.head(key, fetch: fetch) {
-                    backupKey = key
-                    keys.append(remoteTag + key)
-                    // A linked model's file is the shop's and is never removed,
-                    // so there is nothing to prove — and digesting one its drive
-                    // has not downloaded would download it to ask a question.
-                    if !file.isLinked,
-                       let local = await PinWork.run({ try? CloudLibrary.digests(of: model) }),
-                       head.size == local.size,
-                       (try? await engine.etagVerdict(etag: head.etag, md5: local.md5)) == "match" {
-                        proved = true
-                    }
-                }
+                asks.append(BackupAsk(index: i, key: key, model: model, linked: file.isLinked))
             }
+            keysOf.append(keys); markers.append(marker); models.append(model)
+        }
+        var answers: [Int: BackupAnswer] = [:]
+        if let remote, !asks.isEmpty {
+            answers = await checkBackups(asks, remote: remote, engine: engine, fetch: fetch, patience: patience)
+        }
+
+        for (i, file) in files.enumerated() {
+            var keys = keysOf[i]
+            let answer = answers[i]
+            let backupKey = answer?.key
+            if let backupKey { keys.append(remoteTag + backupKey) }
+            let proved = answer?.proved ?? false
+            let model = models[i]
             // Once each: a `.cloud` sidecar names the backup key the HEAD
             // above found too.
             var once = Set<String>()
@@ -117,7 +123,7 @@ extension Shop {
                 plan.inPlace.append(file.id)
             } else if model == nil {
                 if keys.isEmpty { plan.onlyHere.append(file.id) } else { plan.cloudOnly.append(file.id) }
-                if marker { plan.handPlaced.append(file.id) }
+                if markers[i] { plan.handPlaced.append(file.id) }
             } else if proved, let model, let backupKey {
                 plan.keptOnline.append(file.id)
                 plan.local[file.id] = .init(model: model, key: backupKey)
@@ -126,6 +132,68 @@ extension Shop {
             }
         }
         return plan
+    }
+
+    /// How many models' backups are asked about at once, and how long the
+    /// whole plan may wait. Drive answers one HEAD in a second or two, and a
+    /// selection of a hundred asked one at a time held the question back for
+    /// minutes; an unreachable remote held it for a request timeout per model.
+    /// A model not answered in time is planned as if it had no backup —
+    /// what a failed request already meant — so it is counted with the ones
+    /// only on this Mac, never removed on the strength of a copy unseen.
+    nonisolated static let deleteCheckWidth = 4
+    nonisolated static let deleteCheckPatience: Duration = .seconds(45)
+
+    struct BackupAsk: Sendable { let index: Int; let key: String; let model: URL; let linked: Bool }
+    /// `key` the backup was found at; `proved` when its size and MD5 match.
+    struct BackupAnswer: Sendable { let key: String; let proved: Bool }
+
+    /// The remote asked about each backup, `deleteCheckWidth` at a time, and
+    /// no longer than `patience` in all. Keyed by `BackupAsk.index`; a model
+    /// whose backup is not there, or was not answered in time, has none.
+    static func checkBackups(_ asks: [BackupAsk], remote: LibraryRemote, engine: KhaytEngine,
+                             fetch: @escaping S3.Fetch,
+                             patience: Duration = deleteCheckPatience) async -> [Int: BackupAnswer] {
+        enum Event: Sendable { case answer(Int, BackupAnswer?), outOfTime }
+        @Sendable func ask(_ a: BackupAsk) async -> Event {
+            guard let head = try? await remote.head(a.key, fetch: fetch) else { return .answer(a.index, nil) }
+            // A linked model's file is the shop's and is never removed, so
+            // there is nothing to prove — and digesting one its drive has not
+            // downloaded would download it to ask a question.
+            var proved = false
+            if !a.linked, !Task.isCancelled,
+               let local = await PinWork.run({ try? CloudLibrary.digests(of: a.model) }),
+               head.size == local.size,
+               (try? await engine.etagVerdict(etag: head.etag, md5: local.md5)) == "match" {
+                proved = true
+            }
+            return .answer(a.index, BackupAnswer(key: a.key, proved: proved))
+        }
+        return await withTaskGroup(of: Event.self) { group in
+            var out: [Int: BackupAnswer] = [:]
+            group.addTask {
+                try? await Task.sleep(for: patience)
+                return .outOfTime
+            }
+            var next = 0, running = 0
+            while next < asks.count, running < deleteCheckWidth {
+                let a = asks[next]; next += 1; running += 1
+                group.addTask { await ask(a) }
+            }
+            while let event = await group.next() {
+                guard case .answer(let i, let answer) = event else { break }
+                if let answer { out[i] = answer }
+                running -= 1
+                if next < asks.count {
+                    let a = asks[next]; next += 1; running += 1
+                    group.addTask { await ask(a) }
+                } else if running == 0 { break }
+            }
+            // Out of time, or all answered: the timer and anything still
+            // asking are let go.
+            group.cancelAll()
+            return out
+        }
     }
 
     /// One model's local file, removed once its online copy is proved — in a
@@ -154,16 +222,38 @@ extension Shop {
     ///   `.cloud` sidecar or `.online` marker) — never deleted: the object is
     ///   that model's too. Two Macs adopting one bucket object at once make two
     ///   records of it, and deleting one must not strand the other.
+    ///
+    /// - Parameter prefix: the remote's key prefix, when the library's own
+    ///   folder for each model (`print-files/<id>/`) is to be emptied too —
+    ///   the versions, thumbs and guides a backup put beside the model, which
+    ///   the plan does not name one by one. Only under that model's own id.
     static func deleteOnlineCopies(_ plan: LibraryDeletePlan, ids: [String],
                                    remote: LibraryRemote?, bucket: LibraryRemote?,
                                    remoteTag: String, keptFor: Set<String> = [],
+                                   prefix: String? = nil,
                                    fetch: @escaping S3.Fetch) async -> (done: [String], failed: [String: String]) {
         // lock: callers — deleteCompletely
         var done: [String] = []
         var failed: [String: String] = [:]
+        // What else is in each model's own folder online. Drive's folder is
+        // flat and asked once; a bucket is asked per model, under its prefix.
+        let folders = await Self.onlineFolders(ids, remote: remote, prefix: prefix, fetch: fetch)
         for id in ids {
             var problem: String?
-            for tagged in plan.online[id] ?? [] {
+            var tags = plan.online[id] ?? []
+            switch folders[id] {
+            case .some(.success(let keys)):
+                let named = Set(tags)
+                tags += keys.map { remoteTag + $0 }.filter { !named.contains($0) }
+            case .some(.failure(let why)):
+                // Kept whole when it is known to be online; a model nothing
+                // online was ever found for is not held back by a listing
+                // that failed (a delete with the network down).
+                if !tags.isEmpty { problem = why.said }
+            case .none:
+                break
+            }
+            for tagged in problem == nil ? tags : [] {
                 // `drive:` is Drive, which is only ever the remote in use;
                 // `bucket:` is the library's bucket, in use or not.
                 let target: LibraryRemote?, key: String
@@ -193,6 +283,40 @@ extension Shop {
             if let problem { failed[id] = problem } else { done.append(id) }
         }
         return (done, failed)
+    }
+
+    /// The keys under `print-files/<id>/` on the remote in use, per model —
+    /// or why they could not be listed, which keeps that model whole.
+    static func onlineFolders(_ ids: [String], remote: LibraryRemote?, prefix: String?,
+                              fetch: @escaping S3.Fetch) async -> [String: Result<[String], ListFailure>] {
+        guard let remote, let prefix, !ids.isEmpty else { return [:] }
+        func folder(_ id: String) -> String {
+            S3.objectKey(prefix: prefix, id: LibraryLocation.itemDirName(id), filename: "") + "/"
+        }
+        var out: [String: Result<[String], ListFailure>] = [:]
+        if remote.isDrive {
+            let all = S3.objectKey(prefix: prefix, id: "", filename: "") + "/"
+            do {
+                let keys = try await remote.keys(under: all, fetch: fetch)
+                for id in ids { out[id] = .success(keys.filter { $0.hasPrefix(folder(id)) }) }
+            } catch {
+                for id in ids { out[id] = .failure(ListFailure(error)) }
+            }
+            return out
+        }
+        for id in ids {
+            do { out[id] = .success(try await remote.keys(under: folder(id), fetch: fetch)) }
+            catch { out[id] = .failure(ListFailure(error)) }
+        }
+        return out
+    }
+
+    /// A listing that failed, said as the delete says any other failure.
+    struct ListFailure: Error, Equatable, Sendable {
+        let said: String
+        init(_ error: any Error) {
+            said = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+        }
     }
 
     // MARK: - The shop's side
@@ -361,7 +485,8 @@ extension Shop {
         let roots = libraryRoots?.roots ?? []
         let keptFor = await PinWork.run { Shop.keysNamedOnDisk(roots: roots, except: chosen) }
         let result = await Self.deleteOnlineCopies(plan, ids: plan.ids, remote: r.remote, bucket: r.bucket,
-                                                   remoteTag: r.tag, keptFor: keptFor, fetch: CloudLibrary.fetch)
+                                                   remoteTag: r.tag, keptFor: keptFor, prefix: r.prefix,
+                                                   fetch: CloudLibrary.fetch)
         let done = Set(result.done)
         let records = files.filter { done.contains($0.id) }
         if !records.isEmpty { await deleteLibraryFiles(records) }

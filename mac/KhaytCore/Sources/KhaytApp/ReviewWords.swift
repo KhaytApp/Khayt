@@ -15,6 +15,8 @@ enum ReviewWords {
                                  "ar": "إغلاق دون إعادتها؟"],
         "mac.losses_dismiss_body": ["en": "{n} records sync took have not been put back. Their copies stay in the sync-conflicts folder beside your backups, but this notice will not come back.",
                                     "ar": "لم يُعَد {n} من السجلات التي أخذتها المزامنة. تبقى نسخها في مجلد sync-conflicts بجانب النسخ الاحتياطية، لكن هذا التنبيه لن يعود."],
+        "mac.losses_dismiss_body_one": ["en": "{n} record sync took has not been put back. Its copy stays in the sync-conflicts folder beside your backups, but this notice will not come back.",
+                                        "ar": "لم يُعَد سجل واحد أخذته المزامنة. تبقى نسخته في مجلد sync-conflicts بجانب النسخ الاحتياطية، لكن هذا التنبيه لن يعود."],
         "mac.losses_dismiss": ["en": "Close Notice", "ar": "إغلاق التنبيه"],
         "mac.losses_review_unsaved": ["en": "Closed, but this Mac could not remember that — the notice will come back on the next launch:",
                                       "ar": "أُغلق، لكن تعذّر على هذا الماك تذكّر ذلك — سيعود التنبيه عند التشغيل التالي:"],

@@ -12,8 +12,10 @@ import KhaytCore
 /// A linked model's record points at its file (`externalPath`); only its
 /// picture goes into the vault. Nothing here copies, moves or removes a
 /// linked file: deleting the model deletes the RECORD (the vault folder holds
-/// only the picture), unlinking a folder removes its records, and online
-/// storage and library moves walk the vault and never see a linked file.
+/// only the picture, and the path is remembered in `notAdopted` so the next
+/// scan does not index it again), unlinking a folder removes its records,
+/// and online storage and library moves walk the vault and never see a
+/// linked file.
 extension Shop {
 
     /// The folders linked on this book.
@@ -55,17 +57,26 @@ extension Shop {
 
     /// Stop indexing a folder. Its models leave the library; its FILES are
     /// not touched.
+    ///
+    /// Not while a scan or a move runs (`libraryMoveBusy`): a linked scan
+    /// that walked the folder before it was unlinked went on to add its
+    /// models after, as records under a folder the book no longer links.
     func unlinkFolder(_ path: String) async {
         guard permitted("settings", "edit") else { return }
+        guard !libraryMoveBusy else { libraryMoveProblem = words.callIt("mac.linked_unlink_busy"); return }
         libraryMoveProblem = nil
         guard let build = source.build else { return }
+        let remaining = linkedFolders.filter { $0 != path }
+        // Held for the whole unlink: a Rescan started during its write read
+        // the folders as they were and indexed this one's models again.
+        libraryMoveBusy = true
+        defer { libraryMoveBusy = false }
         do {
-            try await writeLinked(linkedFolders.filter { $0 != path })
-            let gone = Set(files.filter { $0.isLinked && LibraryMove.under($0.externalPath ?? "", path) }.map(\.id))
-            try await StoreWriter.updateOffMain(build) { root in
-                var rows = Self.rows(root, "printFiles")
-                rows.removeAll { Self.recordId($0).map(gone.contains) ?? false }
-                root["printFiles"] = .array(rows)
+            // ONE write: the list, the records and what the deletes
+            // remembered, together. Two writes left a refused second one with
+            // the folder unlinked and its records still in the book.
+            let gone = try await StoreWriter.updateOffMain(build) { root in
+                Self.unlink(path, remaining: remaining, in: &root)
             }
             // The vault folders of those records hold only their pictures.
             if let roots = libraryRoots {
@@ -82,6 +93,41 @@ extension Shop {
         } catch {
             libraryMoveProblem = String(describing: error)
         }
+    }
+
+    /// The unlink itself, on the book as it is on disk: `path` leaves the
+    /// linked list, and so do the records under it — except those under a
+    /// folder that STAYS linked inside it. Unlinking `Drive` while
+    /// `Drive/Prints` is linked too took the models of `Drive/Prints` with
+    /// it. The deleted paths remembered under `path` are let go, so linking
+    /// it again indexes what is there. Returns the ids taken out.
+    nonisolated static func unlink(_ path: String, remaining: [String],
+                                   in root: inout [String: JSONValue]) -> Set<String> {
+        var settings = Self.settings(root)
+        var library: [String: JSONValue] = [:]
+        if case .object(let l)? = settings["printLibrary"] { library = l }
+        library["linked"] = .array(remaining.map(JSONValue.string))
+        func underPath(_ p: String) -> Bool {
+            LibraryMove.under(p, path) && !remaining.contains { LibraryMove.under(p, $0) }
+        }
+        if case .array(let remembered)? = library["notAdopted"] {
+            library["notAdopted"] = .array(remembered.filter {
+                if case .string(let p) = $0 { !underPath(p) } else { true }
+            })
+        }
+        settings["printLibrary"] = .object(library)
+        root["settings"] = .object(settings)
+
+        var gone = Set<String>()
+        var rows = Self.rows(root, "printFiles")
+        rows.removeAll { row in
+            guard case .object(let o) = row, case .string(let p)? = o["externalPath"], !p.isEmpty,
+                  underPath(p), let id = Self.recordId(row) else { return false }
+            gone.insert(id)
+            return true
+        }
+        root["printFiles"] = .array(rows)
+        return gone
     }
 
     /// Index what is new in every linked folder, in place. A file already
@@ -133,7 +179,10 @@ extension Shop {
         // library is reloaded only when the book was written — so a scan that
         // finds nothing new reloads nothing. `LibraryScanPerfTests` holds it.
         var bookAt = Self.bookStamp(build.storeURL)
-        let externals = files.compactMap(\.externalPath)
+        // Indexed already, or deleted by the shop since (`notAdopted`): a
+        // deleted linked model keeps its file, and without the second it
+        // came back at the next launch.
+        let externals = files.compactMap(\.externalPath) + Array(notAdopted)
         let vaults = roots.roots + [roots.primary]
 
         // THE WALK, metadata only, on a dispatch queue (`PinWork`) — not a
@@ -485,13 +534,31 @@ extension Shop {
                 && !isOnline(URL(fileURLWithPath: $0.path)) }
         }
         guard !here.isEmpty else { return }
+        // Written a batch at a time, as Measure Online writes (`OnlineMeasure.batch`):
+        // one write per model was the whole 16 MB book again for each one a
+        // shop made available offline.
+        var pending: [String: DownloadedRead] = [:]
+        func writeFilled() async {
+            guard !pending.isEmpty else { return }
+            let batch = pending
+            pending = [:]
+            // lock: callers — fillNowLocal
+            try? await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
+                Shop.applyDownloaded(batch, to: &book)
+            }
+        }
         for item in here {
             if stop?.isStopped == true || Task.isCancelled { break }
             let pictures = Self.vaultFolder(item.id, roots: roots)
             try? FileManager.default.createDirectory(at: pictures, withIntermediateDirectories: true)
-            _ = try? await Self.fillDownloaded(id: item.id, file: URL(fileURLWithPath: item.path), pictures: pictures,
-                                               storeURL: storeURL, engine: engine, owns: owns, whoHasIt: whoHasIt)
+            if let read = try? await Self.readDownloaded(file: URL(fileURLWithPath: item.path), pictures: pictures,
+                                                         engine: engine) {
+                pending[item.id] = read
+            }
+            if pending.count >= OnlineMeasure.batch { await writeFilled() }
         }
+        // What was read before a Stop is still written.
+        await writeFilled()
     }
 
     /// A record's vault folder — the one it already has, in whichever of the

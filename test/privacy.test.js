@@ -47,7 +47,7 @@ test('buildClientDataExport never leaks shop settings/secrets', () => {
   const json = JSON.stringify(e);
   assert.equal(json.includes('apiKey'), false);
   assert.equal(json.includes('settings'), false);
-  assert.deepEqual(Object.keys(e).sort(), ['communications', 'counts', 'exportedAt', 'intakeHistory', 'intakeSubmissions', 'orders', 'subject'].sort());
+  assert.deepEqual(Object.keys(e).sort(), ['communications', 'counts', 'exportedAt', 'giftCards', 'intakeHistory', 'intakeSubmissions', 'loyaltyLedger', 'orders', 'subject'].sort());
 });
 
 test('buildClientDataExport on an unknown client is empty, not a throw', () => {
@@ -201,4 +201,41 @@ test('the desktop blanks only the jobs the plan names', () => {
   const body = src.slice(at, src.indexOf('\n}', at));
   assert.match(body, /plan\.blankNameOrderIds/, 'deleteClient decides for itself which names to blank');
   assert.doesNotMatch(body, /if \(fullErase\) \{ priorNames\.set/, 'every job is blanked on a full erase again');
+});
+
+test('gift cards and loyalty rows are in the export, and a full erase unlinks only what owes nothing', () => {
+  const collections = {
+    clients: [{ id: 'C1', nameEn: 'Nora', email: 'n@x.sa' }, { id: 'C2', nameEn: 'Other' }],
+    printLog: [],
+    giftCards: [
+      { id: 'GC-SPENT', code: 'AAA', initialBalance: 50, balance: 0, issuedTo: 'C1', issuedToName: 'Nora' },
+      { id: 'GC-LEFT', code: 'BBB', initialBalance: 50, balance: 12.5, issuedTo: 'C1', issuedToName: 'Nora' },
+      { id: 'GC-OTHER', code: 'CCC', initialBalance: 20, balance: 0, issuedTo: 'C2', issuedToName: 'Other' },
+    ],
+    loyaltyLedger: [
+      { id: 'L1', clientId: 'C1', type: 'redeem', points: 500, credit: 5 },
+      { id: 'L2', clientId: 'C2', type: 'redeem', points: 100, credit: 1 },
+    ],
+  };
+  const exp = P.buildClientDataExport('C1', collections, '2026-10-21T00:00:00Z');
+  assert.deepEqual(exp.giftCards.map(g => g.id), ['GC-SPENT', 'GC-LEFT']);
+  assert.equal(exp.giftCards[1].balance, 12.5);
+  assert.deepEqual(exp.loyaltyLedger.map(r => r.id), ['L1']);
+  assert.equal(exp.counts.giftCards, 2);
+  assert.equal(exp.counts.loyaltyLedger, 1);
+
+  const full = P.planClientErasure('C1', collections, 'full');
+  assert.deepEqual(full.unlinkGiftCardIds, ['GC-SPENT'], 'a spent card loses its holder');
+  assert.deepEqual(full.keepGiftCardIds, ['GC-LEFT'], 'a card with a balance is money owed, and keeps the name');
+  assert.equal(full.counts.keptCards, 1);
+  assert.equal(full.unlinkLoyaltyLedger, true);
+  assert.equal(full.counts.loyaltyLedger, 1);
+
+  const unlink = P.planClientErasure('C1', collections, 'unlink');
+  assert.deepEqual(unlink.unlinkGiftCardIds, []);
+  assert.equal(unlink.unlinkLoyaltyLedger, false);
+  // Without the two collections (an older caller) nothing is touched.
+  const bare = P.planClientErasure('C1', { clients: collections.clients, printLog: [] }, 'full');
+  assert.deepEqual(bare.unlinkGiftCardIds, []);
+  assert.equal(bare.unlinkLoyaltyLedger, false);
 });

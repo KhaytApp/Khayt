@@ -294,6 +294,11 @@ final class PrinterWatch {
         previous = [:]
         alertState = .object([:])
         finishCamera.reset()
+        // And the readings themselves. Another book's printers, or this book
+        // reopened later, would otherwise be drawn as printing from a poll made
+        // before it closed, and their first new answer read as that print's end.
+        readings = [:]
+        pollCache = [:]
     }
 
     /// The edge into a finished print, for the printer's own photo.
@@ -396,6 +401,7 @@ final class PrinterWatch {
     /// a burst of simultaneous requests to a Klipper host is a way to find out
     /// what its request queue does under load, on somebody's live print.
     private func sweep(shop: Shop) async {
+        let forgot = forgetUnwatched(shop: shop)
         var asked = false
         for machine in shop.machines where Self.notWatched(machine) == nil {
             if Task.isCancelled { return }
@@ -409,7 +415,45 @@ final class PrinterWatch {
         if asked {
             await shop.printersAnswered()
             await raiseAlerts(shop: shop)
+        } else if forgot {
+            // Nothing was asked, but a machine's last reading went: the
+            // dashboard and the widget still count it until they are told.
+            await shop.printersAnswered()
         }
+    }
+
+    /// Drop everything remembered about a machine this app no longer asks.
+    ///
+    /// A printer put under service or retired mid-print kept its last reading
+    /// for the rest of the session: the menu bar, the widget and the dashboard
+    /// went on calling it printing, its phone's Live Activity never ended, and
+    /// when it came back into service its first poll was taken for that old
+    /// print's end — a finish event and a power reading spanning the repair.
+    /// What it says next starts from nothing, as a machine just added does.
+    ///
+    /// A machine DELETED from the book is forgotten the same way. A new printer
+    /// with no history may be deleted even mid-print, and walking only the
+    /// book's machines never reached it again: its reading stayed in every
+    /// count and its Live Activity stayed on the phone.
+    /// True when anything was dropped.
+    @discardableResult
+    func forgetUnwatched(shop: Shop) -> Bool {
+        let inBook = Set(shop.machines.map(\.id))
+        var ids = Set(shop.machines.filter { Self.notWatched($0) != nil }.map(\.id))
+        ids.formUnion(Set(readings.keys).union(pollCache.keys).union(finishCamera.machineIds)
+            .union(shop.liveActivities.running.keys).subtracting(inBook))
+        var forgot = false
+        for id in ids {
+            if readings[id] != nil { readings[id] = nil; forgot = true }
+            pollCache[id] = nil
+            finishCamera.forget(id)
+            // The alert module's memory too, or a printer back in service
+            // starts with an offline count or a stall clock from before.
+            previous[id] = nil
+            if case .object(var o) = alertState, o[id] != nil { o[id] = nil; alertState = .object(o) }
+            shop.printerUnwatched(id)
+        }
+        return forgot
     }
 
     /// Ask the shared module what has just gone wrong, and say it.
@@ -562,10 +606,52 @@ final class PrinterWatch {
     /// applies to a printer? Asked before any request that carries a
     /// printer's credential — a camera URL is matched against the printer's
     /// host, and a printer host that is itself public was never checked.
-    nonisolated static func onThisNetwork(_ url: URL, engine: KhaytEngine) async -> Bool {
+    nonisolated static func onThisNetwork(_ url: URL, engine: KhaytEngine,
+                                          lookUp: @escaping @Sendable (String) async -> [String] = { await WebhookClient.addresses(of: $0) })
+    async -> Bool {
+        await pinned(url, engine: engine, lookUp: lookUp) != nil
+    }
+
+    /// The same URL, aimed at the address `baseURL`'s rule checked — or nil
+    /// when that rule refuses it.
+    ///
+    /// ── A CAMERA'S NAME IS RESOLVED TOO ──────────────────────────────────
+    ///
+    /// This used to apply only the text rule, which passes any name, so a
+    /// synced or restored `webcam.snapshotUrl` (or printer host) naming
+    /// `cam.attacker.example` was fetched with the printer's API key or Bambu
+    /// access code on every frame — the hole #1955 closed for the poller and
+    /// left open here. And checking a name, then letting `URLSession` look it
+    /// up again, is a race a rebinding name wins. So a request that may carry
+    /// a credential is built from THIS URL, never the one in the book.
+    nonisolated static func pinned(_ url: URL, engine: KhaytEngine,
+                                   lookUp: @escaping @Sendable (String) async -> [String] = { await WebhookClient.addresses(of: $0) })
+    async -> URL? {
         guard let raw = url.host(percentEncoded: false), !raw.isEmpty,
-              let host = try? await engine.printerHost(raw), !host.isEmpty else { return false }
-        return (try? await engine.printerHostAllowed(host)) == true
+              let host = try? await engine.printerHost(raw), !host.isEmpty,
+              (try? await engine.printerHostAllowed(host)) == true,
+              let target = await pinnedAddress(host, engine: engine, lookUp: lookUp) else { return nil }
+        guard target != host else { return url }
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        parts.host = target
+        return parts.url
+    }
+
+    /// The address to connect to for a host that passed the text rule: the
+    /// host itself when it is an address, otherwise the checked IPv4 answer
+    /// (or the name, when every answer is link-local IPv6 — the resolver drops
+    /// the zone it would need). Nil when the name resolves to nothing, or to
+    /// any address a printer may not be at.
+    nonisolated static func pinnedAddress(_ host: String, engine: KhaytEngine,
+                                          lookUp: @Sendable (String) async -> [String]) async -> String? {
+        if IPv4Address(host) != nil || IPv6Address(host) != nil { return host }
+        let addresses = await lookUp(host)
+        guard !addresses.isEmpty else { return nil }
+        for address in addresses {
+            let bare = String(address.split(separator: "%", maxSplits: 1).first ?? "")
+            guard await SmartPlug.addressAllowed(bare, engine: engine) else { return nil }
+        }
+        return addresses.first(where: { !$0.contains(":") }) ?? host
     }
 
     // MARK: - The conversations
@@ -866,15 +952,8 @@ final class PrinterWatch {
         guard try await engine.printerHostAllowed(host) else { throw Refusal.notALanAddress(host) }
         let port = machine.printerApi?.port ?? defaultPort(machine.printerApi?.type ?? "")
         guard port > 0, port <= 65535 else { throw Refusal.badPort(port) }
-        var target = host
-        if IPv4Address(host) == nil, IPv6Address(host) == nil {
-            let addresses = await lookUp(host)
-            guard !addresses.isEmpty else { throw Refusal.notALanAddress(host) }
-            for address in addresses {
-                let bare = String(address.split(separator: "%", maxSplits: 1).first ?? "")
-                guard await SmartPlug.addressAllowed(bare, engine: engine) else { throw Refusal.notALanAddress(host) }
-            }
-            if let v4 = addresses.first(where: { !$0.contains(":") }) { target = v4 }
+        guard let target = await pinnedAddress(host, engine: engine, lookUp: lookUp) else {
+            throw Refusal.notALanAddress(host)
         }
         let shown = target.contains(":") ? "[\(target)]" : target
         guard let url = URL(string: "http://\(shown):\(port)") else { throw Refusal.noHost }

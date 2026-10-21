@@ -162,6 +162,14 @@ final class Words {
         if language == "ar", n == 2, let dual = Self.own[key + "_two"]?["ar"], !dual.isEmpty {
             return dual
         }
+        // ── AND NONE, WHERE THE WORD HAS BEEN GIVEN IT ───────────────────
+        //
+        // The 11-and-over form a key falls back to reads badly for nothing:
+        // "0 آلة", "منذ 0 يومًا". Arabic says none in words. Opt-in, like
+        // the dual: only a key with a `_zero`.
+        if language == "ar", n == 0, let none = Self.own[key + "_zero"]?["ar"], !none.isEmpty {
+            return none
+        }
         // ── THE VALUE MAY CARRY ITS OWN `{n}` ────────────────────────────
         //
         // Two shapes, because the catalogue has both. A value written as
@@ -198,7 +206,10 @@ final class Words {
         // "day" and wants its numeral, `آلة واحدة` already has one. Checking
         // for the word rather than assuming by language is what keeps the
         // first of those working.
-        if n == 1, said.contains("واحد") { return said }
+        //
+        // A literal (UTF-16) search, not `contains`: in "يومًا واحدًا" the
+        // tanween joins the last letter into one grapheme, which hides واحد.
+        if n == 1, said.range(of: "واحد", options: .literal) != nil { return said }
         // A plain space, not a non-breaking one. Binding the numeral to the
         // word is tempting and wrong here: eight existing tests read this
         // output back and compare it to "2 days", and a caller that has to
@@ -327,7 +338,9 @@ final class Words {
     /// "an integration is configured" does not.
     func outboundRefusal(_ reaches: [Outbound]) -> String {
         let named = reaches.map { callIt("mac.reach_" + $0.channel) }
-        let list = named.joined(separator: named.count == 2 ? " " + callIt("mac.and") + " " : "، ")
+        // The shop's language's own list: "A, B and C" in English (the
+        // Arabic comma was being used for both), "أ وب وج" in Arabic.
+        let list = named.formatted(.list(type: .and).locale(locale))
         return callIt("mac.move_reaches") + " " + list + ". " + callIt("mac.move_in_khayt")
     }
 
@@ -391,8 +404,12 @@ final class Words {
         // When NONE of them can be timed the band has nothing to draw, so it is
         // not drawn: one line saying what is missing beats three empty lanes and
         // a legend for marks that do not appear.
-        "mac.band_free_across": ["en": "{hours} free across {n} machines",
-                                 "ar": "{hours} متفرغة على {n} طابعات"],
+        "mac.band_free_across": ["en": "{hours} free across {machines}",
+                                 "ar": "{hours} متفرغة على {machines}"],
+        "mac.band_machines": ["en": "{n} machines", "ar": "{n} طابعة"],
+        "mac.band_machines_one": ["en": "{n} machine", "ar": "طابعة واحدة"],
+        "mac.band_machines_two": ["en": "2 machines", "ar": "طابعتين"],
+        "mac.band_machines_few": ["en": "{n} machines", "ar": "{n} طابعات"],
         "mac.band_none":     ["en": "Khayt cannot time any of these printers yet",
                               "ar": "لا يستطيع خيط تقدير أي من هذه الطابعات بعد"],
         "mac.band_none_why": ["en": "Connect a printer and the next 48 hours fill themselves in — what is running, when each machine comes free, and what is waiting on filament.",
@@ -735,7 +752,9 @@ final class Words {
         // The expenses table's order column. The shared `exp.order_ref` is the
         // sheet's field label, "(optional)" and all, and did not fit a column.
         "mac.expense_order_col": ["en": "Order", "ar": "الطلب"],
-        "mac.waste_empty":     ["en": "No waste logged yet.", "ar": "لم يُسجَّل أي هدر بعد."],
+        // Titles, so no full stop — as "No customers yet".
+        "mac.waste_empty":     ["en": "No waste logged yet", "ar": "لم يُسجَّل أي هدر بعد"],
+        "mac.expenses_empty":  ["en": "No expenses recorded yet", "ar": "لا توجد مصروفات مسجلة بعد"],
         "mac.library":       ["en": "Library",       "ar": "المكتبة"],
         "mac.all_models":    ["en": "Library",       "ar": "المكتبة"],
         "mac.people":        ["en": "People",        "ar": "الأشخاص"],
@@ -792,7 +811,11 @@ final class Words {
         "mac.cm_title":      ["en": "Where the work comes from", "ar": "من أين يأتي العمل"],
         "mac.cm_new":        ["en": "New customers",  "ar": "عملاء جدد"],
         "mac.cm_returning":  ["en": "Coming back",    "ar": "عملاء عائدون"],
-        "mac.cm_people":     ["en": "{n} people",     "ar": "{n} أشخاص"],
+        "mac.cm_people":     ["en": "{n} people",     "ar": "{n} شخصًا"],
+        "mac.cm_people_one": ["en": "{n} person",     "ar": "شخص واحد"],
+        "mac.cm_people_two": ["en": "2 people",       "ar": "شخصان"],
+        "mac.cm_people_few": ["en": "{n} people",     "ar": "{n} أشخاص"],
+        "mac.cm_people_zero": ["en": "No people", "ar": "لا أحد"],
         "mac.cm_first":      ["en": "A new customer's first order is worth {amount} on average.",
                               "ar": "أول طلب لعميل جديد يساوي {amount} في المتوسط."],
         // Which products actually earn.
@@ -839,8 +862,23 @@ final class Words {
         "mac.qf_by_count":   ["en": "of the quotes",  "ar": "من عدد العروض"],
         "mac.qf_decide":     ["en": "{n} days to decide, typically",
                               "ar": "{n} يومًا للبتّ عادةً"],
-        "mac.qf_open":       ["en": "{n} quotes still open, worth {amount}. The oldest has been waiting {days} days.",
-                              "ar": "{n} عروض ما زالت مفتوحة بقيمة {amount}. أقدمها ينتظر منذ {days} يومًا."],
+        "mac.qf_decide_one": ["en": "{n} day to decide, typically", "ar": "يوم واحد للبتّ عادةً"],
+        "mac.qf_decide_two": ["en": "2 days to decide, typically", "ar": "يومان للبتّ عادةً"],
+        "mac.qf_decide_few": ["en": "{n} days to decide, typically", "ar": "{n} أيام للبتّ عادةً"],
+        "mac.qf_decide_zero": ["en": "Decided the same day, typically", "ar": "يُبتّ فيها في اليوم نفسه عادةً"],
+        // Two counts in one sentence, each counted on its own: Arabic says
+        // "3 عروض" but "11 عرضًا", and "منذ يومين" rather than "منذ 2 يومًا".
+        "mac.qf_open":       ["en": "{quotes} still open, worth {amount}. The oldest has been waiting {days}.",
+                              "ar": "لم يُبتّ بعد في {quotes} بقيمة {amount}. أقدمها ينتظر منذ {days}."],
+        "mac.qf_quotes":     ["en": "{n} quotes", "ar": "{n} عرضًا"],
+        "mac.qf_quotes_one": ["en": "{n} quote", "ar": "عرض واحد"],
+        "mac.qf_quotes_two": ["en": "2 quotes", "ar": "عرضين"],
+        "mac.qf_quotes_few": ["en": "{n} quotes", "ar": "{n} عروض"],
+        "mac.qf_days":       ["en": "{n} days", "ar": "{n} يومًا"],
+        "mac.qf_days_one":   ["en": "{n} day", "ar": "يوم واحد"],
+        "mac.qf_days_two":   ["en": "2 days", "ar": "يومين"],
+        "mac.qf_days_few":   ["en": "{n} days", "ar": "{n} أيام"],
+        "mac.qf_days_zero":  ["en": "today", "ar": "اليوم"],
         // Whether the shop can take another job.
         "mac.cap_clear_days": ["en": "clear in {n} days", "ar": "يخلو خلال {n} يومًا"],
         "mac.cap_clear_days_one": ["en": "clear in {n} day", "ar": "يخلو خلال يوم واحد"],
@@ -1307,8 +1345,10 @@ final class Words {
         "mac.attn_unpriced_one": ["en": "{n} finished job was charged nothing", "ar": "عمل منجز واحد لم يُحتسب عليه شيء"],
         "mac.charged_nothing": ["en": "Finished at a price of 0. A test, a gift or for the shop itself?", "ar": "أُنجز بسعر صفر. تجربة أو هدية أو للمحل نفسه؟"],
         "mac.mark_all_not_business": ["en": "Mark all Not business", "ar": "اجعلها كلها «ليس عملًا تجاريًا»"],
-        "mac.days_over": ["en": "{n} days over", "ar": "متأخر {n} أيام"],
-        "mac.days_over_one": ["en": "{n} day over", "ar": "متأخر يومًا"],
+        "mac.days_over": ["en": "{n} days over", "ar": "متأخر {n} يومًا"],
+        "mac.days_over_one": ["en": "{n} day over", "ar": "متأخر يومًا واحدًا"],
+        "mac.days_over_two": ["en": "2 days over", "ar": "متأخر يومين"],
+        "mac.days_over_few": ["en": "{n} days over", "ar": "متأخر {n} أيام"],
         "mac.past_its_date": ["en": "Past its due date", "ar": "تجاوز تاريخ التسليم"],
         "mac.grams_left": ["en": "{n} g left", "ar": "بقي {n} غ"],
         "mac.out_of_stock": ["en": "None left on the shelf", "ar": "لا شيء على الرف"],
@@ -1736,9 +1776,15 @@ final class Words {
         // The last backup is a DAY, so the strip says the day, not a time.
         "mac.saved_today":   ["en": "saved today",   "ar": "حُفظ اليوم"],
         "mac.saved_yesterday": ["en": "saved yesterday", "ar": "حُفظ أمس"],
-        "mac.n_machines":    ["en": "{n} machines", "ar": "{n} آلات"],
+        "mac.n_machines":    ["en": "{n} machines", "ar": "{n} آلة"],
+        "mac.n_machines_two": ["en": "2 machines", "ar": "آلتان"],
+        "mac.n_machines_few": ["en": "{n} machines", "ar": "{n} آلات"],
+        "mac.n_machines_zero": ["en": "No machines", "ar": "لا آلات"],
         "mac.n_machines_one": ["en": "{n} machine", "ar": "آلة واحدة"],
-        "mac.n_people":      ["en": "{n} people",   "ar": "{n} أشخاص"],
+        "mac.n_people":      ["en": "{n} people",   "ar": "{n} شخصًا"],
+        "mac.n_people_two":  ["en": "2 people",     "ar": "شخصان"],
+        "mac.n_people_few":  ["en": "{n} people",   "ar": "{n} أشخاص"],
+        "mac.n_people_zero": ["en": "No people", "ar": "لا أحد"],
         "mac.n_people_one":  ["en": "{n} person",   "ar": "شخص واحد"],
         // ── AND THE TWO AXES THE GROUPING MENU NEVER HAD ─────────────────
         //
@@ -2052,13 +2098,29 @@ final class Words {
         "mac.not_measured": ["en": "Not measured", "ar": "غير مقاس"],
         "mac.pct_over":     ["en": "{pct}% over",  "ar": "{pct}% زيادة"],
         "mac.pct_under":    ["en": "{pct}% under", "ar": "{pct}% أقل"],
-        "mac.prints_word_one": ["en": "print",  "ar": "طبعة"],
-        "mac.prints_word":     ["en": "prints", "ar": "طبعات"],
+        "mac.prints_word_one": ["en": "print",  "ar": "طبعة واحدة"],
+        "mac.prints_word":     ["en": "prints", "ar": "طبعة"],
+        "mac.prints_word_few": ["en": "{n} prints", "ar": "{n} طبعات"],
+        "mac.prints_word_zero": ["en": "No prints", "ar": "لا طبعات"],
         // English has no dual, so its `_two` is just the plural — as every other
         // `_two` key here carries one. `counting` only reaches for this form in
         // Arabic; the English side exists so the both-languages guard means
         // what it says rather than growing an exception.
         "mac.prints_word_two": ["en": "prints", "ar": "طبعتين"],
+        // A model's print count, Mac-own so Arabic can count it: the shared
+        // `cat.printed_n` has one form, and drew "طُبع 9 مرة".
+        "mac.printed_n":     ["en": "printed {n}×", "ar": "طُبع {n} مرة"],
+        "mac.printed_n_one": ["en": "printed {n}×", "ar": "طُبع مرة واحدة"],
+        "mac.printed_n_two": ["en": "printed 2×", "ar": "طُبع مرتين"],
+        "mac.printed_n_few": ["en": "printed {n}×", "ar": "طُبع {n} مرات"],
+        // An average in days. A whole number is counted; a fraction takes the
+        // singular in Arabic ("0.7 يوم"), as a measure rather than a count.
+        "mac.avg_days":      ["en": "{n} days", "ar": "{n} يومًا"],
+        "mac.avg_days_one":  ["en": "{n} day", "ar": "يوم واحد"],
+        "mac.avg_days_two":  ["en": "2 days", "ar": "يومان"],
+        "mac.avg_days_few":  ["en": "{n} days", "ar": "{n} أيام"],
+        "mac.avg_days_zero": ["en": "Under a day", "ar": "أقل من يوم"],
+        "mac.avg_days_fraction": ["en": "{n} days", "ar": "{n} يوم"],
         "mac.quoting_advice_filament": ["en": "Quoted {pct}% short on filament — the price is under what this costs.",
                                         "ar": "التسعير أقل بـ{pct}% في الخيط — السعر دون تكلفته الفعلية."],
         "mac.quoting_advice_time":     ["en": "Takes {pct}% longer than quoted — the machine time is under-charged.",
@@ -2169,8 +2231,15 @@ final class Words {
         // narrower list than either: past due, still owing, not nudged
         // recently and not nudged too often already.
         "mac.chase_invoices": ["en": "Invoices to chase", "ar": "فواتير للمتابعة"],
-        "mac.chase_days_over": ["en": "{n}d overdue", "ar": "متأخرة {n} يوم"],
-        "mac.chase_days_left": ["en": "expires in {n}d", "ar": "تنتهي خلال {n} يوم"],
+        "mac.chase_days_over": ["en": "{n}d overdue", "ar": "متأخرة {n} يومًا"],
+        "mac.chase_days_over_one": ["en": "{n}d overdue", "ar": "متأخرة يومًا واحدًا"],
+        "mac.chase_days_over_two": ["en": "2d overdue", "ar": "متأخرة يومين"],
+        "mac.chase_days_over_few": ["en": "{n}d overdue", "ar": "متأخرة {n} أيام"],
+        "mac.chase_days_over_zero": ["en": "Due today", "ar": "مستحقة اليوم"],
+        "mac.chase_days_left": ["en": "expires in {n}d", "ar": "تنتهي خلال {n} يومًا"],
+        "mac.chase_days_left_one": ["en": "expires in {n}d", "ar": "تنتهي خلال يوم واحد"],
+        "mac.chase_days_left_two": ["en": "expires in 2d", "ar": "تنتهي خلال يومين"],
+        "mac.chase_days_left_few": ["en": "expires in {n}d", "ar": "تنتهي خلال {n} أيام"],
         "mac.chase_expired":   ["en": "expired", "ar": "منتهية"],
         "mac.reveal":        ["en": "Reveal",        "ar": "إظهار"],
         "mac.open":          ["en": "Open",          "ar": "فتح"],
@@ -2194,9 +2263,15 @@ final class Words {
         "mac.nozzle":        ["en": "Nozzle",          "ar": "الفوهة"],
         "mac.colours":       ["en": "Colours",         "ar": "الألوان"],
         "mac.extruder":      ["en": "Extruder",        "ar": "الباثق"],
+        "mac.extruder_direct": ["en": "Direct drive", "ar": "دفع مباشر"],
+        "mac.extruder_bowden": ["en": "Bowden", "ar": "بودن"],
         "mac.power":         ["en": "Power",           "ar": "الطاقة"],
         "mac.address":       ["en": "Address",         "ar": "العنوان"],
         "mac.quarter_drawn": ["en": "Where {q} went",  "ar": "أين ذهب {q}"],
+        "mac.quarter_1": ["en": "Q1 {year}", "ar": "الربع الأول {year}"],
+        "mac.quarter_2": ["en": "Q2 {year}", "ar": "الربع الثاني {year}"],
+        "mac.quarter_3": ["en": "Q3 {year}", "ar": "الربع الثالث {year}"],
+        "mac.quarter_4": ["en": "Q4 {year}", "ar": "الربع الرابع {year}"],
         "mac.idle":          ["en": "Idle",            "ar": "متوقفة"],
         "mac.cannot_ask":    ["en": "Khayt cannot ask this machine",
                               "ar": "لا تستطيع خيط سؤال هذه الآلة"],
@@ -2307,8 +2382,10 @@ final class Words {
         // number first — "3 " + noun — which is right for "3 jobs" and wrong
         // here, because Arabic says متأخر before the count. So the placeholder
         // stays inside the sentence and the SENTENCE has a singular.
-        "mac.days_late":     ["en": "{n} days late",   "ar": "متأخر {n} يوماً"],
-        "mac.days_late_one": ["en": "{n} day late",    "ar": "متأخر {n} يوماً"],
+        "mac.days_late":     ["en": "{n} days late",   "ar": "متأخر {n} يومًا"],
+        "mac.days_late_one": ["en": "{n} day late",    "ar": "متأخر يومًا واحدًا"],
+        "mac.days_late_two": ["en": "2 days late",     "ar": "متأخر يومين"],
+        "mac.days_late_few": ["en": "{n} days late",   "ar": "متأخر {n} أيام"],
         "mac.no_figures":    ["en": "No figures yet",  "ar": "لا أرقام بعد"],
         // The FIRST screen this app ever shows a shop. Not "0.00 revenue",
         // which is what a quiet month looks like — this is a shop that has not
@@ -2614,6 +2691,8 @@ final class Words {
         "mac.libmove_no_room": ["en": "Not enough room in the new folder — {short} short. Nothing was moved; new models will still go there.", "ar": "لا مساحة كافية في المجلد الجديد — ينقص {short}. لم يُنقل شيء، وستذهب المجسّمات الجديدة إليه."],
         "mac.libmove_done": ["en": "Moved {n} files; {same} were already there.", "ar": "نُقل {n} ملفًا؛ و{same} كانت موجودة من قبل."],
         "mac.libmove_some_failed": ["en": "{n} files could not be moved and are where they were:", "ar": "تعذّر نقل {n} ملفًا وبقيت مكانها:"],
+        "mac.linked_unlink_busy": ["en": "The library is busy with a scan or a move. Unlink the folder once it has finished.", "ar": "المكتبة مشغولة بفحص أو نقل. ألغِ ربط المجلد بعد انتهائه."],
+        "mac.cloudlib_other_bucket": ["en": "This model is in the bucket {bucket}, which is not the one set up now, so it was not brought back.", "ar": "هذا النموذج في الحاوية {bucket}، وهي ليست الحاوية المعدّة الآن، لذا لم يُستعد."],
         "mac.cloudlib_not_there": ["en": "The bucket did not confirm the upload: the file is not there.", "ar": "لم تؤكد الحاوية الرفع: الملف غير موجود فيها."],
         "mac.cloudlib_wrong_size": ["en": "The bucket did not confirm the upload: it holds {there} bytes, not {here}.", "ar": "لم تؤكد الحاوية الرفع: فيها {there} بايت وليس {here}."],
         "mac.cloudlib_hash_mismatch": ["en": "The bucket did not confirm the upload: its content hash does not match.", "ar": "لم تؤكد الحاوية الرفع: بصمة المحتوى لا تطابق."],
@@ -2634,6 +2713,8 @@ final class Words {
         "mac.gdrive_need_client": ["en": "Add the OAuth client ID from your Google Cloud project first.", "ar": "أضف معرّف عميل OAuth من مشروعك في Google Cloud أولًا."],
         "mac.gdrive_waiting": ["en": "Waiting for the sign-in in your browser…", "ar": "بانتظار تسجيل الدخول في المتصفح…"],
         "mac.gdrive_connected": ["en": "Google Drive connected.", "ar": "رُبط Google Drive."],
+        "mac.portal_takedown_pending": ["en": "This customer was erased and their link is still on Khayt Cloud. Khayt keeps trying to take it down; you can try now.", "ar": "حُذف هذا العميل وما زال رابطه على خيط السحابي. يحاول خيط إزالته باستمرار، ويمكنك المحاولة الآن."],
+        "mac.gdrive_disconnected_revoked": ["en": "Disconnected, and Google has withdrawn Khayt's access. Anything already in Drive stays there.", "ar": "فُصل الحساب وسحبت Google إذن خيط. ما في Drive يبقى هناك."],
         "mac.gdrive_disconnected": ["en": "Disconnected. Anything already in Drive stays there. To withdraw the access fully, remove Khayt at myaccount.google.com.", "ar": "فُصل الحساب. ما في Drive يبقى هناك. لسحب الإذن كاملًا، احذف خيط من myaccount.google.com."],
         "mac.gdrive_disconnect_warn": ["en": "Models that were moved to the cloud will not open until they are brought back — bring them back first.", "ar": "المجسّمات المنقولة إلى السحابة لن تُفتح حتى تُعاد — أعدها أولًا."],
         "mac.gdrive_timed_out": ["en": "The browser sign-in was not finished within five minutes.", "ar": "لم يكتمل تسجيل الدخول في المتصفح خلال خمس دقائق."],
@@ -2811,7 +2892,7 @@ final class Words {
         "mac.cr_deleted":    ["en": "Deleted from Khayt Cloud.", "ar": "حُذف من سحابة خيط."],
         // WhatsApp delivery reports by way of Khayt Cloud (WhatsAppReports.swift).
         "mac.wa_hook_title": ["en": "WhatsApp delivery reports", "ar": "تقارير تسليم واتساب"],
-        "mac.wa_hook_hint":  ["en": "Meta reports whether each WhatsApp message was delivered and read to Khayt Cloud, and Khayt shows it on the customer's log beside each message sent through Meta. A message opened in the WhatsApp app is not reported. Paste your Meta app's secret, then enter the address and verify token below in Meta (WhatsApp → Configuration → Webhook) and subscribe to \"messages\".",
+        "mac.wa_hook_hint":  ["en": "Meta tells Khayt Cloud whether each WhatsApp message was delivered and read, and Khayt shows it on the customer's log beside each message sent through Meta. A message opened in the WhatsApp app is not reported. Paste your Meta app's secret, then enter the address and verify token below in Meta (WhatsApp → Configuration → Webhook) and subscribe to \"messages\".",
                               "ar": "يبلّغ Meta سحابة خيط بوصول كل رسالة واتساب وقراءتها، ويعرض خيط ذلك في سجل العميل بجانب كل رسالة أُرسلت عبر Meta. الرسالة التي تُفتح في تطبيق واتساب لا يصل عنها تقرير. الصق السر الخاص بتطبيقك في Meta، ثم أدخل العنوان ورمز التحقق أدناه في Meta (WhatsApp ← Configuration ← Webhook) واشترك في \"messages\"."],
         "mac.wa_app_secret": ["en": "Meta app secret", "ar": "سر تطبيق Meta"],
         "mac.wa_hook_connect": ["en": "Connect", "ar": "ربط"],
@@ -2972,8 +3053,11 @@ final class Words {
                                 "ar": "أُرسل بريد إلى العميل."],
         "mac.email_failed":    ["en": "The job was saved, but the customer's email did not go out:",
                                 "ar": "حُفظ العمل، لكن لم يُرسل بريد العميل:"],
-        "mac.webhooks_sent":   ["en": "Told {n} other system(s).",
-                                "ar": "أُبلغ {n} نظام آخر."],
+        "mac.webhooks_sent":   ["en": "Told {n} other systems.",
+                                "ar": "أُبلغ {n} نظامًا آخر."],
+        "mac.webhooks_sent_one": ["en": "Told {n} other system.", "ar": "أُبلغ نظام آخر واحد."],
+        "mac.webhooks_sent_two": ["en": "Told 2 other systems.", "ar": "أُبلغ نظامان آخران."],
+        "mac.webhooks_sent_few": ["en": "Told {n} other systems.", "ar": "أُبلغت {n} أنظمة أخرى."],
         "mac.webhook_failed":  ["en": "The job was saved, but {where} was not told:",
                                 "ar": "حُفظ العمل، لكن لم يُبلَّغ {where}:"],
         "mac.webhook_bad_url": ["en": "that address cannot be read.",
@@ -3001,8 +3085,23 @@ final class Words {
                                   "ar": "ما زالت مزامنة السحابة جارية. لم يُستعد شيء — حاول مرة أخرى بعد لحظة."],
         // What automatic sync took from this book. Copies are kept in
         // sync-conflicts/ beside the backups; the banner offers them back.
-        "mac.losses_banner":   ["en": "Sync replaced {replaced} record(s) changed on this Mac and removed {removed}. A copy of each was kept.",
-                              "ar": "استبدلت المزامنة {replaced} سجلًا عُدّل على هذا الماك وحذفت {removed}. حُفظت نسخة من كل منها."],
+        // One clause per count that is not zero, each counted on its own:
+        // "replaced 1 record(s) … and removed 0" was a sentence that had not
+        // decided. Arabic's clauses carry their own subject.
+        "mac.losses_banner":   ["en": "Sync {what}. A copy of each was kept.",
+                              "ar": "{what}. حُفظت نسخة من كل منها."],
+        "mac.losses_replaced_n": ["en": "replaced {n} records changed on this Mac",
+                                  "ar": "استبدلت المزامنة {n} سجلًا عُدّل على هذا الماك"],
+        "mac.losses_replaced_n_one": ["en": "replaced {n} record changed on this Mac",
+                                      "ar": "استبدلت المزامنة سجلًا واحدًا عُدّل على هذا الماك"],
+        "mac.losses_replaced_n_two": ["en": "replaced 2 records changed on this Mac",
+                                      "ar": "استبدلت المزامنة سجلّين عُدّلا على هذا الماك"],
+        "mac.losses_replaced_n_few": ["en": "replaced {n} records changed on this Mac",
+                                      "ar": "استبدلت المزامنة {n} سجلات عُدّلت على هذا الماك"],
+        "mac.losses_removed_n": ["en": "removed {n} records", "ar": "حذفت المزامنة {n} سجلًا"],
+        "mac.losses_removed_n_one": ["en": "removed {n} record", "ar": "حذفت المزامنة سجلًا واحدًا"],
+        "mac.losses_removed_n_two": ["en": "removed 2 records", "ar": "حذفت المزامنة سجلّين"],
+        "mac.losses_removed_n_few": ["en": "removed {n} records", "ar": "حذفت المزامنة {n} سجلات"],
         "mac.losses_head": ["en": "What sync took from this book",
                                  "ar": "ما أخذته المزامنة من هذا الدفتر"],
         "mac.losses_body": ["en": "Another device's copy won each of these. Put one back to keep this Mac's version — the next sync carries it everywhere.",
@@ -3012,6 +3111,31 @@ final class Words {
                                    "ar": "عُدّل هنا، واستُبدل بنسخة جهاز آخر"],
         "mac.losses_kept_deleted": ["en": "Deleted here; another device's later change was dropped",
                                        "ar": "حُذف هنا؛ وأُسقط تغيير لاحق من جهاز آخر"],
+        // The Mac's one word for the person a job is for. Khayt's `doc.client`
+        // is "Client" — right on its printed documents — and the tables and
+        // the New Job sheet said that beside a sidebar of "Customers".
+        "mac.customer": ["en": "Customer", "ar": "العميل"],
+        // What kind of record each loss was — never the store's own key.
+        "mac.losses_kind_job": ["en": "Job", "ar": "عمل"],
+        "mac.losses_kind_customer": ["en": "Customer", "ar": "عميل"],
+        "mac.losses_kind_spool": ["en": "Spool", "ar": "بكرة"],
+        "mac.losses_kind_product": ["en": "Product", "ar": "منتج"],
+        "mac.losses_kind_machine": ["en": "Machine", "ar": "طابعة"],
+        "mac.losses_kind_model": ["en": "Model", "ar": "مجسم"],
+        "mac.losses_kind_expense": ["en": "Expense", "ar": "مصروف"],
+        "mac.losses_kind_waste": ["en": "Waste", "ar": "هدر"],
+        "mac.losses_kind_message": ["en": "Saved message", "ar": "رسالة محفوظة"],
+        "mac.losses_kind_supplier": ["en": "Supplier", "ar": "مورّد"],
+        "mac.losses_kind_purchase_order": ["en": "Purchase order", "ar": "أمر شراء"],
+        "mac.losses_kind_gift_card": ["en": "Gift card", "ar": "بطاقة هدية"],
+        "mac.losses_kind_maintenance": ["en": "Maintenance task", "ar": "مهمة صيانة"],
+        "mac.losses_kind_service": ["en": "Service record", "ar": "سجل صيانة"],
+        "mac.losses_kind_consumable": ["en": "Consumable", "ar": "مستهلك"],
+        "mac.losses_kind_operator": ["en": "Operator", "ar": "مشغّل"],
+        "mac.losses_kind_time": ["en": "Time entry", "ar": "وقت عمل"],
+        "mac.losses_kind_location": ["en": "Location", "ar": "موقع"],
+        "mac.losses_kind_loyalty": ["en": "Loyalty points", "ar": "نقاط ولاء"],
+        "mac.losses_kind_record": ["en": "Record", "ar": "سجل"],
         "mac.losses_put_back": ["en": "Put back", "ar": "إعادة"],
         "mac.losses_put_back_done": ["en": "Put back", "ar": "أُعيد"],
         "mac.losses_put_back_failed": ["en": "Could not put it back:", "ar": "تعذّرت الإعادة:"],
@@ -3172,6 +3296,12 @@ final class Words {
         "mac.n_groups_one":  ["en": "{n} group",       "ar": "مجموعة واحدة"],
         "mac.n_groups_two":  ["en": "{n} groups",      "ar": "مجموعتان"],
         "mac.n_groups_few":  ["en": "{n} groups",      "ar": "{n} مجموعات"],
+        // After a verbal noun ("نقل مجموعتين", "تجميع مجموعتين") the dual is
+        // genitive; `mac.n_groups_two` is the nominative.
+        "mac.n_groups_of":      ["en": "{n} groups",      "ar": "{n} مجموعةً"],
+        "mac.n_groups_of_one":  ["en": "{n} group",       "ar": "مجموعة واحدة"],
+        "mac.n_groups_of_two":  ["en": "{n} groups",      "ar": "مجموعتين"],
+        "mac.n_groups_of_few":  ["en": "{n} groups",      "ar": "{n} مجموعات"],
         "mac.move_into_group": ["en": "Move into Group\u{2026}", "ar": "نقل إلى مجموعة\u{2026}"],
         "mac.move_n_groups_into": ["en": "Move {groups} into Group\u{2026}",
                                    "ar": "نقل {groups} إلى مجموعة\u{2026}"],
@@ -3237,6 +3367,20 @@ final class Words {
         // Settings is where they do that, in this app.
         "mac.campaign_needs_email": ["en": "Set up an email provider in Settings before sending a campaign.",
                                      "ar": "اضبط مزوّد البريد في الإعدادات قبل إرسال حملة."],
+        // A campaign goes by email only: this app has no WhatsApp sender for a
+        // list, and a WhatsApp list is phone numbers — mailed, they bounce.
+        "mac.campaign_email_only": ["en": "Campaigns are sent by email only.",
+                                    "ar": "تُرسل الحملات بالبريد الإلكتروني فقط."],
+        // A full erase leaves the holder's name on a gift card that still has
+        // money on it — the shop owes it to them. Counted, never "card(s)".
+        "mac.erase_keeps_cards": ["en": "{n} gift cards still have a balance. They keep their holders' names, because the balance is money the shop owes.",
+                                  "ar": "{n} من بطاقات الهدايا لا يزال فيها رصيد، وتحتفظ بأسماء حامليها لأن الرصيد مبلغ يدين به المتجر."],
+        "mac.erase_keeps_cards_one": ["en": "{n} gift card still has a balance. It keeps its holder's name, because the balance is money the shop owes.",
+                                      "ar": "بطاقة هدية واحدة لا يزال فيها رصيد، وتحتفظ باسم حاملها لأن الرصيد مبلغ يدين به المتجر."],
+        "mac.erase_keeps_cards_two": ["en": "{n} gift cards still have a balance. They keep their holders' names, because the balance is money the shop owes.",
+                                      "ar": "بطاقتا هدايا لا يزال فيهما رصيد، وتحتفظان باسمَي حامليهما لأن الرصيد مبلغ يدين به المتجر."],
+        "mac.erase_keeps_cards_few": ["en": "{n} gift cards still have a balance. They keep their holders' names, because the balance is money the shop owes.",
+                                      "ar": "{n} بطاقات هدايا لا يزال فيها رصيد، وتحتفظ بأسماء حامليها لأن الرصيد مبلغ يدين به المتجر."],
         "mac.whatsapp": ["en": "WhatsApp", "ar": "واتساب"],
         "mac.export_accounting_where": [
             "en": "Two files are written here: one of invoices and one of expenses.",
@@ -3511,9 +3655,18 @@ final class Words {
                                "ar": "يغيّر هذا الدفتر على هذا الماك. السجل الأحدث في السحابة يحل محل "
                              + "النسخة هنا؛ والسجل الموجود على هذا الماك وحده يُترك كما هو. "
                              + "لا تُنزَّل الإعدادات أبدًا، والسجلات — الهدر والصيانة والوقت — يُضاف إليها فقط."],
-        "mac.cloud_lost_edits": ["en": "{n} change(s) made here were discarded: the record had been "
+        "mac.cloud_lost_edits": ["en": "{n} changes made here were discarded: the record had been "
                                + "deleted on another device.",
-                                 "ar": "أُلغيت {n} تغييرات أُجريت هنا: كان السجل قد حُذف على جهاز آخر."],
+                                 "ar": "أُلغي {n} تغييرًا أُجري هنا: كان السجل قد حُذف على جهاز آخر."],
+        "mac.cloud_lost_edits_one": ["en": "{n} change made here was discarded: the record had been "
+                                   + "deleted on another device.",
+                                     "ar": "أُلغي تغيير واحد أُجري هنا: كان السجل قد حُذف على جهاز آخر."],
+        "mac.cloud_lost_edits_two": ["en": "2 changes made here were discarded: the record had been "
+                                   + "deleted on another device.",
+                                     "ar": "أُلغي تغييران أُجريا هنا: كان السجل قد حُذف على جهاز آخر."],
+        "mac.cloud_lost_edits_few": ["en": "{n} changes made here were discarded: the record had been "
+                                   + "deleted on another device.",
+                                     "ar": "أُلغيت {n} تغييرات أُجريت هنا: كان السجل قد حُذف على جهاز آخر."],
         "mac.cloud_sent":    ["en": "{n} sent. Khayt Cloud is now at revision {rev}.",
                               "ar": "أُرسل {n}. سحابة خيط الآن عند المراجعة {rev}."],
         // A shop whose delta chain the service refuses. Said plainly, because

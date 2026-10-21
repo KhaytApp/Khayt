@@ -91,6 +91,10 @@ enum MeshPreview {
         func draw(_ ax: Double, _ ay: Double, _ az: Double,
                   _ bx: Double, _ by: Double, _ bz: Double,
                   _ cxx: Double, _ cyy: Double, _ czz: Double) {
+            // A corner that is not a number is skipped, as `Mesh` skips it when
+            // measuring: `Int(nan)` traps, and one bad vertex in a linked
+            // folder would otherwise take the app down at every launch.
+            guard Mesh.allFinite(ax, ay, az, bx, by, bz, cxx, cyy, czz) else { return }
             let a = view(ax, ay, az), b = view(bx, by, bz), c = view(cxx, cyy, czz)
             let ux = a.0 * k + offU, uy = offV - a.1 * k
             let vx = b.0 * k + offU, vy = offV - b.1 * k
@@ -114,10 +118,15 @@ enum MeshPreview {
             let tone = 0.28 + 0.72 * lambert
             let value = UInt8(max(0, min(255, (tone * 235).rounded())))
 
-            let loX = max(0, Int(min(ux, vx, wx).rounded(.down)))
-            let hiX = min(side - 1, Int(max(ux, vx, wx).rounded(.up)))
-            let loY = max(0, Int(min(uy, vy, wy).rounded(.down)))
-            let hiY = min(side - 1, Int(max(uy, vy, wy).rounded(.up)))
+            // Clamped as Doubles before they become Ints: a corner far outside
+            // the picture is still finite, and `Int` traps on anything beyond
+            // its range.
+            let edge = Double(side)
+            func pixel(_ d: Double) -> Int { Int(max(-1, min(edge, d))) }
+            let loX = max(0, pixel(min(ux, vx, wx).rounded(.down)))
+            let hiX = min(side - 1, pixel(max(ux, vx, wx).rounded(.up)))
+            let loY = max(0, pixel(min(uy, vy, wy).rounded(.down)))
+            let hiY = min(side - 1, pixel(max(uy, vy, wy).rounded(.up)))
             if loX > hiX || loY > hiY { return }
 
             let za = a.2, zb = b.2, zc = c.2
@@ -143,13 +152,13 @@ enum MeshPreview {
             }
         }
 
+        // Streamed a line at a time for the text forms, as the measurement
+        // above reads them: a whole OBJ read into a String and split was
+        // several times the file's size resident.
         if isOBJ {
-            if let text = try? String(contentsOf: url, encoding: .utf8) {
-                Mesh.eachOBJTriangle(text, draw)
-            }
-        } else if try !Mesh.eachSTLTriangle(url, draw),
-                  let text = try? String(contentsOf: url, encoding: .utf8) {
-            Mesh.eachAsciiSTLTriangle(text, draw)
+            _ = Mesh.eachOBJTriangle(url, draw)
+        } else if try !Mesh.eachSTLTriangle(url, draw) {
+            _ = Mesh.eachAsciiSTLTriangle(url, draw)
         }
 
         guard covered.contains(true) else { return nil }

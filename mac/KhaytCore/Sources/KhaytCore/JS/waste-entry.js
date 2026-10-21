@@ -139,25 +139,16 @@
       cost: Math.round(costOf(material, weight, c.inventory, c.reclaimsTax) * 100) / 100,
     };
     const D = deduction();
-    // How long each spool's history was before the draw, so the lines this
-    // waste wrote (unshifted at the front) can carry its id.
-    const before = new Map((c.inventory || []).map((s) => [s, Array.isArray(s && s.usageHistory) ? s.usageHistory.length : 0]));
+    // TAGGED, so deleting this entry takes back ITS lines and no other: the
+    // job's own print lines carry the same orderId and can weigh the same.
+    // `drawFrom` stamps the id on each line as it writes it.
     const taken = (D && weight > 0 && order)
       ? D.deductActual(order, weight, {
           settings: c.settings, inventory: c.inventory, machines: c.machines, today: entry.date,
+          wasteId: entry.id,
         })
       : { deducted: 0, spools: [], drawn: [] };
     if (taken.drawn.length) entry.drawn = taken.drawn.slice();
-    // TAGGED, so deleting this entry takes back ITS lines and no other: the
-    // job's own print lines carry the same orderId and can weigh the same.
-    if (entry.id != null) {
-      for (const s of c.inventory || []) {
-        const hist = s && Array.isArray(s.usageHistory) ? s.usageHistory : null;
-        if (!hist) continue;
-        const added = hist.length - (before.get(s) || 0);
-        for (let k = 0; k < added && k < hist.length; k++) hist[k] = Object.assign({}, hist[k], { wasteId: String(entry.id) });
-      }
-    }
     if (taken.spools.length === 1) entry.spoolId = taken.spools[0];
     return { entry, deducted: taken.deducted };
   }

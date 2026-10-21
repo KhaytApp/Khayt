@@ -50,7 +50,8 @@ const CASES = [
       discountPct: 12.5, priceBeforeDiscount: 1300, rushFeeAmount: 90, shippingCost: 60,
     }),
     opts: { settings: SHOP },
-    money: { shipping: 60, subtotalShown: '1150.00' },
+    // The Subtotal is the ITEMS at list price (`invoiceSummary`): 1150 − 60 − 90 + 162.50.
+    money: { shipping: 60, subtotalShown: '1162.50' },
   },
   {
     // One part at the price the customer agreed, the other at cost plus

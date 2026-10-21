@@ -254,9 +254,12 @@ struct Machine: Identifiable, Decodable, Hashable, Sendable {
     ///
     /// `Int(saturating:)`, not `Int(_:)`: a bed of 1e300 from a hand-edited
     /// or imported book trapped and took the machine card down with it.
-    var bedSize: String? {
+    var bedSize: String? { bedSize(numeral: { String($0) }) }
+
+    /// The same, each figure in the shop's digits (`Words.numeral`).
+    func bedSize(numeral: (Int) -> String) -> String? {
         guard let bed, let x = bed.x, let y = bed.y, let z = bed.z else { return nil }
-        return "\(Int(saturating: x)) × \(Int(saturating: y)) × \(Int(saturating: z))"
+        return [x, y, z].map { numeral(Int(saturating: $0)) }.joined(separator: " × ")
     }
 
     /// Where it can be reached, without the credential.

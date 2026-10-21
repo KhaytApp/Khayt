@@ -101,6 +101,47 @@ enum CloudLibrary {
         return d.isConfigured ? (d, text(gd, "prefix")) : nil
     }
 
+    /// The stored Drive refresh token, opened, or nil when there is none.
+    /// Needs nothing else of the sign-in: revoking takes the token alone.
+    static func driveRefreshToken(settings: [String: JSONValue], build: StoreReader.Build?) async -> String? {
+        guard case .object(let library)? = settings["printLibrary"] else { return nil }
+        guard let token = await open(text(section(library, "gdrive"), "refreshToken"), build: build),
+              !token.isEmpty, !token.hasPrefix(SafeStorage.marker) else { return nil }
+        return token
+    }
+
+    /// Google's revocation endpoint (RFC 7009). Revoking a refresh token
+    /// withdraws the whole grant, so Khayt leaves the account's
+    /// third-party access list.
+    static let googleRevokeURL = URL(string: "https://oauth2.googleapis.com/revoke")!
+
+    /// Ask Google to withdraw the grant. The token goes in the form BODY,
+    /// never the URL, where proxies and logs keep it. Five seconds: a
+    /// disconnect should not wait on an unreachable Google. True on a 2xx.
+    static func revokeAtGoogle(_ refreshToken: String, fetch: S3.Fetch) async -> Bool {
+        var request = URLRequest(url: googleRevokeURL, timeoutInterval: 5)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        let encoded = refreshToken.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+        request.httpBody = Data("token=\(encoded)".utf8)
+        guard let (_, response) = try? await fetch(request),
+              let status = (response as? HTTPURLResponse)?.statusCode else { return false }
+        return (200..<300).contains(status)
+    }
+
+    /// The old refresh token to revoke when a new sign-in replaces it, or
+    /// nil. Only for a different account, both known: the same account's old
+    /// token shares the new one's grant, and an account that could not be
+    /// asked (offline, a grant already gone) is not guessed at.
+    static func supersededToken(old: String, new: String, oldAccount: String?, newAccount: String?) -> String? {
+        guard !old.isEmpty, old != new,
+              let was = oldAccount?.lowercased(), let now = newAccount?.lowercased(),
+              !was.isEmpty, !now.isEmpty, was != now else { return nil }
+        return old
+    }
+
     // MARK: - What the settings say, without opening a secret
 
     /// Which remote the library is using, read off the settings alone — the
@@ -245,7 +286,7 @@ enum CloudLibrary {
         }
         let t = section(library, "tier")
         o.tierOn = on(t)
-        if case .number(let n)? = t["keepDays"], n >= 1 { o.keepDays = Int(n) }
+        if case .number(let n)? = t["keepDays"], n >= 1 { o.keepDays = Int(saturating: n) }
         return o
     }
 
@@ -388,6 +429,8 @@ enum CloudLibrary {
         case bucketLostIt
         /// The shared rule's own reason (`verifyRehydrate`).
         case badDownload(String)
+        /// A marker written for another bucket than the one set up now.
+        case otherBucket(String)
     }
 
     /// Make sure the bucket holds exactly this file under `key`: skip the
@@ -1174,6 +1217,8 @@ extension Shop {
         cloudLibraryBusy = true
         cloudLibraryNote = words.callIt("mac.gdrive_waiting")
         defer { cloudLibraryBusy = false }
+        // The sign-in this one replaces, read before anything is written over it.
+        let before = await CloudLibrary.libraryDrive(settings: settingsDict, build: source.build)
         do {
             let typed = typedSecret.trimmingCharacters(in: .whitespaces)
             try await writeDrive(clientId: id, clientSecret: typed.isEmpty ? nil : typed, folderName: folderName)
@@ -1200,6 +1245,22 @@ extension Shop {
                                                      })
             googleSignInURL = nil
             try Task.checkCancellation()
+            // A DIFFERENT account replaces the old one: its grant is withdrawn
+            // at Google first, as Disconnect does, best effort. Only when both
+            // accounts are known and differ: revoking a refresh token withdraws
+            // the whole grant, so revoking the same account's old token would
+            // cut off the sign-in just made.
+            if let before {
+                let fresh = DriveClient.Config(clientId: id, clientSecret: secret, refreshToken: refresh)
+                let was = try? await DriveClient(before.config, fetch: CloudLibrary.fetch,
+                                                 download: CloudLibrary.download).about().email
+                let now = try? await DriveClient(fresh, fetch: CloudLibrary.fetch,
+                                                 download: CloudLibrary.download).about().email
+                if let old = CloudLibrary.supersededToken(old: before.config.refreshToken, new: refresh,
+                                                          oldAccount: was, newAccount: now) {
+                    _ = await CloudLibrary.revokeAtGoogle(old, fetch: CloudLibrary.fetch)
+                }
+            }
             try await writeDrive(refreshToken: refresh, enabled: true, bucketOff: true)
             cloudLibraryNote = words.callIt("mac.gdrive_connected")
             googleSignInTask = nil
@@ -1259,13 +1320,24 @@ extension Shop {
         }
     }
 
-    /// Forget the account here. Only Google can withdraw the access itself,
-    /// and the note says so rather than overstating what this did.
+    /// Withdraw the access at Google, then forget the account here.
+    ///
+    /// Blanking the stored token alone left the grant valid at Google: the
+    /// refresh token still worked wherever a copy of it was, and a backup
+    /// restored from before the disconnect reconnected without a word. So
+    /// the token is revoked first, best effort: a revoke that fails (offline,
+    /// a grant already withdrawn) never keeps the account connected here,
+    /// and the note then says how to withdraw it by hand.
     func disconnectGoogleDrive() async {
+        guard permitted("settings", "edit") else { return }
         cloudLibraryProblem = nil
+        var revoked = false
+        if let token = await CloudLibrary.driveRefreshToken(settings: settingsDict, build: source.build) {
+            revoked = await CloudLibrary.revokeAtGoogle(token, fetch: CloudLibrary.fetch)
+        }
         do {
             try await writeDrive(refreshToken: "", enabled: false)
-            cloudLibraryNote = words.callIt("mac.gdrive_disconnected")
+            cloudLibraryNote = words.callIt(revoked ? "mac.gdrive_disconnected_revoked" : "mac.gdrive_disconnected")
         } catch {
             cloudLibraryProblem = cloudSay(error)
         }
@@ -1362,6 +1434,7 @@ extension Shop {
         case .noSidecar: return words.callIt("mac.cloudlib_no_sidecar")
         case .bucketLostIt: return words.callIt("mac.cloudlib_bucket_lost_it")
         case .badDownload(let why): return words.callIt("mac.cloudlib_bad_download") + " " + why
+        case .otherBucket(let bucket): return words.callIt("mac.cloudlib_other_bucket", ["bucket": .string(bucket)])
         }
     }
 }

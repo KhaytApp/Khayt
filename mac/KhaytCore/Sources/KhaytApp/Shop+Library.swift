@@ -1063,17 +1063,19 @@ extension Shop {
                 scratches.append(out.scratch)
                 // Grouped by the archive's own name, the way a folder of models
                 // is grouped by the folder — see `ImportGrouping`.
+                // Kept, not moved: they are scratch copies, deleted below,
+                // and "move originals" would send each one to the Trash.
                 files += ImportGrouping.incoming(archive: out.models, group: out.group,
                                                  documents: out.documents)
+                    .map { var f = $0; f.keepOriginal = true; return f }
             } catch let refusal as ArchiveImport.Failure {
                 refusals.append(refusal.description)
             } catch {
                 refusals.append(self.said(error))
             }
         }
-        // The scratch copies are consumed by the import (it MOVES them in), but
-        // a refusal or a duplicate leaves some behind, and they are in the
-        // system temp directory either way.
+        // The scratch copies are imported as kept originals (copied in, never
+        // trashed), and deleted here with the rest of the scratch folder.
         defer { for dir in scratches { try? FileManager.default.removeItem(at: dir) } }
 
         guard !files.isEmpty else {
@@ -1724,7 +1726,7 @@ extension Shop {
     /// answer a record written before the field existed gives.
     private static func rowPrintCount(_ row: JSONValue) -> Int {
         guard case .object(let o) = row, case .number(let n)? = o["timesPrinted"] else { return 0 }
-        return Int(n)
+        return Int(saturating: n)
     }
 
     /// The group a record is in, by the rule the grid files it under —
@@ -2504,6 +2506,24 @@ extension Shop {
         // lock: system — migration: a service log stranded by an old build, moved where the app reads it.
         try? StoreWriter.update(build) { root in
             _ = ServiceLogEdit.rescueStranded(&root)
+        }
+    }
+
+    /// Empty a camera URL with credentials in it, saved before the shared rule
+    /// refused them (`Camera.scrubCredentials`). Once: the write leaves
+    /// nothing for the next load to find. Inside the write chain, and only
+    /// when a machine in memory has an `@` in a camera URL, so an ordinary
+    /// load does not open the store for writing.
+    func scrubWebcamCredentials(_ build: StoreReader.Build?) async {
+        guard let build, canWrite, let engine else { return }
+        guard machines.contains(where: {
+            ($0.webcam?.snapshotUrl ?? "").contains("@") || ($0.webcam?.streamUrl ?? "").contains("@")
+        }) else { return }
+        // lock: system — migration: a camera password saved in plain text by an older build, removed.
+        try? await StoreWriter.updateAsync(build) { root in
+            _ = await Camera.scrubCredentials(&root) { url, api in
+                try? await engine.normalizeWebcamUrl(url, printerApi: api)
+            }
         }
     }
 

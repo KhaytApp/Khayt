@@ -496,3 +496,66 @@ test('the trigger day is leadDays before the cycle, never after', () => {
   assert.equal(R.triggerDay({ nextDue: '2026-09-20', leadDays: -3 }), '2026-09-20');
   assert.equal(R.triggerDay({ nextDue: '2026-09-20', leadDays: 'x' }), '2026-09-20');
 });
+
+test('a repeat order carries the standing order, not the last run’s money, links or tokens', () => {
+  const Pay = require('../lib/order-payment.js');
+  const template = {
+    id: 'ORD-7', clientId: 'C', client: 'Tuwaiq', status: 'completed', date: '2026-08-01',
+    project: 'Monthly brackets', price: 100, machineId: 'M1',
+    tags: ['vip'], internalNotes: 'fragile', nonBusiness: true, clientRef: 'PO-77', locationId: 'LOC-2',
+    // A part as the last run left it: printed, measured, inspected.
+    parts: [{ id: 'PRT-OLD', name: 'bracket', qty: 4, unitCost: 3, material: 'PETG', partStatus: 'done',
+              partMachineId: 'M2', startedAt: 's', completedAt: 'c', printedAt: 'p', actualWeight: 80,
+              actualPrintTime: 2, actualGrams: 81, failedAt: 'f', qcStatus: 'passed' }],
+    // Money the last run settled some other way than cash.
+    creditNotes: [{ id: 'CN-1', amount: 40, at: '2026-08-02' }], creditedAt: '2026-08-02',
+    giftCardDiscount: 20, giftCardCode: 'GC-1', depositAmount: 30, paidGross: 100,
+    instalments: [{ amount: 50, paidAt: '2026-08-01' }], instalmentBase: 100,
+    paidAmount: 40, paymentStatus: 'paid', voidedAt: null, editHistory: [{ at: 'x' }],
+    // Links that belong to that one job.
+    survey: { rating: 5 }, surveyToken: 'aa', trackingToken: 'bb', quoteApprovalToken: 'cc',
+    shippedAt: '2026-08-03', trackingNumber: 'TN', carrier: 'aramex', shippingHistory: [{ s: 'x' }],
+    completedAt: '2026-08-02', statusHistory: [{ status: 'completed' }], qcStatus: 'passed',
+    qcPassedAt: 'x', source: 'webstore', sourceOrderId: 'W-9', intakeId: 'IN-1',
+    rev: 9, updatedAt: 'u', operatorId: 'OP', reprintOf: 'ORD-1',
+  };
+  const settings = { invNumNext: 3, invNumYear: 2026 };
+  const tracking = new Uint8Array(16).fill(0xab);
+  let n = 0;
+  const uid = (prefix) => `${prefix}-new${++n}`;
+  const job = R.clone(template, { settings, now: new Date(), cycle: TODAY, tokens: { tracking }, uid });
+
+  // Kept: the standing order — its site, its reference, and that it is not business revenue.
+  for (const k of ['project', 'client', 'clientId', 'price', 'machineId', 'internalNotes',
+    'nonBusiness', 'clientRef', 'locationId']) {
+    assert.deepEqual(job[k], template[k], k);
+  }
+  assert.deepEqual(job.tags, ['vip']);
+  assert.notEqual(job.tags, template.tags, 'copied, not shared');
+  // Left behind: everything that was the last run's.
+  for (const k of ['creditNotes', 'creditedAt', 'giftCardDiscount', 'giftCardCode', 'depositAmount',
+    'paidGross', 'instalments', 'instalmentBase', 'voidedAt', 'editHistory', 'survey', 'surveyToken',
+    'quoteApprovalToken', 'shippedAt', 'trackingNumber', 'carrier', 'shippingHistory', 'completedAt',
+    'statusHistory', 'qcStatus', 'qcPassedAt', 'source', 'sourceOrderId', 'intakeId', 'rev',
+    'updatedAt', 'operatorId', 'reprintOf']) {
+    assert.equal(k in job, false, `${k} rode along onto the new job`);
+  }
+  assert.equal(job.trackingToken, 'ab'.repeat(16), 'its own tracking page, never the old job’s');
+  // The parts start unprinted, under ids of their own (the ⌘D copy's list of what a run wrote).
+  const D = require('../lib/record-duplicate.js');
+  assert.deepEqual(job.parts, [{ id: 'PRT-new1', name: 'bracket', qty: 4, unitCost: 3, material: 'PETG' }]);
+  for (const k of D.PART_RUN_KEYS.filter(k => k !== 'id')) assert.equal(k in job.parts[0], false, k);
+  assert.equal(template.parts[0].partStatus, 'done', 'the template is untouched');
+  // A 100 job that had a 40 credit note and a 20 gift card: the repeat owes 100.
+  assert.equal(Pay.cashDue(job).cash, 100);
+  assert.equal(Pay.statusOf(job), 'unpaid');
+
+  // Through run(): one token per job made; none given, none minted.
+  const b = { clients: [{ id: 'C', recurring: { enabled: true, interval: 'monthly', nextDue: TODAY } }],
+              orders: [template], settings: { invNumNext: 1, invNumYear: 2026 } };
+  const withTokens = R.run(deep(b.clients), deep(b.orders), { settings: deep(b.settings), now: new Date(), tokens: [{ tracking }], uid });
+  assert.equal(withTokens.created[0].trackingToken, 'ab'.repeat(16));
+  assert.match(withTokens.created[0].parts[0].id, /^PRT-new/, 'run() hands uid on');
+  const without = R.run(deep(b.clients), deep(b.orders), { settings: deep(b.settings), now: new Date() });
+  assert.equal('trackingToken' in without.created[0], false);
+});

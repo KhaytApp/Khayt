@@ -893,6 +893,28 @@ struct PaymentTests {
         #expect(after["paymentMethod"] == .null)
     }
 
+    @Test("a payment plan with collected rows refuses a clear, and the sheet says why")
+    func clearRefusedUnderACollectedPlan() async throws {
+        // The rows are money received and the next collection rebuilt the
+        // figure from them, so the cleared money came back.
+        let (engine, words) = try await Self.engineAndWords()
+        let order: JSONValue = .object([
+            "id": .string("J1"), "price": .number(300), "paidAmount": .number(200),
+            "instalmentBase": .number(100),
+            "instalments": .array([.object(["amount": .number(100), "paid": .bool(true),
+                                            "paidAt": .string("2026-10-01")])]),
+        ])
+        let out = try await engine.clearPayment(order: order)
+        #expect(out.refused == "plan_collected")
+        #expect(out.order == order, "a refusal changes nothing")
+        #expect(!words.callIt("pay.clear_plan_first").contains("pay.clear_plan_first"),
+                "the refusal has no sentence")
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/KhaytApp/Shop+Money.swift"), encoding: .utf8)
+        #expect(source.contains("throw MoveRefused(sentence: self.words.callIt(\"pay.clear_plan_first\"))"))
+    }
+
     @Test("a payment that would reach somebody is refused whole")
     func refusedForOutbound() async throws {
         let (engine, _) = try await Self.engineAndWords()
@@ -996,6 +1018,35 @@ struct EditJobTests {
         let same = try await engine.editJob(order: order, dueDate: "2026-09-20", priorityLevel: "normal",
                                             price: nil, now: Date(), editId: "e2")
         #expect(!same.changed)
+    }
+
+    @Test("a typed price on a shop that adds tax keeps the tax already paid")
+    func typedPriceOnATaxAddedShop() async throws {
+        // 100 + 15% = 115, paid in full. Raised to 110 the job owes 126.50:
+        // without the shop's settings the cap cut the payment to 110 (5 SAR
+        // erased) and called the job paid.
+        let engine = try KhaytEngine()
+        let settings: [String: JSONValue] = [
+            "currency": .string("SAR"),
+            "tax": .object(["mode": .string("exclusive"), "rates": .array([
+                .object(["id": .string("vat"), "label": .string("VAT"), "percent": .number(15)]),
+            ])]),
+        ]
+        let order: JSONValue = .object([
+            "id": .string("J1"), "price": .number(100), "paidAmount": .number(115),
+            "paidGross": .bool(true), "paymentStatus": .string("paid"), "status": .string("queued"),
+        ])
+        let out = try await engine.editJob(order: order, fields: ["price": .number(110)],
+                                           settings: settings, now: Date(), editId: "e1")
+        guard case .object(let after) = out.order else { Issue.record("not an order"); return }
+        #expect(MoveJobTests.number(after["paidAmount"]) == 115)
+        #expect(MoveJobTests.string(after["paymentStatus"]) == "partial")
+        #expect(try await engine.owedRaw(order: out.order, settings: settings) == 11.5)
+        // And the shop's own write passes them: the call names its settings.
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/KhaytApp/Shop+Money.swift"), encoding: .utf8)
+        #expect(source.contains("order: order, fields: fields, settings: Self.settings(root),"))
     }
 
     @Test("a due date can be cleared, because no due date is a real answer")

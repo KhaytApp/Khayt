@@ -1112,8 +1112,10 @@ struct MachineSheet: View {
                 // printer's own — and the printer's own was typed into this
                 // sheet a moment ago and never checked. The key goes nowhere
                 // the poller's LAN rule would refuse.
-                guard await PrinterWatch.onThisNetwork(url, engine: engine) else { continue }
-                var request = URLRequest(url: url)
+                // Resolved, and aimed at the address that was checked, as the
+                // camera tile does (`PrinterWatch.pinned`).
+                guard let aimed = await PrinterWatch.pinned(url, engine: engine) else { continue }
+                var request = URLRequest(url: aimed)
                 request.timeoutInterval = 4
                 if let headers = try? await engine.webcamAuthHeaders(printerApi: row) {
                     for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }

@@ -55,6 +55,32 @@ When every box is ticked, the next cut is `4.0.0-beta.1` instead of
 6. **The usual pre-release review is clean** (bugs, security, and the UI in
    English and Arabic, light and dark) over everything since the last alpha.
 
+## How beta.1 was actually decided (21 October 2026)
+
+Not every box above was ticked. The owner decided to release `4.0.0-beta.1`
+after alpha.86, on one condition: ten comprehensive reviews of the whole app
+(security twice, money, jobs and printers, stock, library, data integrity and
+crashes, customers, and the interface in English and in Arabic, light and
+dark), each fix checked by a second and third independent pass, until all ten
+areas came back clean.
+
+- Criterion 1 (crash reports read): met in spirit, and the review found why it
+  was weak. Only one install reports, and before alpha.86 a Swift crash was
+  never sent. The one shipped-app crash (alpha.77, Settings ▸ Overhead) was
+  found in the Mac's own crash logs and had already been fixed by #1911.
+  alpha.86 reports Swift crashes through MetricKit.
+- Criterion 2 (a week on the real book): NOT met. The shop's book still holds
+  no orders. Waived by the owner.
+- Criterion 3 (the untried list): NOT met. Waived by the owner. The list
+  stands as the first thing to try on the beta.
+- Criteria 4, 5 and 6: met. The review is the beta.1 batch PR.
+
+Deferred from the review, on purpose: the catalogue ignoring a part's
+quantity in its cost (fixing it re-prices existing products, so it is the
+owner's call), the dashboard's gross margin counting shipping, the custom
+report mixing price terms, launch-time file checks on the main thread for a
+NAS library, Spotlight's rebuild cost, and the 3MF multi-component re-read.
+
 ## What changes at beta
 
 - **The Electron lane turns `BUILD_MAC` off.** Until now the Electron app has

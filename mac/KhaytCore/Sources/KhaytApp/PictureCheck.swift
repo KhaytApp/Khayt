@@ -222,7 +222,7 @@ enum PictureVerdicts {
             case .string(let h): out[k] = Seen(hash: h, size: -1, modified: -1)
             case .object(let o):
                 guard case .string(let h)? = o["h"] else { continue }
-                let size: Int = { if case .number(let n)? = o["size"] { Int(n) } else { -1 } }()
+                let size: Int = { if case .number(let n)? = o["size"] { Int(saturating: n) } else { -1 } }()
                 let mod: Double = { if case .number(let n)? = o["mtime"] { n } else { -1 } }()
                 out[k] = Seen(hash: h, size: size, modified: mod)
             default: continue

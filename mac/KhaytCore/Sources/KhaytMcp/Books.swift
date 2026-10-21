@@ -307,7 +307,11 @@ struct Books: Sendable {
             }
             part["filamentId"] = .string(id)
             if case .string(let m)? = spool["material"] { part["material"] = .string(m) }
-            part["spoolCost"] = .number(Self.plain(spool["cost"]) ?? 0)
+            // What the spool costs a JOB — net of the tax a registered shop
+            // reclaims (`CalculatorPart.netCost`), as the calculator costs it.
+            let reclaims = (try? await engine.taxProfile(settings: settings))?.isRegistered == true
+            part["spoolCost"] = .number(CalculatorPart.netCost(
+                paid: Self.plain(spool["cost"]), vatAmount: Self.plain(spool["vatAmount"]), reclaims: reclaims))
             part["spoolWeight"] = .number(max(1, Self.plain(spool["spoolWeight"]) ?? 1000))
             spoolLabel = [spool["material"], spool["color"]].compactMap {
                 if case .string(let s)? = $0, !s.isEmpty { return s } else { return nil }

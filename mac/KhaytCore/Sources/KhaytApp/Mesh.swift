@@ -58,6 +58,12 @@ enum Mesh {
         mutating func add(_ ax: Double, _ ay: Double, _ az: Double,
                           _ bx: Double, _ by: Double, _ bz: Double,
                           _ cx: Double, _ cy: Double, _ cz: Double) {
+            // A corner that is not a number is a corrupt file, and it is
+            // skipped rather than counted: `min(inf, nan)` is inf in Swift, so
+            // the box stays finite and hides it, and the preview then traps
+            // turning that NaN into a pixel — on every launch, for a file in a
+            // linked folder.
+            guard Mesh.allFinite(ax, ay, az, bx, by, bz, cx, cy, cz) else { return }
             triangleCount += 1
             volumeMm3 += (ax * (by * cz - bz * cy)
                         + ay * (bz * cx - bx * cz)
@@ -77,6 +83,18 @@ enum Mesh {
             out.volumeMm3 = abs(volumeMm3)
             return out
         }
+    }
+
+    /// Whether all nine coordinates of a triangle are real numbers.
+    @inline(__always)
+    static func allFinite(_ ax: Double, _ ay: Double, _ az: Double,
+                          _ bx: Double, _ by: Double, _ bz: Double,
+                          _ cx: Double, _ cy: Double, _ cz: Double) -> Bool {
+        // A sum is finite only when every term is, and it is one test where
+        // nine would sit in the hottest loop of a measurement.
+        (ax + ay + az + bx + by + bz + cx + cy + cz).isFinite
+            || (ax.isFinite && ay.isFinite && az.isFinite && bx.isFinite && by.isFinite
+                && bz.isFinite && cx.isFinite && cy.isFinite && cz.isFinite)
     }
 
     // MARK: - Which way the surfaces face
@@ -141,6 +159,9 @@ enum Mesh {
         mutating func add(_ ax: Double, _ ay: Double, _ az: Double,
                           _ bx: Double, _ by: Double, _ bz: Double,
                           _ cx: Double, _ cy: Double, _ cz: Double) {
+            // Skipped as `Measurement.add` skips it, so a corrupt corner is
+            // neither counted nor a NaN in every total of the report.
+            guard Mesh.allFinite(ax, ay, az, bx, by, bz, cx, cy, cz) else { return }
             triangleCount += 1
             vol6 += ax * (by * cz - bz * cy)
                   - ay * (bx * cz - bz * cx)
@@ -469,17 +490,13 @@ enum Mesh {
                 body(ax, ay, az, bx, by, bz, cx, cy, cz)
             } > 0
         case "obj":
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
-            eachOBJTriangle(text, body)
-            return true
+            return eachOBJTriangle(url, body)
         case "stl":
             // Binary first, then the text form — the same order and the same
             // arithmetic test `measureSTL` uses, because a file it measures as
             // binary and this reads as text would be judged on nothing.
             if try eachSTLTriangle(url, body) { return true }
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
-            eachAsciiSTLTriangle(text, body)
-            return true
+            return eachAsciiSTLTriangle(url, body)
         default:
             return false
         }
@@ -1026,30 +1043,92 @@ enum Mesh {
 
     /// An OBJ's triangle count and the box it sits in.
     static func measureOBJ(_ url: URL) throws -> Measurement? {
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-            throw Failure.notAMesh("it is not UTF-8 text")
-        }
         var m = Measurement()
-        eachOBJTriangle(text) { ax, ay, az, bx, by, bz, cx, cy, cz in
+        let read = eachOBJTriangle(url) { ax, ay, az, bx, by, bz, cx, cy, cz in
             m.add(ax, ay, az, bx, by, bz, cx, cy, cz)
         }
+        guard read else { throw Failure.notAMesh("it is not UTF-8 text") }
         return m.finished()
     }
 
     /// The text form. Rare from a slicer, common out of a CAD package.
     static func measureAsciiSTL(_ url: URL) throws -> Measurement? {
-        let text: String
-        do { text = try String(contentsOf: url, encoding: .utf8) }
-        catch { throw Failure.notAMesh("it is neither binary STL nor UTF-8 text") }
-        guard text.contains("facet") || text.contains("solid") else {
-            throw Failure.notAMesh("no facets in it")
+        var m = Measurement()
+        var reader = AsciiSTLReader()
+        var named = false
+        let read = eachLine(of: url) { line in
+            if !named, line.contains("facet") || line.contains("solid") { named = true }
+            reader.line(line) { ax, ay, az, bx, by, bz, cx, cy, cz in
+                m.add(ax, ay, az, bx, by, bz, cx, cy, cz)
+            }
+        }
+        guard read else { throw Failure.notAMesh("it is neither binary STL nor UTF-8 text") }
+        guard named else { throw Failure.notAMesh("no facets in it") }
+        return m.finished()
+    }
+
+    /// Every line of a text file, read a megabyte at a time.
+    ///
+    /// ── WHY NOT `String(contentsOf:)` ─────────────────────────────────────
+    ///
+    /// The text readers used to read the whole file and then split it, which
+    /// holds the file, the String and every line at once: a 227 MB OBJ peaked
+    /// at 919 MB resident, from the import, the linked-folder scans and the
+    /// phone's price alike. A line is all a text mesh ever needs at a time,
+    /// and the binary reader already streams for the same reason.
+    ///
+    /// Lines end at LF or CR, so CR-LF (a Windows export) and a lone CR both
+    /// split where a person would say; the empty line between CR and LF is
+    /// dropped. False when the file cannot be read, is not UTF-8, or has a
+    /// "line" longer than any text mesh writes — a binary file read as text,
+    /// which would otherwise be gathered whole into one line.
+    static func eachLine(of url: URL, _ body: (Substring) -> Void) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        let longestLine = 1 << 20
+        var carry: [UInt8] = []
+        var valid = true
+        // A UTF-8 byte-order mark is not part of the first line. Kept, an OBJ
+        // whose first line is a vertex read "\u{FEFF}v …", lost that vertex,
+        // and every face after it pointed one corner off (`String(contentsOf:)`
+        // used to strip it).
+        var first = true
+
+        func emit(_ bytes: UnsafeBufferPointer<UInt8>) {
+            guard valid, !bytes.isEmpty else { return }
+            guard let line = String(validating: bytes, as: UTF8.self) else { valid = false; return }
+            body(line[...])
         }
 
-        var m = Measurement()
-        eachAsciiSTLTriangle(text) { ax, ay, az, bx, by, bz, cx, cy, cz in
-            m.add(ax, ay, az, bx, by, bz, cx, cy, cz)
+        while valid {
+            let chunk: Data
+            do {
+                guard let read = try handle.read(upToCount: 1 << 20), !read.isEmpty else { break }
+                chunk = read
+            } catch { return false }
+            chunk.withUnsafeBytes { raw in
+                let bytes = raw.bindMemory(to: UInt8.self)
+                var start = 0
+                if first {
+                    first = false
+                    if bytes.count >= 3, bytes[0] == 0xEF, bytes[1] == 0xBB, bytes[2] == 0xBF { start = 3 }
+                }
+                for i in start..<bytes.count where bytes[i] == 0x0A || bytes[i] == 0x0D {
+                    if carry.isEmpty {
+                        emit(UnsafeBufferPointer(rebasing: bytes[start..<i]))
+                    } else {
+                        carry.append(contentsOf: bytes[start..<i])
+                        carry.withUnsafeBufferPointer { emit($0) }
+                        carry.removeAll(keepingCapacity: true)
+                    }
+                    start = i + 1
+                }
+                carry.append(contentsOf: bytes[start...])
+            }
+            if carry.count > longestLine { return false }
         }
-        return m.finished()
+        if !carry.isEmpty { carry.withUnsafeBufferPointer { emit($0) } }
+        return valid
     }
 
     /// Every triangle of an OBJ, from text already read.
@@ -1079,14 +1158,33 @@ enum Mesh {
     static func eachOBJTriangle(_ text: String,
                                 _ body: (Double, Double, Double, Double, Double,
                                          Double, Double, Double, Double) -> Void) {
+        var reader = OBJReader()
+        for line in text.split(whereSeparator: \.isNewline) { reader.line(line, body) }
+    }
+
+    /// The same, streamed from the file a line at a time (`eachLine`). False
+    /// when the file is not text.
+    static func eachOBJTriangle(_ url: URL,
+                                _ body: (Double, Double, Double, Double, Double,
+                                         Double, Double, Double, Double) -> Void) -> Bool {
+        var reader = OBJReader()
+        return eachLine(of: url) { reader.line($0, body) }
+    }
+
+    /// What an OBJ reader has to remember between lines: the vertices so far,
+    /// which a face refers back to.
+    struct OBJReader {
         var xs: [Double] = [], ys: [Double] = [], zs: [Double] = []
-        for line in text.split(whereSeparator: \.isNewline) {
+
+        mutating func line(_ line: Substring,
+                           _ body: (Double, Double, Double, Double, Double,
+                                    Double, Double, Double, Double) -> Void) {
             let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if t.hasPrefix("v ") {
                 let parts = t.dropFirst(2).split(separator: " ", omittingEmptySubsequences: true)
                 guard parts.count >= 3,
                       let x = Double(parts[0]), let y = Double(parts[1]), let z = Double(parts[2])
-                else { continue }
+                else { return }
                 xs.append(x); ys.append(y); zs.append(z)
             } else if t.hasPrefix("f ") {
                 let corners = t.dropFirst(2).split(separator: " ", omittingEmptySubsequences: true)
@@ -1097,7 +1195,7 @@ enum Mesh {
                         let at = n > 0 ? n - 1 : xs.count + n
                         return (at >= 0 && at < xs.count) ? at : nil
                     }
-                guard corners.count >= 3 else { continue }
+                guard corners.count >= 3 else { return }
                 for i in 1..<(corners.count - 1) {
                     let a = corners[0], b = corners[i], c = corners[i + 1]
                     body(xs[a], ys[a], zs[a], xs[b], ys[b], zs[b], xs[c], ys[c], zs[c])
@@ -1113,11 +1211,10 @@ enum Mesh {
     /// Sixteen of this shop's models are this format — a CAD package's default
     /// — and they were the ones that came back as grey cubes after the
     /// renderer only learned to read the binary form.
-    @inline(__always)
     static func eachAsciiSTLTriangle(_ text: String,
                                      _ body: (Double, Double, Double, Double, Double,
                                               Double, Double, Double, Double) -> Void) {
-        var corner: [Double] = []
+        var reader = AsciiSTLReader()
         // SPLIT ON NEWLINES, not on "\n" — and the difference is not pedantry.
         //
         // In Swift a String is a sequence of grapheme clusters, and CR-LF is
@@ -1130,18 +1227,39 @@ enum Mesh {
         // and drawn as nothing, and every one of them opens perfectly in any
         // editor. CATIA and several CAD exporters write CR-LF as a matter of
         // course. `isNewline` is true for the cluster, so this splits where a
-        // person would say the lines are.
-        for line in text.split(whereSeparator: \.isNewline) {
-            // A lone CR, which is neither of the above and still ends a line on
-            // some very old exports.
+        // person would say the lines are. (`eachLine`, which the file readers
+        // use, splits bytes on CR and LF and so meets the same files the same
+        // way.)
+        for line in text.split(whereSeparator: \.isNewline) { reader.line(line, body) }
+    }
+
+    /// The same, streamed from the file a line at a time (`eachLine`). False
+    /// when the file is not text.
+    static func eachAsciiSTLTriangle(_ url: URL,
+                                     _ body: (Double, Double, Double, Double, Double,
+                                              Double, Double, Double, Double) -> Void) -> Bool {
+        var reader = AsciiSTLReader()
+        return eachLine(of: url) { reader.line($0, body) }
+    }
+
+    /// The corners of the facet being read, which a text STL spreads over
+    /// three `vertex` lines.
+    struct AsciiSTLReader {
+        var corner: [Double] = []
+
+        mutating func line(_ line: Substring,
+                           _ body: (Double, Double, Double, Double, Double,
+                                    Double, Double, Double, Double) -> Void) {
+            // Trimmed of a lone CR as well as spaces, which still ends a line
+            // on some very old exports.
             let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard t.hasPrefix("vertex") else { continue }
+            guard t.hasPrefix("vertex") else { return }
             let parts = t.dropFirst(6).split(separator: " ", omittingEmptySubsequences: true)
             guard parts.count >= 3,
                   let x = Double(parts[0].trimmingCharacters(in: .whitespacesAndNewlines)),
                   let y = Double(parts[1].trimmingCharacters(in: .whitespacesAndNewlines)),
                   let z = Double(parts[2].trimmingCharacters(in: .whitespacesAndNewlines))
-            else { continue }
+            else { return }
             corner.append(contentsOf: [x, y, z])
             if corner.count == 9 {
                 body(corner[0], corner[1], corner[2], corner[3], corner[4],

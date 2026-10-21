@@ -215,6 +215,31 @@ struct PurchaseOrderTests {
         #expect(po["unitPrice"] == nil, "nothing priced it, so it carries no price")
     }
 
+    @Test("a spool counted in sheets is ordered in sheets, and received as a quantity with a lot")
+    func draftingSheets() async throws {
+        let engine = try KhaytEngine()
+        let drafted = try await engine.draftOrder(
+            item: .object(["id": .string("sp-ply"), "material": .string("Birch ply"),
+                           "unit": .string("sheet"), "spoolWeight": .number(10)]),
+            ask: ["status": .string("draft")], id: "PO-3", today: "2026-09-19", supplierName: "")
+        guard case .object(let po) = drafted else { Issue.record("no order"); return }
+        #expect(po["unit"] == .string("sheet"), "a 10-sheet pack was ordered as 1000 g")
+        #expect(po["qty"] == .number(10), "one more pack, not a thousand sheets")
+        #expect(po["kind"] == nil, "still a spool order: the receive restocks the shelf")
+        #expect(try await engine.isConsumableOrder(drafted) == false)
+
+        // The receive sheet captions it in its own unit and still asks the lot,
+        // which it decides by the rule's reading and not by the unit.
+        let sources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/KhaytApp")
+        let sheet = try String(contentsOf: sources.appending(path: "ReceiveSheet.swift"), encoding: .utf8)
+        #expect(sheet.contains("if consumable == false {"), "the lot is keyed on the unit again")
+        #expect(sheet.contains("shop.ordersAConsumable(order.id)"))
+        #expect(sheet.contains("callIt(\"unit.\" + named)"), "a shelf unit is captioned raw")
+        #expect(!sheet.contains("order.unit.isEmpty"), "a sheet order captioned as grams")
+    }
+
     @Test("a material nothing prices is drafted without a price")
     func unpricedMaterialsDraftWithoutOne() async throws {
         // A price of zero would read as free to every reader downstream —

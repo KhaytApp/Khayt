@@ -375,6 +375,9 @@ public struct PaymentRecorded: Decodable, Sendable {
     /// was written; a payment threw them away, so the Mac could only refuse to
     /// record a payment that owed one.
     public let webhookEffects: [WebhookEffect]?
+    /// Why the rule changed nothing, when it refused — `clearPayment` on a job
+    /// whose payment plan has collected rows says `plan_collected`.
+    public let refused: String?
 }
 
 /// A job handed over, or a job that was not ready to be.

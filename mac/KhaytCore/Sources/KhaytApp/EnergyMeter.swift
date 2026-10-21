@@ -78,6 +78,15 @@ final class EnergyMeter {
         save(memo)
     }
 
+    /// A machine taken out of the watch: whatever print it was metering is not
+    /// one to carry into its return, or the reading would span the repair.
+    func forget(_ machineId: String) {
+        guard case .object(var o) = memo, o[machineId] != nil else { return }
+        o[machineId] = nil
+        memo = .object(o)
+        save(memo)
+    }
+
     /// The end of a print: take its reading out of the memory.
     func take(_ machineId: String, engine: KhaytEngine) async -> KhaytEngine.EnergyReading? {
         guard let t = try? await engine.energyTake(memo: memo, machineId: machineId) else { return nil }

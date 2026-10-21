@@ -166,7 +166,7 @@ final class Spotlight {
             // The same phrase the tile in the library prints under the same
             // model, so a result and the thing it opens agree.
             let printed = file.printCount > 0
-                ? shop.words.callIt("cat.printed_n", ["n": .number(Double(file.printCount))])
+                ? shop.words.counting(file.printCount, "mac.printed_n")
                 : nil
             let card = Self.card(for: file, printedTimes: printed)
             let attributes = CSSearchableItemAttributeSet(contentType: .content)

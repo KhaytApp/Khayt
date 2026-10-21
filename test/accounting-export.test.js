@@ -315,8 +315,35 @@ test('Wafeq/Daftra expenses: required columns, gross amount, shop currency, date
   assert.deepEqual(w.rows[0], ['2026-02-10', 'Rent', 'Petty Cash', 'SAR', '1000.00', 'inc. tax', '']);
 
   const d = parseCsv(buildExpenseCsv(expenses, { format: 'daftra', currency: 'SAR' }));
-  assert.deepEqual(d.header, ['Date', 'Amount', 'Currency', 'Category', 'Description']);
-  assert.deepEqual(d.rows[0], ['10/01/2026', '57.50', 'SAR', 'Cost of Goods Sold', 'PLA']);
+  assert.deepEqual(d.header, ['Date', 'Amount', 'Currency', 'Category', 'Description', 'Taxes']);
+  assert.deepEqual(d.rows[0], ['10/01/2026', '57.50', 'SAR', 'Cost of Goods Sold', 'PLA', '']);
+});
+
+test('Daftra expenses carry their VAT: the net amount, with the tax named', () => {
+  require('../lib/tax.js');
+  const REG = { enableVat: true, vatRate: 15 };
+  // Daftra's expense import has a Taxes column (a tax registered in Daftra) and
+  // decides from it whether the amount holds the tax — as on the income side.
+  const expenses = [
+    { date: '2026-01-10', category: 'filament', amount: 115, vatAmount: 15, note: 'PLA' },
+    { date: '2026-01-11', category: 'rent', amount: 1000, note: '' },
+  ];
+  const named = parseCsv(buildExpenseCsv(expenses, { format: 'daftra', currency: 'SAR', taxCode: 'VAT 15%', settings: REG }));
+  assert.deepEqual(named.rows[0], ['10/01/2026', '100.00', 'SAR', 'Cost of Goods Sold', 'PLA', 'VAT 15%']);
+  assert.deepEqual(named.rows[1], ['11/01/2026', '1000.00', 'SAR', 'Rent', '', ''], 'no VAT recorded: as before');
+  // No tax name configured: the rate, which Daftra's import screen flags.
+  const bare = parseCsv(buildExpenseCsv(expenses, { format: 'daftra', currency: 'SAR', settings: REG }));
+  assert.equal(bare.rows[0][5], '15');
+  // Wafeq's documented expense columns have no tax field: unchanged, gross.
+  // VAT off: the receipt's VAT is not input tax — gross, no tax named.
+  const off = parseCsv(buildExpenseCsv(expenses, { format: 'daftra', currency: 'SAR', taxCode: 'VAT 15%',
+    settings: { enableVat: false, vatRate: 0 } }));
+  assert.deepEqual(off.rows[0], ['10/01/2026', '115.00', 'SAR', 'Cost of Goods Sold', 'PLA', '']);
+  // No settings handed over: nothing is netted.
+  assert.equal(parseCsv(buildExpenseCsv(expenses, { format: 'daftra', currency: 'SAR' })).rows[0][1], '115.00');
+  const w = parseCsv(buildExpenseCsv(expenses, { format: 'wafeq', currency: 'SAR' }));
+  assert.equal(w.header.length, 7);
+  assert.equal(w.rows[0][4], '115.00');
 });
 
 test('the format lists name the Saudi packages, and Qoyod is not guessed at', () => {

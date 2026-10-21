@@ -294,19 +294,58 @@
   }
 
   /**
+   * Log collections that drop their own oldest rows at a size cap — the
+   * team activity log keeps 2,000 (renderer/app-helpers.js logActivity, and
+   * the Mac's Shop.appendActivity).
+   *
+   * A row the cap trims IS tombstoned, like any other row that disappears:
+   * the tombstone is what stops another device, or the cloud, sending the
+   * old row back. Without it a merge re-added trimmed rows at the END of the
+   * log, and the next trim — by position — kept those old rows and dropped
+   * this device's newest ones.
+   */
+  const CAPPED_LOGS = new Map([['auditLog', 2000]]);
+
+  /**
    * Bound tombstone growth. They are transient delete-markers for sync; once
    * every device has seen a delete they are dead weight. Keeps the most recent
    * set (they are appended oldest-first) so the array cannot grow without limit
    * and bloat every save and every sync blob.
    *
+   * ── EACH CAPPED LOG HAS AN ALLOWANCE OF ITS OWN ───────────────────────
+   *
+   * Once the activity log is full every logged action trims one row, and so
+   * leaves one tombstone. Counted in one shared list, a few thousand logged
+   * actions pushed out every REAL delete marker — a customer or job deleted
+   * a week ago lost its tombstone, and the next device to sync from an older
+   * copy brought it back. So the tombstones of each capped log are counted,
+   * and evicted, among themselves (TOMB_CAP each), and everything else keeps
+   * the TOMB_CAP it always had. Order is kept; only the oldest of a bucket
+   * that is over its allowance go.
+   *
    * Applied on both paths that add tombstones — the local delete in stampChanges
    * and the propagated one in applyDeltas. Leaving applyDeltas to rely on the
    * next save for trimming would have made the bound a property of the caller
-   * rather than of this module.
+   * rather than of this module. StoreWriter.capTombstones is the Mac's copy.
    */
   const TOMB_CAP = 5000;
   function capTombstones(tomb) {
-    if (Array.isArray(tomb) && tomb.length > TOMB_CAP) tomb.splice(0, tomb.length - TOMB_CAP);
+    if (!Array.isArray(tomb) || tomb.length <= TOMB_CAP) return;
+    const counted = new Map();
+    const keep = new Array(tomb.length);
+    let dropping = false;
+    for (let i = tomb.length - 1; i >= 0; i--) {
+      const t = tomb[i];
+      const bucket = (t && typeof t.collection === 'string' && CAPPED_LOGS.has(t.collection)) ? t.collection : '';
+      const n = counted.get(bucket) || 0;
+      keep[i] = n < TOMB_CAP;
+      if (!keep[i]) dropping = true;
+      counted.set(bucket, n + 1);
+    }
+    if (!dropping) return;
+    let w = 0;
+    for (let i = 0; i < tomb.length; i++) if (keep[i]) tomb[w++] = tomb[i];
+    tomb.length = w;
   }
 
   /** High-water cursor across the snapshot (rev authoritative; updatedAt advisory). */
@@ -662,6 +701,7 @@
     syncedRevOf,
     summarizeDiscardedEdits,
     maxCursor,
+    CAPPED_LOGS,
     setBackend,
     getBackend,
     status,

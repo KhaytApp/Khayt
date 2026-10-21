@@ -62,7 +62,7 @@ struct CustomerMixCard: View {
                 .font(.title3.weight(.medium)).monospacedDigit()
             // People, not orders — twelve sales to one person is not twelve
             // customers, and the other app could not tell them apart.
-            Text(shop.words.callIt("mac.cm_people", ["n": .number(Double(side.clients))]))
+            Text(shop.words.counting(side.clients, "mac.cm_people"))
                 .font(.caption2).foregroundStyle(.secondary)
         }
     }

@@ -312,7 +312,7 @@ enum RestoreGuard {
             tombs.append(.object(t))
             known.insert(key)
         }
-        if tombs.count > StoreWriter.tombstoneCap { tombs.removeFirst(tombs.count - StoreWriter.tombstoneCap) }
+        StoreWriter.capTombstones(&tombs)
         out["tombstones"] = .array(tombs)
         return out
     }

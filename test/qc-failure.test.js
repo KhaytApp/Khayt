@@ -222,3 +222,31 @@ test('the waste row is dated by the shop\'s local day when one is given', () => 
   });
   assert.equal(r2.waste.date, '2026-09-04');
 });
+
+test('deleting a failure that drew 30 g + 20 g off one spool takes back both lines and nothing else', () => {
+  const W = require('../lib/waste-entry.js');
+  // The job's own completion line weighs 50 g, the same as the failure's
+  // combined draw: an untagged delete matched it by weight and erased it.
+  const inventory = [{
+    id: 'S1', material: 'PLA', cost: 80, weight: 1000, spoolWeight: 1000,
+    usageHistory: [{ orderId: 'J1', weightUsed: 50, date: '2026-09-01' }],
+  }];
+  const order = {
+    id: 'J1', material: 'PLA',
+    parts: [{ filamentId: 'S1', printWeight: 30, qty: 1 }, { filamentId: 'S1', printWeight: 20, qty: 1 }],
+  };
+  const log = [];
+  Q.record(order, { failureType: 'warping', weight: 50 },
+    { now: NOW, inventory, wasteLog: log, wasteId: 'WASTE-9', today: '2026-09-04' });
+  assert.equal(inventory[0].weight, 950);
+  const hist = inventory[0].usageHistory;
+  assert.equal(hist.length, 3);
+  assert.deepEqual(hist.slice(0, 2).map((h) => [h.weightUsed, h.wasteId]),
+    [[20, 'WASTE-9'], [30, 'WASTE-9']], 'each line is stamped as it is written');
+
+  W.removeEntry(log, 'WASTE-9', { inventory });
+  assert.equal(inventory[0].weight, 1000);
+  assert.deepEqual(inventory[0].usageHistory,
+    [{ orderId: 'J1', weightUsed: 50, date: '2026-09-01' }],
+    'both failure lines gone, the completion line kept');
+});

@@ -295,10 +295,11 @@ extension Shop {
         var tag = ""
         var tier = ""
 
-        /// The channels the rule knows. `sms` and `whatsapp` both read the
-        /// phone number; they are separate because what is DONE with the
-        /// number differs, and that is the sending app's business.
-        static let channels = ["email", "whatsapp"]
+        /// The channels this app can SEND a campaign on. The rule also knows
+        /// `sms` and `whatsapp` (both read the phone number), but this app's
+        /// only campaign sender is email: offering WhatsApp built a list of
+        /// phone numbers and then mailed them.
+        static let channels = ["email"]
 
         var criteria: [String: JSONValue] {
             var out: [String: JSONValue] = [:]
@@ -452,9 +453,12 @@ extension Shop {
     /// log the other app keeps — in the same shape, in the same place.
     ///
     /// Returns what to tell the shop.
-    func sendCampaign(_ body: String, subject: String = "",
+    func sendCampaign(_ body: String, subject: String = "", channel: String = "email",
                       to recipients: [KhaytEngine.Recipient]) async -> String {
         guard permitted("clients", "edit") else { return moveProblem ?? "" }
+        // Every send below is a MAIL. A list built for any other channel holds
+        // phone numbers, and posting them as addresses is the bug this stops.
+        guard channel == "email" else { return words.callIt("mac.campaign_email_only") }
         guard !recipients.isEmpty else { return words.callIt("camp.none") }
         guard !body.trimmingCharacters(in: .whitespaces).isEmpty else {
             return words.callIt("camp.need_body")
@@ -846,6 +850,9 @@ extension Shop {
         }
         let ids = Set(files.map(\.id))
         let roots = libraryRoots?.roots ?? []
+        // A linked folder's model is remembered too: its file stays where the
+        // shop keeps it, and the next linked scan would index it again.
+        let remembering = roots + linkedFolders
         let base = libraryBase()
         // Off the screen NOW — see `Shop+LibraryWrites.swift`. Everything
         // below is off the main thread until the book is written.
@@ -860,15 +867,16 @@ extension Shop {
                 let present = Set(before.compactMap(Self.recordId)).intersection(ids)
                 rows.removeAll { Self.recordId($0).map(ids.contains) ?? false }
                 root["printFiles"] = .array(rows)
-                // A model ADOPTED from the library's own folder keeps its file
-                // where the shop put it — so remember not to adopt it again,
-                // or the delete is undone on the next launch (`LibraryStorage`).
+                // A model ADOPTED from the library's own folder, or indexed
+                // from a linked one, keeps its file where the shop put it — so
+                // remember not to take it in again, or the delete is undone on
+                // the next launch (`LibraryStorage`, `rescanLinkedFolders`).
                 var settings = Self.settings(root)
                 var library: [String: JSONValue] = [:]
                 if case .object(let l)? = settings["printLibrary"] { library = l }
                 var already: [JSONValue] = []
                 if case .array(let a)? = library["notAdopted"] { already = a }
-                let next = Self.notAdoptedAfterDeleting(chosen, roots: roots, already: already)
+                let next = Self.notAdoptedAfterDeleting(chosen, roots: remembering, already: already)
                 if next.count != already.count || next != already {
                     library["notAdopted"] = .array(next)
                     settings["printLibrary"] = .object(library)

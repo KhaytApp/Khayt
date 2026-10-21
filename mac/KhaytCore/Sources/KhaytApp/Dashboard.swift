@@ -530,9 +530,9 @@ struct ToChase: View {
     /// overdue, it has expired.
     private func age(_ row: Chase, overdue: Bool) -> String {
         guard let days = row.days else { return "" }
-        if overdue { return shop.words.callIt("mac.chase_days_over", ["n": .number(Double(days))]) }
+        if overdue { return shop.words.counting(days, "mac.chase_days_over") }
         if days <= 0 { return shop.words.callIt("mac.chase_expired") }
-        return shop.words.callIt("mac.chase_days_left", ["n": .number(Double(days))])
+        return shop.words.counting(days, "mac.chase_days_left")
     }
 }
 
@@ -713,8 +713,7 @@ private struct NeedsAttention: View {
                 if let late = item.daysLate, late > 0 {
                     // Said in words, not by colour alone. This is the line that
                     // decides whether someone gets a phone call today.
-                    Text(shop.words.callIt(late == 1 ? "mac.days_late_one" : "mac.days_late",
-                                           ["n": .number(Double(late))]))
+                    Text(shop.words.counting(late, "mac.days_late"))
                         .font(.callout).monospacedDigit().foregroundStyle(ink)
                 } else if let grams = item.grams {
                     // In the item's OWN unit. The shelf learned to count in
@@ -797,24 +796,27 @@ private struct Work: View {
             // The machines themselves, above the count of them. "Printing 0"
             // is the book's answer; the tiles are the printers'.
             FloorStrip(shop: shop)
+            // Every count through `Money.quantity`: grouped, and in the
+            // digits the shop chose — a bare "\(n)" was neither.
             StatStrip(stats: [
                 // Amber only when something IS printing. A colour that means
                 // "being made right now" sitting on a zero says the opposite of
                 // what it means, and a dashboard where the warm colour is
                 // always on is a dashboard where it stops being noticed.
                 Stat(label: shop.words.callIt("queue.printing"),
-                     value: "\(facts.printingCount)",
+                     value: Money.quantity(Double(facts.printingCount), decimals: 0),
                      symbol: "printer",
                      tint: facts.printingCount > 0 ? Khayt.hot : Color.secondary,
                      alive: facts.printingCount > 0),
                 Stat(label: shop.words.callIt("mac.open_count"),
-                     value: "\(facts.activeCount)", mark: .jobs),
+                     value: Money.quantity(Double(facts.activeCount), decimals: 0), mark: .jobs),
                 Stat(label: shop.words.callIt("mac.late_tile"),
-                     value: "\(facts.lateCount)",
+                     value: Money.quantity(Double(facts.lateCount), decimals: 0),
                      mark: .clock,
                      tint: facts.lateCount > 0 ? Khayt.attention : Color.secondary),
                 Stat(label: shop.words.callIt("mac.machines_online"),
-                     value: "\(facts.fleet.live)/\(facts.fleet.total)",
+                     value: Money.quantity(Double(facts.fleet.live), decimals: 0) + "/"
+                         + Money.quantity(Double(facts.fleet.total), decimals: 0),
                      working: facts.fleet.offline > 0
                          ? shop.words.callIt("mac.fleet_offline",
                                              ["n": .number(Double(facts.fleet.offline))]) : nil,
@@ -1063,7 +1065,7 @@ private struct MoneyTiles: View {
                     // the same trap this section was rewritten to remove once
                     // already.
                     Stat(label: shop.words.callIt("mac.jobs_count"),
-                         value: "\(k.orderCount)", mark: .jobs),
+                         value: Money.quantity(Double(k.orderCount), decimals: 0), mark: .jobs),
                     // Nothing to judge against is "—", not 100%. A shop with no
                     // due dates has not delivered everything on time; it has
                     // promised nothing.
@@ -1071,9 +1073,9 @@ private struct MoneyTiles: View {
                          value: k.onTimePct.map { "\(Money.figure($0))%" } ?? "—",
                          symbol: "checkmark.circle"),
                     Stat(label: shop.words.callIt("queue.completed"),
-                         value: "\(k.completedCount)", symbol: "checkmark.seal"),
+                         value: Money.quantity(Double(k.completedCount), decimals: 0), symbol: "checkmark.seal"),
                     Stat(label: shop.words.callIt("mac.library"),
-                         value: "\(shop.files.count)", mark: .library),
+                         value: Money.quantity(Double(shop.files.count), decimals: 0), mark: .library),
                 ])
             }
             }   // hasNotTradedYet

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 // kpi-rows, top-lists and pnl-report do. Required here so the netting under
 // test is the real rule rather than the gross fallback.
 require('../lib/tax.js');
-const { buildComparables, materialFamily, pickPrice } = require('../lib/ai-price.js');
+const { buildComparables, materialFamily, pickPrice, markupFromMargin } = require('../lib/ai-price.js');
 
 const mk = (id, status, price, costBasis, material, date) =>
   ({ id, status, price, costBasis, date, parts: [{ material }] });
@@ -83,4 +83,32 @@ test('comparable margins are NET of tax for an inclusive-VAT shop', () => {
   // And a caller that passes no settings gets the old answer rather than a
   // wrong one — the netting is opt-in by having a profile to net against.
   assert.equal(buildComparables(log, { material: 'PETG' }).medianMarginPct, 56.5);
+});
+
+test('the margin field is a markup on cost, so advice is converted before it is applied', () => {
+  require('../lib/pricing.js');
+  // 30% of the price is 30/70 = 42.9% on cost; typed as 30 it earned 23.1%.
+  assert.equal(markupFromMargin(30), 42.9);
+  assert.equal(markupFromMargin(50), 100);
+  assert.equal(markupFromMargin(0), 0);
+  assert.equal(markupFromMargin(-20), 0, 'a loss is no markup — pricing clamps it to 0');
+  assert.equal(markupFromMargin(100), null, 'no markup earns 100% of the price');
+  assert.equal(markupFromMargin(140), null);
+  assert.equal(markupFromMargin('x'), null);
+  // Priced at that markup, the job earns the margin it was promised.
+  const cost = 70, markup = markupFromMargin(30);
+  const price = cost * (1 + markup / 100);
+  assert.ok(Math.abs((price - cost) / price - 0.30) < 0.001);
+  // Both the deterministic median and the model's answer carry the markup.
+  const log = [mk('a', 'completed', 100, 50, 'PLA'), mk('b', 'completed', 100, 50, 'PLA'), mk('c', 'completed', 100, 50, 'PLA')];
+  const c = buildComparables(log, { material: 'PLA' });
+  assert.equal(c.suggestedMargin, 50);
+  assert.equal(c.suggestedMarkup, 100);
+  assert.equal(pickPrice({ suggestedMargin: 30 }).suggestedMarkup, 42.9);
+});
+
+test('Electron applies the markup, not the margin, to the margin field', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'renderer', 'build.js'), 'utf8');
+  assert.match(src, /KhaytAiPrice\.markupFromMargin\(reco\.suggestedMargin\)/);
+  assert.doesNotMatch(src, /m\.value = String\(reco\.suggestedMargin\)/);
 });

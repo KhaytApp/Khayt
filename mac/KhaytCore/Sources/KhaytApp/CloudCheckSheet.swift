@@ -175,8 +175,7 @@ struct CloudCheckSheet: View {
                 // merge that threw somebody's work away in silence is the
                 // failure the conflicts list exists to prevent.
                 if !pulled.conflicts.isEmpty {
-                    Label(shop.words.callIt("mac.cloud_lost_edits",
-                                            ["n": .number(Double(pulled.conflicts.count))]),
+                    Label(shop.words.counting(pulled.conflicts.count, "mac.cloud_lost_edits"),
                           systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(Khayt.attention)
                         .fixedSize(horizontal: false, vertical: true)

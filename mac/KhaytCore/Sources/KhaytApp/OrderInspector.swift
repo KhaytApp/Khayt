@@ -373,7 +373,7 @@ private struct Detail: View {
                         // it, and it is not "g" everywhere: Arabic writes غ.
                         // Hard-coding the letter was a claim that the symbol is
                         // universal, and the catalogue says otherwise.
-                        Text("\(Money.grams(part.printWeight)) \(shop.words.callIt("common.grams"))")
+                        Text(verbatim: "\(Money.grams(part.printWeight)) \(shop.words.callIt("common.grams"))")
                             .font(.caption)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
@@ -422,7 +422,7 @@ struct ZatcaLine: View {
                         Text("·").foregroundStyle(.tertiary)
                         // The counter the authority requires to be unbroken, so
                         // a gap in it is something a shop can be asked about.
-                        Text("ICV \(icv.formatted(.number.precision(.fractionLength(0)).locale(shop.words.locale)))")
+                        Text(verbatim: "ICV \(icv.formatted(.number.precision(.fractionLength(0)).locale(shop.words.locale)))")
                             .monospacedDigit().foregroundStyle(.secondary)
                     }
                 }

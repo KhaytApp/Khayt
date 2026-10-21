@@ -145,6 +145,12 @@ public enum StoreWriter {
     /// either file I/O the synchronous version already does on this thread or a
     /// hop to the engine actor. Leaving it nonisolated only means handing three
     /// closures across an isolation boundary they have no reason to cross.
+    /// TESTS ONLY: run between a change being worked out and the swap, so a
+    /// test can move the book under it and make the change run again — the
+    /// retry every caller's closure has to survive (an undo list that kept
+    /// growing on each run put stock back twice). Nothing in the app sets it.
+    @MainActor public static var afterMutateForTests: ((URL) -> Void)?
+
     @MainActor
     public static func update(storeURL url: URL,
                        owns: @Sendable () -> Bool,
@@ -185,6 +191,7 @@ public enum StoreWriter {
 
             var root = decoded
             try await mutate(&root)
+            afterMutateForTests?(url)
             let changed = root
             let next = try await offMain { () throws -> Data in
                 var root = changed
@@ -526,7 +533,7 @@ public enum StoreWriter {
             tombs.append(.object(["id": .string(g.id), "collection": .string(g.collection),
                                   "rev": .number(g.rev), "deletedAt": .string(at)]))
         }
-        if tombs.count > tombstoneCap { tombs.removeFirst(tombs.count - tombstoneCap) }
+        capTombstones(&tombs)
         after["tombstones"] = .array(tombs)
     }
 
@@ -679,6 +686,37 @@ public enum StoreWriter {
 
     /// `TOMB_CAP` in lib/sync.js.
     public static let tombstoneCap = 5000
+
+    /// `CAPPED_LOGS` in lib/sync.js: the log collections that drop their own
+    /// oldest rows at a size, and the size.
+    public static let cappedLogs: [String: Int] = ["auditLog": 2000]
+
+    /// `capTombstones` in lib/sync.js: the newest `tombstoneCap`, kept in order
+    /// — counted SEPARATELY for each capped log.
+    ///
+    /// A full activity log trims a row, and so leaves a tombstone, on every
+    /// logged action. Counted in the one list, those pushed out the markers
+    /// of real deletes, and an older copy syncing in brought deleted
+    /// customers and jobs back. The trimmed rows still need theirs — without
+    /// it a merge sends them back to the end of the log, where the next trim
+    /// by position keeps them and drops the newest — so each capped log's
+    /// tombstones are evicted among themselves instead.
+    public static func capTombstones(_ tombs: inout [JSONValue]) {
+        guard tombs.count > tombstoneCap else { return }
+        var counted: [String: Int] = [:]
+        var keep = [Bool](repeating: true, count: tombs.count)
+        var dropping = false
+        for i in tombs.indices.reversed() {
+            var bucket = ""
+            if case .object(let t) = tombs[i], case .string(let c)? = t["collection"],
+               cappedLogs[c] != nil { bucket = c }
+            let n = counted[bucket, default: 0]
+            if n >= tombstoneCap { keep[i] = false; dropping = true }
+            counted[bucket] = n + 1
+        }
+        guard dropping else { return }
+        tombs = tombs.indices.filter { keep[$0] }.map { tombs[$0] }
+    }
 
     // MARK: - Stamping
 

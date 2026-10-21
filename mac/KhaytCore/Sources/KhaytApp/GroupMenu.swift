@@ -11,6 +11,7 @@ import KhaytCore
 struct GroupMenu: View {
     @Bindable var shop: Shop
     @State private var typed = ""
+    @Environment(\.stripCompact) private var compact
 
     private var count: Int { shop.selectedIds.count }
     /// Group TILES chosen with ⌘/⇧-click. Never at the same time as models
@@ -46,13 +47,20 @@ struct GroupMenu: View {
                 }
             }
         } label: {
-            Label(!chosenGroups.isEmpty
-                  ? shop.words.callIt("mac.group_n_groups",
-                                      ["groups": .string(shop.words.counting(chosenGroups.count, "mac.n_groups"))])
-                  : count > 1
-                  ? shop.words.callIt("mac.group_n_models", ["n": .number(Double(count))])
-                  : shop.words.callIt("mac.group"),
-                  systemImage: "square.stack")
+            let title = !chosenGroups.isEmpty
+                ? shop.words.callIt("mac.group_n_groups",
+                                    ["groups": .string(shop.words.counting(chosenGroups.count, "mac.n_groups_of"))])
+                : count > 1
+                ? shop.words.callIt("mac.group_n_models", ["n": .number(Double(count))])
+                : shop.words.callIt("mac.group")
+            // Its symbol alone when the strip is narrow, as Provenance does:
+            // at 900 points the three menus' words pushed the library's title
+            // under the traffic lights. The title stays the spoken label.
+            if compact {
+                Label(title, systemImage: "square.stack").labelStyle(.iconOnly)
+            } else {
+                Label(title, systemImage: "square.stack")
+            }
         }
         .disabled(!shop.canWrite || (count == 0 && chosenGroups.isEmpty))
         .help(shop.canWrite

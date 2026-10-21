@@ -43,6 +43,67 @@ struct MoneyTaxFixesAppTests {
                 "Electron goes order → customer → shop; the Mac skipped the customer")
     }
 
+    // MARK: - the customer pane's Billed and Paid
+
+    @Test("a customer's Billed − Paid is the Owed beside it")
+    func customerBilledLessPaidIsOwed() async throws {
+        // An exclusive 8.25% shop: a job of 100 owes 108.25, part paid; a
+        // quote, a cancelled job and a test print bill nothing; a credit note
+        // comes off what was billed.
+        func row(_ id: String, _ fields: [String: JSONValue]) -> JSONValue {
+            var o: [String: JSONValue] = [
+                "id": .string(id), "date": .string("2026-09-01"), "project": .string(id),
+                "status": .string("completed"), "client": .string("Acme"), "printTime": .number(1),
+                "priority": .bool(false), "notes": .string(""), "paidAmount": .number(0),
+                "costBasis": .number(0), "paymentStatus": .string("unpaid"),
+            ]
+            for (k, v) in fields { o[k] = v }
+            return .object(o)
+        }
+        let rows: [JSONValue] = [
+            row("A", ["price": .number(100), "paidAmount": .number(50), "paidGross": .bool(true)]),
+            row("Q", ["price": .number(400), "status": .string("quote")]),
+            row("X", ["price": .number(300), "status": .string("cancelled"), "paidAmount": .number(20)]),
+            row("T", ["price": .number(80), "nonBusiness": .bool(true)]),
+            row("C", ["price": .number(200), "creditNotes": .array([.object(["amount": .number(100)])])]),
+        ]
+        let settings: [String: JSONValue] = [
+            "currency": .string("USD"),
+            "tax": .object(["name": .string("Sales Tax"), "mode": .string("exclusive"),
+                            "rates": .array([.object(["id": .string("st"), "label": .string("Sales tax"),
+                                                      "percent": .number(8.25)])])]),
+        ]
+        let engine = try KhaytEngine()
+        let owed = try await engine.owedByOrder(rows, settings: settings, clients: [], currencies: [:])
+        let money = try await engine.billedAndPaidByOrder(rows, settings: settings, clients: [], currencies: [:])
+        var orders = try rows.map { try JSONDecoder().decode(Order.self, from: JSONEncoder().encode($0)) }
+        for i in orders.indices {
+            orders[i].owedResolved = owed[orders[i].id]
+            orders[i].billedPaidResolved = money[orders[i].id]
+        }
+        let person = try #require(Customer.from(orders).first)
+        // 108.25 + 108.25 (200 less 100 credited, grossed up) billed; 50 paid.
+        #expect(abs(person.billed - 216.5) < 0.005, Comment(rawValue: "billed \(person.billed)"))
+        #expect(abs(person.paid - 50) < 0.005, Comment(rawValue: "paid \(person.paid)"))
+        #expect(abs(person.billed - person.paid - person.owed) < 0.005,
+                Comment(rawValue: "owed \(person.owed)"))
+    }
+
+    @Test("a break-even margin is learned from business jobs only")
+    func breakEvenLeavesOutTestPrints() {
+        let rows: [JSONValue] = [
+            .object(["id": .string("A"), "status": .string("completed")]),
+            .object(["id": .string("T"), "status": .string("completed"), "nonBusiness": .bool(true)]),
+            .object(["id": .string("V"), "status": .string("completed"), "voidedAt": .string("2026-09-02")]),
+            .object(["id": .string("P"), "status": .string("printing")]),
+        ]
+        let ids = Reports.breakEvenJobs(rows).compactMap { row -> String? in
+            if case .object(let o) = row, case .string(let id)? = o["id"] { return id }
+            return nil
+        }
+        #expect(ids == ["A"], "a test print earns nothing and its plastic dragged the margin down")
+    }
+
     // MARK: - 1. the ledger's margin
 
     static func order(price: Double, cost: Double) throws -> Order {
@@ -67,6 +128,18 @@ struct MoneyTaxFixesAppTests {
         #expect(money.net == 100)
         #expect(money.vat == 15)
         #expect(money.charged == 115)
+    }
+
+    @Test("the ledger's margin comes off what a credit note left, as Reports'")
+    func ledgerMarginNetsCreditNotes() throws {
+        // 115 charged, 57.50 credited back: the shop kept 50 net of VAT, and a
+        // job that cost 40 made 10 — not the 60 the invoice's split implies.
+        var job = try Self.order(price: 115, cost: 40)
+        job.figures = .init(billed: 115, net: 100, tax: 15, owed: 0, earned: 50)
+        let money = Shop.ledgerMoney(job)
+        #expect(money.marginMoney == 10)
+        #expect(money.margin.map { abs($0 - 0.2) < 1e-9 } == true)
+        #expect(money.net == 100, "the invoice's split is unchanged")
     }
 
     @Test("an exclusive shop's ledger charges price + tax and keeps the price")

@@ -66,7 +66,7 @@ struct OnTimeCard: View {
                                     .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
                             }
                             Spacer(minLength: 8)
-                            Text(words.callIt("mac.days_late", ["n": .number(Double(job.delayDays))]))
+                            Text(words.counting(Int(job.delayDays.rounded()), "mac.days_late"))
                                 .font(.callout).monospacedDigit()
                                 .foregroundStyle(job.delayDays >= 7 ? Khayt.late : Khayt.attention)
                         }

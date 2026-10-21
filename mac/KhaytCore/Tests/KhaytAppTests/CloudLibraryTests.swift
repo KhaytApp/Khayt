@@ -167,3 +167,79 @@ struct CloudLibraryTests {
         #expect(!ok("ftp://192.168.1.20"))
     }
 }
+
+/// Disconnecting Google Drive withdraws the grant at Google, not only the
+/// copy of the token on this Mac.
+@MainActor
+struct GoogleDriveRevokeTests {
+    final class Seen: @unchecked Sendable { var requests: [URLRequest] = [] }
+
+    @Test("the revoke is a form POST to Google with the token in the body, never the URL")
+    func revokeRequest() async throws {
+        let seen = Seen()
+        let ok = await CloudLibrary.revokeAtGoogle("1//rt+/=x") { request in
+            seen.requests.append(request)
+            return (Data(), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        #expect(ok)
+        let request = try #require(seen.requests.first)
+        #expect(request.httpMethod == "POST")
+        #expect(request.url == URL(string: "https://oauth2.googleapis.com/revoke"))
+        #expect(request.url?.query == nil, "the token rode in the URL")
+        #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded")
+        #expect(String(decoding: request.httpBody ?? Data(), as: UTF8.self) == "token=1%2F%2Frt%2B%2F%3Dx")
+        #expect(request.timeoutInterval <= 10, "a disconnect waits on Google for seconds, not a minute")
+    }
+
+    @Test("a revoke that fails says so and throws nothing")
+    func revokeFailure() async {
+        #expect(await CloudLibrary.revokeAtGoogle("rt") { _ in throw URLError(.notConnectedToInternet) } == false)
+        #expect(await CloudLibrary.revokeAtGoogle("rt") { request in
+            (Data(), HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!)
+        } == false)
+    }
+
+    @Test("the stored token is read for the revoke without the rest of the sign-in")
+    func readsTheToken() async {
+        let settings: [String: JSONValue] = ["printLibrary": .object(["gdrive": .object(["refreshToken": .string("rt-1")])])]
+        #expect(await CloudLibrary.driveRefreshToken(settings: settings, build: nil) == "rt-1")
+        #expect(await CloudLibrary.driveRefreshToken(settings: [:], build: nil) == nil)
+    }
+
+    @Test("disconnect revokes first and forgets the account whatever Google answered")
+    func disconnectOrder() throws {
+        let src = try QuoteSheetStatusTests.source("CloudLibrary.swift")
+        let body = try #require(src.range(of: "func disconnectGoogleDrive(").map { String(src[$0.lowerBound...]) })
+        let revoke = try #require(body.range(of: "revokeAtGoogle("))
+        let forget = try #require(body.range(of: "writeDrive(refreshToken: \"\""))
+        #expect(revoke.lowerBound < forget.lowerBound)
+        // The revoke's answer only picks the note; it never guards the forget.
+        let between = body[revoke.upperBound..<forget.lowerBound]
+        #expect(!between.contains("return"), "a failed revoke can stop the disconnect")
+        #expect(!src.contains("Only Google can withdraw"))
+    }
+
+    @Test("a new sign-in revokes the old token only for a different account, both known")
+    func supersededToken() {
+        #expect(CloudLibrary.supersededToken(old: "rt-a", new: "rt-b", oldAccount: "a@x.com", newAccount: "b@x.com") == "rt-a")
+        // The same account: its old token shares the new grant.
+        #expect(CloudLibrary.supersededToken(old: "rt-a", new: "rt-b", oldAccount: "A@x.com", newAccount: "a@x.com") == nil)
+        // Not known: never guessed.
+        #expect(CloudLibrary.supersededToken(old: "rt-a", new: "rt-b", oldAccount: nil, newAccount: "b@x.com") == nil)
+        #expect(CloudLibrary.supersededToken(old: "rt-a", new: "rt-b", oldAccount: "", newAccount: "b@x.com") == nil)
+        #expect(CloudLibrary.supersededToken(old: "", new: "rt-b", oldAccount: "a@x.com", newAccount: "b@x.com") == nil)
+        #expect(CloudLibrary.supersededToken(old: "rt-a", new: "rt-a", oldAccount: "a@x.com", newAccount: "b@x.com") == nil)
+    }
+
+    @Test("connect reads the old sign-in before writing, and revokes it before the new token is stored")
+    func connectRevokesTheOld() throws {
+        let src = try QuoteSheetStatusTests.source("CloudLibrary.swift")
+        let body = try #require(src.range(of: "func connectGoogleDrive(").map { String(src[$0.lowerBound...]) })
+        let read = try #require(body.range(of: "let before = await CloudLibrary.libraryDrive("))
+        let firstWrite = try #require(body.range(of: "try await writeDrive(clientId:"))
+        let revoke = try #require(body.range(of: "revokeAtGoogle(old"))
+        let store = try #require(body.range(of: "writeDrive(refreshToken: refresh"))
+        #expect(read.lowerBound < firstWrite.lowerBound)
+        #expect(revoke.lowerBound < store.lowerBound)
+    }
+}

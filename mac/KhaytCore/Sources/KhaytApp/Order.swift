@@ -81,6 +81,11 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// on a job taken for a walk-in, and on every job in a shop that has never
     /// used the customer screen.
     let clientId: String?
+    /// The job's customer was ERASED (`clientErasedAt`, written by the erase).
+    /// An invoiced job keeps the name with no link, and without this mark it
+    /// was matched by that name to any other customer who shares it — showing
+    /// them the erased person's history.
+    let clientErased: Bool
     /// The catalogue product this job is for, when it was taken from one.
     ///
     /// What the catalogue counts to say a product has been made 14 times and
@@ -159,7 +164,7 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, date, status, project, client, currency, price, paidAmount, costBasis, componentsCost
         case paymentStatus, paymentMethod, printTime, priority, priorityLevel, notes
-        case machineId, operatorId, clientId, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
+        case machineId, operatorId, clientId, clientErasedAt, productId, completedAt, deliveredAt, shippedAt, dueDate, parts
         case carrier, trackingNumber, shippingService, shippingStatus
         case fromStock
         case nonBusiness
@@ -275,6 +280,8 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
         // the shelf existed and most of them since.
         fromStock = (try? c.decodeIfPresent(Bool.self, forKey: .fromStock)) as? Bool ?? false
         clientId = try c.decodeIfPresent(String.self, forKey: .clientId)
+        clientErased = ((try? c.decodeIfPresent(String.self, forKey: .clientErasedAt)) ?? nil)
+            .map { !$0.isEmpty } ?? false
         productId = try c.decodeIfPresent(String.self, forKey: .productId)
         completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
         deliveredAt = try c.decodeIfPresent(String.self, forKey: .deliveredAt)
@@ -392,6 +399,11 @@ struct Order: Identifiable, Decodable, Hashable, Sendable {
     /// in the title bar, the customers table and on the card. Neither book on
     /// this machine has either field, which is why nothing showed.
     var owedResolved: Double?
+
+    /// What this job billed and was paid, in the shop's currency, on the
+    /// terms `owedResolved` is on (`KhaytEngine.billedAndPaidByOrder`) — so a
+    /// customer's Billed − Paid is its Owed. Nil until a load resolves it.
+    var billedPaidResolved: KhaytEngine.BilledAndPaid?
 
     /// The shared answer when there is one, and a subtraction when there is
     /// not. A dead engine must not blank the money column — but it is the LAST

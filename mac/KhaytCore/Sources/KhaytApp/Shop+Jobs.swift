@@ -269,7 +269,14 @@ extension Shop {
     /// A NAME IS THE ONLY THING REQUIRED, in either language, because that is
     /// Khayt's own rule and because a customer with a phone number and no name
     /// is not a customer anyone can find again.
-    func saveCustomer(_ client: Client) async {
+    ///
+    /// `opened` is the customer as the sheet opened it — nil for a new one.
+    /// It, and not the row on disk now, is what an untouched save is compared
+    /// with: a field the shop did not touch still holds the OPENED value, and
+    /// against the disk that reads as an edit and writes the old value over
+    /// whatever sync or the iPhone put there meanwhile — a standing order's
+    /// `lastRun` rolled back is a standing-order job made twice.
+    func saveCustomer(_ client: Client, opened: Client?) async {
         moveProblem = nil
         guard permitted("clients", "edit") else { return }
         guard let build = source.build else {
@@ -292,7 +299,7 @@ extension Shop {
                     // An edit, so it is stamped like any other — and undoable.
                     guard case .object(let was) = rows[at] else { return }
                     undo.append(ChangedRecord(collection: "clients", id: client.id, was: was))
-                    record = Self.customerRecord(saving: client, over: was)
+                    record = Self.customerRecord(saving: client, over: was, opened: opened)
                     StoreWriter.stamp(&record)
                     rows[at] = .object(record)
                 } else {
@@ -320,10 +327,13 @@ extension Shop {
     /// rather than `12`, a price row the other app wrote with a field of its
     /// own — because the sheet's own open→save of the stored row is the
     /// baseline every untouched value is compared with (`RoundTrip`).
-    static func customerRecord(saving client: Client,
-                               over was: [String: JSONValue]) -> [String: JSONValue] {
+    ///
+    /// The baseline is drawn from `opened`, the customer as the sheet opened
+    /// it, when there is one; `was` only stands in for a caller with no sheet.
+    static func customerRecord(saving client: Client, over was: [String: JSONValue],
+                               opened: Client? = nil) -> [String: JSONValue] {
         var record = client.record
-        if let stored = Client.decoding(was) {
+        if let stored = opened ?? Client.decoding(was) {
             let baseline = CustomerSheet.saving(CustomerSheet.opening(stored)).record
             record = RoundTrip.keepUntouched(written: record, baseline: baseline, stored: was)
         }
@@ -645,7 +655,7 @@ extension Shop {
     private func partFor(spoolId: String?, grams: Double, hours: Double, qty: Int,
                          extra: [String: JSONValue] = [:]) -> JSONValue {
         Self.costInput(spool: spoolId.flatMap { id in spools.first { $0.id == id } },
-                       grams: grams, hours: hours, qty: qty, extra: extra)
+                       grams: grams, hours: hours, qty: qty, reclaimsTax: reclaimsTax, extra: extra)
     }
 
     /// The part the shared cost model is handed. `extra` is the part as the
@@ -654,8 +664,9 @@ extension Shop {
     /// other app costs the same part — and the four measured fields are
     /// written over it. Static so a test can hold it to a record.
     static func costInput(spool: Spool?, grams: Double, hours: Double, qty: Int,
-                          extra: [String: JSONValue] = [:]) -> JSONValue {
-        CalculatorPart.single(spool: spool.map(\.costing), grams: grams, hours: hours, qty: qty, extra: extra)
+                          reclaimsTax: Bool = false, extra: [String: JSONValue] = [:]) -> JSONValue {
+        CalculatorPart.single(spool: spool.map { $0.costing(reclaimsTax: reclaimsTax) },
+                              grams: grams, hours: hours, qty: qty, extra: extra)
     }
 
     /// What one part costs to make, through the shared cost model.
@@ -1146,26 +1157,7 @@ extension Shop {
                                 uniquingKeysWith: { first, _ in first })
         do {
             let moved = try await StoreWriter.updateOffMain(build) { root -> Int in
-                // Read INSIDE the write: the book on disk may have moved since
-                // the proposal was drawn, and a job somebody assigned by hand in
-                // the meantime must not be overwritten by a stale suggestion.
-                var moved = 0
-                let orders = Self.rows(root, "printLog")
-                var out: [JSONValue] = []
-                out.reserveCapacity(orders.count)
-                for row in orders {
-                    guard case .object(var o) = row,
-                          let id = Self.plainString(o["id"]),
-                          let machine = wanted[id],
-                          (Self.plainString(o["machineId"]) ?? "").isEmpty else {
-                        out.append(row); continue
-                    }
-                    o["machineId"] = .string(machine)
-                    out.append(.object(o))
-                    moved += 1
-                }
-                root["printLog"] = .array(out)
-                return moved
+                Self.writeSchedule(into: &root, wanted: wanted)
             }
             scheduleApplied = moved
             schedulePlan = nil
@@ -1176,6 +1168,43 @@ extension Shop {
         } catch {
             scheduleProblem = self.said(error)
         }
+    }
+
+    /// The schedule's write: each wanted job gets its printer, unless the job
+    /// was given one meanwhile or the printer can no longer take work. Static,
+    /// on the root inside the write, so a test drives it against a book.
+    nonisolated static func writeSchedule(into root: inout [String: JSONValue],
+                                          wanted: [String: String]) -> Int {
+        // Read INSIDE the write: the book on disk may have moved since
+        // the proposal was drawn, and a job somebody assigned by hand in
+        // the meantime must not be overwritten by a stale suggestion.
+        var moved = 0
+        // And the printer must still be one that may be given work. A
+        // proposal drawn before somebody put a printer under service or
+        // retired it would otherwise hand that printer jobs it cannot
+        // run — `lib/machine-status.js`'s rule, as `Machine` reads it.
+        let working = Set(Self.rows(root, "machines").compactMap { row -> String? in
+            guard let data = try? JSONEncoder().encode(row),
+                  let m = try? JSONDecoder().decode(Machine.self, from: data),
+                  m.inService else { return nil }
+            return m.id
+        })
+        let orders = Self.rows(root, "printLog")
+        var out: [JSONValue] = []
+        out.reserveCapacity(orders.count)
+        for row in orders {
+            guard case .object(var o) = row,
+                  let id = Self.plainString(o["id"]),
+                  let machine = wanted[id], working.contains(machine),
+                  (Self.plainString(o["machineId"]) ?? "").isEmpty else {
+                out.append(row); continue
+            }
+            o["machineId"] = .string(machine)
+            out.append(.object(o))
+            moved += 1
+        }
+        root["printLog"] = .array(out)
+        return moved
     }
 
     /// Put the proposal out of mind.
@@ -2038,7 +2067,7 @@ extension Shop {
             }
         }
         if sent > 0 {
-            moveNotices.append(words.callIt("mac.webhooks_sent", ["n": .number(Double(sent))]))
+            moveNotices.append(words.counting(sent, "mac.webhooks_sent"))
         }
     }
 
@@ -2251,14 +2280,12 @@ extension Shop {
         // back, so actuals written afterwards would be written onto a copy the
         // book has already replaced.
         //
-        // AND NOT BECAUSE THE DEDUCTION READS THEM. It does not, in either
-        // app: `deductForOrder` takes an `actualGrams` — "what the PRINTER says
-        // the job used" — and nobody passes it, `renderer/inventory.js`'s
-        // `deductionContext()` included. So a job that used 260 g against a
-        // 160 g quote still takes 160 g off the shelf. That is a gap in the
-        // shared rule rather than in this app, and closing it here alone would
-        // make the two disagree about a shop's shelf, so it is left alone and
-        // pinned by `MoveJobTests.theShelfStillFollowsTheEstimate`.
+        // AND THE DEDUCTION READS THEM. The move's `deduct_filament` passes
+        // `actualGrams: order.actualWeight` to `deductForOrder`, off this very
+        // record — so a job that used 260 g against a 160 g quote takes 260 g
+        // off the shelf, and written after the move the shelf would follow the
+        // estimate instead. Pinned by `MoveJobTests.theShelfFollowsTheActual`
+        // and `aShortJobTakesLess`.
         //
         // Both figures and their provenance travel together. A record with
         // actuals and no `actualsSource` reads as measured to anything that
@@ -2527,7 +2554,8 @@ extension Shop {
         // Khayt keeps two thousand and drops the oldest. A log that grew for
         // ever would be the one collection that could push a book past the size
         // every backup is built to hold.
-        if log.count > 2000 { log = Array(log.suffix(2000)) }
+        let cap = StoreWriter.cappedLogs["auditLog"] ?? 2000
+        if log.count > cap { log = Array(log.suffix(cap)) }
         root["auditLog"] = .array(log)
     }
 

@@ -122,7 +122,7 @@ struct SuppliersCard: View {
             if !supplier.priceList.isEmpty {
                 parts.append(shop.words.counting(supplier.priceList.count, "mac.quotes_word"))
             }
-            if !supplier.phone.isEmpty { parts.append(supplier.phone) }
+            if !supplier.phone.isEmpty { parts.append(Figure.isolated(supplier.phone)) }
             return parts.joined(separator: " · ")
         }
 
@@ -159,6 +159,9 @@ struct SupplierSheet: View {
     /// Save.
     @State private var draft: Supplier
     @State private var lead: String
+    /// The supplier as this sheet opened it: what an untouched save is
+    /// compared with (`Shop.saveSupplier`).
+    @State private var opened: Supplier
     @State private var problem: String?
     /// A save is on its way to the book. The write no longer holds the
     /// window, so a second click would start a second save — for a new
@@ -176,6 +179,7 @@ struct SupplierSheet: View {
     init(shop: Shop, supplier: Supplier) {
         self.shop = shop
         _draft = State(initialValue: supplier)
+        _opened = State(initialValue: supplier)
         _lead = State(initialValue: Self.leadText(supplier))
     }
 
@@ -345,9 +349,10 @@ struct SupplierSheet: View {
         }
         guard !saving else { return }
         let wanted = Self.saving(draft, lead: lead)
+        let was = existing ? opened : nil
         saving = true
         Task {
-            await shop.saveSupplier(wanted)
+            await shop.saveSupplier(wanted, opened: was)
             saving = false
             if let said = shop.moveProblem { problem = said }
         }

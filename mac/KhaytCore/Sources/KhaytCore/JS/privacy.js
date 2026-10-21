@@ -73,6 +73,11 @@
     };
     const intake = (c.waitingList || []).filter(matchesSubject);
     const intakeHistory = (c.waitingListHistory || []).filter(matchesSubject);
+    // Gift cards issued to them (lib/gift-card.js, and a loyalty redemption in
+    // lib/loyalty.js — both write `issuedTo` and the name) and their loyalty
+    // ledger rows: theirs as much as their orders are.
+    const giftCards = cardsOf(clientId, c);
+    const loyalty = ledgerOf(clientId, c);
     return {
       exportedAt: nowIso || new Date().toISOString(),
       subject: client ? {
@@ -86,8 +91,35 @@
       orders,
       intakeSubmissions: intake.map(r => ({ ...r })),
       intakeHistory: intakeHistory.map(r => ({ ...r })),
-      counts: { orders: orders.length, intake: intake.length, communications: (client && client.commLog || []).length },
+      giftCards: giftCards.map(g => ({
+        id: g.id, code: g.code, initialBalance: g.initialBalance, balance: g.balance,
+        issuedToName: g.issuedToName || '', issuedAt: g.issuedAt || null,
+        expiresAt: g.expiresAt || null, source: g.source || null,
+      })),
+      loyaltyLedger: loyalty.map(r => ({ ...r })),
+      counts: { orders: orders.length, intake: intake.length, communications: (client && client.commLog || []).length,
+                giftCards: giftCards.length, loyaltyLedger: loyalty.length },
     };
+  }
+
+  /** The gift cards issued to this customer. */
+  function cardsOf(clientId, c) {
+    return (c.giftCards || []).filter(g => g && clientId && g.issuedTo === clientId);
+  }
+
+  /** This customer's loyalty-ledger rows. */
+  function ledgerOf(clientId, c) {
+    return (c.loyaltyLedger || []).filter(r => r && clientId && r.clientId === clientId);
+  }
+
+  /**
+   * A card with money left on it is money the shop OWES its holder — like an
+   * invoiced order, it keeps the name, or the shop cannot say whose it is
+   * when they come to spend it. A card spent to nothing is only a record.
+   */
+  function cardHasBalance(card) {
+    const b = Number(card && card.balance);
+    return Number.isFinite(b) && b > 0;
   }
 
   /**
@@ -123,6 +155,10 @@
     const exp = buildClientDataExport(clientId, c);
     const intakeIds = full ? exp.intakeSubmissions.map(r => r.id).filter(Boolean) : [];
     const intakeHistoryIds = full ? exp.intakeHistory.map(r => r.id).filter(Boolean) : [];
+    const cards = full ? cardsOf(clientId, c) : [];
+    const unlinkGiftCardIds = cards.filter(g => !cardHasBalance(g)).map(g => g.id).filter(Boolean);
+    const keepGiftCardIds = cards.filter(cardHasBalance).map(g => g.id).filter(Boolean);
+    const ledgerRows = full ? ledgerOf(clientId, c).length : 0;
     return {
       mode: full ? 'full' : 'unlink',
       clientId,
@@ -135,9 +171,18 @@
       purgeIntakeIds: intakeIds,
       purgeIntakeHistoryIds: intakeHistoryIds,
       purgeCommLog: full,
+      // A full erase takes the holder off a spent card (`issuedTo` to null,
+      // `issuedToName` blank); a card with a balance keeps both.
+      unlinkGiftCardIds,
+      keepGiftCardIds,
+      // And takes the customer's link off their loyalty-ledger rows
+      // (`clientId` blank); the points and credit stay, for the shop's sums.
+      unlinkLoyaltyLedger: full && ledgerRows > 0,
       counts: {
         orders: orders.length,
         keptNames: full ? keepNameOrderIds.length : 0,
+        keptCards: keepGiftCardIds.length,
+        loyaltyLedger: ledgerRows,
         intake: intakeIds.length + intakeHistoryIds.length,
         communications: full ? exp.counts.communications : 0,
       },

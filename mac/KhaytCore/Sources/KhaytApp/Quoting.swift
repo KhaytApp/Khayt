@@ -171,8 +171,8 @@ struct Quoting: View {
                     } else {
                         // A glyph, not "→": the symbol turns with the
                         // layout in Arabic, the arrow character does not.
-                        (Text("\(figure(est)) \(shown) ") + Text(Image(systemName: "arrow.forward"))
-                            + Text(" \(figure(act)) \(shown)"))
+                        (Text(verbatim: "\(figure(est)) \(shown) ") + Text(Image(systemName: "arrow.forward"))
+                            + Text(verbatim: " \(figure(act)) \(shown)"))
                             .font(.callout.monospacedDigit())
                     }
                 } else {

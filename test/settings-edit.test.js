@@ -753,3 +753,22 @@ test('a shop with two tax rates that switches tax off has no rates left', () => 
   const kept = SE.apply(s, { taxMode: 'exclusive' });
   assert.equal(kept.tax.rates.length, 2, 'still on: both rates kept');
 });
+
+test('the loyalty rates the Mac Payments pane edits are saved, within bounds', () => {
+  const after = apply({ loyaltyEnabled: true }, { loyaltyPointsPerUnit: 2, loyaltyRedeemRate: 0.05 }, CTX);
+  assert.equal(after.loyaltyPointsPerUnit, 2);
+  assert.equal(after.loyaltyRedeemRate, 0.05);
+  // A zero or a word keeps the stored figure: readers take 0 as the default.
+  const kept = apply({ loyaltyPointsPerUnit: 3, loyaltyRedeemRate: 0.02 },
+                     { loyaltyPointsPerUnit: 0, loyaltyRedeemRate: 'x' }, CTX);
+  assert.equal(kept.loyaltyPointsPerUnit, 3);
+  assert.equal(kept.loyaltyRedeemRate, 0.02);
+  const fresh = apply({}, { loyaltyPointsPerUnit: -1, loyaltyRedeemRate: 0 }, CTX);
+  assert.equal(fresh.loyaltyPointsPerUnit, 1);
+  assert.equal(fresh.loyaltyRedeemRate, 0.01);
+  const capped = apply({}, { loyaltyPointsPerUnit: 5000, loyaltyRedeemRate: 7 }, CTX);
+  assert.equal(capped.loyaltyPointsPerUnit, 1000);
+  assert.equal(capped.loyaltyRedeemRate, 1);
+  // Not on the form: untouched.
+  assert.equal(apply({ loyaltyRedeemRate: 0.03 }, { phone: '1' }, CTX).loyaltyRedeemRate, 0.03);
+});

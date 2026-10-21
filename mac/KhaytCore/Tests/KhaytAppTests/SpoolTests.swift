@@ -119,6 +119,83 @@ struct SpoolTests {
         #expect(Self.number(shelf[2]["rev"]) == 1, "a new spool is stamped once, as created")
     }
 
+    @Test("Add keeps the unit, reorder point and colour variant the sheet said")
+    func addKeepsTheWholeForm() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let url = try Self.tempStore(Self.shelf())
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        // What the Spool sheet hands the rule for a new 10-sheet pack of ply.
+        let input: [String: JSONValue] = [
+            "material": .string("Birch ply"), "color": .string("#C8A165"), "cost": .number(120),
+            "vatAmount": .number(0), "weight": .number(10), "unit": .string("sheet"),
+            "lot": .string(""), "colourVariant": .string("Natural"), "reorderPoint": .number(2),
+            "reorderQty": .number(10), "printTemp": .number(0), "bedTemp": .number(0),
+            "maxSpeed": .number(0),
+        ]
+        try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+            let wrote = try await Shop.writeNewSpool(into: &root, input: input, engine: engine,
+                                                     newId: "INV-ply", today: "2026-09-05")
+            #expect(wrote)
+        }
+        let back = try Self.read(url)
+        let ply = try #require(Self.rows(back).first { Self.string($0["id"]) == "INV-ply" })
+        #expect(Self.string(ply["unit"]) == "sheet", "a 10-sheet pack saved as 10 g")
+        #expect(Self.number(ply["weight"]) == 10)
+        #expect(Self.number(ply["spoolWeight"]) == 10)
+        #expect(Self.number(ply["reorderPoint"]) == 2, "flagged low at once against 200")
+        #expect(Self.number(ply["reorderQty"]) == 10)
+        #expect(Self.string(ply["colourVariant"]) == "Natural")
+        #expect(Self.number(ply["cost"]) == 120)
+        #expect(ply["priceHistory"] == nil, "a new spool has no price change to remember")
+        #expect(try await engine.spoolColours(settings: Shop.settings(back), material: "Birch ply")
+                == ["Natural"], "the colour library never learned the variant")
+        #expect(Self.string(Shop.settings(back)["currency"]) == "SAR", "the settings kept the rest")
+    }
+
+    @Test("a new spool nobody gave a reorder point stores none, and the shop's threshold still applies")
+    func addWritesNoDefaultReorderPoint() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        var root = Self.shelf()
+        root["settings"] = .object(["currency": .string("SAR"), "lowStockThreshold": .number(500)])
+        let url = try Self.tempStore(root)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        // The sheet as Add opens it, the reorder fields untouched.
+        var ply = SpoolSheet.Form()
+        ply.material = "Birch ply"; ply.unit = "sheet"; ply.weight = 10
+        var pla = SpoolSheet.Form()
+        pla.material = "PLA"; pla.weight = 400
+        let plyInput = ply.input(isNew: true, reclaimsTax: false)
+        #expect(plyInput["reorderPoint"] == nil, "the sheet's 200 was written on every new spool")
+        #expect(plyInput["reorderQty"] == nil)
+        // An edited spool still sends it, as before.
+        #expect(ply.input(isNew: false, reclaimsTax: false)["reorderPoint"] != nil)
+        // And one the shop typed is sent.
+        var typed = ply; typed.reorderPointSet = true; typed.reorderPoint = 3
+        #expect(typed.input(isNew: true, reclaimsTax: false)["reorderPoint"] == .number(3))
+
+        try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+            _ = try await Shop.writeNewSpool(into: &root, input: plyInput, engine: engine,
+                                             newId: "INV-ply", today: "2026-09-05")
+            _ = try await Shop.writeNewSpool(into: &root, input: pla.input(isNew: true, reclaimsTax: false),
+                                             engine: engine, newId: "INV-pla", today: "2026-09-05")
+        }
+        let back = try Self.read(url)
+        let rows = Shop.rows(back, "inventory")
+        let storedPly = try #require(Self.rows(back).first { Self.string($0["id"]) == "INV-ply" })
+        let storedPla = try #require(Self.rows(back).first { Self.string($0["id"]) == "INV-pla" })
+        #expect(storedPly["reorderPoint"] == nil)
+        #expect(storedPla["reorderPoint"] == nil)
+        let units = try await engine.inventoryUnits(rows, settings: Shop.settings(back))
+        #expect(units["INV-ply"]?.low == 2, "10 sheets against 200 was low at once")
+        #expect(units["INV-pla"]?.low == 500, "the shop's 500 g was overridden by the sheet's 200")
+    }
+
     @Test("deleting a spool takes it off the shelf and leaves the rest")
     func delete() async throws {
         let url = try Self.tempStore(Self.shelf())

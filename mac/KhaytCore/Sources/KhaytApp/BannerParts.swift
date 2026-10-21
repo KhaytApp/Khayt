@@ -19,9 +19,7 @@ struct SyncLossBanner: View {
     @State private var asking: Int?
 
     var body: some View {
-        Banner(text: shop.words.callIt("mac.losses_banner",
-                                       ["replaced": .number(Double(lost.replaced + lost.keptDeleted)),
-                                        "removed": .number(Double(lost.removed))]),
+        Banner(text: Self.said(lost, shop.words),
                symbol: "arrow.triangle.2.circlepath", tint: Khayt.attention) {
             Button(shop.words.callIt("mac.review") + "\u{2026}") {
                 shop.reviewingSyncLosses = true
@@ -33,11 +31,21 @@ struct SyncLossBanner: View {
         }
         .askFirst($asking,
                   title: { _ in shop.words.callIt("mac.losses_dismiss_q") },
-                  message: { n in shop.words.callIt("mac.losses_dismiss_body", ["n": .number(Double(n))]) },
+                  message: { n in shop.words.counting(n, "mac.losses_dismiss_body") },
                   confirm: shop.words.callIt("mac.losses_dismiss"),
                   cancel: shop.words.callIt("common.cancel")) { _ in
             shop.closeSyncLosses()
         }
+    }
+
+    /// One clause for each count that is not zero, each with its own plural.
+    static func said(_ lost: SyncLossNotice, _ words: Words) -> String {
+        var clauses: [String] = []
+        let replaced = lost.replaced + lost.keptDeleted
+        if replaced > 0 { clauses.append(words.counting(replaced, "mac.losses_replaced_n")) }
+        if lost.removed > 0 { clauses.append(words.counting(lost.removed, "mac.losses_removed_n")) }
+        return words.callIt("mac.losses_banner",
+                            ["what": .string(clauses.formatted(.list(type: .and).locale(words.locale)))])
     }
 }
 

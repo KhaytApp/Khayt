@@ -27,6 +27,10 @@ struct ReceiveSheet: View {
     @State private var verdict = "none"
     @State private var problem: String?
     @State private var started = false
+    /// Whether the order restocks a consumable rather than a spool — the
+    /// rule's answer (`isConsumableOrder`), nil until it has given it. A spool
+    /// can be counted in ml or sheets now, so the unit no longer says which.
+    @State private var consumable: Bool?
     /// True for the whole write. Without it a double click, or Return pressed
     /// twice, received the same delivery twice — two receipts, two expenses.
     @State private var busy = false
@@ -56,9 +60,7 @@ struct ReceiveSheet: View {
                     // The unit is the ORDER's, never a hard-captioned "(g)": a
                     // box of bags asked for in grams is a question nobody can
                     // answer.
-                    Text(order.unit.isEmpty
-                         ? shop.words.callIt("po.weight_received")
-                         : shop.words.callIt("po.qty_received") + " (" + order.unit + ")")
+                    Text(receivedCaption)
                         .foregroundStyle(.secondary)
                     TextField("", value: $amount, format: .number.locale(Money.digits).precision(.fractionLength(0...2)))
                         .textFieldStyle(.roundedBorder)
@@ -75,9 +77,10 @@ struct ReceiveSheet: View {
                 // What a recall names. A lot different from the spool's own
                 // becomes its own spool (`lib/purchase-orders.js`), because
                 // grams of two lots poured into one record can never be told
-                // apart again. Filament only (counted in grams, as the weight caption
-                // above decides); the rule ignores a lot on a consumable anyway.
-                if order.unit.isEmpty || order.unit == "g" {
+                // apart again. Any spool, whatever it is counted in — a resin
+                // bottle has a lot as surely as a reel does — and never a
+                // consumable, whose lot the rule ignores anyway.
+                if consumable == false {
                     GridRow {
                         Text(shop.words.callIt("inv.lot")).foregroundStyle(.secondary)
                         TextField("", text: $lot).textFieldStyle(.roundedBorder)
@@ -165,6 +168,7 @@ struct ReceiveSheet: View {
         // moves a shop is told its invoice matches in one app and not the
         // other.
         .task(id: bill) { verdict = await shop.billVerdict(on: order, bill: bill) }
+        .task { consumable = await shop.ordersAConsumable(order.id) }
         .onAppear {
             guard !started else { return }
             started = true
@@ -174,6 +178,18 @@ struct ReceiveSheet: View {
             amount = order.outstanding
             focused = true
         }
+    }
+
+    /// What the quantity field is captioned. Grams are a weight; anything
+    /// else is a quantity in its own unit, said in the shelf's words for ml and
+    /// sheets ("لوح", not "sheet") and as typed for a unit the shop made up.
+    private var receivedCaption: String {
+        let named = order.unit.trimmingCharacters(in: .whitespaces)
+        if named.isEmpty || named == "g" {
+            return shop.words.callIt(consumable == true ? "po.qty_received" : "po.weight_received")
+        }
+        let said = Quantity.shelfPlaces[named] != nil ? shop.words.callIt("unit." + named) : named
+        return shop.words.callIt("po.qty_received") + " (" + said + ")"
     }
 
     private func commit() {

@@ -479,18 +479,22 @@ private struct JobMenu: View {
         // until now the only ways to make it were dragging the card across the
         // board or reading the list and picking the right word.
         //
-        // ⌘→ / ⌘← rather than a letter: the arrows say direction, and the
-        // board reads left to right. In a mirrored window the shortcut still
-        // says "along" — `Stage.progression` is the order of WORK, not of
-        // pixels, so it does not flip with the layout.
+        // ⌘→ / ⌘← rather than a letter: the arrows say direction, so they
+        // point the way the board reads. In Arabic the board is mirrored and
+        // the next stage is to the LEFT — and the SYSTEM turns these keys with
+        // it: arrow-key equivalents are mirrored in a right-to-left interface
+        // (`KeyboardShortcut.Localization.automatic`, NSMenuItem's
+        // `allowsAutomaticKeyEquivalentMirroring`, macOS 12+), so "along" shows
+        // and acts as ⌘← there. Written as ⌘→ here; flipping it by hand as
+        // well would turn it back (beta.1 review).
         //
         // Both go through `questionFor` and `moveJob` exactly as the stage
         // buttons above do. Nothing about what a move means is decided here.
         Button(Words.upfront("mac.move_along")) { step(by: 1) }
-            .keyboardShortcut(.rightArrow, modifiers: .command)
+            .keyboardShortcut(.rightArrow, modifiers: .command, localization: .automatic)
             .disabled(stepTarget(1) == nil)
         Button(Words.upfront("mac.move_back")) { step(by: -1) }
-            .keyboardShortcut(.leftArrow, modifiers: .command)
+            .keyboardShortcut(.leftArrow, modifiers: .command, localization: .automatic)
             .disabled(stepTarget(-1) == nil)
 
         Divider()
