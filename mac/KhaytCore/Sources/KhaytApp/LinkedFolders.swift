@@ -63,10 +63,14 @@ extension Shop {
     /// models after, as records under a folder the book no longer links.
     func unlinkFolder(_ path: String) async {
         guard permitted("settings", "edit") else { return }
-        guard !libraryMoveBusy else { return }
+        guard !libraryMoveBusy else { libraryMoveProblem = words.callIt("mac.linked_unlink_busy"); return }
         libraryMoveProblem = nil
         guard let build = source.build else { return }
         let remaining = linkedFolders.filter { $0 != path }
+        // Held for the whole unlink: a Rescan started during its write read
+        // the folders as they were and indexed this one's models again.
+        libraryMoveBusy = true
+        defer { libraryMoveBusy = false }
         do {
             // ONE write: the list, the records and what the deletes
             // remembered, together. Two writes left a refused second one with

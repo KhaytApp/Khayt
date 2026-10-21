@@ -133,9 +133,14 @@ extension LibraryEditPerfTests {
             shop.libraryMoveBusy = true
             await shop.unlinkFolder(drive.standardizedFileURL.path)
             shop.libraryMoveBusy = false
+            #expect(shop.libraryMoveProblem == shop.words.callIt("mac.linked_unlink_busy"), "refused in silence")
             #expect(try diskIds(url) == ["PF-a"])
             #expect(Self.strings(try Self.library(url)["linked"]) == [drive.standardizedFileURL.path])
         }
+        // And it holds the flag itself while it writes, so a Rescan waits.
+        let linked = try LockRound3Tests.source("LinkedFolders.swift")
+        let start = try #require(linked.range(of: "func unlinkFolder("))
+        #expect(linked[start.upperBound...].prefix(1200).contains("libraryMoveBusy = true"))
         let settings = try LockRound3Tests.source("LibraryLocationSettings.swift")
         let at = try #require(settings.range(of: "{ unlinking = path }"))
         #expect(settings[at.upperBound...].prefix(200).contains(".disabled(shop.libraryMoveBusy)"))
