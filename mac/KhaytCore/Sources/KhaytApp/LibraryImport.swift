@@ -156,16 +156,22 @@ enum LibraryImport {
         return name
     }
 
+    /// Run a file-reading step on a background thread and wait for it.
+    ///
+    /// On a dispatch queue (`PinWork`), not a detached task: hashing a
+    /// gigabyte, measuring and drawing a model are seconds of BLOCKING work,
+    /// and a detached task holds a thread of Swift's cooperative pool for all
+    /// of it — three threads on a CI runner, every other task waiting on them
+    /// (memory: swift-pool-starvation).
+    nonisolated static func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await PinWork.run(work)
+    }
+
     /// SHA-256 of a file, read in pieces.
     ///
     /// `lib/model-identity.js` calls this the certain claim — "the bytes are
     /// identical. Same file." — so it has to be over the whole file, and the
     /// whole file is up to a gigabyte. Nothing is held.
-    /// Run a file-reading step on a background thread and wait for it.
-    nonisolated static func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
-        await Task.detached(priority: .userInitiated, operation: work).value
-    }
-
     nonisolated static func contentHash(of url: URL) throws -> String? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
