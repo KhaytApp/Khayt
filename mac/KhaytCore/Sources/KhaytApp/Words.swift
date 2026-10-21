@@ -3369,6 +3369,16 @@ final class Words {
         // list, and a WhatsApp list is phone numbers — mailed, they bounce.
         "mac.campaign_email_only": ["en": "Campaigns are sent by email only.",
                                     "ar": "تُرسل الحملات بالبريد الإلكتروني فقط."],
+        // A full erase leaves the holder's name on a gift card that still has
+        // money on it — the shop owes it to them. Counted, never "card(s)".
+        "mac.erase_keeps_cards": ["en": "{n} gift cards still have a balance. They keep their holders' names, because the balance is money the shop owes.",
+                                  "ar": "{n} من بطاقات الهدايا لا يزال فيها رصيد، وتحتفظ بأسماء حامليها لأن الرصيد مبلغ يدين به المتجر."],
+        "mac.erase_keeps_cards_one": ["en": "{n} gift card still has a balance. It keeps its holder's name, because the balance is money the shop owes.",
+                                      "ar": "بطاقة هدية واحدة لا يزال فيها رصيد، وتحتفظ باسم حاملها لأن الرصيد مبلغ يدين به المتجر."],
+        "mac.erase_keeps_cards_two": ["en": "{n} gift cards still have a balance. They keep their holders' names, because the balance is money the shop owes.",
+                                      "ar": "بطاقتا هدايا لا يزال فيهما رصيد، وتحتفظان باسمَي حامليهما لأن الرصيد مبلغ يدين به المتجر."],
+        "mac.erase_keeps_cards_few": ["en": "{n} gift cards still have a balance. They keep their holders' names, because the balance is money the shop owes.",
+                                      "ar": "{n} بطاقات هدايا لا يزال فيها رصيد، وتحتفظ بأسماء حامليها لأن الرصيد مبلغ يدين به المتجر."],
         "mac.whatsapp": ["en": "WhatsApp", "ar": "واتساب"],
         "mac.export_accounting_where": [
             "en": "Two files are written here: one of invoices and one of expenses.",

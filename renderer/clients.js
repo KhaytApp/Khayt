@@ -469,7 +469,11 @@ async function deleteClient(clientId) {
   // Show what erasure will touch, and let the owner choose whether order records survive.
   const plan = P ? P.planClientErasure(clientId, { clients, printLog, waitingList, waitingListHistory, giftCards, loyaltyLedger }, 'full') : null;
   let fullErase = false;
-  if (P && plan && (plan.counts.orders || plan.counts.intake || plan.counts.communications)) {
+  // Gift cards and loyalty rows count too: a customer with only those still
+  // has something a full erase would take, and must be offered it.
+  const hasCards = giftCards.some(g => g && g.issuedTo === clientId);
+  const hasLedger = loyaltyLedger.some(r => r && r.clientId === clientId);
+  if (P && plan && (plan.counts.orders || plan.counts.intake || plan.counts.communications || hasCards || hasLedger)) {
     const choice = await new Promise((resolve) => {
       openFormModal({
         title: t('priv.erase_title') || 'Delete customer',
@@ -480,7 +484,7 @@ async function deleteClient(clientId) {
             t('priv.erase_summary', { orders: plan.counts.orders, intake: plan.counts.intake, comms: plan.counts.communications })
             || `This customer has ${plan.counts.orders} order(s), ${plan.counts.intake} intake submission(s) and ${plan.counts.communications} logged communication(s).`)}</p>
           ${plan.counts.keptNames ? `<p style="font-size:12.5px;color:var(--text-muted);margin:-4px 0 12px;">${escapeHtml(t('priv.erase_keeps_invoiced', { n: plan.counts.keptNames }))}</p>` : ''}
-          ${plan.counts.keptCards ? `<p style="font-size:12.5px;color:var(--text-muted);margin:-4px 0 12px;">${escapeHtml(t('priv.erase_keeps_cards', { n: plan.counts.keptCards }))}</p>` : ''}
+          ${plan.counts.keptCards ? `<p style="font-size:12.5px;color:var(--text-muted);margin:-4px 0 12px;">${escapeHtml(t(plan.counts.keptCards === 1 ? 'priv.erase_keeps_cards_one' : 'priv.erase_keeps_cards', { n: plan.counts.keptCards }))}</p>` : ''}
           <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;cursor:pointer;margin-bottom:8px;">
             <input type="radio" name="eraseMode" value="unlink" checked style="width:auto;margin-top:3px;">
             <span><b>${escapeHtml(t('priv.mode_unlink') || 'Unlink (recommended)')}</b><br>
@@ -969,7 +973,7 @@ function checkRecurringOrders() {
   // each repeat order gets its own rather than the template's.
   const bytes = () => { const b = new Uint8Array(16); crypto.getRandomValues(b); return b; };
   const tokens = clients.map(() => ({ tracking: bytes() }));
-  const { created } = KhaytRecurringOrders.run(clients, printLog, { settings, now: new Date(), tokens });
+  const { created } = KhaytRecurringOrders.run(clients, printLog, { settings, now: new Date(), tokens, uid });
   if (created.length > 0) {
     saveAll();
     renderKanban(); renderLogs(); renderDashboard();

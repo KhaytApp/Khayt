@@ -34,7 +34,7 @@ struct CustomerEraseSheet: View {
             }
             // A card with a balance is money the shop owes, and keeps its holder.
             if counts.keptCards > 0 {
-                Text(shop.words.callIt("priv.erase_keeps_cards", ["n": .number(Double(counts.keptCards))]))
+                Text(shop.words.counting(counts.keptCards, "mac.erase_keeps_cards"))
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

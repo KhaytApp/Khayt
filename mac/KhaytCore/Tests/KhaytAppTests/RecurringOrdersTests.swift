@@ -157,6 +157,11 @@ struct RecurringOrdersTests {
         t["shippedAt"] = .string("2026-08-02")
         t["trackingNumber"] = .string("TN-1")
         t["sourceOrderId"] = .string("W-9")
+        t["nonBusiness"] = .bool(true)
+        t["locationId"] = .string("LOC-2")
+        t["parts"] = .array([.object(["id": .string("PRT-OLD"), "name": .string("bracket"), "qty": .number(12),
+                                      "partStatus": .string("done"), "completedAt": .string("x"),
+                                      "actualGrams": .number(80), "qcStatus": .string("passed")])])
         log[1] = .object(t)
         root["printLog"] = .array(log)
 
@@ -171,5 +176,15 @@ struct RecurringOrdersTests {
         #expect(token != "old-tracking" && token.count == 32, "its own tracking page")
         #expect(job["price"] == .number(100))
         #expect(job["paidAmount"] == .number(0), "a 100 job owes 100 again")
+        #expect(job["nonBusiness"] == .bool(true) && job["locationId"] == .string("LOC-2"))
+        guard case .array(let parts)? = job["parts"], case .object(let part)? = parts.first else {
+            Issue.record("no parts"); return
+        }
+        #expect(part["name"] == .string("bracket") && part["qty"] == .number(12))
+        for key in ["partStatus", "completedAt", "actualGrams", "qcStatus"] {
+            #expect(part[key] == nil, "the part was born with the last run's \(key)")
+        }
+        guard case .string(let partId)? = part["id"] else { Issue.record("the part has no id"); return }
+        #expect(partId != "PRT-OLD" && partId.hasPrefix("PRT-"), "two jobs share a part id")
     }
 }

@@ -13628,7 +13628,11 @@ private let RECURRING_SCRIPT = """
 (function () {
   var clients = ARG0, orders = ARG1, settings = ARG2;
   var tokens = (ARG4 || []).map(function (b) { return { tracking: b }; });
-  var r = KhaytRecurringOrders.run(clients, orders, { settings: settings, now: ARG3, tokens: tokens });
+  // Part ids in the desktop's `uid` shape (renderer/util.js).
+  var uid = function (prefix) {
+    return prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5).toUpperCase();
+  };
+  var r = KhaytRecurringOrders.run(clients, orders, { settings: settings, now: ARG3, tokens: tokens, uid: uid });
   return { orders: orders, clients: clients, settings: settings,
            created: r.created.map(function (o) { return o.id; }) };
 })()

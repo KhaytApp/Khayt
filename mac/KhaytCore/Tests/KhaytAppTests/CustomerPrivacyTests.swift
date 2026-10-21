@@ -336,6 +336,18 @@ struct CustomerPrivacyTests {
         #expect(try Self.job(back, "J-INV")["clientErasedAt"] == nil, "Undo takes the mark off")
     }
 
+    @Test("the kept-cards line is counted in both languages, never \"card(s)\"")
+    func keptCardsAreCounted() async throws {
+        let en = try await WordsResolveTests.words("en"), ar = try await WordsResolveTests.words("ar")
+        #expect(en.counting(1, "mac.erase_keeps_cards").hasPrefix("1 gift card still has"))
+        #expect(en.counting(3, "mac.erase_keeps_cards").hasPrefix("3 gift cards still have"))
+        #expect(ar.counting(1, "mac.erase_keeps_cards").hasPrefix("بطاقة هدية واحدة"))
+        #expect(ar.counting(2, "mac.erase_keeps_cards").hasPrefix("بطاقتا هدايا"))
+        #expect(ar.counting(5, "mac.erase_keeps_cards").hasPrefix("5 بطاقات"))
+        #expect(ar.counting(12, "mac.erase_keeps_cards").hasPrefix("12 من بطاقات"))
+        for n in [1, 2, 5, 12] { #expect(!en.counting(n, "mac.erase_keeps_cards").contains("(s)")) }
+    }
+
     @Test("a job whose customer was erased is nobody else's history, even under the same name")
     func erasedJobsAreNotMatchedByName() throws {
         func order(_ id: String, erased: Bool) throws -> Order {
@@ -369,7 +381,7 @@ struct CustomerPrivacyTests {
     }
 
     static let keys = ["priv.section", "priv.export_data", "priv.exported", "priv.erase_title",
-                       "priv.erase_summary", "priv.erase_keeps_invoiced", "priv.erase_keeps_cards", "priv.mode_unlink",
+                       "priv.erase_summary", "priv.erase_keeps_invoiced", "mac.erase_keeps_cards", "priv.mode_unlink",
                        "priv.mode_unlink_hint", "priv.mode_full", "priv.mode_full_hint",
                        "priv.erased_full", "ce.deleted", "mac.erase_customer", "mac.undo_after"]
 
