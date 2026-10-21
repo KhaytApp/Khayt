@@ -55,7 +55,8 @@ telemetry: { crashOptIn: false, usageOptIn: false, installId: '', consentAt: '' 
 - **Six fields, nothing else:** `platform`, `channel`, `version`, `firstThisWeek`, `firstThisMonth`, `firstEver`. **No id** — not the telemetry `installId`, not a shop, user, locale or device name. The cloud stores counters only (per day, platform, channel, version), never the message or the address.
 - **At most once a UTC day.** The flags come from the last *counted* day kept on the computer: first counted day of this ISO week (Monday, UTC), this UTC month, ever. Only a 200 counts; 404, 5xx or offline is tried again within the hour; a 422 ends the day.
 - **Off** sends nothing and keeps the stored dates, so turning it back on is not a new install.
-- Ships held (`READY = false`) until the privacy page describes it. While held, nothing is sent and the switch is hidden.
+- Only an installed (packaged) build counts; a developer's `npm start` and every CI or e2e run send nothing.
+- `READY` in `lib/active-count.js` is the gate: true since the privacy section went live and Turki confirmed it (2026-10-21). False sends nothing and hides the switch.
 
 ## 4. Scrubbing pipeline (`lib/telemetry-scrub.js`, runs before anything leaves the device)
 

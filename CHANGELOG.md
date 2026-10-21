@@ -4,13 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: an anonymous count of installs in use, held until the privacy
-  page describes it.** Once a day the app would tell Khayt Cloud only its
-  platform, version and release channel, and whether this is its first day
-  this week, this month or ever. There is no id and nothing about the shop.
-  It is on unless "Count this install (anonymous)" is switched off in
-  Settings, and the switch belongs to this computer. Nothing is sent yet:
-  it ships switched off until khaytapp.com/privacy covers it.
+- **Desktop: an anonymous count of installs in use.** Once a day the app
+  tells Khayt Cloud only its platform, version and release channel, and
+  whether this is its first day this week, this month or ever. There is no
+  id and nothing about the shop (khaytapp.com/privacy, "The anonymous install
+  count"). It is on unless "Count this install (anonymous)" is switched off in
+  Settings → Crash Reports & Usage, and that switch belongs to this computer.
+  Settings no longer says Khayt sends nothing by default.
 
 - **Desktop: Khayt asks once about crash reports.** A card at the top of the
   window asks whether to share crash reports, with usage counts as an extra

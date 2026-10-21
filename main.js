@@ -1914,7 +1914,9 @@ let activeCountSending = false;
 // server. Honoured for 127.0.0.1 only, so it can never redirect a real count.
 const ACTIVE_COUNT_E2E = /^http:\/\/127\.0\.0\.1:\d+\//.test(process.env.KHAYT_ACTIVE_COUNT_E2E || '')
   ? process.env.KHAYT_ACTIVE_COUNT_E2E : '';
-const activeCountReady = () => ActiveCount.READY || !!ACTIVE_COUNT_E2E;
+// Only an installed build counts: a developer's `npm start` and every CI and
+// e2e run start unpackaged, and none of them is a shop using Khayt.
+const activeCountReady = () => !!ACTIVE_COUNT_E2E || (ActiveCount.READY && app.isPackaged);
 
 function readActiveCount() {
   try {

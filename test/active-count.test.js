@@ -58,6 +58,10 @@ test('only a 200 counts; a 422 ends the day; anything else is tried again', () =
   assert.deepEqual(A.after({ ...s, off: true }, '2026-10-21', 404), { ...s, off: true });
 });
 
-test('it ships off until the privacy page and Turki say otherwise', () => {
-  assert.equal(A.READY, false);
+test('it is on, and says which privacy section allows it', () => {
+  // Every field sent is named at khaytapp.com/privacy#active-count-en. Adding
+  // one means changing that page first.
+  assert.equal(A.READY, true);
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'active-count.js'), 'utf8');
+  assert.match(src, /khaytapp\.com\/privacy#active-count-en/);
 });
