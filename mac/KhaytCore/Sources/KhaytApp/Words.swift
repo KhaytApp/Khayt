@@ -327,7 +327,9 @@ final class Words {
     /// "an integration is configured" does not.
     func outboundRefusal(_ reaches: [Outbound]) -> String {
         let named = reaches.map { callIt("mac.reach_" + $0.channel) }
-        let list = named.joined(separator: named.count == 2 ? " " + callIt("mac.and") + " " : "، ")
+        // The shop's language's own list: "A, B and C" in English (the
+        // Arabic comma was being used for both), "أ وب وج" in Arabic.
+        let list = named.formatted(.list(type: .and).locale(locale))
         return callIt("mac.move_reaches") + " " + list + ". " + callIt("mac.move_in_khayt")
     }
 
@@ -2974,8 +2976,11 @@ final class Words {
                                 "ar": "أُرسل بريد إلى العميل."],
         "mac.email_failed":    ["en": "The job was saved, but the customer's email did not go out:",
                                 "ar": "حُفظ العمل، لكن لم يُرسل بريد العميل:"],
-        "mac.webhooks_sent":   ["en": "Told {n} other system(s).",
-                                "ar": "أُبلغ {n} نظام آخر."],
+        "mac.webhooks_sent":   ["en": "Told {n} other systems.",
+                                "ar": "أُبلغ {n} نظامًا آخر."],
+        "mac.webhooks_sent_one": ["en": "Told {n} other system.", "ar": "أُبلغ نظام آخر واحد."],
+        "mac.webhooks_sent_two": ["en": "Told 2 other systems.", "ar": "أُبلغ نظامان آخران."],
+        "mac.webhooks_sent_few": ["en": "Told {n} other systems.", "ar": "أُبلغت {n} أنظمة أخرى."],
         "mac.webhook_failed":  ["en": "The job was saved, but {where} was not told:",
                                 "ar": "حُفظ العمل، لكن لم يُبلَّغ {where}:"],
         "mac.webhook_bad_url": ["en": "that address cannot be read.",
@@ -3003,8 +3008,23 @@ final class Words {
                                   "ar": "ما زالت مزامنة السحابة جارية. لم يُستعد شيء — حاول مرة أخرى بعد لحظة."],
         // What automatic sync took from this book. Copies are kept in
         // sync-conflicts/ beside the backups; the banner offers them back.
-        "mac.losses_banner":   ["en": "Sync replaced {replaced} record(s) changed on this Mac and removed {removed}. A copy of each was kept.",
-                              "ar": "استبدلت المزامنة {replaced} سجلًا عُدّل على هذا الماك وحذفت {removed}. حُفظت نسخة من كل منها."],
+        // One clause per count that is not zero, each counted on its own:
+        // "replaced 1 record(s) … and removed 0" was a sentence that had not
+        // decided. Arabic's clauses carry their own subject.
+        "mac.losses_banner":   ["en": "Sync {what}. A copy of each was kept.",
+                              "ar": "{what}. حُفظت نسخة من كل منها."],
+        "mac.losses_replaced_n": ["en": "replaced {n} records changed on this Mac",
+                                  "ar": "استبدلت المزامنة {n} سجلًا عُدّل على هذا الماك"],
+        "mac.losses_replaced_n_one": ["en": "replaced {n} record changed on this Mac",
+                                      "ar": "استبدلت المزامنة سجلًا واحدًا عُدّل على هذا الماك"],
+        "mac.losses_replaced_n_two": ["en": "replaced 2 records changed on this Mac",
+                                      "ar": "استبدلت المزامنة سجلّين عُدّلا على هذا الماك"],
+        "mac.losses_replaced_n_few": ["en": "replaced {n} records changed on this Mac",
+                                      "ar": "استبدلت المزامنة {n} سجلات عُدّلت على هذا الماك"],
+        "mac.losses_removed_n": ["en": "removed {n} records", "ar": "حذفت المزامنة {n} سجلًا"],
+        "mac.losses_removed_n_one": ["en": "removed {n} record", "ar": "حذفت المزامنة سجلًا واحدًا"],
+        "mac.losses_removed_n_two": ["en": "removed 2 records", "ar": "حذفت المزامنة سجلّين"],
+        "mac.losses_removed_n_few": ["en": "removed {n} records", "ar": "حذفت المزامنة {n} سجلات"],
         "mac.losses_head": ["en": "What sync took from this book",
                                  "ar": "ما أخذته المزامنة من هذا الدفتر"],
         "mac.losses_body": ["en": "Another device's copy won each of these. Put one back to keep this Mac's version — the next sync carries it everywhere.",
@@ -3014,6 +3034,27 @@ final class Words {
                                    "ar": "عُدّل هنا، واستُبدل بنسخة جهاز آخر"],
         "mac.losses_kept_deleted": ["en": "Deleted here; another device's later change was dropped",
                                        "ar": "حُذف هنا؛ وأُسقط تغيير لاحق من جهاز آخر"],
+        // What kind of record each loss was — never the store's own key.
+        "mac.losses_kind_job": ["en": "Job", "ar": "عمل"],
+        "mac.losses_kind_customer": ["en": "Customer", "ar": "عميل"],
+        "mac.losses_kind_spool": ["en": "Spool", "ar": "بكرة"],
+        "mac.losses_kind_product": ["en": "Product", "ar": "منتج"],
+        "mac.losses_kind_machine": ["en": "Machine", "ar": "طابعة"],
+        "mac.losses_kind_model": ["en": "Model", "ar": "مجسم"],
+        "mac.losses_kind_expense": ["en": "Expense", "ar": "مصروف"],
+        "mac.losses_kind_waste": ["en": "Waste", "ar": "هدر"],
+        "mac.losses_kind_message": ["en": "Saved message", "ar": "رسالة محفوظة"],
+        "mac.losses_kind_supplier": ["en": "Supplier", "ar": "مورّد"],
+        "mac.losses_kind_purchase_order": ["en": "Purchase order", "ar": "أمر شراء"],
+        "mac.losses_kind_gift_card": ["en": "Gift card", "ar": "بطاقة هدية"],
+        "mac.losses_kind_maintenance": ["en": "Maintenance task", "ar": "مهمة صيانة"],
+        "mac.losses_kind_service": ["en": "Service record", "ar": "سجل صيانة"],
+        "mac.losses_kind_consumable": ["en": "Consumable", "ar": "مستهلك"],
+        "mac.losses_kind_operator": ["en": "Operator", "ar": "مشغّل"],
+        "mac.losses_kind_time": ["en": "Time entry", "ar": "وقت عمل"],
+        "mac.losses_kind_location": ["en": "Location", "ar": "موقع"],
+        "mac.losses_kind_loyalty": ["en": "Loyalty points", "ar": "نقاط ولاء"],
+        "mac.losses_kind_record": ["en": "Record", "ar": "سجل"],
         "mac.losses_put_back": ["en": "Put back", "ar": "إعادة"],
         "mac.losses_put_back_done": ["en": "Put back", "ar": "أُعيد"],
         "mac.losses_put_back_failed": ["en": "Could not put it back:", "ar": "تعذّرت الإعادة:"],
@@ -3517,9 +3558,18 @@ final class Words {
                                "ar": "يغيّر هذا الدفتر على هذا الماك. السجل الأحدث في السحابة يحل محل "
                              + "النسخة هنا؛ والسجل الموجود على هذا الماك وحده يُترك كما هو. "
                              + "لا تُنزَّل الإعدادات أبدًا، والسجلات — الهدر والصيانة والوقت — يُضاف إليها فقط."],
-        "mac.cloud_lost_edits": ["en": "{n} change(s) made here were discarded: the record had been "
+        "mac.cloud_lost_edits": ["en": "{n} changes made here were discarded: the record had been "
                                + "deleted on another device.",
-                                 "ar": "أُلغيت {n} تغييرات أُجريت هنا: كان السجل قد حُذف على جهاز آخر."],
+                                 "ar": "أُلغي {n} تغييرًا أُجري هنا: كان السجل قد حُذف على جهاز آخر."],
+        "mac.cloud_lost_edits_one": ["en": "{n} change made here was discarded: the record had been "
+                                   + "deleted on another device.",
+                                     "ar": "أُلغي تغيير واحد أُجري هنا: كان السجل قد حُذف على جهاز آخر."],
+        "mac.cloud_lost_edits_two": ["en": "2 changes made here were discarded: the record had been "
+                                   + "deleted on another device.",
+                                     "ar": "أُلغي تغييران أُجريا هنا: كان السجل قد حُذف على جهاز آخر."],
+        "mac.cloud_lost_edits_few": ["en": "{n} changes made here were discarded: the record had been "
+                                   + "deleted on another device.",
+                                     "ar": "أُلغيت {n} تغييرات أُجريت هنا: كان السجل قد حُذف على جهاز آخر."],
         "mac.cloud_sent":    ["en": "{n} sent. Khayt Cloud is now at revision {rev}.",
                               "ar": "أُرسل {n}. سحابة خيط الآن عند المراجعة {rev}."],
         // A shop whose delta chain the service refuses. Said plainly, because

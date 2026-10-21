@@ -67,7 +67,7 @@ struct Alpha58SnapshotTests {
 
         // ── The ✕'s question, and the went-backwards one ──────────────────
         try both(DialogPicture(title: words.callIt("mac.losses_dismiss_q"),
-                               message: words.callIt("mac.losses_dismiss_body", ["n": .number(2)]),
+                               message: words.counting(2, "mac.losses_dismiss_body"),
                                confirm: words.callIt("mac.losses_dismiss"),
                                cancel: words.callIt("common.cancel")),
                  "ask-close-losses", size: CGSize(width: 360, height: 260))

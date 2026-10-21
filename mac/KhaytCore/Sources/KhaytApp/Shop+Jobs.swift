@@ -2067,7 +2067,7 @@ extension Shop {
             }
         }
         if sent > 0 {
-            moveNotices.append(words.callIt("mac.webhooks_sent", ["n": .number(Double(sent))]))
+            moveNotices.append(words.counting(sent, "mac.webhooks_sent"))
         }
     }
 
