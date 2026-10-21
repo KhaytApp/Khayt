@@ -897,7 +897,9 @@ extension Shop {
         var forPricing: [String: JSONValue] = ["parts": .array(parts)]
         if let margin = product.margin { forPricing["defaultMargin"] = .number(margin) }
         if let components = product.rest["components"] { forPricing["components"] = components }
-        for key in ["priceRound", "priceOverride"] {
+        // `assemblyQty` too: the rule costs one set of components per
+        // assembly, as a job taken from the product does.
+        for key in ["assemblyQty", "priceRound", "priceOverride"] {
             if let value = product.rest[key] { forPricing[key] = value }
         }
         return forPricing

@@ -649,11 +649,14 @@ extension Shop {
     }
 
     func priceProduct(parts: [JSONValue], margin: Double?,
-                      components: JSONValue?, rule: PriceRule = PriceRule()) async -> KhaytEngine.ProductPricing? {
+                      components: JSONValue?, assemblyQty: JSONValue? = nil,
+                      rule: PriceRule = PriceRule()) async -> KhaytEngine.ProductPricing? {
         guard let engine else { return nil }
         var record: [String: JSONValue] = ["parts": .array(parts)]
         if let margin { record["defaultMargin"] = .number(margin) }
         if let components { record["components"] = components }
+        // What the save prices with (`pricingInput`), so the sheet shows it.
+        if let assemblyQty { record["assemblyQty"] = assemblyQty }
         for (key, value) in rule.fields { record[key] = value }
         return try? await engine.priceProduct(.object(record),
                                               inventory: inventoryRows,

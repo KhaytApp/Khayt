@@ -62,6 +62,9 @@ struct ProductSheet: View {
     @State private var pickNote: String?
     /// What those parts cost, priced by the shared rule.
     @State private var pricing: KhaytEngine.ProductPricing?
+    /// What the rule makes of the product AS OPENED — the figure an untouched
+    /// save is compared with (`Shop.productPriceFields`). Nil for a new one.
+    @State private var openedPricing: KhaytEngine.ProductPricing?
     /// Save was pressed at a price of zero; the question is up.
     @State private var askingZero = false
     /// The shop's own rounding and typed price for this product — the two
@@ -165,8 +168,14 @@ struct ProductSheet: View {
                 o["material"] = .string(spool.material)
                 o["spoolCost"] = .number(spool.jobCost(reclaimsTax: reclaimsTax))
                 o["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
-            } else if spoolId == nil {
+            } else if spoolId == nil, !(Shop.plainString(raw["filamentId"]) ?? "").isEmpty {
                 // The shop took the filament off: the part is not made of it any more.
+                // ONLY then. A part that never named a spool — typed in the
+                // other app, imported, a blend — carries its own `spoolCost`
+                // and `spoolWeight`, and they are what it is costed at.
+                // Stripping them on every save costed it at nothing, so an
+                // edit to its grams priced the same as the untouched part and
+                // the product never re-priced.
                 for key in ["filamentId", "material", "spoolCost", "spoolWeight"] { o.removeValue(forKey: key) }
             }
             if let printFileId, !printFileId.isEmpty { o["printFileId"] = .string(printFileId) }
@@ -410,6 +419,12 @@ struct ProductSheet: View {
             }
             tiers = opened.tiers
             docs = opened.docs
+            if !isNew {
+                openedPricing = await shop.priceProduct(
+                    parts: opened.parts.map { $0.record(spools: shop.spools, reclaimsTax: shop.reclaimsTax) },
+                    margin: opened.draft.margin, components: opened.draft.rest["components"],
+                    assemblyQty: opened.draft.rest["assemblyQty"], rule: opened.rule)
+            }
             await reprice()
         }
         // Re-priced when the margin changes, because the margin is above the
@@ -755,7 +770,9 @@ struct ProductSheet: View {
                              + Money.text(pricing.cost, shop.currency))
                         Text("·").foregroundStyle(.tertiary)
                         Text(shop.words.callIt("mac.price") + " "
-                             + Money.text(pricing.price, shop.currency))
+                             + Money.text(Self.shownPrice(stored: Self.storedPrice(existing),
+                                                          opened: openedPricing, live: pricing),
+                                          shop.currency))
                             .fontWeight(.medium)
                         Spacer()
                         Text(Money.quantity(pricing.hours) + " "
@@ -764,6 +781,13 @@ struct ProductSheet: View {
                             .foregroundStyle(.secondary)
                     }
                     .font(.caption).monospacedDigit()
+                    if let note = Self.savedPriceNote(stored: Self.storedPrice(existing),
+                                                      opened: openedPricing, live: pricing,
+                                                      words: shop.words) {
+                        Text(note)
+                            .font(.caption).foregroundStyle(Khayt.attention)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
@@ -1008,6 +1032,43 @@ struct ProductSheet: View {
         return abs(pricing.price) < 0.005
     }
 
+    // ── THE PRICE THE SHEET SHOWS IS THE PRICE IT SAVES ────────────────────
+    //
+    // A product saved under an older rule (before the catalogue counted a
+    // part's quantity, or before a component's price moved) prices higher or
+    // lower today than the figure on its record. Saving it with nothing
+    // priced edited keeps the stored figure (`Shop.productPriceFields`), so
+    // showing today's figure as "Price" showed a number Save does not write.
+    // Until an edit makes the sheet re-price, the price shown is the stored
+    // one, and today's figure is said beside it; once an edit re-prices it,
+    // the stored figure and the new one are both said.
+
+    /// The same three figures `productPriceFields` compares: equal means
+    /// nothing the price is made from was edited.
+    static func samePricing(_ a: KhaytEngine.ProductPricing, _ b: KhaytEngine.ProductPricing) -> Bool {
+        abs(a.cost - b.cost) < 0.005 && abs(a.basePrice - b.basePrice) < 0.005 && abs(a.price - b.price) < 0.005
+    }
+
+    /// The stored price while the sheet is as opened, today's once an edit re-priced it.
+    static func shownPrice(stored: Double?, opened: KhaytEngine.ProductPricing?,
+                           live: KhaytEngine.ProductPricing) -> Double {
+        guard let stored, let opened, samePricing(opened, live) else { return live.price }
+        return stored
+    }
+
+    /// What the sheet says about the stored price, or nil when there is
+    /// nothing to say. Untouched and different: the stored price is kept, and
+    /// today's figure is given beside it. Edited so the save re-prices: the
+    /// stored figure and the one Save will write. A new product, or one whose
+    /// price is unchanged, says nothing.
+    static func savedPriceNote(stored: Double?, opened: KhaytEngine.ProductPricing?,
+                               live: KhaytEngine.ProductPricing, words: Words) -> String? {
+        guard let stored, let opened, abs(stored - live.price) >= 0.005 else { return nil }
+        let now = JSONValue.string(Money.figure(live.price))
+        if samePricing(opened, live) { return words.callIt("mac.price_kept", ["now": now]) }
+        return words.callIt("mac.price_was_now", ["was": .string(Money.figure(stored)), "now": now])
+    }
+
     /// The price the record carries now, to say what a zero save replaces.
     static func storedPrice(_ product: Product) -> Double? {
         switch product.rest["price"] {
@@ -1022,6 +1083,7 @@ struct ProductSheet: View {
         pricing = await shop.priceProduct(parts: effectiveParts.map { $0.record(spools: shop.spools, reclaimsTax: shop.reclaimsTax) },
                                           margin: draft.margin,
                                           components: draft.rest["components"],
+                                          assemblyQty: draft.rest["assemblyQty"],
                                           rule: rule)
     }
 

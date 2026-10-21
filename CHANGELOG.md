@@ -4,6 +4,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **The catalogue now counts each part's quantity in a product's cost.** A part used three times in a product was costed once, so the catalogue suggested a price well under what a job made from that product costs. The catalogue and a job now agree. Saved product prices do not change by themselves: a product's price moves only when you open it, edit it and save. The catalogue's margin column now shows the real margin, so a product priced under the old rule may show a thin or negative margin. Review those products and re-save any you want re-priced.
+
+- **Mac: a product part with no spool linked keeps its own spool cost.** Editing the grams of such a part did not re-price the product, because the sheet dropped the part's spool cost when it saved.
+
 - **iPhone: a quote moved on from the phone counts as accepted.** When the
   phone moved a quote to Pending (or any stage but Cancelled) in its own
   copy of the book, it didn't record the acceptance day. The quote then
@@ -325,16 +329,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   not-business orders, and takes credit notes off the price. On the Mac, a
   customer billed in another currency now exports in that currency, with the
   shop's base columns filled in.
-- **Desktop: a printer with history is retired, not deleted.** Deleting a
-  printer that jobs, costs or service records name rewrote the past: its
-  depreciation disappeared from earlier months, its jobs fell into
-  "Unassigned", and its service costs dropped out of the machine profit and
-  loss. Now Delete removes only a printer that nothing refers to. Any other
-  printer is offered **Retire** instead. A retired printer stays in your
-  records, leaves the pickers, the board, the dashboard and printer polling,
-  and stops counting toward maintenance reminders. Its unfinished jobs become
-  unassigned. **Return to service** brings it back. The Mac app follows the
-  same rule.
 - **(Maintainers) A printer's status is one shared rule.** `lib/machine-status.js`:
   - **Under service** is the `isOffline` flag the desktop already writes, with
     an optional reason and date.
@@ -430,13 +424,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   machine pickers; past orders still name it. A machine marked offline shows
   as Offline and is left out of the pickers.
 
-- **Desktop: a paired iPhone can check it is talking to your computer.** The
-  LAN server now has its own key, made once and stored sealed in the keychain.
-  It answers `GET /api/identity` (requires the PIN) with the key's public part
-  and `GET /api/proof` with a signature. Before sending the PIN, the iPhone
-  can check that whatever answers to the shop's network name is the computer
-  it paired with, not a device copying that name. The Mac app answers the
-  same two requests.
 - **Mac: the board says why a lot search found a card.** A job on the board
   found only by the filament lot it drew from shows that lot, as its row in
   the orders list already did. The sample shop now holds a delivery that
@@ -8357,6 +8344,23 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.4] - 2026-10-21
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Before you update
+
+- **The catalogue now counts each part's quantity in a product's cost.** A part used three times in a product was costed once, so the catalogue suggested a price well under what a job made from that product costs. The catalogue and a job now agree. Saved product prices do not change by themselves: a product's price moves only when you open it, edit it and save. The catalogue's margin column now shows the real margin, so a product priced under the old rule may show a thin or negative margin. Review those products and re-save any you want re-priced.
+
+### Changed
+
+- **The product sheet says when a saved price is out of date.** It shows the saved price with "Saved price kept; today's costs give X", and after an edit "was X → now Y".
+
+### Fixed
+
+- **A product part with no spool linked keeps its own spool cost.** Editing its grams now re-prices the product.
 
 ## [4.0.0-beta.3] - 2026-10-21
 

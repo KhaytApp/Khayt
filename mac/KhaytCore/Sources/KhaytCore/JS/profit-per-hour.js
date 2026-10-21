@@ -130,12 +130,20 @@ function productRates(input, deps) {
       ? PP.finalPrice(p, base !== null ? base : (num(p.price) || 0))
       : { final: override !== null ? override : (base !== null ? base : num(p.price)), source: 'base' };
     if (!(fp.final > 0) && fp.source !== 'override') return { price: null, cost: null };
-    // The cost `product-pricing` wrote beside the price. Worked out afresh only
-    // for a record that has none — an older one, or one typed elsewhere.
+    // What the product costs to make NOW, by `product-pricing` over its parts,
+    // beside the price it is stored at. Not the `baseCost` written beside that
+    // price: a product saved before the catalogue counted each part's
+    // quantity carries the cost of one piece, so a stand ×3 priced at 25.74
+    // read as 30% on a 19.80 cost when its three pieces cost 59.40 — a loss
+    // shown as a healthy margin. The stored price is left alone (it moves only
+    // when the shop saves the product); the margin here tells the truth about
+    // it. The stored cost stands where the parts cannot be costed — none, or
+    // parts with no cost inputs of their own (a record typed elsewhere).
     let cost = num(p.baseCost);
-    if (cost === null && PR && typeof PR.priceProduct === 'function') {
-      cost = PR.priceProduct(p, { inventory: i.inventory, settings: i.settings,
-                                  consumables: i.consumables }).cost;
+    if (PR && typeof PR.priceProduct === 'function' && Array.isArray(p.parts) && p.parts.length) {
+      const live = num(PR.priceProduct(p, { inventory: i.inventory, settings: i.settings,
+                                            consumables: i.consumables }).cost);
+      if (live !== null && (cost === null || live > 0)) cost = live;
     }
     return { price: fp.final, cost: cost === null ? 0 : cost };
   };
