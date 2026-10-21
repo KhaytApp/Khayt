@@ -374,6 +374,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (navOpBtn) navOpBtn.style.display = settings.operatorLockEnabled ? 'inline-flex' : 'none';
 
   initAppShell();
+  // Tracking pages a full customer erase is still taking down: at launch, then
+  // every ten minutes, until the cloud has said yes to each (clients.js).
+  if (typeof runPortalTakedowns === 'function') {
+    setTimeout(() => runPortalTakedowns(), 20 * 1000);
+    setInterval(() => runPortalTakedowns(), 10 * 60 * 1000);
+  }
 
   // Feature 2 (new batch): Start live printer polling for connected machines
   const apiMachines = activeMachines().filter(m => m.printerApi?.type && m.printerApi.type !== 'none');

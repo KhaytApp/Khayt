@@ -1382,6 +1382,8 @@ async function publishOrderToCloudPortal(orderId) {
   if (!(c.enabled && c.shopId)) { toast(t('cloud.portal_need_connect') || 'Connect Khayt Cloud first (Settings)', 'error'); return; }
   const pubToken = order.trackingToken;
   if (!pubToken) { toast(t('cloud.portal_no_token') || 'This order has no tracking token yet', 'error'); return; }
+  // Its customer was fully erased and the page is still coming down: never put it back up.
+  if (order.portalTakedownPending) { toast(t('cloud.portal_takedown_pending'), 'error'); return; }
   if (!portalTrialAllows()) return;
 
   // For a quote, first let the owner attach an optional deposit + their own pay link.

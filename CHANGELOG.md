@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a full customer erase takes their tracking pages down.**
+  Fully erasing a customer now also takes down every tracking page they were
+  sent from Khayt Cloud, invoiced and paid jobs included, as the privacy
+  policy promises. The erase sheet says how many. A page the cloud could not
+  take down right away is tried again at launch and every ten minutes, and
+  can't be published again in the meantime. "Unlink" takes nothing down. The
+  same as the Mac.
+
 - **A printer retired by its date alone is out of the lead time and the
   overhead rate.** A printer can be marked retired by its status or by a
   retire date. The published lead time and the overhead rate looked only at
