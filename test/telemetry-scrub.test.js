@@ -247,3 +247,79 @@ test('a stack frame through a folder with spaces keeps its module, line and colu
   // A slash inside a sentence is not a path that swallows the rest of it.
   assert.equal(S.scrubText('either/or 50 / 100'), 'either/or 50 / 100');
 });
+
+// A path is a path whatever comes before it: a JSC frame's `@`, a shell's
+// `|` or `;`, markup's `<`, a brace. The second pass of the space fix only
+// counted one after a space, a bracket or a quote, and leaked these whole.
+const PATH_AFTER_ANY_LEAD = [
+  ['open ~/Nouf Aldossari/lamp.3mf', 'open <path>/<file>.3mf'],
+  ['foo</Users/turki/x.js>', 'foo<<path>/x.js>'],
+  ['x{/Users/Nouf Aldossari/a.stl}', 'x{<path>/<file>.stl}'],
+  ['x|/Users/turki/a.3mf', 'x|<path>/<file>.3mf'],
+  ['x;/Users/turki/a.3mf', 'x;<path>/<file>.3mf'],
+  ['x>/Users/turki/a.3mf', 'x><path>/<file>.3mf'],
+  ['x*/Users/turki/a.3mf', 'x*<path>/<file>.3mf'],
+  ['readStore@/Users/turki/Khayt/lib/x.js:12:3', 'readStore@<path>/x.js:12:3'],
+  ['open ./Nouf/a.3mf', 'open <path>/<file>.3mf'],
+];
+
+test('a path is collapsed after any character that cannot be inside a word', () => {
+  for (const [input, want] of PATH_AFTER_ANY_LEAD) assert.equal(S.scrubPath(input), want, input);
+  // Words with a slash in them are not paths.
+  assert.equal(S.scrubPath('and/or Trace/BPT KhaytApp/Shop.swift'), 'and/or Trace/BPT KhaytApp/Shop.swift');
+  // The scrubber's own marker is not a path to collapse again.
+  assert.equal(S.scrubPath(S.scrubPath('x>/Users/turki/a.3mf')), 'x><path>/<file>.3mf');
+});
+
+test('the sentence after a file name is kept, a space inside a folder name is not', () => {
+  assert.equal(S.scrubPath('Failed /Users/a/b.3mf because disk full'), 'Failed <path>/<file>.3mf because disk full');
+  assert.equal(S.scrubPath('Fatal error: file /Users/turki/src/KhaytApp/Shop.swift, line 120'),
+    'Fatal error: file <path>/Shop.swift, line 120');
+  assert.equal(S.scrubPath('copy /a/Nouf.v2 Aldossari/x.3mf to /b/c d/e.3mf now'),
+    'copy <path>/<file>.3mf to <path>/<file>.3mf now');
+  assert.equal(S.scrubPath('ENOENT /x/My Drive/Nouf Aldossari/lamp.3mf'), 'ENOENT <path>/<file>.3mf');
+});
+
+test('nothing the scrubber used to redact is leaked now', () => {
+  // The scrubber before paths ran through spaces, verbatim. Every word it took
+  // out of a path must still be out; the only words allowed back are a code
+  // file's own name, which a stack frame needs.
+  const CODE = /\.(?:js|mjs|cjs|ts|json|html|css|node)$/i;
+  const oldBase = (name) => {
+    const base = String(name || '');
+    if (CODE.test(base)) return base;
+    const dot = base.lastIndexOf('.');
+    return dot > 0 ? '<file>' + base.slice(dot) : '<file>';
+  };
+  const oldScrubPath = (str) => str
+    .replace(/(?:file:\/\/)?(?:\/[^\s:()]+)+/g, (m) => '<path>/' + oldBase(m.split('/').filter(Boolean).pop()))
+    .replace(/[A-Za-z]:\\(?:[^\s:()\\]+\\)*([^\s:()\\]+)/g, (m, base) => '<path>/' + oldBase(base));
+  const words = (s) => new Set(s.match(/[A-Za-z0-9]{2,}/g) || []);
+  const kept = (s) => new Set((s.match(/[\w.-]+\.(?:js|mjs|cjs|ts|json|html|css|node|swift)\b/g) || [])
+    .flatMap((f) => [...words(f)]));
+  const corpus = [
+    ...SECRETS,
+    ...PATH_AFTER_ANY_LEAD.map(([input]) => input),
+    'ENOENT /Users/turki/Library/CloudStorage/GoogleDrive-x@y.com/My Drive/Nouf Aldossari/lamp.3mf',
+    'open C:\\Users\\Turki Alballaa\\AppData\\Roaming\\Khayt\\store.json',
+    '    at foo (/Users/x y/app/lib/a.js:12:3)',
+    '    at /Users/x y/app/lib/a.js:12:3',
+    'at load (C:\\Users\\Turki A\\app\\store.js:3:1)',
+    'at load (/Users/turki/Library/Application Support/Khayt/khayt-store.json:12:5)',
+    'ENOENT: open /Users/t/Khayt/exports/mohammed-alqahtani-invoice.pdf',
+    'at saveAll (/Users/t/Khayt/renderer/store.js:412:9)',
+    'Error: auth\n    at post (/app/net.js:1:1) token=abcdef1234567890',
+    'GET http://192.168.1.50/api/job?apikey=A1B2C3D4E5F6G7H8I9J0KLMN',
+    'Failed /Users/a/b.3mf because disk full',
+    'Fatal error: file /Users/turki/src/KhaytApp/Shop.swift, line 120',
+    'copy /a/Nouf.v2 Aldossari/x.3mf to /b/c d/e.3mf now',
+    'file:///Users/sara/Desktop/order.3mf',
+  ];
+  for (const input of corpus) {
+    const before = words(oldScrubPath(input));
+    const now = S.scrubPath(input);
+    const allowed = kept(now);
+    const leaked = [...words(input)].filter((w) => !before.has(w) && words(now).has(w) && !allowed.has(w));
+    assert.deepEqual(leaked, [], `${input} -> ${now}`);
+  }
+});
