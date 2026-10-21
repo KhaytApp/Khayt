@@ -497,6 +497,14 @@ public enum StoreWriter {
         var gone: [(collection: String, id: String, rev: Double)] = []
         for (collection, value) in before where collection != "tombstones" {
             guard case .array(let was) = value else { continue }
+            // A log trimming its own oldest rows is not deleting them: one
+            // tombstone per entry once the activity log was full pushed the
+            // real delete markers out of the capped list, and an older copy
+            // syncing in then brought deleted customers and jobs back. At or
+            // over its cap after the write, the rows went to the cap — as
+            // `trimmedByCap` in lib/sync.js decides it.
+            if let cap = cappedLogs[collection], case .array(let now)? = after[collection],
+               now.count >= cap { continue }
             var kept = Set<String>()
             if case .array(let now)? = after[collection] {
                 for row in now {
@@ -679,6 +687,10 @@ public enum StoreWriter {
 
     /// `TOMB_CAP` in lib/sync.js.
     public static let tombstoneCap = 5000
+
+    /// `CAPPED_LOGS` in lib/sync.js: the log collections that drop their own
+    /// oldest rows at a size, and the size.
+    public static let cappedLogs: [String: Int] = ["auditLog": 2000]
 
     // MARK: - Stamping
 

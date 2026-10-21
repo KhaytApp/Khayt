@@ -189,3 +189,49 @@ struct DeletesSurviveSyncTests {
         #expect(id != "PROD-mth8nqkoVJC")
     }
 }
+
+/// The activity log trims its own oldest rows at 2,000. Those are not
+/// deletes: tombstoned one per logged action, they pushed the REAL delete
+/// markers out of the 5,000-cap list, and an older copy syncing in brought
+/// deleted customers and jobs back. `test/sync-capped-logs.test.js` pins the
+/// same rule in `lib/sync.js`.
+extension DeletesSurviveSyncTests {
+
+    static func audit(_ range: Range<Int>) -> JSONValue {
+        .array(range.map { .object(["id": .string("AL\($0)"), "action": .string("edit"), "rev": .number(1)]) })
+    }
+
+    @Test("the 2001st audit entry trims the oldest and adds no tombstone")
+    func auditTrimIsNotADelete() throws {
+        let cap = try #require(StoreWriter.cappedLogs["auditLog"])
+        #expect(cap == 2000)
+        var before = Self.book(["A"])
+        before["auditLog"] = Self.audit(0..<cap)
+        var after = before
+        after["auditLog"] = Self.audit(1..<(cap + 1))
+        StoreWriter.recordDeletions(before: before, after: &after)
+        #expect(Self.tombs(after).isEmpty, "a trimmed log row was tombstoned")
+    }
+
+    @Test("a real delete beside a full audit log is still tombstoned")
+    func realDeleteBesideTheLog() {
+        var before = Self.book(["A"])
+        before["auditLog"] = Self.audit(0..<2000)
+        var after = before
+        after["auditLog"] = Self.audit(1..<2001)
+        after["products"] = .array([])
+        StoreWriter.recordDeletions(before: before, after: &after)
+        #expect(Self.tombs(after).map { $0["collection"] } == [.string("products")])
+        #expect(Self.tombs(after).first?["id"] == .string("A"))
+    }
+
+    @Test("an audit log emptied below its cap is a delete")
+    func auditClearedIsADelete() {
+        var before = Self.book([])
+        before["auditLog"] = Self.audit(0..<3)
+        var after = before
+        after["auditLog"] = .array([])
+        StoreWriter.recordDeletions(before: before, after: &after)
+        #expect(Self.tombs(after).count == 3)
+    }
+}

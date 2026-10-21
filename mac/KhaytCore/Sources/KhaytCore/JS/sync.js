@@ -277,6 +277,9 @@
       const sep = key.indexOf(':');
       const coll = key.slice(0, sep);
       const id = key.slice(sep + 1);
+      // A log trimming its own oldest rows is not deleting them — see
+      // trimmedByCap. No tombstone, and not reported as a delete.
+      if (trimmedByCap(snapshot, coll)) continue;
       summary.deleted.push({ collection: coll, id });
       if (tomb && !tomb.some((t) => t && t.id === id && t.collection === coll)) {
         // Carry the rev that was deleted. Without it a delete outranks every
@@ -291,6 +294,27 @@
 
     setIndexFor(scope, next);
     return summary;
+  }
+
+  /**
+   * Log collections that drop their own oldest rows at a size cap — the
+   * team activity log keeps 2,000 (renderer/app-helpers.js logActivity, and
+   * the Mac's Shop.appendActivity).
+   *
+   * Rows a cap trimmed are not deletes, and must not be tombstoned. They were,
+   * one per entry once the log was full: every save that logged an action
+   * pushed a tombstone, and at TOMB_CAP those pushed out the REAL delete
+   * markers — a customer or a job deleted a week ago lost its tombstone, and
+   * the next device to sync from an older copy brought it back.
+   *
+   * Told apart by the log's size: a log at (or over) its cap after the save
+   * lost its rows to the cap. A log cleared or cut below it was emptied on
+   * purpose, and that is still a delete.
+   */
+  const CAPPED_LOGS = new Map([['auditLog', 2000]]);
+  function trimmedByCap(snapshot, coll) {
+    const cap = CAPPED_LOGS.get(coll);
+    return cap !== undefined && Array.isArray(snapshot[coll]) && snapshot[coll].length >= cap;
   }
 
   /**
@@ -662,6 +686,7 @@
     syncedRevOf,
     summarizeDiscardedEdits,
     maxCursor,
+    CAPPED_LOGS,
     setBackend,
     getBackend,
     status,

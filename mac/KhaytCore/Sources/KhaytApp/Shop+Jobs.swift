@@ -2544,7 +2544,8 @@ extension Shop {
         // Khayt keeps two thousand and drops the oldest. A log that grew for
         // ever would be the one collection that could push a book past the size
         // every backup is built to hold.
-        if log.count > 2000 { log = Array(log.suffix(2000)) }
+        let cap = StoreWriter.cappedLogs["auditLog"] ?? 2000
+        if log.count > cap { log = Array(log.suffix(cap)) }
         root["auditLog"] = .array(log)
     }
 
