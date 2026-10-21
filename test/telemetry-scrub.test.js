@@ -263,6 +263,35 @@ const PATH_AFTER_ANY_LEAD = [
   ['open ./Nouf/a.3mf', 'open <path>/<file>.3mf'],
 ];
 
+// A path right after a word character, `-`, `.` or `$` — no lead the POSIX
+// pass takes — and a RELATIVE path with two slashes or more.
+const PATH_AFTER_A_WORD = [
+  ['Users/nouf/Desktop/order.3mf failed', '<path>/<file>.3mf failed'],
+  ['abc/Users/nouf/a.txt', '<path>/<file>.txt'],
+  ['x-/Users/nouf/a.3mf', '<path>/<file>.3mf'],
+  ['x./Users/nouf/a.3mf', '<path>/<file>.3mf'],
+  ['$HOME/../nouf/b.3mf', '<path>/<file>.3mf'],
+  ['openC:\\Users\\Turki A\\x.3mf', 'open<path>/<file>.3mf'],
+  ['at lib/foo/bar.swift:12', 'at <path>/bar.swift:12'],
+];
+
+// An apostrophe or backtick INSIDE a folder name does not end the path.
+const QUOTE_IN_A_FOLDER = [
+  ["ENOENT /Users/t/Orders/Sa'ad Alghamdi/lamp.3mf", 'ENOENT <path>/<file>.3mf'],
+  ["/Users/nouf/O'Brien/lamp.3mf", '<path>/<file>.3mf'],
+  ['/Users/nouf/a`b/c.3mf', '<path>/<file>.3mf'],
+  ["open '/x/a.3mf' now", "open '<path>/<file>.3mf' now"],
+];
+
+test('a relative path with two slashes is collapsed, one slash is text', () => {
+  for (const [input, want] of PATH_AFTER_A_WORD) assert.equal(S.scrubPath(input), want, input);
+  assert.equal(S.scrubPath('and/or KhaytApp/Shop.swift'), 'and/or KhaytApp/Shop.swift');
+});
+
+test('a quote inside a folder name stays in the path, the closing quote ends it', () => {
+  for (const [input, want] of QUOTE_IN_A_FOLDER) assert.equal(S.scrubPath(input), want, input);
+});
+
 test('a path is collapsed after any character that cannot be inside a word', () => {
   for (const [input, want] of PATH_AFTER_ANY_LEAD) assert.equal(S.scrubPath(input), want, input);
   // Words with a slash in them are not paths.
@@ -280,23 +309,34 @@ test('the sentence after a file name is kept, a space inside a folder name is no
   assert.equal(S.scrubPath('ENOENT /x/My Drive/Nouf Aldossari/lamp.3mf'), 'ENOENT <path>/<file>.3mf');
 });
 
-test('nothing the scrubber used to redact is leaked now', () => {
-  // The scrubber before paths ran through spaces, verbatim. Every word it took
-  // out of a path must still be out; the only words allowed back are a code
-  // file's own name, which a stack frame needs.
-  const CODE = /\.(?:js|mjs|cjs|ts|json|html|css|node)$/i;
-  const oldBase = (name) => {
-    const base = String(name || '');
-    if (CODE.test(base)) return base;
-    const dot = base.lastIndexOf('.');
-    return dot > 0 ? '<file>' + base.slice(dot) : '<file>';
-  };
-  const oldScrubPath = (str) => str
+// The scrubber before paths ran through spaces, verbatim. Every word it took
+// out of a path must still be out; the only words allowed back are a code
+// file's own name, which a stack frame needs.
+const OLD_CODE = /\.(?:js|mjs|cjs|ts|json|html|css|node)$/i;
+function oldBase(name) {
+  const base = String(name || '');
+  if (OLD_CODE.test(base)) return base;
+  const dot = base.lastIndexOf('.');
+  return dot > 0 ? '<file>' + base.slice(dot) : '<file>';
+}
+function oldScrubPath(str) {
+  return str
     .replace(/(?:file:\/\/)?(?:\/[^\s:()]+)+/g, (m) => '<path>/' + oldBase(m.split('/').filter(Boolean).pop()))
     .replace(/[A-Za-z]:\\(?:[^\s:()\\]+\\)*([^\s:()\\]+)/g, (m, base) => '<path>/' + oldBase(base));
-  const words = (s) => new Set(s.match(/[A-Za-z0-9]{2,}/g) || []);
-  const kept = (s) => new Set((s.match(/[\w.-]+\.(?:js|mjs|cjs|ts|json|html|css|node|swift)\b/g) || [])
-    .flatMap((f) => [...words(f)]));
+}
+const wordsOf = (s) => new Set(s.match(/[A-Za-z0-9]{2,}/g) || []);
+const codeNameWords = (s) => new Set((s.match(/[\w.-]+\.(?:js|mjs|cjs|ts|json|html|css|node|swift)\b/g) || [])
+  .flatMap((f) => [...wordsOf(f)]));
+/** Words the old scrubber removed from `input` that the new one lets through. */
+function leakedSinceOld(input) {
+  const before = wordsOf(oldScrubPath(input));
+  const now = S.scrubPath(input);
+  const nowWords = wordsOf(now);
+  const allowed = codeNameWords(now);
+  return [...wordsOf(input)].filter((w) => !before.has(w) && nowWords.has(w) && !allowed.has(w));
+}
+
+test('nothing the scrubber used to redact is leaked now', () => {
   const corpus = [
     ...SECRETS,
     ...PATH_AFTER_ANY_LEAD.map(([input]) => input),
@@ -314,12 +354,34 @@ test('nothing the scrubber used to redact is leaked now', () => {
     'Fatal error: file /Users/turki/src/KhaytApp/Shop.swift, line 120',
     'copy /a/Nouf.v2 Aldossari/x.3mf to /b/c d/e.3mf now',
     'file:///Users/sara/Desktop/order.3mf',
+    ...PATH_AFTER_A_WORD.map(([input]) => input),
+    ...QUOTE_IN_A_FOLDER.map(([input]) => input),
   ];
-  for (const input of corpus) {
-    const before = words(oldScrubPath(input));
-    const now = S.scrubPath(input);
-    const allowed = kept(now);
-    const leaked = [...words(input)].filter((w) => !before.has(w) && words(now).has(w) && !allowed.has(w));
-    assert.deepEqual(leaked, [], `${input} -> ${now}`);
+  for (const input of corpus) assert.deepEqual(leakedSinceOld(input), [], `${input} -> ${S.scrubPath(input)}`);
+});
+
+test('a path after ANY lead, with spaces or apostrophes in it, leaks nothing the old scrubber removed', () => {
+  // Generated, so a lead or a folder shape nobody thought to write down is
+  // still tried.
+  const leads = [...'aZ09_.$~<{|;>*@\'"`( -'];
+  const paths = [
+    '/Users/nouf/Desktop/order.3mf',
+    'Users/nouf/Desktop/order.3mf',
+    '/Users/nouf/My Drive/Nouf Aldossari/lamp.3mf',
+    "/Users/sara/Orders/Sa'ad Alghamdi/lamp.3mf",
+    "/Users/sara/O'Brien/lamp.3mf",
+    '/Users/sara/a`b/c.3mf',
+    '~/Nouf Aldossari/lamp.3mf',
+    '$HOME/../nouf/b.3mf',
+    'C:\\Users\\Turki Alballaa\\AppData\\store.json',
+  ];
+  const tails = ['', ' end', ':12:3', "'", ')'];
+  for (const lead of leads) {
+    for (const path of paths) {
+      for (const tail of tails) {
+        const input = `open${lead}${path}${tail}`;
+        assert.deepEqual(leakedSinceOld(input), [], `${input} -> ${S.scrubPath(input)}`);
+      }
+    }
   }
 });

@@ -98,12 +98,24 @@
    * classes, spelled so this file's bracket count stays balanced for
    * test/bundled-modules-are-wrapped.test.js.
    */
-  const PATH_BODY = '(?:[^\\n:\\x29\\]\\x7d>\'"`\\u2018\\u2019\\u201C\\u201D]|:(?![\\d\\s]|$))*';
+  // An apostrophe or backtick followed by a letter or digit is part of a
+  // folder name ("Sa'ad Alghamdi", "O'Brien"), not the quote that closes the
+  // path, which is followed by a space, punctuation or the end.
+  const PATH_BODY = '(?:[^\\n:\\x29\\]\\x7d>\'"`\\u2018\\u2019\\u201C\\u201D]|[\'`\\u2019](?=[A-Za-z0-9])|:(?![\\d\\s]|$))*';
   // The first alternative is this scrubber's own `<path>/`, passed over:
   // its `>` would otherwise lead a path and the marker be collapsed again.
   const POSIX_PATH_RE = new RegExp(
     '(<path>\\/)|(^|[^A-Za-z0-9_./\\\\-])((?:file:\\/\\/)?(?:~|\\.{1,2})?\\/(?![\\s\\x29])' + PATH_BODY + ')', 'g');
-  const WINDOWS_PATH_RE = new RegExp('\\b[A-Za-z]:\\\\' + PATH_BODY, 'g');
+  // No word boundary before the drive letter: "openC:\Users\…" is still a path.
+  const WINDOWS_PATH_RE = new RegExp('[A-Za-z]:\\\\' + PATH_BODY, 'g');
+  // A RELATIVE run with two slashes or more, right after a word or a symbol
+  // the POSIX lead does not take: "Users/nouf/Desktop/order.3mf",
+  // "abc/Users/…", "x-/Users/…", "$HOME/../nouf/b.3mf". One slash
+  // ("and/or", "KhaytApp/Shop.swift") stays text. Past its second slash it
+  // runs on like any other path.
+  const RELATIVE_PATH_RE = new RegExp(
+    '(<path>\\/)|(^|[^A-Za-z0-9_.$~\\/\\\\-])([A-Za-z0-9_.$~-]+\\/[^\\s\\/:\\x29\\]\\x7d>\'"`]+\\/(?![\\s\\x29])' +
+    PATH_BODY + ')', 'g');
 
   /**
    * Where the path in a token ends and the sentence resumes: at ", ", or at
@@ -139,7 +151,8 @@
     if (typeof str !== 'string') return str;
     return str
       .replace(WINDOWS_PATH_RE, (m) => collapse(m))
-      .replace(POSIX_PATH_RE, (m, done, lead, token) => (done ? m : lead + collapse(token)));
+      .replace(POSIX_PATH_RE, (m, done, lead, token) => (done ? m : lead + collapse(token)))
+      .replace(RELATIVE_PATH_RE, (m, done, lead, token) => (done ? m : lead + collapse(token)));
   }
 
   /** Strip PII value shapes out of any free text. */
