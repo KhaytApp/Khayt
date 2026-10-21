@@ -329,16 +329,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   not-business orders, and takes credit notes off the price. On the Mac, a
   customer billed in another currency now exports in that currency, with the
   shop's base columns filled in.
-- **Desktop: a printer with history is retired, not deleted.** Deleting a
-  printer that jobs, costs or service records name rewrote the past: its
-  depreciation disappeared from earlier months, its jobs fell into
-  "Unassigned", and its service costs dropped out of the machine profit and
-  loss. Now Delete removes only a printer that nothing refers to. Any other
-  printer is offered **Retire** instead. A retired printer stays in your
-  records, leaves the pickers, the board, the dashboard and printer polling,
-  and stops counting toward maintenance reminders. Its unfinished jobs become
-  unassigned. **Return to service** brings it back. The Mac app follows the
-  same rule.
 - **(Maintainers) A printer's status is one shared rule.** `lib/machine-status.js`:
   - **Under service** is the `isOffline` flag the desktop already writes, with
     an optional reason and date.
@@ -434,13 +424,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   machine pickers; past orders still name it. A machine marked offline shows
   as Offline and is left out of the pickers.
 
-- **Desktop: a paired iPhone can check it is talking to your computer.** The
-  LAN server now has its own key, made once and stored sealed in the keychain.
-  It answers `GET /api/identity` (requires the PIN) with the key's public part
-  and `GET /api/proof` with a signature. Before sending the PIN, the iPhone
-  can check that whatever answers to the shop's network name is the computer
-  it paired with, not a device copying that name. The Mac app answers the
-  same two requests.
 - **Mac: the board says why a lot search found a card.** A job on the board
   found only by the filament lot it drew from shows that lot, as its row in
   the orders list already did. The sample shop now holds a delivery that
