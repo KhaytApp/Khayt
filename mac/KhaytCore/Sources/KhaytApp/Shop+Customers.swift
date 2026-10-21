@@ -295,10 +295,11 @@ extension Shop {
         var tag = ""
         var tier = ""
 
-        /// The channels the rule knows. `sms` and `whatsapp` both read the
-        /// phone number; they are separate because what is DONE with the
-        /// number differs, and that is the sending app's business.
-        static let channels = ["email", "whatsapp"]
+        /// The channels this app can SEND a campaign on. The rule also knows
+        /// `sms` and `whatsapp` (both read the phone number), but this app's
+        /// only campaign sender is email: offering WhatsApp built a list of
+        /// phone numbers and then mailed them.
+        static let channels = ["email"]
 
         var criteria: [String: JSONValue] {
             var out: [String: JSONValue] = [:]
@@ -452,9 +453,12 @@ extension Shop {
     /// log the other app keeps — in the same shape, in the same place.
     ///
     /// Returns what to tell the shop.
-    func sendCampaign(_ body: String, subject: String = "",
+    func sendCampaign(_ body: String, subject: String = "", channel: String = "email",
                       to recipients: [KhaytEngine.Recipient]) async -> String {
         guard permitted("clients", "edit") else { return moveProblem ?? "" }
+        // Every send below is a MAIL. A list built for any other channel holds
+        // phone numbers, and posting them as addresses is the bug this stops.
+        guard channel == "email" else { return words.callIt("mac.campaign_email_only") }
         guard !recipients.isEmpty else { return words.callIt("camp.none") }
         guard !body.trimmingCharacters(in: .whitespaces).isEmpty else {
             return words.callIt("camp.need_body")
