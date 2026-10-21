@@ -4862,7 +4862,7 @@ function renderTelemetryAsk() {
   }
   card.innerHTML = `
     <div class="telemetry-ask-title" id="telemetryAskTitle">${escapeHtml(t('tel.ask_title'))}</div>
-    <p class="telemetry-ask-body">${escapeHtml(t('tel.ask_body'))}</p>
+    <p class="telemetry-ask-body" id="telemetryAskBody">${escapeHtml(t('tel.ask_body'))}</p>
     <label class="telemetry-ask-usage">
       <input type="checkbox" id="telemetryAskUsage">
       <span><span>${escapeHtml(t('tel.ask_usage'))}</span><br>
@@ -4875,6 +4875,12 @@ function renderTelemetryAsk() {
         <button type="button" class="btn small primary" data-tel-ask="share">${escapeHtml(t('tel.ask_share'))}</button>
       </span>
     </div>`;
+  // Once the anonymous install count is live, "sends nothing unless you allow
+  // it" has one exception, and the card says so.
+  window.hubAPI?.activeCountGet?.().then((st) => {
+    const body = card.querySelector('#telemetryAskBody');
+    if (st && st.ready && body) body.textContent = t('tel.ask_body_count');
+  }).catch(() => {});
   card.querySelector('[data-tel-ask="not-now"]').addEventListener('click', () => {
     markTelemetryAsked();
     renderTelemetryAsk();

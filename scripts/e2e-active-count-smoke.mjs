@@ -78,6 +78,11 @@ try {
   await window.waitForSelector('#tel_active');
   ok(await window.evaluate(() => document.getElementById('tel_active').checked), 'Settings shows the count on by default');
   ok(await window.evaluate(() => /Apart from an anonymous once-a-day install count/.test(document.getElementById('telHint').textContent)), 'and no longer says nothing is sent by default');
+  // The one-time card says it too, once the count is live.
+  await window.evaluate(() => { window.__khaytAskTelemetry = true; localStorage.removeItem('khayt_telemetry_asked'); renderTelemetryAsk(); });
+  await window.waitForFunction(() => /Apart from an anonymous once-a-day install count/.test(document.getElementById('telemetryAskBody')?.textContent || ''));
+  ok(true, 'the crash-report card names the one exception');
+  await window.evaluate(() => { localStorage.setItem('khayt_telemetry_asked', '1'); renderTelemetryAsk(); });
   await window.uncheck('#tel_active');
   await waitFor(() => JSON.parse(fs.readFileSync(file, 'utf8')).off === true, 3000);
   const offState = JSON.parse(fs.readFileSync(file, 'utf8'));

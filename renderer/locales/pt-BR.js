@@ -3103,6 +3103,7 @@
 
   "tel.ask_title": "Quer ajudar a melhorar o Khayt?",
   "tel.ask_body": "O Khayt não envia nada sem a sua permissão. Um relatório de erro nos diz o que deu errado, sem e-mails, telefones, números longos e caminhos de arquivos. Nunca seus pedidos, clientes, preços ou arquivos.",
+  "tel.ask_body_count": "Além de uma contagem anônima diária desta instalação, o Khayt não envia nada sem a sua permissão. Um relatório de erro nos diz o que deu errado, sem e-mails, telefones, números longos e caminhos de arquivos. Nunca seus pedidos, clientes, preços ou arquivos.",
   "tel.ask_usage": "Compartilhar também as contagens de uso",
   "tel.ask_share": "Compartilhar relatórios de erro",
   "tel.ask_not_now": "Agora não",

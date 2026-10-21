@@ -3102,6 +3102,7 @@
 
   "tel.ask_title": "Helfen Sie, Khayt besser zu machen?",
   "tel.ask_body": "Khayt sendet nichts, solange Sie es nicht erlauben. Ein Absturzbericht zeigt uns, was schiefging – ohne E-Mail-Adressen, Telefonnummern, lange Zahlen und Dateipfade. Nie Ihre Aufträge, Kunden, Preise oder Dateien.",
+  "tel.ask_body_count": "Abgesehen von einer anonymen täglichen Zählung dieser Installation sendet Khayt nichts, solange Sie es nicht erlauben. Ein Absturzbericht zeigt uns, was schiefging – ohne E-Mail-Adressen, Telefonnummern, lange Zahlen und Dateipfade. Nie Ihre Aufträge, Kunden, Preise oder Dateien.",
   "tel.ask_usage": "Auch Nutzungszahlen teilen",
   "tel.ask_share": "Absturzberichte teilen",
   "tel.ask_not_now": "Nicht jetzt",

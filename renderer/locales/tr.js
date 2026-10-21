@@ -3102,6 +3102,7 @@
 
   "tel.ask_title": "Khayt'ı geliştirmemize yardım eder misiniz?",
   "tel.ask_body": "Khayt siz izin vermedikçe hiçbir şey göndermez. Çökme raporu neyin ters gittiğini söyler; e-postalar, telefon numaraları, uzun numaralar ve dosya yolları çıkarılır. Siparişleriniz, müşterileriniz, fiyatlarınız veya dosyalarınız asla gönderilmez.",
+  "tel.ask_body_count": "Günlük anonim kurulum sayımı dışında Khayt siz izin vermedikçe hiçbir şey göndermez. Çökme raporu neyin ters gittiğini söyler; e-postalar, telefon numaraları, uzun numaralar ve dosya yolları çıkarılır. Siparişleriniz, müşterileriniz, fiyatlarınız veya dosyalarınız asla gönderilmez.",
   "tel.ask_usage": "Kullanım sayılarını da paylaş",
   "tel.ask_share": "Çökme Raporlarını Paylaş",
   "tel.ask_not_now": "Şimdi Değil",

@@ -3102,6 +3102,7 @@
 
   "tel.ask_title": "Nous aider à améliorer Khayt ?",
   "tel.ask_body": "Khayt n'envoie rien sans votre accord. Un rapport d'erreur nous dit ce qui s'est mal passé, sans e-mails, numéros de téléphone, longs numéros ni chemins de fichiers. Jamais vos commandes, clients, prix ou fichiers.",
+  "tel.ask_body_count": "En dehors d'un comptage anonyme quotidien de cette installation, Khayt n'envoie rien sans votre accord. Un rapport d'erreur nous dit ce qui s'est mal passé, sans e-mails, numéros de téléphone, longs numéros ni chemins de fichiers. Jamais vos commandes, clients, prix ou fichiers.",
   "tel.ask_usage": "Partager aussi les compteurs d'utilisation",
   "tel.ask_share": "Partager les rapports d'erreur",
   "tel.ask_not_now": "Pas maintenant",

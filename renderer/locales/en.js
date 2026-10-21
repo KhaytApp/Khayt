@@ -3103,6 +3103,7 @@
 
   "tel.ask_title": "Help make Khayt better?",
   "tel.ask_body": "Khayt sends nothing unless you allow it. A crash report tells us what went wrong, with emails, phone numbers, long numbers and file paths taken out. Never your orders, customers, prices or files.",
+  "tel.ask_body_count": "Apart from an anonymous once-a-day install count, Khayt sends nothing unless you allow it. A crash report tells us what went wrong, with emails, phone numbers, long numbers and file paths taken out. Never your orders, customers, prices or files.",
   "tel.ask_usage": "Also share usage counts",
   "tel.ask_share": "Share Crash Reports",
   "tel.ask_not_now": "Not Now",

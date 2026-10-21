@@ -3102,6 +3102,7 @@
 
   "tel.ask_title": "¿Nos ayudas a mejorar Khayt?",
   "tel.ask_body": "Khayt no envía nada si no lo permites. Un informe de fallo nos dice qué salió mal, sin correos, teléfonos, números largos ni rutas de archivos. Nunca tus pedidos, clientes, precios ni archivos.",
+  "tel.ask_body_count": "Aparte de un recuento anónimo diario de esta instalación, Khayt no envía nada si no lo permites. Un informe de fallo nos dice qué salió mal, sin correos, teléfonos, números largos ni rutas de archivos. Nunca tus pedidos, clientes, precios ni archivos.",
   "tel.ask_usage": "Compartir también los recuentos de uso",
   "tel.ask_share": "Compartir informes de fallos",
   "tel.ask_not_now": "Ahora no",
