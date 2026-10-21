@@ -183,7 +183,14 @@ struct PrinterReviewTests {
     func lanRule() async throws {
         let engine = try KhaytEngine()
         #expect(await PrinterWatch.onThisNetwork(URL(string: "http://192.168.1.50/x")!, engine: engine))
-        #expect(await PrinterWatch.onThisNetwork(URL(string: "http://printer.local:7125/")!, engine: engine))
+        #expect(await PrinterWatch.onThisNetwork(URL(string: "http://printer.local:7125/")!, engine: engine,
+                                                 lookUp: { _ in ["192.168.1.51"] }))
+        #expect(!(await PrinterWatch.onThisNetwork(URL(string: "http://cam.attacker.example/")!, engine: engine,
+                                                   lookUp: { _ in ["93.184.216.34"] })),
+                "a name is judged by what it resolves to")
+        #expect(await PrinterWatch.pinned(URL(string: "http://printer.local:7125/x?y=1")!, engine: engine,
+                                          lookUp: { _ in ["192.168.1.51"] })?.absoluteString
+                == "http://192.168.1.51:7125/x?y=1")
         #expect(!(await PrinterWatch.onThisNetwork(URL(string: "http://8.8.8.8/")!, engine: engine)))
         #expect(!(await PrinterWatch.onThisNetwork(URL(string: "http://127.0.0.1/")!, engine: engine)))
         #expect(!(await PrinterWatch.onThisNetwork(URL(string: "http://169.254.169.254/")!, engine: engine)))

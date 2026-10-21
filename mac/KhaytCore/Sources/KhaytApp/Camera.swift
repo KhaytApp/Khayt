@@ -83,8 +83,12 @@ final class Camera {
     }
 
     /// One still, or why there is not one.
+    ///
+    /// `lookUp` is the resolver, a seam so a test can name a public DNS name
+    /// without asking the real one.
     static func fetch(_ machine: Machine, shop: Shop,
-                      get: ((URLRequest) async throws -> (Data, URLResponse))? = nil) async -> Frame {
+                      get: ((URLRequest) async throws -> (Data, URLResponse))? = nil,
+                      lookUp: @escaping @Sendable (String) async -> [String] = { await WebhookClient.addresses(of: $0) }) async -> Frame {
         guard let engine = shop.engine else { return .none }
         guard machine.hasCamera, let cam = machine.webcam else { return .none }
 
@@ -118,10 +122,13 @@ final class Camera {
             }
             // And the poller's LAN rule, which the one above does not apply
             // to the printer's own host — see the HTTP still below.
-            guard let parsed = URL(string: feed), await PrinterWatch.onThisNetwork(parsed, engine: engine) else {
+            // A name is resolved and the session dialled at the address that
+            // was checked (`PrinterWatch.pinned`).
+            guard let parsed = URL(string: feed),
+                  let aimed = await PrinterWatch.pinned(parsed, engine: engine, lookUp: lookUp) else {
                 return .failed("refused")
             }
-            guard let session = try? RtspSession(url: feed) else { return .failed("bad address") }
+            guard let session = try? RtspSession(url: aimed.absoluteString) else { return .failed("bad address") }
             do { return .picture(try await session.still()) }
             catch Rtsp.Failure.refused(404) {
                 // The camera is there and has not been told to publish locally.
@@ -158,13 +165,24 @@ final class Camera {
         // refuses such a printer (`PrinterWatch.baseURL`); the camera sent it
         // the printer's key on every frame. Same rule here, before anything
         // that may carry a credential is built.
-        guard await PrinterWatch.onThisNetwork(url, engine: engine) else { return .failed("refused") }
-        var request = URLRequest(url: url)
+        //
+        // The rule is the poller's WHOLE rule, resolution included: a NAME is
+        // judged by every address it resolves to, and the request goes to the
+        // address that was checked. Only the text rule used to apply here,
+        // which passes any name — `cam.attacker.example` was sent the key on
+        // every frame (Oct 2026 review), and a name checked here and looked
+        // up again by `URLSession` could answer differently the second time.
+        guard let aimed = await PrinterWatch.pinned(url, engine: engine, lookUp: lookUp) else {
+            return .failed("refused")
+        }
+        var request = URLRequest(url: aimed)
         request.timeoutInterval = 5
         request.httpMethod = "GET"
         // The credential the printer's own adapters send. It reaches the
         // printer and nowhere else — which is only true BECAUSE the host was
-        // pinned above, and is why these two steps are never separated.
+        // checked and the request aimed at the checked address above, and is
+        // why these two steps are never separated. Whether it is the printer
+        // is asked of the URL in the book (`url`), host to host.
         //
         // ONLY TO THE PRINTER ITSELF. A camera may be its own device on the
         // shop's network, and the allow-list above lets it be — so the

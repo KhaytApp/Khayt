@@ -594,10 +594,52 @@ final class PrinterWatch {
     /// applies to a printer? Asked before any request that carries a
     /// printer's credential — a camera URL is matched against the printer's
     /// host, and a printer host that is itself public was never checked.
-    nonisolated static func onThisNetwork(_ url: URL, engine: KhaytEngine) async -> Bool {
+    nonisolated static func onThisNetwork(_ url: URL, engine: KhaytEngine,
+                                          lookUp: @escaping @Sendable (String) async -> [String] = { await WebhookClient.addresses(of: $0) })
+    async -> Bool {
+        await pinned(url, engine: engine, lookUp: lookUp) != nil
+    }
+
+    /// The same URL, aimed at the address `baseURL`'s rule checked — or nil
+    /// when that rule refuses it.
+    ///
+    /// ── A CAMERA'S NAME IS RESOLVED TOO ──────────────────────────────────
+    ///
+    /// This used to apply only the text rule, which passes any name, so a
+    /// synced or restored `webcam.snapshotUrl` (or printer host) naming
+    /// `cam.attacker.example` was fetched with the printer's API key or Bambu
+    /// access code on every frame — the hole #1955 closed for the poller and
+    /// left open here. And checking a name, then letting `URLSession` look it
+    /// up again, is a race a rebinding name wins. So a request that may carry
+    /// a credential is built from THIS URL, never the one in the book.
+    nonisolated static func pinned(_ url: URL, engine: KhaytEngine,
+                                   lookUp: @escaping @Sendable (String) async -> [String] = { await WebhookClient.addresses(of: $0) })
+    async -> URL? {
         guard let raw = url.host(percentEncoded: false), !raw.isEmpty,
-              let host = try? await engine.printerHost(raw), !host.isEmpty else { return false }
-        return (try? await engine.printerHostAllowed(host)) == true
+              let host = try? await engine.printerHost(raw), !host.isEmpty,
+              (try? await engine.printerHostAllowed(host)) == true,
+              let target = await pinnedAddress(host, engine: engine, lookUp: lookUp) else { return nil }
+        guard target != host else { return url }
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        parts.host = target
+        return parts.url
+    }
+
+    /// The address to connect to for a host that passed the text rule: the
+    /// host itself when it is an address, otherwise the checked IPv4 answer
+    /// (or the name, when every answer is link-local IPv6 — the resolver drops
+    /// the zone it would need). Nil when the name resolves to nothing, or to
+    /// any address a printer may not be at.
+    nonisolated static func pinnedAddress(_ host: String, engine: KhaytEngine,
+                                          lookUp: @Sendable (String) async -> [String]) async -> String? {
+        if IPv4Address(host) != nil || IPv6Address(host) != nil { return host }
+        let addresses = await lookUp(host)
+        guard !addresses.isEmpty else { return nil }
+        for address in addresses {
+            let bare = String(address.split(separator: "%", maxSplits: 1).first ?? "")
+            guard await SmartPlug.addressAllowed(bare, engine: engine) else { return nil }
+        }
+        return addresses.first(where: { !$0.contains(":") }) ?? host
     }
 
     // MARK: - The conversations
@@ -898,15 +940,8 @@ final class PrinterWatch {
         guard try await engine.printerHostAllowed(host) else { throw Refusal.notALanAddress(host) }
         let port = machine.printerApi?.port ?? defaultPort(machine.printerApi?.type ?? "")
         guard port > 0, port <= 65535 else { throw Refusal.badPort(port) }
-        var target = host
-        if IPv4Address(host) == nil, IPv6Address(host) == nil {
-            let addresses = await lookUp(host)
-            guard !addresses.isEmpty else { throw Refusal.notALanAddress(host) }
-            for address in addresses {
-                let bare = String(address.split(separator: "%", maxSplits: 1).first ?? "")
-                guard await SmartPlug.addressAllowed(bare, engine: engine) else { throw Refusal.notALanAddress(host) }
-            }
-            if let v4 = addresses.first(where: { !$0.contains(":") }) { target = v4 }
+        guard let target = await pinnedAddress(host, engine: engine, lookUp: lookUp) else {
+            throw Refusal.notALanAddress(host)
         }
         let shown = target.contains(":") ? "[\(target)]" : target
         guard let url = URL(string: "http://\(shown):\(port)") else { throw Refusal.noHost }

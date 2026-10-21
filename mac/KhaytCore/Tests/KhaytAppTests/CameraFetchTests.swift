@@ -90,6 +90,45 @@ struct CameraFetchTests {
         #expect(frame == .picture(png))
     }
 
+    /// ── A NAME IS JUDGED BY WHAT IT RESOLVES TO ─────────────────────────
+    ///
+    /// The text rule passes any name, so a synced or restored book naming
+    /// `cam.attacker.example` — as the printer's host, or as the camera's —
+    /// was fetched with the printer's key on every frame. The poller resolved
+    /// and refused it (#1955); the camera did not.
+    @Test("a camera or printer NAME that resolves off this network gets no request")
+    func aPublicNameIsRefused() async throws {
+        let shop = await Self.shop()
+        for (host, snap) in [("cam.attacker.example", "http://cam.attacker.example/snap.jpg"),
+                             ("192.168.1.50", "http://cam.attacker.example/snap.jpg"),
+                             ("192.168.1.50", "http://mixed.example/snap.jpg")] {
+            let machine = try Self.machine(host: host, snapshot: snap, type: "octoprint")
+            var asked = 0
+            let frame = await Camera.fetch(machine, shop: shop, get: { _ in
+                asked += 1
+                return (Data(), HTTPURLResponse())
+            }, lookUp: { name in name == "mixed.example" ? ["192.168.1.9", "93.184.216.34"] : ["93.184.216.34"] })
+            #expect(asked == 0, "\(snap) was fetched")
+            #expect(frame == .failed("refused"))
+        }
+    }
+
+    /// And a LAN name is fetched at the address that was checked, so a name
+    /// that answers differently to `URLSession`'s own lookup (rebinding) is
+    /// never asked.
+    @Test("a camera name on this network is fetched at the checked address")
+    func aLanNameIsPinned() async throws {
+        let shop = await Self.shop()
+        let machine = try Self.machine(host: "voron.local",
+                                       snapshot: "http://voron.local:8080/webcam/?action=snapshot")
+        var seen: [URL] = []
+        _ = await Camera.fetch(machine, shop: shop, get: { request in
+            seen.append(request.url!)
+            return (Data(), HTTPURLResponse())
+        }, lookUp: { _ in ["192.168.1.50"] })
+        #expect(seen.map(\.absoluteString) == ["http://192.168.1.50:8080/webcam/?action=snapshot"])
+    }
+
     /// ── THE REDIRECT, AND THE KEY THAT USED TO GO WITH IT ───────────────
     ///
     /// A camera is allowed to be its own device now, and the request to it
