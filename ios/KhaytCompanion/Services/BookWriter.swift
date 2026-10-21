@@ -35,8 +35,25 @@ struct BookWriter {
     let book: CompanionBook
 
     /// Advance or set a job's stage.
-    func setOrderStatus(orderId: String, to status: String) throws {
+    ///
+    /// A quote that leaves the Quote column has been accepted, and the day
+    /// is stamped as `lib/order-status.js` stamps it on the Mac: once, not
+    /// for a cancellation, as the LOCAL day. That day is the quote conversion
+    /// rate's and the VAT tax point's (`taxPointDate`); without it a quote
+    /// won from the phone counted as never accepted.
+    func setOrderStatus(orderId: String, to status: String, now: Date = Date()) throws {
         try book.updateRecord(collection: "printLog", id: orderId) { record in
+            let was: String? = { if case .string(let s)? = record["status"] { return s } else { return nil } }()
+            let stamped: Bool = {
+                switch record["quoteAcceptedAt"] {
+                case .string(let s)?: return !s.isEmpty
+                case nil, .null?: return false
+                default: return true
+                }
+            }()
+            if was == "quote", status != "quote", status != "cancelled", !stamped {
+                record["quoteAcceptedAt"] = .string(Self.localDay(now))
+            }
             record["status"] = .string(status)
         }
     }
