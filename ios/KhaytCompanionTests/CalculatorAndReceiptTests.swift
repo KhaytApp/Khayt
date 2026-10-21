@@ -28,7 +28,7 @@ final class CalculatorAndReceiptTests: XCTestCase {
     // MARK: - Calculator
 
     func testTheShelfReadsTheBooksSpellings() throws {
-        let shelf = CalculatorShelf.from(SampleShop.book())
+        let shelf = CalculatorShelf.from(SampleShop.book(), reclaimsTax: false)
         let pla = try XCTUnwrap(shelf.spools.first { $0.id == "SP-203" })
         XCTAssertEqual(pla.costing.cost, 29.99)
         XCTAssertEqual(pla.costing.spoolWeight, 1000, "weightTotal is the wire's name for spoolWeight")
@@ -36,6 +36,30 @@ final class CalculatorAndReceiptTests: XCTestCase {
         XCTAssertEqual(shelf.presets.map(\.id), ["PR-1"])
         XCTAssertEqual(shelf.consumables.count, 2)
         XCTAssertEqual(shelf.currency, "USD")
+    }
+
+    func testAShopThatReclaimsTaxCostsSpoolsWithoutIt() async throws {
+        var store = SampleShop.book()
+        let roll: JSONValue = .object(["id": .string("SP-VAT"), "material": .string("PLA"), "cost": .number(115),
+                                       "vatAmount": .number(15), "spoolWeight": .number(1000)])
+        if case .array(var inventory)? = store["inventory"] { inventory.append(roll); store["inventory"] = .array(inventory) }
+        func cost(_ shelf: CalculatorShelf) -> Double? { shelf.spools.first { $0.id == "SP-VAT" }?.costing.cost }
+
+        XCTAssertEqual(cost(CalculatorShelf.from(store, reclaimsTax: true)), 100, "200 g of it is 20.00, not 23.00")
+        XCTAssertEqual(cost(CalculatorShelf.from(store, reclaimsTax: false)), 115, "a shop that reclaims nothing pays it all")
+
+        // Read from the book: the shop's own VAT setting decides.
+        guard case .object(var settings)? = store["settings"] else { return XCTFail("sample shape") }
+        settings["enableVat"] = .bool(true); settings["vatRate"] = .number(15)
+        store["settings"] = .object(settings)
+        try book.replace(with: store, scope: SampleShop.scope())
+        let registered = try await reader.calculatorShelf()
+        XCTAssertEqual(cost(registered), 100)
+        settings["enableVat"] = .bool(false)
+        store["settings"] = .object(settings)
+        try book.replace(with: store, scope: SampleShop.scope())
+        let unregistered = try await reader.calculatorShelf()
+        XCTAssertEqual(cost(unregistered), 115)
     }
 
     func testThePriceIsTheSharedRulesAnswer() async throws {
@@ -52,7 +76,7 @@ final class CalculatorAndReceiptTests: XCTestCase {
         let store = SampleShop.book()
         guard case .object(let settings)? = store["settings"], case .array(let inventory)? = store["inventory"],
               case .array(let presets)? = store["printers"] else { return XCTFail("sample shape") }
-        let part = CalculatorPart.input(lines: [.init(spool: CalculatorShelf.from(store).spools.first { $0.id == "SP-203" }?.costing,
+        let part = CalculatorPart.input(lines: [.init(spool: CalculatorShelf.from(store, reclaimsTax: false).spools.first { $0.id == "SP-203" }?.costing,
                                                       grams: 120)], purge: 0, hours: 4, qty: 1)
         let costed = try await engine.costPart(part, inventory: inventory, settings: settings, preset: presets.first)
         XCTAssertEqual(answer.costed.cost, costed.cost, accuracy: 0.0001)
