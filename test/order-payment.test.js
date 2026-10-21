@@ -217,3 +217,42 @@ test('a payment reaches what the shop actually switched on', () => {
     P.outboundFor({ id: 'o' }, { settings, clients }).map(x => x.channel),
     ['webhooks', 'event_webhook'], 'and a walk-in is nobody at all');
 });
+
+test('a payment plan with collected rows refuses a clear, and a clear resets the plan base', () => {
+  const Plan = require('../lib/payment-plan.js');
+  // Collected rows are money received; zeroing paidAmount under them came back
+  // on the next collection (instalmentBase + collected).
+  const collected = {
+    price: 300, paidAmount: 200, paymentMethod: 'cash', paidAt: TODAY, instalmentBase: 100,
+    instalments: [{ amount: 100, paid: true, paidAt: TODAY }, { amount: 100, paid: false }],
+  };
+  const before = JSON.stringify(collected);
+  const out = P.clearPayment(collected);
+  assert.equal(out.refused, 'plan_collected');
+  assert.deepEqual(out.effects, [{ type: 'toast_refused', key: 'pay.clear_plan_first' }]);
+  assert.equal(JSON.stringify(collected), before, 'a refusal changes nothing');
+
+  // No row collected: the deposit the plan was built on is what is cleared,
+  // so the next collection counts from zero, not from the cleared deposit.
+  const deposit = {
+    price: 300, paidAmount: 100, instalmentBase: 100,
+    instalments: [{ amount: 100, paid: false }, { amount: 100, paid: false }],
+  };
+  assert.equal(P.clearPayment(deposit).refused, undefined);
+  assert.equal(deposit.paidAmount, 0);
+  assert.equal(deposit.instalmentBase, 0);
+  deposit.instalments[0].paid = true;
+  const t = Plan.collectionTotals({ price: deposit.price, paidAmount: deposit.paidAmount,
+    instalments: deposit.instalments, instalmentBase: deposit.instalmentBase });
+  assert.equal(t.paidAmount, 100, 'the cleared deposit came back');
+
+  // An order with no plan is cleared exactly as before, no base invented.
+  const plain = { price: 100, paidAmount: 100 };
+  P.clearPayment(plain);
+  assert.equal('instalmentBase' in plain, false);
+});
+
+test('Electron shows the refusal', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'renderer', 'order-flows.js'), 'utf8');
+  assert.match(src, /case 'toast_refused': toast\(t\(e\.key\), 'error'\)/);
+});

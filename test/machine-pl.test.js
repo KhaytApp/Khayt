@@ -225,3 +225,22 @@ test('a job marked Not business keeps its machine hours but not its money', () =
   assert.equal(u1.revenue, 50);
   assert.equal(u1.materialCost, 36, 'a test print is not a cost of sales');
 });
+
+test('an expense booked against a job is charged net of reclaimable tax, as the P&L', () => {
+  require('../lib/tax.js');
+  require('../lib/pnl-report.js');
+  const registered = { enableVat: true, vatRate: 15, vat: '300000000000003' };
+  const input = (settings) => ({
+    machines: [{ id: 'M1', name: 'U1' }],
+    completed: [job('J1', 'M1', 500)],
+    expenses: [{ id: 'E1', orderId: 'J1', amount: 115, vatAmount: 15, category: 'shipping', date: '2026-10-01' }],
+    settings,
+  });
+  const row = (s) => machineProfit(input(s), deps).rows.find((r) => r.machineId === 'M1');
+  assert.equal(row(registered).linkedExpenses, 100, 'the 15 is reclaimed, not a cost');
+  assert.equal(row({}).linkedExpenses, 115, 'an unregistered shop pays every riyal');
+  assert.equal(row(undefined).linkedExpenses, 115, 'no settings: as before');
+  // The P&L's own rule says the same.
+  const Pnl = require('../lib/pnl-report.js');
+  assert.equal(Pnl.expenseNetOf({ amount: 115, vatAmount: 15 }, registered), 100);
+});

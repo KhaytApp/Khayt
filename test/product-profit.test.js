@@ -129,3 +129,15 @@ test('nothing at all is an answer, not a throw', () => {
   assert.equal(r.totals.marginPct, null);
   assert.equal(r.totals.bestPerHour, null);
 });
+
+test('an expense booked against a job is charged net of reclaimable tax, as the P&L', () => {
+  require('../lib/tax.js');
+  require('../lib/pnl-report.js');
+  const registered = { enableVat: true, vatRate: 15, vat: '300000000000003' };
+  const orders = [job('J1', 'p1', 'completed', 500, 50, 1)];
+  const expenses = [{ orderId: 'J1', amount: 115, vatAmount: 15 }];
+  const cost = (settings) => of(productProfit({ orders, products, expenses, untagged: 'U', settings }, deps), 'p1').cost;
+  assert.equal(cost(registered), 150);
+  assert.equal(cost({}), 165);
+  assert.equal(cost(undefined), 165);
+});

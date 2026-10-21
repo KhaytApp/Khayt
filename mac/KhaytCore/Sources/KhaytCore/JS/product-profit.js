@@ -36,6 +36,8 @@ const FINISHED = ['completed', 'delivered'];
  *   orders    every order; which ones are finished is part of the answer
  *   products  [{ id }] — only to resolve a name
  *   expenses  expenses linked to an order by `orderId`
+ *   settings  the shop's, so a linked expense is charged net of the tax it
+ *             reclaims, as the P&L charges it; omit it and it is gross
  *   untagged  what to call work that names no product
  * @param {object} deps
  *   revenueOf         (order) => net revenue in base currency
@@ -68,11 +70,21 @@ function productProfit(input, deps) {
   // Expenses booked against a specific job are part of that job's cost, and so
   // part of its product's. Indexed once: a shop with a thousand expenses and a
   // thousand orders would otherwise scan the list a thousand times.
+  //
+  // NET of the tax a registered shop reclaims, the P&L's rule
+  // (`KhaytPnl.expenseNetOf`): charged gross, a product read 15% of every
+  // linked bill worse here than the P&L counts it. No `settings`, the gross.
+  const Pnl = global.KhaytPnl
+    || (typeof require === 'function'
+      ? (() => { try { return require('./pnl-report.js'); } catch (e) { return null; } })()
+      : null);
+  const expenseCost = (e) => (Pnl && typeof Pnl.expenseNetOf === 'function' && i.settings)
+    ? num(Pnl.expenseNetOf(e, i.settings)) : num(e && e.amount);
   const linked = new Map();
   for (const e of (Array.isArray(i.expenses) ? i.expenses : [])) {
     const id = String((e && e.orderId) || '');
     if (!id) continue;
-    linked.set(id, num(linked.get(id)) + num(e && e.amount));
+    linked.set(id, num(linked.get(id)) + expenseCost(e));
   }
 
   const byProduct = new Map();

@@ -173,6 +173,8 @@ function computeHandoffMachineRows() {
     machines,
     completed: orders,
     expenses: expenses.filter(e => e.orderId),
+    // Net of reclaimable tax, as the P&L charges them (lib/machine-pl.js).
+    settings,
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
     // A job's logged labour, charged to the machine it ran on.
     timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : [])
@@ -1593,6 +1595,8 @@ function renderPrinterUtilizationChart() {
     machines,
     completed: orders,
     expenses: expenses.filter(e => e.orderId),
+    // Net of reclaimable tax, as the P&L charges them (lib/machine-pl.js).
+    settings,
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
     // A job's logged labour, charged to the machine it ran on.
     timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : [])
@@ -1797,6 +1801,7 @@ function renderProductProfitability() {
   const report = KhaytProductProfit.productProfit({
     orders: (printLog || []).filter(o => inRange(o.date, analyticsRange, 'analytics')),
     products: products || [], expenses: expenses || [], untagged: t('an.untagged'),
+    settings,   // linked expenses net of reclaimable tax, as the P&L
   }, {
     revenueOf: orderEarnedBase, partCostOf: partTotalCost,
     nameOf: localName, countsForBusiness: _countsForBusiness,
@@ -1999,6 +2004,8 @@ function renderMachinePL() {
     machines,
     completed,
     expenses: expenses.filter(e => e.orderId),
+    // Net of reclaimable tax, as the P&L charges them (lib/machine-pl.js).
+    settings,
     maintenance: machMaintLog.filter(e => inRange(e.date, analyticsRange, 'analytics')),
     // A job's logged labour, charged to the machine it ran on.
     timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : [])

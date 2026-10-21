@@ -82,3 +82,14 @@ test('pricingFields writes the three fields it owns and no others', () => {
   const fields = pricing.pricingFields({ defaultMargin: 35, parts: [PART] }, {});
   assert.deepEqual(Object.keys(fields).sort(), ['basePrice', 'baseCost', 'price'].sort());
 });
+
+test('a product with no margin of its own is priced at the shop default, as a sale from it is', () => {
+  const part = { name: 'P', printWeight: 1000, spoolCost: 100, spoolWeight: 1000, qty: 1 };
+  // The shop quotes at 50: the catalogue said cost × 1.3, the counter sale cost × 1.5.
+  assert.equal(pricing.priceProduct({ parts: [part] }, { settings: { defaultMargin: 50 } }).basePrice, 150);
+  assert.equal(pricing.priceProduct({ parts: [part] }, { settings: {} }).basePrice, 130, 'no shop default: 30');
+  assert.equal(pricing.priceProduct({ parts: [part], defaultMargin: 20 }, { settings: { defaultMargin: 50 } }).basePrice, 120,
+    "the product's own margin still wins");
+  assert.equal(pricing.priceProduct({ parts: [part], defaultMargin: 0 }, { settings: { defaultMargin: 50 } }).basePrice, 100,
+    'a margin of 0 is a margin, not a blank');
+});

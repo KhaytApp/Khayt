@@ -1390,6 +1390,7 @@ function runPaymentEffects(order, effects) {
       case 'render': renderLogs(); renderKanban(); renderAnalytics(); break;
       case 'toast_saved': toast(t('pay.saved'), 'success'); break;
       case 'toast_cleared': toast(t('pay.cleared'), 'success'); break;
+      case 'toast_refused': toast(t(e.key), 'error'); break;
       case 'webhook':
         fireWebhook(e.event, {
           orderId: order.id, amount: order.paidAmount,

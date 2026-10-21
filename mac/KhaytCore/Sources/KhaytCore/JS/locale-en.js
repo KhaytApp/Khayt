@@ -802,6 +802,7 @@
   "pay.modal_title": "Record payment",
   "pay.saved": "Payment recorded",
   "pay.cleared": "Payment cleared",
+  "pay.clear_plan_first": "Instalments on this order are marked collected. Untick them in the payment plan first, then clear the payment.",
   "pay.receivables": "Outstanding",
   "pay.outstanding": "Outstanding balance",
   "pay.gift_card_credit": "Gift card credit applied",

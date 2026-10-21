@@ -188,11 +188,33 @@
    * reading as paid — and somebody clearing a payment means the order is owed.
    */
   function clearPayment(order) {
+    // ── NOT WHILE A PAYMENT PLAN SAYS MONEY WAS COLLECTED ──────────────────
+    //
+    // A plan's collected rows are records of money received, each with its own
+    // date, and `KhaytPaymentPlan.collectionTotals` rebuilds `paidAmount` from
+    // them (`instalmentBase + collected`) on the next collection. Zeroing the
+    // figure under them did not clear anything: the cleared money came back
+    // the next time a row was ticked. Unticking the rows here instead would
+    // erase that history from a button that says nothing about it, so the
+    // move is refused and the shop clears the plan's rows itself, where it can
+    // see which of them were really collected. Nothing is changed.
+    const rows = Array.isArray(order && order.instalments) ? order.instalments : [];
+    if (rows.some((r) => r && (r.paid || r.paidAt))) {
+      return {
+        refused: 'plan_collected',
+        notices: [{ type: 'refused', key: 'pay.clear_plan_first' }],
+        effects: [{ type: 'toast_refused', key: 'pay.clear_plan_first' }],
+      };
+    }
     order.paidAmount = 0;
     order.paidGross = true;
     order.paymentMethod = null;
     order.paidAt = null;
     order.paymentStatus = 'unpaid';
+    // The plan's base is the cash the order held when the plan was made. That
+    // is the cash being cleared, so it is cleared too — or the next collection
+    // adds it back (`instalmentBase + collected`).
+    if (order.instalmentBase != null) order.instalmentBase = 0;
     return {
       notices: [],
       effects: [{ type: 'save' }, { type: 'render' }, { type: 'toast_cleared' }],

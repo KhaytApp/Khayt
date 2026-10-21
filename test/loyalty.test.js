@@ -294,3 +294,10 @@ test('redemption: no rate set means the default rate, not a worthless card', () 
   assert.equal(made.ok, true);
   assert.equal(made.card.balance, 2.5);
 });
+
+test('pointsToCredit is money: rounded to the halala', () => {
+  assert.equal(L.pointsToCredit(7, 0.1), 0.7);
+  assert.equal(L.pointsToCredit(333, 0.015), 5);     // 4.995
+  assert.equal(L.pointsToCredit(1, 0.004), 0);       // under half a halala
+  assert.equal(L.pointsToCredit(123, 0.0333), 4.1);  // 4.0959
+});
