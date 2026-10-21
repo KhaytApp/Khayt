@@ -1185,6 +1185,8 @@
   "pe.price_is_override": "Kendi fiyatınız",
   "pe.price_is_rounded": "Şundan yuvarlandı",
   "pe.price_is_base": "Hesaplanan",
+  "pe.price_kept": "Kayıtlı fiyat korundu; bugünkü maliyetlerle {now} olur",
+  "pe.price_was_now": "önce {was} → şimdi {now}",
   "pe.filled_from_file": "Ağırlık ve süre dosyadan dolduruldu.",
   "pe.fill_kept": "Kendi girdiğiniz değerler korundu.",
   "pe.image_too_big": "Görsel çok büyük — 8 MB altında bir tane deneyin.",

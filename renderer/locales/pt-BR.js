@@ -1186,6 +1186,8 @@
   "pe.price_is_override": "Seu próprio preço",
   "pe.price_is_rounded": "Arredondado de",
   "pe.price_is_base": "Calculado",
+  "pe.price_kept": "Preço salvo mantido; com os custos de hoje seria {now}",
+  "pe.price_was_now": "era {was} → agora {now}",
   "pe.filled_from_file": "Peso e tempo preenchidos a partir do arquivo.",
   "pe.fill_kept": "Seus próprios valores foram mantidos.",
   "pe.image_too_big": "Imagem muito grande — tente uma com menos de 8 MB.",

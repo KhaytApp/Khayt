@@ -36,6 +36,7 @@
     "test:e2e:webhooks": "node scripts/e2e-webhook-bus-smoke.mjs",
     "test:e2e:lots": "node scripts/e2e-lot-recall-smoke.mjs",
     "test:e2e:phones": "node scripts/e2e-paired-phones-smoke.mjs",
+    "test:e2e:pricekeep": "node scripts/e2e-product-price-keep-smoke.mjs",
     "test:e2e:settingsro": "node scripts/e2e-settings-readonly-smoke.mjs",
     "test:e2e:takedown": "node scripts/e2e-erase-takedown-smoke.mjs",
     "test:e2e:activecount": "node scripts/e2e-active-count-smoke.mjs",

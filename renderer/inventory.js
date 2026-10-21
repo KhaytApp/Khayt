@@ -3457,6 +3457,19 @@ function openProductEditor(productId = null) {
         parts: [],
         createdAt: localDateStr()
       };
+  /* A SAVED PRICE NEVER CHANGES SILENTLY (Turki's rule; the Mac's
+   * Shop+Messages.swift keeps the stored price on an untouched save).
+   *
+   * Saving re-prices from parts, and a pricing rule can change under a product
+   * (a part's quantity started counting, a spool got dearer): a description
+   * edit used to rewrite the price with nobody told. So the product is priced
+   * once AS OPENED, under the same rules as the edit. A save whose draft prices
+   * the same keeps the stored cost and price; one that prices differently says
+   * "was → now" before Save. */
+  const openedPricing = existing ? productDefaultPricing(JSON.parse(JSON.stringify(existing))) : null;
+  const storedPrice = existing ? (existing.price ?? existing.basePrice ?? null) : null;
+  const pricingMoved = (r) => !openedPricing
+    || ['cost', 'basePrice', 'price'].some((k) => Math.abs((+r[k] || 0) - (+openedPricing[k] || 0)) >= 0.005);
   /* Every per-language field has to EXIST on the draft before the form is built.
    *
    * The [data-f] sync below writes a field only if the draft already has that
@@ -3806,6 +3819,16 @@ function openProductEditor(productId = null) {
         const cEl = modal.querySelector('#prodCostVal');
         const pEl = modal.querySelector('#prodPriceVal');
         const wEl = modal.querySelector('#prodPriceWhy');
+        // Nothing that prices it has been touched: what Save keeps is the
+        // stored figure, so that is what is shown — with today's figure beside
+        // it when the two differ, so the shop can choose to re-price.
+        if (existing && storedPrice != null && !pricingMoved(r)) {
+          if (cEl) cEl.textContent = fmtPrice(+existing.baseCost || r.cost);
+          if (pEl) pEl.textContent = fmtPrice(+storedPrice);
+          if (wEl) wEl.textContent = Math.abs(r.price - storedPrice) < 0.005
+            ? '' : `(${t('pe.price_kept', { now: fmtPrice(r.price) })})`;
+          return;
+        }
         if (cEl) cEl.textContent = fmtPrice(r.cost);
         if (pEl) pEl.textContent = fmtPrice(r.price);
         // Say WHICH number this is. A rounded price that does not admit it looks
@@ -3813,8 +3836,12 @@ function openProductEditor(productId = null) {
         // apart — including the calculated figure, shown when it differs.
         if (wEl) {
           const why = KhaytProductPrice.describe(r, t);
-          wEl.textContent = (r.priceSource === 'base' || Math.abs(r.price - r.basePrice) < 0.005)
-            ? '' : `(${why} · ${fmtPrice(r.basePrice)})`;
+          const parts = [];
+          if (existing && storedPrice != null && Math.abs(r.price - storedPrice) >= 0.005) {
+            parts.push(t('pe.price_was_now', { was: fmtPrice(+storedPrice), now: fmtPrice(r.price) }));
+          }
+          if (!(r.priceSource === 'base' || Math.abs(r.price - r.basePrice) < 0.005)) parts.push(`${why} · ${fmtPrice(r.basePrice)}`);
+          wEl.textContent = parts.length ? `(${parts.join(' · ')})` : '';
         }
       }
 
@@ -4155,10 +4182,14 @@ function openProductEditor(productId = null) {
       // Compute default pricing from parts + margin (same math as the calculator) so
       // the product carries a ready price without a separate quoting step.
       const pricing = productDefaultPricing(draft);
-      draft.baseCost = pricing.cost;
-      draft.basePrice = pricing.basePrice;
-      // What the shop actually charges, after its own rounding or override.
-      draft.price = pricing.price;
+      // An edit that does not touch what prices the product keeps its stored
+      // figures (see openedPricing above): a saved price never changes silently.
+      if (!(existing && storedPrice != null && !pricingMoved(pricing))) {
+        draft.baseCost = pricing.cost;
+        draft.basePrice = pricing.basePrice;
+        // What the shop actually charges, after its own rounding or override.
+        draft.price = pricing.price;
+      }
 
       // Persist
       /* Through lib/organise.js, so a name matching one already in use adopts

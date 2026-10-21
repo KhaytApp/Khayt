@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a saved product price never changes on its own.** Saving a
+  catalogue product re-priced it from its parts every time, so an edit to
+  its name or group could quietly change its price when the costs or the
+  pricing rules had moved since it was last priced. A save that doesn't touch
+  anything that prices the product now keeps its saved price, and the editor
+  shows what today's costs would give beside it. An edit that does change the
+  price says "was … → now …" before you save. The same as the Mac.
+
 - **iPhone: a quote moved on from the phone counts as accepted.** When the
   phone moved a quote to Pending (or any stage but Cancelled) in its own
   copy of the book, it didn't record the acceptance day. The quote then
