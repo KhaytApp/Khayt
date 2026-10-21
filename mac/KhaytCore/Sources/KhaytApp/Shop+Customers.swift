@@ -850,6 +850,9 @@ extension Shop {
         }
         let ids = Set(files.map(\.id))
         let roots = libraryRoots?.roots ?? []
+        // A linked folder's model is remembered too: its file stays where the
+        // shop keeps it, and the next linked scan would index it again.
+        let remembering = roots + linkedFolders
         let base = libraryBase()
         // Off the screen NOW — see `Shop+LibraryWrites.swift`. Everything
         // below is off the main thread until the book is written.
@@ -864,15 +867,16 @@ extension Shop {
                 let present = Set(before.compactMap(Self.recordId)).intersection(ids)
                 rows.removeAll { Self.recordId($0).map(ids.contains) ?? false }
                 root["printFiles"] = .array(rows)
-                // A model ADOPTED from the library's own folder keeps its file
-                // where the shop put it — so remember not to adopt it again,
-                // or the delete is undone on the next launch (`LibraryStorage`).
+                // A model ADOPTED from the library's own folder, or indexed
+                // from a linked one, keeps its file where the shop put it — so
+                // remember not to take it in again, or the delete is undone on
+                // the next launch (`LibraryStorage`, `rescanLinkedFolders`).
                 var settings = Self.settings(root)
                 var library: [String: JSONValue] = [:]
                 if case .object(let l)? = settings["printLibrary"] { library = l }
                 var already: [JSONValue] = []
                 if case .array(let a)? = library["notAdopted"] { already = a }
-                let next = Self.notAdoptedAfterDeleting(chosen, roots: roots, already: already)
+                let next = Self.notAdoptedAfterDeleting(chosen, roots: remembering, already: already)
                 if next.count != already.count || next != already {
                     library["notAdopted"] = .array(next)
                     settings["printLibrary"] = .object(library)

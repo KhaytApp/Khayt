@@ -714,6 +714,11 @@ extension Shop {
         // lock: system — fetches a model the shop asked for, into its own folder; removes only its marker and half-written .part.
         let data = try Data(contentsOf: marker)
         let m = try JSONDecoder().decode(OnlineMarker.self, from: data)
+        // The bucket the marker was written for, or none — as a complete
+        // delete refuses (`markerBuckets`): a bucket switched since may hold
+        // an unrelated object at the same key, and it would be brought down
+        // as this model.
+        if !m.bucket.isEmpty, m.bucket != c.bucket { throw CloudLibrary.Failure.otherBucket(m.bucket) }
         // To a file and hashed from it: a model is never held in memory whole.
         guard let file = try await S3.getFile(c, key: m.key, download: download) else { throw CloudLibrary.Failure.notThere }
         do {
@@ -1100,7 +1105,9 @@ extension Shop {
     }
 
     /// The paths to remember as "not to be adopted again", for records being
-    /// deleted: those whose file is in a library root, held in place.
+    /// deleted: those whose file is in one of `roots`, held in place — the
+    /// library's own folders, and the linked ones (`linkedWalk` skips these
+    /// as it skips a path already indexed).
     nonisolated static func notAdoptedAfterDeleting(_ files: [LibraryFile], roots: [String],
                                                     already: [JSONValue]) -> [JSONValue] {
         var out = already
