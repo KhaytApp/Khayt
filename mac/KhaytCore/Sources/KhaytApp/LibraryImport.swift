@@ -691,6 +691,11 @@ enum LibraryImport {
         /// Tags the new record starts with — a linked model's collection
         /// (`PrintSort.Placement.collection`): where it came from.
         var tags: [String] = []
+        /// Never to the Trash, whatever the import's `keepOriginal` says: a
+        /// scratch copy out of an archive, which is not the shop's file and
+        /// which its caller deletes. "Move originals" put every model of a
+        /// zip into ~/.Trash, one scratch copy at a time.
+        var keepOriginal = false
 
         /// Files with no grouping — what `--import` of a bare list means, and
         /// what most tests want. Spelled out at the call site so a caller that
@@ -796,7 +801,8 @@ enum LibraryImport {
                 }
                 let added = try await add(file.url, storeURL: storeURL, libraryRoot: libraryRoot,
                                           knownHashes: known, nameOfExisting: nameOfExisting,
-                                          engine: engine, keepOriginal: keepOriginal, inPlace: false,
+                                          engine: engine, keepOriginal: keepOriginal || file.keepOriginal,
+                                          inPlace: false,
                                           group: file.group, documents: file.documents,
                                           title: file.title,
                                           tags: file.tags,

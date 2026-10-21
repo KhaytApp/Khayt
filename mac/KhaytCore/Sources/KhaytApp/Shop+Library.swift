@@ -1063,17 +1063,19 @@ extension Shop {
                 scratches.append(out.scratch)
                 // Grouped by the archive's own name, the way a folder of models
                 // is grouped by the folder — see `ImportGrouping`.
+                // Kept, not moved: they are scratch copies, deleted below,
+                // and "move originals" would send each one to the Trash.
                 files += ImportGrouping.incoming(archive: out.models, group: out.group,
                                                  documents: out.documents)
+                    .map { var f = $0; f.keepOriginal = true; return f }
             } catch let refusal as ArchiveImport.Failure {
                 refusals.append(refusal.description)
             } catch {
                 refusals.append(self.said(error))
             }
         }
-        // The scratch copies are consumed by the import (it MOVES them in), but
-        // a refusal or a duplicate leaves some behind, and they are in the
-        // system temp directory either way.
+        // The scratch copies are imported as kept originals (copied in, never
+        // trashed), and deleted here with the rest of the scratch folder.
         defer { for dir in scratches { try? FileManager.default.removeItem(at: dir) } }
 
         guard !files.isEmpty else {
