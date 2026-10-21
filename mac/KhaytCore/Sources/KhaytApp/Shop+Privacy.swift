@@ -29,6 +29,9 @@ struct ErasedCustomer: Sendable, Equatable {
     let jobs: [Job]
     let intake: [JSONValue]
     let intakeHistory: [JSONValue]
+    /// The tracking tokens of this customer's jobs whose pages a full erase
+    /// takes down from Khayt Cloud. Undo does not put a page back.
+    var takenDown: [String] = []
 }
 
 /// A customer's rights over their own data (PDPL): to have it, and to have it
@@ -160,6 +163,7 @@ extension Shop {
 
         let blank = Set(full ? plan.blankNameOrderIds : [])
         var jobs: [ErasedCustomer.Job] = []
+        var takenDown: [String] = []
         var log = rows(root, "printLog")
         for i in log.indices {
             guard case .object(var o) = log[i], case .string(let link)? = o["clientId"], link == clientId,
@@ -167,6 +171,17 @@ extension Shop {
             o["clientId"] = .null
             var was: JSONValue?
             if blank.contains(id) { was = o["client"] ?? .null; o["client"] = .string("") }
+            // A published job's page lives on Khayt Cloud, linked to the
+            // customer's email and holding their messages and photos. A full
+            // erase takes every one down, invoiced and paid jobs included: the
+            // invoice stays in the book, the tracking page was a convenience.
+            // The mark goes in this write, so nothing on this Mac republishes
+            // the page; the DELETE follows the write (`eraseCustomer`).
+            if full, o["cloudPublished"] == .bool(true),
+               case .string(let token)? = o["trackingToken"], !token.isEmpty {
+                takenDown.append(token)
+                o["cloudPublished"] = .bool(false)
+            }
             jobs.append(.init(id: id, blankedName: was))
             log[i] = .object(o)
         }
@@ -189,7 +204,7 @@ extension Shop {
         let intake = full ? purge("waitingList", plan.purgeIntakeIds) : []
         let history = full ? purge("waitingListHistory", plan.purgeIntakeHistoryIds) : []
         return ErasedCustomer(clientId: clientId, client: client, index: index, jobs: jobs,
-                              intake: intake, intakeHistory: history)
+                              intake: intake, intakeHistory: history, takenDown: takenDown)
     }
 
     /// Undo's half: the record back where it was, the jobs relinked (and
@@ -248,6 +263,9 @@ extension Shop {
             await load(source)
             moveNotices = [words.callIt(full ? "priv.erased_full" : "ce.deleted")]
             await customersChangedOnCloud()
+            // After the write, as a job delete does: the book is erased either
+            // way, and a page that would not come down is said, not swallowed.
+            await takeDownLinks(outcome.takenDown, engine: engine)
         } catch {
             moveProblem = self.said(error)
         }

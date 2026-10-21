@@ -216,6 +216,71 @@ struct CustomerPrivacyTests {
         #expect(Self.ids(after, "waitingListHistory").count == 2)
     }
 
+    /// The book, with every job's tracking page published on Khayt Cloud.
+    static func publishedBook() -> [String: JSONValue] {
+        var root = book()
+        root["printLog"] = .array(MoveJobTests.rows(root, "printLog").map { row in
+            var o = row
+            guard let id = MoveJobTests.string(o["id"]) else { return .object(row) }
+            o["trackingToken"] = .string("tok-" + id)
+            o["cloudPublished"] = .bool(true)
+            return .object(o)
+        })
+        return root
+    }
+
+    @Test("full erase takes down every page of theirs, invoiced and paid included, and marks them down")
+    func fullEraseTakesDownTheirPages() async throws {
+        let url = try DeleteJobsAndCustomersTests.scratch(Self.publishedBook())
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let erased = try #require(try await Self.erase("C1", full: true, at: url))
+        #expect(Set(erased.takenDown) == ["tok-J-QUOTE", "tok-J-INV", "tok-J-PAID"])
+        let after = try DeleteJobsAndCustomersTests.onDisk(url)
+        for id in ["J-QUOTE", "J-INV", "J-PAID"] {
+            #expect(try Self.job(after, id)["cloudPublished"] == .bool(false), "\(id) would be republished")
+        }
+        #expect(try Self.job(after, "J-HIND")["cloudPublished"] == .bool(true), "another customer's page came down")
+
+        // Undo puts the customer back, not a page that is no longer there.
+        try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+            Shop.applyCustomerUnerase(to: &root, erased)
+        }
+        let undone = try DeleteJobsAndCustomersTests.onDisk(url)
+        #expect(try Self.job(undone, "J-QUOTE")["cloudPublished"] == .bool(false))
+    }
+
+    @Test("unlink leaves the pages up")
+    func unlinkLeavesPages() async throws {
+        let url = try DeleteJobsAndCustomersTests.scratch(Self.publishedBook())
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let erased = try #require(try await Self.erase("C1", full: false, at: url))
+        #expect(erased.takenDown.isEmpty)
+        #expect(try Self.job(try DeleteJobsAndCustomersTests.onDisk(url), "J-INV")["cloudPublished"] == .bool(true))
+    }
+
+    @Test("every page is asked to come down, a failure does not stop the rest, and is reported")
+    func takeDownIsBestEffort() async {
+        final class Seen: @unchecked Sendable { var tokens: [String] = [] }
+        let seen = Seen()
+        let allDown = await Shop.takeDown(["a", "b", "c"]) { tok in
+            seen.tokens.append(tok)
+            if tok == "b" { throw PortalClient.Failure.unreachable("offline") }
+        }
+        #expect(seen.tokens == ["a", "b", "c"])
+        #expect(allDown == false)
+        #expect(await Shop.takeDown(["a"]) { _ in } == true)
+    }
+
+    @Test("the erase takes the pages down after the book write, as a job delete does")
+    func eraseWiresTheTakedown() throws {
+        let src = try QuoteSheetStatusTests.source("Shop+Privacy.swift")
+        let body = try #require(src.range(of: "func eraseCustomer(").map { String(src[$0.lowerBound...]) })
+        let write = try #require(body.range(of: "StoreWriter.updateAsync"))
+        let down = try #require(body.range(of: "await takeDownLinks(outcome.takenDown"))
+        #expect(write.lowerBound < down.lowerBound)
+    }
+
     // MARK: - The lock and the words
 
     @Test("the erase and the export ask the lock, and the erase asks what Delete asks")

@@ -164,14 +164,21 @@ extension Shop {
         guard cloudRoleCanWrite, let creds = try? await portalCredentials() else {
             moveProblem = words.callIt("mac.delete_portal_kept"); return
         }
-        for tok in tokens {
-            do {
-                try await PortalClient.unpublish(pubToken: tok, baseUrl: creds.url, shopId: creds.shopId,
-                                                 token: creds.token, engine: engine)
-            } catch {
-                moveProblem = words.callIt("mac.delete_portal_kept")
-            }
+        let allDown = await Self.takeDown(tokens) { tok in
+            try await PortalClient.unpublish(pubToken: tok, baseUrl: creds.url, shopId: creds.shopId,
+                                             token: creds.token, engine: engine)
         }
+        if !allDown { moveProblem = words.callIt("mac.delete_portal_kept") }
+    }
+
+    /// Each link in turn, a failure not stopping the rest. True when every
+    /// one came down.
+    static func takeDown(_ tokens: [String], unpublish: (String) async throws -> Void) async -> Bool {
+        var allDown = true
+        for tok in tokens {
+            do { try await unpublish(tok) } catch { allDown = false }
+        }
+        return allDown
     }
 
     /// Take a job's link down; the job stops refreshing it.
