@@ -21,7 +21,8 @@ const book = () => ({
   ],
   machMaintLog: [{ id: 'L1', machineId: 'M1' }],
   printFiles: [{ id: 'F', setups: [{ machineId: 'M1' }] }],
-  settings: { printerCompletions: { M1: { at: 'x' } } },
+  // Top level, where both apps write it — not under settings.
+  printerCompletions: { M1: [{ at: 'x' }] },
   tombstones: [{ collection: 'machines', id: 'M2' }],
 });
 
@@ -36,8 +37,13 @@ test('the three states, from the fields both apps write', () => {
 
 test('references count every record that names the machine, nested ones included', () => {
   const r = MS.references(book(), 'M1');
-  assert.deepEqual(r.by, { printLog: 3, machMaintLog: 1, printFiles: 1, 'settings.printerCompletions': 1 });
+  assert.deepEqual(r.by, { printLog: 3, machMaintLog: 1, printFiles: 1, printerCompletions: 1 });
   assert.equal(r.total, 6);
+  // A book from before the cache moved out of settings still counts, and once.
+  const legacy = Object.assign(book(), { printerCompletions: undefined, settings: { printerCompletions: { M3: {} } } });
+  assert.equal(MS.references(legacy, 'M3').by.printerCompletions, 1);
+  const both = Object.assign(book(), { settings: { printerCompletions: { M1: {} } } });
+  assert.equal(MS.references(both, 'M1').total, 6, 'kept in both places is one record');
   assert.equal(MS.references(book(), 'M3').by.printLog, 1, 'a part on the machine is history');
   assert.equal(MS.references(book(), 'M2').total, 0, 'a tombstone is not history');
 });

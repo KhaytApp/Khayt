@@ -11555,7 +11555,7 @@ public actor KhaytEngine {
     /// `lib/machine-status.js canDelete`: whether a printer may be deleted, and
     /// when it may not, what in the book still names it. `reason` is
     /// `has_history`, `missing` or nil; `by` is collection → how many records
-    /// (`printLog`, `machMaintLog`, `settings.printerCompletions`, …).
+    /// (`printLog`, `machMaintLog`, `printerCompletions`, …).
     public struct MachineDeleteVerdict: Decodable, Sendable, Equatable {
         public let ok: Bool
         public let reason: String?
