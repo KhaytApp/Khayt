@@ -288,4 +288,59 @@ extension Shop {
             record["userPhotoRemoved"] = .bool(true)
         }
     }
+
+    // ── THE PHOTO, FROM WHERE A SHOP LOOKS FOR IT ─────────────────────────────
+    //
+    // "I dont see an option to add a photo manually to the library." It was
+    // there, as the last section of the model's page, under parts, versions,
+    // setups and consumables — and nowhere else. These are the same write by
+    // two shorter roads: the model's right-click menu and a picture dropped on
+    // its tile. Both end in `setLibraryPhoto`, so the bytes are the section's.
+
+    /// Choose a photo for one model in a panel — the right-click menu's door.
+    ///
+    /// A panel rather than `fileImporter`: a context menu is gone by the time
+    /// its item runs, and a sheet hung on it would have nothing to hang from.
+    func chooseLibraryPhoto(for fileId: LibraryFile.ID) {
+        guard canMoveJobs else { writeProblem = words.callIt("mac.move_sample"); return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = LibraryPhoto.kinds
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.prompt = words.callIt("mac.lp_add")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        setLibraryPhoto(fileId, from: url)
+    }
+
+    /// What a drop on one model's tile means.
+    enum TileDrop: Equatable {
+        /// Pictures, and only pictures: the first is this model's photo.
+        case photo(URL)
+        /// Anything else is what a drop on the library always was, an import.
+        case models([URL])
+    }
+
+    /// Pictures become the photo; a drop with ANY model, folder or archive in
+    /// it goes to the import untouched. A tile covers most of the grid, so a
+    /// `.stl` let fall on one has to import exactly as it did before tiles
+    /// took drops at all.
+    nonisolated static func tileDrop(_ urls: [URL]) -> TileDrop? {
+        guard !urls.isEmpty else { return nil }
+        if urls.allSatisfy(LibraryPhoto.isPicture) { return .photo(urls[0]) }
+        return .models(urls)
+    }
+
+    /// A drop on a model's tile. The grid's own gate, so a tile never takes
+    /// what the library around it would refuse.
+    func dropOnModelTile(_ urls: [URL], onto fileId: LibraryFile.ID) -> Bool {
+        guard canMoveJobs, let drop = Self.tileDrop(urls) else { return false }
+        switch drop {
+        case .photo(let url):
+            setLibraryPhoto(fileId, from: url)
+        case .models(let urls):
+            guard !importing else { return false }
+            Task { await addModelsToLibrary(urls) }
+        }
+        return true
+    }
 }
