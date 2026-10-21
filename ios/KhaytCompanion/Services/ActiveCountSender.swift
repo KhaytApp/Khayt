@@ -33,7 +33,32 @@ final class ActiveCountSender {
         static let doneDay = "khayt.activeCount.doneDay"
     }
 
-    init(settings: ConnectionSettings, defaults: UserDefaults = .standard, session: URLSession = .shared,
+    /// No cookies, no cache, nothing of CFNetwork's own: the request carries
+    /// the six fields and the fixed headers of `request(_:)`.
+    static let session: URLSession = {
+        let c = URLSessionConfiguration.ephemeral
+        c.httpShouldSetCookies = false
+        c.httpCookieStorage = nil
+        c.urlCache = nil
+        return URLSession(configuration: c)
+    }()
+
+    /// The body and fixed headers. A User-Agent and Accept-Language of our
+    /// own, so the system's (the build number, the phone's languages and
+    /// region) never go with it, as on the Mac.
+    nonisolated static func request(_ body: Data) -> URLRequest {
+        var request = URLRequest(url: ActiveCount.endpoint, cachePolicy: .reloadIgnoringLocalCacheData,
+                                 timeoutInterval: 15)
+        request.httpMethod = "POST"
+        request.httpShouldHandleCookies = false
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Khayt", forHTTPHeaderField: "User-Agent")
+        request.setValue("en", forHTTPHeaderField: "Accept-Language")
+        request.httpBody = body
+        return request
+    }
+
+    init(settings: ConnectionSettings, defaults: UserDefaults = .standard, session: URLSession = ActiveCountSender.session,
          ready: Bool = ActiveCountSender.ready, channel: @escaping () async -> String? = ActiveCountSender.releaseChannel) {
         self.settings = settings
         self.defaults = defaults
@@ -63,11 +88,7 @@ final class ActiveCountSender {
         // No channel, a build from Xcode, say: not an install to count.
         guard let channel = await channel() else { return }
         let flags = ActiveCount.flags(lastCounted: state.lastCounted, now: now)
-        var request = URLRequest(url: ActiveCount.endpoint)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 15
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = ActiveCount.body(platform: "ios", channel: channel, version: version, flags: flags)
+        let request = Self.request(ActiveCount.body(platform: "ios", channel: channel, version: version, flags: flags))
         let status = ((try? await session.data(for: request))?.1 as? HTTPURLResponse)?.statusCode ?? 0
         let outcome = ActiveCount.outcome(status: status)
         state = state.after(outcome, now: now)

@@ -25,7 +25,7 @@ final class ActiveCountSenderTests: XCTestCase {
     }
 
     private func sender(ready: Bool = true, channel: String? = "beta") -> ActiveCountSender {
-        let config = URLSessionConfiguration.ephemeral
+        let config = ActiveCountSender.session.configuration
         config.protocolClasses = [CountCloud.self]
         return ActiveCountSender(settings: settings, defaults: defaults, session: URLSession(configuration: config),
                                  ready: ready, channel: { channel })
@@ -49,6 +49,20 @@ final class ActiveCountSenderTests: XCTestCase {
         XCTAssertEqual(CountCloud.bodies.count, 2)
         XCTAssertEqual(CountCloud.bodies.last?["firstEver"] as? Bool, false)
         XCTAssertEqual(CountCloud.bodies.last?["firstThisWeek"] as? Bool, false, "Wednesday then Thursday: one ISO week")
+    }
+
+    func testNoHeaderSaysMoreThanTheBody() async throws {
+        HTTPCookieStorage.shared.setCookie(HTTPCookie(properties: [.domain: "cloud.khaytapp.com", .path: "/", .name: "t", .value: "1"])!)
+        defer { HTTPCookieStorage.shared.cookies(for: ActiveCount.endpoint)?.forEach(HTTPCookieStorage.shared.deleteCookie) }
+        await sender().tick(now: day1)
+        let headers = try XCTUnwrap(CountCloud.headers.first)
+        XCTAssertEqual(headers["User-Agent"], "Khayt", "not the build number")
+        XCTAssertEqual(headers["Accept-Language"], "en", "not the phone's languages and region")
+        XCTAssertNil(headers["Cookie"])
+        let config = ActiveCountSender.session.configuration
+        XCTAssertFalse(config.httpShouldSetCookies)
+        XCTAssertNil(config.httpCookieStorage)
+        XCTAssertNil(config.urlCache)
     }
 
     func testSwitchedOffSendsNothingAndKeepsTheDates() async {
@@ -91,8 +105,9 @@ final class ActiveCountSenderTests: XCTestCase {
 final class CountCloud: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var status = 200
     nonisolated(unsafe) static var bodies: [[String: Any]] = []
+    nonisolated(unsafe) static var headers: [[String: String]] = []
 
-    static func reset() { status = 200; bodies = [] }
+    static func reset() { status = 200; bodies = []; headers = [] }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url == ActiveCount.endpoint }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -106,6 +121,7 @@ final class CountCloud: URLProtocol, @unchecked Sendable {
             while stream.hasBytesAvailable { let n = stream.read(&buf, maxLength: buf.count); if n <= 0 { break }; out.append(buf, count: n) }
             data = out
         }
+        Self.headers.append(request.allHTTPHeaderFields ?? [:])
         if let data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { Self.bodies.append(json) }
         let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1", headerFields: nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
