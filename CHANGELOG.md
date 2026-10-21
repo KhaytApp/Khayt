@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a locked-out PIN guesser stays locked out.** When the LAN
+  server's table of failed attempts filled up, it made room by dropping the
+  oldest entries, live lockouts included. Someone able to fill it (easy
+  behind the remote tunnel, where each request can claim a new address)
+  could wipe their own lockout and keep guessing. A live lockout is now
+  never dropped; it leaves when it expires. An IPv6 client is also counted
+  by its /64 network rather than by each address it uses, since a single
+  device can use a fresh address for every request. The same as the Mac.
+
 - **Mac: crash reports include Swift crashes, and Settings can send a test
   report.** Until now the Mac reported only the crashes it could catch itself:
   failed rules and AppKit exceptions. A Swift crash, like the Settings ▸
