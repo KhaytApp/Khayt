@@ -100,8 +100,7 @@ enum StoreLock {
     }
 
     static func read(for build: StoreReader.Build) -> Record? {
-        guard let data = try? Data(contentsOf: lockURL(for: build)) else { return nil }
-        return try? JSONDecoder().decode(Record.self, from: data)
+        read(at: lockURL(for: build))
     }
 
     /// Is that pid a running process? `EPERM` means it exists and is not ours.
@@ -114,10 +113,48 @@ enum StoreLock {
         return errno == EPERM
     }
 
+    /// This Mac's name now. Asked each time rather than kept: it can change
+    /// while the app runs (a rename in Sharing, a network handing out
+    /// another `.local` name).
+    static func currentHost() -> String { ProcessInfo.processInfo.hostName }
+
+    // ── THE RECORD THIS PROCESS WROTE, KEPT IN MEMORY ─────────────────────
+    //
+    // The lock names its holder by pid AND host, so a Mac whose hostname
+    // changed mid-session read its own record as another machine's, fresh —
+    // and refused every write until it was relaunched. What this process
+    // wrote is known without asking the file: the same pid and the same
+    // `takenAt` (the instant it took the book, to the millisecond) is that
+    // record, whatever host it names. Per lock file, because a session can
+    // move between books.
+    private static let written = Mine()
+    private final class Mine: @unchecked Sendable {
+        private let lock = NSLock()
+        private var records: [String: Record] = [:]
+        subscript(url: URL) -> Record? {
+            get { lock.withLock { records[url.path] } }
+            set { lock.withLock { records[url.path] = newValue } }
+        }
+    }
+
+    /// Whether `record`, as the file holds it, is the one this process wrote.
+    static func isOurs(_ record: Record?, at url: URL) -> Bool {
+        guard let record, let mine = written[url], let taken = mine.takenAt else { return false }
+        return record.pid == mine.pid && record.takenAt == taken
+    }
+
     /// The verdict for a store on this Mac, right now.
     static func verdict(for build: StoreReader.Build) -> Verdict {
-        let record = read(for: build)
-        let host = ProcessInfo.processInfo.hostName
+        verdict(at: lockURL(for: build), host: currentHost())
+    }
+
+    /// The same, for the lock file at `url`, as a Mac named `host` sees it.
+    static func verdict(at url: URL, host: String) -> Verdict {
+        let record = read(at: url)
+        // Ours whatever host it names — see `written`.
+        if isOurs(record, at: url) {
+            return Verdict(action: .own, holder: record, reason: "already-ours")
+        }
         let sameHost = record.map { Self.sameHost($0.host, host) } ?? false
         let alive: Bool? = (sameHost && (record?.pid ?? 0) != 0)
             ? pidIsAlive(record!.pid!) : nil
@@ -125,18 +162,29 @@ enum StoreLock {
                       host: host, now: Date().timeIntervalSince1970 * 1000, alive: alive)
     }
 
+    static func read(at url: URL) -> Record? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(Record.self, from: data)
+    }
+
     /// Take ownership, if it is free. Returns the record we wrote, or nil when
     /// somebody else has it — in which case this app stays a reader.
     @discardableResult
     static func take(for build: StoreReader.Build, appName: String = "Khayt for Mac") -> Record? {
-        guard verdict(for: build).action != .held else { return nil }
+        take(at: lockURL(for: build), host: currentHost(), appName: appName)
+    }
+
+    @discardableResult
+    static func take(at url: URL, host: String, appName: String = "Khayt for Mac") -> Record? {
+        guard verdict(at: url, host: host).action != .held else { return nil }
         let now = Date().timeIntervalSince1970 * 1000
         let record = Record(app: appName,
                             pid: Int(ProcessInfo.processInfo.processIdentifier),
-                            host: ProcessInfo.processInfo.hostName,
+                            host: host,
                             takenAt: now, heartbeat: now)
         guard let data = try? JSONEncoder().encode(record) else { return nil }
-        try? data.write(to: lockURL(for: build))
+        try? data.write(to: url)
+        written[url] = record
         return record
     }
 
@@ -148,12 +196,21 @@ enum StoreLock {
     /// Electron's next save of its in-memory copy erased whatever the Mac had
     /// written. Found by a review. Now a beat first reads the file: somebody
     /// else's record there means we have lost the book, and nil says so.
+    ///
+    /// A beat also writes the host this Mac has NOW, so a record that outlives
+    /// a rename names the machine as everything else will see it.
     static func beat(_ record: Record, for build: StoreReader.Build) -> Record? {
-        guard let current = read(for: build), current.pid == record.pid,
-              sameHost(current.host, record.host) else { return nil }
+        beat(record, at: lockURL(for: build), host: currentHost())
+    }
+
+    static func beat(_ record: Record, at url: URL, host: String) -> Record? {
+        guard let current = read(at: url), current.pid == record.pid,
+              isOurs(current, at: url) || sameHost(current.host, record.host) else { return nil }
         var next = record
+        next.host = host
         next.heartbeat = Date().timeIntervalSince1970 * 1000
-        if let data = try? JSONEncoder().encode(next) { try? data.write(to: lockURL(for: build)) }
+        if let data = try? JSONEncoder().encode(next) { try? data.write(to: url) }
+        written[url] = next
         return next
     }
 
@@ -167,10 +224,17 @@ enum StoreLock {
     /// out would leave the book looking unowned while it is being written to.
     static func release(_ record: Record?, for build: StoreReader.Build?) {
         // lock: system — removes this Mac's own claim on the book as it lets go.
-        guard let record, let build, let current = read(for: build) else { return }
+        guard let record, let build else { return }
+        release(record, at: lockURL(for: build))
+    }
+
+    static func release(_ record: Record, at url: URL) {
+        guard let current = read(at: url) else { return }
         guard current.pid == record.pid,
-              host(current.host) == host(record.host) else { return }
-        try? FileManager.default.removeItem(at: lockURL(for: build))
+              isOurs(current, at: url) || host(current.host) == host(record.host) else { return }
+        // lock: system — removes only the claim this process wrote, as it lets go.
+        try? FileManager.default.removeItem(at: url)
+        written[url] = nil
     }
 
     /// Do we hold it right now? Asked again immediately before a write lands.
