@@ -391,6 +391,6 @@ struct LinkedScanTests {
         let cloud = try LockRound3Tests.source("CloudLibrary.swift")
         #expect(cloud.contains("if file.isLinked, LinkedCloud.isOnlineOnly(url) { continue }"))
         let delete = try LockRound3Tests.source("LibraryDelete.swift")
-        #expect(delete.contains("if !file.isLinked,\n                       let local = await PinWork.run({ try? CloudLibrary.digests(of: model) })"))
+        #expect(delete.contains("if !a.linked, !Task.isCancelled,\n               let local = await PinWork.run({ try? CloudLibrary.digests(of: a.model) })"))
     }
 }

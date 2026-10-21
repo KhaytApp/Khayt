@@ -2614,6 +2614,7 @@ final class Words {
         "mac.libmove_no_room": ["en": "Not enough room in the new folder — {short} short. Nothing was moved; new models will still go there.", "ar": "لا مساحة كافية في المجلد الجديد — ينقص {short}. لم يُنقل شيء، وستذهب المجسّمات الجديدة إليه."],
         "mac.libmove_done": ["en": "Moved {n} files; {same} were already there.", "ar": "نُقل {n} ملفًا؛ و{same} كانت موجودة من قبل."],
         "mac.libmove_some_failed": ["en": "{n} files could not be moved and are where they were:", "ar": "تعذّر نقل {n} ملفًا وبقيت مكانها:"],
+        "mac.cloudlib_other_bucket": ["en": "This model is in the bucket {bucket}, which is not the one set up now, so it was not brought back.", "ar": "هذا النموذج في الحاوية {bucket}، وهي ليست الحاوية المعدّة الآن، لذا لم يُستعد."],
         "mac.cloudlib_not_there": ["en": "The bucket did not confirm the upload: the file is not there.", "ar": "لم تؤكد الحاوية الرفع: الملف غير موجود فيها."],
         "mac.cloudlib_wrong_size": ["en": "The bucket did not confirm the upload: it holds {there} bytes, not {here}.", "ar": "لم تؤكد الحاوية الرفع: فيها {there} بايت وليس {here}."],
         "mac.cloudlib_hash_mismatch": ["en": "The bucket did not confirm the upload: its content hash does not match.", "ar": "لم تؤكد الحاوية الرفع: بصمة المحتوى لا تطابق."],

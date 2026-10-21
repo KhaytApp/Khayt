@@ -418,6 +418,8 @@ enum CloudLibrary {
         case bucketLostIt
         /// The shared rule's own reason (`verifyRehydrate`).
         case badDownload(String)
+        /// A marker written for another bucket than the one set up now.
+        case otherBucket(String)
     }
 
     /// Make sure the bucket holds exactly this file under `key`: skip the
@@ -1403,6 +1405,7 @@ extension Shop {
         case .noSidecar: return words.callIt("mac.cloudlib_no_sidecar")
         case .bucketLostIt: return words.callIt("mac.cloudlib_bucket_lost_it")
         case .badDownload(let why): return words.callIt("mac.cloudlib_bad_download") + " " + why
+        case .otherBucket(let bucket): return words.callIt("mac.cloudlib_other_bucket", ["bucket": .string(bucket)])
         }
     }
 }

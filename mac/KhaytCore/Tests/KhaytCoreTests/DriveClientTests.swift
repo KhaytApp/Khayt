@@ -135,6 +135,44 @@ struct DriveClientTests {
                     .trashedCopy("k", fetch: google.fetch) == nil, "a bucket has no Trash to look in")
     }
 
+    @Test("a delete trashes every file carrying the key, not just the first")
+    func deleteTrashesEveryCopy() async throws {
+        let google = FakeGoogle()
+        let drive = DriveClient(.init(clientId: "c", refreshToken: "r"), fetch: google.fetch)
+        let key = "print-files/PF-3/Vase.stl"
+        try await drive.put(key, data: Data([1, 2, 3]))
+        // A second file under the same key — two Macs uploading at once.
+        google.files["M99"] = ("Vase.stl", nil, key, Data([1, 2, 3]), false, false)
+        try await drive.delete(key)
+        #expect(!google.files.values.contains { !$0.trashed && $0.key == key }, "a copy was left live")
+        #expect(google.files.values.filter { $0.trashed && $0.key == key }.count == 2)
+    }
+
+    /// The delete question bounds each request to 15 seconds through the
+    /// fetch it passes; Drive went out on its own two-minute ones instead.
+    @Test("a Drive remote asks through the fetch its caller passes")
+    func remoteUsesTheCallersFetch() async throws {
+        let google = FakeGoogle()
+        let drive = DriveClient(.init(clientId: "c", refreshToken: "r"), fetch: google.fetch)
+        try await drive.put("print-files/PF-4/Cup.stl", data: Data([9, 9]))
+        final class Seen: @unchecked Sendable { let lock = NSLock(); var timeouts: [TimeInterval] = [] }
+        let seen = Seen()
+        let inner = google.fetch
+        let quick: S3.Fetch = { request in
+            var r = request
+            r.timeoutInterval = 15
+            seen.lock.withLock { seen.timeouts.append(r.timeoutInterval) }
+            return try await inner(r)
+        }
+        let remote = LibraryRemote.drive(drive)
+        #expect(try await remote.head("print-files/PF-4/Cup.stl", fetch: quick)?.size == 2)
+        #expect(!seen.timeouts.isEmpty, "the head went out on the client's own fetch")
+        let before = seen.timeouts.count
+        try await remote.delete("print-files/PF-4/Cup.stl", fetch: quick)
+        #expect(seen.timeouts.count > before)
+        #expect(seen.timeouts.allSatisfy { $0 == 15 })
+    }
+
     @Test("a key with a quote in it cannot break out of the query")
     func quoting() {
         #expect(DriveClient.quoted("it's") == #"'it\'s'"#)

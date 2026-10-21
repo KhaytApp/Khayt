@@ -235,6 +235,30 @@ struct LibraryStorageGapsTests {
         #expect(!left.contains { $0.contains(".part-") }, "\(left)")
     }
 
+    @Test("a marker written for another bucket is not brought down from this one")
+    func bringDownRefusesOtherBucket() async throws {
+        let (bench, bucket) = try bucketBench()
+        defer { try? FileManager.default.removeItem(at: bench.dir) }
+        _ = try await adoptBucket(bench, bucket)
+        guard case .object(let o)? = try T.rows(bench).first, case .string(let id)? = o["id"] else { return }
+        let marker = bench.library.appending(path: LibraryLocation.itemDirName(id))
+            .appending(path: "dragon.stl" + Shop.onlineExt)
+        var m = try JSONDecoder().decode(Shop.OnlineMarker.self, from: Data(contentsOf: marker))
+        m.bucket = "an-older-bucket"
+        try JSONEncoder().encode(m).write(to: marker)
+        let landed = Landed()
+        let inner = S3.download(over: bucket.fetch)
+        await #expect(throws: CloudLibrary.Failure.otherBucket("an-older-bucket")) {
+            _ = try await Shop.bringDown(marker, config: config, engine: try KhaytEngine(), download: { request in
+                let got = try await inner(request)
+                landed.add(got.0)
+                return got
+            })
+        }
+        #expect(landed.files.isEmpty, "it was downloaded from the bucket set up now")
+        #expect(FileManager.default.fileExists(atPath: marker.path))
+    }
+
     @Test("a move that fails leaves no .part, and the download is removed")
     func placeCleansUp() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "place-\(UUID().uuidString)")
