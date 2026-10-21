@@ -14,6 +14,8 @@ struct LibraryGrid: View {
     /// True while a drag is over the library, so the drop target is visible
     /// BEFORE the mouse is released rather than after.
     @State private var dropping = false
+    /// The tile a drag is over, which takes a picture as that model's photo.
+    @State private var tileTarget: LibraryFile.ID?
     /// Which way "next" is. In a mirrored window the next model is to the left,
     /// and a grid whose right arrow walks backwards is worse than one with no
     /// arrow keys at all.
@@ -250,6 +252,19 @@ struct LibraryGrid: View {
                     flags.contains(.command) ? .toggle : (flags.contains(.shift) ? .extend : .replace)
                 shop.select(file, modifiers: how)
             }
+            // A PICTURE DROPPED ON A MODEL IS ITS PHOTO. The model's page
+            // took one only in its last section, which a shop did not find.
+            // Every other drop — a model, a folder, a zip — is passed on to
+            // the library's own import (`Shop.dropOnModelTile`): a tile now
+            // sits under most of the grid's drop area, and an `.stl` let fall
+            // on one must still import as it did.
+            .dropDestination(for: URL.self) { urls, _ in
+                shop.dropOnModelTile(urls, onto: file.id)
+            } isTargeted: { targeted in
+                if targeted { tileTarget = file.id }
+                else if tileTarget == file.id { tileTarget = nil }
+            }
+            .overlay { TileDropRing(shown: tileTarget == file.id && shop.canMoveJobs) }
             .contextMenu {
                 ModelActions(file: file, shop: shop)
             } preview: {
@@ -541,6 +556,18 @@ struct FolderCell: View {
         .padding(.vertical, 3)
         .background(.black.opacity(0.55), in: Capsule())
         .padding(6)
+    }
+}
+
+/// The ring round a tile that a dragged picture would land on.
+struct TileDropRing: View {
+    let shown: Bool
+    var body: some View {
+        if shown {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Khayt.brand, lineWidth: 2)
+                .allowsHitTesting(false)
+        }
     }
 }
 

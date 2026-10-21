@@ -191,6 +191,21 @@ struct ModelActions: View {
             }
             .disabled(!shop.canWrite || shop.groupCover(group) == .model(file.id))
         }
+        // A photograph of the print, here because this is where a shop looked
+        // for it — the model's page had it only as its last section. The
+        // CLICKED model, never the selection: a photo is of one print, and the
+        // same picture on twelve models would make them harder to tell apart,
+        // which is the opposite of what it is for. Gated as the page's own
+        // buttons are.
+        let hasPhoto = LibraryPhoto.has(file)
+        Button(shop.words.callIt(hasPhoto ? "mac.lp_replace" : "mac.lp_add") + "\u{2026}") {
+            shop.chooseLibraryPhoto(for: file.id)
+        }
+        .disabled(!shop.canMoveJobs)
+        if hasPhoto {
+            Button(shop.words.callIt("mac.lp_remove")) { shop.clearLibraryPhoto(file.id) }
+                .disabled(!shop.canMoveJobs)
+        }
         // To the catalogue: this model — or, when it is one of several
         // selected, all of them, as one product or one each.
         let chosen = picked.contains(file.id) ? shop.selectedFiles : []

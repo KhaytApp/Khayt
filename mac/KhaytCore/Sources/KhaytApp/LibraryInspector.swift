@@ -17,71 +17,7 @@ struct LibraryInspector: View {
         if shop.selectedFiles.count > 1 {
             ManyModels(shop: shop)
         } else if let file = shop.selectedFile {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header(file)
-                    creatorAndCopies(file)
-                    LayerRule()
-                    theFile(file)
-                    if let sliced = slicedSection(file) {
-                        LayerRule()
-                        sliced
-                    }
-                    if !file.palette.isEmpty {
-                        LayerRule()
-                        filament(file)
-                    }
-                    if let mesh = file.mesh {
-                        LayerRule()
-                        geometry(mesh, file.id)
-                    }
-                    // Only for something with a mesh to walk. A gcode is a list
-                    // of moves and there is no geometry in it to judge.
-                    if let estimate = shop.estimates[file.id] {
-                        LayerRule()
-                        priced(estimate)
-                    }
-                    if file.sourceFile?.kind == "model" {
-                        LayerRule()
-                        risk(file)
-                    }
-                    if let how = howItPrints(file) {
-                        LayerRule()
-                        how
-                    }
-                    // Only where there is more than one. A print always HAS a
-                    // version; almost every file has exactly one, and a section
-                    // headed "versions" over a list of one is a heading that
-                    // says nothing.
-                    // Only for a print that IS several files. One file is
-                    // the ordinary case and a "parts" heading over a list of
-                    // one says nothing.
-                    if let parts, parts.multi {
-                        LayerRule()
-                        PartsSection(parts: parts, shop: shop)
-                    }
-                    if let versions, versions.many {
-                        LayerRule()
-                        VersionsSection(versions: versions, shop: shop)
-                    }
-                    if let setups, setups.total > 0 {
-                        LayerRule()
-                        SetupsSection(setups: setups, shop: shop)
-                    }
-                    LayerRule()
-                    ModelConsumablesSection(shop: shop, file: file)
-                    LayerRule()
-                    PhotoSection(shop: shop, file: file)
-                    provenance(file)
-                    guides(file)
-                    actions(file)
-            if let notes = file.testedNotes, !notes.isEmpty {
-                        LayerRule()
-                        DetailSection(shop.words.callIt("doc.notes")) { Text(notes).textSelection(.enabled) }
-                    }
-                }
-                .padding(16)
-            }
+            ScrollView { page(file) }
             // Keyed on the file, not on the book: these are facts about one
             // record and nothing else on this screen moves them.
             .task(id: file.id) {
@@ -92,6 +28,78 @@ struct LibraryInspector: View {
         } else {
             EmptyHere(title: shop.words.callIt("mac.no_model"), message: shop.words.callIt("mac.no_model_hint"), mark: .library)
         }
+    }
+
+    /// The page itself, outside its scroll view so a snapshot can draw it:
+    /// `ImageRenderer` draws nothing inside a `ScrollView`.
+    @ViewBuilder func page(_ file: LibraryFile) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            header(file)
+            creatorAndCopies(file)
+            // The photo straight under the picture it replaces, and
+            // above everything technical: it is what identifies the
+            // print. It was the LAST section — below parts, versions,
+            // setups and consumables — and a shop reported it missing.
+            LayerRule()
+            PhotoSection(shop: shop, file: file)
+            LayerRule()
+            theFile(file)
+            if let sliced = slicedSection(file) {
+                LayerRule()
+                sliced
+            }
+            if !file.palette.isEmpty {
+                LayerRule()
+                filament(file)
+            }
+            if let mesh = file.mesh {
+                LayerRule()
+                geometry(mesh, file.id)
+            }
+            // Only for something with a mesh to walk. A gcode is a list
+            // of moves and there is no geometry in it to judge.
+            if let estimate = shop.estimates[file.id] {
+                LayerRule()
+                priced(estimate)
+            }
+            if file.sourceFile?.kind == "model" {
+                LayerRule()
+                risk(file)
+            }
+            if let how = howItPrints(file) {
+                LayerRule()
+                how
+            }
+            // Only where there is more than one. A print always HAS a
+            // version; almost every file has exactly one, and a section
+            // headed "versions" over a list of one is a heading that
+            // says nothing.
+            // Only for a print that IS several files. One file is
+            // the ordinary case and a "parts" heading over a list of
+            // one says nothing.
+            if let parts, parts.multi {
+                LayerRule()
+                PartsSection(parts: parts, shop: shop)
+            }
+            if let versions, versions.many {
+                LayerRule()
+                VersionsSection(versions: versions, shop: shop)
+            }
+            if let setups, setups.total > 0 {
+                LayerRule()
+                SetupsSection(setups: setups, shop: shop)
+            }
+            LayerRule()
+            ModelConsumablesSection(shop: shop, file: file)
+            provenance(file)
+            guides(file)
+            actions(file)
+            if let notes = file.testedNotes, !notes.isEmpty {
+                LayerRule()
+                DetailSection(shop.words.callIt("doc.notes")) { Text(notes).textSelection(.enabled) }
+            }
+        }
+        .padding(16)
     }
 
     /// The file, reachable. Buttons rather than only a context menu: a menu you

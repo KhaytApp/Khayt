@@ -65,7 +65,20 @@ enum LibraryPhoto {
     }
 
     /// The picture kinds worth offering. Whatever a phone or a camera writes.
-    static let kinds: [UTType] = [.jpeg, .png, .heic, .heif, .tiff, .gif, .bmp, .webP]
+    nonisolated static let kinds: [UTType] = [.jpeg, .png, .heic, .heif, .tiff, .gif, .bmp, .webP]
+
+    /// A file one of `kinds` would offer, judged by its name — all a drop
+    /// says before it is read.
+    nonisolated static func isPicture(_ url: URL) -> Bool {
+        guard url.isFileURL, let type = UTType(filenameExtension: url.pathExtension) else { return false }
+        return kinds.contains { type.conforms(to: $0) }
+    }
+
+    /// Whether the model carries a photograph — the field holds inline data
+    /// or nothing (`PhotoSection.image(from:)` reads nothing else).
+    nonisolated static func has(_ file: LibraryFile) -> Bool {
+        file.userPhoto?.hasPrefix("data:") ?? false
+    }
 }
 
 /// The photograph on a model's page: what there is, and how to change it.
@@ -80,7 +93,7 @@ struct PhotoSection: View {
     @State private var choosing = false
     @State private var dropTarget = false
 
-    private var has: Bool { (file.userPhoto?.hasPrefix("data:") ?? false) }
+    private var has: Bool { LibraryPhoto.has(file) }
 
     var body: some View {
         let words = shop.words
