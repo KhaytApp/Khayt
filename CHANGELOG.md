@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **A printer retired by its date alone is out of the lead time and the
+  overhead rate.** A printer can be marked retired by its status or by a
+  retire date. The published lead time and the overhead rate looked only at
+  the status, so a printer with just the date (left by a sync or an older
+  build) still counted as capacity and still spread the shop's overhead.
+  Both now read either one, like every other place that asks.
+
 - **Desktop: an anonymous count of installs in use.** Once a day the app
   tells Khayt Cloud only its platform, version and release channel, and
   whether this is its first day this week, this month or ever. There is no
