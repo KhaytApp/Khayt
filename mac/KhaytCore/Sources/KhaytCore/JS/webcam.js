@@ -30,17 +30,35 @@
     };
   }
 
-  /** Normalize whatever the owner typed into an absolute http(s) URL against the printer host. */
+  /**
+   * Normalize whatever the owner typed into an absolute http(s) URL against the printer host.
+   *
+   * A URL with credentials in it (`http://user:pass@cam/snap.jpg`) is refused —
+   * '' — like any other address this cannot use. `machines[].webcam` is not a
+   * sealed field: it is stored in plain text, handed to a paired phone and
+   * synced to the cloud, so a password typed there travelled everywhere the
+   * book does. Neither app's fetch sends URL credentials anyway (Electron's
+   * proxy and the Mac's RTSP client have no camera login). Oct 2026 review.
+   */
   function normalizeWebcamUrl(value, printerApi) {
     const v = String(value || '').trim();
     if (!v) return '';
-    if (/^(https?|rtsp):\/\//i.test(v)) return v;
-    const host = String((printerApi && printerApi.host) || '').trim();
-    if (!host) return '';
-    const scheme = /^https:\/\//i.test(host) ? 'https' : 'http';
-    const bare = host.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
-    const path = v.startsWith('/') ? v : '/' + v;
-    return `${scheme}://${bare}${path}`;
+    let out;
+    if (/^(https?|rtsp):\/\//i.test(v)) out = v;
+    else {
+      const host = String((printerApi && printerApi.host) || '').trim();
+      if (!host) return '';
+      const scheme = /^https:\/\//i.test(host) ? 'https' : 'http';
+      const bare = host.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+      const path = v.startsWith('/') ? v : '/' + v;
+      out = `${scheme}://${bare}${path}`;
+    }
+    return hasUserinfo(out) ? '' : out;
+  }
+
+  /** Does this absolute URL carry `user[:pass]@` before its host? */
+  function hasUserinfo(url) {
+    return /^[a-z][a-z0-9+.-]*:\/\/[^/?#]*@/i.test(String(url || ''));
   }
 
   /**
