@@ -147,6 +147,25 @@ test('supplierPriceFor picks the cheapest matching price across suppliers', () =
   assert.equal(R.supplierPriceFor([], 'PLA'), null);
 });
 
+test('supplierPriceFor: a closer match beats a cheaper looser one', () => {
+  const suppliers = [
+    { id: 's1', name: 'A', priceList: [{ material: 'PLA', pricePerKg: 60 }, { material: 'PC', pricePerKg: 50 }] },
+    { id: 's2', name: 'B', priceList: [{ material: 'pla-cf', pricePerKg: 180 }, { material: 'PCTG', pricePerKg: 90 }] },
+  ];
+  // PLA-CF has its own entry: the cheaper plain PLA must not price it.
+  assert.equal(R.supplierPriceFor(suppliers, 'PLA-CF').pricePerKg, 180);
+  assert.equal(R.supplierPriceFor(suppliers, '  PLA-CF ').supplierId, 's2');
+  // Plain PLA is an exact entry of its own, not the carbon-fibre one.
+  assert.equal(R.supplierPriceFor(suppliers, 'PLA').pricePerKg, 60);
+  // PCTG and PC share letters, not a material.
+  assert.equal(R.supplierPriceFor(suppliers, 'PCTG').pricePerKg, 90);
+  assert.equal(R.supplierPriceFor(suppliers, 'PC').pricePerKg, 50);
+  // With no closer entry, a family match still prices it.
+  assert.equal(R.supplierPriceFor(suppliers, 'PLA Silk').pricePerKg, 60);
+  // perGramPriceFor follows the same choice.
+  assert.equal(R.perGramPriceFor({ material: 'PLA-CF' }, suppliers).perG, 0.18);
+});
+
 /* ── runway: how long has this spool got ─────────────────────── */
 
 const RNOW = Date.parse('2026-09-09T12:00:00Z');

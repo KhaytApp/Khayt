@@ -218,25 +218,43 @@ function famToken(s) {
   return m ? m[0] : '';
 }
 
+/** Case- and space-folded material name, for an exact comparison. */
+function foldMaterial(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 /**
- * Find the cheapest supplier price-list entry matching a material, across all
- * suppliers. An entry matches by family token (PLA == "PLA Black") or by a
- * loose name containment. Returns { supplierId, supplierName, pricePerKg } or
- * null. Pure: caller passes the suppliers array.
+ * Find the supplier price-list entry that best matches a material, across all
+ * suppliers. Returns { supplierId, supplierName, pricePerKg } or null. Pure:
+ * caller passes the suppliers array.
+ *
+ * Matches are ranked by how CLOSE they are, and price only breaks a tie within
+ * the closest rank: an exact name (case and spacing folded), then the same
+ * family token (PLA == "PLA Black"), then a name containing the other as a last
+ * resort. Letting the cheapest loose match win priced a PLA-CF draft from a
+ * plain PLA entry at 60/kg although a PLA-CF entry sat beside it.
  */
 function supplierPriceFor(suppliers, material) {
   const fam = famToken(material);
-  const ml = String(material == null ? '' : material).toLowerCase().trim();
+  const ml = foldMaterial(material);
   let best = null;
+  let bestRank = 0;
   for (const s of (suppliers || [])) {
     for (const e of (s && s.priceList) || []) {
       const pk = +(e && e.pricePerKg) || 0;
       if (!(pk > 0)) continue;
-      const em = String((e && e.material) || '').toLowerCase().trim();
+      const em = foldMaterial(e && e.material);
       if (!em) continue;
-      const matches = (fam && famToken(em) === fam) || ml.includes(em) || em.includes(ml);
-      if (!matches) continue;
-      if (!best || pk < best.pricePerKg) best = { supplierId: s.id, supplierName: s.name || '', pricePerKg: pk };
+      // 3 exact, 2 same family token, 1 one name inside the other.
+      let rank = 0;
+      if (ml && em === ml) rank = 3;
+      else if (fam && famToken(em) === fam) rank = 2;
+      else if (ml && (ml.includes(em) || em.includes(ml))) rank = 1;
+      if (!rank) continue;
+      if (rank < bestRank) continue;
+      if (rank === bestRank && best && pk >= best.pricePerKg) continue;
+      best = { supplierId: s.id, supplierName: s.name || '', pricePerKg: pk };
+      bestRank = rank;
     }
   }
   return best;
