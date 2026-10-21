@@ -39,6 +39,12 @@ struct SpoolSheet: View {
     @State private var fullWeight: Double = 0
     @State private var lot = ""
     @State private var reorderPoint: Double = 200
+    /// Whether the shop has said a reorder point for THIS spool. A new spool
+    /// shows the threshold it would get anyway — the shop's own for grams, the
+    /// unit's otherwise (`KhaytInventoryUnits.lowThreshold`) — and writes none
+    /// until somebody types one: a stored 200 flagged a 10-sheet pack low the
+    /// moment it was added, and overrode a shop threshold of 500 g.
+    @State private var reorderPointSet = false
     /// What this filament wants to be printed at. Zero means the shop has not
     /// said, and the rule stores nothing rather than a nought.
     @State private var printTemp: Double = 0
@@ -231,9 +237,11 @@ struct SpoolSheet: View {
                 GridRow {
                     Text(shop.words.callIt("mac.spool_reorder_point")).foregroundStyle(.secondary)
                     HStack(spacing: 4) {
-                        TextField("", value: $reorderPoint, format: .number.locale(Money.digits).precision(.fractionLength(0)))
+                        TextField("", value: Binding(get: { reorderPoint },
+                                                     set: { reorderPoint = $0; reorderPointSet = true }),
+                                  format: .number.locale(Money.digits).precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder).monospacedDigit().frame(width: 100)
-                        Text(shop.words.callIt("common.grams")).foregroundStyle(.secondary)
+                        Text(shop.words.callIt(unitKey)).foregroundStyle(.secondary)
                     }
                 }
                 // ── WHAT THIS FILAMENT WANTS ──────────────────────────
@@ -368,6 +376,10 @@ struct SpoolSheet: View {
             Task { await shop.deleteSpool(chosen.id) }
         }
         .task { units = await shop.inventoryUnitChoices() }
+        .task(id: unit) {
+            guard isNew, !reorderPointSet else { return }
+            reorderPoint = await shop.lowThreshold(unit: unit)
+        }
         .task(id: material) { await loadColours() }
         .task(id: material) { catalogue = await shop.filamentSearch(material, limit: 30) }
     }
@@ -407,6 +419,9 @@ struct SpoolSheet: View {
         var fullWeight: Double = 0
         var lot = ""
         var reorderPoint: Double = 200
+        /// False for a new spool nobody typed a reorder point into: see
+        /// `SpoolSheet.reorderPointSet`.
+        var reorderPointSet = false
         var printTemp: Double = 0
         var bedTemp: Double = 0
         var maxSpeed: Double = 0
@@ -425,6 +440,7 @@ struct SpoolSheet: View {
                  fullWeight: spool.spoolWeight ?? 0,
                  lot: spool.lot ?? "",
                  reorderPoint: spool.reorderPoint ?? 200,
+                 reorderPointSet: true,
                  printTemp: spool.printTemp ?? 0,
                  bedTemp: spool.bedTemp ?? 0,
                  maxSpeed: spool.maxSpeed ?? 0,
@@ -444,7 +460,6 @@ struct SpoolSheet: View {
                 "unit": .string(unit),
                 "lot": .string(lot),
                 "colourVariant": .string(colourVariant),
-                "reorderPoint": .number(reorderPoint),
                 // Sent even at zero, which is how the rule is told to CLEAR one:
                 // it stores nothing for a value that is not above zero, so a shop
                 // that empties the box empties the field.
@@ -453,6 +468,12 @@ struct SpoolSheet: View {
                 "bedTemp": .number(bedTemp),
                 "maxSpeed": .number(maxSpeed),
             ]
+            // A NEW spool writes a reorder point and quantity only when the
+            // shop gave one. Unsaid, the shelf rule falls back to the shop's
+            // threshold and the unit's default, and the drafting rule to its
+            // own quantity — which is what the other app's Add has always done.
+            if !isNew || reorderPointSet { input["reorderPoint"] = .number(reorderPoint) }
+            if isNew, reorderQty <= 0 { input["reorderQty"] = nil }
             if !isNew, fullWeight > 0 { input["spoolWeight"] = .number(fullWeight) }
             if !isNew {
                 // Absent means "leave it as it is", so a cleared date has to be
@@ -470,7 +491,7 @@ struct SpoolSheet: View {
     private var form: Form {
         Form(material: material, unit: unit, colourVariant: colourVariant, swatch: swatch,
              cost: cost, vatAmount: vatAmount, weight: weight, fullWeight: fullWeight,
-             lot: lot, reorderPoint: reorderPoint, printTemp: printTemp, bedTemp: bedTemp,
+             lot: lot, reorderPoint: reorderPoint, reorderPointSet: reorderPointSet, printTemp: printTemp, bedTemp: bedTemp,
              maxSpeed: maxSpeed, openedAt: openedAt, purchasedAt: purchasedAt,
              reorderQty: reorderQty)
     }
@@ -488,6 +509,7 @@ struct SpoolSheet: View {
         unit = f.unit
         lot = f.lot
         reorderPoint = f.reorderPoint
+        reorderPointSet = f.reorderPointSet
         printTemp = f.printTemp
         bedTemp = f.bedTemp
         maxSpeed = f.maxSpeed

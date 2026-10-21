@@ -1066,6 +1066,15 @@ extension Shop {
     func unit(of spool: Spool) -> KhaytEngine.InventoryUnit? { inventoryUnits[spool.id] }
 
     /// The units the editor can offer.
+    /// The threshold a new spool in `unit` is low at when it carries no
+    /// reorder point of its own — the shared rule's answer, with the shop's
+    /// settings. 200 when the engine is not there, the gram default.
+    func lowThreshold(unit: String) async -> Double {
+        let row: JSONValue = .object(["id": .string(""), "unit": .string(unit)])
+        let out = try? await engine?.inventoryUnits([row], settings: settingsDict)
+        return out?[""]?.low ?? 200
+    }
+
     func inventoryUnitChoices() async -> [KhaytEngine.InventoryUnit] {
         (try? await engine?.inventoryUnitChoices()) ?? []
     }
