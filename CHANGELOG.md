@@ -4,14 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **Desktop: a saved product price never changes on its own.** Saving a
-  catalogue product re-priced it from its parts every time, so an edit to
-  its name or group could quietly change its price when the costs or the
-  pricing rules had moved since it was last priced. A save that doesn't touch
-  anything that prices the product now keeps its saved price, and the editor
-  shows what today's costs would give beside it. An edit that does change the
-  price says "was … → now …" before you save. The same as the Mac.
-
 - **iPhone: a quote moved on from the phone counts as accepted.** When the
   phone moved a quote to Pending (or any stage but Cancelled) in its own
   copy of the book, it didn't record the acceptance day. The quote then
@@ -20,14 +12,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   acceptance date.
 
 - **Mac: adding a photo to a model is easy to find.** Right-click a model for Add a photo…, Replace photo… or Remove photo, or drag a picture straight onto its tile. The Photo section now sits near the top of the model's panel instead of at the bottom. Dropping a model file onto a tile still imports it.
-
-- **Desktop: a manager can read Settings but no longer change them.** With
-  the operator lock on, a manager's role was always meant to read Settings
-  only, but every control still worked: the LAN PIN, the LAN server, VAT,
-  prices and Save. Settings now show their values to a manager with every
-  control greyed out and a line saying only the owner can change them. Save
-  refuses too. "Switch operator" still works, so the owner can take over.
-  Without the operator lock nothing changes. The same as the Mac.
 
 - **iPhone: anonymous daily install count.** The iPhone sends the
   same once-a-day count as the Mac, through KhaytCore's shared rules. It
@@ -6218,6 +6202,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.26] - 2026-10-21
+
+A saved product price never changes on its own, since 3.11.25.
+Individual entries are kept below; this is what changed for you.
+
+Saving a catalogue product without touching what prices it now keeps its saved price, and shows what today's costs would give beside it; an edit that does re-price it says "was … → now …" before you save.
+
+- **Desktop: a saved product price never changes on its own.** Saving a
+  catalogue product re-priced it from its parts every time, so an edit to
+  its name or group could quietly change its price when the costs or the
+  pricing rules had moved since it was last priced. A save that doesn't touch
+  anything that prices the product now keeps its saved price, and the editor
+  shows what today's costs would give beside it. An edit that does change the
+  price says "was … → now …" before you save. The same as the Mac.
 
 ## [3.11.25] - 2026-10-21
 
