@@ -41,6 +41,18 @@ struct CustomerLinkSection: View {
                         }
                         .disabled(busy)
                     }
+                } else if shop.isPortalTakedownPending(job.id) {
+                    // An erase asked for this page to come down and the cloud
+                    // has not confirmed it: the way to try again, never Publish.
+                    Text(shop.words.callIt("mac.portal_takedown_pending"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if mayWrite {
+                        Button(shop.words.callIt("cloud.portal_unpublish"), role: .destructive) {
+                            confirmingUnpublish = true
+                        }
+                        .disabled(busy)
+                    }
                 } else if mayWrite {
                     Button(shop.words.callIt(job.status == "quote" ? "mac.portal_publish_quote" : "mac.portal_publish")) {
                         if job.status == "quote" { asking = true } else { Task { await publish(nil, nil) } }

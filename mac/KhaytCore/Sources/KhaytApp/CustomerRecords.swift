@@ -165,6 +165,8 @@ extension Shop {
             try? await Task.sleep(for: CustomerRecordsPublisher.first)
             while !Task.isCancelled {
                 await self?.publishCustomerRecords()
+                // An erased customer's pages that did not come down at the time.
+                await self?.takeDownPendingLinks(say: false)
                 try? await Task.sleep(for: CustomerRecordsPublisher.every)
             }
         }

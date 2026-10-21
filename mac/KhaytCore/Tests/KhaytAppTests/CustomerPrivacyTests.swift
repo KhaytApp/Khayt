@@ -238,9 +238,13 @@ struct CustomerPrivacyTests {
         #expect(Set(erased.takenDown) == ["tok-J-QUOTE", "tok-J-INV", "tok-J-PAID"])
         let after = try DeleteJobsAndCustomersTests.onDisk(url)
         for id in ["J-QUOTE", "J-INV", "J-PAID"] {
-            #expect(try Self.job(after, id)["cloudPublished"] == .bool(false), "\(id) would be republished")
+            let job = try Self.job(after, id)
+            #expect(job["cloudPublished"] == .bool(false), "\(id) would be republished")
+            #expect(job[Shop.takedownPendingKey] == .bool(true), "\(id) is not waiting to come down")
         }
-        #expect(try Self.job(after, "J-HIND")["cloudPublished"] == .bool(true), "another customer's page came down")
+        let hind = try Self.job(after, "J-HIND")
+        #expect(hind["cloudPublished"] == .bool(true) && hind[Shop.takedownPendingKey] == nil,
+                "another customer's page came down")
 
         // Undo puts the customer back, not a page that is no longer there.
         try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
@@ -263,22 +267,62 @@ struct CustomerPrivacyTests {
     func takeDownIsBestEffort() async {
         final class Seen: @unchecked Sendable { var tokens: [String] = [] }
         let seen = Seen()
-        let allDown = await Shop.takeDown(["a", "b", "c"]) { tok in
+        let down = await Shop.takeDown(["a", "b", "c"]) { tok in
             seen.tokens.append(tok)
             if tok == "b" { throw PortalClient.Failure.unreachable("offline") }
         }
         #expect(seen.tokens == ["a", "b", "c"])
-        #expect(allDown == false)
-        #expect(await Shop.takeDown(["a"]) { _ in } == true)
+        #expect(down == ["a", "c"])
     }
 
-    @Test("the erase takes the pages down after the book write, as a job delete does")
+    @Test("a page whose DELETE failed stays pending and is retried; a later success clears it")
+    func failedTakedownIsRetried() async throws {
+        let url = try DeleteJobsAndCustomersTests.scratch(Self.publishedBook())
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        _ = try #require(try await Self.erase("C1", full: true, at: url))
+
+        // One pass of `takeDownPendingLinks`, against this book on disk.
+        func pass(failing: Set<String>) async throws {
+            guard case .array(let jobs)? = try DeleteJobsAndCustomersTests.onDisk(url)["printLog"] else { return }
+            let down = await Shop.takeDown(Shop.pendingTakedowns(jobs).map(\.token)) { tok in
+                if failing.contains(tok) { throw PortalClient.Failure.unreachable("offline") }
+            }
+            try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
+                Shop.clearTakedowns(down, in: &root)
+            }
+        }
+        func pending() throws -> [String] {
+            guard case .array(let jobs)? = try DeleteJobsAndCustomersTests.onDisk(url)["printLog"] else { return [] }
+            return Shop.pendingTakedowns(jobs).map(\.id)
+        }
+        #expect(try pending() == ["J-QUOTE", "J-INV", "J-PAID"])
+
+        try await pass(failing: ["tok-J-INV"])
+        #expect(try pending() == ["J-INV"], "a failed DELETE was forgotten, or a good one kept")
+        #expect(try Self.job(try DeleteJobsAndCustomersTests.onDisk(url), "J-INV")["cloudPublished"] == .bool(false),
+                "a pending page is republished")
+
+        try await pass(failing: [])
+        #expect(try pending().isEmpty)
+        #expect(try Self.job(try DeleteJobsAndCustomersTests.onDisk(url), "J-HIND")["cloudPublished"] == .bool(true))
+    }
+
+    @Test("the erase takes the pages down after the write, retries on the loop, and a pending page cannot be republished")
     func eraseWiresTheTakedown() throws {
         let src = try QuoteSheetStatusTests.source("Shop+Privacy.swift")
         let body = try #require(src.range(of: "func eraseCustomer(").map { String(src[$0.lowerBound...]) })
         let write = try #require(body.range(of: "StoreWriter.updateAsync"))
-        let down = try #require(body.range(of: "await takeDownLinks(outcome.takenDown"))
+        let down = try #require(body.range(of: "await takeDownPendingLinks(say: true)"))
         #expect(write.lowerBound < down.lowerBound)
+        #expect(try QuoteSheetStatusTests.source("CustomerRecords.swift").contains("takeDownPendingLinks(say: false)"),
+                "nothing retries a page that did not come down")
+        let owner = try QuoteSheetStatusTests.source("PortalOwner.swift")
+        let publish = try #require(owner.range(of: "func publishPortal(").map { String(owner[$0.lowerBound...]) })
+        let guardAt = try #require(publish.range(of: "!isPortalTakedownPending(id)"))
+        let put = try #require(publish.range(of: "PortalClient.publish("))
+        #expect(guardAt.lowerBound < put.lowerBound)
+        let sheet = try QuoteSheetStatusTests.source("PortalSheets.swift")
+        #expect(sheet.contains("shop.isPortalTakedownPending(job.id)"), "a pending job has no way to try again")
     }
 
     @Test("full erase takes the holder off a spent gift card and the link off the ledger; a card with a balance keeps its name")

@@ -2712,6 +2712,7 @@ final class Words {
         "mac.gdrive_need_client": ["en": "Add the OAuth client ID from your Google Cloud project first.", "ar": "أضف معرّف عميل OAuth من مشروعك في Google Cloud أولًا."],
         "mac.gdrive_waiting": ["en": "Waiting for the sign-in in your browser…", "ar": "بانتظار تسجيل الدخول في المتصفح…"],
         "mac.gdrive_connected": ["en": "Google Drive connected.", "ar": "رُبط Google Drive."],
+        "mac.portal_takedown_pending": ["en": "This customer was erased and their link is still on Khayt Cloud. Khayt keeps trying to take it down; you can try now.", "ar": "حُذف هذا العميل وما زال رابطه على خيط السحابي. يحاول خيط إزالته باستمرار، ويمكنك المحاولة الآن."],
         "mac.gdrive_disconnected_revoked": ["en": "Disconnected, and Google has withdrawn Khayt's access. Anything already in Drive stays there.", "ar": "فُصل الحساب وسحبت Google إذن خيط. ما في Drive يبقى هناك."],
         "mac.gdrive_disconnected": ["en": "Disconnected. Anything already in Drive stays there. To withdraw the access fully, remove Khayt at myaccount.google.com.", "ar": "فُصل الحساب. ما في Drive يبقى هناك. لسحب الإذن كاملًا، احذف خيط من myaccount.google.com."],
         "mac.gdrive_disconnect_warn": ["en": "Models that were moved to the cloud will not open until they are brought back — bring them back first.", "ar": "المجسّمات المنقولة إلى السحابة لن تُفتح حتى تُعاد — أعدها أولًا."],

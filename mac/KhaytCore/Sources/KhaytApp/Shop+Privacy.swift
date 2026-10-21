@@ -30,7 +30,8 @@ struct ErasedCustomer: Sendable, Equatable {
     let intake: [JSONValue]
     let intakeHistory: [JSONValue]
     /// The tracking tokens of this customer's jobs whose pages a full erase
-    /// takes down from Khayt Cloud. Undo does not put a page back.
+    /// takes down from Khayt Cloud (marked pending until they are down).
+    /// Undo does not put a page back.
     var takenDown: [String] = []
     /// The gift cards a full erase took the holder off, as they were.
     var giftCards: [JSONValue] = []
@@ -185,12 +186,15 @@ extension Shop {
             // customer's email and holding their messages and photos. A full
             // erase takes every one down, invoiced and paid jobs included: the
             // invoice stays in the book, the tracking page was a convenience.
-            // The mark goes in this write, so nothing on this Mac republishes
-            // the page; the DELETE follows the write (`eraseCustomer`).
+            // In this write the job stops being published (so neither app
+            // republishes it) and is marked pending; the DELETE follows the
+            // write, and only a DELETE that succeeded clears the mark. One
+            // that failed is retried (`takeDownPendingLinks`).
             if full, o["cloudPublished"] == .bool(true),
                case .string(let token)? = o["trackingToken"], !token.isEmpty {
                 takenDown.append(token)
                 o["cloudPublished"] = .bool(false)
+                o[Self.takedownPendingKey] = .bool(true)
             }
             jobs.append(.init(id: id, blankedName: was))
             log[i] = .object(o)
@@ -343,7 +347,7 @@ extension Shop {
             await customersChangedOnCloud()
             // After the write, as a job delete does: the book is erased either
             // way, and a page that would not come down is said, not swallowed.
-            await takeDownLinks(outcome.takenDown, engine: engine)
+            if !outcome.takenDown.isEmpty { await takeDownPendingLinks(say: true) }
         } catch {
             moveProblem = self.said(error)
         }
