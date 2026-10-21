@@ -101,6 +101,36 @@ enum CloudLibrary {
         return d.isConfigured ? (d, text(gd, "prefix")) : nil
     }
 
+    /// The stored Drive refresh token, opened, or nil when there is none.
+    /// Needs nothing else of the sign-in: revoking takes the token alone.
+    static func driveRefreshToken(settings: [String: JSONValue], build: StoreReader.Build?) async -> String? {
+        guard case .object(let library)? = settings["printLibrary"] else { return nil }
+        guard let token = await open(text(section(library, "gdrive"), "refreshToken"), build: build),
+              !token.isEmpty, !token.hasPrefix(SafeStorage.marker) else { return nil }
+        return token
+    }
+
+    /// Google's revocation endpoint (RFC 7009). Revoking a refresh token
+    /// withdraws the whole grant, so Khayt leaves the account's
+    /// third-party access list.
+    static let googleRevokeURL = URL(string: "https://oauth2.googleapis.com/revoke")!
+
+    /// Ask Google to withdraw the grant. The token goes in the form BODY,
+    /// never the URL, where proxies and logs keep it. Five seconds: a
+    /// disconnect should not wait on an unreachable Google. True on a 2xx.
+    static func revokeAtGoogle(_ refreshToken: String, fetch: S3.Fetch) async -> Bool {
+        var request = URLRequest(url: googleRevokeURL, timeoutInterval: 5)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        let encoded = refreshToken.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+        request.httpBody = Data("token=\(encoded)".utf8)
+        guard let (_, response) = try? await fetch(request),
+              let status = (response as? HTTPURLResponse)?.statusCode else { return false }
+        return (200..<300).contains(status)
+    }
+
     // MARK: - What the settings say, without opening a secret
 
     /// Which remote the library is using, read off the settings alone — the
@@ -1259,13 +1289,24 @@ extension Shop {
         }
     }
 
-    /// Forget the account here. Only Google can withdraw the access itself,
-    /// and the note says so rather than overstating what this did.
+    /// Withdraw the access at Google, then forget the account here.
+    ///
+    /// Blanking the stored token alone left the grant valid at Google: the
+    /// refresh token still worked wherever a copy of it was, and a backup
+    /// restored from before the disconnect reconnected without a word. So
+    /// the token is revoked first, best effort: a revoke that fails (offline,
+    /// a grant already withdrawn) never keeps the account connected here,
+    /// and the note then says how to withdraw it by hand.
     func disconnectGoogleDrive() async {
+        guard permitted("settings", "edit") else { return }
         cloudLibraryProblem = nil
+        var revoked = false
+        if let token = await CloudLibrary.driveRefreshToken(settings: settingsDict, build: source.build) {
+            revoked = await CloudLibrary.revokeAtGoogle(token, fetch: CloudLibrary.fetch)
+        }
         do {
             try await writeDrive(refreshToken: "", enabled: false)
-            cloudLibraryNote = words.callIt("mac.gdrive_disconnected")
+            cloudLibraryNote = words.callIt(revoked ? "mac.gdrive_disconnected_revoked" : "mac.gdrive_disconnected")
         } catch {
             cloudLibraryProblem = cloudSay(error)
         }
