@@ -38,8 +38,8 @@ struct NativeCrash: Equatable, Sendable {
     /// `subFrames` entry. A tree that does not parse gives no frames rather
     /// than no report: the exception and signal still say what happened.
     nonisolated static func frames(fromCallStackJSON data: Data, limit: Int = 30) -> [String] {
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let stacks = root["callStacks"] as? [[String: Any]] else { return [] }
+        guard let tree = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let stacks = tree["callStacks"] as? [[String: Any]] else { return [] }
         let stack = stacks.first { ($0["threadAttributed"] as? Bool) == true } ?? stacks.first
         var frame = (stack?["callStackRootFrames"] as? [[String: Any]])?.first
         var out: [String] = []
