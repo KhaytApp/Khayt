@@ -4,14 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-- **iPhone: anonymous daily install count (held).** The iPhone sends the
+- **iPhone: anonymous daily install count.** The iPhone sends the
   same once-a-day count as the Mac, through KhaytCore's shared rules. It
   sends six fields: platform `ios`, channel (TestFlight → beta, App Store →
   stable), version, and whether this is the install's first day this week,
   this month or ever. There's no id and nothing about the shop. A Settings
-  switch, "Count this install (anonymous)", turns it off. Nothing is sent
-  and the switch stays hidden until khaytapp.com/privacy describes it and
-  the cloud route is on. The app and its widget and alerts now carry Apple
+  switch, "Count this install (anonymous)", turns it off. It's described
+  at khaytapp.com/privacy#active-count and counts nothing until the cloud
+  route is switched on. The app and its widget and alerts now carry Apple
   privacy manifests that declare the count.
 
 - **Mac: the anonymous daily install count, built and held.** Once a day

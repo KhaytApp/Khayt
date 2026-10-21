@@ -11,10 +11,12 @@ import StoreKit
 /// opens or comes back to the front.
 @MainActor
 final class ActiveCountSender {
-    /// Held until khaytapp.com/privacy `#active-count` is live and the cloud
-    /// route is switched on. Until then nothing is sent and Settings hides the
-    /// switch, as on the Mac.
-    static let ready = false
+    /// Whether the count is sent at all, and Settings shows its switch.
+    /// khaytapp.com/privacy `#active-count` describes it (live 21 October
+    /// 2026). Until the cloud route is switched on it answers 404, which is
+    /// an ordinary retry an hour later, so nothing is counted and nothing
+    /// is shown to the person.
+    static let ready = true
 
     private let settings: ConnectionSettings
     private let defaults: UserDefaults
