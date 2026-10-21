@@ -218,9 +218,18 @@ function famToken(s) {
   return m ? m[0] : '';
 }
 
-/** Case- and space-folded material name, for an exact comparison. */
+/**
+ * A material name folded for comparison: case ignored, and `-`, `_` and runs
+ * of spaces all one separator — "PLA-CF", "pla_cf" and "PLA  CF" are one name.
+ */
 function foldMaterial(s) {
-  return String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim();
+  return String(s == null ? '' : s).toLowerCase().replace(/[\s_-]+/g, ' ').trim();
+}
+
+/** Does folded name `a` contain folded name `b` as whole words? "pctg" does
+ *  not contain "pc"; "pla cf black" contains "pla cf". */
+function containsWords(a, b) {
+  return (' ' + a + ' ').includes(' ' + b + ' ');
 }
 
 /**
@@ -229,32 +238,48 @@ function foldMaterial(s) {
  * caller passes the suppliers array.
  *
  * Matches are ranked by how CLOSE they are, and price only breaks a tie within
- * the closest rank: an exact name (case and spacing folded), then the same
- * family token (PLA == "PLA Black"), then a name containing the other as a last
- * resort. Letting the cheapest loose match win priced a PLA-CF draft from a
- * plain PLA entry at 60/kg although a PLA-CF entry sat beside it.
+ * the closest rank:
+ *
+ *   4  the same name, folded;
+ *   3  one name inside the other as whole words — and of those, the one
+ *      sharing the MOST of the name, so "PLA-CF Black" beats "PLA" for a
+ *      PLA-CF spool, while a plain PLA spool, which shares only "pla" with
+ *      both "PLA Black" and "PLA-CF Black", takes the cheaper of them;
+ *   2  the same family token (PLA == "PLA Black");
+ *   1  one name inside the other anywhere, the last resort.
+ *
+ * Letting the cheapest loose match win priced a PLA-CF draft from a plain PLA
+ * entry at 60/kg although a PLA-CF entry sat beside it.
  */
 function supplierPriceFor(suppliers, material) {
   const fam = famToken(material);
   const ml = foldMaterial(material);
   let best = null;
   let bestRank = 0;
+  let bestShared = 0;
   for (const s of (suppliers || [])) {
     for (const e of (s && s.priceList) || []) {
       const pk = +(e && e.pricePerKg) || 0;
       if (!(pk > 0)) continue;
       const em = foldMaterial(e && e.material);
       if (!em) continue;
-      // 3 exact, 2 same family token, 1 one name inside the other.
       let rank = 0;
-      if (ml && em === ml) rank = 3;
+      if (ml && em === ml) rank = 4;
+      else if (ml && (containsWords(ml, em) || containsWords(em, ml))) rank = 3;
       else if (fam && famToken(em) === fam) rank = 2;
       else if (ml && (ml.includes(em) || em.includes(ml))) rank = 1;
-      if (!rank) continue;
-      if (rank < bestRank) continue;
-      if (rank === bestRank && best && pk >= best.pricePerKg) continue;
+      if (!rank || rank < bestRank) continue;
+      // How much of the name the two share: the shorter one, when one sits
+      // inside the other.
+      const shared = rank === 3 ? Math.min(em.length, ml.length) : 0;
+      if (rank === bestRank && best) {
+        if (shared !== bestShared) {
+          if (shared < bestShared) continue;
+        } else if (pk >= best.pricePerKg) continue;
+      }
       best = { supplierId: s.id, supplierName: s.name || '', pricePerKg: pk };
       bestRank = rank;
+      bestShared = shared;
     }
   }
   return best;
