@@ -197,6 +197,44 @@ struct OnlineOrderReadingTests {
         #expect(priced.total == 67)
     }
 
+    /// A quantity from outside that no `Int` holds. `Int(1e20)` traps, and a
+    /// paid web-store order is read 20 s after every launch, so one such order
+    /// crash-looped the app.
+    @Test("a huge quantity is capped, on the shared rule's reading and on a raw one")
+    func hugeQuantities() async throws {
+        let shop = await Self.shop()
+        let engine = try #require(shop.engine)
+        let stocked = try #require(Self.stocked(shop).first)
+        for huge in [1e20, 5e18] {
+            let payload = JSONValue.object([
+                "title": .string("Store order — W-10"), "source": .string("webstore"),
+                "ref": .string("webstore:W-10"), "name": .string("Nora"),
+                "lines": .array([.object(["name": .string(stocked.1), "qty": .number(huge),
+                                          "productId": .string(stocked.0)])]),
+            ])
+            let order = Shop.OnlineOrder(
+                item: CloudIntake.Item(id: "14", payload: payload, createdAt: Date()),
+                reading: try await engine.shelfSaleReading(payload: payload, products: shop.productRows,
+                                                           stock: Shop.stockCounts(shop.settingsDict)))
+            #expect(order.lines.first?.qty == 100_000)
+            let input = await shop.onlineJobInput(order)
+            #expect(input["parts"] != nil, "the job input is built without trapping")
+
+            // A reading the rule did not clamp — an older copy, or another host.
+            let raw = Shop.OnlineOrder(
+                item: CloudIntake.Item(id: "15", payload: payload, createdAt: Date()),
+                reading: .object(["fromShelf": .number(huge), "toPrint": .number(-huge),
+                                  "lines": .array([.object(["name": .string("Vase"), "qty": .number(huge),
+                                                            "onShelf": .number(huge), "toPrint": .number(.nan)])])]))
+            #expect(raw.fromShelf == 100_000)
+            #expect(raw.toPrint == -100_000)
+            #expect(raw.lines.first?.qty == 100_000)
+            #expect(raw.lines.first?.toPrint == 0)
+            _ = await shop.onlineJobInput(raw)
+        }
+        #expect(Shop.OnlineOrder.count(7.9) == 7)
+    }
+
     @Test("an order already in the book is found, by its reference or by its queue item")
     func alreadyInBook() async throws {
         let shop = await Self.shop()

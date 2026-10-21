@@ -56,7 +56,23 @@ extension Shop {
         private func number(_ key: String) -> Int {
             guard case .object(let fields) = reading,
                   case .number(let value)? = fields[key] else { return 0 }
-            return Int(value)
+            return OnlineOrder.count(value)
+        }
+
+        /// The most of one thing a line can ask for — `MAX_QTY` in
+        /// `lib/shelf-sale.js`, which clamps first. Clamped here too because the
+        /// order came from outside: `Int(1e20)` traps, and a paid order that
+        /// traps while it is read crash-loops the app at every launch.
+        static let maxCount = 100_000
+
+        /// A count off the wire, never a trap: not a whole number in range is
+        /// clamped, not a number at all is 0.
+        static func count(_ n: Double) -> Int {
+            guard n.isFinite else { return 0 }
+            let whole = n.rounded(.down)
+            if whole >= Double(maxCount) { return maxCount }
+            if whole <= -Double(maxCount) { return -maxCount }
+            return Int(exactly: whole) ?? 0
         }
 
         struct Line: Identifiable, Sendable {
@@ -103,7 +119,7 @@ extension Shop {
                 }
             }
             private static func int(_ value: JSONValue?) -> Int {
-                if case .number(let n)? = value { return Int(n) }
+                if case .number(let n)? = value { return OnlineOrder.count(n) }
                 return 0
             }
         }
@@ -592,7 +608,10 @@ extension Shop {
                 // The product's part count is PER ONE. Six hoods is six times
                 // each of a hood's parts.
                 let perPiece = max(1, part.qty)
-                part.qty = perPiece * max(1, line.qty)
+                // Overflow-safe: both counts are clamped, but a product's own
+                // part count is the shop's and is not.
+                let (total, overflow) = perPiece.multipliedReportingOverflow(by: max(1, line.qty))
+                part.qty = overflow ? Int.max : total
                 drafts.append(part)
                 origin.append((index, perPiece))
             }
@@ -694,8 +713,8 @@ extension Shop {
         var scaledLines: [Int: (ordered: Int, toPrint: Int)] = [:]
         for row in rows {
             guard case .object(var part) = row else { kept.append(row); continue }
-            let line = plainNumber(part[lineKey]).map { Int($0) }
-            let perPiece = plainNumber(part[perPieceKey]).map { Int($0) }
+            let line = plainNumber(part[lineKey]).map { OnlineOrder.count($0) }
+            let perPiece = plainNumber(part[perPieceKey]).map { OnlineOrder.count($0) }
             part.removeValue(forKey: lineKey)
             part.removeValue(forKey: perPieceKey)
             if !fresh.allFromShelf, let line, let perPiece, lines.indices.contains(line) {

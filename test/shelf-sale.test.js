@@ -200,3 +200,17 @@ test('a product with no id is not indexed, and neither is a blank name', () => {
   assert.equal(match(''), null);
   assert.equal(match('Real one'), 'PRD-W');
 });
+
+test('a quantity no host can hold is capped, not passed on to trap', () => {
+  // `Int(1e20)` traps on the Mac, and a paid order that traps when it is read
+  // crash-loops the app at every launch.
+  for (const huge of ['99999999999999999999', '5000000000000000000']) {
+    assert.deepEqual(S.lines(order(`- Vase x ${huge}`)), [{ name: 'Vase', qty: S.MAX_QTY }]);
+    assert.equal(S.structuredLines([{ name: 'Vase', qty: Number(huge) }])[0].qty, S.MAX_QTY);
+    assert.equal(S.itemLines([{ name: 'Vase', quantity: Number(huge) }])[0].qty, S.MAX_QTY);
+  }
+  assert.equal(S.MAX_QTY, 100000);
+  const r = S.read({ title: 'x', description: '', lines: [{ name: 'Flexi Dragon', qty: 1e20 }] },
+                   { products, stock: { 'PRD-A': 1e20 } });
+  for (const k of ['fromShelf', 'toPrint']) assert.ok(Number.isSafeInteger(r[k]), k);
+});
