@@ -3096,8 +3096,13 @@
   "tel.nothing": "Hiçbir şey toplanmıyor — her iki seçenek de kapalı.",
   "tel.consented": "Onaylandı",
   "tel.saved": "Telemetri tercihleri kaydedildi",
+  "tel.active": "Bu kurulumu say (anonim)",
+  "tel.active_hint": "Günde bir kez yalnızca uygulamanın platformunu, sürümünü ve yayın kanalını, ve bunun bu hafta, bu ay ya da hiç ilk günü olup olmadığını gönderir. Kimlik yok, işletmenizle ilgili hiçbir şey yok.",
+  "tel.hint_count": "Aşağıdan kapatabileceğiniz günlük anonim kurulum sayımı dışında Khayt varsayılan olarak hiçbir şey göndermez. Hataları düzeltmeye yardım etmek için çökme raporlarını ve anonim kullanım sayılarını da paylaşabilirsiniz. Siparişleriniz, müşterileriniz, fiyatlarınız veya dosyalarınız asla gönderilmez.",
+
   "tel.ask_title": "Khayt'ı geliştirmemize yardım eder misiniz?",
   "tel.ask_body": "Khayt siz izin vermedikçe hiçbir şey göndermez. Çökme raporu neyin ters gittiğini söyler; e-postalar, telefon numaraları, uzun numaralar ve dosya yolları çıkarılır. Siparişleriniz, müşterileriniz, fiyatlarınız veya dosyalarınız asla gönderilmez.",
+  "tel.ask_body_count": "Günlük anonim kurulum sayımı dışında Khayt siz izin vermedikçe hiçbir şey göndermez. Çökme raporu neyin ters gittiğini söyler; e-postalar, telefon numaraları, uzun numaralar ve dosya yolları çıkarılır. Siparişleriniz, müşterileriniz, fiyatlarınız veya dosyalarınız asla gönderilmez.",
   "tel.ask_usage": "Kullanım sayılarını da paylaş",
   "tel.ask_share": "Çökme Raporlarını Paylaş",
   "tel.ask_not_now": "Şimdi Değil",

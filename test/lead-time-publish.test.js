@@ -46,6 +46,9 @@ test('an offline printer is not capacity', () => {
   // given the true date rather than one that assumes a repair.
   assert.deepEqual(P.usableMachines([{ id: 'a' }, { id: 'b', isOffline: true }, { id: 'c', status: 'offline' }]), ['a']);
   assert.deepEqual(P.usableMachines([{ id: 'd', status: 'retired' }]), []);
+  // Retired is EITHER field (lib/machine-status.js): a record carrying only
+  // the retire date is just as gone.
+  assert.deepEqual(P.usableMachines([{ id: 'e', retiredAt: '2026-10-01' }, { id: 'f', retiredAt: '  ' }]), ['f']);
   assert.deepEqual(P.usableMachines(null), []);
 });
 

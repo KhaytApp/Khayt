@@ -4862,7 +4862,7 @@ function renderTelemetryAsk() {
   }
   card.innerHTML = `
     <div class="telemetry-ask-title" id="telemetryAskTitle">${escapeHtml(t('tel.ask_title'))}</div>
-    <p class="telemetry-ask-body">${escapeHtml(t('tel.ask_body'))}</p>
+    <p class="telemetry-ask-body" id="telemetryAskBody">${escapeHtml(t('tel.ask_body'))}</p>
     <label class="telemetry-ask-usage">
       <input type="checkbox" id="telemetryAskUsage">
       <span><span>${escapeHtml(t('tel.ask_usage'))}</span><br>
@@ -4875,6 +4875,12 @@ function renderTelemetryAsk() {
         <button type="button" class="btn small primary" data-tel-ask="share">${escapeHtml(t('tel.ask_share'))}</button>
       </span>
     </div>`;
+  // Once the anonymous install count is live, "sends nothing unless you allow
+  // it" has one exception, and the card says so.
+  window.hubAPI?.activeCountGet?.().then((st) => {
+    const body = card.querySelector('#telemetryAskBody');
+    if (st && st.ready && body) body.textContent = t('tel.ask_body_count');
+  }).catch(() => {});
   card.querySelector('[data-tel-ask="not-now"]').addEventListener('click', () => {
     markTelemetryAsked();
     renderTelemetryAsk();
@@ -4887,12 +4893,36 @@ function renderTelemetryAsk() {
   });
 }
 
+// The anonymous active-install count (lib/active-count.js): ON unless turned
+// off, and this computer's own switch — it is kept beside the app, not in the
+// book, so another computer on the same shop keeps its own. Shown only once
+// the count is live; until then there is nothing to switch.
+async function renderActiveCountRow(el) {
+  const row = el.querySelector('#activeCountRow');
+  if (!row) return;
+  const st = await window.hubAPI?.activeCountGet?.().catch(() => null);
+  if (!st || !st.ready) { row.innerHTML = ''; return; }
+  // "Sends nothing by default" stops being true the day the count is live.
+  const hint = el.querySelector('#telHint');
+  if (hint) hint.textContent = t('tel.hint_count');
+  row.innerHTML = `
+    <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;cursor:pointer;margin-top:8px;">
+      <input type="checkbox" id="tel_active" style="width:auto;margin-top:3px;" ${st.on ? 'checked' : ''}>
+      <span><b>${escapeHtml(t('tel.active'))}</b><br>
+      <span style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('tel.active_hint'))}</span></span>
+    </label>`;
+  row.querySelector('#tel_active')?.addEventListener('change', async (e) => {
+    const r = await window.hubAPI?.activeCountSet?.(e.target.checked).catch(() => null);
+    if (r?.ok) toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
+  });
+}
+
 function renderTelemetrySettings() {
   const el = $('#telemetrySection');
   if (!el) return;
   const tm = settings.telemetry || {};
   el.innerHTML = `
-    <p style="font-size:11.5px;color:var(--text-muted);margin-bottom:10px;">${escapeHtml(t('tel.hint') || 'Khayt sends nothing by default. You can optionally share crash reports and anonymous usage counts to help fix bugs. Never your orders, customers, prices or files.')}</p>
+    <p id="telHint" style="font-size:11.5px;color:var(--text-muted);margin-bottom:10px;">${escapeHtml(t('tel.hint') || 'Khayt sends nothing by default. You can optionally share crash reports and anonymous usage counts to help fix bugs. Never your orders, customers, prices or files.')}</p>
     <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;cursor:pointer;margin-bottom:8px;">
       <input type="checkbox" id="tel_crash" style="width:auto;margin-top:3px;" ${tm.crashOptIn ? 'checked' : ''}>
       <span><b>${escapeHtml(t('tel.crash') || 'Share crash reports')}</b><br>
@@ -4903,6 +4933,7 @@ function renderTelemetrySettings() {
       <span><b>${escapeHtml(t('tel.usage') || 'Share anonymous usage counts')}</b><br>
       <span style="font-size:12px;color:var(--text-muted);">${escapeHtml(t('tel.usage_hint') || 'Which features are used, as counts only — never what is in them.')}</span></span>
     </label>
+    <div id="activeCountRow"></div>
     <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;">
       <button class="btn small" id="btnViewTelemetry">${escapeHtml(t('tel.view') || 'View what’s collected')}</button>
       ${tm.consentAt ? `<span style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('tel.consented') || 'Consented')}: ${escapeHtml(String(tm.consentAt).split('T')[0])}</span>` : ''}
@@ -4912,6 +4943,7 @@ function renderTelemetrySettings() {
     await setTelemetryConsent(!!el.querySelector('#tel_crash')?.checked, !!el.querySelector('#tel_usage')?.checked);
     toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
   };
+  renderActiveCountRow(el);
   el.querySelector('#tel_crash')?.addEventListener('change', persist);
   el.querySelector('#tel_usage')?.addEventListener('change', persist);
 

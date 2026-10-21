@@ -55,7 +55,10 @@ const ACTIVE = new Set(['queued', 'pending', 'printing', 'post', 'qc', 'on_hold'
  */
 function usableMachines(machines) {
   return (Array.isArray(machines) ? machines : [])
-    .filter((m) => m && m.id && !m.isOffline && m.status !== 'offline' && m.status !== 'retired')
+    // Retired is EITHER field (lib/machine-status.js isRetired): a record the
+    // Mac or a sync left with only a retiredAt is still sold or scrapped.
+    .filter((m) => m && m.id && !m.isOffline && m.status !== 'offline' && m.status !== 'retired'
+      && !(m.retiredAt && String(m.retiredAt).trim()))
     .map((m) => String(m.id));
 }
 

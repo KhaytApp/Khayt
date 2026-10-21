@@ -220,6 +220,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   flushSaveDone:        ()   => ipcRenderer.send('hub:flush-save-done'),
   telemetryPurge: ()      => ipcRenderer.invoke('hub:telemetry-purge'),
   telemetryRecord: (o)    => ipcRenderer.invoke('hub:telemetry-record', o),
+  activeCountGet: ()      => ipcRenderer.invoke('hub:active-count-get'),
+  activeCountSet: (on)    => ipcRenderer.invoke('hub:active-count-set', !!on),
   requestFullWipe: ()     => ipcRenderer.invoke('hub:request-full-wipe'),
   verifyOperatorPin: (opts) => ipcRenderer.invoke('hub:verify-operator-pin', opts),
 

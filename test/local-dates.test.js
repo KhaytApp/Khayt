@@ -103,6 +103,8 @@ const LIB_UTC_IS_DELIBERATE = {
   'lib/sample-data.js': 'anchors to T00:00:00Z and does UTC arithmetic; demo data besides',
   'lib/payment-plan.js': 'addDays anchors to T00:00:00.000Z; the no-argument branch is unreachable',
   'lib/telemetry-scrub.js': 'telemetry is aggregated in UTC by design, not shown as a local day',
+  'lib/active-count.js': 'the cloud contract defines the day, ISO week and month in UTC so every '
+    + 'install counts against the same calendar; never shown to anyone as a local day',
 };
 
 test('no lib file derives a LOCAL calendar date from toISOString()', () => {

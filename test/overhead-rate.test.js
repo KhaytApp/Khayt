@@ -80,6 +80,7 @@ test('without a figure of its own, the hours come from the machines by the depre
     { id: 'm2', depreciation: { price: 3000, monthlyHours: 200 } }, // typed on the machine
     { id: 'm3', targetHoursPerDay: 20, status: 'retired' },       // not printing any more
     { id: 'm4' },                                                 // nothing known: not counted
+    { id: 'm5', targetHoursPerDay: 20, retiredAt: '2026-09-30' },  // retired by its date alone
   ];
   const r = OH.resolve({ settings, machines, orders: [], today: '2026-10-15' });
   assert.equal(r.source, 'machines');
