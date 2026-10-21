@@ -24,7 +24,7 @@ struct LanSecurityReviewTests {
     /// lockout window. On the real clock a slow runner can let the window
     /// lapse between the tenth wrong PIN and the check — which is what failed
     /// `linkLocalLockoutIsPerDevice` on a loaded CI run (alpha.62).
-    static func server(pin: String = "24682468", exposed: Bool = false,
+    static func server(pin: String = "24682468", devices: LanDevices? = nil,
                        measureDelay: TimeInterval = 0, now: Date? = nil,
                        book: (([String: JSONValue]) -> [String: JSONValue])? = nil) async throws -> LanServer {
         let shop = Shop()
@@ -32,7 +32,7 @@ struct LanSecurityReviewTests {
         let engine = try #require(shop.engine)
         let store = book.map { $0(shop.lanBook) } ?? shop.lanBook
         var host = LanServer.Host(store: { store }, pin: pin, engine: engine)
-        host.exposedBeyondLan = exposed
+        if let devices { host.devices = devices }
         if let now { host.now = { now } }
         host.intakeToken = "intake-token-for-tests"
         host.pricing = { store }
@@ -79,31 +79,92 @@ struct LanSecurityReviewTests {
         #expect(!LanServer.pinTooShort(""), "no PIN is 'not configured', a different message")
     }
 
-    // MARK: 3 — the global throttle is not armed on the LAN
+    // MARK: 3 — the whole-server budget is armed on the LAN too
 
-    @Test("on the LAN, wrong PINs from many addresses do not lock the owner out")
-    func noGlobalLockoutOnTheLan() async throws {
-        let server = try await Self.server()
-        for i in 0..<60 {
+    /// ── IT WAS OFF ON THE LAN, AND THAT WAS UNLIMITED GUESSING ──────────
+    ///
+    /// Off, so a neighbour could not lock the owner out — but then each new
+    /// address (and a phone mints link-local and SLAAC ones at will) was a
+    /// fresh ten guesses. The owner's phones sign now and never reach the
+    /// count, so the budget is armed everywhere. Oct 2026 review.
+    @Test("on the LAN, fifty wrong PINs from many addresses lock the PIN, and a signed phone still gets in")
+    func globalLockoutOnTheLan() async throws {
+        let (devices, sign) = try LanDeviceKeysTests.enrolled()
+        let server = try await Self.server(devices: devices, now: LanDeviceKeysTests.at)
+        for i in 0..<50 {
             let r = await server.respond(to: Self.get("/api/queue", from: "192.168.\(i / 200).\(i % 200 + 2)",
                                                       headers: ["x-khayt-pin": "wrong-\(i)"]))
             #expect(r.status == 401)
         }
-        let owner = await server.respond(to: Self.get("/api/queue", from: "192.168.9.9",
-                                                      headers: ["x-khayt-pin": "24682468"]))
-        #expect(owner.status == 200, "a neighbour on the Wi-Fi locked the owner's phone out")
+        let stranger = await server.respond(to: Self.get("/api/queue", from: "192.168.9.9",
+                                                         headers: ["x-khayt-pin": "24682468"]))
+        #expect(stranger.status == 429, "fifty addresses had fifty fresh budgets")
+        let phone = await server.respond(to: Self.get(
+            "/api/queue", from: "192.168.9.10",
+            headers: sign("GET", "/api/queue", Data(), String(repeating: "a1", count: 16), 1_792_396_800)))
+        #expect(phone.status == 200, "an enrolled phone was locked out by a neighbour's guesses")
     }
 
-    @Test("exposed beyond the LAN, the whole-server budget is still armed")
-    func globalLockoutWhenExposed() async throws {
-        let server = try await Self.server(exposed: true, now: Date(timeIntervalSince1970: 1_788_000_000))
-        for i in 0..<50 {
-            _ = await server.respond(to: Self.get("/api/queue", from: "10.0.\(i).1",
+    @Test("each time the whole-server budget trips again, the cooldown doubles")
+    func globalCooldownBacksOff() {
+        var trips = 0
+        var state = KhaytEngine.LanThrottle()
+        let t0 = Date(timeIntervalSince1970: 1_788_000_000)
+        var minutes: [Double] = []
+        for round in 0..<6 {
+            let now = t0.addingTimeInterval(Double(round) * 3600)
+            let was = state
+            var tripped = state
+            tripped.blockedUntil = now.timeIntervalSince1970 * 1000 + 60_000
+            state = LanServer.backedOff(tripped, was: was, trips: &trips, now: now)
+            minutes.append((state.blockedUntil - now.timeIntervalSince1970 * 1000) / 60_000)
+            // The next trip lands right as this cooldown ends: no quiet stretch.
+            state.blockedUntil = t0.addingTimeInterval(Double(round + 1) * 3600).timeIntervalSince1970 * 1000 - 1
+        }
+        #expect(minutes == [1, 2, 4, 8, 16, 16])
+        // A quiet stretch longer than the longest cooldown starts it again.
+        let later = Date(timeIntervalSince1970: state.blockedUntil / 1000 + 17 * 60)
+        var tripped = state
+        tripped.blockedUntil = later.timeIntervalSince1970 * 1000 + 60_000
+        let fresh = LanServer.backedOff(tripped, was: state, trips: &trips, now: later)
+        #expect(fresh.blockedUntil == tripped.blockedUntil && trips == 1)
+        // Not a trip: passed through untouched.
+        #expect(LanServer.backedOff(state, was: state, trips: &trips, now: later) == state && trips == 1)
+    }
+
+    @Test("filling the failure map never evicts a live lockout")
+    func sweepKeepsLockouts() {
+        let now = Date(timeIntervalSince1970: 1_788_000_000)
+        let live = now.timeIntervalSince1970 * 1000 + 30_000
+        var map: [String: KhaytEngine.LanFailures] = [:]
+        for i in 0..<5 { map["locked-\(i)"] = .init(count: 10, resetAt: live) }
+        for i in 0..<10 { map["counting-\(i)"] = .init(count: 1, resetAt: live) }
+        map["expired"] = .init(count: 10, resetAt: live - 60_000)
+        let out = LanServer.swept(map, now: now, cap: 8)
+        #expect(out.count == 8)
+        #expect((0..<5).allSatisfy { out["locked-\($0)"] != nil }, "a lockout was dropped to make room")
+        #expect(out["expired"] == nil)
+        // All lockouts and still over the cap: kept, not evicted.
+        let tight = LanServer.swept(map, now: now, cap: 3)
+        #expect(tight.count == 5 && tight.keys.allSatisfy { $0.hasPrefix("locked-") })
+    }
+
+    @Test("a wrong PIN counts against the caller's whole IPv6 /64, on the shop's network too")
+    func pinKeyIsPerPrefix() async throws {
+        #expect(LanServer.pinThrottleKey("fe80::1%en0") == LanServer.pinThrottleKey("fe80::2:3:4:5%en1"))
+        #expect(LanServer.pinThrottleKey("2001:db8:5:6::a") == LanServer.pinThrottleKey("2001:db8:5:6:ffff::b"))
+        #expect(LanServer.pinThrottleKey("2001:db8:5:6::a") != LanServer.pinThrottleKey("2001:db8:5:7::a"))
+        #expect(LanServer.pinThrottleKey("::ffff:192.168.1.5") == "192.168.1.5")
+        #expect(LanServer.pinThrottleKey("192.168.1.5") == "192.168.1.5")
+        // Over the wire: ten guesses from ten link-local addresses are one lockout.
+        let server = try await Self.server(now: Date(timeIntervalSince1970: 1_788_000_000))
+        for i in 1...10 {
+            _ = await server.respond(to: Self.get("/api/queue", from: "fe80::\(String(i, radix: 16))%en0",
                                                   headers: ["x-khayt-pin": "wrong-\(i)"]))
         }
-        let after = await server.respond(to: Self.get("/api/queue", from: "10.9.9.9",
-                                                      headers: ["x-khayt-pin": "24682468"]))
-        #expect(after.status == 429)
+        let next = await server.respond(to: Self.get("/api/queue", from: "fe80::99%en0",
+                                                     headers: ["x-khayt-pin": "24682468"]))
+        #expect(next.status == 429, "a rotated link-local address bought a fresh ten guesses")
     }
 
     // MARK: — wrong PINs sent together are each counted

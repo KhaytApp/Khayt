@@ -85,13 +85,26 @@ final class LanDevices: @unchecked Sendable {
     private var saved: Saved
     private var seen: [String: [String: Date]] = [:]
     private let persist: (@Sendable (Data) -> Void)?
+    /// The first whole second this store may accept a request from.
+    ///
+    /// The nonces above live in memory only, so a request captured in the
+    /// last `skew` seconds before a restart could be replayed once after it:
+    /// its clock still agreed and no nonce remembered it. A request timed
+    /// before the store existed is refused instead — `device-clock`, with
+    /// `now`, so a phone retries at once. Rounded UP, so a request signed in
+    /// the very second the store started (before it, or after) is refused
+    /// too; that costs a phone one retry, never a replay. Oct 2026 review.
+    private let since: Int
 
     /// False when the Keychain could not be read, or held something this
     /// build cannot decode: phones still enrol, for this run only, and what is
     /// stored is left alone rather than overwritten with an empty list.
     let keeps: Bool
 
-    init(loaded: Data?, persist: (@Sendable (Data) -> Void)?) {
+    /// `since`: when this store started taking requests — `Date()` for the
+    /// app's own (`shared`). The default lets a test sign at a fixed clock.
+    init(loaded: Data?, since: Date = .distantPast, persist: (@Sendable (Data) -> Void)?) {
+        self.since = since == .distantPast ? Int.min : Int(since.timeIntervalSince1970.rounded(.up))
         if let loaded, let kept = try? JSONDecoder().decode(Saved.self, from: loaded) {
             saved = kept
             self.persist = persist
@@ -131,10 +144,10 @@ final class LanDevices: @unchecked Sendable {
         // only, with what is stored left as it was.
         guard status == errSecSuccess || status == errSecItemNotFound else {
             NSLog("Khayt LAN devices: Keychain read failed (%d); enrolments will not be kept", status)
-            return LanDevices(loaded: nil, persist: nil)
+            return LanDevices(loaded: nil, since: Date(), persist: nil)
         }
         let loaded = status == errSecSuccess ? (out as? Data ?? Data()) : nil
-        return LanDevices(loaded: loaded, persist: { data in
+        return LanDevices(loaded: loaded, since: Date(), persist: { data in
             let update = [kSecValueData as String: data] as CFDictionary
             var result = SecItemUpdate(keychainBase as CFDictionary, update)
             if result == errSecItemNotFound {
@@ -320,7 +333,9 @@ final class LanDevices: @unchecked Sendable {
                                                               nonce: nonce, body: body))
             guard Self.constantTimeEqual(expected, sent) else { return auth }
         }
-        guard abs(time - nowSeconds) <= Int(Self.skew) else { return .refused("device-clock", now: nowSeconds) }
+        guard abs(time - nowSeconds) <= Int(Self.skew), time >= since else {
+            return .refused("device-clock", now: nowSeconds)
+        }
         if headOnly { return .pass }
 
         var nonces = (seen[id] ?? [:]).filter { now.timeIntervalSince($0.value) < Self.replayWindow }

@@ -43,9 +43,10 @@ import KhaytCore
 /// the phone has always sent the header. The one place `?pin=` is still read
 /// is the queue page's old bookmark, which trades it once for a session
 /// cookie. A PIN shorter than `minimumPin` opens nothing (see `pinGate`).
-/// Ten wrong PINs from one address (or a stranger's IPv6 /64 — see
-/// `throttleKey`) lock it out
-/// for a minute — the rule is `lan-auth`'s, run in JavaScriptCore, so the two
+/// Ten wrong PINs from one address (or one IPv6 /64 — see
+/// `pinThrottleKey`) lock it out
+/// for a minute, and fifty from everyone together lock the PIN for a minute
+/// that doubles each time it trips again (`pinGate`) — the rule is `lan-auth`'s, run in JavaScriptCore, so the two
 /// apps cannot come to disagree about what a lockout is. The comparison is
 /// constant-time and in Swift: a primitive, not a rule (see lan-auth.js).
 /// Every response carries the same four security headers, JSON included,
@@ -174,14 +175,6 @@ final class LanServer {
         /// it moved, or nil when the book as it is now had nothing to move.
         var carrierEvent: (_ event: JSONValue, _ at: String) async throws -> JSONValue?
             = { _, _ in throw CocoaError(.fileWriteUnknown) }
-        /// Whether this server is reachable from beyond the shop's own network
-        /// (a tunnel). Only then is the WHOLE server's wrong-PIN budget armed —
-        /// `lib/lan-auth.js`'s rule, which the Node server applies behind its
-        /// tunnel only. On the LAN it is a lockout anyone on the Wi-Fi can
-        /// trip for everybody, the owner's phone with the right PIN included,
-        /// so it costs more than the per-address lockout it backs up. This Mac
-        /// has no tunnel today, so the app never sets it. Oct 2026 review.
-        var exposedBeyondLan = false
     }
 
     struct Request {
@@ -2180,32 +2173,36 @@ final class LanServer {
         await lockCounters()
         defer { unlockCounters() }
         let now = host.now()
-        // One lockout per stranger's IPv6 /64 (billions of addresses in it),
-        // but per ADDRESS on the shop's own network — see `throttleKey`.
-        let key = Self.throttleKey(request.remote)
+        // ── ONLY A STRANGER GETS THIS FAR ─────────────────────────────────
+        //
+        // An enrolled phone signs and has returned above, before any counter.
+        // So everything below is a caller without a device key, and it is
+        // counted as one: per IPv6 /64, link-local and the shop's own prefix
+        // included (`pinThrottleKey`), and against ONE budget for the whole
+        // server. Keyed by full address with the whole-server budget off on
+        // the LAN, a phone on the Wi-Fi rotating its link-local or SLAAC
+        // address had a fresh ten guesses a minute per address — unlimited
+        // guessing. Oct 2026 review.
+        let key = Self.pinThrottleKey(request.remote)
         let record = failures[key]
         if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
             return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
         }
-        // The whole server's budget, only when exposed beyond the LAN — see
-        // `Host.exposedBeyondLan`. On the shop's own network it let anyone on
-        // the Wi-Fi lock the owner out, right PIN and all.
-        if host.exposedBeyondLan,
-           let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: false), g.blocked {
-            return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
+        if let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: false), g.blocked {
+            return .json(429, #"{"error":"Too many attempts — try again later"}"#)
         }
         guard Self.constantTimeEqual(provided, host.pin) else {
             if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
                 failures[key] = bumped
             }
-            if host.exposedBeyondLan,
-               let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: true) {
-                throttle = g.state
+            if let g = try? await host.engine.lanGlobalThrottle(throttle, now: now, failed: true) {
+                throttle = Self.backedOff(g.state, was: throttle, trips: &throttleTrips, now: now)
             }
             sweepFailures(now: now)
             return .json(401, #"{"error":"Unauthorized"}"#)
         }
         failures.removeValue(forKey: key)
+        throttleTrips = 0
         return nil
     }
 
@@ -2304,6 +2301,8 @@ final class LanServer {
 
     /// The whole server's wrong-PIN budget — see `KhaytEngine.lanGlobalThrottle`.
     private var throttle = KhaytEngine.LanThrottle()
+    /// How many times in a row the whole-server budget has tripped (`backedOff`).
+    private var throttleTrips = 0
 
     /// Is this `Host` header one a phone or the shop's own browser would send:
     /// an IP address, `localhost`, or a Bonjour `.local` name? Anything else
@@ -2322,8 +2321,9 @@ final class LanServer {
         return h == "localhost" || h.hasSuffix(".local")
     }
 
-    /// The key every per-visitor limit counts against — wrong PINs, webhook
-    /// signatures, forms, estimates and open connections: the address, or for
+    /// The key every per-visitor limit counts against — webhook signatures,
+    /// forms, estimates and open connections (wrong PINs count against
+    /// `pinThrottleKey`, stricter): the address, or for
     /// a GLOBAL IPv6 address from beyond this Mac's own network its /64 (an
     /// IPv4-mapped address counts as its IPv4 address).
     ///
@@ -2358,13 +2358,58 @@ final class LanServer {
     /// The map of failed addresses cannot grow without bound — an attacker
     /// with many addresses would otherwise fill memory one wrong PIN at a
     /// time. Expired records go first; the cap is the Node server's.
+    ///
+    /// A LIVE LOCKOUT IS NEVER THE ONE EVICTED: dropping one hands its owner
+    /// a fresh ten guesses, so filling the map was a way to unlock yourself.
+    /// Past the cap only buckets still counting go; if every one left is a
+    /// lockout the map is let grow, and the whole-server budget bounds how
+    /// fast it can (fifty wrong PINs a minute is five lockouts).
     private func sweepFailures(now: Date) {
         guard failures.count > Self.maxFailureKeys else { return }
+        failures = Self.swept(failures, now: now, cap: Self.maxFailureKeys)
+    }
+
+    /// `sweepFailures`' rule, on its own so a test can hold it.
+    nonisolated static func swept(_ map: [String: KhaytEngine.LanFailures], now: Date,
+                                  cap: Int) -> [String: KhaytEngine.LanFailures] {
         let ms = now.timeIntervalSince1970 * 1000
-        failures = failures.filter { $0.value.resetAt > ms }
-        while failures.count > Self.maxFailureKeys, let any = failures.keys.first {
-            failures.removeValue(forKey: any)
-        }
+        var out = map.filter { $0.value.resetAt > ms }
+        guard out.count > cap else { return out }
+        let counting = out.filter { $0.value.count < perAddressLimit }.keys
+        for key in counting.prefix(out.count - cap) { out.removeValue(forKey: key) }
+        return out
+    }
+
+    /// `lib/lan-auth.js PER_IP_LIMIT` — a bucket at this count is a lockout.
+    nonisolated static let perAddressLimit: Double = 10
+
+    /// The key a wrong PIN counts against: the address, and for ANY IPv6
+    /// address its /64 — the shop's own network included, unlike
+    /// `throttleKey`. A phone owns its whole /64 of SLAAC addresses and can
+    /// mint link-local ones, so on the PIN path a full address is not one
+    /// guesser. The owner's own phones sign and never reach this count.
+    nonisolated static func pinThrottleKey(_ remote: String) -> String {
+        let bare = String(remote.split(separator: "%", maxSplits: 1).first ?? "")
+        guard bare.contains(":"), let v6 = IPv6Address(bare) else { return bare }
+        if let v4 = v6.asIPv4 { return "\(v4)" }
+        return "v6/64:" + [UInt8](v6.rawValue).prefix(8).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The whole-server budget, with backoff: each time it trips again the
+    /// cooldown doubles, up to `maxCooldownDoublings`. Fifty a minute alone is
+    /// seventy thousand guesses a day; doubling makes a guesser that never
+    /// stops wait sixteen minutes for each fifty. A right PIN, or a quiet
+    /// stretch as long as the longest cooldown, starts the count again.
+    nonisolated static let maxCooldownDoublings = 4
+    nonisolated static func backedOff(_ next: KhaytEngine.LanThrottle, was: KhaytEngine.LanThrottle,
+                                      trips: inout Int, now: Date) -> KhaytEngine.LanThrottle {
+        guard next.blockedUntil > was.blockedUntil else { return next }   // did not trip
+        let ms = now.timeIntervalSince1970 * 1000
+        let longest = 60_000 * Double(1 << maxCooldownDoublings)
+        trips = ms > was.blockedUntil + longest ? 1 : trips + 1
+        var out = next
+        out.blockedUntil = ms + 60_000 * Double(1 << min(trips - 1, maxCooldownDoublings))
+        return out
     }
 
     /// Constant-time, in Swift, on the platform's own primitive shape: every
@@ -2476,6 +2521,12 @@ struct LanConfig: Equatable, Sendable {
     var storefrontSecrets: [String: String] = [:]
     /// The carriers' webhook secrets as STORED, for the same reason.
     var carrierSecrets: [String: String] = [:]
+    /// The intake form's and the calendar feed's tokens as STORED, for the
+    /// same reason. They were not here, so a token rotated by the other app
+    /// or a sync left the OLD one opening the form and the feed until this
+    /// Mac restarted. Oct 2026 review.
+    var intakeToken: String = ""
+    var calendarToken: String = ""
 }
 
 extension Shop {
@@ -2487,7 +2538,8 @@ extension Shop {
         return LanConfig(enabled: lan.flag("enabled"), port: port, bindLan: lan.flag("bindLan"), pin: lan.text("pin"),
                          storefrontSecrets: ["salla": lan.text("sallaWebhookSecret"),
                                              "zid": lan.text("zidWebhookSecret")],
-                         carrierSecrets: carrierSecretsStored)
+                         carrierSecrets: carrierSecretsStored,
+                         intakeToken: lan.text("intakeToken"), calendarToken: lan.text("calendarToken"))
     }
 
     /// The address a phone is told, while the server is up.
@@ -2520,8 +2572,7 @@ extension Shop {
         // Sealed on disk by whichever app wrote it; opened here, once, and
         // handed to the server — never read back out of the book per request.
         let pin = (try? await Secrets.open(config.pin, for: source)) ?? ""
-        let lan = SettingsReader(settings: SettingsReader(settings: settingsDict).object("lanApi"))
-        let intakeToken = (try? await Secrets.open(lan.text("intakeToken"), for: source)) ?? ""
+        let intakeToken = (try? await Secrets.open(config.intakeToken, for: source)) ?? ""
         let calendarToken = await ensureCalendarToken()
         var host = LanServer.Host(store: { [weak self] in self?.lanBook ?? [:] }, pin: pin, engine: engine)
         host.intakeToken = intakeToken

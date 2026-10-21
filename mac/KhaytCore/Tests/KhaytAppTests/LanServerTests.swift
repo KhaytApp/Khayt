@@ -1683,6 +1683,27 @@ struct LanServerTests {
         #expect(config.enabled == false && config.port == 3219)
     }
 
+    /// The intake and calendar tokens are opened once, at start — so a
+    /// token rotated by the other app or a sync must count as a config change
+    /// that restarts the server, or the OLD one keeps opening the form and
+    /// the feed. Oct 2026 review.
+    @Test("a rotated intake or calendar token is a config change")
+    func rotatedTokensRestart() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        func config(intake: String, calendar: String) -> LanConfig {
+            shop.settingsValue = .object(["lanApi": .object([
+                "enabled": .bool(true), "pin": .string("sealed-pin"),
+                "intakeToken": .string(intake), "calendarToken": .string(calendar)])])
+            return shop.lanConfig
+        }
+        let before = config(intake: "sealed-a", calendar: "sealed-c")
+        #expect(before.intakeToken == "sealed-a" && before.calendarToken == "sealed-c")
+        #expect(config(intake: "sealed-b", calendar: "sealed-c") != before)
+        #expect(config(intake: "sealed-a", calendar: "sealed-d") != before)
+        #expect(config(intake: "sealed-a", calendar: "sealed-c") == before)
+    }
+
     @Test("the LAN address, when there is one, is a private IPv4 and never loopback")
     func lanAddress() {
         guard let address = LanServer.lanIPv4() else { return }   // a Mac with no network

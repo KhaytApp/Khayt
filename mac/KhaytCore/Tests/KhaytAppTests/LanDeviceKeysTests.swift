@@ -148,6 +148,32 @@ struct LanDeviceKeysTests {
                 == .refused("device-unknown", now: nil))
     }
 
+    /// The nonces are memory only, so after a restart a request captured in
+    /// the last two minutes would have been taken once more. One timed before
+    /// the store started is refused, with the clock, so a phone retries.
+    @Test("a request timed before this run started is refused, so a restart opens no replay")
+    func nothingFromBeforeTheRestart() throws {
+        let store = LanDevices(loaded: nil, since: Self.at.addingTimeInterval(-0.5), persist: nil)
+        let mac = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: Self.d(V.macPrivate))
+        _ = try store.enrol(phonePublic: V.phonePublic, name: "p", pin: Self.pin, identity: .init(), now: Self.at,
+                            serverKey: mac, deviceId: V.deviceId)
+        let key = Self.d(V.key)
+        func sign(_ nonce: String, _ time: Int) -> [String: String] {
+            let c = LanDevices.canonical(method: "GET", target: "/api/store", time: String(time), nonce: nonce, body: Data())
+            return Self.signed(V.deviceId, mac: LanDevices.mac(key: key, canonical: c).base64EncodedString(),
+                               nonce: nonce, time: time)
+        }
+        let t = 1_792_396_800
+        let now = Self.at.addingTimeInterval(30)
+        // Inside the skew, but signed before the store existed (and in the
+        // second it started, which the rounding up also refuses).
+        #expect(store.verify(headers: sign(String(repeating: "a1", count: 16), t - 1), method: "GET",
+                             target: "/api/store", body: Data(), pin: Self.pin, now: now)
+                == .refused("device-clock", now: t + 30))
+        #expect(store.verify(headers: sign(String(repeating: "b2", count: 16), t), method: "GET",
+                             target: "/api/store", body: Data(), pin: Self.pin, now: now) == .pass)
+    }
+
     @Test("a new PIN signs every phone out, whoever changed it")
     func pinChange() throws {
         let (store, sign) = try Self.enrolled()

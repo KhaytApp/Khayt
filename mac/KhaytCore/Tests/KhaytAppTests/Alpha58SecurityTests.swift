@@ -43,11 +43,15 @@ struct Alpha58SecurityTests {
         #expect(!odd.contains([UInt8](try #require(IPv6Address("2001:db8:5:10::1")).rawValue)))
     }
 
+    /// The owner's iPhone SIGNS now, and a signed request is judged before
+    /// any counter — so the neighbour's lockout (per /64 on the PIN path since
+    /// the Oct 2026 review, link-local included) cannot reach it.
     @Test("ten wrong PINs from one phone on the Wi-Fi do not lock the owner's iPhone out")
     func linkLocalLockoutIsPerDevice() async throws {
         // A fixed clock: twelve guesses and the check must land in one lockout
         // window however slow the runner is (it lapsed on a loaded CI run).
-        let server = try await LanSecurityReviewTests.server(now: Date(timeIntervalSince1970: 1_788_000_000))
+        let (devices, sign) = try LanDeviceKeysTests.enrolled()
+        let server = try await LanSecurityReviewTests.server(devices: devices, now: LanDeviceKeysTests.at)
         for i in 0..<12 {
             _ = await server.respond(to: LanSecurityReviewTests.get(
                 "/api/queue", from: "fe80::bad%en0", headers: ["x-khayt-pin": "wrong-\(i)"]))
@@ -56,7 +60,8 @@ struct Alpha58SecurityTests {
             "/api/queue", from: "fe80::bad%en0", headers: ["x-khayt-pin": "24682468"]))
         #expect(attacker.status == 429, "the guesser itself is still locked out")
         let owner = await server.respond(to: LanSecurityReviewTests.get(
-            "/api/queue", from: "fe80::1c2:3ff:fe04:506%en0", headers: ["x-khayt-pin": "24682468"]))
+            "/api/queue", from: "fe80::1c2:3ff:fe04:506%en0",
+            headers: sign("GET", "/api/queue", Data(), String(repeating: "b2", count: 16), 1_792_396_800)))
         #expect(owner.status == 200, "a neighbour's guesses locked the owner's phone out")
     }
 
