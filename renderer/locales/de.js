@@ -802,6 +802,7 @@
   "pay.modal_title": "Zahlung erfassen",
   "pay.saved": "Zahlung erfasst",
   "pay.cleared": "Zahlung eingegangen",
+  "pay.clear_plan_first": "Raten dieses Auftrags sind als erhalten markiert. Entferne die Markierung zuerst im Zahlungsplan und lösche dann die Zahlung.",
   "pay.receivables": "Offene Posten",
   "pay.outstanding": "Offener Betrag",
   "pay.gift_card_credit": "Geschenkkarten-Guthaben angewendet",

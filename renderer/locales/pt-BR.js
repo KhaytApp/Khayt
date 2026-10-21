@@ -803,6 +803,7 @@
   "pay.modal_title": "Registrar pagamento",
   "pay.saved": "Pagamento registrado",
   "pay.cleared": "Pagamento removido",
+  "pay.clear_plan_first": "Há parcelas deste pedido marcadas como recebidas. Desmarque-as primeiro no plano de pagamento e depois limpe o pagamento.",
   "pay.receivables": "Em aberto",
   "pay.outstanding": "Saldo em aberto",
   "pay.gift_card_credit": "Crédito de vale-presente aplicado",

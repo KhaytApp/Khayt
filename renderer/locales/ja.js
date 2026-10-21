@@ -802,6 +802,7 @@
   "pay.modal_title": "支払いを記録",
   "pay.saved": "支払いを記録しました",
   "pay.cleared": "支払いをクリアしました",
+  "pay.clear_plan_first": "この注文の分割払いに回収済みのものがあります。先に支払いプランでチェックを外してから、支払いを取り消してください。",
   "pay.receivables": "未回収",
   "pay.outstanding": "未払い残高",
   "pay.gift_card_credit": "ギフトカードのクレジットを適用しました",

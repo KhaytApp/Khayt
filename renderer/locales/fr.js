@@ -802,6 +802,7 @@
   "pay.modal_title": "Enregistrer un paiement",
   "pay.saved": "Paiement enregistré",
   "pay.cleared": "Paiement enregistré",
+  "pay.clear_plan_first": "Des échéances de cette commande sont marquées comme encaissées. Décochez-les d’abord dans l’échéancier, puis effacez le paiement.",
   "pay.receivables": "En attente",
   "pay.outstanding": "Solde dû",
   "pay.gift_card_credit": "Crédit de carte cadeau appliqué",

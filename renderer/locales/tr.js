@@ -802,6 +802,7 @@
   "pay.modal_title": "Ödeme kaydet",
   "pay.saved": "Ödeme kaydedildi",
   "pay.cleared": "Ödeme silindi",
+  "pay.clear_plan_first": "Bu siparişte tahsil edildi olarak işaretlenmiş taksitler var. Önce ödeme planında işaretlerini kaldırın, sonra ödemeyi temizleyin.",
   "pay.receivables": "Bekleyen",
   "pay.outstanding": "Bekleyen bakiye",
   "pay.gift_card_credit": "Hediye kartı kredisi uygulandı",

@@ -802,6 +802,7 @@
   "pay.modal_title": "Registrar pago",
   "pay.saved": "Pago registrado",
   "pay.cleared": "Pago recibido",
+  "pay.clear_plan_first": "Hay cuotas de este pedido marcadas como cobradas. Desmárcalas primero en el plan de pagos y luego borra el pago.",
   "pay.receivables": "Pendiente",
   "pay.outstanding": "Saldo pendiente",
   "pay.gift_card_credit": "Crédito de tarjeta de regalo aplicado",

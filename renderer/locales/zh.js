@@ -802,6 +802,7 @@
   "pay.modal_title": "记录付款",
   "pay.saved": "付款已记录",
   "pay.cleared": "付款已结清",
+  "pay.clear_plan_first": "此订单有分期已标记为已收款。请先在付款计划中取消标记，然后再清除付款。",
   "pay.receivables": "待收款",
   "pay.outstanding": "未付余额",
   "pay.gift_card_credit": "已应用礼品卡余额",
