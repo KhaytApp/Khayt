@@ -593,7 +593,10 @@ struct StorefrontDraft: Equatable {
     static func text(_ v: JSONValue?) -> String {
         switch v {
         case .string(let s)?: return s
-        case .number(let n)? where n != 0: return n == n.rounded() ? String(Int(n)) : String(n)
+        // `Int(exactly:)`, not `Int(_:)`: a whole number past Int's range
+        // (9.2e18 and up, from a hand-edited or synced book) trapped here
+        // while the storefront settings drew. It reads as Swift writes it.
+        case .number(let n)? where n != 0: return Int(exactly: n).map { String($0) } ?? String(n)
         default: return ""
         }
     }

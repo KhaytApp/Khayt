@@ -224,6 +224,18 @@ struct WebStoreTests {
     }
 
 
+    /// `String(Int(n))` trapped for a whole number past Int's range, and the
+    /// store settings are read from a book anyone can edit or sync.
+    @Test("a store setting too large for an Int reads as a number, not a trap")
+    func hugeStoreNumbers() {
+        #expect(StorefrontDraft.text(.number(20)) == "20")
+        #expect(StorefrontDraft.text(.number(2.5)) == "2.5")
+        #expect(StorefrontDraft.text(.number(1e19)) == String(1e19))
+        #expect(StorefrontDraft.text(.number(9.3e18)) == String(9.3e18))
+        #expect(StorefrontDraft.text(.number(.infinity)) == String(Double.infinity))
+        #expect(StorefrontDraft(["storefront": .object(["depositPct": .number(1e300)])]).depositPct.isEmpty == false)
+    }
+
     @Test("store settings: read from the book, clamped like the desktop, and nothing else in settings.storefront is touched")
     func storeSettingsRoundTrip() {
         let settings: [String: JSONValue] = ["storefront": .object([
