@@ -338,3 +338,19 @@ struct DigitsTests {
         #expect(found.isEmpty, "Eastern Arabic digits in: \(found)")
     }
 }
+
+/// Two counts that skipped the digits setting: the library's group header and
+/// the menu bar's print progress interpolated a bare Int into
+/// `Text(verbatim:)`, which writes whatever Swift's description writes.
+@MainActor
+struct DigitsLeftoversTests {
+    @Test("the group header's count and the menu bar's progress go through numeral")
+    func leftoversUseNumeral() throws {
+        let grid = try QuoteSheetStatusTests.source("LibraryGrid.swift")
+        #expect(!grid.contains("Text(verbatim: \"\\(shop.shownFiles.count)\")"))
+        #expect(grid.contains("Text(verbatim: shop.words.numeral(shop.shownFiles.count))"))
+        let menu = try QuoteSheetStatusTests.source("MenuBar.swift")
+        #expect(!menu.contains("Text(verbatim: \"\\(status.progress)%\")"))
+        #expect(menu.contains("shop.words.numeral(status.progress) + \"%\""))
+    }
+}

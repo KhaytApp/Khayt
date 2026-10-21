@@ -362,7 +362,8 @@ struct GroupCrumb: View {
             .disabled(!shop.canWrite)
             .help(shop.words.callIt("mac.group_kind_menu"))
             // What is in it, so the count a shop tapped is still on screen.
-            Text(verbatim: "\(shop.shownFiles.count)")
+            // In the shop's digits, as every other count in the app.
+            Text(verbatim: shop.words.numeral(shop.shownFiles.count))
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
             Spacer(minLength: 0)
