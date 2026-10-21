@@ -4091,6 +4091,13 @@ final class Words {
         "mac.edit_product":  ["en": "Edit product", "ar": "تعديل المنتج"],
         "mac.product_need_name": ["en": "A product needs a name in at least one language.",
                                   "ar": "يحتاج المنتج إلى اسم بلغة واحدة على الأقل."],
+        // The sheet shows the stored price until an edit re-prices it. Word
+        // for word the desktop editor's `pe.price_kept` / `pe.price_was_now`
+        // (#2010), so the two apps say the same thing about the same product.
+        "mac.price_kept": ["en": "Saved price kept; today's costs give {now}",
+                           "ar": "أُبقي السعر المحفوظ؛ تكاليف اليوم تعطي {now}"],
+        "mac.price_was_now": ["en": "was {was} → now {now}",
+                              "ar": "كان {was} ← الآن {now}"],
         "mac.parts_cost_nothing": ["en": "These parts have no filament chosen, so they cost "
                                    + "nothing — saving will set this product's price to zero. "
                                    + "Pick a spool for each part.",

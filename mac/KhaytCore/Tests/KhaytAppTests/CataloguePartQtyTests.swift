@@ -108,6 +108,55 @@ struct CataloguePartQtyTests {
         #expect(bare["spoolCost"] == nil && bare["filamentId"] == nil)
     }
 
+    @Test("the sheet shows an old ×3 product's SAVED price and today's beside it; an up-to-date one says nothing")
+    func sheetSaysTheSavedPrice() async throws {
+        let engine = try KhaytEngine()
+        let stand: [String: JSONValue] = ["name": .string("Stand"), "printWeight": .number(180), "printTime": .number(2),
+                                          "spoolCost": .number(110), "spoolWeight": .number(1000), "qty": .number(3)]
+        let live = try await engine.priceProduct(.object(["defaultMargin": .number(30), "parts": .array([.object(stand)])]),
+                                                 inventory: [], settings: [:], consumables: [])
+        #expect(live.price == 77.22)
+        let words = Words()
+        await words.load("en", engine: nil)
+
+        // Saved at 25.74 under the one-piece rule, opened and not edited.
+        let note = try #require(ProductSheet.savedPriceNote(stored: 25.74, opened: live, live: live, words: words))
+        #expect(note == "Saved price kept; today's costs give 77.22", Comment(rawValue: note))
+        #expect(ProductSheet.shownPrice(stored: 25.74, opened: live, live: live) == 25.74,
+                "the sheet showed a price an untouched save does not write")
+
+        // Up to date: nothing to say, and the price is the price.
+        #expect(ProductSheet.savedPriceNote(stored: 77.22, opened: live, live: live, words: words) == nil)
+        #expect(ProductSheet.shownPrice(stored: 77.22, opened: live, live: live) == 77.22)
+
+        // Edited: the save re-prices, so the sheet shows what it will write.
+        var heavier = stand; heavier["printWeight"] = .number(190)
+        let edited = try await engine.priceProduct(.object(["defaultMargin": .number(30), "parts": .array([.object(heavier)])]),
+                                                   inventory: [], settings: [:], consumables: [])
+        #expect(ProductSheet.savedPriceNote(stored: 25.74, opened: live, live: edited, words: words)
+                == "was 25.74 → now \(Money.figure(edited.price))")
+        // Edited back to exactly what is stored: nothing moves, nothing said.
+        #expect(ProductSheet.savedPriceNote(stored: edited.price, opened: live, live: edited, words: words) == nil)
+        #expect(ProductSheet.shownPrice(stored: 25.74, opened: live, live: edited) == edited.price)
+
+        // A new product has nothing saved.
+        #expect(ProductSheet.savedPriceNote(stored: nil, opened: nil, live: live, words: words) == nil)
+        #expect(ProductSheet.shownPrice(stored: nil, opened: nil, live: live) == 77.22)
+
+        // In Arabic too, in Western digits.
+        let arabic = Words()
+        await arabic.load("ar", engine: nil)
+        #expect(ProductSheet.savedPriceNote(stored: 25.74, opened: live, live: live, words: arabic)
+                == "أُبقي السعر المحفوظ؛ تكاليف اليوم تعطي 77.22")
+
+        // Both languages say it, with both figures in.
+        for lang in ["en", "ar"] {
+            #expect(Words.own["mac.price_kept"]?[lang]?.contains("{now}") == true, Comment(rawValue: lang))
+            let wasNow = try #require(Words.own["mac.price_was_now"]?[lang])
+            #expect(wasNow.contains("{was}") && wasNow.contains("{now}"), Comment(rawValue: lang))
+        }
+    }
+
     @Test("the sheet prices the components with the product's assemblyQty, as the save does")
     func sheetAndSaveAgree() {
         let product = Product.from(["id": .string("P"), "nameEn": .string("P"), "assemblyQty": .number(2),
