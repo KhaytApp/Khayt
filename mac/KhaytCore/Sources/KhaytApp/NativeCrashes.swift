@@ -29,6 +29,9 @@ struct NativeCrash: Equatable, Sendable {
     var signal: Int?
     /// `CFBundleVersion` of the build that crashed — not always this one.
     var build: String?
+    /// Only its `Namespace X, Code Y` head (`reasonHead`): the rest of a
+    /// DYLD or code-signing reason quotes whole paths, and the scrubber cannot
+    /// collapse a path with a space in it ("/Users/Turki Alballaa/…").
     var terminationReason: String?
     /// The crashing thread, crashing frame first, `binary +0xoffset`.
     var frames: [String]
@@ -53,6 +56,15 @@ struct NativeCrash: Equatable, Sendable {
             frame = (f["subFrames"] as? [[String: Any]])?.first
         }
         return out
+    }
+
+    /// `Namespace SIGNAL, Code 5` out of macOS's termination reason, and
+    /// nothing after it. Nil when the reason does not start that way.
+    nonisolated static func reasonHead(_ reason: String?) -> String? {
+        guard let reason,
+              let r = reason.range(of: #"^Namespace [A-Z_]+, Code [0-9A-Za-z]+"#, options: .regularExpression)
+        else { return nil }
+        return String(reason[r])
     }
 
     nonisolated static func exceptionName(_ type: Int?) -> String? {
@@ -120,7 +132,7 @@ final class NativeCrashListener: NSObject, MXMetricManagerSubscriber {
                 crashes.append(NativeCrash(exceptionType: d.exceptionType?.intValue,
                                            signal: d.signal?.intValue,
                                            build: d.metaData.applicationBuildVersion,
-                                           terminationReason: d.terminationReason,
+                                           terminationReason: NativeCrash.reasonHead(d.terminationReason),
                                            frames: NativeCrash.frames(fromCallStackJSON: d.callStackTree.jsonRepresentation())))
             }
         }

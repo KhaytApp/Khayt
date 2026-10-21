@@ -108,6 +108,8 @@ struct TelemetrySettings: View {
             }
         }
         .disabled(!shop.canWrite || !shop.source.isReal)
+        // A result from before crash reports went off and on again is stale.
+        .onChange(of: shop.telemetryConsent.crash) { testResult = nil }
     }
 
     /// One test crash report, sent now — so a shop asked "are reports
@@ -135,7 +137,7 @@ struct TelemetrySettings: View {
     nonisolated static func resultKey(_ reason: String) -> String {
         switch reason {
         case "accepted": "mac.tel_test_sent"
-        case "unreachable", "retry", "rate-limited", "backoff": "mac.tel_test_later"
+        case "unreachable", "retry", "rate-limited", "backoff", "not-enabled", "empty": "mac.tel_test_later"
         case "development-build": "mac.tel_test_dev"
         default: "mac.tel_test_failed"
         }
@@ -184,8 +186,8 @@ enum TelemetryWords {
         // What `lib/telemetry-scrub.js` takes out, as the privacy page says
         // it: emails, phone numbers, long numbers (IBANs among them) and file
         // paths. NOT person names — the scrubber has no way to know one.
-        "mac.tel_card_body": ["en": "Khayt sends nothing unless you allow it. A crash report tells us what went wrong, with emails, phone numbers, long numbers and file paths taken out. Never your orders, customers, prices or files.",
-                              "ar": "لا يرسل خيط شيئًا ما لم تسمح بذلك. يخبرنا تقرير العطل بما حدث بعد حذف عناوين البريد الإلكتروني وأرقام الهواتف والأرقام الطويلة ومسارات الملفات، ولا يتضمن أبدًا طلباتك أو عملاءك أو أسعارك أو ملفاتك."],
+        "mac.tel_card_body": ["en": "Apart from an anonymous once-a-day install count, which you can turn off in Settings, Khayt sends nothing unless you allow it. A crash report tells us what went wrong, with emails, phone numbers, long numbers and file paths taken out. Never your orders, customers, prices or files.",
+                              "ar": "باستثناء عدّ يومي مجهول الهوية لهذا التثبيت يمكنك إيقافه من الإعدادات، لا يرسل خيط شيئًا ما لم تسمح بذلك. يخبرنا تقرير العطل بما حدث بعد حذف عناوين البريد الإلكتروني وأرقام الهواتف والأرقام الطويلة ومسارات الملفات، ولا يتضمن أبدًا طلباتك أو عملاءك أو أسعارك أو ملفاتك."],
         "mac.tel_card_usage": ["en": "Also share usage counts",
                                "ar": "مشاركة أعداد الاستخدام أيضًا"],
         "mac.tel_card_share": ["en": "Share Crash Reports",

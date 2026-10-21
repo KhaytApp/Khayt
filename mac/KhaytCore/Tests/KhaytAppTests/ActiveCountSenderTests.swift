@@ -55,6 +55,11 @@ struct ActiveCountSenderTests {
         #expect(first["firstEver"] as? Bool == true)
         #expect(rig.requests[0].url == ActiveCount.endpoint && rig.requests[0].httpMethod == "POST")
         #expect(rig.requests[0].value(forHTTPHeaderField: "Authorization") == nil)
+        // Fixed headers only: nothing of this Mac's languages, region or build.
+        #expect(rig.requests[0].value(forHTTPHeaderField: "User-Agent") == "Khayt")
+        #expect(rig.requests[0].value(forHTTPHeaderField: "Accept-Language") == "en")
+        #expect(rig.requests[0].value(forHTTPHeaderField: "Cookie") == nil && !rig.requests[0].httpShouldHandleCookies)
+        #expect(ActiveCountSender.session.configuration.httpCookieStorage == nil)
 
         rig.clock = ActiveCountTestsClock.at("2026-10-22")
         #expect(await rig.sender.tick() == "counted")
@@ -97,6 +102,18 @@ struct ActiveCountSenderTests {
         rig.sender.enabled = true
         #expect(await rig.sender.tick() == "counted")
         #expect(true == (rig.requests.count == 2))
+    }
+
+    @Test("a count that happened is kept even if the switch went off meanwhile")
+    func offMidRequest() async {
+        let rig = Rig()
+        let sender = rig.sender
+        rig.sender.fetch = { request in
+            await MainActor.run { sender.enabled = false }
+            return (Data(), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        #expect(await rig.sender.tick() == "counted")
+        #expect(rig.sender.state.lastCounted == "2026-10-21")
     }
 
     @Test("a development build and an unknown version send nothing")

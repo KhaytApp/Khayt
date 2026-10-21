@@ -31,7 +31,16 @@ final class ActiveCountSender {
 
     @ObservationIgnored let defaults: UserDefaults
     @ObservationIgnored var now: () -> Date = Date.init
-    @ObservationIgnored var fetch: Telemetry.Fetch = { try await URLSession.shared.data(for: $0) }
+    /// No cookies, no cache, nothing CFNetwork would add of its own: the
+    /// request carries the six fields and fixed headers (`request(for:)`).
+    nonisolated static let session: URLSession = {
+        let c = URLSessionConfiguration.ephemeral
+        c.httpShouldSetCookies = false
+        c.httpCookieStorage = nil
+        c.urlCache = nil
+        return URLSession(configuration: c)
+    }()
+    @ObservationIgnored var fetch: Telemetry.Fetch = { try await ActiveCountSender.session.data(for: $0) }
     @ObservationIgnored var appVersion: String = Feedback.appVersion().version
     @ObservationIgnored var sendsFromThisBuild = Bundle.main.bundleIdentifier != nil
     @ObservationIgnored var ready = ActiveCountSender.READY
@@ -59,6 +68,21 @@ final class ActiveCountSender {
         }
     }
 
+    /// The request: the body and fixed headers. A User-Agent and
+    /// Accept-Language of our own, so CFNetwork's (the build number, the
+    /// Mac's languages and region) never go with it.
+    nonisolated static func request(_ body: Data) -> URLRequest {
+        var request = URLRequest(url: ActiveCount.endpoint, cachePolicy: .reloadIgnoringLocalCacheData,
+                                 timeoutInterval: 30)
+        request.httpMethod = "POST"
+        request.httpShouldHandleCookies = false
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Khayt", forHTTPHeaderField: "User-Agent")
+        request.setValue("en", forHTTPHeaderField: "Accept-Language")
+        request.httpBody = body
+        return request
+    }
+
     /// Send today's ping if one is owed. Returns what happened, for a test.
     @discardableResult
     func tick() async -> String {
@@ -73,11 +97,8 @@ final class ActiveCountSender {
         defer { sending = false }
 
         let flags = ActiveCount.flags(lastCounted: state.lastCounted, now: at)
-        var request = URLRequest(url: ActiveCount.endpoint, timeoutInterval: 30)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = ActiveCount.body(platform: "mac", channel: Telemetry.channel(forVersion: appVersion),
-                                            version: appVersion, flags: flags)
+        let request = Self.request(ActiveCount.body(platform: "mac", channel: Telemetry.channel(forVersion: appVersion),
+                                                    version: appVersion, flags: flags))
         let status: Int
         do {
             let (_, response) = try await fetch(request)
@@ -86,8 +107,8 @@ final class ActiveCountSender {
             status = 0
         }
         let outcome = ActiveCount.outcome(status: status)
-        // Switched off while the request was out: keep the days as they were.
-        guard enabled else { return "off" }
+        // Recorded even if the switch went off while the request was out: a
+        // count that happened is true, and forgetting it would count it again.
         state = state.after(outcome, now: at)
         switch outcome {
         case .counted: return "counted"

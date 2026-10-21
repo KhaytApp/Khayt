@@ -43,6 +43,15 @@ struct ActiveCountTests {
         #expect(ActiveCount.flags(lastCounted: "2025-10-21", now: Self.at("2026-10-21")).firstThisWeek)
     }
 
+    @Test("a clock moved back counts nothing as first, and never moves the counted day back")
+    func clockBack() {
+        let now = Self.at("2026-10-21")
+        #expect(ActiveCount.flags(lastCounted: "2026-11-03", now: now)
+                == .init(firstThisWeek: false, firstThisMonth: false, firstEver: false))
+        let ahead = ActiveCount.State(lastCounted: "2026-11-03", doneDay: "2026-11-03")
+        #expect(ahead.after(.counted, now: now) == .init(lastCounted: "2026-11-03", doneDay: "2026-10-21"))
+    }
+
     @Test("the body is exactly the six fields")
     func body() throws {
         let data = ActiveCount.body(platform: "mac", channel: "alpha", version: "4.0.0-alpha.86",
