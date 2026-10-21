@@ -1572,6 +1572,7 @@
   "set.elec_rate": "Elektrik fiyatı",
   "set.elec_rate_hint": "Dükkânınıza bir kWh'in maliyeti. Bir yazıcı ön ayarı kendi değerini belirlemedikçe teklifler, başarısız baskılar ve güç raporları bunu kullanır. Khayt'ın varsayılanı için boş bırakın.",
   "set.prefs_section": "Uygulama Tercihleri",
+  "set.readonly_note": "Ayarları yalnızca sahip değiştirebilir. Burada görüntüleyebilirsiniz.",
   "set.language": "Varsayılan dil",
   "set.content_langs": "Ürün dilleri",
   "set.biz_name": "İşletme adı",

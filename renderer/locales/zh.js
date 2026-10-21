@@ -1572,6 +1572,7 @@
   "set.elec_rate": "电价",
   "set.elec_rate_hint": "您店铺每千瓦时的电费。报价、失败打印和用电报告都会使用它，除非打印机预设另行设定。留空则使用 Khayt 的默认值。",
   "set.prefs_section": "应用偏好",
+  "set.readonly_note": "只有店主可以更改设置。你可以在这里查看。",
   "set.language": "语言",
   "set.content_langs": "产品语言",
   "set.biz_name": "企业名称",

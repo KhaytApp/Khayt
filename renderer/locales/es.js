@@ -1572,6 +1572,7 @@
   "set.elec_rate": "Precio de la electricidad",
   "set.elec_rate_hint": "Lo que cuesta un kWh a tu taller. Lo usan los presupuestos, las impresiones fallidas y los informes de consumo, salvo que un perfil de impresora fije el suyo. Déjalo vacío para usar el valor predeterminado de Khayt.",
   "set.prefs_section": "Preferencias de la app",
+  "set.readonly_note": "Solo el propietario puede cambiar los ajustes. Aquí puedes consultarlos.",
   "set.language": "Idioma",
   "set.content_langs": "Idiomas de los productos",
   "set.biz_name": "Nombre del negocio",

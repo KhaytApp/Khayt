@@ -5329,3 +5329,13 @@ body.khayt-workbench .wb-glist li.is-openable { cursor: pointer; }
 .telemetry-ask-hint { font-size: 11.5px; color: var(--text-muted); }
 .telemetry-ask-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
 .telemetry-ask-buttons { display: flex; gap: 8px; margin-inline-start: auto; }
+
+/* Settings for a role that may read but not change them (settings.js applySettingsReadOnly). */
+.settings-readonly-note {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
