@@ -136,7 +136,13 @@
       <li><strong>Right to rectification</strong> — every customer field is editable.</li>
       <li><strong>Right to erasure</strong> — deleting a customer offers a clear choice: unlink
         (keep the order records you may be legally required to retain) or full erase (also remove
-        the name from those orders and purge intake submissions and communication logs).</li>
+        the name from those orders and purge intake submissions and communication logs). Orders
+        that carry an invoice or a payment keep the customer's name even then, because tax invoices
+        must be kept as issued. So does a gift card with a balance left, because that balance is
+        money the shop still owes them; a used-up gift card loses the name, and their loyalty points
+        are unlinked from them. A full erase also takes the customer's order tracking pages down from
+        Khayt Cloud, those of invoiced and paid orders included; if Khayt Cloud cannot be reached at
+        that moment, the app keeps trying until it can.</li>
       <li><strong>Storage limitation</strong> — an optional retention setting anonymizes the contact
         details on old intake submissions while keeping the operational record.</li>
     </ul>
