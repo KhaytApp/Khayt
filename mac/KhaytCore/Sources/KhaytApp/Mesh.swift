@@ -378,8 +378,14 @@ enum Mesh {
     /// The body is handed the PLATE each triangle belongs to, first. Callers
     /// that do not care take `_` for it — the overhang pass judges a surface
     /// the same whichever plate it is laid out on.
+    ///
+    /// `sharingParts: false` streams the part once per component, the way it
+    /// was read before Oct 2026 — kept only so a test can hold the two ways to
+    /// the same triangles, in the same order, to the bit. `inflated` is told
+    /// each time a part file in the plan is read, for the same test.
     @discardableResult
-    static func each3MFTriangle(_ url: URL,
+    static func each3MFTriangle(_ url: URL, sharingParts: Bool = true,
+                                inflated: ((String) -> Void)? = nil,
                                 _ body: (Int, Double, Double, Double, Double, Double,
                                          Double, Double, Double, Double) -> Void) throws -> Int {
         let entries = try Zip.entries(of: url)
@@ -409,10 +415,40 @@ enum Mesh {
         // The triangle count and the volume are the same either way, which is
         // why they matched before this existed and why the box did not.
         if let plan = try buildPlan(entries, in: url), !plan.isEmpty {
-            for (path, placement, itemPlate, object) in plan {
-                guard let entry = entries.first(where: { equalPath($0.name, path) }) else { continue }
+            // ── ONE INFLATE PER PART FILE, NOT ONE PER COMPONENT ───────────
+            //
+            // A slicer puts every object of an assembly into one part file,
+            // and the plan names that file once per component — so a part of
+            // K components was inflated and walked K times over, each time
+            // keeping one object (and again for the overhang pass). A part
+            // named more than once is read ONCE, keeping just the objects the
+            // plan asks for, and each component is then served from that.
+            // A part named once is streamed as before, holding nothing.
+            let resolved = plan.map { step in
+                (step, entries.first(where: { equalPath($0.name, step.0) }))
+            }
+            var objectsIn: [String: Set<String>] = [:]
+            var uses: [String: Int] = [:]
+            for (step, entry) in resolved {
+                guard let entry else { continue }
+                objectsIn[entry.name, default: []].insert(step.3)
+                uses[entry.name, default: 0] += 1
+            }
+            var read: [String: [String: PartObject]] = [:]
+            for ((_, placement, itemPlate, object), entry) in resolved {
+                guard let entry else { continue }
                 plate = itemPlate
-                try streamModelPart(entry, in: url, placement: placement, only: object, body: sink)
+                if sharingParts, uses[entry.name, default: 0] > 1 {
+                    if read[entry.name] == nil {
+                        inflated?(entry.name)
+                        read[entry.name] = try readPartObjects(entry, in: url,
+                                                               wanted: objectsIn[entry.name] ?? [])
+                    }
+                    read[entry.name]?[object]?.emit(placement: placement, body: sink)
+                } else {
+                    inflated?(entry.name)
+                    try streamModelPart(entry, in: url, placement: placement, only: object, body: sink)
+                }
             }
             if emitted > 0 { return emitted }
             // A build that named nothing this could find. Fall through and
@@ -783,6 +819,107 @@ enum Mesh {
         }
 
         try Zip.stream(entry, in: url, onChunk: consume)
+    }
+
+    /// One object's mesh out of a part file, held so several components can
+    /// be served from one read: its vertices, flat, and its triangles as
+    /// vertex numbers — only the triangles `streamModelPart` would have
+    /// emitted, checked against the table exactly as it checks them.
+    struct PartObject {
+        var vertices: [Double] = []
+        var triangles: [UInt32] = []
+        /// Where the current `<mesh>` starts in `vertices`: a mesh numbers
+        /// its vertices from zero, as `streamModelPart`'s reset says.
+        var base = 0
+
+        func emit(placement: Placement,
+                  body: (Double, Double, Double, Double, Double,
+                         Double, Double, Double, Double) -> Void) {
+            var t = 0
+            while t + 2 < triangles.count {
+                let ia = Int(triangles[t]) * 3, ib = Int(triangles[t + 1]) * 3,
+                    ic = Int(triangles[t + 2]) * 3
+                // The same arithmetic, in the same order, as `streamModelPart`,
+                // so a component served from here is the same doubles.
+                if placement.isIdentity {
+                    body(vertices[ia], vertices[ia + 1], vertices[ia + 2],
+                         vertices[ib], vertices[ib + 1], vertices[ib + 2],
+                         vertices[ic], vertices[ic + 1], vertices[ic + 2])
+                } else {
+                    let p = placement.apply(vertices[ia], vertices[ia + 1], vertices[ia + 2])
+                    let q = placement.apply(vertices[ib], vertices[ib + 1], vertices[ib + 2])
+                    let r = placement.apply(vertices[ic], vertices[ic + 1], vertices[ic + 2])
+                    body(p.0, p.1, p.2, q.0, q.1, q.2, r.0, r.1, r.2)
+                }
+                t += 3
+            }
+        }
+    }
+
+    /// Every object in `wanted` out of one part file, in one streamed read.
+    ///
+    /// The tag walk is `streamModelPart`'s with `only` widened to a set: an
+    /// `<object` decides whether what follows is kept and under which id, and
+    /// `<mesh` restarts that object's numbering. What `streamModelPart` would
+    /// have handed its body for any one id is what `emit` hands back for it.
+    private static func readPartObjects(_ entry: Zip.Entry, in url: URL,
+                                        wanted: Set<String>) throws -> [String: PartObject] {
+        var out: [String: PartObject] = [:]
+        var carry = [UInt8]()
+        // The object being read, held out of the dictionary while it grows
+        // so an append never copies it.
+        var currentId: String?
+        var current = PartObject()
+
+        func consume(_ bytes: UnsafeRawBufferPointer) -> Bool {
+            var buffer = carry
+            buffer.append(contentsOf: bytes.bindMemory(to: UInt8.self))
+            carry.removeAll(keepingCapacity: true)
+
+            var i = 0
+            var lastComplete = 0
+            while i < buffer.count {
+                guard buffer[i] == UInt8(ascii: "<") else { i += 1; continue }
+                guard let close = index(of: UInt8(ascii: ">"), in: buffer, from: i) else { break }
+                let tag = buffer[i..<close]
+                if starts(tag, with: "<object") {
+                    if let id = currentId { out[id] = current }
+                    currentId = rawAttribute("id", in: tag).flatMap { wanted.contains($0) ? $0 : nil }
+                    current = currentId.flatMap { out.removeValue(forKey: $0) } ?? PartObject()
+                } else if currentId == nil {
+                    // Not an object asked for: skipped, as `streamModelPart` skips it.
+                } else if starts(tag, with: "<mesh") {
+                    current.base = current.vertices.count
+                } else if starts(tag, with: "<vertex") {
+                    if let x = attribute("x", in: tag), let y = attribute("y", in: tag),
+                       let z = attribute("z", in: tag) {
+                        current.vertices.append(contentsOf: [x, y, z])
+                    }
+                } else if starts(tag, with: "<triangle") {
+                    if let a = attribute("v1", in: tag), let b = attribute("v2", in: tag),
+                       let c = attribute("v3", in: tag),
+                       let ia = vertexOffset(a), let ib = vertexOffset(b),
+                       let ic = vertexOffset(c) {
+                        let count = current.vertices.count - current.base
+                        if ia >= 0, ic >= 0, ib >= 0,
+                           ia + 2 < count, ib + 2 < count, ic + 2 < count {
+                            let first = current.base / 3
+                            current.triangles.append(contentsOf: [
+                                UInt32(first + ia / 3), UInt32(first + ib / 3),
+                                UInt32(first + ic / 3)])
+                        }
+                    }
+                }
+                i = close + 1
+                lastComplete = i
+            }
+            if lastComplete < buffer.count { carry = Array(buffer[lastComplete...]) }
+            return true
+        }
+
+        try Zip.stream(entry, in: url, onChunk: consume)
+        if let id = currentId { out[id] = current }
+        return out
     }
 
     // MARK: - Reading a tag
