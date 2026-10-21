@@ -2509,6 +2509,24 @@ extension Shop {
         }
     }
 
+    /// Empty a camera URL with credentials in it, saved before the shared rule
+    /// refused them (`Camera.scrubCredentials`). Once: the write leaves
+    /// nothing for the next load to find. Inside the write chain, and only
+    /// when a machine in memory has an `@` in a camera URL, so an ordinary
+    /// load does not open the store for writing.
+    func scrubWebcamCredentials(_ build: StoreReader.Build?) async {
+        guard let build, canWrite, let engine else { return }
+        guard machines.contains(where: {
+            ($0.webcam?.snapshotUrl ?? "").contains("@") || ($0.webcam?.streamUrl ?? "").contains("@")
+        }) else { return }
+        // lock: system — migration: a camera password saved in plain text by an older build, removed.
+        try? await StoreWriter.updateAsync(build) { root in
+            _ = await Camera.scrubCredentials(&root) { url, api in
+                try? await engine.normalizeWebcamUrl(url, printerApi: api)
+            }
+        }
+    }
+
     func markMaintenanceDone(_ taskId: String, on machine: Machine) async {
         guard permitted("inventory", "edit") else { return }
         guard let engine, let build = source.build, canMoveJobs else { return }

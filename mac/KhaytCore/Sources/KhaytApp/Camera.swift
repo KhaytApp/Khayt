@@ -338,6 +338,39 @@ final class RefuseRedirects: NSObject, URLSessionTaskDelegate, Sendable {
 }
 
 extension Camera {
+    /// ── A PASSWORD SAVED BEFORE THE RULE STAYED ON DISK ─────────────────
+    ///
+    /// `normalizeWebcamUrl` refuses a camera URL with credentials in it now
+    /// (`http://user:pass@cam/snap.jpg`), but one saved before that sits in
+    /// plain text in `machines[].webcam` — not a sealed field, so it goes to
+    /// the phone and the cloud with the book. This empties exactly those two
+    /// fields, by the shared rule's verdict, and touches nothing else. A URL
+    /// is only asked about when it has an `@` in it, so an ordinary book is
+    /// never changed. Returns how many fields were emptied.
+    static func scrubCredentials(_ root: inout [String: JSONValue],
+                                 normalize: (String, JSONValue) async -> String?) async -> Int {
+        guard case .array(var rows)? = root["machines"] else { return 0 }
+        var emptied = 0
+        for i in rows.indices {
+            guard case .object(var machine) = rows[i], case .object(var cam)? = machine["webcam"] else { continue }
+            let api = machine["printerApi"] ?? .object([:])
+            var changed = false
+            for field in ["snapshotUrl", "streamUrl"] {
+                guard case .string(let url)? = cam[field], url.contains("@"),
+                      await normalize(url, api) == "" else { continue }
+                cam[field] = .string("")
+                changed = true
+                emptied += 1
+            }
+            if changed {
+                machine["webcam"] = .object(cam)
+                rows[i] = .object(machine)
+            }
+        }
+        if emptied > 0 { root["machines"] = .array(rows) }
+        return emptied
+    }
+
     /// Is this address the printer's own host — `lib/webcam.js printerHost`,
     /// compared host to host (scheme, port and path aside)?
     nonisolated static func samePrinterHost(_ url: URL, printerApi: JSONValue) -> Bool {

@@ -1248,6 +1248,8 @@ final class Shop {
             // outside it races whatever is in flight — and only for a real
             // book, which is the only kind that can have one.
             rescueStrandedServiceLog(next.build)
+            // And a camera password an older build saved in plain text.
+            await scrubWebcamCredentials(next.build)
             // COUNTED, never repaired, on open: see `applySpoolRepair`. A
             // write here re-priced every product on a spool whose size changed,
             // without the shop seeing a single new price.

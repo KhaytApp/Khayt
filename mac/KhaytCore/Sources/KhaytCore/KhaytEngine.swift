@@ -4552,6 +4552,13 @@ public actor KhaytEngine {
                           [input, printerApi], as: JSONValue.self)
     }
 
+    /// One camera address, normalised: `lib/webcam.js normalizeWebcamUrl`.
+    /// '' is its refusal — a URL with credentials in it among them.
+    public func normalizeWebcamUrl(_ url: String, printerApi: JSONValue) throws -> String {
+        try runtime.call2("globalThis.KhaytWebcam.normalizeWebcamUrl(ARG0, ARG1)",
+                          [.string(url), printerApi], as: String.self)
+    }
+
     /// The addresses a printer of this family might serve a camera on, best
     /// first — plural, because one guess is demonstrably not enough. Checked
     /// against a Snapmaker U1 on stock firmware, the derived
