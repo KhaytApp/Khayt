@@ -2666,10 +2666,10 @@ function openExecutiveSummary() {
         // what was stocked (stockShare), as the Mac and the P&L cost it.
         // Shipping is not a cost of goods — it is charged in the price, and
         // what the courier was paid is an expense.
-        cost: KhaytKpiRows.orderCost(o, {
-          inventory, settings, clients,
-          known: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
-        }),
+        // Only inventory and settings: since beta.2 shipping is not a cost of
+        // goods, so the clients and currency table it was converted with are
+        // no longer read.
+        cost: KhaytKpiRows.orderCost(o, { inventory, settings }),
         outstanding: (typeof orderOwedBase === 'function') ? orderOwedBase(o) : 0,
       }),
       clientName: (o) => {
