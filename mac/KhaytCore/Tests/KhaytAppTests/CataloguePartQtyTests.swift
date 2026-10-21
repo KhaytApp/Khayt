@@ -87,6 +87,27 @@ struct CataloguePartQtyTests {
         }
     }
 
+    @Test("a part that never named a spool keeps its spool cost through the sheet; one whose spool was removed loses it")
+    func recordKeepsUnlinkedSpoolCost() throws {
+        let raw: [String: JSONValue] = ["name": .string("Bracket"), "material": .string("PETG"),
+                                        "printWeight": .number(200), "printTime": .number(3),
+                                        "spoolCost": .number(100), "spoolWeight": .number(750), "qty": .number(1)]
+        var row = try #require(ProductSheet.PartRow.from(.object(raw)))
+        row.grams = "250"
+        guard case .object(let saved) = row.record(spools: []) else { Issue.record("not an object"); return }
+        #expect(saved["spoolCost"] == .number(100), "the part's own spool cost was dropped")
+        #expect(saved["spoolWeight"] == .number(750))
+        #expect(saved["material"] == .string("PETG"))
+        #expect(saved["printWeight"] == .number(250))
+        // Taking a linked spool off still takes its figures with it.
+        var linked = try #require(ProductSheet.PartRow.from(.object(CataloguePriceFidelityTests.portraitPart)))
+        linked.spoolId = nil
+        guard case .object(let bare) = linked.record(spools: [CataloguePriceFidelityTests.spool]) else {
+            Issue.record("not an object"); return
+        }
+        #expect(bare["spoolCost"] == nil && bare["filamentId"] == nil)
+    }
+
     @Test("the sheet prices the components with the product's assemblyQty, as the save does")
     func sheetAndSaveAgree() {
         let product = Product.from(["id": .string("P"), "nameEn": .string("P"), "assemblyQty": .number(2),
@@ -169,6 +190,46 @@ extension LibraryEditPerfTests {
         }
     }
 
+    /// A part with its own spool cost and no spool on the shelf — typed in the
+    /// other app, or imported — with rates of its own.
+    static let unlinkedProduct: [String: JSONValue] = [
+        "id": .string("PNS"), "nameEn": .string("Bracket"), "defaultMargin": .number(30), "rev": .number(1),
+        "baseCost": .number(20), "basePrice": .number(26), "price": .number(26),
+        "parts": .array([.object(["name": .string("Bracket"), "material": .string("PETG"),
+                                  "printWeight": .number(200), "printTime": .number(3),
+                                  "spoolCost": .number(100), "spoolWeight": .number(1000),
+                                  "supportWeight": .number(0), "qty": .number(1),
+                                  "laborRate": .number(0), "failureRate": .number(0)])]),
+    ]
+
+    @Test("a part with its own spool cost and no spool keeps it: untouched save is a no-op, a grams edit prices with it")
+    func unlinkedPartKeepsItsSpoolCost() async throws {
+        var book = PerfBook.synthesize(models: 5)
+        book["products"] = .array([.object(Self.unlinkedProduct)])
+        try await withPerfBook(book) { shop, url in
+            try await Self.saveFromSheet(shop, "PNS")
+            let untouched = try #require(try Self.diskProduct(url, "PNS"))
+            let changed = Set(untouched.keys).union(Self.unlinkedProduct.keys)
+                // Every save stamps the record; that is a save, not an edit.
+                .subtracting(["rev", "updatedAt"])
+                .filter { untouched[$0] != Self.unlinkedProduct[$0] }.sorted()
+            #expect(changed.isEmpty, Comment(rawValue: "an untouched save changed \(changed): \(changed.map { "\($0)=\(String(describing: untouched[$0]))" })"))
+
+            try await Self.saveFromSheet(shop, "PNS") { $0.parts[0].grams = "250" }
+            let saved = try #require(try Self.diskProduct(url, "PNS"))
+            // 250 g at 100 a kilo is 25.00; plus 30% is 32.50.
+            #expect(saved["baseCost"] == .number(25), Comment(rawValue: "\(String(describing: saved["baseCost"]))"))
+            #expect(saved["price"] == .number(32.5), Comment(rawValue: "\(String(describing: saved["price"]))"))
+            guard case .array(let parts)? = saved["parts"], case .object(let part)? = parts.first else {
+                Issue.record("no part"); return
+            }
+            #expect(part["printWeight"] == .number(250))
+            for key in ["spoolCost", "spoolWeight", "material", "laborRate", "failureRate"] {
+                #expect(part[key] == Self.unlinkedProduct.partField(key), Comment(rawValue: "\(key) was dropped or changed"))
+            }
+        }
+    }
+
     @Test("the catalogue's per-hour figure reads the qty-3 product's real cost, beside its stored price")
     func perHourShowsTheLoss() async throws {
         var book = PerfBook.synthesize(models: 5)
@@ -184,5 +245,13 @@ extension LibraryEditPerfTests {
             #expect((row.profit ?? 0) < 0, "a loss read as a margin")
             #expect(try Self.diskProduct(url, "PQ3") == Self.oldQtyProduct, "reporting on it wrote to it")
         }
+    }
+}
+
+private extension Dictionary where Key == String, Value == JSONValue {
+    /// A field of the first part, for comparing a saved part with the one it was.
+    func partField(_ key: String) -> JSONValue? {
+        guard case .array(let parts)? = self["parts"], case .object(let p)? = parts.first else { return nil }
+        return p[key]
     }
 }

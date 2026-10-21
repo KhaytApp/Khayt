@@ -165,8 +165,14 @@ struct ProductSheet: View {
                 o["material"] = .string(spool.material)
                 o["spoolCost"] = .number(spool.jobCost(reclaimsTax: reclaimsTax))
                 o["spoolWeight"] = .number(max(1, spool.spoolWeight ?? 1000))
-            } else if spoolId == nil {
+            } else if spoolId == nil, !(Shop.plainString(raw["filamentId"]) ?? "").isEmpty {
                 // The shop took the filament off: the part is not made of it any more.
+                // ONLY then. A part that never named a spool — typed in the
+                // other app, imported, a blend — carries its own `spoolCost`
+                // and `spoolWeight`, and they are what it is costed at.
+                // Stripping them on every save costed it at nothing, so an
+                // edit to its grams priced the same as the untouched part and
+                // the product never re-priced.
                 for key in ["filamentId", "material", "spoolCost", "spoolWeight"] { o.removeValue(forKey: key) }
             }
             if let printFileId, !printFileId.isEmpty { o["printFileId"] = .string(printFileId) }
