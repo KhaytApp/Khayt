@@ -538,7 +538,7 @@ extension Shop {
         // one write per model was the whole 16 MB book again for each one a
         // shop made available offline.
         var pending: [String: DownloadedRead] = [:]
-        func flush() async {
+        func writeFilled() async {
             guard !pending.isEmpty else { return }
             let batch = pending
             pending = [:]
@@ -555,10 +555,10 @@ extension Shop {
                                                          engine: engine) {
                 pending[item.id] = read
             }
-            if pending.count >= OnlineMeasure.batch { await flush() }
+            if pending.count >= OnlineMeasure.batch { await writeFilled() }
         }
         // What was read before a Stop is still written.
-        await flush()
+        await writeFilled()
     }
 
     /// A record's vault folder — the one it already has, in whichever of the

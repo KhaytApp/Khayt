@@ -11,6 +11,7 @@ import KhaytCore
 /// that owns the test support folder (`extension LibraryEditPerfTests`,
 /// below); the rest need no book at all.
 @MainActor
+@Suite(.serialized)
 struct Beta1IntegrityTests {
 
     // MARK: - The lock, across a hostname change

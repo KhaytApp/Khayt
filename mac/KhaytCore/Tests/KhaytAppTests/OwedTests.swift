@@ -202,7 +202,7 @@ struct LateTests {
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "Sources/KhaytApp/Shop.swift"))
-        #expect(shop.contains("await resolveLate(root)"))
+        #expect(shop.contains("await resolveLate(jobs, machines: fleet"))
         #expect(shop.contains("engine.lateOrders("))
     }
 }

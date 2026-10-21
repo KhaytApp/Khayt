@@ -389,11 +389,14 @@ struct Reports: View {
                 // A row the chosen span cuts short — this month under the
                 // quarter view — is marked, and says which days it holds.
                 let said = MonthLabel.period(r.period, words: shop.words)
+                // Wraps rather than widening the column: "الربع الثالث 2026"
+                // at 96 pushed Net Income off the edge (`ColumnWidthsTests`).
                 Text(verbatim: r.isPartial ? said + "*" : said)
                     .font(.body.weight(.semibold)).monospacedDigit()
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     .help(r.isPartial ? Self.days(r) : "")
             }
-            .width(min: 64, ideal: 96, max: 160)
+            .width(min: 64, ideal: 64, max: 160)
             TableColumn(shop.words.callIt("an.pnl_orders"), value: \.orders) { r in
                 Text("\(r.orders)").monospacedDigit()
             }

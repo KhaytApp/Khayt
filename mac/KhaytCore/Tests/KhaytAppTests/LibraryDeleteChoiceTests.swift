@@ -113,7 +113,10 @@ struct LibraryDeleteChoiceTests {
                                       modelFile: { file in
                                           f.paths[file.id] ?? f.root.appending(path: "\(file.id)/x.stl")
                                       })
-        #expect(ContinuousClock.now - started < .seconds(10), "the plan waited on the remote")
+        // Each remote hangs for 60 s; a plan that waited on one would take a
+        // minute. 30 s, not 10: under the whole suite's load the 400 ms
+        // patience alone stretched past 10 (beta.1 batch run).
+        #expect(ContinuousClock.now - started < .seconds(30), "the plan waited on the remote")
         #expect(flight.most > 1 && flight.most <= Shop.deleteCheckWidth, "\(flight.most) at once")
         #expect(p.keptOnline.isEmpty, "nothing is kept online on a copy nobody saw")
         #expect(p.onlyHere.contains("PF-a") && p.ids.count == many.count)
