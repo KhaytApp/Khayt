@@ -4,6 +4,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+
+
+- **Mac: adding a photo to a model is easy to find.** Right-click a model for Add a photo…, Replace photo… or Remove photo, or drag a picture straight onto its tile. The Photo section now sits near the top of the model's panel instead of at the bottom. Dropping a model file onto a tile still imports it.
+
+- **Desktop: a manager can read Settings but no longer change them.** With
+  the operator lock on, a manager's role was always meant to read Settings
+  only, but every control still worked: the LAN PIN, the LAN server, VAT,
+  prices and Save. Settings now show their values to a manager with every
+  control greyed out and a line saying only the owner can change them. Save
+  refuses too. "Switch operator" still works, so the owner can take over.
+  Without the operator lock nothing changes. The same as the Mac.
+
 - **iPhone: anonymous daily install count.** The iPhone sends the
   same once-a-day count as the Mac, through KhaytCore's shared rules. It
   sends six fields: platform `ios`, channel (TestFlight → beta, App Store →
