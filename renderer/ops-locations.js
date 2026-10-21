@@ -536,6 +536,8 @@ function operatorCan(area, action) {
 
 /** Apply tab/feature restrictions based on the active operator's role (RBAC matrix). */
 function applyOperatorPermissions() {
+  // The crash-report ask is for whoever may change Settings.
+  if (typeof renderTelemetryAsk === 'function') renderTelemetryAsk();
   if (!settings.operatorLockEnabled) {
     // Remove all restrictions
     $$('.tab-btn').forEach(b => b.style.display = '');

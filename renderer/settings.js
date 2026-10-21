@@ -4795,6 +4795,98 @@ const API_TOKEN_SCOPES = ['orders:read', 'orders:write', 'clients:read', 'client
 // Telemetry consent (TELEMETRY-SPEC §3). Off by default, crash and usage consented
 // SEPARATELY, revocable without restart — opting out purges the local queue and clears
 // the install id so nothing identifying survives.
+/** The two consents — the Settings switches and the one-time card both land here. */
+async function setTelemetryConsent(crash, usage) {
+  const prev = settings.telemetry || {};
+  const anyOn = crash || usage;
+  let installId = prev.installId || '';
+  if (anyOn && !installId) {
+    // Rotating, non-identifying install id — created only on opt-in.
+    const b = new Uint8Array(8); crypto.getRandomValues(b);
+    installId = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+  }
+  settings.telemetry = {
+    crashOptIn: crash, usageOptIn: usage,
+    installId: anyOn ? installId : '',
+    consentAt: anyOn ? (prev.consentAt || new Date().toISOString()) : '',
+  };
+  saveAll();
+  // Opting fully out purges anything queued locally, immediately.
+  if (!anyOn) { try { await window.hubAPI?.telemetryPurge?.(); } catch (_) {} }
+  renderTelemetrySettings();
+  renderTelemetryAsk();
+}
+
+// The one-time ask, as the Mac's TelemetryCard: a card across the top of the
+// window, never a modal. Whichever button is pressed, this computer does not
+// ask again; Settings → Crash Reports & Usage keeps the two switches. Nothing
+// is sent until somebody says yes (TELEMETRY-SPEC §3).
+//
+// "Asked" is this computer's, not the shop's: a second computer on the same
+// book asks once too, as each Mac does. Unreadable storage counts as asked —
+// a card that can never be put away would be a nag.
+const TELEMETRY_ASKED_KEY = 'khayt_telemetry_asked';
+
+function telemetryAsked() {
+  try { return localStorage.getItem(TELEMETRY_ASKED_KEY) === '1'; } catch (_) { return true; }
+}
+
+function markTelemetryAsked() {
+  try { localStorage.setItem(TELEMETRY_ASKED_KEY, '1'); } catch (_) {}
+}
+
+function shouldAskTelemetry() {
+  const tm = settings.telemetry || {};
+  // Bed Ready has no Settings section to point the card at.
+  if (!document.getElementById('telemetrySection')) return false;
+  // Never in a scripted window (tests, store and website screenshots) unless
+  // the script asks for it.
+  if (navigator.webdriver && !window.__khaytAskTelemetry) return false;
+  if (typeof shouldShowSetupWizard === 'function' && shouldShowSetupWizard()) return false;
+  if (tm.crashOptIn || tm.usageOptIn) return false;
+  if (typeof operatorCan === 'function' && !operatorCan('settings', 'edit')) return false;
+  return !telemetryAsked();
+}
+
+function renderTelemetryAsk() {
+  let card = document.getElementById('telemetryAsk');
+  if (!shouldAskTelemetry()) { card?.remove(); return; }
+  const main = document.getElementById('mainContent');
+  if (!main) return;
+  if (!card) {
+    card = document.createElement('section');
+    card.id = 'telemetryAsk';
+    card.className = 'telemetry-ask';
+    card.setAttribute('aria-labelledby', 'telemetryAskTitle');
+    main.prepend(card);
+  }
+  card.innerHTML = `
+    <div class="telemetry-ask-title" id="telemetryAskTitle">${escapeHtml(t('tel.ask_title'))}</div>
+    <p class="telemetry-ask-body">${escapeHtml(t('tel.ask_body'))}</p>
+    <label class="telemetry-ask-usage">
+      <input type="checkbox" id="telemetryAskUsage">
+      <span><span>${escapeHtml(t('tel.ask_usage'))}</span><br>
+      <span class="telemetry-ask-hint">${escapeHtml(t('tel.usage_hint'))}</span></span>
+    </label>
+    <div class="telemetry-ask-foot">
+      <span class="telemetry-ask-hint">${escapeHtml(t('tel.ask_later', { section: t('tel.section') }))}</span>
+      <span class="telemetry-ask-buttons">
+        <button type="button" class="btn small" data-tel-ask="not-now">${escapeHtml(t('tel.ask_not_now'))}</button>
+        <button type="button" class="btn small primary" data-tel-ask="share">${escapeHtml(t('tel.ask_share'))}</button>
+      </span>
+    </div>`;
+  card.querySelector('[data-tel-ask="not-now"]').addEventListener('click', () => {
+    markTelemetryAsked();
+    renderTelemetryAsk();
+  });
+  card.querySelector('[data-tel-ask="share"]').addEventListener('click', async () => {
+    const usage = !!card.querySelector('#telemetryAskUsage')?.checked;
+    markTelemetryAsked();
+    await setTelemetryConsent(true, usage);
+    toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
+  });
+}
+
 function renderTelemetrySettings() {
   const el = $('#telemetrySection');
   if (!el) return;
@@ -4817,25 +4909,7 @@ function renderTelemetrySettings() {
     </div>`;
 
   const persist = async () => {
-    const crash = !!el.querySelector('#tel_crash')?.checked;
-    const usage = !!el.querySelector('#tel_usage')?.checked;
-    const prev = settings.telemetry || {};
-    const anyOn = crash || usage;
-    let installId = prev.installId || '';
-    if (anyOn && !installId) {
-      // Rotating, non-identifying install id — created only on opt-in.
-      const b = new Uint8Array(8); crypto.getRandomValues(b);
-      installId = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
-    }
-    settings.telemetry = {
-      crashOptIn: crash, usageOptIn: usage,
-      installId: anyOn ? installId : '',
-      consentAt: anyOn ? (prev.consentAt || new Date().toISOString()) : '',
-    };
-    saveAll();
-    // Opting fully out purges anything queued locally, immediately.
-    if (!anyOn) { try { await window.hubAPI?.telemetryPurge?.(); } catch (_) {} }
-    renderTelemetrySettings();
+    await setTelemetryConsent(!!el.querySelector('#tel_crash')?.checked, !!el.querySelector('#tel_usage')?.checked);
     toast(t('tel.saved') || 'Telemetry preferences saved', 'success');
   };
   el.querySelector('#tel_crash')?.addEventListener('change', persist);
@@ -6409,6 +6483,8 @@ function renderTelegramSettings() {
     renderApiTokensSettings,
     renderShippingSettings,
     renderTelemetrySettings,
+    renderTelemetryAsk,
+    setTelemetryConsent,
     // Called from app-state.js at load. This file is IIFE-wrapped, so without
     // this line the typeof check there just sees undefined and the whole thing
     // silently never runs — which is the failure the four names above document.

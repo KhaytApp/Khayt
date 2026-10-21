@@ -41,7 +41,7 @@ Lives in **Settings → Privacy** (`renderer/settings.js`), persisted in `defaul
 telemetry: { crashOptIn: false, usageOptIn: false, installId: '', consentAt: '' }
 ```
 
-- **First run / upgrade:** never auto-enabled and no nag. A single passive card explains the option; default stays off.
+- **First run / upgrade:** never auto-enabled and no nag. A single passive card explains the option; default stays off. It is asked once per computer, after the first-run setup, only of someone who may change Settings, and either answer puts it away for good (desktop: `renderTelemetryAsk` in `renderer/settings.js`; Mac: `TelemetryCard.swift`).
 - **Two toggles**, separately consented (crash vs usage) — a user can share crashes but not usage. Saved via the existing `saveSettingsFromPanel()` checkbox pattern.
 - **"View what's collected":** a modal (reuse `shell.js` modal) renders the *exact* last/next payload that would be sent, post-scrub, as readable JSON. No hidden fields.
 - **Opt out anytime:** unchecking sets the flag false, **flushes and deletes** the local queue immediately (§7), and stops all collection that session — no restart required.

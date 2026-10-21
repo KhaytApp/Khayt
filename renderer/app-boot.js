@@ -292,6 +292,8 @@ function initWizard() {
 
     document.removeEventListener('keydown', wizEscHandler);
     wiz.style.display = 'none';
+    // The crash-report ask waits until the shop is set up.
+    if (typeof renderTelemetryAsk === 'function') renderTelemetryAsk();
     applyTheme(settings.theme);
     if (typeof applyDesignSettings === 'function') applyDesignSettings();
     applyMode();
@@ -768,6 +770,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 document.addEventListener('languagechange', () => {
   initialRender();
   refreshCurrencyLabels();
+  if (typeof renderTelemetryAsk === 'function') renderTelemetryAsk();
 });
 }
 
@@ -824,6 +827,8 @@ function paintShortcutHints() {
 
 (function (global) {
   global.initWizard = initWizard;
+  // settings.js asks it before putting up the crash-report card.
+  global.shouldShowSetupWizard = shouldShowSetupWizard;
   global.KhaytAppBoot = { initWizard };
   if (typeof module !== 'undefined' && module.exports) module.exports = { initWizard };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
