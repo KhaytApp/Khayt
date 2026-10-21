@@ -1185,6 +1185,8 @@
   "pe.price_is_override": "指定した価格",
   "pe.price_is_rounded": "元の価格",
   "pe.price_is_base": "計算値",
+  "pe.price_kept": "保存済みの価格を維持（現在のコストでは {now}）",
+  "pe.price_was_now": "以前 {was} → 現在 {now}",
   "pe.filled_from_file": "重量と時間をファイルから入力しました。",
   "pe.fill_kept": "入力済みの値はそのまま残しました。",
   "pe.image_too_big": "画像が大きすぎます — 8 MB未満のファイルをお試しください。",

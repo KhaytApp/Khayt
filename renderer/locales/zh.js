@@ -1185,6 +1185,8 @@
   "pe.price_is_override": "您设置的价格",
   "pe.price_is_rounded": "取整自",
   "pe.price_is_base": "计算值",
+  "pe.price_kept": "保留已保存的价格；按今天的成本为 {now}",
+  "pe.price_was_now": "原为 {was} → 现为 {now}",
   "pe.filled_from_file": "已根据文件填写重量和时间。",
   "pe.fill_kept": "您自己填写的数值已保留。",
   "pe.image_too_big": "图片过大——请使用 8 MB 以下的文件。",

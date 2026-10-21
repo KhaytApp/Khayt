@@ -1303,6 +1303,8 @@
   "pe.price_is_override": "سعرك الخاص",
   "pe.price_is_rounded": "مُقرَّب من",
   "pe.price_is_base": "محسوب",
+  "pe.price_kept": "أُبقي السعر المحفوظ؛ تكاليف اليوم تعطي {now}",
+  "pe.price_was_now": "كان {was} ← الآن {now}",
   "pe.filled_from_file": "تم تعبئة الوزن والوقت من الملف.",
   "pe.fill_kept": "تم الاحتفاظ بالقيم التي أدخلتها.",
   "pe.image_too_big": "الصورة كبيرة جداً — جرّب صورة أقل من ٨ ميجابايت.",
