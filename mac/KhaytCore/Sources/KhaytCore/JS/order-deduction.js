@@ -146,13 +146,23 @@
     return out;
   }
 
-  /** Draw `grams` from a spool, recording what it was for. */
-  function drawFrom(spool, grams, order, today) {
+  /**
+   * Draw `grams` from a spool, recording what it was for.
+   *
+   * `wasteId` is the waste entry a failed print's draw belongs to, stamped on
+   * the line as it is written so deleting that entry takes back exactly its
+   * lines. Tagging afterwards by how much the history grew miscounted once the
+   * history sat at USAGE_CAP, where a new line pushes an old one off and the
+   * length does not move.
+   */
+  function drawFrom(spool, grams, order, today, wasteId) {
     spool.weight = Math.max(0, (+spool.weight || 0) - grams);
     if (!spool.usageHistory) spool.usageHistory = [];
-    spool.usageHistory.unshift(Object.assign({
+    const line = Object.assign({
       orderId: order.id, project: order.project || '', weightUsed: grams, date: today,
-    }, lotStamp(spool)));
+    }, lotStamp(spool));
+    if (wasteId != null && wasteId !== '') line.wasteId = String(wasteId);
+    spool.usageHistory.unshift(line);
     if (spool.usageHistory.length > USAGE_CAP) spool.usageHistory.length = USAGE_CAP;
   }
 
@@ -284,7 +294,8 @@
    * the spools it was printing from. Nothing is marked `materialDeducted`,
    * because the job is not done: the reprint will deduct its own.
    *
-   * `ctx`: `{ settings, inventory, machines, today }`.
+   * `ctx`: `{ settings, inventory, machines, today, wasteId }`. `wasteId`, when
+   * given, is stamped on every history line the draw writes (see `drawFrom`).
    * Returns `{ deducted, spools, drawn, nowLow }` — the grams actually taken,
    * the spool ids they came off, WHAT CAME OFF EACH, and any spool now low.
    *
@@ -339,7 +350,7 @@
         const avail = +sp.weight || 0;
         if (avail <= 0) continue;
         const take = Math.min(avail, remaining);
-        drawFrom(sp, take, order, c.today);
+        drawFrom(sp, take, order, c.today, c.wasteId);
         remaining -= take;
         deducted += take;
         if (!spools.includes(sp.id)) spools.push(sp.id);

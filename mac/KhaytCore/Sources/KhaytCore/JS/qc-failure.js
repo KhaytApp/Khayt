@@ -142,6 +142,9 @@
       ? D.deductActual(order, weight, {
           settings: c.settings, inventory: c.inventory, machines: c.machines,
           today: waste.date,
+          // Each history line carries the entry's id, so deleting the failure
+          // takes back its lines and not the job's own completion line.
+          wasteId: waste.id,
         })
       : { deducted: 0, spools: [], drawn: [], nowLow: [] };
     // WHAT CAME OFF EACH SPOOL, so a host that undoes the failure can put the

@@ -178,3 +178,21 @@ test('a registered shop did not pay the tax on the plastic it threw away', () =>
   const plain = [{ id: 'sp', material: 'PA-CF', cost: 240, weight: 500, spoolWeight: 500 }];
   assert.equal(round2(costOf('PA-CF', 180, plain, true)), 86.40);
 });
+
+test('a job\'s waste is tagged on its history lines even when the history is full', () => {
+  const D = require('../lib/order-deduction.js');
+  // At USAGE_CAP a new line pushes the oldest off, so the history's length
+  // does not move: tagging by how much it grew tagged nothing.
+  const full = Array.from({ length: D.USAGE_CAP }, (_, k) => ({ orderId: 'OLD' + k, weightUsed: 10, date: '2026-08-01' }));
+  const inventory = [{ id: 'S1', material: 'PLA', cost: 100, weight: 800, spoolWeight: 1000, usageHistory: full }];
+  const order = { id: 'J7', parts: [{ filamentId: 'S1', printWeight: 40, qty: 1 }] };
+  const { entry } = W.forOrder(order, { material: 'PLA', weight: 40 },
+    { id: 'w-9', today: '2026-09-04', inventory });
+  const hist = inventory[0].usageHistory;
+  assert.equal(hist.length, D.USAGE_CAP);
+  assert.equal(hist[0].wasteId, 'w-9');
+  assert.equal(hist[0].weightUsed, 40);
+  W.removeEntry([entry], 'w-9', { inventory });
+  assert.equal(inventory[0].weight, 800);
+  assert.equal(inventory[0].usageHistory.some((h) => h.wasteId === 'w-9'), false);
+});
