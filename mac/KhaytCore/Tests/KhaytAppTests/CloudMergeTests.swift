@@ -19,10 +19,10 @@ struct CloudMergeTests {
             .appending(path: "khayt-merge-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appending(path: "khayt-store.json")
-        for build in StoreReader.Build.allCases where build.exists {
-            try Data(contentsOf: build.storeURL).write(to: url)
-            return url
-        }
+        // The SAMPLE, never `Build.storeURL`: that is the shop's own book on a
+        // Mac that has one, and — while the serialised suite has pointed the
+        // app at a test folder — whatever book THAT test wrote, which made
+        // these tests depend on what ran beside them.
         try Data(contentsOf: Bundle.module.url(forResource: "sample-shop", withExtension: "json")!)
             .write(to: url)
         return url

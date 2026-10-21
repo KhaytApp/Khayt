@@ -78,7 +78,7 @@ struct Beta1IntegrityTests {
         }
     }
 
-    @Test("the 2001st activity entry adds no tombstone; a real job delete still does")
+    @Test("the 2001st activity entry tombstones only the trimmed row; a real job delete still does")
     func activityTrimLeavesNoTombstone() async throws {
         let full: [JSONValue] = (0..<2000).map {
             .object(["id": .string("AL\($0)"), "action": .string("status"), "rev": .number(1)])
@@ -95,14 +95,14 @@ struct Beta1IntegrityTests {
             Shop.appendActivity(&root, text: "moved", ref: "J1", settings: [:], root: snapshot)
         }
         #expect(Shop.rows(try Self.read(url), "auditLog").count == 2000)
-        #expect(try Self.tombs(url).isEmpty, "the trimmed activity entry was tombstoned")
+        #expect(try Self.tombs(url) == ["auditLog:AL0"])
 
         try await StoreWriter.update(storeURL: url, owns: { true }, whoHasIt: { nil }) { root in
             let snapshot = root
             root["printLog"] = .array([])
             Shop.appendActivity(&root, text: "deleted", ref: "J1", settings: [:], root: snapshot)
         }
-        #expect(try Self.tombs(url) == ["printLog:J1"])
+        #expect(try Self.tombs(url) == ["auditLog:AL0", "auditLog:AL1", "printLog:J1"])
     }
 
     // MARK: - Numbers no Int holds
