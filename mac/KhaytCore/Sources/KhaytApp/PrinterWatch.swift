@@ -294,6 +294,11 @@ final class PrinterWatch {
         previous = [:]
         alertState = .object([:])
         finishCamera.reset()
+        // And the readings themselves. Another book's printers, or this book
+        // reopened later, would otherwise be drawn as printing from a poll made
+        // before it closed, and their first new answer read as that print's end.
+        readings = [:]
+        pollCache = [:]
     }
 
     /// The edge into a finished print, for the printer's own photo.
@@ -396,6 +401,7 @@ final class PrinterWatch {
     /// a burst of simultaneous requests to a Klipper host is a way to find out
     /// what its request queue does under load, on somebody's live print.
     private func sweep(shop: Shop) async {
+        let forgot = forgetUnwatched(shop: shop)
         var asked = false
         for machine in shop.machines where Self.notWatched(machine) == nil {
             if Task.isCancelled { return }
@@ -409,7 +415,33 @@ final class PrinterWatch {
         if asked {
             await shop.printersAnswered()
             await raiseAlerts(shop: shop)
+        } else if forgot {
+            // Nothing was asked, but a machine's last reading went: the
+            // dashboard and the widget still count it until they are told.
+            await shop.printersAnswered()
         }
+    }
+
+    /// Drop everything remembered about a machine this app no longer asks.
+    ///
+    /// A printer put under service or retired mid-print kept its last reading
+    /// for the rest of the session: the menu bar, the widget and the dashboard
+    /// went on calling it printing, its phone's Live Activity never ended, and
+    /// when it came back into service its first poll was taken for that old
+    /// print's end — a finish event and a power reading spanning the repair.
+    /// What it says next starts from nothing, as a machine just added does.
+    /// True when anything was dropped.
+    @discardableResult
+    func forgetUnwatched(shop: Shop) -> Bool {
+        var forgot = false
+        for machine in shop.machines where Self.notWatched(machine) != nil {
+            let id = machine.id
+            if readings[id] != nil { readings[id] = nil; forgot = true }
+            pollCache[id] = nil
+            finishCamera.forget(id)
+            shop.printerUnwatched(id)
+        }
+        return forgot
     }
 
     /// Ask the shared module what has just gone wrong, and say it.

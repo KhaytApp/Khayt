@@ -27,6 +27,19 @@ final class FinishCamera {
     /// A book closed and reopened has not just finished a print.
     func reset() { memo = .object([:]) }
 
+    /// One machine taken out of the watch: its next answer is not an edge.
+    func forget(_ machineId: String) {
+        guard case .object(var o) = memo, o[machineId] != nil else { return }
+        o[machineId] = nil
+        memo = .object(o)
+    }
+
+    /// Whether the rule holds anything for this machine. For the tests.
+    func remembers(_ machineId: String) -> Bool {
+        if case .object(let o) = memo { return o[machineId] != nil }
+        return false
+    }
+
     /// Fold one answered poll in. The edge when this poll is one — whatever
     /// the outcome — and nil every other time.
     func observe(_ machineId: String, status: JSONValue, engine: KhaytEngine) async -> KhaytEngine.FinishTrack? {

@@ -206,12 +206,42 @@ extension Shop {
             guard probe else { liveActivityRecord(step, outcome: .sent, now: now, quietly: true); return }
         }
 
+        liveActivityPost(step, cloud: cloud, shopId: shopId, now: now)
+    }
+
+    /// A machine the poller no longer asks — put under service, retired, or
+    /// its connection removed. Its phone's Live Activity would otherwise stay
+    /// on the Lock Screen: nothing it says is heard again, and only a heard
+    /// reading ever ends one. Ended as cancelled, the one phase that does not
+    /// claim the print finished or failed when nobody saw how it went.
+    func liveActivityUnwatched(_ machineId: String, now: Date = Date()) {
+        let memory = liveActivities
+        guard let was = memory.running[machineId], !memory.inFlight.contains(machineId) else { return }
+        guard liveActivitiesOptedIn(), Self.cloudConnected(settingsDict), cloudRoleCanWrite else { return }
+        var cloud: [String: JSONValue] = [:]
+        if case .object(let c)? = settingsDict["cloud"] { cloud = c }
+        let shopId = Self.plainString(cloud["shopId"]) ?? ""
+        guard memory.shopId == shopId else { return }
+        if let quiet = memory.quietUntil, now < quiet { return }
+        let step = LiveActivityPlan.Step.end(machineId: machineId, LiveActivityPlan.State(
+            phase: .cancelled, job: was.job, progress: was.progress, startedAt: was.startedAt, endsAt: now))
+        if memory.noPhonesSince != nil {
+            liveActivityRecord(step, outcome: .sent, now: now, quietly: true); return
+        }
+        liveActivityPost(step, cloud: cloud, shopId: shopId, now: now)
+    }
+
+    /// Post one step on its own task and record the reply.
+    private func liveActivityPost(_ step: LiveActivityPlan.Step, cloud: [String: JSONValue],
+                                  shopId: String, now: Date) {
+        let memory = liveActivities
+        let machineId = step.machineId
         let connection = CloudReader.Connection(url: Self.plainString(cloud["url"]) ?? "", shopId: shopId,
                                                 storedToken: Self.plainString(cloud["token"]) ?? "")
         let book = source
-        memory.inFlight.insert(machine.id)
+        memory.inFlight.insert(machineId)
         Task { @MainActor [weak self] in
-            defer { memory.inFlight.remove(machine.id) }
+            defer { memory.inFlight.remove(machineId) }
             guard let self else { return }
             let outcome: LiveActivityPush.Outcome
             do {
