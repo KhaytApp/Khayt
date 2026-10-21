@@ -232,6 +232,11 @@ struct WordsAreTranslatedTests {
         // would break authentication rather than help anybody read it.
         #"api:\(apiKey)"#,
         #"\(url.lastPathComponent).tmp.\(ProcessInfo.processInfo.processIdentifier).\(UUID().uuidString)"#,
+        // A crash report's frames, Mach exceptions and signals (`NativeCrash`):
+        // read in the cloud's report by whoever fixes the crash, never shown.
+        #"\(binary) +0x\(String(offset, radix: 16))"#,
+        #"EXC_\(type)"#,
+        #"SIG\(signal)"#,
     ]
 
     /// The SECOND rule, and the one that catches what the first cannot see.

@@ -4,6 +4,17 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: crash reports include Swift crashes, and Settings can send a test
+  report.** Until now the Mac reported only the crashes it could catch itself:
+  failed rules and AppKit exceptions. A Swift crash, like the Settings ▸
+  Overhead crash in alpha.77, sent nothing. The report said "0 crashes" for a
+  Mac that had crashed. MetricKit now passes the system's crash report to
+  the app at the next launch. What is sent is the exception, the signal, the
+  build that crashed and the crashing thread's frames, and it goes through the
+  same scrubber as every other report. Only Macs that allow crash reports send
+  anything. In Settings ▸ Preferences, **Send a Test Report** sends one now
+  and says whether it got through.
+
 - **Mac: fixes from the alpha.85 pre-release review.** WhatsApp delivery
   reports kept on this Mac hold only what they need and are forgotten when
   the hook comes down or the Mac signs out of Khayt Cloud. A download that

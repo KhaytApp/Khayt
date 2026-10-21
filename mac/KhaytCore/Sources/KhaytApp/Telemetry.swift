@@ -1,5 +1,6 @@
 import Foundation
 import KhaytCore
+import MetricKit
 
 /// Opt-in crash reports and usage counts, on the Mac (#1789).
 ///
@@ -214,7 +215,7 @@ enum TelemetryRaw {
         ]) { _, new in new }
     }
 
-    private static func common(_ c: Context) -> [String: JSONValue] {
+    static func common(_ c: Context) -> [String: JSONValue] {
         ["appVersion": .string(c.appVersion), "electronVersion": .string(""),
          "osFamily": .string("macOS"), "osMajor": .string(c.osMajor),
          "locale": .string(c.locale), "channel": .string(c.channel), "at": .string(c.day)]
@@ -309,6 +310,15 @@ final class Telemetry {
     @ObservationIgnored private var nextFlushAt = Date.distantFuture
     @ObservationIgnored private var faultCursor = Date.distantPast
     @ObservationIgnored private var loop: Task<Void, Never>?
+    /// Crashes MetricKit handed over, waiting for `collect` — they can arrive
+    /// before the book is open. Held in memory only: a crash reported while
+    /// crash reports are off is not kept for later.
+    @ObservationIgnored private(set) var nativeCrashes: [NativeCrash] = []
+    @ObservationIgnored private var nativeListener: NativeCrashListener?
+
+    func received(_ crashes: [NativeCrash]) {
+        nativeCrashes = Array((nativeCrashes + crashes).suffix(20))
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -557,6 +567,13 @@ final class Telemetry {
     func start(shop: Shop) {
         guard loop == nil else { return }
         nextFlushAt = now().addingTimeInterval(Self.firstFlush)
+        if sendsFromThisBuild, nativeListener == nil {
+            let listener = NativeCrashListener { crashes in
+                Task { @MainActor in Telemetry.shared.received(crashes) }
+            }
+            nativeListener = listener
+            MXMetricManager.shared.add(listener)
+        }
         loop = Task { [weak self, weak shop] in
             guard let self, let shop else { return }
             await self.recordLaunch(shop)
@@ -680,9 +697,19 @@ final class Telemetry {
     func collect(_ shop: Shop) async {
         let faults = EngineFaults.recent().filter { $0.at > faultCursor }
         faultCursor = faults.last?.at ?? faultCursor
-        guard shop.telemetryConsent.crash, let engine = shop.engine, let file = Self.file(for: shop) else { return }
+        // Off: what MetricKit handed over is let go. Not open yet: kept.
+        guard shop.telemetryConsent.crash else { nativeCrashes = []; return }
+        guard let engine = shop.engine, let file = Self.file(for: shop) else { return }
+        let natives = nativeCrashes
+        nativeCrashes = []
         let live: () -> TelemetryConsent = { [weak shop] in shop?.telemetryConsent ?? TelemetryConsent() }
         let c = context(language: shop.words.language)
+        for crash in natives {
+            let consent = live()
+            guard consent.crash else { break }
+            await enqueue(.crash, TelemetryRaw.crash(native: crash, c), consent: consent, engine: engine,
+                          file: file, live: live)
+        }
         if let note = shop.lastCrash, defaults.string(forKey: Self.crashNoteKey) != Self.noteId(note) {
             defaults.set(Self.noteId(note), forKey: Self.crashNoteKey)
             if let raw = TelemetryRaw.crash(note: note, c) {
@@ -698,6 +725,19 @@ final class Telemetry {
         // A fault the scrubbing itself raised is not news, and reporting it
         // would only raise another: the cursor moves past everything up to now.
         faultCursor = max(faultCursor, now())
+    }
+
+    /// Settings ▸ "Send a Test Report": one test crash report, queued and
+    /// sent now rather than at the next hourly flush, so the shop (and we) can
+    /// see a report get through. The answer is what the send came to.
+    func sendTest(_ shop: Shop) async -> String {
+        let consent = shop.telemetryConsent
+        guard consent.crash, let engine = shop.engine, let file = Self.file(for: shop) else { return "off" }
+        let live: () -> TelemetryConsent = { [weak shop] in shop?.telemetryConsent ?? TelemetryConsent() }
+        guard await enqueue(.crash, TelemetryRaw.testCrash(context(language: shop.words.language)),
+                            consent: consent, engine: engine, file: file, live: live) else { return "unplanned" }
+        backoffMs = 0; nextAttemptAtMs = 0
+        return await flush(consent: live(), engine: engine, file: file)
     }
 
     /// Which note this is — its `when:` line, which `LastWords` writes first.

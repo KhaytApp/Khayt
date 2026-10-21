@@ -15,6 +15,7 @@ Two **separately consented** streams. Each is an explicit allowlist — anything
 - Error class/name and a scrubbed one-line message.
 - App version (`app.getVersion()`), Electron/Chromium version, OS family + major version (e.g. `macOS 14`, not build/serial).
 - Process origin: `main` vs `renderer`, and the crash type (`uncaughtException`, `unhandledRejection`, `render-process-gone`, renderer error boundary).
+- **On the native Mac app**, three sources feed this stream: failures of the shared rules engine, the note `LastWords` leaves after an uncaught Objective-C exception, and the crash reports macOS hands the app about its own crashes (MetricKit `MXCrashDiagnostic`, `NativeCrashes.swift`). The last carries only the Mach exception, the signal, the build number that crashed, the system's termination reason, and the crashing thread's frames as `binary +0xoffset`. All three go through the same scrubber, and only with `crashOptIn`.
 - Anonymized **install id** (§5), coarse locale (`en`/`ar`), app channel (stable/beta — mirrors `betaUpdates`).
 
 **B. Coarse usage counters** (consent: `telemetry.usageOptIn`) — **counts and enums only, never content.** Allowlist:

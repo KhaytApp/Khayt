@@ -80,6 +80,8 @@ struct TelemetryCard: View {
 /// not part of the pane's draft.
 struct TelemetrySettings: View {
     let shop: Shop
+    @State private var testing = false
+    @State private var testResult: String?
 
     var body: some View {
         let consent = shop.telemetryConsent
@@ -95,6 +97,7 @@ struct TelemetrySettings: View {
             })) {
                 labelled("tel.crash", "tel.crash_hint")
             }
+            if consent.crash { testReport }
             Toggle(isOn: Binding(get: { shop.telemetryConsent.usage }, set: { on in
                 Task { await shop.setTelemetry(usage: on) }
             })) {
@@ -105,6 +108,37 @@ struct TelemetrySettings: View {
             }
         }
         .disabled(!shop.canWrite || !shop.source.isReal)
+    }
+
+    /// One test crash report, sent now — so a shop asked "are reports
+    /// reaching you?" can find out, and so can we.
+    private var testReport: some View {
+        HStack(spacing: 8) {
+            Button(shop.words.callIt("mac.tel_test")) {
+                testing = true; testResult = nil
+                Task {
+                    let reason = await Telemetry.shared.sendTest(shop)
+                    testResult = Self.resultKey(reason)
+                    testing = false
+                }
+            }
+            .disabled(testing)
+            if testing { ProgressView().controlSize(.small) }
+            if let testResult {
+                Text(shop.words.callIt(testResult)).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// What a test send came to, as words: `flush`'s reason.
+    nonisolated static func resultKey(_ reason: String) -> String {
+        switch reason {
+        case "accepted": "mac.tel_test_sent"
+        case "unreachable", "retry", "rate-limited", "backoff": "mac.tel_test_later"
+        case "development-build": "mac.tel_test_dev"
+        default: "mac.tel_test_failed"
+        }
     }
 
     private func labelled(_ title: String, _ hint: String) -> some View {
@@ -162,5 +196,15 @@ enum TelemetryWords {
                                "ar": "يمكنك تغيير ذلك في أي وقت من الإعدادات، ضمن التفضيلات."],
         "mac.tel_queue_empty": ["en": "Nothing is waiting to be sent.",
                                 "ar": "لا شيء بانتظار الإرسال."],
+        "mac.tel_test": ["en": "Send a Test Report",
+                         "ar": "إرسال تقرير تجريبي"],
+        "mac.tel_test_sent": ["en": "Sent. Crash reports from this Mac are reaching Khayt.",
+                              "ar": "تم الإرسال. تقارير الأعطال من هذا الماك تصل إلى خيط."],
+        "mac.tel_test_later": ["en": "Could not reach Khayt just now. The report will be sent later.",
+                               "ar": "تعذّر الوصول إلى خيط الآن. سيُرسل التقرير لاحقًا."],
+        "mac.tel_test_dev": ["en": "A development build sends nothing.",
+                             "ar": "نسخة التطوير لا ترسل شيئًا."],
+        "mac.tel_test_failed": ["en": "The test report was not sent.",
+                                "ar": "لم يُرسل التقرير التجريبي."],
     ]
 }
