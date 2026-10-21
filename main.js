@@ -1943,9 +1943,13 @@ async function sendActiveCount() {
   activeCountSending = true;
   let status = 0;
   try {
+    // Node's fetch, not Chromium's: no cookie jar and no OS locale. The two
+    // headers it does add are pinned to the Mac's fixed values, so every app's
+    // count looks the same and says nothing about the machine.
     const res = await fetch(ACTIVE_COUNT_E2E || ActiveCount.ENDPOINT, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      credentials: 'omit',
+      headers: { 'content-type': 'application/json', 'user-agent': 'Khayt', 'accept-language': 'en' },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
     });

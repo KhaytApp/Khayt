@@ -58,6 +58,11 @@ try {
   ok(p.body.version === version && ['win', 'mac', 'linux'].includes(p.body.platform) && ['stable', 'beta', 'alpha'].includes(p.body.channel), `platform, channel and version of this build (${p.body.platform} ${p.body.channel} ${p.body.version})`);
   ok(p.body.firstEver === true && p.body.firstThisWeek === true && p.body.firstThisMonth === true, 'a new install is first ever, this week and this month');
   ok(!/install|shop|khayt-/i.test(Object.keys(p.headers).join(' ')), 'no id in the headers either');
+  // The whole header set, measured: nothing from the OS, the build or a cookie jar.
+  const h = { ...p.headers }; delete h.host; delete h['content-length'];
+  const sorted = (o) => JSON.stringify(Object.fromEntries(Object.entries(o).sort()));
+  ok(sorted(h) === sorted({ connection: 'keep-alive', 'content-type': 'application/json', accept: '*/*', 'accept-language': 'en', 'sec-fetch-mode': 'cors', 'user-agent': 'Khayt', 'accept-encoding': 'gzip, deflate' }),
+    `fixed headers only, no cookie, no locale, no version (${JSON.stringify(h)})`);
 
   const file = path.join(await electronApp.evaluate(({ app: a }) => a.getPath('userData')), 'active-count.json');
   const today = new Date().toISOString().slice(0, 10);
