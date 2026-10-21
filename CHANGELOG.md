@@ -4,8 +4,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
-
-
 - **Mac: adding a photo to a model is easy to find.** Right-click a model for Add a photo…, Replace photo… or Remove photo, or drag a picture straight onto its tile. The Photo section now sits near the top of the model's panel instead of at the bottom. Dropping a model file onto a tile still imports it.
 
 - **Desktop: a manager can read Settings but no longer change them.** With
@@ -8345,6 +8343,15 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.3] - 2026-10-21
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Changed
+
+- **Adding a photo to a model is easy to find.** Right-click a model for Add a photo…, Replace photo… or Remove photo, or drag a picture straight onto its tile. The Photo section now sits near the top of the model's panel instead of at the bottom. Dropping a model file onto a tile still imports it.
 
 ## [4.0.0-beta.2] - 2026-10-21
 
