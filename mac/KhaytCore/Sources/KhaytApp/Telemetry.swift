@@ -576,6 +576,7 @@ final class Telemetry {
         }
         loop = Task { [weak self, weak shop] in
             guard let self, let shop else { return }
+            await ActiveCountSender.shared.tick()
             await self.recordLaunch(shop)
             await self.collect(shop)
             while !Task.isCancelled {
@@ -586,6 +587,8 @@ final class Telemetry {
     }
 
     private func tick(_ shop: Shop) async {
+        // The anonymous daily count: its own switch, not the book's consent.
+        await ActiveCountSender.shared.tick()
         // The book on disk as well as the book in memory: an opt-out made in
         // the Electron app on this same book is not in memory until the Mac
         // next reloads, and it must still empty this Mac's queue and stop it
