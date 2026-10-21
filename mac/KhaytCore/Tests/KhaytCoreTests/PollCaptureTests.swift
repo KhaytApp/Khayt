@@ -93,6 +93,34 @@ import Testing
         }
     }
 
+    /// The same, AFTER a job has finished. Every call crosses JSON, so the
+    /// completion carried forward arrives as a fresh object each poll — and an
+    /// identity test called it new every time, writing the whole book every
+    /// ten seconds per printer for the rest of the session.
+    @Test("idle polls after a finish are not new completions")
+    func idleAfterAFinishIsNotAnEvent() async throws {
+        let engine = try KhaytEngine()
+        let now = Date()
+        let printing = try await engine.mergePoll(
+            previous: .object([:]),
+            status: Self.status("printing", file: "hood.gcode", durationS: 7100, filamentG: 220),
+            now: now.addingTimeInterval(-60))
+        var entry = try await engine.mergePoll(
+            previous: printing,
+            status: Self.status("idle", file: "hood.gcode", durationS: 7200, filamentG: 226),
+            now: now)
+        #expect(try await engine.completionIsNew(before: printing, after: entry))
+        for i in 1...2 {
+            let next = try await engine.mergePoll(
+                previous: entry,
+                status: Self.status("idle", file: "hood.gcode", durationS: 7200, filamentG: 226),
+                now: now.addingTimeInterval(Double(i) * 10))
+            #expect(!(try await engine.completionIsNew(before: entry, after: next)),
+                    "idle poll \(i) after the finish looked like a completion")
+            entry = next
+        }
+    }
+
     /// What reaches the disk is finished jobs and NOTHING LIVE. A saved status
     /// comes back as a confident "Printing · 47%" for a machine that has been
     /// off all night — the exact failure the dashboard's freshness check

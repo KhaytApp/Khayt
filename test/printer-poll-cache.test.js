@@ -476,6 +476,16 @@ test('completionIsNew fires once per job, not once per poll', () => {
   assert.equal(C.completionIsNew(null, null), false);
 });
 
+test('completionIsNew compares by value, so a copied entry is not a new job', () => {
+  // The Mac crosses JSON per call: the same completion comes back as a distinct
+  // object every poll, and an identity test wrote the book on every one.
+  const after = { lastCompleted: REAL };
+  const copy = JSON.parse(JSON.stringify(after));
+  assert.equal(C.completionIsNew(copy, after), false);
+  assert.equal(C.completionIsNew(after, JSON.parse(JSON.stringify(after))), false);
+  assert.equal(C.completionIsNew(copy, { lastCompleted: { ...REAL, filename: 'other.gcode' } }), true);
+});
+
 test('the real capture, end to end through a merge', () => {
   // Not a hand-built fixture: this is the shape mergePollSuccess produces from
   // the printing→complete edge, exercised against the U1's actual figures.
