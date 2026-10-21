@@ -795,8 +795,8 @@ extension Shop {
         // its inventory alone entirely; zero means it stocks it and the batch
         // has sold out, which is a state it reverses next week. Reading one as
         // the other moves a customer's quoted date by weeks in whichever
-        // direction is wrong.
-        return Int(n)
+        // direction is wrong. Saturating: a count no `Int` holds traps.
+        return Int(saturating: n)
     }
 
     /// When the shop last counted it. A storefront re-applies a figure only

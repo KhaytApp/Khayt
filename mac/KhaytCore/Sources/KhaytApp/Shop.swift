@@ -952,11 +952,14 @@ final class Shop {
                 productRows, language: words.language, settings: Self.settings(root))) ?? []
             if overtaken() { return }
             catalogueRows = catalogued
-            productCategories = Dictionary(uniqueKeysWithValues: productRows.compactMap { row in
+            // The first of two products sharing an id wins, as in every other
+            // id-keyed map: a book an older build wrote with a duplicated
+            // product must open, not trap on every launch.
+            productCategories = Dictionary(productRows.compactMap { row in
                 guard case .object(let p) = row, case .string(let id)? = p["id"] else { return nil }
                 if case .string(let c)? = p["category"] { return (id, c) }
                 return (id, "")
-            })
+            }, uniquingKeysWith: { a, _ in a })
             await readCatalogueFacets()
             if overtaken() { return }
             let languages = await Self.catalogueLanguages(Self.settings(root), engine: engine)

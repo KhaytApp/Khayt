@@ -101,7 +101,7 @@ final class WidgetFeed {
             .map { s in
                 let hex = s.color.flatMap { $0.hasPrefix("#") && $0.count == 7 ? $0 : nil }
                 return ShopWidgetSnapshot.LowSpool(id: s.id, name: name(s), colour: hex,
-                                                   gramsLeft: Int((s.weight ?? 0).rounded()))
+                                                   gramsLeft: Int(saturating: (s.weight ?? 0).rounded()))
             }
             .sorted { $0.gramsLeft != $1.gramsLeft ? $0.gramsLeft < $1.gramsLeft : $0.name < $1.name }
     }

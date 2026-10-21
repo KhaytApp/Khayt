@@ -149,7 +149,7 @@ struct ProductSheet: View {
         var isComplete: Bool { (Double(grams) ?? 0) > 0 || (Double(hours) ?? 0) > 0 }
 
         /// Which plate of a multi-plate file this part is, when it is one.
-        var plate: Int? { if case .number(let n)? = raw["plate"] { Int(n) } else { nil } }
+        var plate: Int? { if case .number(let n)? = raw["plate"] { Int(saturating: n) } else { nil } }
 
         /// The record shape a product's `parts` list holds: what was there,
         /// with this sheet's five fields written over it.
@@ -1047,6 +1047,9 @@ struct ProductSheet: View {
 
     /// 30 rather than 30.0, and 27.5 kept.
     static func trim(_ value: Double) -> String {
-        value == value.rounded() ? String(Int(value)) : String(value)
+        // Whole AND inside `Int`: a figure past it (a hand-edited 1e300)
+        // trapped here, and is drawn as `String` spells it instead.
+        value == value.rounded() && abs(value) < Double(Int.saturationLimit)
+            ? String(Int(value)) : String(value)
     }
 }

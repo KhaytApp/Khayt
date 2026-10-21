@@ -1724,7 +1724,7 @@ extension Shop {
     /// answer a record written before the field existed gives.
     private static func rowPrintCount(_ row: JSONValue) -> Int {
         guard case .object(let o) = row, case .number(let n)? = o["timesPrinted"] else { return 0 }
-        return Int(n)
+        return Int(saturating: n)
     }
 
     /// The group a record is in, by the rule the grid files it under —
