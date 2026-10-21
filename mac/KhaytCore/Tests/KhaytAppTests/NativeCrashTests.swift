@@ -56,6 +56,15 @@ struct NativeCrashTests {
         #expect(!message.contains("noura"))
     }
 
+    @Test("only the head of macOS's reason is kept: the rest quotes paths")
+    func reasonHead() {
+        #expect(NativeCrash.reasonHead("Namespace SIGNAL, Code 5 Trace/BPT trap: 5") == "Namespace SIGNAL, Code 5")
+        #expect(NativeCrash.reasonHead("Namespace DYLD, Code 1 Library missing | Library not loaded: @rpath/X.framework | Referenced from: /Users/Turki Alballaa/Applications/Khayt.app")
+                == "Namespace DYLD, Code 1")
+        #expect(NativeCrash.reasonHead("/Users/Turki Alballaa/secret") == nil)
+        #expect(NativeCrash.reasonHead(nil) == nil)
+    }
+
     @Test("names for the exceptions and signals a Mac app dies of")
     func names() {
         #expect(NativeCrash.exceptionName(1) == "EXC_BAD_ACCESS" && NativeCrash.signalName(11) == "SIGSEGV")
@@ -88,6 +97,7 @@ struct NativeCrashTests {
         #expect(rig.file.read().isEmpty)
         #expect(TelemetrySettings.resultKey(reason) == "mac.tel_test_sent")
         #expect(TelemetrySettings.resultKey("unreachable") == "mac.tel_test_later")
-        #expect(TelemetrySettings.resultKey("not-enabled") == "mac.tel_test_failed")
+        #expect(TelemetrySettings.resultKey("not-enabled") == "mac.tel_test_later")
+        #expect(TelemetrySettings.resultKey("refused") == "mac.tel_test_failed")
     }
 }

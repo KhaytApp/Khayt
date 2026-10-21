@@ -69,6 +69,9 @@ public enum ActiveCount {
         guard let s = lastCounted, let last = date(ofDay: s) else {
             return Flags(firstThisWeek: true, firstThisMonth: true, firstEver: true)
         }
+        // Counted on a day after today: the clock went back. Nothing here is
+        // first, or the week would count twice once the clock is right again.
+        if s > day(now) { return Flags(firstThisWeek: false, firstThisMonth: false, firstEver: false) }
         let week: (Date) -> [Int?] = { d in
             let p = iso.dateComponents([.yearForWeekOfYear, .weekOfYear], from: d)
             return [p.yearForWeekOfYear, p.weekOfYear]
@@ -125,7 +128,11 @@ public enum ActiveCount {
         public func after(_ outcome: Outcome, now: Date) -> State {
             var next = self
             switch outcome {
-            case .counted: next.lastCounted = ActiveCount.day(now); next.doneDay = ActiveCount.day(now)
+            case .counted:
+                // Never moved backwards by a clock that went back.
+                let today = ActiveCount.day(now)
+                if (next.lastCounted ?? "") < today { next.lastCounted = today }
+                next.doneDay = today
             case .refused: next.doneDay = ActiveCount.day(now)
             case .retry: break
             }

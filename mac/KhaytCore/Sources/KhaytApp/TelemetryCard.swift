@@ -86,7 +86,7 @@ struct TelemetrySettings: View {
     var body: some View {
         let consent = shop.telemetryConsent
         Section(shop.words.callIt("tel.section")) {
-            Text(shop.words.callIt("tel.hint"))
+            Text(shop.words.callIt(ActiveCountSender.READY ? "tel.hint_count" : "tel.hint"))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             // Each switch says only its own stream. The other is read off the
@@ -108,6 +108,8 @@ struct TelemetrySettings: View {
             }
         }
         .disabled(!shop.canWrite || !shop.source.isReal)
+        // A result from before crash reports went off and on again is stale.
+        .onChange(of: shop.telemetryConsent.crash) { testResult = nil }
     }
 
     /// One test crash report, sent now — so a shop asked "are reports
@@ -135,7 +137,7 @@ struct TelemetrySettings: View {
     nonisolated static func resultKey(_ reason: String) -> String {
         switch reason {
         case "accepted": "mac.tel_test_sent"
-        case "unreachable", "retry", "rate-limited", "backoff": "mac.tel_test_later"
+        case "unreachable", "retry", "rate-limited", "backoff", "not-enabled", "empty": "mac.tel_test_later"
         case "development-build": "mac.tel_test_dev"
         default: "mac.tel_test_failed"
         }
@@ -184,8 +186,8 @@ enum TelemetryWords {
         // What `lib/telemetry-scrub.js` takes out, as the privacy page says
         // it: emails, phone numbers, long numbers (IBANs among them) and file
         // paths. NOT person names — the scrubber has no way to know one.
-        "mac.tel_card_body": ["en": "Khayt sends nothing unless you allow it. A crash report tells us what went wrong, with emails, phone numbers, long numbers and file paths taken out. Never your orders, customers, prices or files.",
-                              "ar": "لا يرسل خيط شيئًا ما لم تسمح بذلك. يخبرنا تقرير العطل بما حدث بعد حذف عناوين البريد الإلكتروني وأرقام الهواتف والأرقام الطويلة ومسارات الملفات، ولا يتضمن أبدًا طلباتك أو عملاءك أو أسعارك أو ملفاتك."],
+        "mac.tel_card_body": ["en": "Apart from an anonymous once-a-day install count, which you can turn off in Settings, Khayt sends nothing unless you allow it. A crash report tells us what went wrong, with emails, phone numbers, long numbers and file paths taken out. Never your orders, customers, prices or files.",
+                              "ar": "باستثناء عدّ يومي مجهول الهوية لهذا التثبيت يمكنك إيقافه من الإعدادات، لا يرسل خيط شيئًا ما لم تسمح بذلك. يخبرنا تقرير العطل بما حدث بعد حذف عناوين البريد الإلكتروني وأرقام الهواتف والأرقام الطويلة ومسارات الملفات، ولا يتضمن أبدًا طلباتك أو عملاءك أو أسعارك أو ملفاتك."],
         "mac.tel_card_usage": ["en": "Also share usage counts",
                                "ar": "مشاركة أعداد الاستخدام أيضًا"],
         "mac.tel_card_share": ["en": "Share Crash Reports",
@@ -206,11 +208,5 @@ enum TelemetryWords {
                              "ar": "نسخة التطوير لا ترسل شيئًا."],
         "mac.tel_test_failed": ["en": "The test report was not sent.",
                                 "ar": "لم يُرسل التقرير التجريبي."],
-        // The same words in the desktop and iPhone apps and on
-        // khaytapp.com/privacy #active-count.
-        "mac.active_count": ["en": "Count this install (anonymous)",
-                             "ar": "احتساب هذا التثبيت (دون هوية)"],
-        "mac.active_count_hint": ["en": "Once a day, sends only the app's platform, version and release channel, and whether this is its first day this week, this month or ever. No id, nothing about your shop.",
-                                  "ar": "مرة في اليوم، يُرسل نوع الجهاز وإصدار التطبيق وقناة إصداره فقط، وهل هذا أول يوم له في هذا الأسبوع أو الشهر أو على الإطلاق. لا معرّف، ولا شيء عن مطبعتك."],
     ]
 }

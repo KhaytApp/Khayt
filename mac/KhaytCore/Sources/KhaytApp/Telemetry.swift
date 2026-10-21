@@ -576,7 +576,9 @@ final class Telemetry {
         }
         loop = Task { [weak self, weak shop] in
             guard let self, let shop else { return }
-            await ActiveCountSender.shared.tick()
+            // Its own task: an offline send waits up to 30 s, and that is no
+            // reason to hold up the crash reports behind it.
+            Task { await ActiveCountSender.shared.tick() }
             await self.recordLaunch(shop)
             await self.collect(shop)
             while !Task.isCancelled {
@@ -588,7 +590,7 @@ final class Telemetry {
 
     private func tick(_ shop: Shop) async {
         // The anonymous daily count: its own switch, not the book's consent.
-        await ActiveCountSender.shared.tick()
+        Task { await ActiveCountSender.shared.tick() }
         // The book on disk as well as the book in memory: an opt-out made in
         // the Electron app on this same book is not in memory until the Mac
         // next reloads, and it must still empty this Mac's queue and stop it
@@ -734,13 +736,18 @@ final class Telemetry {
     /// sent now rather than at the next hourly flush, so the shop (and we) can
     /// see a report get through. The answer is what the send came to.
     func sendTest(_ shop: Shop) async -> String {
-        let consent = shop.telemetryConsent
+        // The book on disk too, as `tick` asks: an opt-out made in the other
+        // app on this book is not in memory yet.
+        var consent = shop.telemetryConsent
+        if let build = shop.source.build, let stored = await consentOnDiskIfChanged(build.storeURL) {
+            consent = consent.and(stored)
+        }
         guard consent.crash, let engine = shop.engine, let file = Self.file(for: shop) else { return "off" }
         let live: () -> TelemetryConsent = { [weak shop] in shop?.telemetryConsent ?? TelemetryConsent() }
         guard await enqueue(.crash, TelemetryRaw.testCrash(context(language: shop.words.language)),
                             consent: consent, engine: engine, file: file, live: live) else { return "unplanned" }
-        backoffMs = 0; nextAttemptAtMs = 0
-        return await flush(consent: live(), engine: engine, file: file)
+        // The server's backoff stands: a test is not a reason to ignore a 429.
+        return await flush(consent: live().and(consent), engine: engine, file: file)
     }
 
     /// Which note this is — its `when:` line, which `LastWords` writes first.
