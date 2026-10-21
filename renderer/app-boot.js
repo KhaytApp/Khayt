@@ -777,6 +777,7 @@ document.addEventListener('languagechange', () => {
   initialRender();
   refreshCurrencyLabels();
   if (typeof renderTelemetryAsk === 'function') renderTelemetryAsk();
+  if (typeof applySettingsReadOnly === 'function') applySettingsReadOnly();
 });
 }
 

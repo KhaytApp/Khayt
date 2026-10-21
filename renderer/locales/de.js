@@ -1572,6 +1572,7 @@
   "set.elec_rate": "Strompreis",
   "set.elec_rate_hint": "Was eine kWh deine Werkstatt kostet. Angebote, Fehldrucke und Stromberichte nutzen ihn, solange keine Druckervorlage einen eigenen festlegt. Leer lassen für Khayts Standardwert.",
   "set.prefs_section": "App-Einstellungen",
+  "set.readonly_note": "Nur der Inhaber kann die Einstellungen ändern. Sie können sie hier ansehen.",
   "set.language": "Sprache",
   "set.content_langs": "Produktsprachen",
   "set.biz_name": "Firmenname",

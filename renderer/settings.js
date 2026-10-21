@@ -5656,7 +5656,62 @@ function saveLanApiSettingsFromForm({ restartServer = false } = {}) {
   }
 }
 
+// ── Settings for someone who may only READ them ───────────────────────────────
+// With the operator lock on, a manager's role reads Settings but may not change
+// them (lib/rbac.js settings: R). The page used to show every control live
+// anyway: the PIN, the LAN server, VAT, prices, Save. The Mac greys Settings out
+// the same way (permitted("settings","edit")).
+//
+// The window is the trust boundary here — main has no operator identity — so
+// the gate is in the page: every control in the Settings tab is disabled, again
+// after each panel redraws, and saveSettingsFromPanel refuses as well.
+const SETTINGS_RO_ALLOW = '.settings-nav-item, #btnSwitchOperator, #btnLockNow, #btnViewTelemetry';
+
+function settingsReadOnly() {
+  return typeof operatorCan === 'function' && !operatorCan('settings', 'edit');
+}
+
+let _settingsRoObserver = null;
+function applySettingsReadOnly() {
+  const tab = document.getElementById('settings-tab');
+  if (!tab) return;
+  const ro = settingsReadOnly();
+  tab.classList.toggle('settings-readonly', ro);
+  let note = document.getElementById('settingsReadOnlyNote');
+  if (ro && !note) {
+    note = document.createElement('div');
+    note.id = 'settingsReadOnlyNote';
+    note.className = 'settings-readonly-note';
+    note.setAttribute('role', 'status');
+    tab.prepend(note);
+  }
+  if (note) {
+    if (ro) note.textContent = t('set.readonly_note');
+    else note.remove();
+  }
+  for (const el of tab.querySelectorAll('input, select, textarea, button')) {
+    if (el.matches(SETTINGS_RO_ALLOW)) continue;
+    if (ro) {
+      if (!el.disabled) { el.disabled = true; el.dataset.roDisabled = '1'; }
+    } else if (el.dataset.roDisabled) {
+      el.disabled = false;
+      delete el.dataset.roDisabled;
+    }
+  }
+  // Panels render on demand; whatever they draw later is closed too.
+  if (!_settingsRoObserver && typeof MutationObserver === 'function') {
+    let queued = false;
+    _settingsRoObserver = new MutationObserver(() => {
+      if (queued || !settingsReadOnly()) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; applySettingsReadOnly(); });
+    });
+    _settingsRoObserver.observe(tab, { childList: true, subtree: true });
+  }
+}
+
 function saveSettingsFromPanel() {
+  if (settingsReadOnly()) { toast(t('set.readonly_note'), 'error'); return; }
   const onlineCb = document.getElementById('online_enabled');
   if (onlineCb) settings.onlineEnabled = onlineCb.checked;
   saveLanApiSettingsFromForm({ restartServer: false });
@@ -6516,6 +6571,7 @@ function renderTelegramSettings() {
     renderShippingSettings,
     renderTelemetrySettings,
     renderTelemetryAsk,
+    applySettingsReadOnly,
     setTelemetryConsent,
     // Called from app-state.js at load. This file is IIFE-wrapped, so without
     // this line the typeof check there just sees undefined and the whole thing

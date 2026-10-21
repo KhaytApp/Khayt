@@ -1572,6 +1572,7 @@
   "set.elec_rate": "電気料金",
   "set.elec_rate_hint": "ショップの1kWhあたりの費用です。プリンタープリセットで個別に設定しない限り、見積もり、失敗したプリント、電力レポートで使われます。空欄にするとKhaytの既定値になります。",
   "set.prefs_section": "アプリ設定",
+  "set.readonly_note": "設定を変更できるのはオーナーだけです。ここでは閲覧できます。",
   "set.language": "デフォルト言語",
   "set.content_langs": "商品の言語",
   "set.biz_name": "事業者名",

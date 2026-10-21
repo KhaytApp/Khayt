@@ -538,6 +538,8 @@ function operatorCan(area, action) {
 function applyOperatorPermissions() {
   // The crash-report ask is for whoever may change Settings.
   if (typeof renderTelemetryAsk === 'function') renderTelemetryAsk();
+  // And Settings themselves are read-only for a role that may only read them.
+  if (typeof applySettingsReadOnly === 'function') applySettingsReadOnly();
   if (!settings.operatorLockEnabled) {
     // Remove all restrictions
     $$('.tab-btn').forEach(b => b.style.display = '');

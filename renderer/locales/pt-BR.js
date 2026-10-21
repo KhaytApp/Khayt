@@ -1573,6 +1573,7 @@
   "set.elec_rate": "Preço da eletricidade",
   "set.elec_rate_hint": "Quanto custa um kWh para a sua oficina. Orçamentos, impressões com falha e relatórios de energia usam este valor, a menos que um perfil de impressora defina o seu. Deixe vazio para usar o padrão do Khayt.",
   "set.prefs_section": "Preferências do aplicativo",
+  "set.readonly_note": "Só o proprietário pode alterar as configurações. Você pode consultá-las aqui.",
   "set.language": "Idioma padrão",
   "set.content_langs": "Idiomas dos produtos",
   "set.biz_name": "Nome do negócio",
