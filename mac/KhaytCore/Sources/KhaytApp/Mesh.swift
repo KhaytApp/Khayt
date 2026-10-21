@@ -1088,6 +1088,11 @@ enum Mesh {
         let longestLine = 1 << 20
         var carry: [UInt8] = []
         var valid = true
+        // A UTF-8 byte-order mark is not part of the first line. Kept, an OBJ
+        // whose first line is a vertex read "\u{FEFF}v …", lost that vertex,
+        // and every face after it pointed one corner off (`String(contentsOf:)`
+        // used to strip it).
+        var first = true
 
         func emit(_ bytes: UnsafeBufferPointer<UInt8>) {
             guard valid, !bytes.isEmpty else { return }
@@ -1104,7 +1109,11 @@ enum Mesh {
             chunk.withUnsafeBytes { raw in
                 let bytes = raw.bindMemory(to: UInt8.self)
                 var start = 0
-                for i in 0..<bytes.count where bytes[i] == 0x0A || bytes[i] == 0x0D {
+                if first {
+                    first = false
+                    if bytes.count >= 3, bytes[0] == 0xEF, bytes[1] == 0xBB, bytes[2] == 0xBF { start = 3 }
+                }
+                for i in start..<bytes.count where bytes[i] == 0x0A || bytes[i] == 0x0D {
                     if carry.isEmpty {
                         emit(UnsafeBufferPointer(rebasing: bytes[start..<i]))
                     } else {

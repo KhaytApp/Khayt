@@ -85,6 +85,29 @@ struct MeshCorruptTests {
         #expect(streamed == whole)
     }
 
+    /// `String(contentsOf:)` dropped a UTF-8 byte-order mark; the streamed
+    /// reader must too, or an OBJ starting with a vertex loses it and every
+    /// face after it points one corner off.
+    @Test("a byte-order mark changes nothing")
+    func byteOrderMark() throws {
+        let dir = MeshPreviewTests.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let bom = Data([0xEF, 0xBB, 0xBF])
+        let obj = OBJTests.cubeOBJ(20).replacingOccurrences(of: "# a cube\n", with: "")
+        let plainOBJ = dir.appending(path: "plain.obj"), bomOBJ = dir.appending(path: "bom.obj")
+        try Data(obj.utf8).write(to: plainOBJ)
+        try (bom + Data(obj.utf8)).write(to: bomOBJ)
+        let a = try #require(try Mesh.measureOBJ(plainOBJ)), b = try #require(try Mesh.measureOBJ(bomOBJ))
+        #expect(a.triangleCount == 12 && b == a)
+
+        let stl = AsciiPreviewTests.asciiCube(20)
+        let plainSTL = dir.appending(path: "plain.stl"), bomSTL = dir.appending(path: "bom.stl")
+        try Data(stl.utf8).write(to: plainSTL)
+        try (bom + Data(stl.utf8)).write(to: bomSTL)
+        let c = try #require(try Mesh.measureSTL(plainSTL)), d = try #require(try Mesh.measureSTL(bomSTL))
+        #expect(c.triangleCount == 12 && d == c)
+    }
+
     /// A binary file named .obj has no line ends to stop at; the reader gives
     /// up rather than gathering the whole file into one "line".
     @Test("a file with no line ends is not read as a text mesh")
