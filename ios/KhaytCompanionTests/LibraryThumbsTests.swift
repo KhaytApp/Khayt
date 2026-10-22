@@ -32,6 +32,47 @@ final class LibraryThumbsTests: XCTestCase {
         XCTAssertNil(gone)
     }
 
+    private func picture(_ side: Int) -> Data {
+        let r = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: {
+            let f = UIGraphicsImageRendererFormat(); f.scale = 1; return f }())
+        return r.pngData { ctx in UIColor.systemTeal.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: side, height: side)) }
+    }
+
+    func testAKeptPictureIsASmallCopy() throws {
+        let big = picture(1024)
+        let small = try XCTUnwrap(LibraryThumbs.shrink(big))
+        let image = try XCTUnwrap(UIImage(data: small))
+        XCTAssertEqual(max(image.size.width * image.scale, image.size.height * image.scale), 320)
+        XCTAssertLessThan(small.count, big.count)
+        XCTAssertNil(LibraryThumbs.shrink(Data("not a picture".utf8)))
+    }
+
+    func testOnTheShopsWiFiEveryPictureIsKeptOnce() async {
+        let s = ConnectionSettings()
+        let saved = (s.host, s.port, s.isPaired, s.isSampleShop)
+        defer { s.host = saved.0; s.port = saved.1; s.isPaired = saved.2; s.isSampleShop = saved.3 }
+        s.host = "khayt-thumbs.invalid"; s.port = 3219; s.isPaired = true; s.isSampleShop = false
+        let defaults = UserDefaults(suiteName: "pics-\(UUID().uuidString)")!
+        ThumbMac.library = (1...5).map { "PF-\($0)" }
+        ThumbMac.withPicture = ["PF-1", "PF-2", "PF-4"]
+        ThumbMac.image = picture(600)
+        let api = KhaytAPIClient(settings: s, protocols: [ThumbMac.self])
+        api.thumbShelf = LibraryThumbs(directory: dir)
+
+        let now = Date()
+        let fetched = await api.keepAllLibraryPictures(now: now, defaults: defaults)
+        XCTAssertEqual(fetched, 3)
+        let kept = await api.thumbShelf.kept(ThumbMac.library)
+        XCTAssertEqual(kept, ["PF-1", "PF-2", "PF-4"])
+        let one = await api.thumbShelf.get("PF-1")
+        XCTAssertLessThan(one?.data.count ?? .max, ThumbMac.image.count, "kept small")
+
+        let asked = ThumbMac.asked
+        let again = await api.keepAllLibraryPictures(now: now.addingTimeInterval(3600), defaults: defaults)
+        XCTAssertEqual(again, 0)
+        XCTAssertEqual(ThumbMac.asked, asked, "not again within twelve hours")
+    }
+
     func testOverTheBudgetTheLeastRecentlySeenGoFirst() async {
         let shelf = LibraryThumbs(directory: dir, budget: 1000)
         let t0 = Date(timeIntervalSince1970: 1_800_000_000)
@@ -84,8 +125,12 @@ final class ThumbMac: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var reachable = true
     nonisolated(unsafe) static var hasPicture = true
     nonisolated(unsafe) static var asked = 0
+    /// A library to page through, and which of it has a picture.
+    nonisolated(unsafe) static var library: [String] = []
+    nonisolated(unsafe) static var withPicture: Set<String> = []
+    nonisolated(unsafe) static var image = Data("jpeg".utf8)
 
-    static func reset() { reachable = true; hasPicture = true; asked = 0 }
+    static func reset() { reachable = true; hasPicture = true; asked = 0; library = []; withPicture = []; image = Data("jpeg".utf8) }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-thumbs.invalid" }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -97,7 +142,26 @@ final class ThumbMac: URLProtocol, @unchecked Sendable {
             return
         }
         Self.asked += 1
-        let ok = Self.hasPicture && request.url?.path() == "/api/library/PF-1/thumb"
+        let path = request.url?.path() ?? ""
+        if path == "/api/library" {
+            let items = Self.library.map { #"{"id":"\#($0)","name":"\#($0)","thumb":\#(Self.withPicture.contains($0))}"# }
+            let body = #"{"total":\#(Self.library.count),"offset":0,"folders":[],"items":[\#(items.joined(separator: ","))]}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(body.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        if !Self.library.isEmpty {
+            let id = path.split(separator: "/").dropLast().last.map(String.init) ?? ""
+            let has = Self.withPicture.contains(id)
+            let response = HTTPURLResponse(url: request.url!, statusCode: has ? 200 : 404, httpVersion: "HTTP/1.1", headerFields: nil)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: has ? Self.image : Data("{}".utf8))
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        let ok = Self.hasPicture && path == "/api/library/PF-1/thumb"
         let response = HTTPURLResponse(url: request.url!, statusCode: ok ? 200 : 404, httpVersion: "HTTP/1.1",
                                        headerFields: ["Content-Type": ok ? "image/jpeg" : "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
