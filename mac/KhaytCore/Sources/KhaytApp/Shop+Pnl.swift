@@ -213,6 +213,10 @@ extension Shop {
             vatFiledProblem = words.callIt("mac.vat_filed_overlap", [
                 "period": .string(MonthLabel.period(period, words: words)),
                 "other": .string(MonthLabel.period(overlap.other, words: words))])
+        } catch let later as VatFiledLater {
+            vatFiledProblem = words.callIt("mac.vat_filed_later", [
+                "period": .string(MonthLabel.period(period, words: words)),
+                "later": .string(MonthLabel.period(later.later, words: words))])
         } catch {
             vatFiledProblem = self.said(error)
         }
@@ -220,6 +224,9 @@ extension Shop {
 
     /// Marking refused: the period overlaps `other`, already marked filed.
     struct VatFiledOverlap: Error { let other: String }
+
+    /// Un-filing refused: `later` is filed after it and already holds its adjustments.
+    struct VatFiledLater: Error { let later: String }
 
     /// The filed-mark write, on a book already read: the seam the tests use.
     /// The overlap is judged on THIS book — the one on disk, inside the write
@@ -232,6 +239,9 @@ extension Shop {
         if filed {
             let other = try await engine.vatFiledOverlap(settings: stored, period: period)
             if !other.isEmpty { throw VatFiledOverlap(other: other) }
+        } else {
+            let later = try await engine.vatFiledLater(settings: stored, period: period)
+            if !later.isEmpty { throw VatFiledLater(later: later) }
         }
         let jobs: [JSONValue]
         if case .array(let rows)? = root["printLog"] { jobs = rows } else { jobs = [] }

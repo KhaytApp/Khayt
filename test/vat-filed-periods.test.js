@@ -424,6 +424,19 @@ test('filing again FRESH records the book as it is now (an amended return)', () 
   assert.deepEqual(rowsOf([cancelled], fresh), []);
 });
 
+test('a period cannot be un-filed while a later one is filed (no double count)', () => {
+  const live = invoice();
+  const s1 = V.markFiled(VAT15, '2026-Q3', [live], instant(2026, 10, 3));
+  const cancelled = { ...live, status: 'cancelled', cancelledAt: '2026-10-05' };
+  const s2 = V.markFiled(s1, '2026-Q4', [cancelled], instant(2027, 1, 5));
+  assert.equal(V.laterFiledOf(s2, '2026-Q3'), '2026-Q4');
+  assert.deepEqual(V.unmarkFiled(s2, '2026-Q3'), s2, 'refused: Q4 already corrects Q3');
+  assert.equal(V.laterFiledOf(s2, '2026-Q4'), '');
+  const q4off = V.unmarkFiled(s2, '2026-Q4');
+  assert.equal(V.laterFiledOf(q4off, '2026-Q3'), '');
+  assert.equal(V.unmarkFiled(q4off, '2026-Q3').vatFiledPeriods.length, 0, 'newest first, then it goes');
+});
+
 test('size: 300 invoices a quarter for three years is about 160 KB', () => {
   const book = [];
   for (let q = 0; q < 12; q++) {

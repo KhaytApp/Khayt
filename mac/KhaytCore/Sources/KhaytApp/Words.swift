@@ -1750,6 +1750,7 @@ final class Words {
         "mac.vat_refile_restore": ["en": "Restore what you filed", "ar": "استعد ما قدّمته"],
         "mac.vat_refile_fresh": ["en": "Record the book as it is now", "ar": "سجّل الدفتر كما هو الآن"],
         "mac.vat_filed_part_of": ["en": "Filed as part of {period}", "ar": "مُقدَّم ضمن {period}"],
+        "mac.vat_filed_later": ["en": "{later} is filed after {period} and already corrects it. Un-file {later} first.", "ar": "الفترة {later} مُقدَّمة بعد {period} وتصحّحها بالفعل. ألغِ تقديم {later} أولًا."],
         "mac.vat_filed_overlap": ["en": "{period} overlaps {other}, which is already marked filed.",
                                   "ar": "تتداخل {period} مع {other} المُعلَّمة مُقدَّمة."],
         // A failure allowance learned from the shop's own history —

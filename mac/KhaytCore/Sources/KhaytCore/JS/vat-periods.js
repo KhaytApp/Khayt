@@ -331,6 +331,21 @@
   }
 
   /**
+   * The key of a period marked filed AFTER this one, or '' — this one cannot
+   * be un-filed while it is there. A later return's snapshot already holds
+   * its adjustments for this period; un-filing this one under it would count
+   * those adjustments twice (Q3 cancelled into Q4: Q3 live 0 and Q4 still
+   * −15). Returns are corrected newest first, as they are filed oldest first.
+   */
+  function laterFiledOf(settings, key) {
+    const bounds = periodBounds(key);
+    if (!bounds) return '';
+    const later = filedMarks(settings).filter((m) => m.period !== key && m.from > bounds.to)
+      .sort((a, b) => (a.from < b.from ? -1 : 1));
+    return later.length ? later[later.length - 1].period : '';
+  }
+
+  /**
    * Take a period's filed mark off. Returns NEW settings.
    *
    * The snapshot is NOT thrown away: it moves to `settings.vatUnfiledPeriods`
@@ -339,6 +354,7 @@
    */
   function unmarkFiled(settings, key, opts) {
     const s = settings || {};
+    if (!(opts && opts.archive === false) && laterFiledOf(s, key)) return { ...s };
     const all = Array.isArray(s.vatFiledPeriods) ? s.vatFiledPeriods : [];
     const keyOf = (r) => (typeof r === 'string' ? r : r && r.period);
     const gone = all.filter((r) => keyOf(r) === key);
@@ -400,7 +416,7 @@
     frequencyOf, localDay, periodKeyOf, periodBounds, nextPeriodKey, periodsBetween, dayAfter,
     filedMarks, markFor, isFiled, coveringMark, landingDay, landingPeriod,
     isReversed, reversalDayOf,
-    markFiled, unmarkFiled, overlapOf, filingPeriods,
+    markFiled, unmarkFiled, overlapOf, laterFiledOf, filingPeriods,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') globalThis.KhaytVatPeriods = api;

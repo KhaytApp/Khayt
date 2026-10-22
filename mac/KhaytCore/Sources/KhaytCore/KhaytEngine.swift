@@ -8134,6 +8134,13 @@ public actor KhaytEngine {
                           as: String.self)
     }
 
+    /// The latest period marked filed after `period`, or "" — `lib/vat-periods.js`
+    /// `laterFiledOf`. While there is one, `period` cannot be un-filed.
+    public func vatFiledLater(settings: [String: JSONValue], period: String) throws -> String {
+        try runtime.call2("KhaytVatPeriods.laterFiledOf(ARG0, ARG1)", [.object(settings), .string(period)],
+                          as: String.self)
+    }
+
     /// The settings with `period` marked FILED — with the SNAPSHOT of what the
     /// period holds, job by job, taken from `orders` (the book's jobs as they
     /// are on disk) with the same `clients` and `currencies` the P&L is asked
