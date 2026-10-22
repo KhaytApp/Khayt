@@ -726,6 +726,7 @@ final class PrinterWatch {
         if held || watch.existing(machine.id, config: config) != nil {
             let session = await watch.session(for: machine.id, config: config, accessCode: accessCode)
             let state = try await session.status(wait: .seconds(8))
+            watch.noteTrust(machine.id, verifiedByBambu: await session.verifiedByBambu)
             guard let status = try await engine.bambuStatus(held: state) else {
                 throw Refusal.unreadable("bambu")
             }

@@ -8,8 +8,9 @@ import KhaytCore
 ///
 /// No Bambu is on the bench, so no genuine leaf can be presented here. What
 /// is checked: the bundle is the eight Bambu Lab certificates from
-/// rolottr/bambu-bar; a certificate outside it is refused with a reason even
-/// when it carries the right serial (anyone can type a serial into openssl);
+/// rolottr/bambu-bar; a certificate outside it is NOT verified, even when it
+/// carries the right serial (anyone can type a serial into openssl), and
+/// falls to the first-use pin;
 /// the name rule; and the bytes of the two new controls.
 @MainActor
 struct BambuTrustTests {
@@ -51,7 +52,7 @@ struct BambuTrustTests {
         }
     }
 
-    @Test("a certificate that does not chain to Bambu is refused, even named after the serial")
+    @Test("a certificate that does not chain to Bambu is not verified, even named after the serial")
     func impostorRefused() throws {
         let certs = BambuTrust.certificates(fromPEM: Self.impostor)
         let leaf = try #require(certs.first)
@@ -66,6 +67,52 @@ struct BambuTrustTests {
         let said = PrinterWatch.say(BambuMqtt.Trouble.notBambu(why))
         #expect(said.contains("Bambu Lab certificate"))
         #expect(said.contains("access code was not sent"))
+    }
+
+    /// No Bambu here proves every model and firmware chains to the bundled
+    /// CAs, so only a verified chain naming ANOTHER serial is a hard refusal;
+    /// an unverified chain falls back to the first-use pin.
+    @Test("verified + this serial: in; verified + other serial: out; unverified: the pin decides")
+    func trustDecision() {
+        let pins = BambuPin.Store.memory()
+        let key = BambuPin.key(serial: "01P00A000000000", host: "192.168.68.70")
+
+        let ok = PinVerdict()
+        #expect(BambuMqtt.trustDecision(.trusted, fingerprint: { "aa" }, pinKey: key, verdict: ok, pins: pins))
+        #expect(ok.byBambu == true)
+        #expect(pins.read(key) == nil, "a verified printer is not pinned")
+
+        let other = PinVerdict()
+        #expect(!BambuMqtt.trustDecision(.otherPrinter("01P00A000000001"), fingerprint: { "aa" },
+                                         pinKey: key, verdict: other, pins: pins))
+        #expect(other.refused == .otherPrinter("01P00A000000001"))
+
+        let first = PinVerdict()
+        #expect(BambuMqtt.trustDecision(.notBambu("untrusted"), fingerprint: { "aa" },
+                                        pinKey: key, verdict: first, pins: pins))
+        #expect(first.byBambu == false, "an unverified printer must be marked so the sheet can say it")
+        let same = PinVerdict()
+        #expect(BambuMqtt.trustDecision(.notBambu("untrusted"), fingerprint: { "aa" },
+                                        pinKey: key, verdict: same, pins: pins))
+        let changed = PinVerdict()
+        #expect(!BambuMqtt.trustDecision(.notBambu("untrusted"), fingerprint: { "bb" },
+                                         pinKey: key, verdict: changed, pins: pins))
+        #expect(changed.refused == .certificateChanged)
+        let blank = PinVerdict()
+        #expect(!BambuMqtt.trustDecision(.notBambu("x"), fingerprint: { nil },
+                                         pinKey: key, verdict: blank, pins: pins))
+        #expect(blank.refused == .notBambu("x"))
+    }
+
+    @Test("the registry remembers which machines were let in unverified")
+    func unverifiedNoted() {
+        let watch = BambuWatch()
+        watch.noteTrust("M-1", verifiedByBambu: false)
+        #expect(watch.unverified.contains("M-1"))
+        watch.noteTrust("M-1", verifiedByBambu: nil)
+        #expect(watch.unverified.contains("M-1"), "unknown is not a verdict")
+        watch.noteTrust("M-1", verifiedByBambu: true)
+        #expect(!watch.unverified.contains("M-1"))
     }
 
     @Test("the name must be this machine's serial")

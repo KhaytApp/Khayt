@@ -164,8 +164,8 @@ enum BambuMqtt {
         case silent
         case closed(String)
         /// The printer presented a different certificate from the one it
-        /// presented the first time — see `BambuPin`. No longer raised since
-        /// trust is `BambuTrust`'s; kept so an old sentence still has a home.
+        /// presented the first time — see `BambuPin`. Raised only for a
+        /// printer whose certificate Bambu Lab's CAs do not vouch for.
         case certificateChanged
         /// The certificate does not chain to Bambu Lab's CAs: whatever
         /// answered is not a Bambu printer, so the access code was not sent.
@@ -187,13 +187,13 @@ enum BambuMqtt {
     }
 }
 
-/// ── NO LONGER DECIDES TRUST (Oct 2026) ────────────────────────────────────
+/// ── THE FALLBACK SINCE OCT 2026 ───────────────────────────────────────────
 ///
-/// A printer is now trusted by `BambuTrust`: chained to Bambu Lab's CAs and
-/// named after the machine's serial. This store is still cleared when an
-/// access code is saved, and its tests still run, but no connection consults
-/// it. It is left for a follow-up to remove, rather than deleted in the same
-/// change that replaced it.
+/// A printer whose certificate chains to Bambu Lab's CAs and names its serial
+/// is trusted by `BambuTrust` and never reaches this. A printer whose
+/// certificate does not chain falls back to this pin
+/// (`BambuMqtt.trustDecision`), so no model or firmware the bundled CAs miss
+/// is cut off.
 ///
 /// ── TRUST ON FIRST USE, FOR A CERTIFICATE NOTHING CAN VERIFY ──────────────
 ///
@@ -384,16 +384,19 @@ extension BambuPin.Store {
 final class PinVerdict: @unchecked Sendable {
     private let lock = NSLock()
     private var refusal: BambuMqtt.Trouble?
+    private var verified: Bool?
     func refuse(_ why: BambuMqtt.Trouble) { lock.withLock { refusal = why } }
     var refused: BambuMqtt.Trouble? { lock.withLock { refusal } }
+    /// True when Bambu Lab's CAs vouched for the printer, false when it was
+    /// let in by the first-use pin instead, nil before the handshake.
+    func markVerified(_ v: Bool) { lock.withLock { verified = v } }
+    var byBambu: Bool? { lock.withLock { verified } }
 }
 
 extension BambuMqtt {
-    /// A TLS connection to a Bambu's MQTT port. The printer is trusted only
-    /// if its certificate chains to Bambu Lab's CAs AND is named after this
-    /// machine's serial (`BambuTrust`). One place, so the one-shot
-    /// conversation and the held session (`BambuSession`) cannot trust
-    /// certificates differently.
+    /// A TLS connection to a Bambu's MQTT port, trusted by `trustDecision`.
+    /// One place, so the one-shot conversation and the held session
+    /// (`BambuSession`) cannot trust certificates differently.
     static func connection(host: String, port: UInt16, serial: String,
                            verdict: PinVerdict) -> NWConnection {
         let options = NWProtocolTLS.Options()
@@ -401,17 +404,51 @@ extension BambuMqtt {
             options.securityProtocolOptions,
             { _, trust, complete in
                 let ref = sec_trust_copy_ref(trust).takeRetainedValue()
-                switch BambuTrust.evaluate(ref, serial: serial) {
-                case .trusted: complete(true)
-                case .notBambu(let why): verdict.refuse(.notBambu(why)); complete(false)
-                case .otherPrinter(let name): verdict.refuse(.otherPrinter(name)); complete(false)
-                }
+                let pinKey = BambuPin.key(serial: serial, host: host)
+                complete(trustDecision(BambuTrust.evaluate(ref, serial: serial),
+                                       fingerprint: { BambuPin.fingerprint(trust) },
+                                       pinKey: pinKey, verdict: verdict))
             },
             DispatchQueue.global(qos: .userInitiated))
         return NWConnection(
             host: NWEndpoint.Host(host),
             port: NWEndpoint.Port(rawValue: port) ?? .init(integerLiteral: 8883),
             using: NWParameters(tls: options))
+    }
+
+    /// Whether to let the printer in, given what `BambuTrust` said.
+    ///
+    /// ── STRICT WHERE IT CAN BE, LENIENT WHERE IT MUST ─────────────────────
+    ///
+    ///   - Chains to Bambu Lab's CAs and names this serial: trusted, verified.
+    ///   - Chains to Bambu Lab's CAs and names ANOTHER serial: refused. That
+    ///     is a genuine Bambu that is not this machine, and the access code
+    ///     must not go to it.
+    ///   - Does not chain: let in by the trust-on-first-use pin (`BambuPin`,
+    ///     the rule before Oct 2026), marked unverified, and the machine sheet
+    ///     says so quietly. Only one P2S has been seen to chain to the bundled
+    ///     CAs (rolottr/bambu-bar). Nothing on this bench proves that every X1,
+    ///     P1, A1 and H2 on every firmware does, and refusing outright could
+    ///     cut off a printer that works. A pin mismatch is still refused.
+    static func trustDecision(_ said: BambuTrust.Verdict, fingerprint: () -> String?,
+                              pinKey: String, verdict: PinVerdict,
+                              pins: BambuPin.Store = BambuPin.store) -> Bool {
+        switch said {
+        case .trusted:
+            verdict.markVerified(true)
+            return true
+        case .otherPrinter(let name):
+            verdict.refuse(.otherPrinter(name))
+            return false
+        case .notBambu(let why):
+            guard let print = fingerprint() else { verdict.refuse(.notBambu(why)); return false }
+            guard BambuPin.accept(print, key: pinKey, in: pins) else {
+                verdict.refuse(.certificateChanged)
+                return false
+            }
+            verdict.markVerified(false)
+            return true
+        }
     }
 
     /// The `pushall` request: the object ha-bambulab sends

@@ -29,6 +29,11 @@ import Security
 /// ha-bambulab for the protocol. The roots expire in 2032 ("BBL CA") and 2050
 /// ("BBL CA2 RSA/ECC"), and the device CAs in 2040.
 ///
+/// What follows from each verdict is `BambuMqtt.trustDecision`'s. A verified
+/// chain naming another serial is refused. A chain that does not verify falls
+/// back to the first-use pin and is marked unverified, because only a P2S has
+/// been seen to chain (bambu-bar) and refusing could cut off a working printer.
+///
 /// Not verified against a printer: there is none on the bench. What is tested
 /// is that the bundle parses into these eight certificates, that a certificate
 /// outside it is refused with a reason, and the name rule.

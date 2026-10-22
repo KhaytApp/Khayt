@@ -129,6 +129,9 @@ actor BambuSession {
     private(set) var backoff: TimeInterval = BambuSession.firstBackoff
     private(set) var nextAttempt: Date
     private(set) var trouble: BambuMqtt.Trouble?
+    /// How the printer's certificate was trusted on the latest connection:
+    /// true by Bambu Lab's CAs, false by the first-use pin only.
+    private(set) var verifiedByBambu: Bool?
     private(set) var stopped = false
     private var loop: Task<Void, Never>?
     private var consumer: Task<Void, Never>?
@@ -253,6 +256,7 @@ actor BambuSession {
         guard gen == generation, link != nil, !stopped else { return }
         switch event {
         case .ready:
+            if let v = link?.verifiedByBambu { verifiedByBambu = v }
             send(BambuMqtt.connect(clientId: Self.clientId(), username: "bblp",
                                    password: accessCode, keepalive: Self.keepalive))
         case .failed(let error):
@@ -470,6 +474,9 @@ enum BambuLinkEvent: Sendable {
 /// A byte pipe to a printer. A seam: the session is tested against a fake,
 /// because no Bambu answers on this Mac's network and none can be made to.
 protocol BambuLink: AnyObject, Sendable {
+    /// After `.ready`: did Bambu Lab's CAs vouch for the printer (true), or
+    /// was it let in by the first-use pin (false)? Nil when not known.
+    var verifiedByBambu: Bool? { get }
     /// Begin connecting; events arrive on `handler`, in order.
     func start(_ handler: @escaping @Sendable (BambuLinkEvent) -> Void)
     func send(_ bytes: [UInt8])
@@ -486,6 +493,8 @@ final class NetworkBambuLink: BambuLink, @unchecked Sendable {
     private var closed = false
     /// Events are delivered on one serial queue, so in order.
     private var handler: (@Sendable (BambuLinkEvent) -> Void)?
+
+    var verifiedByBambu: Bool? { verdict.byBambu }
 
     init(_ config: BambuSession.Config) {
         connection = BambuMqtt.connection(host: config.host, port: config.port,
@@ -590,8 +599,15 @@ final class BambuWatch {
     var ledger: PushallLedger = .shared
 
     private(set) var sessions: [String: BambuSession] = [:]
+    /// Machines whose printer was let in by the first-use pin and not by
+    /// Bambu Lab's CAs. The machine sheet notes it.
+    private(set) var unverified: Set<String> = []
 
     init() {}
+
+    func noteTrust(_ id: String, verifiedByBambu: Bool?) {
+        if verifiedByBambu == false { unverified.insert(id) } else if verifiedByBambu == true { unverified.remove(id) }
+    }
 
     /// The session for this machine, started if new, replaced if its config
     /// changed.
@@ -616,6 +632,7 @@ final class BambuWatch {
     func retain(_ ids: Set<String>) async {
         for (id, s) in sessions where !ids.contains(id) {
             sessions[id] = nil
+            unverified.remove(id)
             await s.stop()
         }
     }

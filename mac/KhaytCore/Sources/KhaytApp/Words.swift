@@ -2335,6 +2335,8 @@ final class Words {
                                 "ar": "رفضت الطابعة رمز الوصول (CONNACK {code}). يظهر الرمز على شاشة الطابعة نفسها، في قسم وضع الشبكة المحلية فقط."],
         "mac.pw_bambu_silent": ["en": "The printer accepted the connection and then said nothing. That is what happens when Developer Mode is off — LAN-only Mode alone does not open MQTT. Both are in the same menu on the printer (Settings → LAN Mode, or WLAN/Network on P1 and A1).",
                                 "ar": "قبلت الطابعة الاتصال ثم لم تقل شيئًا. هذا ما يحدث حين يكون وضع المطوّر (Developer Mode) مطفأً — وضع الشبكة المحلية وحده لا يفتح MQTT. كلاهما في القائمة نفسها على الطابعة (Settings ← LAN Mode، أو WLAN/Network في P1 وA1)."],
+        "mac.mach_cert_unverified": ["en": "Certificate not verified by Bambu Lab. This printer is trusted because it presented the same certificate as the first time it connected.",
+                                     "ar": "الشهادة غير موثّقة من Bambu Lab. هذه الطابعة موثوقة لأنها قدّمت الشهادة نفسها التي قدّمتها أول مرة اتصلت فيها."],
         "mac.pw_cert_not_bambu": ["en": "The device at this address did not present a Bambu Lab certificate, so the access code was not sent. Check the address is the printer's ({why}).",
                                   "ar": "لم يقدّم الجهاز على هذا العنوان شهادة من Bambu Lab، لذا لم يُرسَل رمز الوصول. تأكد أن العنوان هو عنوان الطابعة ({why})."],
         "mac.pw_cert_other_printer": ["en": "A different Bambu printer answered at this address (its certificate names serial {name}), so the access code was not sent. Check the address and the serial on the machine sheet.",

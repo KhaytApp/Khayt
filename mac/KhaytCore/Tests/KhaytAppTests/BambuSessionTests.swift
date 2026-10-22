@@ -29,6 +29,7 @@ struct BambuSessionTests {
         private var _closed = false
         var sent: [[UInt8]] { lock.withLock { _sent } }
         var closed: Bool { lock.withLock { _closed } }
+        var verifiedByBambu: Bool? { nil }
         func start(_ handler: @escaping @Sendable (BambuLinkEvent) -> Void) {}
         func send(_ bytes: [UInt8]) { lock.withLock { _sent.append(bytes) } }
         func close() { lock.withLock { _closed = true } }
