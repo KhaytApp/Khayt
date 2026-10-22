@@ -94,6 +94,7 @@ struct LibraryInspector: View {
             provenance(file)
             guides(file)
             actions(file)
+            if !file.isArchived { archiveButton(file) }
             if let notes = file.testedNotes, !notes.isEmpty {
                 LayerRule()
                 DetailSection(shop.words.callIt("doc.notes")) { Text(notes).textSelection(.enabled) }
@@ -145,6 +146,40 @@ struct LibraryInspector: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             quoteOrJob(file)
         }
+    }
+
+    /// "Archived 12 Oct 2026", and Restore beside it.
+    private func archivedNote(_ file: LibraryFile) -> some View {
+        HStack(spacing: 8) {
+            Label(archivedSentence(file), systemImage: "archivebox")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Button(shop.words.callIt("mac.unarchive_model")) { shop.unarchive([file.id]) }
+                .controlSize(.small)
+                .disabled(!shop.canWrite)
+        }
+    }
+
+    private func archivedSentence(_ file: LibraryFile) -> String {
+        // In the book's calendar (`Words.say`), never `Calendar.current`.
+        guard let when = Calendar.instant(file.archivedAt ?? "") else {
+            return shop.words.callIt("mac.archived_undated")
+        }
+        let day = shop.words.say(when, .dateTime.day().month(.abbreviated).year())
+        return shop.words.callIt("mac.archived_on", ["date": .string(day)])
+    }
+
+    /// Archive, on its own line under the rest: it changes what the library
+    /// offers, and does nothing to the file — so it is not with the buttons
+    /// that open the file.
+    private func archiveButton(_ file: LibraryFile) -> some View {
+        Button { shop.archive([file.id]) } label: {
+            Label(shop.words.callIt("mac.archive_model"), systemImage: "archivebox")
+        }
+        .controlSize(.small)
+        .disabled(!shop.canWrite)
+        .help(shop.words.callIt("mac.archive_help"))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Quote this model — or take the job — on its own figures, without
@@ -232,6 +267,10 @@ struct LibraryInspector: View {
                     .font(.title3.weight(.semibold))
                     .textSelection(.enabled)
             }
+            // PUT ASIDE, and said so where the eye is, with the way back. A
+            // model found through Spotlight or a job opens here even while it
+            // is archived, and should not read as one still on offer.
+            if file.isArchived { archivedNote(file) }
             if let problem = shop.writeProblem {
                 Label(problem, systemImage: "exclamationmark.triangle")
                     .font(.caption)

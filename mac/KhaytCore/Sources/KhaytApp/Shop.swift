@@ -54,9 +54,10 @@ final class Shop {
     /// Only ever the book's own records: a put-aside model stays in here.
     func showLibraryFiles(_ next: [LibraryFile]) { files = next }
 
-    /// Show the models that have been put aside. Off: they are still there.
+    /// The Archived view: only the models that have been put aside, where they
+    /// can be restored. Off, they are still in the book, just not offered.
     var libraryShowArchived = false {
-        didSet { if libraryShowArchived != oldValue { pruneSelectionToVisible() } }
+        didSet { if libraryShowArchived != oldValue { libraryViewChanged() } }
     }
 
     /// How many are hidden right now, so the library can offer to show them

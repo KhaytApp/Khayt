@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: archive models by hand, and bring them back.** Right-click a model (or several), use the Model menu, or press Archive in the model's panel to take it out of the library. Nothing is deleted: the file and its history stay. Show ▸ Archived lists everything put aside, including originals a conversion replaced, and Restore from Archive brings a model back. Undo works for both. The library's filter counts no longer include archived models.
+
 - **Desktop: pause, resume and cancel a print from the machine card.**
   While a printer is printing, its card in Settings → Printers now has Pause
   (or Resume when it is paused) and Cancel print, and a Klipper printer also

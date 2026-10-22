@@ -1292,23 +1292,56 @@ extension Shop {
         await load(source)
     }
 
-    /// Bring a model back into the library.
+    /// Put models aside by hand: out of the library's list, still in the book.
+    ///
+    /// The same field a conversion writes (`archivedAt`), without
+    /// `supersededBy` — nothing replaced these, the shop simply stopped
+    /// choosing them. NOTHING ON DISK IS TOUCHED: not the file, not its
+    /// folder, not a sidecar. A job printed from one of these months ago was
+    /// printed from those bytes, and the Archived view is where they come back
+    /// from. One write for the whole selection, and undoable, like every other
+    /// library edit (`editFiles`).
+    @discardableResult
+    func archive(_ ids: Set<LibraryFile.ID>) -> Bool {
+        let at = StoreWriter.iso(Date())
+        let named = ids.count > 1
+            ? words.callIt("mac.archive_n_models", ["n": .number(Double(ids.count))])
+            : words.callIt("mac.archive_model")
+        return editFiles(ids, named: named) { record in
+            // A model already put aside keeps the date it was put aside on.
+            if case .string(let was)? = record["archivedAt"], !was.isEmpty { return }
+            record["archivedAt"] = .string(at)
+        }
+    }
+
+    /// Bring models back into the library.
     ///
     /// The other half, because a one-way door is not a decision a shop should
-    /// have to be sure about before it makes it.
-    func unarchive(_ file: LibraryFile) async {
-        guard permitted("inventory", "edit") else { return }
-        guard let build = source.build else { return }
-        do {
-            try await StoreWriter.updateRecordOffMain(build, collection: "printFiles", id: file.id) { record in
-                record.removeValue(forKey: "archivedAt")
-                record.removeValue(forKey: "supersededBy")
-            }
-        } catch {
-            convertProblem = self.said(error)
-            return
+    /// have to be sure about before it makes it. Clears `supersededBy` too:
+    /// a converted original brought back is a model in its own right again.
+    @discardableResult
+    func unarchive(_ ids: Set<LibraryFile.ID>) -> Bool {
+        let named = ids.count > 1
+            ? words.callIt("mac.unarchive_n_models", ["n": .number(Double(ids.count))])
+            : words.callIt("mac.unarchive_model")
+        return editFiles(ids, named: named) { record in
+            record.removeValue(forKey: "archivedAt")
+            record.removeValue(forKey: "supersededBy")
         }
-        await load(source)
+    }
+
+    /// The selected models that are (true) or are not (false) put aside.
+    func selectedArchiveIds(_ archived: Bool) -> Set<LibraryFile.ID> {
+        Set(selectedFiles.filter { $0.isArchived == archived }.map(\.id))
+    }
+
+    /// What Archive or Restore acts on from a model's menu: every model
+    /// selected when it is one of them, else that model alone — and only the
+    /// ones the action would change.
+    func archiveTargets(for file: LibraryFile, archiving: Bool) -> Set<LibraryFile.ID> {
+        let picked = selectedFiles
+        let pool = picked.contains(where: { $0.id == file.id }) && picked.count > 1 ? picked : [file]
+        return Set(pool.filter { $0.isArchived != archiving }.map(\.id))
     }
 
     /// `Falcon hood — Snapmaker U1.3mf`. The target in the name, because a
@@ -1672,6 +1705,9 @@ extension Shop {
         var creators: [CreatorCount] = []
         var printNext = 0
         var duplicates = 0
+        /// Models put aside (`LibraryFile.archivedAt`), for the Show menu's
+        /// Archived view — in the shelf, over what the other chips leave.
+        var archived = 0
         struct Ready: Equatable, Identifiable {
             let machineId: String
             let machineName: String
@@ -1680,15 +1716,21 @@ extension Shop {
         }
         var isEmpty: Bool {
             categories.isEmpty && tags.isEmpty && unfiled == 0 && neverPrinted == 0 && ready.isEmpty
-                && creators.isEmpty && printNext == 0 && duplicates == 0
+                && creators.isEmpty && printNext == 0 && duplicates == 0 && archived == 0
         }
     }
 
-    enum LibraryAxis { case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates }
+    enum LibraryAxis { case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates, archived }
 
     /// What one axis counts: the shelf, the search, and the other two chips.
     private func libraryPool(skipping axis: LibraryAxis) -> [JSONValue] {
         var rows = libraryRows
+        // The chips count what the grid could draw: the put-aside models in
+        // the Archived view, the rest everywhere else. They counted the whole
+        // book, archived and all, so a chip could say 7 over a grid of 5.
+        if axis != .archived {
+            rows = rows.filter { Self.rowText($0, "archivedAt").isEmpty != libraryShowArchived }
+        }
         if case .library(let group) = shelf, let group {
             rows = rows.filter { Self.isUnder(Self.rowGroup($0), group) }
         }
@@ -1803,9 +1845,11 @@ extension Shop {
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.name < $1.name }
         let printNext = ids(.printNext).count { byId[$0]?.isPrintNext == true }
         let dupes = ids(.duplicates).count { duplicateOf[$0] != nil }
+        let archived = libraryPool(skipping: .archived).count { !Self.rowText($0, "archivedAt").isEmpty }
         let facets = LibraryFacets(categories: categories, tags: tags,
                                    unfiled: unfiled, neverPrinted: never, ready: ready,
-                                   creators: creators, printNext: printNext, duplicates: dupes)
+                                   creators: creators, printNext: printNext, duplicates: dupes,
+                                   archived: archived)
         if facets != libraryFacets { libraryFacets = facets }
     }
 
@@ -1873,6 +1917,7 @@ extension Shop {
         libraryCategory != nil || libraryTag != nil || libraryUnfiledOnly
             || libraryNeverPrintedOnly || libraryReadyOn != nil
             || libraryCreator != nil || libraryPrintNextOnly || libraryDuplicatesOnly
+            || libraryShowArchived
     }
 
     func clearLibraryFilter() {
@@ -1884,6 +1929,7 @@ extension Shop {
         libraryCreator = nil
         libraryPrintNextOnly = false
         libraryDuplicatesOnly = false
+        libraryShowArchived = false
     }
 
     /// ── DUPLICATES, in the library already there ─────────────────────────
@@ -1939,6 +1985,9 @@ extension Shop {
         // and still what a past job was printed from; it is simply not one of
         // the things the shop is choosing between today.
         if !libraryShowArchived { rows = rows.filter { !$0.isArchived } }
+        // The Archived view: ONLY what has been put aside, so a shop looking
+        // for something to restore is not looking through everything else.
+        if libraryShowArchived { rows = rows.filter(\.isArchived) }
         if case .library(let group) = shelf, let group {
             rows = rows.filter { Self.isUnder($0.groupName, group) }
         }

@@ -48,6 +48,15 @@ struct LibraryFilterBar: View {
                 shop.libraryDuplicatesOnly.toggle()
             })
         }
+        // THE ARCHIVED VIEW: what has been put aside, by hand or by a
+        // conversion, and the one place it can be restored from. Offered only
+        // when there is something in it, or while it is open.
+        if facets.archived > 0 || shop.libraryShowArchived {
+            out.append(FilterChipModel(id: "archived", label: shop.words.callIt("mac.lib_archived"),
+                                       count: facets.archived, on: shop.libraryShowArchived) {
+                shop.libraryShowArchived.toggle()
+            })
+        }
         // A chip that is ON stays on the row even at zero. Its count can fall to
         // nothing when another chip narrows past it, and a filter that vanishes
         // while still narrowing the screen leaves a shop looking at an empty
@@ -161,7 +170,7 @@ struct LibraryFilterBar: View {
                 .help(shop.words.callIt("mac.lib_view_help"))
             }
 
-            menu("mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed"])
+            menu("mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed", "archived"])
             menu("mac.lib_printer", prefix: "ready:")
             menu("mac.lib_creator", prefix: "creator:")
             menu("mac.category", prefix: "category:")

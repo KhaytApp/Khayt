@@ -163,6 +163,14 @@ struct ModelActions: View {
         Button(shop.words.callIt(allOn ? "mac.print_next_remove" : "mac.print_next_add")) {
             shop.setPrintNext(marked, on: !allOn)
         }
+        // Put aside, or brought back — the selection when this model is one
+        // of it, as Print next above. Never a delete: `Shop.archive`.
+        let restoring = file.isArchived
+        let aside = shop.archiveTargets(for: file, archiving: !restoring)
+        Button(Self.archiveTitle(restoring: restoring, count: aside.count, words: shop.words)) {
+            if restoring { shop.unarchive(aside) } else { shop.archive(aside) }
+        }
+        .disabled(!shop.canWrite || aside.isEmpty)
         // Into a group: the same choices as the toolbar's Group menu, here
         // because right-clicking the models is where a shop looks for it. A
         // model right-clicked outside the selection becomes the selection
@@ -263,6 +271,15 @@ struct ModelActions: View {
 }
 
 extension ModelActions {
+    /// "Archive", "Archive 3 Models", "Restore", "Restore 3 Models".
+    static func archiveTitle(restoring: Bool, count: Int, words: Words) -> String {
+        if count > 1 {
+            return words.callIt(restoring ? "mac.unarchive_n_models" : "mac.archive_n_models",
+                                ["n": .number(Double(count))])
+        }
+        return words.callIt(restoring ? "mac.unarchive_model" : "mac.archive_model")
+    }
+
     /// Right-clicking a model outside the selection acts on that model alone.
     @MainActor fileprivate func adoptSelection() {
         if !shop.fileSelection.contains(file.id) { shop.select(file, modifiers: .replace) }

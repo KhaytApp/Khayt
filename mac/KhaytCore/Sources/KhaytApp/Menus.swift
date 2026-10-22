@@ -672,6 +672,14 @@ private struct ModelMenu: View {
         Button(Words.upfront("mac.favourite")) { shop.toggleFavouriteOnSelection() }
             .keyboardShortcut("d", modifiers: [.command, .shift])
             .disabled(!canEdit)
+        // Two items rather than one that toggles: a frozen title cannot say
+        // which it would do (see above), and Archive and Restore are not the
+        // same act. Each is enabled only when the selection holds a model it
+        // would change.
+        Button(Words.upfront("mac.archive_model")) { shop.archive(shop.selectedArchiveIds(false)) }
+            .disabled(!canEdit || shop.selectedArchiveIds(false).isEmpty)
+        Button(Words.upfront("mac.unarchive_model")) { shop.unarchive(shop.selectedArchiveIds(true)) }
+            .disabled(!canEdit || shop.selectedArchiveIds(true).isEmpty)
         Divider()
         // ⌘Y, and Space in the grid — the two gestures Finder uses, because a
         // library of print files is a Finder window in everything but name.

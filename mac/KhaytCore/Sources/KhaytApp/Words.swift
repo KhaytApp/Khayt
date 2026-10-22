@@ -2681,6 +2681,17 @@ final class Words {
         "mac.print_next_add": ["en": "Add to Print next", "ar": "أضف إلى قائمة الطباعة"],
         "mac.print_next_remove": ["en": "Remove from Print next", "ar": "أزل من قائمة الطباعة"],
         "mac.duplicates": ["en": "Duplicates", "ar": "المكرّرة"],
+        // Putting a model aside by hand, and the Archived view it comes back
+        // from (`Shop.archive`). Never a delete: the file and the record stay.
+        "mac.archive_model": ["en": "Archive", "ar": "أرشفة"],
+        "mac.archive_n_models": ["en": "Archive {n} Models", "ar": "أرشفة {n} نماذج"],
+        "mac.unarchive_model": ["en": "Restore from Archive", "ar": "استعادة من الأرشيف"],
+        "mac.unarchive_n_models": ["en": "Restore {n} Models from Archive", "ar": "استعادة {n} نماذج من الأرشيف"],
+        "mac.lib_archived": ["en": "Archived", "ar": "المؤرشفة"],
+        "mac.archived_on": ["en": "Archived {date}", "ar": "أُرشف في {date}"],
+        "mac.archived_undated": ["en": "Archived", "ar": "مؤرشف"],
+        "mac.archive_help": ["en": "Take this model out of the library. Its file and its history stay, and Show ▸ Archived brings it back.",
+                             "ar": "أخرج هذا النموذج من المكتبة. يبقى ملفه وسجله، ويعيده «عرض ▸ المؤرشفة»."],
         "mac.by_creator": ["en": "by {name}", "ar": "من تصميم {name}"],
         "mac.creator_show_all": ["en": "Show everything by this creator", "ar": "اعرض كل أعمال هذا المصمم"],
         "mac.duplicate_of": ["en": "The same model as {n} other in the library:", "ar": "المجسّم نفسه موجود {n} مرة أخرى في المكتبة:"],
