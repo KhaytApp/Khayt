@@ -602,7 +602,7 @@ struct WindowSheets: ViewModifier {
         var lines = Shop.deletePlanLines(plan, words: shop.words)
         // ASKED FIRST: a model the shop said to keep on this Mac is named
         // before Remove from This Mac takes its copy (and its keep) away.
-        if let kept = shop.deleteKeptLine(plan) { lines.append(kept) }
+        if let kept = shop.keptModelsNotice(plan) { lines.append(kept) }
         return lines
     }
 

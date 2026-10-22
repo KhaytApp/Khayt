@@ -260,9 +260,9 @@ struct LibrarySyncIndexTests {
         #expect(shop.notKept(files).map(\.fullPath) == ["/x/PF-5/m.3mf"])
         var plan = LibraryDeletePlan()
         plan.keptOnline = ["PF-5"]
-        #expect(shop.deleteKeptLine(plan) == nil)
+        #expect(shop.keptModelsNotice(plan) == nil)
         plan.keptOnline = ["PF-5", "PF-6"]
-        #expect(shop.deleteKeptLine(plan) == shop.words.callIt("mac.delete_kept_single"))
+        #expect(shop.keptModelsNotice(plan) == shop.words.callIt("mac.delete_kept_single"))
     }
 
     @Test("one model's files: the record's own folder in the primary root, never a symlink or elsewhere")
@@ -347,7 +347,7 @@ struct LibrarySyncIndexTests {
         #expect(sync.contains("CloudLibrary.files(in: folder, root: primary"))
         let delete = try src("LibraryDelete.swift")
         #expect(delete.contains("syncIndex?.setKeep(Set(keptAmong(plan.keptOnline)), false)"))
-        #expect(try src("ShopWindow.swift").contains("shop.deleteKeptLine(plan)"))
+        #expect(try src("ShopWindow.swift").contains("shop.keptModelsNotice(plan)"))
         let shop = try src("Shop.swift")
         #expect(shop.contains("didSet { refreshLibraryRemote() }"))
         let settingsAt = try #require(shop.range(of: "settingsValue = root[\"settings\"] ?? .object([:]) }"))

@@ -137,7 +137,7 @@ extension Shop {
 
     /// The delete question's line for models set to Keep on This Mac, which
     /// Remove from This Mac would take off this Mac anyway.
-    func deleteKeptLine(_ plan: LibraryDeletePlan) -> String? {
+    func keptModelsNotice(_ plan: LibraryDeletePlan) -> String? {
         let kept = keptAmong(plan.keptOnline)
         guard !kept.isEmpty else { return nil }
         return kept.count == 1

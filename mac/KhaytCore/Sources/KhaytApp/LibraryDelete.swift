@@ -452,7 +452,7 @@ extension Shop {
         var failures: [String] = []
         var removed = 0
         // The person was told which of these are set to Keep on This Mac
-        // (`deleteKeptLine`) and went ahead: they are not kept any more.
+        // (`keptModelsNotice`) and went ahead: they are not kept any more.
         syncIndex?.setKeep(Set(keptAmong(plan.keptOnline)), false)
         var sync: FileStates = [:]
         defer { recordSync(sync) }
