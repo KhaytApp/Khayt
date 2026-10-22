@@ -163,21 +163,59 @@
   }
 
   /**
-   * The day this job last changed in a way that moves its tax: the cancel or
-   * void (lib/vat-periods.js `reversalDayOf`), else its latest credit note,
-   * else the sync stamp `updatedAt`. '' when nothing says. ONE day per job,
-   * whichever filed period is asked about, so the adjustments for one job
-   * always land together (and marking a period filed cannot split them).
+   * The day this job last changed: the LATEST of every stamp it carries —
+   * `cancelledAt`, its last `statusHistory` cancel, `voidedAt`, `creditedAt`,
+   * each credit note's `issuedAt`, the sync stamp `updatedAt` — each as its
+   * local day, so a change is never dated before it happened (a phone cancel
+   * with only `updatedAt` lands when it was made). '' when nothing says.
+   * ONE day per job, whichever filed period is asked about, so the
+   * adjustments for one job always land together.
    */
-  function changeDayOf(o, V) {
-    if (!o) return '';
-    if (V.isReversed(o)) return V.reversalDayOf(o);
-    let latest = '';
-    for (const n of Array.isArray(o.creditNotes) ? o.creditNotes : []) {
-      const d = V.localDay(n && n.issuedAt);
-      if (d > latest) latest = d;
+  function stampsOf(o) {
+    if (!o) return [];
+    const out = [o.cancelledAt, o.voidedAt, o.creditedAt, o.updatedAt];
+    if (o.status === 'cancelled' && Array.isArray(o.statusHistory)) {
+      for (let i = o.statusHistory.length - 1; i >= 0; i--) {
+        const h = o.statusHistory[i];
+        if (h && h.status === 'cancelled') { out.push(h.at); break; }
+      }
     }
-    return latest || V.localDay(o.updatedAt);
+    for (const n of Array.isArray(o.creditNotes) ? o.creditNotes : []) out.push(n && n.issuedAt);
+    return out.filter((x) => typeof x === 'string' && x);
+  }
+
+  function changeDayOf(o, V) {
+    let latest = '';
+    for (const st of stampsOf(o)) { const d = V.localDay(st); if (d > latest) latest = d; }
+    return latest;
+  }
+
+  /**
+   * Has this job's RECORD changed since `filedAt`? Only then can it adjust a
+   * filed return. A job nobody touched keeps its filed value even when the
+   * shop's exchange rates, tax mode or rate have moved since — re-valuing
+   * the book is not a change to the invoice. Instants are compared as
+   * instants; a bare day (`cancelledAt`) counts from the filing's own day.
+   * A mark with no readable `filedAt` treats every job as changed.
+   */
+  /** What the job charges in its OWN currency, its credit notes off: the
+   *  record's own figure, which no exchange rate or tax setting moves. */
+  function ownFigureOf(o) {
+    const credits = (Array.isArray(o && o.creditNotes) ? o.creditNotes : [])
+      .reduce((t, n) => t + (+(n && n.amount) || 0), 0);
+    return round2((+(o && o.price) || 0) - credits);
+  }
+
+  function touchedSince(o, filedAt, V) {
+    const filed = Date.parse(filedAt || '');
+    if (!Number.isFinite(filed)) return true;
+    const filedDay = V.localDay(filedAt);
+    for (const st of stampsOf(o)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(st)) { if (st >= filedDay) return true; continue; }
+      const t = Date.parse(st);
+      if (Number.isFinite(t) && t > filed) return true;
+    }
+    return false;
   }
 
   function reasonFor(o, cur, filed) {
@@ -211,6 +249,35 @@
       if (!vat && !sales) return;
       out.push({ orderId, day, vat, sales, kind, reason, period });
     };
+    // A deleted job carries no stamp; its reversal is dated today.
+    const now = (ctx && ctx.now instanceof Date) ? ctx.now : new Date();
+    const today = V.localDay(now.toISOString());
+    // Oldest first, by the days a mark covers (keys do not sort by date:
+    // '2026-10' < '2026-Q3').
+    snapped.sort((a, b) => a.from.localeCompare(b.from));
+    // Each job's HOME: the first filed period it is in. Whether it has been
+    // touched is asked against that filing — see `touchedSince`.
+    const untouched = new Set();
+    const seen = new Set();
+    for (const m of snapped) {
+      const here = new Set(Object.keys(m.orders));
+      for (const [id, e] of current) if (e.mark === m) here.add(id);
+      for (const id of here) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const o = byId.get(id);
+        if (!o) continue;
+        const snap = m.orders[id];
+        // Not in the return it belongs to: added (or backdated) since — a
+        // change whatever its stamps say.
+        if (!snap) continue;
+        // Changed for certain: undone since it was filed live, or its own
+        // figure (price less credits, its currency) is not what was filed.
+        if (snap && V.isReversed(o) && (+snap[0] || +snap[1])) continue;
+        if (snap && snap.length > 2 && round2(+snap[2]) !== ownFigureOf(o)) continue;
+        if (!touchedSince(o, m.filedAt, V)) untouched.add(id);
+      }
+    }
     for (const m of snapped) {
       const ids = new Set(Object.keys(m.orders));
       for (const [id, e] of current) if (e.mark === m) ids.add(id);
@@ -229,8 +296,11 @@
         const own = o ? taxPointDate(o) : '';
         const inside = cur.day || (own >= m.from && own <= m.to ? own : m.from);
         push(id, inside, fv - cur.vat, fs - cur.sales, 'filed', reason, m.period);
+        // Untouched since filing: the period keeps its filed value and the
+        // difference — a re-valuation, not a change — is not carried forward.
+        if (untouched.has(id)) continue;
         const after = V.dayAfter(m.to);
-        const changed = changeDayOf(o, V);
+        const changed = o ? changeDayOf(o, V) : today;
         push(id, V.landingDay(changed > after ? changed : after, env.settings, marks),
           cur.vat - fv, cur.sales - fs, 'adjustment', reason, m.period);
       }
@@ -282,13 +352,18 @@
       if (e && !V.coveringMark(env.settings, e.day, marks)) add(String(o.id), e.day, e.vat, e.sales);
     }
     for (const c of vatCorrections(orders, ctx)) add(c.orderId, c.day, c.vat, c.sales);
+    const byIdSnap = new Map();
+    for (const o of orders || []) if (o && o.id != null) byIdSnap.set(String(o.id), o);
     const out = {};
     let vat = 0, sales = 0;
     for (const id of Array.from(per.keys()).sort()) {
       const [v, s] = per.get(id);
       const rv = round2(v), rs = round2(s);
       if (!rv && !rs) continue;
-      out[id] = [rv, rs];
+      // The job's own figure beside it, so a later edit is told apart from
+      // a re-valuation (`ownFigureOf`). A job gone from the book has none.
+      const o = byIdSnap.get(id);
+      out[id] = o ? [rv, rs, ownFigureOf(o)] : [rv, rs];
       vat += rv; sales += rs;
     }
     return { totals: { vat: round2(vat), sales: round2(sales) }, orders: out };

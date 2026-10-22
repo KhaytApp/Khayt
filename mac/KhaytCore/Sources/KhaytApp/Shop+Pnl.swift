@@ -181,6 +181,12 @@ extension Shop {
     /// read from the book on disk, inside the write — so marking never changes
     /// any figure, and the filed period reads what was filed from then on.
     /// Only the shop's explicit mark counts; a deadline passing marks nothing.
+    ///
+    /// WHERE IT LIVES: in the book's settings, on this Mac. Settings do not
+    /// travel through Khayt Cloud sync; the desktop app on this Mac reads the
+    /// same book and sees the marks. Un-filing archives the snapshot
+    /// (`vatUnfiledPeriods`) and filing again restores it; the card asks
+    /// before un-filing all the same.
     func setVatPeriodFiled(_ period: String, filed: Bool) async {
         vatFiledProblem = nil
         guard lockAllows("settings", "edit") else {
@@ -189,6 +195,15 @@ extension Shop {
         }
         guard let build = source.build else { vatFiledProblem = words.callIt("mac.settings_sample"); return }
         guard let engine else { vatFiledProblem = words.callIt("mac.move_no_engine"); return }
+        // A period inside (or around) one already marked is not marked on its
+        // own — said, rather than a switch that silently springs back.
+        if filed, let other = try? await engine.vatFiledOverlap(settings: settingsDict, period: period),
+           !other.isEmpty {
+            vatFiledProblem = words.callIt("mac.vat_filed_overlap", [
+                "period": .string(MonthLabel.period(period, words: words)),
+                "other": .string(MonthLabel.period(other, words: words))])
+            return
+        }
         // The P&L's own currency table, so the snapshot is the screen's figures.
         let currencies = Invoice.currencyTable(self)
         do {

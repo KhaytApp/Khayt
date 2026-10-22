@@ -44,7 +44,7 @@ struct VatFiledPeriodTests {
               case .array(let marks)? = settings["vatFiledPeriods"],
               case .object(let mark)? = marks.first else { Issue.record("no mark written"); return }
         #expect(mark["period"] == .string("2026-Q3"))
-        #expect(mark["orders"] == .object(["INV-1": .array([.number(15), .number(100)])]),
+        #expect(mark["orders"] == .object(["INV-1": .array([.number(15), .number(100), .number(115)])]),
                 "the snapshot: what the return held, job by job")
         #expect(mark["totals"] == .object(["vat": .number(15), "sales": .number(100)]))
 
@@ -90,6 +90,32 @@ struct VatFiledPeriodTests {
         let q4 = try await Self.statement(root, engine: engine, from: "2026-10-01", to: "2026-12-31")
         #expect(abs((q4.vat.adjustment ?? 0) - 30) < 0.001, "15 more on the edit, 15 on the backdated invoice")
         #expect(q4.vat.adjustments == 2)
+    }
+
+    @Test("switching a filed period off and on again restores what was filed")
+    func offAndOn() async throws {
+        let engine = try KhaytEngine()
+        var root: [String: JSONValue] = ["settings": .object(Self.vat15), "printLog": .array([Self.job()])]
+        try await Shop.applyVatFiled(to: &root, period: "2026-Q3", filed: true,
+                                     engine: engine, now: try Self.day(2026, 10, 3))
+        root["printLog"] = .array([.object(["id": .string("INV-1"), "invoiceNumber": .string("INV-1"),
+                                            "status": .string("cancelled"), "cancelledAt": .string("2026-10-05"),
+                                            "date": .string("2026-08-10"), "price": .number(115)])])
+        let before = try await Self.statement(root, engine: engine, from: "2026-07-01", to: "2026-12-31")
+        try await Shop.applyVatFiled(to: &root, period: "2026-Q3", filed: false,
+                                     engine: engine, now: try Self.day(2026, 11, 1))
+        try await Shop.applyVatFiled(to: &root, period: "2026-Q3", filed: true,
+                                     engine: engine, now: try Self.day(2026, 11, 1))
+        let after = try await Self.statement(root, engine: engine, from: "2026-07-01", to: "2026-12-31")
+        #expect(after.rows == before.rows)
+        #expect(abs((after.vat.adjustment ?? 0) + 15) < 0.001, "the reversal survives off/on")
+        guard case .object(let settings)? = root["settings"] else { return }
+        #expect(try await engine.vatFiledOverlap(settings: settings, period: "2026-08") == "2026-Q3")
+        var monthly = settings
+        monthly["vatFilingFrequency"] = .string("monthly")
+        let months = try await engine.vatFilingPeriods(settings: monthly, from: "2026-08-01", to: "2026-08-31",
+                                                       today: "2026-10-22")
+        #expect(months.first?.partOf == "2026-Q3")
     }
 
     @Test("the card offers the ended return periods in the span, with the mark")

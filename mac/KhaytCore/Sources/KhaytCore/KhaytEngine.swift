@@ -8107,6 +8107,10 @@ public actor KhaytEngine {
         public let from: String
         public let to: String
         public let filed: Bool
+        /// The marked period this one is filed AS PART OF (a month inside a
+        /// filed quarter) — it cannot be switched on its own. Empty or nil
+        /// otherwise; nil from an older bundle.
+        public let partOf: String?
         public var id: String { period }
     }
 
@@ -8121,12 +8125,20 @@ public actor KhaytEngine {
             as: [VatFilingPeriod].self)
     }
 
+    /// The marked period `period` overlaps, or "" — `lib/vat-periods.js`
+    /// `overlapOf`. Such a period cannot be marked, and the screen says why.
+    public func vatFiledOverlap(settings: [String: JSONValue], period: String) throws -> String {
+        try runtime.call2("KhaytVatPeriods.overlapOf(ARG0, ARG1)", [.object(settings), .string(period)],
+                          as: String.self)
+    }
+
     /// The settings with `period` marked FILED — with the SNAPSHOT of what the
     /// period holds, job by job, taken from `orders` (the book's jobs as they
     /// are on disk) with the same `clients` and `currencies` the P&L is asked
     /// with, so the snapshot is exactly the figures on screen
-    /// (`lib/vat-periods.js` `markFiled`) — or, `filed: false`, with the mark
-    /// taken off.
+    /// (`lib/vat-periods.js` `markFiled`; a period un-filed before gets its
+    /// archived snapshot back) — or, `filed: false`, with the mark taken off
+    /// and its snapshot archived in `vatUnfiledPeriods`.
     public func vatMarkFiled(_ settings: [String: JSONValue], period: String, filed: Bool,
                              orders: [JSONValue], clients: [JSONValue] = [],
                              currencies: [String: JSONValue] = [:], now: Date) throws -> [String: JSONValue] {

@@ -1739,6 +1739,14 @@ final class Words {
         "mac.pnl_col_operating": ["en": "Operating costs", "ar": "تكاليف التشغيل"],
         // The net income card adds up every period in the book.
         "mac.pnl_all_time": ["en": "all time", "ar": "منذ البداية"],
+        // A filed VAT return (PnlControls.swift VatSummaryCard).
+        "mac.vat_unfile_title": ["en": "Mark {period} as not filed?", "ar": "هل تعلّم {period} غير مُقدَّم؟"],
+        "mac.vat_unfile_message": ["en": "This forgets what you filed for {period}. Only do this if the return was not actually filed.",
+                                   "ar": "هذا ينسى ما قدّمته عن {period}. لا تفعل ذلك إلا إذا لم يُقدَّم الإقرار فعلًا."],
+        "mac.vat_unfile_confirm": ["en": "Mark as not filed", "ar": "علّمه غير مُقدَّم"],
+        "mac.vat_filed_part_of": ["en": "Filed as part of {period}", "ar": "مُقدَّم ضمن {period}"],
+        "mac.vat_filed_overlap": ["en": "{period} overlaps {other}, which is already marked filed.",
+                                  "ar": "تتداخل {period} مع {other} المُعلَّمة مُقدَّمة."],
         // A failure allowance learned from the shop's own history —
         // lib/failure-rate.js. Offered beside the field, never applied alone.
         "mac.fail_suggest": [

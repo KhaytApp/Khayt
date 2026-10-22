@@ -98,6 +98,8 @@ struct VatSummaryCard: View {
 
     /// The return periods in the chosen span that can be marked filed.
     @State private var returns: [KhaytEngine.VatFilingPeriod] = []
+    /// The period the shop asked to un-file, awaiting its confirmation.
+    @State private var unfiling: KhaytEngine.VatFilingPeriod?
 
     /// What the list of returns is asked again for: the span, the settings
     /// (a mark just written, a frequency just changed).
@@ -164,19 +166,31 @@ struct VatSummaryCard: View {
                 // One toggle per return period that has ended. ONLY THIS MARK
                 // makes a period filed: a deadline passing marks nothing.
                 ForEach(returns) { r in
+                    let partOf = r.partOf ?? ""
                     Toggle(isOn: Binding(
                         get: { r.filed },
-                        set: { on in Task { await shop.setVatPeriodFiled(r.period, filed: on) } })) {
+                        set: { on in
+                            // Un-filing forgets what was filed in the screen's
+                            // eyes: asked first, never on one click.
+                            if on { Task { await shop.setVatPeriodFiled(r.period, filed: true) } }
+                            else { unfiling = r }
+                        })) {
                         HStack {
                             Text(MonthLabel.period(r.period, words: words))
                             Spacer(minLength: 8)
-                            if r.filed {
+                            if !partOf.isEmpty {
+                                Text(words.callIt("mac.vat_filed_part_of",
+                                                  ["period": .string(MonthLabel.period(partOf, words: words))]))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            } else if r.filed {
                                 Text(words.callIt("pnl.vat_filed"))
                                     .font(.caption).foregroundStyle(Khayt.done)
                             }
                         }
                     }
                     .toggleStyle(.switch)
+                    // Filed as part of another return: switched there, not here.
+                    .disabled(!partOf.isEmpty)
                     .accessibilityLabel(MonthLabel.period(r.period, words: words) + " · " + words.callIt("pnl.vat_filed"))
                 }
                 if let problem = shop.vatFiledProblem {
@@ -192,6 +206,21 @@ struct VatSummaryCard: View {
         }
         .task(id: ReturnsKey(range: shop.pnlRange, settings: shop.settingsValue)) {
             returns = await shop.vatFilingPeriods()
+        }
+        .confirmationDialog(
+            words.callIt("mac.vat_unfile_title",
+                         ["period": .string(MonthLabel.period(unfiling?.period ?? "", words: words))]),
+            isPresented: Binding(get: { unfiling != nil }, set: { if !$0 { unfiling = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(words.callIt("mac.vat_unfile_confirm"), role: .destructive) {
+                if let r = unfiling { Task { await shop.setVatPeriodFiled(r.period, filed: false) } }
+                unfiling = nil
+            }
+            Button(words.callIt("common.cancel"), role: .cancel) { unfiling = nil }
+        } message: {
+            Text(words.callIt("mac.vat_unfile_message",
+                              ["period": .string(MonthLabel.period(unfiling?.period ?? "", words: words))]))
         }
     }
 }

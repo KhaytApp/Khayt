@@ -50,7 +50,7 @@ test('the snapshot is what the period held, job by job, to the halala', () => {
     invoice({ id: 'INV-3', date: '2026-10-02' })], instant(2026, 10, 3));
   assert.deepEqual(settings.vatFiledPeriods, [{
     period: '2026-Q3', filedAt: instant(2026, 10, 3),
-    totals: { vat: 45, sales: 300 }, orders: { 'INV-1': [15, 100], 'INV-2': [30, 200] },
+    totals: { vat: 45, sales: 300 }, orders: { 'INV-1': [15, 100, 115], 'INV-2': [30, 200, 230] },
   }]);
 });
 
@@ -117,13 +117,19 @@ test('a NEW invoice backdated into a filed period is added in the first open one
   assert.equal(row(rows, '2026-Q4').vatAdjustment, 15);
   const adj = vatCorrections([invoice(), late], { settings }).find((x) => x.kind === 'adjustment');
   assert.deepEqual([adj.orderId, adj.reason, adj.day], ['INV-7', 'added', '2026-10-15']);
+  // With no stamp at all it is still added — on the day after the period.
+  const bare = { ...late };
+  delete bare.updatedAt;
+  const a2 = vatCorrections([invoice(), bare], { settings }).find((x) => x.kind === 'adjustment');
+  assert.deepEqual([a2.reason, a2.day, a2.vat], ['added', '2026-10-01', 15]);
 });
 
 test('a job removed from the book after filing is reversed forward', () => {
   const settings = V.markFiled(VAT15, '2026-Q3', [invoice()], instant(2026, 10, 3));
-  const cors = vatCorrections([], { settings });
+  // A deleted job carries no stamp: its reversal is dated today.
+  const cors = vatCorrections([], { settings, now: new Date(2026, 11, 3, 12) });
   assert.deepEqual(cors.map((c) => [c.kind, c.reason, c.day, c.vat]),
-    [['filed', 'removed', '2026-07-01', 15], ['adjustment', 'removed', '2026-10-01', -15]]);
+    [['filed', 'removed', '2026-07-01', 15], ['adjustment', 'removed', '2026-12-03', -15]]);
 });
 
 test('an UNDATED cancel (an old iPhone) after filing lands on the first day after the filed period', () => {
@@ -144,7 +150,7 @@ test('the change falls in a filed period too: it lands in the next unfiled one, 
   assert.equal(row(open, '2026-Q4').vatAdjustment, -15);
   // Q4 filed WITH that reversal in it: Q4 keeps it, nothing moves on.
   const s2 = V.markFiled(settings, '2026-Q4', [cancelled], instant(2027, 1, 20));
-  assert.deepEqual(s2.vatFiledPeriods[1].orders, { 'INV-1': [-15, -100] });
+  assert.deepEqual(s2.vatFiledPeriods[1].orders, { 'INV-1': [-15, -100, 115] });
   const filed = rowsOf([cancelled], s2);
   assert.equal(row(filed, '2026-Q3').vatCollected, 15);
   assert.equal(row(filed, '2026-Q4').vatCollected, -15);
@@ -303,6 +309,60 @@ test('the exported statement has the adjustment as its own line', () => {
   assert.match(html, /Adjustment for a filed period<\/th><td>−15\.00/);
   const plain = summarize(rowsOf([invoice()], VAT15), { settings: VAT15, expenses: [] });
   assert.doesNotMatch(periodsToCsv(rowsOf([invoice()], VAT15), plain, {}), /Adjustment/);
+});
+
+test('un-filing keeps the snapshot, and filing again restores it: off/on changes nothing', () => {
+  const live = invoice();
+  const s1 = V.markFiled(VAT15, '2026-Q3', [live], instant(2026, 10, 3));
+  const cancelled = { ...live, status: 'cancelled', cancelledAt: '2026-10-05' };
+  const before = rowsOf([cancelled], s1);
+  const off = V.unmarkFiled(s1, '2026-Q3');
+  assert.deepEqual(off.vatFiledPeriods, []);
+  assert.deepEqual(off.vatUnfiledPeriods, s1.vatFiledPeriods, 'archived, same shape');
+  assert.deepEqual(rowsOf([cancelled], off), [], 'unfiled: the period follows the book');
+  const on = V.markFiled(off, '2026-Q3', [cancelled], instant(2027, 1, 2));
+  assert.deepEqual(on.vatFiledPeriods, s1.vatFiledPeriods, 'the old snapshot, not today\'s book');
+  assert.deepEqual(on.vatUnfiledPeriods, []);
+  assert.deepEqual(rowsOf([cancelled], on), before);
+});
+
+test('settings moving after filing adjust nothing: an exchange rate, the tax mode', () => {
+  const usd = { ...VAT15, exchangeRates: { USD: 3.75 } };
+  const job = invoice({ currency: 'USD', price: 100, updatedAt: instant(2026, 8, 10) });
+  const filed = V.markFiled(usd, '2026-Q3', [job], instant(2026, 10, 3));
+  const fx = { ...filed, exchangeRates: { USD: 3.8 } };
+  const q3 = rowsOf([job], fx);
+  assert.equal(row(q3, '2026-Q3').vatCollected, filed.vatFiledPeriods[0].totals.vat, 'the filed figure');
+  assert.deepEqual(vatCorrections([job], { settings: fx }).filter((c) => c.kind === 'adjustment'), []);
+  const plain = invoice({ updatedAt: instant(2026, 8, 10) });
+  const s2 = V.markFiled(VAT15, '2026-Q3', [plain], instant(2026, 10, 3));
+  const exclusive = { ...s2, tax: { country: 'SA', name: 'VAT', mode: 'exclusive', rates: [{ id: 'vat', label: 'VAT', percent: 15 }] } };
+  assert.deepEqual(vatCorrections([plain], { settings: exclusive }).filter((c) => c.kind === 'adjustment'), []);
+  assert.equal(row(rowsOf([plain], exclusive), '2026-Q3').vatCollected, 15);
+  // An edited job still adjusts, at today's settings.
+  const edited = { ...plain, price: 230, updatedAt: instant(2026, 11, 2) };
+  assert.equal(vatCorrections([edited], { settings: exclusive }).filter((c) => c.kind === 'adjustment').length, 1);
+});
+
+test('the change day is the LATEST stamp: a phone cancel with only updatedAt lands when it was made', () => {
+  const monthly = { ...VAT15, vatFilingFrequency: 'monthly' };
+  const job = invoice({ date: '2026-09-10' });
+  const settings = V.markFiled(monthly, '2026-09', [job], instant(2026, 10, 3));
+  const phone = { ...job, status: 'cancelled', updatedAt: instant(2026, 12, 15) };
+  const adj = vatCorrections([phone], { settings }).find((c) => c.kind === 'adjustment');
+  assert.equal(adj.day, '2026-12-15', 'December, not October');
+  // A stale cancelledAt never pulls it earlier than the latest stamp.
+  const both = { ...phone, cancelledAt: '2026-10-20' };
+  assert.equal(vatCorrections([both], { settings }).find((c) => c.kind === 'adjustment').day, '2026-12-15');
+});
+
+test('an overlapping period cannot be marked, and says what it is part of', () => {
+  const s = V.markFiled(VAT15, '2026-Q3', [], instant(2026, 10, 3));
+  assert.equal(V.overlapOf(s, '2026-08'), '2026-Q3');
+  assert.equal(V.overlapOf(s, '2026-Q3'), '');
+  const months = V.filingPeriods({ ...s, vatFilingFrequency: 'monthly' }, { today: '2026-10-22', from: '2026-08-01', to: '2026-10-31' });
+  assert.deepEqual(months.map((p) => [p.period, p.filed, p.partOf]), [['2026-09', true, '2026-Q3'], ['2026-08', true, '2026-Q3']]);
+  assert.equal(V.filingPeriods(s, { today: '2026-10-22', count: 1 })[0].partOf, '');
 });
 
 test('size: 300 invoices a quarter for three years is about a hundred kilobytes', () => {

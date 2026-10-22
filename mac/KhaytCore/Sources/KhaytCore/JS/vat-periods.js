@@ -32,12 +32,14 @@
  *     { period: '2026-Q3' | '2026-09',       // the return's period key
  *       filedAt: '2026-10-20T09:12:00.000Z', // when it was marked (ISO)
  *       totals: { vat: 1234.5, sales: 8230 },// what the return held
- *       orders: { 'INV-2026-0012': [13.04, 86.96], … } } // the SNAPSHOT
+ *       orders: { 'INV-2026-0012': [13.04, 86.96, 100], … } } // the SNAPSHOT
  *
- * `orders` maps each job with tax in the period to `[vat, sales]`, rounded to
- * the halala, as the book showed it when the period was marked — a job with
- * none is left out (absent is zero). About 30 bytes a job: a shop with 300
- * invoices a quarter carries ~9 KB per quarter, ~110 KB over three years.
+ * `orders` maps each job with tax in the period to `[vat, sales, own]`,
+ * rounded to the halala, as the book showed it when the period was marked —
+ * `own` is the job's own figure (price less credit notes, in its currency),
+ * so an edit is told apart from a re-valuation. A job with none is left out
+ * (absent is zero). About 36 bytes a job: a shop with 300 invoices a quarter
+ * carries ~11 KB per quarter, ~130 KB over three years.
  *
  * ONLY AN EXPLICIT MARK COUNTS: a period whose deadline has passed is not
  * filed until the shop says so. Marking a period filed never changes its own
@@ -48,6 +50,20 @@
  * corrects nothing itself: its period reads as the book says. That is the
  * conservative reading — with nothing recorded, nothing is moved.
  *
+ * UN-FILING KEEPS THE SNAPSHOT: `unmarkFiled` moves the record to
+ * `settings.vatUnfiledPeriods`, and marking the same period again restores it
+ * instead of taking a new one — an accidental off/on changes nothing.
+ *
+ * ONLY A CHANGE TO THE JOB IS A CHANGE. A job whose record has not changed
+ * since `filedAt` keeps its filed value: a new exchange rate, tax mode or
+ * rate re-values the book but does not adjust a filed return. A job adjusts
+ * when its `updatedAt`, a cancel/void/credit stamp or a credit note is after
+ * filing, when it is not in the snapshot (added), or when it is gone.
+ *
+ * WHERE THE MARKS LIVE: in the book's settings, on the machine that keeps the
+ * book. Settings do not travel through Khayt Cloud sync, so a second Mac does
+ * not see them; the desktop app on the same Mac reads the same book and does.
+ *
  * A period key is either shape whatever the frequency is today, so a shop
  * that moves from quarterly to monthly keeps its old quarters filed. A period
  * that overlaps one already marked cannot be marked as well.
@@ -57,11 +73,17 @@
  * `cancelledAt`: the LOCAL calendar day, `YYYY-MM-DD`, stamped by
  * lib/order-status.js when a job is cancelled (as `quoteAcceptedAt` is), and
  * removed when it is un-cancelled. Every writer — Mac, desktop, iPhone — must
- * write that one field in that one format. A job's change day is its cancel
- * or void (`cancelledAt`, else the last `statusHistory` entry to `cancelled`,
- * then `voidedAt`, `creditedAt` — the earliest), else its latest credit
- * note's `issuedAt`, else its sync stamp `updatedAt`, each read as its local
- * day. With none, the change lands on the first day after the filed period.
+ * write that one field in that one format. A job's change day is read from
+ * `cancelledAt`, the last `statusHistory` entry to `cancelled`, `voidedAt`,
+ * `creditedAt`, each credit note's `issuedAt` and the sync stamp `updatedAt`,
+ * each as its local
+ * day — the LATEST of all of them that exist, so it is never earlier than
+ * the change itself. With none, the change lands on the first day after the
+ * filed period. A job DELETED from the book carries no stamp at all (the
+ * book keeps no deletion day the rule is handed), so its reversal is dated
+ * TODAY (`ctx.now`) — and, while that period is open, moves with the calendar
+ * until the period is filed. Known limit, documented: in a monthly view a
+ * deleted job's 'filed' entry sits on its period's first day.
  *
  * Pure: no DOM, no clock (the caller passes `now`), book days compared as
  * `YYYY-MM-DD` strings with calendar arithmetic on the numbers, so no time
@@ -261,28 +283,64 @@
   function markFiled(settings, key, orders, now, ctx) {
     const s = settings || {};
     const bounds = periodBounds(key);
-    if (!bounds) return { ...s };
-    const others = filedMarks(s).filter((m) => m.period !== key);
-    if (others.some((m) => m.from <= bounds.to && m.to >= bounds.from)) return { ...s };
-    const P = pnl();
-    const without = unmarkFiled(s, key);
-    const c = ctx || {};
-    const snap = P && typeof P.filedSnapshot === 'function'
-      ? P.filedSnapshot(orders, key, { settings: without, clients: c.clients, currencies: c.currencies })
-      : { totals: { vat: 0, sales: 0 }, orders: {} };
-    const at = now instanceof Date ? now.toISOString() : String(now || '');
-    const record = { period: key, filedAt: at, totals: snap.totals, orders: snap.orders };
+    if (!bounds || overlapOf(s, key)) return { ...s };
+    const without = unmarkFiled(s, key, { archive: false });
+    // RE-FILING RESTORES WHAT WAS FILED. A period switched off and on again
+    // (by accident, or to look at the book's own figures) gets its archived
+    // snapshot back rather than a new one of today's book — which would
+    // silently fold every change since filing into the filed period.
+    const unfiled = Array.isArray(s.vatUnfiledPeriods) ? s.vatUnfiledPeriods : [];
+    const archived = unfiled.find((r) => r && typeof r === 'object' && r.period === key && r.orders);
+    let record;
+    if (archived) {
+      record = archived;
+    } else {
+      const P = pnl();
+      const c = ctx || {};
+      const snap = P && typeof P.filedSnapshot === 'function'
+        ? P.filedSnapshot(orders, key, { settings: without, clients: c.clients, currencies: c.currencies })
+        : { totals: { vat: 0, sales: 0 }, orders: {} };
+      const at = now instanceof Date ? now.toISOString() : String(now || '');
+      record = { period: key, filedAt: at, totals: snap.totals, orders: snap.orders };
+    }
     const list = without.vatFiledPeriods.concat([record])
       .sort((a, b) => String(typeof a === 'string' ? a : a.period).localeCompare(String(typeof b === 'string' ? b : b.period)));
-    return { ...s, vatFiledPeriods: list };
+    const out = { ...s, vatFiledPeriods: list };
+    if (archived) out.vatUnfiledPeriods = unfiled.filter((r) => r !== archived);
+    return out;
   }
 
-  /** Take a period's filed mark off. Returns NEW settings. */
-  function unmarkFiled(settings, key) {
+  /**
+   * The key of an already-marked period this one OVERLAPS (a month inside a
+   * filed quarter, a quarter around a filed month), or '' — such a period
+   * cannot be marked. Its own key is not an overlap.
+   */
+  function overlapOf(settings, key) {
+    const bounds = periodBounds(key);
+    if (!bounds) return '';
+    const hit = filedMarks(settings).find((m) => m.period !== key && m.from <= bounds.to && m.to >= bounds.from);
+    return hit ? hit.period : '';
+  }
+
+  /**
+   * Take a period's filed mark off. Returns NEW settings.
+   *
+   * The snapshot is NOT thrown away: it moves to `settings.vatUnfiledPeriods`
+   * (same record shape), and marking the period filed again restores it.
+   * `{ archive: false }` only for `markFiled`'s own use.
+   */
+  function unmarkFiled(settings, key, opts) {
     const s = settings || {};
-    const list = (Array.isArray(s.vatFiledPeriods) ? s.vatFiledPeriods : [])
-      .filter((r) => (typeof r === 'string' ? r : r && r.period) !== key);
-    return { ...s, vatFiledPeriods: list };
+    const all = Array.isArray(s.vatFiledPeriods) ? s.vatFiledPeriods : [];
+    const keyOf = (r) => (typeof r === 'string' ? r : r && r.period);
+    const gone = all.filter((r) => keyOf(r) === key);
+    const out = { ...s, vatFiledPeriods: all.filter((r) => keyOf(r) !== key) };
+    const keep = gone.filter((r) => r && typeof r === 'object' && r.orders);
+    if (keep.length && !(opts && opts.archive === false)) {
+      const prev = (Array.isArray(s.vatUnfiledPeriods) ? s.vatUnfiledPeriods : []).filter((r) => keyOf(r) !== key);
+      out.vatUnfiledPeriods = prev.concat(keep);
+    }
+    return out;
   }
 
   /**
@@ -317,7 +375,13 @@
     return keys
       .filter((k) => { const b = periodBounds(k); return b && b.to < today; })
       .reverse()
-      .map((k) => ({ period: k, ...periodBounds(k), filed: isFiled(settings, k) }));
+      .map((k) => {
+        // Filed as part of ANOTHER mark (a month inside a filed quarter): it
+        // cannot be marked or unmarked on its own, and the screen says which.
+        const m = markFor(settings, k);
+        const partOf = m ? '' : overlapOf(settings, k);
+        return { period: k, ...periodBounds(k), filed: isFiled(settings, k), partOf };
+      });
   }
 
   const api = {
@@ -325,7 +389,7 @@
     frequencyOf, localDay, periodKeyOf, periodBounds, nextPeriodKey, periodsBetween, dayAfter,
     filedMarks, markFor, isFiled, coveringMark, landingDay, landingPeriod,
     isReversed, reversalDayOf,
-    markFiled, unmarkFiled, filingPeriods,
+    markFiled, unmarkFiled, overlapOf, filingPeriods,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof globalThis !== 'undefined') globalThis.KhaytVatPeriods = api;
