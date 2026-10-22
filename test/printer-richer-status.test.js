@@ -193,3 +193,19 @@ test('SDCP: the spec’s status example — enclosure as the chamber, layers und
   assert.equal(none.layer, null);
   assert.equal(none.message, null);
 });
+
+test('Duet: a heater switched off or on standby has no target, though RRF keeps its last setpoint', () => {
+  const model = {
+    heat: {
+      bedHeaters: [0], chamberHeaterMapping: [[2]],
+      heaters: [{ current: 22, active: 60, state: 'off' }, { current: 150, active: 215, state: 'standby' },
+        { current: 30, active: 45, state: 'off' }],
+    },
+    tools: [{ heaters: [1], fans: [0], extruders: [0] }],
+    state: { status: 'idle' },
+  };
+  const s = duet.statusFromObjectModel(model);
+  assert.deepEqual([s.targetNozzle, s.targetBed, s.targetChamber], [null, null, null]);
+  model.heat.heaters[1].state = 'active';
+  assert.equal(duet.statusFromObjectModel(model).targetNozzle, 215);
+});

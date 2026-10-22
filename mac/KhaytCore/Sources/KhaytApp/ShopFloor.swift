@@ -1919,7 +1919,7 @@ private struct Live: View {
             // A SPOOL THAT RAN OUT, said on the card as well as in the alert.
             // Only `true` is drawn: false is a loaded head and nil is a machine
             // with no sensor, and neither is something to look at.
-            if status.filamentOut == true {
+            if status.filamentOut == true, isRunning(status.state) {
                 Label(shop.words.callIt("mac.filament_out"), systemImage: "exclamationmark.triangle.fill")
                     .font(.caption.weight(.semibold)).foregroundStyle(Khayt.attention)
             }
