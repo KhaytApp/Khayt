@@ -94,6 +94,108 @@ function machineLiveBadge(m) {
   return badge('var(--surface-2)', 'var(--text-muted)', t('mach.live_idle') || 'Idle');
 }
 
+/* ── JOB CONTROL on the machine card ──────────────────────────────────────────
+ * main.js has carried pause / resume / cancel and "drop one object" since the
+ * Mac got them, and preload exposed all three — but nothing on this screen
+ * called them, so a desktop shop watched a print it could not stop. The Mac's
+ * card (ShopFloor.swift controls) is the model: shown only while a job is
+ * running or paused; Pause and Resume are each other's undo and go straight
+ * through; Cancel ASKS FIRST, because it scraps every hour on the plate and no
+ * printer asks twice; dropping an object is Klipper only and asks too. A verb
+ * the protocol cannot do (lib/printer-commands.js) is not offered at all. */
+function _printerVerbOk(m, cmd) {
+  const PC = (typeof KhaytPrinterCommands !== 'undefined') ? KhaytPrinterCommands : null;
+  const api = (m && m.printerApi) || {};
+  if (!PC) return false;
+  const d = PC.buildCommand(api.type, cmd, 'job', { duetFlavour: api.duetFlavour, printerSlug: api.printerSlug || 'printer' });
+  return !!d && !d.unsupported;
+}
+
+function machineControlsHtml(m) {
+  if (!m || !m.printerApi || !m.printerApi.type || m.printerApi.type === 'none') return '';
+  const cache = (typeof machineStatusCache !== 'undefined' && machineStatusCache) || {};
+  const entry = cache[m.id];
+  if (!entry || entry.error) return '';
+  const age = entry.lastUpdated ? Date.now() - entry.lastUpdated : null;
+  if (age !== null && age > MACHINE_LIVE_STALE_MS) return '';
+  const raw = String(entry.state || '').toLowerCase();
+  // By the state word only, as the Mac's card: a printer that has finished can
+  // still report its last job's progress, and that is no job to pause.
+  const paused = /paus/.test(raw);
+  const running = !paused && /print/.test(raw) && !/error/.test(raw);
+  if (!(paused || running)) return '';
+  const id = escapeHtml(m.id);
+  const out = [];
+  if (paused) {
+    if (_printerVerbOk(m, 'resume')) out.push(`<button class="btn small" data-act="printer-resume" data-id="${id}">${escapeHtml(t('mach.printer_resume'))}</button>`);
+  } else if (_printerVerbOk(m, 'pause')) {
+    out.push(`<button class="btn small" data-act="printer-pause" data-id="${id}">${escapeHtml(t('mach.printer_pause'))}</button>`);
+  }
+  if (_printerVerbOk(m, 'cancel')) out.push(`<button class="btn small danger" data-act="printer-cancel" data-id="${id}">${escapeHtml(t('mach.printer_cancel'))}</button>`);
+  if (m.printerApi.type === 'moonraker') out.push(`<button class="btn small ghost" data-act="printer-drop" data-id="${id}">${escapeHtml(t('mach.drop_object'))}…</button>`);
+  return out.join('');
+}
+
+const _printerBusy = new Set();
+async function printerJobCommand(machineId, command, confirmed = false) {
+  const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === machineId);
+  if (!m || _printerBusy.has(machineId) || !window.hubAPI?.printerCommand) return;
+  // Cancel asks first; the dialog's own Save sends it, and dismissing it sends nothing.
+  if (command === 'cancel' && !confirmed) {
+    openFormModal({
+      title: t('mach.cancel_ask', { machine: m.name || '' }),
+      bodyHtml: `<p style="margin:0;">${escapeHtml(t('mach.cancel_why'))}</p>`,
+      saveLabel: t('mach.printer_cancel'),
+      onSave: () => { printerJobCommand(machineId, 'cancel', true); return true; },
+    });
+    return;
+  }
+  _printerBusy.add(machineId);
+  try {
+    const r = await window.hubAPI.printerCommand(m, command).catch((e) => ({ ok: false, error: String(e && e.message || e) }));
+    if (r && r.ok) toast(t('mach.printer_sent'), 'success');
+    else toast(t('mach.printer_failed', { error: (r && (r.error || r.unsupported)) || '' }), 'error');
+  } finally {
+    _printerBusy.delete(machineId);
+  }
+}
+
+async function openDropObject(machineId) {
+  const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === machineId);
+  if (!m || !window.hubAPI?.printerPlate) return;
+  const plate = await window.hubAPI.printerPlate(m).catch(() => null);
+  if (!plate || !plate.ok) { toast(t('mach.printer_failed', { error: (plate && plate.error) || '' }), 'error'); return; }
+  const remaining = Array.isArray(plate.remaining) ? plate.remaining : [];
+  let body;
+  if (!plate.supported) body = `<p style="margin:0;">${escapeHtml(t('mach.drop_unsupported'))}</p>`;
+  else if (!remaining.length) body = `<p style="margin:0;">${escapeHtml(t('mach.drop_nothing'))}</p>`;
+  else {
+    body = `<div style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;">${remaining.map((name, i) => `
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
+        <input type="radio" name="dropObj" value="${i}" style="width:auto;margin:0;">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(name)}</span>
+        ${name === plate.current ? `<span style="font-size:11px;color:var(--text-muted);">${escapeHtml(t('mach.drop_printing_now'))}</span>` : ''}
+      </label>`).join('')}</div>
+      <p style="margin:10px 0 0;font-size:12px;color:var(--warning);">${escapeHtml(t('mach.drop_forever'))}</p>`;
+  }
+  const canDrop = plate.supported && remaining.length > 0;
+  openFormModal({
+    title: `${t('mach.drop_object')} · ${m.name || ''}`,
+    bodyHtml: body,
+    noSave: !canDrop,
+    saveLabel: t('mach.drop_it'),
+    async onSave(modal) {
+      const pick = modal.querySelector('input[name="dropObj"]:checked');
+      if (!pick) { toast(t('mach.drop_choose'), 'error'); return false; }
+      const name = remaining[+pick.value];
+      const r = await window.hubAPI.printerExcludeObject(m, name).catch((e) => ({ ok: false, error: String(e && e.message || e) }));
+      if (r && r.ok) toast(t('mach.printer_sent'), 'success');
+      else { toast(t('mach.printer_failed', { error: (r && r.error) || '' }), 'error'); return false; }
+      return true;
+    },
+  });
+}
+
 /**
  * Refresh the live badges in place, on every poll.
  *
@@ -105,6 +207,10 @@ function updateMachinesLiveStatus() {
   document.querySelectorAll('#machinesList [data-machine-live]').forEach((el) => {
     const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === el.dataset.machineLive);
     if (m) el.innerHTML = machineLiveBadge(m);
+  });
+  document.querySelectorAll('#machinesList [data-machine-ctl]').forEach((el) => {
+    const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === el.dataset.machineCtl);
+    if (m) el.innerHTML = machineControlsHtml(m);
   });
 }
 
@@ -197,6 +303,7 @@ function renderMachines() {
         ${retired ? `<span class="machine-jobs-badge" style="background:var(--text-muted); color:#fff;">${escapeHtml(t('mach.retired_badge', { date: m.retiredAt || '' }))}</span>` : ''}
         ${m.isOffline ? `<span class="machine-jobs-badge" style="background:var(--danger); color:#fff;">${_mIcoL('alert', '⚠', 12)}${escapeHtml(t('mach.offline_badge'))}</span>` : ''}
         <span data-machine-live="${escapeHtml(m.id)}">${machineLiveBadge(m)}</span>
+        <span data-machine-ctl="${escapeHtml(m.id)}" style="display:inline-flex;gap:6px;">${retired ? '' : machineControlsHtml(m)}</span>
         ${active > 0 ? `<span class="machine-jobs-badge">${active} ${escapeHtml(t('mach.active_jobs'))}</span>` : ''}
         ${svcBadge ? `<span class="pro-only">${svcBadge}</span>` : ''}
         ${downtimeBadge ? `<span class="pro-only">${downtimeBadge}</span>` : ''}
@@ -1731,6 +1838,9 @@ function machineWearRate(m) {
 }
 
   const api = {
+    machineControlsHtml,
+    printerJobCommand,
+    openDropObject,
 
     MACHINE_COLORS,
     machineGramsSinceNozzle,
