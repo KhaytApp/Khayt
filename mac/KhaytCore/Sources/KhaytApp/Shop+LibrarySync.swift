@@ -6,28 +6,46 @@ import KhaytCore
 /// Show menu and the inspector. See `LibrarySyncIndex`.
 extension Shop {
 
+    typealias FileStates = [String: [String: LibrarySyncIndex.FileEntry]]
+
+    /// Where the library has its online copy, read again whenever the
+    /// settings change (`settingsValue`): a tile's "on this Mac only" and a
+    /// "backed up" proved on a remote that is no longer the one in use both
+    /// turn on it.
+    func refreshLibraryRemote() {
+        let id = CloudLibrary.remoteIdentity(settingsDict)
+        if id != libraryRemoteId { libraryRemoteId = id }
+        let has = id != nil
+        if has != libraryHasRemote { libraryHasRemote = has }
+    }
+
     /// Open this library's index — or, the first time, build it from the
     /// sidecars — and bring it level with the book. Off the main actor; the
-    /// tiles draw without badges until it lands.
+    /// tiles draw without badges until it lands. Called once the book's
+    /// settings are on screen, so the remote it is read against is this
+    /// book's.
     ///
     /// Only for a real book: the sample has no library folder to describe.
     func openSyncIndex() {
-        guard source.isReal, let roots = libraryRoots else {
+        guard source.isReal, let roots = libraryRoots, let folder = source.build?.storeURL.deletingLastPathComponent()
+        else {
             syncIndex = nil
             return
         }
-        libraryHasRemote = CloudLibrary.remoteInUse(settingsDict) != .none
+        refreshLibraryRemote()
         let probes = files.map { LibrarySyncIndex.Probe(id: $0.id, externalPath: $0.externalPath) }
         let primary = roots.primary, all = roots.roots
-        let current = syncIndex?.root == primary ? syncIndex : nil
+        let current = syncIndex?.root == primary && syncIndex?.url.deletingLastPathComponent() == folder ? syncIndex : nil
         let previous = syncIndexTask
         syncIndexTask = Task { [weak self] in
             await previous?.value
             let (index, changed) = await PinWork.run { () -> (LibrarySyncIndex, Bool) in
-                if let open = current ?? LibrarySyncIndex.open(primary: primary) {
+                if let open = current ?? LibrarySyncIndex.open(primary: primary, folder: folder) {
                     return (open, open.reconcile(roots: all, models: probes))
                 }
-                return (LibrarySyncIndex.migrate(primary: primary, roots: all, models: probes), true)
+                let keep = LibrarySyncIndex.takeLegacy(primary: primary)
+                return (LibrarySyncIndex.migrate(primary: primary, folder: folder, roots: all,
+                                                 models: probes, keep: keep), true)
             }
             guard let self else { return }
             let fresh = self.syncIndex !== index
@@ -52,11 +70,16 @@ extension Shop {
         recountLibrarySoon()
     }
 
-    /// Record where models' bytes are now.
-    func recordSync(_ changes: [String: LibrarySyncIndex.State]) {
+    /// Record files' states — a whole pass's at once: one write, one recount.
+    func recordSync(_ changes: FileStates) {
         guard let index = syncIndex, !changes.isEmpty else { return }
-        index.set(changes)
+        index.record(changes)
         syncIndexChanged()
+    }
+
+    /// `url` is now online only.
+    nonisolated static func movedOut(_ url: URL, remote: String?) -> LibrarySyncIndex.FileEntry {
+        .init(state: .online, remote: remote, at: StoreWriter.iso(Date()))
     }
 
     /// The book's model id for a vault folder name.
@@ -68,7 +91,7 @@ extension Shop {
     /// before the index is open.
     func storageState(for file: LibraryFile) -> LibrarySyncIndex.State? {
         _ = librarySyncRevision
-        return syncIndex?.state(file.id)
+        return syncIndex?.state(file.id, remote: libraryRemoteId)
     }
 
     /// What its tile says, if anything. "On this Mac only" only when the
@@ -83,6 +106,42 @@ extension Shop {
     func isKeptOnThisMac(_ file: LibraryFile) -> Bool {
         _ = librarySyncRevision
         return syncIndex?.isKept(file.id) == true
+    }
+
+    /// Of these model ids, the ones set to Keep on this Mac.
+    func keptAmong(_ ids: [String]) -> [String] {
+        guard let index = syncIndex else { return [] }
+        return ids.filter { index.isKept($0) }
+    }
+
+    /// The delete question's line for models set to Keep on This Mac, which
+    /// Remove from This Mac would take off this Mac anyway.
+    func deleteKeptLine(_ plan: LibraryDeletePlan) -> String? {
+        let kept = keptAmong(plan.keptOnline)
+        guard !kept.isEmpty else { return nil }
+        return kept.count == 1
+            ? words.callIt("mac.delete_kept_one")
+            : words.callIt("mac.delete_kept_n", ["n": .number(Double(kept.count))])
+    }
+
+    /// The disk said something the index did not: put the index right, from
+    /// the folder — after this draw, never during it.
+    func correctSyncIndex(_ file: LibraryFile) {
+        guard let index = syncIndex, let roots = libraryRoots?.roots else { return }
+        let probe = LibrarySyncIndex.Probe(id: file.id, externalPath: file.externalPath)
+        Task { @MainActor [weak self] in
+            let found = await PinWork.run {
+                LibrarySyncIndex.files(of: probe, roots: roots, at: StoreWriter.iso(Date()))
+            }
+            // A file still proved online keeps its stamp.
+            var merged = found
+            for (name, was) in index.entry(file.id)?.files ?? [:]
+            where was.state == .backedUp && found[name]?.state == .local {
+                merged[name] = was
+            }
+            index.replaceFiles([file.id: merged])
+            self?.syncIndexChanged()
+        }
     }
 
     /// The words for a state: the tile's VoiceOver label and the inspector's line.
@@ -114,33 +173,73 @@ extension Shop {
 
     // MARK: - One model, by hand
 
-    /// Free up this one model's space: prove it is online, then remove the
-    /// local copy — `moveOut`, the same verified path "Free up space now"
-    /// takes for many. A vault model only: a linked model is in the shop's own
-    /// folder, which this app never deletes from.
-    func freeUpSpace(model file: LibraryFile) async {
+    /// What freeing one model's space would move: its model files in its own
+    /// folder under the PRIMARY root, listed with the guards the tier pass
+    /// has (`CloudLibrary.files(in:)` — regular files only, no symlinks,
+    /// nothing outside the root), each marked when an open job needs it.
+    /// Nil when the model is not a vault model in the primary folder.
+    func freeUpFiles(for file: LibraryFile, engine: KhaytEngine) async -> [KhaytEngine.TierFile]? {
+        guard !file.isLinked, let roots = libraryRoots else { return nil }
+        let primary = roots.primary
+        let folder = URL(fileURLWithPath: primary).appending(path: LibraryLocation.itemDirName(file.id))
+        let listed = await PinWork.run { CloudLibrary.files(in: folder, root: primary, includingMarkers: false) }
+            .filter { f in
+                let ext = (f.filename as NSString).pathExtension.lowercased()
+                return LibraryImport.kinds.contains(ext) && !f.filename.contains(".part-")
+            }
+        guard !listed.isEmpty else { return nil }
+        return (try? await CloudLibrary.annotated(CloudLibrary.ownFoldersOnly(listed, printFiles: fileRows,
+                                                                              orders: orderRows),
+                                                  engine: engine, printFiles: fileRows, orders: orderRows))
+    }
+
+    /// Free up this one model's space: prove each of its files is online,
+    /// then remove the local copy — `moveOut`, the same verified path "Free
+    /// up space now" takes for many, under the same guards.
+    ///
+    /// A model an open job needs is asked about first (`pendingFreeUp`);
+    /// `anyway` is the answer. Nothing runs while another cloud pass is.
+    func freeUpSpace(model file: LibraryFile, anyway: Bool = false) async {
+        guard !cloudLibraryBusy else { cloudLibraryProblem = words.callIt("mac.storage_busy"); return }
         cloudLibraryProblem = nil
         cloudLibraryNote = nil
         // Deleting this Mac's copy is the storage setting's business, as the
         // whole-library pass is (the staff lock).
         guard permitted("settings", "edit") else { cloudLibraryProblem = moveProblem; return }
-        guard !file.isLinked, let url = modelFile(for: file) else { return }
         guard let engine, let config = await cloudConfig() else {
             cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return
         }
+        guard !cloudLibraryBusy else { return }
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false }
-        let key = S3.objectKey(prefix: config.prefix, id: LibraryLocation.itemDirName(file.id),
-                               filename: url.lastPathComponent)
-        do {
-            let size = try await moveOut(url, key: key, config: config, engine: engine)
-            syncIndex?.setKeep(file.id, false)
-            recordSync([file.id: .online])
-            let human = (try? await engine.formatBytes(Double(size))) ?? ""
-            cloudLibraryNote = words.callIt("mac.storage_freed_one", ["size": .string(human)])
-        } catch {
-            cloudLibraryProblem = url.lastPathComponent + ": " + cloudSay(error)
+        guard let moving = await freeUpFiles(for: file, engine: engine), !moving.isEmpty else {
+            cloudLibraryProblem = words.callIt("mac.storage_free_not_here"); return
         }
+        if !anyway, moving.contains(where: { $0.inUse == true }) {
+            pendingFreeUp = file
+            return
+        }
+        let remote = libraryRemoteId
+        var moved: [String: LibrarySyncIndex.FileEntry] = [:]
+        var freed = 0, failures: [String] = []
+        for f in moving {
+            let url = URL(fileURLWithPath: f.fullPath)
+            let key = S3.objectKey(prefix: config.prefix, id: LibraryLocation.itemDirName(file.id),
+                                   filename: f.filename)
+            do {
+                freed += try await moveOut(url, key: key, config: config, engine: engine)
+                moved[f.filename] = Self.movedOut(url, remote: remote)
+            } catch {
+                failures.append(f.filename + ": " + cloudSay(error))
+            }
+        }
+        if !moved.isEmpty {
+            syncIndex?.setKeep(file.id, false)
+            recordSync([file.id: moved])
+            let human = (try? await engine.formatBytes(Double(freed))) ?? ""
+            cloudLibraryNote = words.callIt("mac.storage_freed_one", ["size": .string(human)])
+        }
+        if !failures.isEmpty { cloudLibraryProblem = failures.prefix(3).joined(separator: "\n") }
         await load(source)
     }
 
@@ -150,6 +249,7 @@ extension Shop {
     func keepOnThisMac(_ file: LibraryFile, _ keep: Bool) async {
         guard let index = syncIndex else { return }
         if keep, storageState(for: file) == .online || isInCloudOnly(file) {
+            guard !cloudLibraryBusy else { cloudLibraryProblem = words.callIt("mac.storage_busy"); return }
             await bringBack(file)
             // Not back (the bucket refused, the drive is offline): not kept,
             // and `bringBack` has said why.

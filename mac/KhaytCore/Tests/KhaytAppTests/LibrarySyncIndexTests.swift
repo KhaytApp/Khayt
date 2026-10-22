@@ -4,87 +4,136 @@ import KhaytCore
 @testable import KhaytApp
 
 /// The per-device cloud state index (`LibrarySyncIndex`): built from the
-/// sidecars, kept beside the library folder and out of the book, read by the
-/// tiles and the Show menu without asking the disk.
+/// sidecars, kept per file in the app's own support folder and out of the
+/// book, read by the tiles and the Show menu without asking the disk — and
+/// overruled by the disk wherever a file is looked at.
 @MainActor
 struct LibrarySyncIndexTests {
 
-    /// A library folder under a fresh temporary support folder, never the
-    /// real one.
-    static func root() throws -> URL {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: "khayt-sync-\(UUID().uuidString)/print-files-vault")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        return root
+    /// A library folder and a support folder under a fresh temporary folder,
+    /// never the real ones.
+    static func folders() throws -> (root: URL, support: URL) {
+        let base = FileManager.default.temporaryDirectory.appending(path: "khayt-sync-\(UUID().uuidString)")
+        let root = base.appending(path: "Library/print-files-vault")
+        let support = base.appending(path: "Support/khayt")
+        for dir in [root, support] { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
+        return (root, support)
     }
 
-    static func folder(_ root: URL, _ id: String, _ names: [String]) throws {
+    @discardableResult
+    static func folder(_ root: URL, _ id: String, _ names: [String]) throws -> URL {
         let dir = root.appending(path: LibraryLocation.itemDirName(id))
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         for name in names { try Data("x".utf8).write(to: dir.appending(path: name)) }
+        return dir
     }
 
-    @Test("what a folder's names say")
-    func stateOfNames() {
-        #expect(LibrarySyncIndex.state(of: ["a.3mf"]) == .local)
-        #expect(LibrarySyncIndex.state(of: ["a.3mf.cloud"]) == .online)
-        #expect(LibrarySyncIndex.state(of: ["a.3mf", "a.3mf.cloud"]) == .backedUp, "a crash between sidecar and removal")
-        #expect(LibrarySyncIndex.state(of: ["a.3mf.online"]) == .online)
-        #expect(LibrarySyncIndex.state(of: ["a.3mf.online.cloud"]) == .online)
-        #expect(LibrarySyncIndex.state(of: []) == .local)
+    static let remote = "s3:https://acc.r2.example/lib/shop"
+
+    @Test("a folder's names, file by file")
+    func filesOfNames() {
+        func f(_ names: [String], _ at: String?) -> [String: LibrarySyncIndex.FileEntry] {
+            LibrarySyncIndex.files(of: names, at: at)
+        }
+        #expect(f(["a.3mf"], nil).mapValues(\.state) == ["a.3mf": .local])
+        #expect(f(["a.3mf.cloud"], nil).mapValues(\.state) == ["a.3mf": .online])
+        #expect(f(["a.3mf", "a.3mf.cloud"], nil).mapValues(\.state) == ["a.3mf": .local],
+                "a crash between sidecar and removal proves no remote")
+        #expect(f(["a.3mf.online"], nil).mapValues(\.state) == ["a.3mf": .online])
+        #expect(f(["a.3mf.online.cloud"], nil).mapValues(\.state) == ["a.3mf": .online])
+        #expect(f(["thumb.jpg", "guide.pdf"], nil).isEmpty, "pictures and papers are not the model")
     }
 
-    @Test("first launch reads the sidecars, keeps them, and writes the index beside the root")
-    func migrates() throws {
-        let root = try Self.root()
+    @Test("a pack with one file moved out is not online only; backed up needs this remote")
+    func modelState() {
+        typealias E = LibrarySyncIndex.FileEntry
+        func state(_ files: [E], _ remote: String?) -> LibrarySyncIndex.State {
+            LibrarySyncIndex.modelState(files, remote: remote)
+        }
+        let proved = E(state: .backedUp, remote: Self.remote)
+        #expect(state([E(state: .online), E(state: .local)], Self.remote) == .local)
+        #expect(state([E(state: .online), E(state: .online)], Self.remote) == .online)
+        #expect(state([proved, E(state: .online)], Self.remote) == .backedUp)
+        #expect(state([proved], "gdrive:Other") == .local, "proved on another remote")
+        #expect(state([proved], nil) == .local, "no remote at all")
+        #expect(state([E(state: .online)], nil) == .online, "online only is still not here")
+    }
+
+    @Test("the index lives in the support folder, one per library, and the old file beside the root is taken in")
+    func location() throws {
+        let (root, support) = try Self.folders()
+        let url = LibrarySyncIndex.location(primary: root.path, folder: support)
+        #expect(url.deletingLastPathComponent().standardizedFileURL.path == support.standardizedFileURL.path)
+        #expect(url.lastPathComponent.hasPrefix("library-sync-") && url.lastPathComponent.hasSuffix(".json"))
+        #expect(url != LibrarySyncIndex.location(primary: root.path + "2", folder: support))
+
+        // What the first build wrote beside the library folder.
+        let legacy = LibrarySyncIndex.legacyLocation(primary: root.path)
+        let old = #"{"v":1,"root":"\#(root.path)","models":{"PF-1":{"state":"local","keep":true},"PF-2":{"state":"online"}}}"#
+        try Data(old.utf8).write(to: legacy)
+        let keep = LibrarySyncIndex.takeLegacy(primary: root.path)
+        #expect(keep == ["PF-1"])
+        #expect(!FileManager.default.fileExists(atPath: legacy.path), "left where another Mac may read it")
+
         try Self.folder(root, "PF-1", ["a.3mf"])
-        try Self.folder(root, "PF-2", ["b.stl.cloud"])
-        try Self.folder(root, "PF-3", ["c.3mf.online"])
-        try Self.folder(root, "PF-4", ["d.3mf", "d.3mf.cloud"])
-        let probes = ["PF-1", "PF-2", "PF-3", "PF-4", "PF-5"].map { LibrarySyncIndex.Probe(id: $0, externalPath: nil) }
-        #expect(LibrarySyncIndex.open(primary: root.path) == nil, "no index yet")
-        let index = LibrarySyncIndex.migrate(primary: root.path, roots: [root.path], models: probes)
-        #expect(index.state("PF-1") == .local)
-        #expect(index.state("PF-2") == .online)
-        #expect(index.state("PF-3") == .online)
-        #expect(index.state("PF-4") == .backedUp)
-        #expect(index.state("PF-5") == .local, "a model with no folder here")
-        #expect(index.migratedAt != nil)
-        // Beside the library root, not inside it, and not the book.
-        #expect(index.url == root.deletingLastPathComponent().appending(path: "library-sync.json"))
-        #expect(FileManager.default.fileExists(atPath: index.url.path))
-        // The sidecars are the fallback and stay.
+        try Self.folder(root, "PF-2", ["b.stl.cloud", "c.stl"])
+        let index = LibrarySyncIndex.migrate(primary: root.path, folder: support, roots: [root.path],
+                                             models: [.init(id: "PF-1", externalPath: nil), .init(id: "PF-2", externalPath: nil)],
+                                             keep: keep)
+        #expect(index.url == url && FileManager.default.fileExists(atPath: url.path))
+        #expect(index.isKept("PF-1"))
+        #expect(index.state("PF-2", remote: Self.remote) == .local, "one file of two moved out")
+        #expect(index.entry("PF-2")?.files["b.stl"]?.state == .online)
         let side = root.appending(path: LibraryLocation.itemDirName("PF-2")).appending(path: "b.stl.cloud")
-        #expect(FileManager.default.fileExists(atPath: side.path))
-
-        let again = try #require(LibrarySyncIndex.open(primary: root.path))
-        #expect(again.snapshot == index.snapshot)
-        // A library moved elsewhere is not described by the old file.
-        #expect(LibrarySyncIndex.open(primary: root.path + "-moved") == nil)
+        #expect(FileManager.default.fileExists(atPath: side.path), "the sidecars stay")
+        #expect(LibrarySyncIndex.open(primary: root.path, folder: support)?.snapshot == index.snapshot)
+        #expect(LibrarySyncIndex.open(primary: root.path + "-moved", folder: support) == nil)
     }
 
-    @Test("changes persist; reconcile reads only new models and drops the gone")
-    func changesAndReconcile() throws {
-        let root = try Self.root()
-        let index = LibrarySyncIndex.migrate(primary: root.path, roots: [root.path],
+    @Test("a backed-up file edited since reads as on this Mac only after the next load")
+    func staleBackup() throws {
+        let (root, support) = try Self.folders()
+        let dir = try Self.folder(root, "PF-1", ["a.3mf"])
+        let probe = LibrarySyncIndex.Probe(id: "PF-1", externalPath: nil)
+        let index = LibrarySyncIndex.migrate(primary: root.path, folder: support, roots: [root.path], models: [probe])
+        let file = dir.appending(path: "a.3mf")
+        index.record(["PF-1": ["a.3mf": LibrarySyncIndex.backedUp(file, remote: Self.remote)]])
+        #expect(index.state("PF-1", remote: Self.remote) == .backedUp)
+        #expect(!index.reconcile(roots: [root.path], models: [probe]), "unchanged: no work, no write")
+        try Data("changed bytes".utf8).write(to: file)
+        #expect(index.reconcile(roots: [root.path], models: [probe]))
+        #expect(index.state("PF-1", remote: Self.remote) == .local)
+    }
+
+    @Test("reconcile reads only new models, drops the gone, and keeps a keep")
+    func reconcile() throws {
+        let (root, support) = try Self.folders()
+        let index = LibrarySyncIndex.migrate(primary: root.path, folder: support, roots: [root.path],
                                              models: [.init(id: "PF-1", externalPath: nil)])
-        index.set("PF-1", .backedUp)
         index.setKeep("PF-1", true)
-        let reopened = try #require(LibrarySyncIndex.open(primary: root.path))
-        #expect(reopened.state("PF-1") == .backedUp)
-        #expect(reopened.isKept("PF-1"))
-
         try Self.folder(root, "PF-2", ["x.3mf.cloud"])
-        // PF-1's folder says nothing now, and must not be re-read over what was recorded.
-        let changed = reopened.reconcile(roots: [root.path], models: [.init(id: "PF-2", externalPath: nil)])
-        #expect(changed)
-        #expect(reopened.state("PF-2") == .online)
-        #expect(reopened.state("PF-1") == nil, "a model gone from the book is dropped")
-        #expect(!reopened.reconcile(roots: [root.path], models: [.init(id: "PF-2", externalPath: nil)]),
-                "nothing new: no work, no write")
+        #expect(index.reconcile(roots: [root.path], models: [.init(id: "PF-2", externalPath: nil)]))
+        #expect(index.state("PF-2", remote: nil) == .online)
+        #expect(index.entry("PF-1") == nil)
     }
 
-    static func shop(with root: URL) async -> Shop {
+    @Test("saves from many threads: the file on disk is the last state, never an older snapshot")
+    func savesAreSerialised() async throws {
+        let (root, support) = try Self.folders()
+        let index = LibrarySyncIndex.migrate(primary: root.path, folder: support, roots: [root.path], models: [])
+        await withTaskGroup(of: Void.self) { group in
+            for i in 0..<64 {
+                group.addTask {
+                    index.record(["PF-\(i)": ["m.3mf": .init(state: .online)]])
+                }
+            }
+        }
+        let back = try #require(LibrarySyncIndex.open(primary: root.path, folder: support))
+        #expect(back.count == 64)
+        #expect(back.snapshot == index.snapshot)
+    }
+
+    static func shop(_ root: URL, _ support: URL) async -> Shop {
         let shop = Shop()
         await shop.load(.sample)
         shop.pretendLibrary((1...6).map { i in
@@ -92,9 +141,15 @@ struct LibrarySyncIndexTests {
         })
         try? folder(root, "PF-1", ["a.3mf.cloud"])
         try? folder(root, "PF-2", ["b.3mf.online"])
-        try? folder(root, "PF-3", ["c.3mf", "c.3mf.cloud"])
-        shop.syncIndex = LibrarySyncIndex.migrate(primary: root.path, roots: [root.path],
-                                                  models: (1...6).map { .init(id: "PF-\($0)", externalPath: nil) })
+        let three = try? folder(root, "PF-3", ["c.3mf"])
+        for i in 4...6 { try? folder(root, "PF-\(i)", ["m\(i).3mf"]) }
+        let index = LibrarySyncIndex.migrate(primary: root.path, folder: support, roots: [root.path],
+                                             models: (1...6).map { .init(id: "PF-\($0)", externalPath: nil) })
+        if let three {
+            index.record(["PF-3": ["c.3mf": LibrarySyncIndex.backedUp(three.appending(path: "c.3mf"), remote: remote)]])
+        }
+        shop.syncIndex = index
+        shop.libraryRemoteId = remote
         shop.libraryHasRemote = true
         shop.syncIndexChanged()
         shop.clearLibraryFilter()
@@ -103,72 +158,139 @@ struct LibrarySyncIndexTests {
         return shop
     }
 
-    @Test("the Show menu's pair filters and counts from the index alone")
+    @Test("the Show menu's pair filters and counts from the index alone, with one search per recount")
     func filters() async throws {
-        let shop = await Self.shop(with: try Self.root())
+        let (root, support) = try Self.folders()
+        let shop = await Self.shop(root, support)
         shop.libraryRows = shop.files.map { .object(["id": .string($0.id), "name": .string($0.name)]) }
         shop.libraryStorage = .onlineOnly
         #expect(shop.shownFiles.map(\.id).sorted() == ["PF-1", "PF-2"])
         shop.libraryStorage = .thisMacOnly
         #expect(shop.shownFiles.map(\.id).sorted() == ["PF-4", "PF-5", "PF-6"], "backed up is not this Mac only")
-        #expect(shop.libraryFilterOn)
+        // The same backup, read against another remote, is on this Mac only.
+        shop.libraryRemoteId = "gdrive:Other"
+        shop.syncIndexChanged()
+        #expect(shop.shownFiles.map(\.id).sorted() == ["PF-3", "PF-4", "PF-5", "PF-6"])
+        shop.libraryRemoteId = Self.remote
         shop.libraryStorage = nil
+        shop.search = "model"
+        await shop.settleLibraryFacets()
+        let before = shop.libraryMemo.work.facetSearches
         shop.recountLibrarySoon()
         await shop.settleLibraryFacets()
+        #expect(shop.libraryMemo.work.facetSearches == before + 1, "the search ran once per pool again")
         #expect(shop.libraryFacets.onlineOnly == 2)
         #expect(shop.libraryFacets.thisMacOnly == 3)
-        // A change to the index moves the list without a reload.
+        shop.search = ""
+        // A pass's changes land at once and move the list without a reload.
         shop.libraryStorage = .onlineOnly
         _ = shop.shownFiles
-        shop.recordSync(["PF-4": .online])
-        #expect(shop.shownFiles.map(\.id).sorted() == ["PF-1", "PF-2", "PF-4"])
+        shop.recordSync(["PF-4": ["m4.3mf": .init(state: .online)], "PF-5": ["m5.3mf": .init(state: .online)]])
+        #expect(shop.shownFiles.map(\.id).sorted() == ["PF-1", "PF-2", "PF-4", "PF-5"])
+    }
+
+    @Test("the remote is read again whenever the settings change")
+    func remoteFollowsSettings() async {
+        let shop = Shop()
+        await shop.load(.sample)
+        shop.settingsValue = .object([:])
+        #expect(!shop.libraryHasRemote && shop.libraryRemoteId == nil)
+        shop.settingsValue = .object(["printLibrary": .object(["s3": .object([
+            "enabled": .bool(true), "endpoint": .string("https://ACC.r2.example/"), "bucket": .string("lib"),
+            "prefix": .string("shop/"), "accessKeyId": .string("k"), "secretAccessKey": .string("s"),
+        ])])])
+        #expect(shop.libraryHasRemote)
+        #expect(shop.libraryRemoteId == "s3:https://acc.r2.example/lib/shop")
+        #expect(shop.libraryRemoteId == CloudLibrary.remoteIdentity(
+            of: .bucket(S3Config(endpoint: "https://acc.r2.example", bucket: "lib", region: "auto",
+                                 accessKeyId: "k", secretAccessKey: "s", prefix: "shop")),
+            settings: shop.settingsDict), "a file brought back from the bucket in use is stamped the same")
     }
 
     @Test("a tile's badge is a lookup, and says nothing for a shop with no cloud")
     func badges() async throws {
-        let shop = await Self.shop(with: try Self.root())
+        let (root, support) = try Self.folders()
+        let shop = await Self.shop(root, support)
         let byId = Dictionary(uniqueKeysWithValues: shop.files.map { ($0.id, $0) })
         #expect(shop.storageBadge(for: byId["PF-1"]!) == .online)
         #expect(shop.storageBadge(for: byId["PF-3"]!) == .backedUp)
         #expect(shop.storageBadge(for: byId["PF-6"]!) == .local)
         shop.libraryHasRemote = false
         #expect(shop.storageBadge(for: byId["PF-6"]!) == nil)
-        #expect(shop.storageBadge(for: byId["PF-1"]!) == .online)
-        // The index answers "online" before any folder is listed.
-        #expect(shop.isInCloudOnly(byId["PF-1"]!))
-        // Every state has its words, in both languages, for VoiceOver.
         for state in [LibrarySyncIndex.State.local, .backedUp, .online] {
             let entry = try #require(Words.own[Shop.storageWordKey(state)])
             #expect(entry["en"]?.isEmpty == false && entry["ar"]?.isEmpty == false)
         }
+        #expect(Words.own["mac.storage_state_online"]?["en"] == "Online only", "one term everywhere")
+        #expect(Words.own["mac.storage_free_one_help"]?["ar"]?.contains("«أعده من السحابة»") == true)
     }
 
-    @Test("Keep on this Mac takes a model out of Free up space")
-    func keptIsNotTiered() async throws {
-        let shop = await Self.shop(with: try Self.root())
+    @Test("Keep on this Mac takes a model out of Free up space, and the delete question names it")
+    func kept() async throws {
+        let (root, support) = try Self.folders()
+        let shop = await Self.shop(root, support)
         shop.syncIndex?.setKeep("PF-6", true)
         let files = ["PF-5", "PF-6"].map {
             KhaytEngine.TierFile(filename: "m.3mf", fullPath: "/x/\($0)/m.3mf", size: 10, mtimeMs: 0,
                                  id: LibraryLocation.itemDirName($0), lastUsedMs: nil)
         }
         #expect(shop.notKept(files).map(\.fullPath) == ["/x/PF-5/m.3mf"])
+        var plan = LibraryDeletePlan()
+        plan.keptOnline = ["PF-5"]
+        #expect(shop.deleteKeptLine(plan) == nil)
+        plan.keptOnline = ["PF-5", "PF-6"]
+        #expect(shop.deleteKeptLine(plan) == shop.words.callIt("mac.delete_kept_one"))
     }
 
-    @Test("the tile, the inspector and the Show menu are wired to it, and every move records it")
+    @Test("one model's files: the record's own folder in the primary root, never a symlink or elsewhere")
+    func freeUpGuards() throws {
+        let (root, _) = try Self.folders()
+        let dir = try Self.folder(root, "PF-1", ["a.3mf"])
+        #expect(CloudLibrary.files(in: dir, root: root.path, includingMarkers: false).map(\.filename) == ["a.3mf"])
+        // A folder that is a link to somewhere else on this Mac.
+        let elsewhere = try Self.folders().root
+        try Self.folder(elsewhere, "PF-2", ["b.3mf"])
+        let link = root.appending(path: LibraryLocation.itemDirName("PF-2"))
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL:
+            elsewhere.appending(path: LibraryLocation.itemDirName("PF-2")))
+        #expect(CloudLibrary.files(in: link, root: root.path, includingMarkers: false).isEmpty)
+        // A folder in another root (an old library folder) is not the primary's.
+        #expect(CloudLibrary.files(in: elsewhere.appending(path: LibraryLocation.itemDirName("PF-2")),
+                                   root: root.path, includingMarkers: false).isEmpty)
+        // A file inside that is a symlink.
+        try FileManager.default.createSymbolicLink(at: dir.appending(path: "c.3mf"),
+                                                   withDestinationURL: elsewhere.appending(path: "x"))
+        #expect(CloudLibrary.files(in: dir, root: root.path, includingMarkers: false).map(\.filename) == ["a.3mf"])
+    }
+
+    @Test("wired: tile, inspector, Show menu, every move recorded once per pass, guards on the one-model path")
     func wired() throws {
         func src(_ name: String) throws -> String {
             try String(contentsOf: GroupFromRightClickTests.source(name), encoding: .utf8)
         }
         #expect(try src("LibraryGrid.swift").contains("storage: shop.storageBadge(for: file)"))
-        #expect(try src("LibraryInspector.swift").contains("StorageSection(shop: shop, file: file)"))
+        let inspector = try src("LibraryInspector.swift")
+        #expect(inspector.contains("StorageSection(shop: shop, file: file)"))
+        #expect(inspector.contains("shop.freeUpSpace(model: file, anyway: true)"), "an open job is not asked about")
         #expect(try src("LibraryFilterBar.swift").contains("\"online-only\", \"this-mac-only\"]"))
         let cloud = try src("CloudLibrary.swift")
-        #expect(cloud.contains("recordSync([id: .online])"), "Free up space does not record the move")
-        #expect(cloud.contains("recordSync([file.id: .backedUp])"), "Bring Back does not record it")
-        #expect(cloud.contains("recordSync([id: .backedUp])"), "a marker brought down is not recorded")
         #expect(cloud.contains("notKept(plan.candidates)"))
-        #expect(try src("LibraryDelete.swift").contains("recordSync([id: .online])"))
-        #expect(try src("Shop.swift").contains("openSyncIndex()"))
+        #expect(cloud.contains("defer { recordSync(sync) }"), "a bulk pass records model by model")
+        #expect(cloud.contains("CloudLibrary.remoteIdentity(of: from, settings: settings)"),
+                "Bring Back does not stamp the remote the bytes came from")
+        #expect(!cloud.contains("recordSync([id: .online])"))
+        let sync = try src("Shop+LibrarySync.swift")
+        #expect(sync.contains("guard !cloudLibraryBusy else"))
+        #expect(sync.contains("pendingFreeUp = file"))
+        #expect(sync.contains("CloudLibrary.files(in: folder, root: primary"))
+        let delete = try src("LibraryDelete.swift")
+        #expect(delete.contains("syncIndex?.setKeep(Set(keptAmong(plan.keptOnline)), false)"))
+        #expect(try src("ShopWindow.swift").contains("shop.deleteKeptLine(plan)"))
+        let shop = try src("Shop.swift")
+        #expect(shop.contains("didSet { refreshLibraryRemote() }"))
+        let settingsAt = try #require(shop.range(of: "settingsValue = root[\"settings\"] ?? .object([:]) }"))
+        let openAt = try #require(shop.range(of: "openSyncIndex()"))
+        #expect(settingsAt.lowerBound < openAt.lowerBound, "the index is opened before the settings are read")
     }
 }
 
@@ -190,7 +312,8 @@ extension CloudLibraryTests {
         #expect(!FileManager.default.fileExists(atPath: url.path))
         #expect(bucket.object("/lib/print-files/PF-1/Benchy.3mf")?.count == 4096)
         let names = try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)
-        #expect(LibrarySyncIndex.state(of: names) == .online, "the sidecar is written, so the fallback agrees")
+        #expect(LibrarySyncIndex.files(of: names)["Benchy.3mf"]?.state == .online,
+                "the sidecar is written, so the fallback agrees")
 
         bucket.lie = .wrongEtag
         let kept = try model()
@@ -204,20 +327,51 @@ extension CloudLibraryTests {
 /// In the serialised suite that owns the test support folder.
 extension LibraryEditPerfTests {
 
-    @Test("a real book opens its index on load, beside its own library folder")
+    @Test("a real book opens its index on load, in its support folder; the disk overrules it")
     func indexOpensOnLoad() async throws {
         try await withPerfBook(PerfBook.synthesize(models: 12)) { shop, url in
             await shop.settleSyncIndex()
             let index = try #require(shop.syncIndex)
             let primary = try #require(shop.libraryRoots?.primary)
             #expect(index.root == primary)
-            #expect(index.url.deletingLastPathComponent().path
-                    == URL(fileURLWithPath: primary).deletingLastPathComponent().path)
+            #expect(index.url.deletingLastPathComponent() == url.deletingLastPathComponent(),
+                    "beside the book, in the app's own folder")
             #expect(index.url != url, "the index is not the book")
             #expect(index.count == shop.files.count)
-            // Not in the book.
-            let book = try String(contentsOf: url, encoding: .utf8)
-            #expect(!book.contains("library-sync"))
+            #expect(!(try String(contentsOf: url, encoding: .utf8)).contains("library-sync"))
+
+            // The index says online; the file is here. The file wins, and the
+            // index is put right.
+            let file = try #require(shop.files.first { !$0.isLinked })
+            let dir = URL(fileURLWithPath: primary).appending(path: LibraryLocation.itemDirName(file.id))
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try Data("solid x".utf8).write(to: dir.appending(path: file.sourceFile?.filename ?? "m.3mf"))
+            index.record([file.id: [file.sourceFile?.filename ?? "m.3mf": .init(state: .online)]])
+            #expect(index.state(file.id, remote: nil) == .online)
+            #expect(!shop.isInCloudOnly(file))
+            for _ in 0..<50 where index.state(file.id, remote: nil) == .online {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            #expect(index.state(file.id, remote: nil) == .local, "the index was not corrected from the disk")
+        }
+    }
+
+    @Test("restoring an original whose conversion is still there says you will have both")
+    func restoreSupersededWarns() async throws {
+        var book = PerfBook.synthesize(models: 6)
+        guard case .array(var rows)? = book["printFiles"],
+              case .object(var original) = rows[0], case .object(let converted) = rows[1],
+              case .string(let convertedId)? = converted["id"] else { Issue.record("no rows"); return }
+        original["archivedAt"] = .string("2026-10-01T09:00:00.000Z")
+        original["supersededBy"] = .string(convertedId)
+        rows[0] = .object(original)
+        book["printFiles"] = .array(rows)
+        try await withPerfBook(book) { shop, _ in
+            let aside = try #require(shop.files.first { $0.isArchived })
+            shop.importNote = nil
+            #expect(shop.unarchive([aside.id]))
+            await shop.settleLibraryWrites()
+            #expect(shop.importNote == shop.words.callIt("mac.unarchive_both_one"))
         }
     }
 }

@@ -1022,5 +1022,21 @@ private struct StorageSection: View {
                 }
             }
         }
+        // An open job needs it: asked, as the whole-library pass never moves
+        // such a model at all.
+        .confirmationDialog(
+            shop.words.callIt("mac.storage_free_in_use_q"),
+            isPresented: Binding(get: { shop.pendingFreeUp?.id == file.id },
+                                 set: { if !$0 { shop.pendingFreeUp = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.storage_free_anyway")) {
+                shop.pendingFreeUp = nil
+                Task { await shop.freeUpSpace(model: file, anyway: true) }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) { shop.pendingFreeUp = nil }
+        } message: {
+            Text(shop.words.callIt("mac.storage_free_in_use"))
+        }
     }
 }

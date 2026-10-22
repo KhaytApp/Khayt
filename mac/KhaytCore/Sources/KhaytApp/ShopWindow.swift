@@ -599,7 +599,11 @@ struct WindowSheets: ViewModifier {
     /// What the delete question says under the names, once the plan is in.
     private var planLines: [String] {
         guard let plan = shop.deletePlan else { return [shop.words.callIt("mac.delete_checking")] }
-        return Shop.deletePlanLines(plan, words: shop.words)
+        var lines = Shop.deletePlanLines(plan, words: shop.words)
+        // ASKED FIRST: a model the shop said to keep on this Mac is named
+        // before Remove from This Mac takes its copy (and its keep) away.
+        if let kept = shop.deleteKeptLine(plan) { lines.append(kept) }
+        return lines
     }
 
     /// The question's first sentence. "…and its files? This cannot be

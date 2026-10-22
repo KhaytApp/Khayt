@@ -64,6 +64,12 @@ final class Shop {
     /// Nil until the book's library has been looked at, and for the sample.
     @ObservationIgnored var syncIndex: LibrarySyncIndex?
     @ObservationIgnored var syncIndexTask: Task<Void, Never>?
+    /// Which models can start on each machine, for the book revision and the
+    /// spools it was worked out from (`readLibraryFacets`).
+    /// The engine's category and tag counts, for the pool they were counted
+    /// over (a hash of the book revision and the pool's ids).
+    @ObservationIgnored var facetCountMemo: [String: (key: Int, rows: [KhaytEngine.GroupCount])] = [:]
+    @ObservationIgnored var readyMemo: [String: (revision: Int, loaded: [KhaytEngine.LoadedSlot], ids: Set<String>)] = [:]
     /// Bumped on every change to `syncIndex`, which is how a tile's badge and
     /// the library's lists know to look again.
     var librarySyncRevision = 0
@@ -72,6 +78,11 @@ final class Shop {
     /// Whether the library has somewhere online to be, so "on this Mac only"
     /// is worth saying on a tile at all.
     var libraryHasRemote = false
+    /// Which remote that is (`CloudLibrary.remoteIdentity`): a "backed up"
+    /// proved anywhere else reads as on this Mac only.
+    var libraryRemoteId: String?
+    /// A model an open job needs, waiting for "Free Up Space anyway".
+    var pendingFreeUp: LibraryFile?
 
     /// The model whose title is being edited in the inspector, from its
     /// pencil, the right-click menu or Model ▸ Rename. One field, wherever it
@@ -192,7 +203,7 @@ final class Shop {
     /// The tax's name in the app's language — "VAT", «ضريبة القيمة المضافة» —
     /// for a line that labels a figure with it. Nil for an unregistered shop.
     private(set) var taxName: String?
-    var settingsValue: JSONValue = .object([:])
+    var settingsValue: JSONValue = .object([:]) { didSet { refreshLibraryRemote() } }
 
     /// Give a shop a mail provider, for a test. The book on disk is not
     /// touched — `pretendMode`'s sibling, and there for the same reason.
@@ -844,7 +855,6 @@ final class Shop {
                 LibraryLocation.resolveRoots(settings: Self.librarySettings(root),
                                              defaultRoot: LibraryLocation.defaultRoot(for: build))
             }
-            openSyncIndex()
             fileSelection = []
             groupSelection = []
             // Read, never taken. This app does not write, and a reader that
@@ -885,6 +895,8 @@ final class Shop {
             // A library write that landed during the await above has put the
             // newer settings (group kinds, covers) on screen already.
             if libraryEpoch == readMark { settingsValue = root["settings"] ?? .object([:]) }
+            // After the settings: the index is read against THIS book's remote.
+            openSyncIndex()
             await readFeatures()
             if overtaken() { return }
             // A shop that has just switched to Simple must not be left looking

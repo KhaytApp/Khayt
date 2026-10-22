@@ -75,6 +75,9 @@ final class LibraryMemo {
         var folds = 0
         /// Questions put to the disk about a thumbnail.
         var diskChecks = 0
+        /// Searches a recount of the chips ran over the book — one per
+        /// recount, however many pools it counts.
+        var facetSearches = 0
     }
 
     var work = Work()
@@ -93,22 +96,45 @@ final class LibraryMemo {
 
     /// One model's text, folded once: what the free search reads, and what
     /// each kind of token (`LibraryQuery.Field`) reads.
+    ///
+    /// Held as UTF-8 bytes, folded and composed, and matched with `memmem`:
+    /// a recount runs the search over every model, and the Foundation
+    /// comparison of the same folded text took 80 ms per pass at 6,600 models
+    /// (Oct 2026 review bench). Both sides are folded by `SearchText` first,
+    /// so a byte match is the comparison the folding was for.
     struct Folded {
-        var free: [String]
-        var tags: [String]
-        var group: String
-        var category: String
-        var materials: [String]
-        var creators: [String]
+        var free: [[UInt8]]
+        var tags: [[UInt8]]
+        var group: [[UInt8]]
+        var category: [[UInt8]]
+        var materials: [[UInt8]]
+        var creators: [[UInt8]]
 
         init(_ file: LibraryFile) {
-            let f = SearchText.fold
-            free = file.searchFields.map(f)
-            tags = (file.tags ?? []).map(f)
-            group = f(file.groupName ?? "")
-            category = f(file.category ?? "")
-            materials = [file.material ?? "", file.parsed?.filamentType ?? ""].map(f)
-            creators = [file.creator ?? "", file.source ?? ""].map(f)
+            func f(_ list: [String]) -> [[UInt8]] { list.map(Self.bytes).filter { !$0.isEmpty } }
+            free = f(file.searchFields)
+            tags = f(file.tags ?? [])
+            group = f([file.groupName ?? ""])
+            category = f([file.category ?? ""])
+            materials = f([file.material ?? "", file.parsed?.filamentType ?? ""])
+            creators = f([file.creator ?? "", file.source ?? ""])
+        }
+
+        /// Text as the matcher compares it.
+        static func bytes(_ text: String) -> [UInt8] {
+            Array(SearchText.fold(text).precomposedStringWithCanonicalMapping.utf8)
+        }
+
+        /// Does any of `fields` hold `needle`?
+        static func any(_ fields: [[UInt8]], _ needle: [UInt8]) -> Bool {
+            guard !needle.isEmpty else { return true }
+            return needle.withUnsafeBytes { n in
+                fields.contains { hay in
+                    hay.count >= n.count && hay.withUnsafeBytes { h in
+                        memmem(h.baseAddress, h.count, n.baseAddress, n.count) != nil
+                    }
+                }
+            }
         }
     }
 
@@ -212,24 +238,21 @@ extension Shop {
             }
             return ids
         }
-        let text = query.text
-        let tokens = query.tokens
+        let text = LibraryMemo.Folded.bytes(query.text)
+        let tokens = query.tokens.map { ($0.field, LibraryMemo.Folded.bytes($0.folded)) }
+        let any = LibraryMemo.Folded.any
         return { [self] file in
             let f = foldedText(file)
-            if !text.isEmpty, !f.free.contains(where: { !$0.isEmpty && $0.localizedStandardContains(text) }) {
-                return false
-            }
+            if !text.isEmpty, !any(f.free, text) { return false }
             var printer = 0
-            for token in tokens {
-                let v = token.folded
-                func any(_ fields: [String]) -> Bool { fields.contains { !$0.isEmpty && $0.localizedStandardContains(v) } }
+            for (field, v) in tokens {
                 let ok: Bool
-                switch token.field {
-                case .tag: ok = any(f.tags)
-                case .group: ok = any([f.group])
-                case .category: ok = any([f.category])
-                case .material: ok = any(f.materials)
-                case .creator: ok = any(f.creators)
+                switch field {
+                case .tag: ok = any(f.tags, v)
+                case .group: ok = any(f.group, v)
+                case .category: ok = any(f.category, v)
+                case .material: ok = any(f.materials, v)
+                case .creator: ok = any(f.creators, v)
                 case .printer:
                     ok = readyFor[printer][file.id] == true
                     printer += 1
