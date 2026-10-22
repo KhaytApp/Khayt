@@ -15,10 +15,11 @@ struct VaultCryptoTests {
     struct Vectors: Decodable {
         struct Inputs: Decodable {
             let shopDek, dk, fileId, uploadId, grantId, linkSecret, password: String
-            let shopWrapNonce, grantWrapNonce, metaNonce, metaJson: String
+            let shopWrapNonce, grantWrapNonce, metaNonce, metaJson, linkMetaNonce: String
         }
         struct Derived: Decodable {
-            let vaultKey, dedupeKey, linkKeyNoPassword, passwordNfcHex, linkPasswordScrypt, linkKeyPassword: String
+            let vaultKey, chunkKey, dedupeKey, linkKeyNoPassword, passwordNfcHex, linkPasswordScrypt,
+                linkKeyPassword: String
         }
         struct Chunk: Decodable {
             let index: Int
@@ -37,12 +38,14 @@ struct VaultCryptoTests {
         struct Wrap: Decodable { let aad, nonce, wrapped: String }
         struct Wraps: Decodable { let shop, grantNoPassword, grantPassword: Wrap }
         struct Meta: Decodable { let aad, nonce, json, sealed: String }
+        struct LinkMetaVec: Decodable { let aad, nonce, json, sealedNoPassword, sealedPassword: String }
 
         let inputs: Inputs
         let derived: Derived
         let files: [File]
         let wraps: Wraps
         let meta: Meta
+        let linkMeta: LinkMetaVec
     }
 
     static let v: Vectors = {
@@ -60,15 +63,18 @@ struct VaultCryptoTests {
 
     var v: Vectors { Self.v }
     var dk: Data { Self.h(v.inputs.dk) }
+    var dek: Data { Self.h(v.inputs.shopDek) }
     var vaultKey: Data { Self.h(v.derived.vaultKey) }
 
     // MARK: - Vectors
 
-    @Test("vault key and dedupe key from the shop DEK")
+    @Test("vault key, dedupe key (both from the DEK) and the per-upload chunk key")
     func keys() throws {
-        let vk = try VaultCrypto.vaultKey(shopDek: Self.h(v.inputs.shopDek))
-        #expect(Self.hex(vk) == v.derived.vaultKey)
-        #expect(Self.hex(try VaultCrypto.dedupeKey(vaultKey: vk)) == v.derived.dedupeKey)
+        #expect(Self.hex(try VaultCrypto.vaultKey(shopDek: dek)) == v.derived.vaultKey)
+        #expect(Self.hex(try VaultCrypto.dedupeKey(shopDek: dek)) == v.derived.dedupeKey)
+        #expect(v.derived.dedupeKey != v.derived.vaultKey)
+        #expect(Self.hex(try VaultCrypto.chunkKey(dk: dk, uploadId: v.inputs.uploadId)) == v.derived.chunkKey)
+        #expect(Self.hex(try VaultCrypto.chunkKey(dk: dk, uploadId: "u_other")) != v.derived.chunkKey)
     }
 
     @Test("every file case: chunks, hashes, manifest, dedupe tag, round trip")
@@ -88,7 +94,7 @@ struct VaultCryptoTests {
             #expect(try VaultCrypto.manifestJSON(size: f.size, chunkHashes: out.chunkHashes,
                                                  chunkBytes: f.chunkBytes) == f.manifestJson, "\(f.name)")
             #expect(out.manifestHash == f.manifestHash, "\(f.name)")
-            #expect(try VaultCrypto.dedupeTag(vaultKey: vaultKey, plaintext: pt) == f.dedupeTag, "\(f.name)")
+            #expect(try VaultCrypto.dedupeTag(shopDek: dek, plaintext: pt) == f.dedupeTag, "\(f.name)")
 
             let back = try VaultCrypto.decryptFile(dk: dk, fileId: v.inputs.fileId, uploadId: v.inputs.uploadId,
                                                    sealedChunks: out.chunks, size: f.size,
@@ -143,16 +149,90 @@ struct VaultCryptoTests {
         }
     }
 
-    @Test("meta record: byte for byte, and back")
+    @Test("linkPasswordOk: at least 10 Unicode scalars after NFC, the JS twin's count")
+    func linkPasswordOk() {
+        #expect(!VaultCrypto.linkPasswordOk("123456789"))
+        #expect(VaultCrypto.linkPasswordOk("1234567890"))
+        #expect(VaultCrypto.linkPasswordOk("abcdefghie\u{301}"))   // 10 after NFC
+        #expect(!VaultCrypto.linkPasswordOk("abcdefghe\u{301}"))   // 9 after NFC
+        #expect(VaultCrypto.linkPasswordOk(String(repeating: "\u{1F600}", count: 10)))
+        #expect(!VaultCrypto.linkPasswordOk(nil))
+    }
+
+    @Test("shop meta record: byte for byte, seq, and back")
     func meta() throws {
-        let sealed = try VaultCrypto.encryptMeta(vaultKey: vaultKey, fileId: v.inputs.fileId,
+        let fid = v.inputs.fileId, uid = v.inputs.uploadId
+        let sealed = try VaultCrypto.encryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
                                                  json: Data(v.meta.json.utf8), nonce: Self.h(v.meta.nonce))
         #expect(Self.hex(sealed) == v.meta.sealed)
-        let back = try VaultCrypto.decryptMeta(vaultKey: vaultKey, fileId: v.inputs.fileId, sealed: sealed)
-        #expect(String(decoding: back, as: UTF8.self) == v.meta.json)
-        #expect(throws: VaultCrypto.Failure.authentication) {
-            try VaultCrypto.decryptMeta(vaultKey: vaultKey, fileId: "f_other", sealed: sealed)
+        let back = try VaultCrypto.decryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid, sealed: sealed,
+                                               lastSeenSeq: 7)
+        #expect(String(decoding: back.json, as: UTF8.self) == v.meta.json)
+        #expect(back.seq == 7)
+        #expect(throws: VaultCrypto.Failure.rollback(seq: 7, lastSeen: 8)) {
+            try VaultCrypto.decryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid, sealed: sealed, lastSeenSeq: 8)
         }
+        #expect(throws: VaultCrypto.Failure.authentication) {
+            try VaultCrypto.decryptMeta(vaultKey: vaultKey, fileId: "f_other", uploadId: uid, sealed: sealed, lastSeenSeq: nil)
+        }
+        #expect(throws: VaultCrypto.Failure.authentication) {
+            try VaultCrypto.decryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: "u_other", sealed: sealed, lastSeenSeq: nil)
+        }
+        for bad in [#"{"name":"x"}"#, #"{"seq":1.5}"#, #"{"seq":true}"#, #"{"seq":"1"}"#, #"{"seq":-1}"#, "[1]"] {
+            #expect(throws: VaultCrypto.Failure.self, "\(bad)") {
+                try VaultCrypto.encryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid, json: Data(bad.utf8))
+            }
+        }
+    }
+
+    @Test("checkMetaSeq: equal is fine, lower is a rollback, nothing remembered accepts")
+    func seq() throws {
+        #expect(try VaultCrypto.checkMetaSeq(5, lastSeen: nil) == 5)
+        #expect(try VaultCrypto.checkMetaSeq(5, lastSeen: 5) == 5)
+        #expect(try VaultCrypto.checkMetaSeq(6, lastSeen: 5) == 6)
+        #expect(throws: VaultCrypto.Failure.rollback(seq: 4, lastSeen: 5)) { try VaultCrypto.checkMetaSeq(4, lastSeen: 5) }
+        #expect(throws: VaultCrypto.Failure.self) { try VaultCrypto.checkMetaSeq(-1, lastSeen: nil) }
+    }
+
+    @Test("link meta record: byte for byte under both link keys, validated, and the share-page path")
+    func linkMeta() throws {
+        let want = try JSONDecoder().decode(VaultCrypto.LinkMeta.self, from: Data(v.linkMeta.json.utf8))
+        #expect(String(decoding: try want.canonicalJSON(), as: UTF8.self) == v.linkMeta.json)
+        let gid = v.inputs.grantId, fid = v.inputs.fileId
+        for (key, sealedHex) in [(v.derived.linkKeyNoPassword, v.linkMeta.sealedNoPassword),
+                                 (v.derived.linkKeyPassword, v.linkMeta.sealedPassword)] {
+            let lk = Self.h(key)
+            let sealed = try VaultCrypto.encryptLinkMeta(linkKey: lk, grantId: gid, fileId: fid, meta: want,
+                                                         nonce: Self.h(v.linkMeta.nonce))
+            #expect(Self.hex(sealed) == sealedHex)
+            #expect(try VaultCrypto.decryptLinkMeta(linkKey: lk, grantId: gid, fileId: fid, sealed: sealed) == want)
+            #expect(throws: VaultCrypto.Failure.authentication) {
+                try VaultCrypto.decryptLinkMeta(linkKey: lk, grantId: "g_other", fileId: fid, sealed: sealed)
+            }
+            #expect(throws: VaultCrypto.Failure.authentication) {
+                try VaultCrypto.decryptLinkMeta(linkKey: lk, grantId: gid, fileId: "f_other", sealed: sealed)
+            }
+        }
+        // link meta → pinned manifestHash → file
+        let lk = Self.h(v.derived.linkKeyNoPassword)
+        let lm = try VaultCrypto.decryptLinkMeta(linkKey: lk, grantId: gid, fileId: fid,
+                                                 sealed: Self.h(v.linkMeta.sealedNoPassword))
+        let gdk = try VaultCrypto.unwrapDkForGrant(linkKey: lk, wrapped: Self.h(v.wraps.grantNoPassword.wrapped),
+                                                   grantId: gid, fileId: fid)
+        let pt = try VaultCrypto.decryptFile(dk: gdk, fileId: fid, uploadId: lm.uploadId,
+                                             sealedChunks: f25.chunks.map { Self.h($0.sealed!) }, size: lm.size,
+                                             chunkHashes: f25.chunks.map(\.sha256),
+                                             expectedManifestHash: lm.manifestHash, chunkBytes: 16)
+        #expect(pt == Self.plaintext(40))
+        let bad = VaultCrypto.LinkMeta(uploadId: "a|b", manifestHash: want.manifestHash, name: "", size: 1, kind: "")
+        #expect(throws: VaultCrypto.Failure.self) {
+            try VaultCrypto.encryptLinkMeta(linkKey: lk, grantId: gid, fileId: fid, meta: bad)
+        }
+    }
+
+    @Test("jsonString writes what JSON.stringify writes")
+    func jsonEscapes() {
+        #expect(VaultCrypto.jsonString("a\"b\\c\n\t\u{01}\u{1F}/é") == #""a\"b\\c\n\t\u0001\u001f/é""#)
     }
 
     // MARK: - Tamper rejection
@@ -219,12 +299,10 @@ struct VaultCryptoTests {
         #expect(throws: VaultCrypto.Failure.manifestMismatch("manifest does not match its hash")) {
             try open(reordered, size: f25.size, swapped, pinned: f25.manifestHash)
         }
-        // Even a forged manifest that is somehow pinned cannot reorder: the AAD carries the index.
         let forged = try VaultCrypto.manifestHash(size: f25.size, chunkHashes: swapped, chunkBytes: 16)
         #expect(throws: VaultCrypto.Failure.authentication) {
             try open(reordered, size: f25.size, swapped, pinned: forged)
         }
-        // A consistently shortened manifest cannot truncate: chunk 1 was sealed as not-last.
         let short = Array(hashes.prefix(2))
         let shortPin = try VaultCrypto.manifestHash(size: 32, chunkHashes: short, chunkBytes: 16)
         #expect(throws: VaultCrypto.Failure.authentication) {
@@ -233,6 +311,57 @@ struct VaultCryptoTests {
         #expect(throws: VaultCrypto.Failure.badInput("chunk count does not match size")) {
             try open(Array(chunks.prefix(2)), size: f25.size, short, pinned: f25.manifestHash)
         }
+    }
+
+    @Test("streaming reader: succeeds only after the last chunk; refuses early end and extra chunks")
+    func reader() throws {
+        let hashes = f25.chunks.map(\.sha256)
+        func make() throws -> VaultCrypto.ChunkReader {
+            try VaultCrypto.ChunkReader(dk: dk, fileId: v.inputs.fileId, uploadId: v.inputs.uploadId,
+                                        size: f25.size, chunkHashes: hashes,
+                                        expectedManifestHash: f25.manifestHash, chunkBytes: 16)
+        }
+        var r = try make()
+        _ = try r.push(sealed(0))
+        _ = try r.push(sealed(1))
+        #expect(!r.done)
+        #expect(throws: VaultCrypto.Failure.stream("stream ended before the last chunk")) { try r.finish() }
+        _ = try r.push(sealed(2))
+        #expect(r.done)
+        #expect(try r.finish() == (40, 3))
+        #expect(throws: VaultCrypto.Failure.stream("chunk after the last chunk")) { try r.push(sealed(2)) }
+        #expect(throws: VaultCrypto.Failure.stream("reader failed")) { try r.finish() }
+
+        var r2 = try make()
+        #expect(throws: VaultCrypto.Failure.self) { try r2.push(sealed(1)) }
+        #expect(throws: VaultCrypto.Failure.stream("reader already failed")) { try r2.push(sealed(0)) }
+
+        let e = try #require(v.files.first { $0.name == "empty" })
+        var r3 = try VaultCrypto.ChunkReader(dk: dk, fileId: v.inputs.fileId, uploadId: v.inputs.uploadId, size: 0,
+                                             chunkHashes: [e.chunks[0].sha256], expectedManifestHash: e.manifestHash,
+                                             chunkBytes: 16)
+        #expect(throws: VaultCrypto.Failure.stream("stream ended before the last chunk")) { try r3.finish() }
+        #expect(try r3.push(Self.h(e.chunks[0].sealed!)).isEmpty)
+        #expect(try r3.finish() == (0, 1))
+    }
+
+    @Test("sizes above 2^53 are refused before anything else, and chunkCount cannot overflow")
+    func hugeSizes() throws {
+        let tooBig = [Int.max, Int.max - 1, (1 << 53) + 1, 1 << 60]
+        for size in tooBig {
+            #expect(throws: VaultCrypto.Failure.self) { try VaultCrypto.chunkCount(size: size) }
+            #expect(throws: VaultCrypto.Failure.badInput("size must be an integer from 0 to 2^53")) {
+                try VaultCrypto.manifestJSON(size: size, chunkHashes: ["junk"])
+            }
+            #expect(throws: VaultCrypto.Failure.badInput("size must be an integer from 0 to 2^53")) {
+                try VaultCrypto.ChunkReader(dk: dk, fileId: "f", uploadId: "u", size: size,
+                                            chunkHashes: ["junk"], expectedManifestHash: "x")
+            }
+        }
+        #expect(throws: VaultCrypto.Failure.self) { try VaultCrypto.chunkCount(size: -1) }
+        #expect(try VaultCrypto.chunkCount(size: 1 << 53) == (1 << 53) / VaultCrypto.chunkBytes)
+        #expect(try VaultCrypto.chunkCount(size: (1 << 53) - 1, chunkBytes: 3) == ((1 << 53) - 1) / 3 + 1)
+        #expect(try VaultCrypto.chunkCount(size: 1 << 53, chunkBytes: 1) == 1 << 53)
     }
 
     @Test("wraps refuse a wrong aad, a wrong kek and a tampered nonce")
@@ -262,14 +391,28 @@ struct VaultCryptoTests {
         }
     }
 
-    @Test("ids containing \"|\" are refused")
-    func pipeInIds() {
-        #expect(throws: VaultCrypto.Failure.self) {
-            try VaultCrypto.encryptChunk(dk: dk, fileId: "a|b", uploadId: "c", index: 0, last: true, plaintext: Data())
+    @Test("ids: only [A-Za-z0-9_-]{1,64}, judged on bytes")
+    func ids() throws {
+        // "|" + a combining mark is ONE grapheme, so String.contains("|") is false for it.
+        let pipeCombining = "a|\u{301}b"
+        #expect(!pipeCombining.contains("|"))
+        // A lone surrogate cannot live in a Swift String; decoding one yields U+FFFD.
+        let loneSurrogate = String(decoding: [0xED, 0xA0, 0x80] as [UInt8], as: UTF8.self)
+        let bad = ["a|b", pipeCombining, loneSurrogate, "", String(repeating: "x", count: 65), "caf\u{E9}",
+                   "a b", "a.b", "a/b", "\u{661}", "a\u{0}"]
+        for b in bad {
+            #expect(throws: VaultCrypto.Failure.self, "\(b.unicodeScalars.map { $0.value })") {
+                try VaultCrypto.encryptChunk(dk: dk, fileId: b, uploadId: "u", index: 0, last: true, plaintext: Data())
+            }
+            #expect(throws: VaultCrypto.Failure.self) {
+                try VaultCrypto.encryptChunk(dk: dk, fileId: "f", uploadId: b, index: 0, last: true, plaintext: Data())
+            }
+            #expect(throws: VaultCrypto.Failure.self) {
+                try VaultCrypto.wrapDkForGrant(linkKey: vaultKey, dk: dk, grantId: b, fileId: "f")
+            }
         }
-        #expect(throws: VaultCrypto.Failure.self) {
-            try VaultCrypto.wrapDkForShop(vaultKey: dk, dk: dk, fileId: "a", uploadId: "b|c")
-        }
+        _ = try VaultCrypto.encryptChunk(dk: dk, fileId: String(repeating: "x", count: 64), uploadId: "A-z_0",
+                                         index: 0, last: true, plaintext: Data())
     }
 
     @Test("random paths differ and round-trip; base64url has no + / =")
