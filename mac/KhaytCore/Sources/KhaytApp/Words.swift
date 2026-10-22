@@ -2110,7 +2110,9 @@ final class Words {
         // A model's print count, Mac-own so Arabic can count it: the shared
         // `cat.printed_n` has one form, and drew "طُبع 9 مرة".
         "mac.printed_n":     ["en": "printed {n}×", "ar": "طُبع {n} مرة"],
-        "mac.printed_n_one": ["en": "printed {n}×", "ar": "طُبع مرة واحدة"],
+        // "مرة" alone says once; "مرة واحدة" ran out of a tile's width
+        // beside a group name (KING Salman, Oct 2026 capture).
+        "mac.printed_n_one": ["en": "printed {n}×", "ar": "طُبع مرة"],
         "mac.printed_n_two": ["en": "printed 2×", "ar": "طُبع مرتين"],
         "mac.printed_n_few": ["en": "printed {n}×", "ar": "طُبع {n} مرات"],
         // An average in days. A whole number is counted; a fraction takes the

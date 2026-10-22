@@ -719,6 +719,13 @@ final class Activator: NSObject, NSApplicationDelegate {
             // shelf of the real book and photographs it, and does nothing
             // else: navigation only, no sheets, no gestures. Writes are gated
             // on owning the book, and a running Khayt holds it.
+            // Only the library phase-1a scenes, on the sample, in whichever
+            // appearance and language this run was started in.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBRARY"] == "1", let shop = subject {
+                await captureLibrary1a(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DELETE"] == "1", let shop = subject {
                 await captureLibraryStorage(shop, into: dir)
                 NSApp.terminate(nil)
@@ -770,6 +777,8 @@ final class Activator: NSObject, NSApplicationDelegate {
                 try? await Task.sleep(for: .milliseconds(700))
                 capture(named: "03-dark-library", into: dir)
                 capturePanes(named: "03-dark-library", into: dir)
+                // A model selected, its inspector and the storage badges, dark.
+                if let subject { await captureLibrary1a(subject, into: dir, dark: true) }
                 subject?.shelf = .jobs(nil)
                 try? await Task.sleep(for: .milliseconds(700))
                 capture(named: "01-dark-jobs", into: dir)
@@ -936,6 +945,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             }
             shop.fileSelection = []
             await settle()
+            await captureLibrary1a(shop, into: dir)
 
             await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
             await settle()
@@ -1596,6 +1606,110 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// no picture: it looks like the change did nothing.
     private static func settle() async {
         try? await Task.sleep(for: .milliseconds(700))
+    }
+
+    /// ── THE LIBRARY REDESIGN, PHASE 1a ────────────────────────────────────
+    ///
+    /// Search tokens and their chips, the Archived view, an archived model's
+    /// note and Restore, and the Storage section with the tile badges — none
+    /// of which the sample book reaches on its own: nothing in it is archived,
+    /// and a sample has no remote and no cloud state index.
+    ///
+    /// ALL IN MEMORY. The archived model is the sample's rows with one date
+    /// added, put up with `pretendLibrary`; the remote is an identity string
+    /// and the index a throwaway file under the temporary folder. The sample
+    /// on disk is never written, and the sample is loaded again at the end so
+    /// nothing here leaks into the shots that follow.
+    ///
+    /// `dark`: only the storage scene, under the dark run's own name.
+    static func captureLibrary1a(_ shop: Shop, into dir: URL, dark: Bool = false) async {
+        await shop.load(.sample)
+        shop.pretendsWritable = true
+        defer { shop.pretendsWritable = false }
+        shop.clearLibraryFilter()
+        shop.libraryFlat = true
+        shop.shelf = .library(nil)
+        shop.fileSelection = []
+        await settle()
+        if !dark {
+            // (a) The search the review asked for — tokens and free text,
+            // which finds nothing in the sample — and one that finds the Kings.
+            for (name, query) in [("03f-library-tokens", "tag:dragon material:PLA dragon"),
+                                  ("03g-library-tokens-found", "tag:relief material:PLA king")] {
+                shop.search = query
+                await settle()
+                capture(named: name, into: dir)
+            }
+            shop.search = ""
+            await settle()
+
+            // (b) One model put aside, and the Archived view.
+            var rows = shop.libraryRows
+            if let i = rows.firstIndex(where: {
+                if case .object(let o) = $0, case .string("PF-sample-lantern")? = o["id"] { return true }
+                return false
+            }), case .object(var o) = rows[i] {
+                o["archivedAt"] = .string("2026-10-12T09:30:00.000Z")
+                rows[i] = .object(o)
+                shop.pretendLibrary(rows)
+                shop.libraryRows = rows
+                shop.libraryShowArchived = true
+                await shop.settleLibraryFacets()
+                await settle()
+                capture(named: "03h-library-archived", into: dir)
+                // (d) Its inspector: the Archived note, with Restore.
+                shop.fileSelection = ["PF-sample-lantern"]
+                await settle()
+                capture(named: "03i-archived-inspector", into: dir)
+                capturePanes(named: "03i-archived-inspector", into: dir)
+                shop.fileSelection = []
+                shop.libraryShowArchived = false
+            }
+            await shop.load(.sample)
+            shop.clearLibraryFilter()
+            shop.libraryFlat = true
+            shop.shelf = .library(nil)
+            await settle()
+        }
+
+        // (c) Storage: a pretend bucket, and an index with all three states
+        // and a keep, so the tiles carry their badges and the inspector its
+        // Storage section and rename pencil.
+        let scratch = FileManager.default.temporaryDirectory
+            .appending(path: "khayt-snapshot-sync-\(UUID().uuidString)")
+        let remote = CloudLibrary.bucketIdentity(endpoint: "https://snapshot.example", bucket: "sample", prefix: "")
+        let ids = shop.visibleFiles.map(\.id)
+        let index = LibrarySyncIndex.migrate(primary: scratch.appending(path: "vault").path, folder: scratch,
+                                             roots: [], models: ids.map { .init(id: $0, externalPath: nil) })
+        var states: Shop.FileStates = [:]
+        for (i, id) in ids.enumerated() {
+            let state: LibrarySyncIndex.State = [.backedUp, .online, .local, .backedUp][i % 4]
+            states[id] = ["model.3mf": .init(state: state, remote: state == .local ? nil : remote)]
+        }
+        index.record(states)
+        if ids.count > 2 { index.setKeep(ids[2], true) }
+        shop.syncIndex = index
+        shop.libraryRemoteId = remote
+        shop.libraryHasRemote = true
+        shop.syncIndexChanged()
+        await shop.settleLibraryFacets()
+        let chosen = ids.count > 2 ? ids[2] : ids.first
+        shop.fileSelection = chosen.map { [$0] } ?? []
+        await settle()
+        shop.libraryInspectorScrollTo = "model-title"
+        await settle()
+        let name = dark ? "03f-dark-library-storage" : "03j-library-storage"
+        capture(named: name, into: dir)
+        capturePanes(named: name, into: dir)
+        shop.libraryInspectorScrollTo = "model-storage"
+        await settle()
+        capturePanes(named: name + "-section", into: dir)
+        shop.libraryInspectorScrollTo = nil
+        shop.fileSelection = []
+        shop.syncIndex = nil
+        try? FileManager.default.removeItem(at: scratch)
+        await shop.load(.sample)
+        await settle()
     }
 
     /// `KHAYT_SNAPSHOT_DELETE=1`: the library's storage surfaces — Rescan

@@ -242,7 +242,8 @@ struct LibraryGrid: View {
              words: shop.words,
              group: Cell.groupShown(for: file, shelf: shop.shelf),
              openGroup: { shop.showGroup($0) },
-             storage: shop.storageBadge(for: file))
+             storage: shop.storageBadge(for: file),
+             kept: shop.isKeptOnThisMac(file))
             .onTapGesture {
                 // SwiftUI's tap gesture does not report modifiers, so they are
                 // read from the event that is arriving. Without this, ⌘-click
@@ -588,6 +589,8 @@ struct Cell: View {
     /// Where its bytes are, from the index (`Shop.storageBadge`) — nil draws
     /// nothing. Handed in, never looked up: a tile asks no disk anything.
     var storage: LibrarySyncIndex.State? = nil
+    /// Set to Keep on this Mac: a pin beside the storage badge.
+    var kept = false
 
     /// Which group a tile names: the model's own, unless the grid is already
     /// INSIDE it.
@@ -625,14 +628,20 @@ struct Cell: View {
                 // corner the palette leaves; read aloud, never only seen.
                 .overlay(alignment: .bottomTrailing) {
                     if let storage {
-                        Image(systemName: Shop.storageSymbol(storage))
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(storage == .online ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.secondary))
-                            .padding(4)
-                            .background(.thinMaterial, in: Circle())
-                            .padding(6)
-                            .help(words.callIt(Shop.storageWordKey(storage)))
-                            .accessibilityLabel(words.callIt(Shop.storageWordKey(storage)))
+                        let said = words.callIt(Shop.storageWordKey(storage))
+                            + (kept ? " · " + words.callIt("mac.storage_keep") : "")
+                        HStack(spacing: 3) {
+                            if kept { Image(systemName: "pin.fill") }
+                            Image(systemName: Shop.storageSymbol(storage))
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(storage == .online ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.primary))
+                        .padding(.horizontal, 5).padding(.vertical, 4)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(6)
+                        .help(said)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(said)
                     }
                 }
                 // WHAT KIND OF FILE THIS IS. Khayt indexes twenty-two

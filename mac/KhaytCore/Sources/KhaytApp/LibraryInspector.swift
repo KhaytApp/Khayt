@@ -17,7 +17,15 @@ struct LibraryInspector: View {
         if shop.selectedFiles.count > 1 {
             ManyModels(shop: shop)
         } else if let file = shop.selectedFile {
-            ScrollView { page(file) }
+            ScrollViewReader { proxy in
+                ScrollView { page(file) }
+                    .onChange(of: shop.libraryInspectorScrollTo) { _, to in
+                        if let to { proxy.scrollTo(to, anchor: .top) }
+                    }
+                    .onAppear {
+                        if let to = shop.libraryInspectorScrollTo { proxy.scrollTo(to, anchor: .top) }
+                    }
+            }
             // Keyed on the file, not on the book: these are facts about one
             // record and nothing else on this screen moves them.
             .task(id: file.id) {
@@ -47,6 +55,7 @@ struct LibraryInspector: View {
             if shop.libraryHasRemote || shop.storageState(for: file) == .online {
                 LayerRule()
                 StorageSection(shop: shop, file: file)
+                    .id("model-storage")
             }
             if let sliced = slicedSection(file) {
                 LayerRule()
@@ -153,14 +162,19 @@ struct LibraryInspector: View {
     }
 
     /// "Archived 12 Oct 2026", and Restore beside it.
+    /// The note on a line of its own and Restore under it: side by side in
+    /// the inspector's width, the date broke over two lines.
     private func archivedNote(_ file: LibraryFile) -> some View {
-        HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Label(archivedSentence(file), systemImage: "archivebox")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Button(shop.words.callIt("mac.unarchive_model")) { shop.unarchive([file.id]) }
-                .controlSize(.small)
-                .disabled(!shop.canWrite)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { shop.unarchive([file.id]) } label: {
+                Label(shop.words.callIt("mac.unarchive_model"), systemImage: "arrow.uturn.backward")
+            }
+            .controlSize(.small)
+            .disabled(!shop.canWrite)
         }
     }
 
@@ -269,6 +283,7 @@ struct LibraryInspector: View {
                 }
                 ModelTitle(shop: shop, file: file)
             }
+            .id("model-title")
             // PUT ASIDE, and said so where the eye is, with the way back. A
             // model found through Spotlight or a job opens here even while it
             // is archived, and should not read as one still on offer.

@@ -85,6 +85,9 @@ final class Shop {
     @ObservationIgnored var driveIdentityCache: (key: String, id: String)?
     /// Models whose index entry is being read again from the disk.
     @ObservationIgnored var syncCorrecting: Set<String> = []
+    /// A part of the model inspector to bring into view ("model-title",
+    /// "model-storage") — for the snapshot run, which cannot scroll.
+    var libraryInspectorScrollTo: String?
     /// A model an open job needs, waiting for "Free Up Space anyway".
     var pendingFreeUp: LibraryFile?
 
@@ -191,7 +194,11 @@ final class Shop {
 
     /// May this app change anything? False for the sample, and false whenever
     /// the Electron app has the book.
-    var canWrite: Bool { ownership != nil }
+    var canWrite: Bool { ownership != nil || pretendsWritable }
+    /// The snapshot run's sample, drawn as a book this app could change, so
+    /// the controls that appear only then (a rename pencil, Restore) are in
+    /// the picture. The sample has no build, so every write still refuses.
+    var pretendsWritable = false
     /// The last refusal, for the screen to say out loud. A write that fails
     /// silently is worse than one that never ran.
     var writeProblem: String?

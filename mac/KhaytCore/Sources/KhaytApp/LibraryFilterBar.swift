@@ -231,17 +231,19 @@ struct LibraryFilterBar: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
-                    Text(shop.words.callIt(key)).foregroundStyle(.secondary)
-                    if !on.isEmpty {
-                        Text(on.count == 1 ? on[0].label : "\(on.count)")
-                            .fontWeight(.semibold)
-                            .lineLimit(1)
-                    }
-                }
+                // ONE Text. A macOS button-style menu draws its label as a
+                // single title, and of an HStack of two it kept only the
+                // first: "Show" with Archived on read "Show" (Oct 2026
+                // capture), and every axis lost what it was set to.
+                Text(on.isEmpty ? shop.words.callIt(key)
+                     : shop.words.callIt(key) + ": " + (on.count == 1 ? on[0].label : shop.words.numeral(on.count)))
+                    .lineLimit(1)
             }
             .menuStyle(.button)
             .fixedSize()
+            // Rebuilt when what it is set to changes, so the button behind
+            // it takes the new title rather than keeping the first one.
+            .id(key + "|" + on.map(\.id).joined(separator: ","))
         }
     }
 }
@@ -253,7 +255,12 @@ private struct TokenChip: View {
     let words: Words
     let remove: () -> Void
 
-    private var label: String { words.callIt(token.field.wordKey) + ": " + token.value }
+    /// The value cut at 28 characters: a chip sizes to its words, and one
+    /// pasted paragraph must not push the menus off the row.
+    private var label: String {
+        let value = token.value.count > 28 ? String(token.value.prefix(27)) + "\u{2026}" : token.value
+        return words.callIt(token.field.wordKey) + ": " + value
+    }
 
     var body: some View {
         Button(action: remove) {
@@ -266,8 +273,9 @@ private struct TokenChip: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: 220)
-        .fixedSize(horizontal: false, vertical: true)
+        // Its own size, never stretched: a flexible chip took a share of the
+        // row's spare width and the chips stood apart (Oct 2026 capture).
+        .fixedSize()
         .help(words.callIt("mac.lib_token_remove", ["name": .string(label)]))
         .accessibilityLabel(words.callIt("mac.lib_token_remove", ["name": .string(label)]))
     }
