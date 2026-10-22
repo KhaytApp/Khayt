@@ -89,6 +89,13 @@ struct MachineSheet: View {
     /// What a probe found, or why it did not. Cleared by the next attempt.
     @State private var camNote: String?
     @State private var camLooking = false
+    /// A camera a look found that is not the one saved — offered, never applied.
+    @State private var camOffer: CameraOffer?
+    /// The look in flight, so the sheet's own quiet look can give way to Find
+    /// and neither outlives the sheet.
+    @State private var camLook: Task<Void, Never>?
+    /// The quiet look runs once per sheet, not on every `.task` re-run.
+    @State private var camLookedOnce = false
 
     /// When this machine is out of action. Loaded from the record and written
     /// back through the shared rule, which drops a window that cannot be read.
@@ -227,8 +234,21 @@ struct MachineSheet: View {
             await shop.readCatalog()
             kinds = await shop.machineKindChoices()
             if let existing { measuredPower = await shop.measuredPowerDraw(existing.id) }
+            // A machine opened with no working camera saved is looked at once,
+            // quietly: the shop's U1 has a dead `:8080` address switched off,
+            // and its camera is one GET away. Only on a real book — the sample
+            // shop's printers are not on this network.
+            if !camLookedOnce, existing != nil, shop.source.build != nil, !(camEnabled && !camSnapshot.isEmpty),
+               ["moonraker", "octoprint", "prusalink"].contains(apiType),
+               !apiHost.trimmingCharacters(in: .whitespaces).isEmpty {
+                camLookedOnce = true
+                findCamera(quiet: true)
+            }
         }
         .onAppear(perform: fill)
+        // A look still running when the sheet goes would write into a sheet
+        // nobody is looking at, and keep asking the printer for nothing.
+        .onDisappear { camLook?.cancel(); camLook = nil; camLooking = false }
         .machineLifeDialogs(shop: shop, ask: $lifeAsk) { dismiss() }
     }
 
@@ -441,6 +461,7 @@ struct MachineSheet: View {
                 serial: $apiSerial, slug: $apiSlug,
                 code: $accessCode, hasStoredCode: $hasStoredCode, forgetCode: $forgetCode,
                 testing: $testing, said: $testSaid, worked: $testWorked,
+                unverified: existing.map { BambuWatch.shared.unverified.contains($0.id) } ?? false,
                 test: test)
 
             // ── AND THE CAMERA ───────────────────────────────────────
@@ -456,7 +477,8 @@ struct MachineSheet: View {
             CameraSettings(
                 shop: shop, enabled: $camEnabled, snapshot: $camSnapshot,
                 rotate: $camRotate, flipH: $camFlipH, flipV: $camFlipV,
-                note: $camNote, looking: $camLooking, find: findCamera)
+                note: $camNote, looking: $camLooking, offer: $camOffer,
+                find: findCamera, accept: acceptCamera)
     }
 
     /// The smart plug: which kind, where, and whether to switch it off after a
@@ -1077,68 +1099,143 @@ struct MachineSheet: View {
     /// those as "no frame yet" and "temporarily unavailable" — a registered
     /// camera warming up is a camera, and refusing it here would tell a shop it
     /// has none.
-    private func findCamera() {
-        camNote = nil
+    ///
+    /// ── ASKED IN ORDER, AND OFFERED, NEVER APPLIED ───────────────────────
+    ///
+    /// `discoverySteps` decides the order: the camera already saved, what the
+    /// printer says it has, a vendor's known file (a Snapmaker U1 announces no
+    /// camera and serves its still as `camera/monitor.jpg`), then the guesses.
+    /// Whatever answers first is OFFERED — "Found a camera", with a button — and
+    /// the saved address is not touched until the owner takes it. A probe that
+    /// overwrote a camera the shop set up would be the app deciding on a guess.
+    ///
+    /// `quiet` is the look the sheet takes by itself when it opens on a machine
+    /// with no working camera saved: it offers what it finds and says nothing
+    /// when it finds nothing.
+    private func findCamera() { findCamera(quiet: false) }
+
+    private func findCamera(quiet: Bool) {
+        // Find wins: a quiet look still running gives way, and its answer is
+        // never written over Find's (every write below asks `isCancelled`).
+        // A quiet look never interrupts a Find.
+        if quiet, camLook != nil { return }
+        camLook?.cancel()
+        if !quiet { camNote = nil }
+        camOffer = nil
         camLooking = true
         let host = apiHost.trimmingCharacters(in: .whitespaces)
         let type = apiType
         let typed = apiKey
         let build = shop.source.build
-        Task {
-            defer { camLooking = false }
+        let savedUrl = camSnapshot.trimmingCharacters(in: .whitespaces)
+        let savedOn = camEnabled
+        camLook = Task {
+            defer {
+                if !Task.isCancelled { camLooking = false; camLook = nil }
+            }
             guard let engine = shop.engine, !host.isEmpty else {
-                camNote = shop.words.callIt("mac.cam_needs_host"); return
+                if !quiet { camNote = shop.words.callIt("mac.cam_needs_host") }
+                return
             }
             var api: [String: JSONValue] = ["type": .string(type), "host": .string(host)]
             if apiPort > 0 { api["port"] = .number(Double(apiPort)) }
             // The key as typed if the shop has just entered one, otherwise the
             // stored one opened for this single use. A probe that cannot
             // authenticate reports "no camera" for a camera that is there.
+            var key = ""
             if !typed.isEmpty {
-                api["apiKey"] = .string(typed)
+                key = typed
             } else if let sealed = existing?.printerApi?.apiKey, !sealed.isEmpty, let build,
                       let opened = try? await Secrets.open(sealed, for: build) {
-                api["apiKey"] = .string(opened)
+                key = opened
             }
+            if !key.isEmpty { api["apiKey"] = .string(key) }
             let row = JSONValue.object(api)
-            guard let candidates = try? await engine.webcamCandidates(printerApi: row),
-                  !candidates.isEmpty else {
-                camNote = shop.words.callIt("mac.cam_none"); return
+            // The saved address as the shared rule reads it, so a path typed
+            // here is the same camera as the absolute URL a probe finds.
+            let savedAbs = savedUrl.isEmpty ? "" :
+                ((try? await engine.normalizeWebcamUrl(savedUrl, printerApi: row)) ?? "")
+            let saved = JSONValue.object(["enabled": .bool(savedOn), "snapshotUrl": .string(savedAbs)])
+            guard let steps = try? await engine.cameraDiscoverySteps(printerApi: row, webcam: saved),
+                  !steps.isEmpty else {
+                if !quiet { camNote = shop.words.callIt("mac.cam_none") }
+                return
             }
-            for candidate in candidates {
-                if (try? await engine.assertWebcamHost(candidate, printerApi: row)) == nil { continue }
-                guard let url = URL(string: candidate) else { continue }
-                // The host rule above passes ANY address equal to the
-                // printer's own — and the printer's own was typed into this
-                // sheet a moment ago and never checked. The key goes nowhere
-                // the poller's LAN rule would refuse.
-                // Resolved, and aimed at the address that was checked, as the
-                // camera tile does (`PrinterWatch.pinned`).
-                guard let aimed = await PrinterWatch.pinned(url, engine: engine) else { continue }
-                var request = URLRequest(url: aimed)
-                request.timeoutInterval = 4
-                if let headers = try? await engine.webcamAuthHeaders(printerApi: row) {
-                    for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+            for step in steps {
+                var candidate: KhaytEngine.CameraCandidate?
+                if let list = step.listUrl {
+                    // A list the printer keeps — on the printer's own host,
+                    // by the same pin as everything else that carries its key.
+                    guard (try? await engine.assertWebcamHost(list, printerApi: row)) != nil,
+                          let url = URL(string: list),
+                          let aimed = await PrinterWatch.pinned(url, engine: engine),
+                          let body = try? await PrinterWatch.get(aimed, path: "", key: key, type: type,
+                                                                 timeout: 4) else { continue }
+                    candidate = try? await engine.cameraCandidate(step: step, body: .object(body), printerApi: row)
+                } else {
+                    candidate = try? await engine.cameraCandidate(step: step, body: .null, printerApi: row)
                 }
-                // The poller's session: ephemeral, and no redirect carries the
-                // printer's key to an address `assertWebcamHost` never saw.
-                guard let (data, response) = try? await PrinterWatch.session.data(for: request) else { continue }
-                let http = response as? HTTPURLResponse
-                let refusal = try? await engine.checkSnapshot(
-                    status: http?.statusCode ?? 0,
-                    contentType: http?.value(forHTTPHeaderField: "Content-Type"),
-                    contentLength: data.count)
-                if refusal == nil || refusal == "no_frame_yet" {
-                    camSnapshot = candidate
-                    camEnabled = true
-                    camNote = refusal == "no_frame_yet"
-                        ? shop.words.callIt("mac.cam_warming")
-                        : shop.words.callIt("mac.cam_found")
+                if Task.isCancelled { return }
+                guard let candidate,
+                      let answer = await Self.probeStill(candidate.snapshotUrl, printerApi: row, engine: engine)
+                else { continue }
+                if Task.isCancelled { return }
+                let kind = (try? await engine.cameraSuggestion(saved: saved, found: candidate.snapshotUrl)) ?? "new"
+                if Task.isCancelled { return }
+                if kind == "same" {
+                    if !quiet {
+                        camNote = shop.words.callIt(answer == .paused ? "mac.cam_saved_paused" : "mac.cam_saved_answered")
+                    }
                     return
                 }
+                camOffer = CameraOffer(url: candidate.snapshotUrl, kind: kind, answer: answer)
+                return
             }
-            camNote = shop.words.callIt("mac.cam_none")
+            if !quiet, !Task.isCancelled { camNote = shop.words.callIt("mac.cam_none") }
         }
+    }
+
+    /// The owner took the camera on offer. Only now does the sheet change —
+    /// and the book only when the sheet is saved.
+    private func acceptCamera() {
+        guard let offer = camOffer else { return }
+        camSnapshot = offer.url
+        camEnabled = true
+        camOffer = nil
+        camNote = shop.words.callIt(offer.answer == .warming ? "mac.cam_warming"
+                                    : offer.answer == .paused ? "mac.cam_found_paused" : "mac.cam_found")
+    }
+
+    /// One still, fetched once, to prove an address is a camera — or nil.
+    static func probeStill(_ candidate: String, printerApi row: JSONValue,
+                           engine: KhaytEngine) async -> CameraOffer.Answer? {
+        guard (try? await engine.assertWebcamHost(candidate, printerApi: row)) != nil,
+              let url = URL(string: candidate) else { return nil }
+        // The host rule above passes ANY address equal to the printer's own —
+        // and the printer's own was typed into this sheet a moment ago and
+        // never checked. The key goes nowhere the poller's LAN rule would
+        // refuse. Resolved, and aimed at the address that was checked, as the
+        // camera tile does (`PrinterWatch.pinned`).
+        guard let aimed = await PrinterWatch.pinned(url, engine: engine) else { return nil }
+        var request = URLRequest(url: aimed)
+        request.timeoutInterval = 4
+        if Camera.samePrinterHost(url, printerApi: row),
+           let headers = try? await engine.webcamAuthHeaders(printerApi: row) {
+            for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        }
+        // The poller's session: ephemeral, and no redirect carries the
+        // printer's key to an address `assertWebcamHost` never saw.
+        guard let (data, response) = try? await PrinterWatch.session.data(for: request) else { return nil }
+        let http = response as? HTTPURLResponse
+        let refusal = try? await engine.checkSnapshot(
+            status: http?.statusCode ?? 0,
+            contentType: http?.value(forHTTPHeaderField: "Content-Type"),
+            contentLength: data.count)
+        if refusal == "no_frame_yet" { return .warming }
+        guard refusal == nil else { return nil }
+        let age = try? await engine.stillAge(lastModified: http?.value(forHTTPHeaderField: "Last-Modified"),
+                                             date: http?.value(forHTTPHeaderField: "Date"), now: Date())
+        return age?.paused == true ? .paused : .live
     }
 
     private func test() {
@@ -1367,6 +1464,8 @@ private struct Connection: View {
     @Binding var testing: Bool
     @Binding var said: String?
     @Binding var worked: Bool
+    /// The printer was let in by the first-use pin, not by Bambu Lab's CAs.
+    var unverified: Bool = false
     let test: () -> Void
 
     /// Only what this app can actually speak. A menu offering Bambu or Duet
@@ -1454,6 +1553,14 @@ private struct Connection: View {
                                 Text(shop.words.callIt("mac.mach_bambu_hint"))
                                     .font(.caption2).foregroundStyle(.tertiary)
                                     .fixedSize(horizontal: false, vertical: true)
+                                // Quietly: it works, and is trusted the way it
+                                // was before, but Bambu Lab's CAs did not vouch
+                                // for it (`BambuMqtt.trustDecision`).
+                                if unverified {
+                                    Text(shop.words.callIt("mac.mach_cert_unverified"))
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
                         }
                     }
@@ -1529,7 +1636,9 @@ private struct CameraSettings: View {
     @Binding var flipV: Bool
     @Binding var note: String?
     @Binding var looking: Bool
+    @Binding var offer: CameraOffer?
     let find: () -> Void
+    let accept: () -> Void
 
     var body: some View {
         let words = shop.words
@@ -1571,12 +1680,65 @@ private struct CameraSettings: View {
                 }
             }
 
+            if let offer {
+                OfferBox(words: words, offer: offer, accept: accept) { self.offer = nil }
+            }
+
             if let note {
                 Text(note).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
+
+    /// "Found a camera" — the address, what taking it would change, and the
+    /// owner's two answers.
+    private struct OfferBox: View {
+        let words: Words
+        let offer: CameraOffer
+        let accept: () -> Void
+        let dismiss: () -> Void
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 6) {
+                Label(words.callIt("mac.cam_offer_title"), systemImage: "camera")
+                    .font(.callout.weight(.semibold))
+                Text(offer.url)
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
+                    .lineLimit(2).truncationMode(.middle)
+                    // An address reads left to right in Arabic too.
+                    .environment(\.layoutDirection, .leftToRight)
+                Text(words.callIt(offer.kind == "replace" ? "mac.cam_offer_replace"
+                                  : offer.kind == "enable" ? "mac.cam_offer_enable" : "mac.cam_offer_new"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if offer.answer == .paused {
+                    Text(words.callIt("mac.cam_offer_paused"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack {
+                    Button(words.callIt("mac.cam_offer_use"), action: accept)
+                    Button(words.callIt("mac.cam_offer_not_now"), action: dismiss)
+                        .buttonStyle(.link)
+                }
+                .padding(.top, 2)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.quaternary.opacity(0.5)))
+        }
+    }
+}
+
+/// A camera a look found, offered to the owner rather than applied.
+struct CameraOffer: Equatable {
+    enum Answer: Equatable { case live, paused, warming }
+    let url: String
+    /// `new` | `replace` | `enable` — `lib/webcam.js suggestionFor`.
+    let kind: String
+    let answer: Answer
 }
 
 /// When a machine is out of action, and why.

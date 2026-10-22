@@ -218,6 +218,14 @@ extension Shop {
 
     // MARK: - Telling a printer what to do
 
+    /// Learn, once per protocol, which verbs its card may offer.
+    func learnPrinterVerbs(_ type: String) async {
+        guard printerVerbs[type] == nil, let engine else { return }
+        // lock: system — asks the shared command table which verbs exist; it
+        // sends a printer nothing and writes nothing.
+        printerVerbs[type] = await PrinterControl.verbs(for: type, engine: engine)
+    }
+
     func tell(_ machine: Machine, _ verb: PrinterControl.Verb) async {
         // A printer is told what to do by somebody running the floor —
         // `orders`/`edit` in lib/rbac.js, which an operator has and a viewer
@@ -232,6 +240,22 @@ extension Shop {
             try await PrinterControl.send(verb, to: machine, engine: engine, build: source.build)
             // Ask straight away rather than waiting for the next poll: a button
             // that appears to do nothing for ten seconds gets pressed again.
+            await printers.refresh(machine, shop: self)
+        } catch {
+            printerProblem[machine.id] = PrinterWatch.problem(error, words)
+        }
+    }
+
+    /// Speed preset or chamber light on a Bambu (S11 follow-on). Same gate
+    /// as `tell`; the speed is confirmed by the card first while printing.
+    func control(_ machine: Machine, _ control: PrinterControl.Control) async {
+        guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
+        guard let engine else { return }
+        printerProblem[machine.id] = nil
+        printerBusy.insert(machine.id)
+        defer { printerBusy.remove(machine.id) }
+        do {
+            try await PrinterControl.control(control, to: machine, engine: engine, build: source.build)
             await printers.refresh(machine, shop: self)
         } catch {
             printerProblem[machine.id] = PrinterWatch.problem(error, words)
@@ -383,7 +407,9 @@ extension Shop {
     func printRunsStamp(_ jobId: String) -> String {
         guard case .object(let o)? = orderRows.first(where: { Self.recordId($0) == jobId }) else { return jobId }
         let runs: Int = if case .array(let a)? = o["printRuns"] { a.count } else { 0 }
-        return "\(jobId)|\(Self.plainString(o["machineId"]) ?? "")|\(Self.plainString(o["plannedMachineId"]) ?? "")|\(runs)"
+        // And its timelapse, noted minutes after the finish edge.
+        let lapse = o["printerTimelapse"] == nil ? "" : "|t"
+        return "\(jobId)|\(Self.plainString(o["machineId"]) ?? "")|\(Self.plainString(o["plannedMachineId"]) ?? "")|\(runs)\(lapse)"
     }
 
     /// What is on a machine's plate, for the sheet that offers to drop one.

@@ -205,6 +205,9 @@ final class Activator: NSObject, NSApplicationDelegate {
             // outlives its application is a timer running against a runtime
             // that is being dismantled.
             FloorStatus.shared.remove()
+            // Every held Bambu connection: MQTT DISCONNECT and close, now —
+            // there is no later in which an async stop would run.
+            BambuWatch.shared.hangUpAll()
             Snapshot.subject?.relinquish()
         }
     }
@@ -471,6 +474,8 @@ final class Activator: NSObject, NSApplicationDelegate {
                     CameraTile(frame: .picture(Snapshot.plateBytes()),
                                webcam: nil, words: Snapshot.subject?.words)
                     CameraTile(frame: .waiting, webcam: nil, words: Snapshot.subject?.words)
+                    CameraTile(frame: .paused(Snapshot.plateBytes()), webcam: nil,
+                               words: Snapshot.subject?.words)
                     CameraTile(frame: .failed("unreachable"), webcam: nil,
                                words: Snapshot.subject?.words)
                 }
@@ -1332,12 +1337,22 @@ final class Activator: NSObject, NSApplicationDelegate {
             // readings are put in place rather than polled: a snapshot runner
             // cannot wait on three machines that are not on this network.
             for (i, machine) in shop.machines.enumerated() {
+                var status = KhaytEngine.PrinterStatus(
+                    state: "printing", progress: [56, 22, 8][i % 3], progressSource: "layers",
+                    filename: "", timeRemaining: [3.8, 5.1, 41.6][i % 3] * 3600,
+                    tempNozzle: 245, tempBed: 60, type: "moonraker")
+                // THE RICHER CARD'S BRANCHES, spread across the three so each
+                // is drawn for somebody: targets and layers on all, a chamber
+                // on the first, a speed override on the second, and a runout
+                // with the printer's own message on the third.
+                status.targetNozzle = 245; status.targetBed = 60
+                status.layer = Double([420, 61, 30][i % 3]); status.totalLayers = Double([750, 280, 380][i % 3])
+                status.fanPart = [100, 60, 0][i % 3]
+                if i % 3 == 0 { status.tempChamber = 37 }
+                if i % 3 == 1 { status.speedFactor = 120 }
+                if i % 3 == 2 { status.filamentOut = true; status.message = "Filament runout on e1" }
                 shop.printers.setReadingForTesting(machine.id, PrinterWatch.Reading(
-                    status: KhaytEngine.PrinterStatus(
-                        state: "printing", progress: [56, 22, 8][i % 3], progressSource: "layers",
-                        filename: "", timeRemaining: [3.8, 5.1, 41.6][i % 3] * 3600,
-                        tempNozzle: 245, tempBed: 60, type: "moonraker"),
-                    problem: nil, at: Date()))
+                    status: status, problem: nil, at: Date()))
             }
             await settle()
             try? await Task.sleep(for: .milliseconds(900))

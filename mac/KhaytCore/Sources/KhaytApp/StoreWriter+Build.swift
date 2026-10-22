@@ -73,15 +73,26 @@ extension StoreWriter {
                                                  change: @escaping @Sendable (inout [String: JSONValue]) -> T)
         async throws -> T? {
         try await updateOffMain(build) { root -> T? in
-            guard case .array(var rows)? = root[collection],
-                  let index = rows.firstIndex(where: { Shop.recordId($0) == id }),
-                  case .object(var record) = rows[index] else { return nil }
-            let out = change(&record)
-            stamp(&record)
-            rows[index] = .object(record)
-            root[collection] = .array(rows)
-            return out
+            changeRecord(&root, collection: collection, id: id, change: change)
         }
+    }
+
+    /// One record changed in place, and stamped ONLY if it really changed.
+    /// A change that changed nothing is not an edit: stamping it would bump
+    /// `rev`/`updatedAt` and win the next sync merge for nothing. Nil when
+    /// the record is not in the book.
+    static func changeRecord<T>(_ root: inout [String: JSONValue], collection: String, id: String,
+                                change: (inout [String: JSONValue]) -> T) -> T? {
+        guard case .array(var rows)? = root[collection],
+              let index = rows.firstIndex(where: { Shop.recordId($0) == id }),
+              case .object(var record) = rows[index] else { return nil }
+        let before = record
+        let out = change(&record)
+        guard record != before else { return out }
+        stamp(&record)
+        rows[index] = .object(record)
+        root[collection] = .array(rows)
+        return out
     }
 
     /// Change one record of one collection in place, stamping it.

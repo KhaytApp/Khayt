@@ -503,8 +503,14 @@ test('a job from a product with components prices exactly as the catalogue does'
   };
   const costCtx = { inventory, settings: {} };
   const catalogue = PP.priceProduct(product, { ...costCtx, consumables });
+  // Each part as the desktop takes it from the product (`appendProductParts`):
+  // at its own rates and the shop's default for any it never carried.
+  const PR = require('../lib/print-rates.js');
   const job = (extra) => N.newOrder({
-    parts: product.parts.map(p => ({ ...p, baseCost: CC.partTotalCost(p, costCtx) })),
+    parts: product.parts.map(p => {
+      const rated = PR.withRates(p, { settings: costCtx.settings });
+      return { ...rated, baseCost: CC.partTotalCost(rated, costCtx) };
+    }),
     components: product.components, assemblyQty: 1, margin: product.defaultMargin, ...extra,
   }, { settings: {}, orders: [], now: NOW, tokens: TOKENS, consumables });
 

@@ -1775,41 +1775,82 @@ private struct Live: View {
     /// idle printer is four things that cannot be pressed, every card, all day.
     @ViewBuilder private func controls(_ status: KhaytEngine.PrinterStatus) -> some View {
         let busy = shop.printerBusy.contains(machine.id)
-        HStack(spacing: 8) {
-            if isPaused(status.state) {
-                Button(shop.words.callIt("mac.printer_resume")) {
-                    Task { await shop.tell(machine, .resume) }
+        let type = machine.printerApi?.type ?? ""
+        // ONLY WHAT THIS PROTOCOL CAN TAKE. A Bambu or Elegoo card drew Pause
+        // and Cancel and failed on press with "requires Bambu Connect" or
+        // "unknown printer type"; a Repetier card drew a Pause it cannot send.
+        // `PrinterControl.offers` asks `lib/printer-commands.js`, the table
+        // the press itself is built from.
+        let known = shop.printerVerbs[type]
+        let paused = isPaused(status.state)
+        let step: PrinterControl.Verb = paused ? .resume : .pause
+        let canStep = PrinterControl.offers(step, known)
+        let canCancel = PrinterControl.offers(.cancel, known)
+        let canDrop = type == "moonraker"
+        VStack(alignment: .leading, spacing: 6) {
+            if canStep || canCancel || canDrop {
+                HStack(spacing: 8) {
+                    if canStep {
+                        Button(shop.words.callIt(paused ? "mac.printer_resume" : "mac.printer_pause")) {
+                            Task { await shop.tell(machine, step) }
+                        }
+                    }
+                    // ASKS FIRST. Cancelling throws away however many hours are already
+                    // in the plate and no printer asks twice. Pause and resume are each
+                    // other's undo and go straight through.
+                    if canCancel {
+                        Button(shop.words.callIt("mac.printer_cancel")) { shop.confirmingCancel = machine }
+                            .foregroundStyle(Khayt.late)
+                    }
+                    if canDrop {
+                        Spacer()
+                        Button(shop.words.callIt("mac.drop_object") + "\u{2026}") {
+                            shop.droppingFrom = machine
+                        }
+                    }
+                    // A Bambu's speed preset (confirmed — it changes a running print)
+                    // and its chamber light (straight through — it changes nothing).
+                    if type == "bambu" {
+                        Menu(shop.words.callIt("mac.printer_speed")) {
+                            ForEach(1...4, id: \.self) { level in
+                                Button(shop.words.callIt("mac.printer_speed_\(level)")) {
+                                    shop.confirmingSpeed = Shop.SpeedChange(machine: machine, level: level)
+                                }
+                            }
+                        }
+                        .fixedSize()
+                        Menu(shop.words.callIt("mac.printer_light")) {
+                            Button(shop.words.callIt("mac.printer_light_on")) {
+                                Task { await shop.control(machine, .light(true)) }
+                            }
+                            Button(shop.words.callIt("mac.printer_light_off")) {
+                                Task { await shop.control(machine, .light(false)) }
+                            }
+                        }
+                        .fixedSize()
+                    }
+                    Spacer()
                 }
-            } else {
-                Button(shop.words.callIt("mac.printer_pause")) {
-                    Task { await shop.tell(machine, .pause) }
-                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(busy || !shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
+            } else if known != nil {
+                // Said, not left blank: a card with no buttons under a running
+                // print reads as a missing feature somebody forgot to draw.
+                Text(shop.words.callIt("mac.printer_no_control"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            // ASKS FIRST. Cancelling throws away however many hours are already
-            // in the plate and no printer asks twice. Pause and resume are each
-            // other's undo and go straight through.
-            Button(shop.words.callIt("mac.printer_cancel")) { shop.confirmingCancel = machine }
-                .foregroundStyle(Khayt.late)
-            if machine.printerApi?.type == "moonraker" {
-                Spacer()
-                Button(shop.words.callIt("mac.drop_object") + "\u{2026}") {
-                    shop.droppingFrom = machine
-                }
-            }
-            Spacer()
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .disabled(busy || !shop.canMoveJobs || !shop.lockAllows("orders", "edit"))
 
-        if let problem = shop.printerProblem[machine.id] {
-            // The printer's refusal in the vocabulary of somebody who has to
-            // act on it — "Bambu requires Bambu Connect for remote job control"
-            // is a sentence, not a status code.
-            Text(problem)
-                .font(.caption).foregroundStyle(Khayt.attention)
-                .fixedSize(horizontal: false, vertical: true)
+            if let problem = shop.printerProblem[machine.id] {
+                // The printer's refusal in the vocabulary of somebody who has to
+                // act on it — a sentence, not a status code.
+                Text(problem)
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .task(id: type) { await shop.learnPrinterVerbs(type) }
     }
 
     private func isPaused(_ state: String) -> Bool {
@@ -1826,6 +1867,15 @@ private struct Live: View {
                         .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
             }
+            // WHY it is paused or failed, when the printer says (a Bambu's
+            // print_error / HMS notice, `lib/bambu-faults.js`). Bambu's own
+            // sentence and the code to look it up by — the code is what the
+            // printer's screen and Bambu's wiki use, in any language.
+            if let fault = status.fault, !fault.isEmpty {
+                Label { Text(verbatim: fault) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if isRunning(status.state) || isPaused(status.state) {
                 controls(status)
             }
@@ -1836,6 +1886,15 @@ private struct Live: View {
                             Text(status.filename).lineLimit(1).truncationMode(.middle)
                         }
                         Spacer()
+                        // "Layer 412 of 750" beside the percentage, when the
+                        // printer says both. The bar below is drawn as layers;
+                        // this is the count it is drawn from.
+                        if let layers = status.layers {
+                            Text(shop.words.callIt("mac.layer_of",
+                                                   ["layer": .string(shop.words.numeral(layers.current)),
+                                                    "total": .string(shop.words.numeral(layers.total))]))
+                                .monospacedDigit().foregroundStyle(.secondary)
+                        }
                         Text(verbatim: shop.words.numeral(status.progress) + "%").monospacedDigit()
                     }
                     .font(.caption)
@@ -1887,17 +1946,53 @@ private struct Live: View {
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
             }
+            // A SPOOL THAT RAN OUT, said on the card as well as in the alert.
+            // Only `true` is drawn: false is a loaded head and nil is a machine
+            // with no sensor, and neither is something to look at.
+            if status.filamentOut == true, isRunning(status.state) {
+                Label(shop.words.callIt("mac.filament_out"), systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption.weight(.semibold)).foregroundStyle(Khayt.attention)
+            }
+            // The printer's own word — Klippy's fault, a macro's reason for
+            // pausing, PrusaLink's attention text. Its language, not ours: it
+            // is the firmware's sentence and translating it would be a guess.
+            if let said = status.message {
+                Text(verbatim: said)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help(shop.words.callIt("mac.printer_says"))
+            }
             HStack(spacing: 14) {
+                // "212/220°" while heating or holding, the reading alone when
+                // the heater is off — a target of 0 is not news.
                 if let nozzle = status.tempNozzle {
-                    Label(PrinterWatch.degrees(nozzle), systemImage: "thermometer.medium")
+                    Label(PrinterWatch.heat(nozzle, target: status.targetNozzle), systemImage: "thermometer.medium")
                         .help(shop.words.callIt("mac.nozzle_temp"))
                 }
                 if let bed = status.tempBed {
-                    Label(PrinterWatch.degrees(bed), systemImage: "rectangle.fill")
+                    Label(PrinterWatch.heat(bed, target: status.targetBed), systemImage: "rectangle.fill")
                         .help(shop.words.callIt("mac.bed_temp"))
+                }
+                if let chamber = status.tempChamber {
+                    Label(PrinterWatch.heat(chamber, target: status.targetChamber), systemImage: "cube.transparent")
+                        .help(shop.words.callIt("mac.chamber_temp"))
                 }
             }
             .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            // FAN, SPEED AND FLOW: only while a job runs, and speed and flow
+            // only when somebody has changed them. 100% is "as sliced", and a
+            // row of 100%s on every card is noise that hides the one that is not.
+            let tuned = PrinterWatch.tuning(status, running: isRunning(status.state))
+            if !tuned.isEmpty {
+                HStack(spacing: 14) {
+                    ForEach(tuned, id: \.key) { item in
+                        Label(shop.words.numeral(item.percent) + "%", systemImage: item.symbol)
+                            .help(shop.words.callIt(item.key))
+                    }
+                }
+                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            }
         }
     }
 

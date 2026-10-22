@@ -44,6 +44,57 @@ actor SdcpSocket {
         /// a timeout: this one means something is listening.
         case closed
         case socket(String)
+        /// A command went out and no Ack naming it came back in time. It may
+        /// or may not have happened.
+        case unconfirmed
+    }
+
+    /// Send one command frame (built by `lib/printer-commands.js`) and wait for
+    /// its Ack — Pause 129, Stop 130, Continue 131 in the SDCP v3 spec, each
+    /// answered on `sdcp/response/<id>` with `Data.Data.Ack`, 0 for success.
+    ///
+    /// Which frame is the Ack is `lib/sdcp-reply.js` `takeAck`: same Cmd, same
+    /// RequestID. A non-zero Ack or an error frame is the printer refusing, in
+    /// its words; no Ack is `unconfirmed`, not "failed".
+    func command(frame: String, cmd: Int, requestId: String, engine: KhaytEngine) async throws {
+        let session = URLSession(configuration: .ephemeral)
+        let task = session.webSocketTask(with: url)
+        task.resume()
+        defer {
+            task.cancel(with: .goingAway, reason: nil)
+            session.invalidateAndCancel()
+        }
+        try await task.send(.string(frame))
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                while true {
+                    let message: URLSessionWebSocketTask.Message
+                    do { message = try await task.receive() }
+                    catch {
+                        if Task.isCancelled { throw CancellationError() }
+                        throw Self.readFailed(error)
+                    }
+                    let text: String
+                    switch message {
+                    case .string(let s): text = s
+                    case .data(let d): text = String(decoding: d, as: UTF8.self)
+                    @unknown default: continue
+                    }
+                    switch try await engine.sdcpAck(frame: text, mainboardId: self.mainboardId,
+                                                    cmd: cmd, requestId: requestId) {
+                    case .ok?: return
+                    case .refused(let why)?: throw Trouble.refused(why)
+                    case nil: continue
+                    }
+                }
+            }
+            group.addTask {
+                try await Task.sleep(for: self.timeout)
+                throw Trouble.unconfirmed
+            }
+            try await group.next()!
+            group.cancelAll()
+        }
     }
 
     /// Send the question and return the first frame that is an answer to it.
