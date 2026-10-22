@@ -18,6 +18,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **Mac: Bambu speed presets and chamber light.** The card has new Speed (Silent, Standard, Sport, Ludicrous) and Light menus. A speed change asks first, because it changes the running print. The light switches straight away. Both are built in `lib/printer-commands.js` `buildControl` and gated by the same `opts.transports` as pause/resume/cancel.
 - **Mac: a Bambu card says why it paused or failed.** The printer's `print_error` and HMS codes now show as Bambu's own sentence plus the code, for example "AMS filament ran out… (0700_8011)". The text comes from `lib/bambu-faults.js`, a short table of common codes copied from ha-bambulab (MIT). A code that isn't in the table shows as the raw code.
 
+- **iPhone: a job cancelled from the phone records the day.** The phone now
+  stamps `cancelledAt` with the local day when it moves a job to Cancelled in
+  its own copy of the book, and removes it when the job leaves Cancelled, as
+  the Mac does. That day places the VAT reversal in the right period.
+
 - **iPhone: pairing during the Mac's "Pair a phone" window.** The Mac now
   takes a new phone only while its owner has clicked Pair a phone
   (Settings → Online). The iPhone gets its own key straight after the PIN
