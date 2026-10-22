@@ -4,6 +4,18 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Khayt Vault: the encryption format for cloud files and share links.**
+  The building block for keeping a shop's files in Khayt Cloud and sharing
+  them by link, without the server ever holding a key that opens them. Files
+  are sealed in 4 MiB chunks under a fresh key for each upload. Each chunk is
+  bound to its file, its upload and its place in the file, so a chunk that is
+  moved, dropped or swapped refuses to open. Keys come from the shop's
+  existing cloud key, and a link can also have a password. There are two
+  matching implementations, one for the browser (`lib/vault-crypto.js`) and
+  one for the Mac and iPhone (`VaultCrypto.swift`), and both are checked
+  against the same test vectors. The format is written up in
+  `docs/vault-format.md`. Nothing uses it yet.
+
 - **Desktop: pause, resume and cancel a print from the machine card.**
   While a printer is printing, its card in Settings → Printers now has Pause
   (or Resume when it is paused) and Cancel print, and a Klipper printer also
