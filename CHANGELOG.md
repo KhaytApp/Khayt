@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: pause, resume and cancel a print from the machine card.**
+  While a printer is printing, its card in Settings → Printers now has Pause
+  (or Resume when it is paused) and Cancel print, and a Klipper printer also
+  has Drop one object. Cancel asks first, because everything already printed
+  is scrap; Pause and Resume go straight through. A printer whose protocol
+  can't take a command doesn't offer it: Bambu Lab printers have none, and
+  Repetier has no Pause. The same controls as the Mac.
+
 - **The catalogue now counts each part's quantity in a product's cost.** A part used three times in a product was costed once, so the catalogue suggested a price well under what a job made from that product costs. The catalogue and a job now agree. Saved product prices do not change by themselves: a product's price moves only when you open it, edit it and save. The catalogue's margin column now shows the real margin, so a product priced under the old rule may show a thin or negative margin. Review those products and re-save any you want re-priced.
 
 - **A job made from a product with no rates of its own now costs labour, power and wear at the shop's defaults, so it costs more than before.** This applies to a product part with no labour, prep, post, wear, power, electricity or failure rate saved on it, or one left blank. Such a part is now costed at your default rates (labour 90 an hour, wear 0.75 an hour, 150 W, 10% failure, your electricity price) in the catalogue, in the desktop app's job from a product and on the Mac, where jobs already used them. Before, the catalogue and the desktop counted those rates as zero. A rate the part does have, including 0, still wins. Saved product prices do not change by themselves. Opening such a product may show "Saved price kept; today's costs give …", its profit-per-hour margin changes, and it is re-priced only if you edit and save it. The spool-size repair's "was → now" can include this rate change too. Parts made in either app's product editor already carry their rates.
