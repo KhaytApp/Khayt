@@ -8,21 +8,27 @@ import KhaytCore
 /// "is it printing, and how far along". A shop that has to open a second app to
 /// look at its own machine has not stopped using the second app.
 ///
-/// **It reads, and it reads only.** No pause, no resume, no cancel and no
-/// upload. Those are commands, and a command sent to the wrong machine — or to
-/// something that is not a machine — costs a shop a print, so they belong
-/// behind a deliberate piece of work rather than arriving with a status card.
+/// **This file reads.** It polls every protocol a machine can be set to —
+/// Moonraker, OctoPrint, PrusaLink, Duet (standalone and SBC), Repetier over
+/// HTTP; Bambu over MQTT (`BambuMqtt`); Elegoo SDCP over a WebSocket
+/// (`SdcpSocket`) — see `spoken`, which is the list the code obeys. It used to
+/// say "Moonraker only, for now" and "it reads only", and both stopped being
+/// true long before the comment did.
 ///
-/// **Moonraker only, for now, and it says so.** Khayt speaks seven protocols;
-/// there is one printer on this bench and it is a Klipper toolchanger, so it is
-/// the one that could be verified against a machine rather than against a
-/// document. A machine on any other protocol is told plainly that this app does
-/// not poll it yet — a card that silently shows nothing looks broken, and a
-/// shop would go back to the other app without knowing why.
+/// **Commands live elsewhere, and only where a protocol can take them.**
+/// Pause, resume and cancel are `PrinterControl`; exclude-object is
+/// `PrinterControl.drop`; upload-and-start is `PrinterSend`; the smart plug is
+/// `SmartPlug`. Which verbs a protocol has is `lib/printer-commands.js`'s
+/// `supports` — the card asks `PrinterControl.offers` and does not draw a
+/// button that would only fail (Bambu and SDCP have none yet; Repetier cannot
+/// pause). Nothing here sends a printer anything but a read.
 ///
-/// **The reading is `lib/moonraker.js`'s.** Four corrections live in there, each
-/// found on a real printer, and none of them is re-decided in Swift. What is
-/// Swift is the socket and the clock.
+/// **The reading is `lib/`'s.** Each protocol's payload is turned into a
+/// status by its shared module (`lib/moonraker.js` and siblings), and the
+/// corrections in there — each found on a real printer — are not re-decided in
+/// Swift. What is Swift is the socket and the clock, and, for Klipper, asking
+/// `/printer/objects/list` once per machine so the shared reader knows which
+/// filament sensors to judge a runout by.
 @MainActor
 @Observable
 final class PrinterWatch {
@@ -83,6 +89,10 @@ final class PrinterWatch {
             "lastUpdated": .number(at.timeIntervalSince1970 * 1000),
         ]
         if let left = status.timeRemaining { entry["timeRemaining"] = .number(left) }
+        // The runout rule reads exactly this (`printer-alerts.js`: only
+        // `filamentOut === true` is news). Absent when the printer cannot say,
+        // which the module reads the same as false — not a reason to walk over.
+        if let out = status.filamentOut { entry["filamentOut"] = .bool(out) }
         return entry
     }
 
@@ -156,6 +166,12 @@ final class PrinterWatch {
                 // reports no usable estimate for the first ~1% of a job, and a
                 // zero there would read as "finishing now".
                 if let left = status.timeRemaining { entry["timeRemaining"] = .number(left) }
+                // A SPOOL THAT RAN OUT. `printer-alerts` raises a runout only on
+                // `filamentOut === true`, and this cache never carried the
+                // field — so the Mac's runout alert, on by default, could not
+                // fire for any printer. main.js keeps the whole status object
+                // and always had it.
+                if let gone = status.filamentOut { entry["filamentOut"] = .bool(gone) }
                 out[id] = .object(entry)
             } else if seen.problem != nil {
                 // A machine that did not answer is offline, which is a fact the
@@ -845,7 +861,16 @@ final class PrinterWatch {
             return try await engine.prusalinkStatus(status: status, job: job)
 
         default:
-            let query = try await engine.moonrakerQuery()
+            // ── WHAT THIS MACHINE HAS, ASKED ONCE ────────────────────────
+            //
+            // The filament sensors (and the chamber and per-head fans) are
+            // DISCOVERED from `/printer/objects/list`, because a hardcoded
+            // sensor name finds nothing on the U1 — see
+            // `lib/filament-sensors.js`. The desktop has done this since Sep
+            // 2026 (`moonrakerSensors` in main.js); the Mac passed nothing, so
+            // `filamentOut` was always null and a runout raised no alert.
+            let watching = await Self.watching(machine, base: base, engine: engine, get: get)
+            let query = try await engine.moonrakerQuery(watching: watching)
             let reply = try await get("/printer/objects/query?" + query)
             // Only the machines that need it pay for the second request, and a
             // failure there keeps toolhead zero's reading rather than nothing.
@@ -885,7 +910,53 @@ final class PrinterWatch {
             } else {
                 fileMeta[machine.id] = nil
             }
-            return try await engine.moonrakerStatus(reply, hot: hot, hotName: hotName, fileMeta: meta)
+            return try await engine.moonrakerStatus(reply, hot: hot, hotName: hotName, fileMeta: meta,
+                                                    watching: watching)
+        }
+    }
+
+    /// What each Klipper machine was found to have, keyed by machine AND
+    /// address, so a printer moved to another IP is asked again.
+    ///
+    /// Klipper's object list changes only across a firmware restart, so a
+    /// good answer is held for the session, as main.js holds it. A FAILED one
+    /// is not held for ever, which is where this parts from the desktop: a
+    /// printer switched off when the app opened would otherwise never have its
+    /// sensors found until the next launch, and the Mac app runs for days. It
+    /// is asked again after `rediscoverAfter`, not on every poll — a request
+    /// every ten seconds to a machine that is not answering helps nobody.
+    struct Discovery: Sendable {
+        var watch: KhaytEngine.MoonrakerWatch
+        var ok: Bool
+        var at: Date
+    }
+    // Internal, not private: a test says what the poller has already learned.
+    static var discovered: [String: Discovery] = [:]
+    static let rediscoverAfter: TimeInterval = 300
+
+    static func discoveryKey(_ machine: Machine, base: URL) -> String {
+        machine.id + "|" + base.absoluteString
+    }
+
+    /// The machine's discovered objects, asking `/printer/objects/list` when
+    /// this session has not, or when the last ask failed long enough ago.
+    /// Never throws: a failed discovery is "no sensors", not a failed poll.
+    static func watching(_ machine: Machine, base: URL, engine: KhaytEngine,
+                         get: (String) async throws -> [String: JSONValue],
+                         now: Date = Date()) async -> KhaytEngine.MoonrakerWatch {
+        let key = discoveryKey(machine, base: base)
+        if let held = discovered[key],
+           held.ok || now.timeIntervalSince(held.at) < rediscoverAfter {
+            return held.watch
+        }
+        do {
+            let list = try await get("/printer/objects/list")
+            let watch = try await engine.moonrakerDiscover(list)
+            discovered[key] = Discovery(watch: watch, ok: true, at: now)
+            return watch
+        } catch {
+            discovered[key] = Discovery(watch: .nothing, ok: false, at: now)
+            return .nothing
         }
     }
 
@@ -1245,6 +1316,45 @@ final class PrinterWatch {
     }
 
     static func degrees(_ value: Double) -> String { "\(Int(saturating: value.rounded()))°" }
+
+    /// A heater as a card shows it: "212/220°" while it holds a target, the
+    /// reading alone when it has none or the target is 0 (heater off). A
+    /// reading of 34° next to "0" reads as a fault; it is a cold machine.
+    static func heat(_ now: Double, target: Double?) -> String {
+        guard let target, target.isFinite, target > 0 else { return degrees(now) }
+        return "\(Int(saturating: now.rounded()))/\(Int(saturating: target.rounded()))°"
+    }
+
+    /// One figure on the card's tuning row.
+    struct Tuning: Equatable {
+        let key: String       // the Words key for its tooltip
+        let symbol: String
+        let percent: Int
+    }
+
+    /// Fan, speed and flow, as the card draws them — the RULE for which ones,
+    /// so a test can ask it rather than read a view.
+    ///
+    /// Only while a job runs: an idle fan at 0% is not news. Speed and flow
+    /// only when they differ from 100, which is "as sliced" — loud only when
+    /// abnormal, the house rule for state on a control. Clamped, because a
+    /// percentage cast from a junk double traps.
+    static func tuning(_ status: KhaytEngine.PrinterStatus, running: Bool) -> [Tuning] {
+        guard running else { return [] }
+        func whole(_ v: Double?) -> Int? {
+            guard let v, v.isFinite else { return nil }
+            return Int(min(10_000, max(0, v.rounded())))
+        }
+        var out: [Tuning] = []
+        if let fan = whole(status.fanPart) { out.append(Tuning(key: "mac.part_fan", symbol: "fan", percent: min(100, fan))) }
+        if let speed = whole(status.speedFactor), speed != 100 {
+            out.append(Tuning(key: "mac.speed_factor", symbol: "speedometer", percent: speed))
+        }
+        if let flow = whole(status.flowFactor), flow != 100 {
+            out.append(Tuning(key: "mac.flow_factor", symbol: "drop", percent: flow))
+        }
+        return out
+    }
 
     /// A failure in the vocabulary of the person who has to fix it, in the
     /// shop's language. This is what the Test button, the machine card and

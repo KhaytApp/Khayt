@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: a Klipper printer that runs out of filament now raises the runout alert.** The Mac never looked up a printer's filament sensors, so the runout alert (on by default) could not fire for any machine. It now finds them once per printer, the same way the desktop does. A Snapmaker U1's four head sensors are read, and only the printing head's sensor counts: an empty spare head is not a runout. The alert reaches the Mac notification, Telegram and ntfy like the others.
+
+- **Mac: the machine card shows more of what the printer reports.** It shows layer count ("Layer 412 of 750"), target temperatures ("212/220°"), and the chamber temperature (the U1's cavity sensor, or any heater or sensor named for the chamber or enclosure). While a print runs, it also shows the part fan, plus speed and flow when someone has changed them from 100%. It shows the printer's own message, such as a Klipper fault or the reason a macro paused, and "Out of filament" when the printing head has run out. Each protocol reports only the fields its vendor's documents name. OctoPrint, PrusaLink, Duet, Repetier and Elegoo report what they have. Bambu adds layers only, because its other fields have no vendor documentation. The desktop already gets the new fields from the shared readers but doesn't show them yet.
+
+- **Mac: a printer card shows only the buttons its protocol can use.** Bambu and Elegoo cards showed Pause and Cancel, which failed when pressed with "requires Bambu Connect" or "unknown printer type". A Repetier card showed a Pause it can't send. The card now asks the shared command table which commands each protocol supports. When there are none, it says so.
+
 - **Desktop: pause, resume and cancel a print from the machine card.**
   While a printer is printing, its card in Settings → Printers now has Pause
   (or Resume when it is paused) and Cancel print, and a Klipper printer also

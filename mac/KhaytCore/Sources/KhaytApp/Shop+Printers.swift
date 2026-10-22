@@ -218,6 +218,14 @@ extension Shop {
 
     // MARK: - Telling a printer what to do
 
+    /// Learn, once per protocol, which verbs its card may offer.
+    func learnPrinterVerbs(_ type: String) async {
+        guard printerVerbs[type] == nil, let engine else { return }
+        // lock: system — asks the shared command table which verbs exist; it
+        // sends a printer nothing and writes nothing.
+        printerVerbs[type] = await PrinterControl.verbs(for: type, engine: engine)
+    }
+
     func tell(_ machine: Machine, _ verb: PrinterControl.Verb) async {
         // A printer is told what to do by somebody running the floor —
         // `orders`/`edit` in lib/rbac.js, which an operator has and a viewer

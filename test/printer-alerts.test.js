@@ -383,3 +383,15 @@ test('the runout alert can be switched off like the others', () => {
     fullSettings(), T0, { enable: { error: true, offline: true, stall: true, runout: false } });
   assert.deepEqual(types(res), []);
 });
+
+test('an idle machine with an empty last head is not a runout, even on the first poll', () => {
+  // A U1 left on an empty head reads `filament_detected: false` with nothing
+  // printing, and launch has no previous status to compare with.
+  const idle = { [M]: { state: 'standby', progress: 0, filamentOut: true } };
+  assert.deepEqual(types(computePrinterAlerts({}, idle, fullSettings(), T0)), []);
+  const done = { [M]: { state: 'complete', progress: 100, filamentOut: true } };
+  assert.deepEqual(types(computePrinterAlerts({}, done, fullSettings(), T0)), []);
+  // A print paused for the runout is the case the alert exists for.
+  const paused = { [M]: { state: 'paused', progress: 47, filamentOut: true } };
+  assert.deepEqual(types(computePrinterAlerts(printing({ filamentOut: false }), paused, fullSettings(), T0)), ['runout']);
+});
