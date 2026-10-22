@@ -461,6 +461,7 @@ struct MachineSheet: View {
                 serial: $apiSerial, slug: $apiSlug,
                 code: $accessCode, hasStoredCode: $hasStoredCode, forgetCode: $forgetCode,
                 testing: $testing, said: $testSaid, worked: $testWorked,
+                unverified: existing.map { BambuWatch.shared.unverified.contains($0.id) } ?? false,
                 test: test)
 
             // ── AND THE CAMERA ───────────────────────────────────────
@@ -1463,6 +1464,8 @@ private struct Connection: View {
     @Binding var testing: Bool
     @Binding var said: String?
     @Binding var worked: Bool
+    /// The printer was let in by the first-use pin, not by Bambu Lab's CAs.
+    var unverified: Bool = false
     let test: () -> Void
 
     /// Only what this app can actually speak. A menu offering Bambu or Duet
@@ -1550,6 +1553,14 @@ private struct Connection: View {
                                 Text(shop.words.callIt("mac.mach_bambu_hint"))
                                     .font(.caption2).foregroundStyle(.tertiary)
                                     .fixedSize(horizontal: false, vertical: true)
+                                // Quietly: it works, and is trusted the way it
+                                // was before, but Bambu Lab's CAs did not vouch
+                                // for it (`BambuMqtt.trustDecision`).
+                                if unverified {
+                                    Text(shop.words.callIt("mac.mach_cert_unverified"))
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
                         }
                     }

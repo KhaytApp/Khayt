@@ -134,4 +134,71 @@ struct BambuReportParityTests {
         }
         #expect(out["timeRemaining"] == .number(87 * 60), "minutes were not converted")
     }
+
+    // MARK: - Holding the state across deltas (`mergeReport`)
+
+    /// A P1 sends only what changed, so the Mac now keeps one connection and
+    /// lays every delta over the last full report. The two apps must agree on
+    /// what that held state IS, or the same printer reads differently on each.
+    @Test("merging a run of reports agrees with the JavaScript, step by step")
+    func mergeAgrees() throws {
+        let js = try js()
+        let run = [
+            #"{"print":{"gcode_state":"RUNNING","mc_percent":42,"subtask_name":"bracket.3mf","nozzle_temper":219.5,"hms":[{"attr":50331904,"code":65543}],"ams":{"tray_now":"1","ams":[{"id":"0","tray":[{"id":"0"}]}]},"command":"push_status"}}"#,
+            #"{"print":{"mc_percent":43,"command":"push_status"}}"#,
+            #"{"print":{"ams":{"tray_now":"2"},"hms":[]}}"#,
+            #"{"info":{"command":"get_version"}}"#,
+            #"{"print":{"subtask_name":null,"__proto__":{"x":1},"constructor":{"y":2}}}"#,
+            #"{"print":null}"#, #"{"print":[]}"#, "not json", "", "[]", "null",
+            #"{"print":{"command":"pause","sequence_id":"3","result":"success"}}"#,
+            #"{"print":{"ams":"replaced by a string"}}"#,
+            #"{"print":{"gcode_state":"FAILED","print_error":50348044}}"#,
+        ]
+        var mine: JSONValue? = nil
+        var theirs: JSONValue = .null
+        for (i, payload) in run.enumerated() {
+            mine = BambuReport.merge(mine, payload)
+            theirs = try js.value("globalThis.KhaytBambuReport.mergeReport(ARG0, ARG1)",
+                                  [theirs, .string(payload)])
+            #expect((mine ?? .null) == theirs,
+                    Comment(rawValue: "step \(i) \(payload.prefix(40))\n  swift \(mine ?? .null)\n  js    \(theirs)"))
+            // And the held state reads the same way through both parsers.
+            if let held = mine {
+                let swiftRead = BambuReport.parse(value: held) ?? .null
+                let jsRead = try js.value(
+                    "globalThis.KhaytBambuReport.parseBambuReport(JSON.stringify(ARG0))", [held])
+                #expect(swiftRead == jsRead, Comment(rawValue: "read at step \(i)"))
+            }
+        }
+    }
+
+    @Test("a delta keeps what it does not name, and an emptied list empties")
+    func mergeKeepsAndClears() throws {
+        let full = #"{"print":{"gcode_state":"RUNNING","mc_percent":42,"subtask_name":"a.3mf","hms":[{"attr":1,"code":2}],"ams":{"tray_now":"1","ams":[1]}}}"#
+        var held = BambuReport.merge(nil, full)
+        held = BambuReport.merge(held, #"{"print":{"mc_percent":50,"hms":[],"ams":{"tray_now":"2"}}}"#)
+        guard case .object(let root)? = held, case .object(let p)? = root["print"],
+              case .object(let ams)? = p["ams"] else { Issue.record("no held state"); return }
+        #expect(p["mc_percent"] == .number(50))
+        #expect(p["subtask_name"] == .string("a.3mf"))
+        #expect(p["hms"] == .array([]))
+        #expect(ams["tray_now"] == .string("2"))
+        #expect(ams["ams"] == .array([.number(1)]))
+    }
+
+    @Test("nesting deeper than the cap is taken whole, the same on both sides")
+    func mergeDepthCap() throws {
+        let js = try js()
+        func nest(_ n: Int, _ leaf: String) -> String {
+            String(repeating: #"{"a":"#, count: n) + leaf + String(repeating: "}", count: n)
+        }
+        let first = #"{"print":"# + nest(40, #"{"x":1}"#) + "}"
+        let second = #"{"print":"# + nest(40, #"{"y":2}"#) + "}"
+        let mine = BambuReport.merge(BambuReport.merge(nil, first), second) ?? .null
+        let theirs = try js.value(
+            "globalThis.KhaytBambuReport.mergeReport(globalThis.KhaytBambuReport.mergeReport(null, ARG0), ARG1)",
+            [.string(first), .string(second)])
+        #expect(mine == theirs)
+        #expect(BambuReport.mergeDepth == 32)
+    }
 }

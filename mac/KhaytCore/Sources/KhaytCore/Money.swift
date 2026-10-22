@@ -618,6 +618,15 @@ public struct PnlPeriod: Decodable, Sendable, Identifiable, Equatable {
     /// What is actually owed for the quarter: charged less paid. NEGATIVE is a
     /// real position — the quarter a shop buys a printer, the authority owes it.
     public let vatDue: Double
+    /// The part of `vatCollected` that reverses an invoice from a FILED VAT
+    /// return — cancelled, voided or credited after the return went in, and
+    /// landed here, the first open period (lib/vat-periods.js). Negative for a
+    /// reversal. Nil on a row with none, and from an older bundle.
+    public let vatAdjustment: Double?
+    /// The same reversals' share of `taxableSales`.
+    public let salesAdjustment: Double?
+    /// How many reversals landed in this period.
+    public let adjustments: Int?
     public let net: Double
     /// What the finished work cost to make, in the shop's currency. Optional
     /// because the rule gained it in September 2026 and an older bundle must

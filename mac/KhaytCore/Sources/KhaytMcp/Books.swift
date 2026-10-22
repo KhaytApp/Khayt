@@ -276,6 +276,9 @@ struct Books: Sendable {
         ]
         if let v = p.taxableSales { row["taxable_sales"] = money(v) }
         if let v = p.revenueVat { row["revenue_vat"] = money(v) }
+        // Inside vat_collected: reversals of invoices from FILED returns,
+        // landed in this period (lib/vat-periods.js). Only where there are any.
+        if let v = p.vatAdjustment { row["vat_adjustment_filed_periods"] = money(v) }
         if let v = p.cogs { row["cost_of_goods"] = money(v) }
         if let v = p.marginPct { row["margin_pct"] = money(v) }
         if let v = p.unpriced, v > 0 { row["unpriced_jobs"] = v }

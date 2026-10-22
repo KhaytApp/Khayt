@@ -263,6 +263,22 @@ public struct VatSummary: Decodable, Sendable, Equatable {
     public let position: String
     public let expensesWithVat: Int
     public let expensesWithoutVat: Int
+    /// Inside `output`: what reverses invoices from FILED returns, landed in
+    /// this span (lib/vat-periods.js) — negative for a cancel, void or credit
+    /// made after filing. Shown as its own line. Optional: an older bundle
+    /// has no such field.
+    public let adjustment: Double?
+    /// Inside `sales`: the same reversals' sales.
+    public let salesAdjustment: Double?
+    /// How many reversals.
+    public let adjustments: Int?
+
+    /// The output VAT on this span's own invoices, the adjustment taken out.
+    public var outputOnSales: Double { output - (adjustment ?? 0) }
+    /// The sales this span's own invoices were charged on.
+    public var salesOnInvoices: Double { sales - (salesAdjustment ?? 0) }
+    /// Is there an adjustment for a filed period to show?
+    public var hasAdjustment: Bool { (adjustment ?? 0) != 0 || (salesAdjustment ?? 0) != 0 }
 
     public struct Rate: Decodable, Sendable, Equatable {
         public let label: String

@@ -471,6 +471,9 @@ struct InvoicePane: View {
         var enableVat = false
         var vatRate = 15.0
         var taxMode = "inclusive"
+        /// How often the shop files its VAT return (lib/vat-periods.js):
+        /// "quarterly" unless it is a monthly filer.
+        var vatFilingFrequency = "quarterly"
         var enableZatca = false
         var invPrefix = "INV", quotePrefix = "QUO"
         var invTemplate = "classic"
@@ -486,6 +489,7 @@ struct InvoicePane: View {
                 enableVat: r.flag("enableVat"),
                 vatRate: r.number("vatRate", 15),
                 taxMode: Shop.taxMode(settings),
+                vatFilingFrequency: r.text("vatFilingFrequency", "quarterly") == "monthly" ? "monthly" : "quarterly",
                 enableZatca: r.onUnlessOff("enableZatca"),
                 invPrefix: r.text("invPrefix", "INV"), quotePrefix: r.text("quotePrefix", "QUO"),
                 invTemplate: r.text("invTemplate", "classic"),
@@ -498,6 +502,7 @@ struct InvoicePane: View {
         func form() -> [String: JSONValue] {
             ["currency": .string(currency), "taxCountry": .string(taxCountry),
              "enableVat": .bool(enableVat), "vatRate": .number(vatRate), "taxMode": .string(taxMode),
+             "vatFilingFrequency": .string(vatFilingFrequency),
              "enableZatca": .bool(enableZatca),
              "invPrefix": .string(invPrefix), "quotePrefix": .string(quotePrefix),
              "invTemplate": .string(invTemplate), "invoiceBilingual": .string(invoiceBilingual),
@@ -559,6 +564,18 @@ struct InvoicePane: View {
                         // one that got missed.
                         .disabled(!draft.enableVat)
                     }
+                    // How often the return is filed. It decides the period a
+                    // reversal of a FILED return's invoice lands in — the
+                    // next quarter, or the next month (lib/vat-periods.js).
+                    row(shop.words.callIt("pnl.vat_filing")) {
+                        Picker("", selection: $draft.vatFilingFrequency) {
+                            Text(shop.words.callIt("pnl.vat_filing_quarterly")).tag("quarterly")
+                            Text(shop.words.callIt("pnl.vat_filing_monthly")).tag("monthly")
+                        }.labelsHidden()
+                        .disabled(!draft.enableVat)
+                    }
+                    Text(shop.words.callIt("pnl.vat_filing_hint")).font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     // The arithmetic on a round number, because inclusive and
                     // exclusive both look plausible and differ by the tax on
                     // every order.

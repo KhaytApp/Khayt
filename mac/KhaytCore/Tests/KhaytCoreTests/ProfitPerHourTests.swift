@@ -16,7 +16,14 @@ import Testing
         if let base { p["basePrice"] = .number(base) }
         if let cost { p["baseCost"] = .number(cost) }
         if let hours {
-            p["parts"] = .array([.object(["printTime": .number(hours), "qty": .number(1)])])
+            // Every rate said, and said zero: a part that carries none is
+            // costed at the shop's defaults (`KhaytPrintRates.withRates`), and
+            // these products are about hours, not about what a labour hour costs.
+            var part: [String: JSONValue] = ["printTime": .number(hours), "qty": .number(1)]
+            for key in ["wearRate", "powerDraw", "elecRate", "prepTime", "postTime", "laborRate", "failureRate"] {
+                part[key] = .number(0)
+            }
+            p["parts"] = .array([.object(part)])
         }
         if hidden { p["storefrontHidden"] = .bool(true) }
         return .object(p)

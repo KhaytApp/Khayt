@@ -41,6 +41,10 @@ struct BookWriter {
     /// for a cancellation, as the LOCAL day. That day is the quote conversion
     /// rate's and the VAT tax point's (`taxPointDate`); without it a quote
     /// won from the phone counted as never accepted.
+    ///
+    /// A move INTO cancelled stamps `cancelledAt` the same way, and a move out
+    /// of it removes the stamp: that day decides which VAT period the reversal
+    /// lands in, and a job brought back is no longer reversed.
     func setOrderStatus(orderId: String, to status: String, now: Date = Date()) throws {
         try book.updateRecord(collection: "printLog", id: orderId) { record in
             let was: String? = { if case .string(let s)? = record["status"] { return s } else { return nil } }()
@@ -53,6 +57,11 @@ struct BookWriter {
             }()
             if was == "quote", status != "quote", status != "cancelled", !stamped {
                 record["quoteAcceptedAt"] = .string(Self.localDay(now))
+            }
+            if status == "cancelled", was != "cancelled" {
+                record["cancelledAt"] = .string(Self.localDay(now))
+            } else if status != "cancelled" {
+                record["cancelledAt"] = nil
             }
             record["status"] = .string(status)
         }
