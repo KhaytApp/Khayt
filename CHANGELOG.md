@@ -49,6 +49,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Mac: see where each model is stored.** When the library has online storage set up, each tile has a small badge: on this Mac only, backed up online, or online only. VoiceOver reads it out. Show ▸ Online only and Show ▸ On this Mac only filter the library. In a model's panel, Storage has Free Up Space, which removes this Mac's copy only after the copy online has been checked, and Keep on This Mac, which brings the model back if needed so Free up space never moves it out. This Mac keeps the information in `library-sync.json` beside the library folder, not in the book. It is filled from the existing `.cloud` and `.online` files the first time, and those files stay. A file found on this Mac always counts as on this Mac, whatever the stored state says. A model counts as backed up only while its copy is on the storage set up now and the file hasn't changed since. A model with one file of several moved online is not shown as online only. Free Up Space for one model asks first when an open job uses it, and Remove from This Mac says which models are set to Keep on This Mac before it removes their copies. Restoring an original whose converted copy is still in the library says you'll have both.
 
+- **Khayt Vault: the Mac and iPhone can now upload, download and sync vault files.**
+  This is the engine only. Nothing in the app uses it yet, and the cloud's vault is still
+  switched off.
+  - Uploads are resumable. Each file is sealed to disk before any of it is sent, so an
+    upload that stops halfway carries on with the same encrypted bytes instead of starting
+    over.
+  - A file the shop has already uploaded is linked to the copy that is there, not sent again.
+  - Downloads are checked against the file's sealed record before they replace anything on
+    disk. A changed or swapped chunk fails the download and leaves the old file where it was.
+  - When two devices change the same file at once, both versions are kept. Neither replaces
+    the other.
+  - The vault can also be used as a third place for the library's cloud copies, next to a
+    bucket and Google Drive. It follows the same rule: a local copy is removed only after
+    the cloud copy has been read back and matched.
+
 - **Khayt Vault: the encryption format for cloud files and share links.**
   The building block for keeping a shop's files in Khayt Cloud and sharing
   them by link, without the server ever holding a key that opens them. Files

@@ -361,7 +361,7 @@ public actor DriveClient {
     }
 }
 
-/// Wherever the library's remote copy lives: a bucket or a Drive. The same
+/// Wherever the library's remote copy lives: a bucket, a Drive or the vault. The same
 /// four calls over the same opaque keys, so backing up, freeing space and
 /// bringing back are written once — as `printLibRemote()` in the other app.
 ///
@@ -371,17 +371,21 @@ public actor DriveClient {
 public enum LibraryRemote: Sendable {
     case bucket(S3Config)
     case drive(DriveClient)
+    /// Khayt Vault: end-to-end encrypted in Khayt Cloud (`VaultRemote`).
+    case vault(VaultRemote)
 
     public func put(_ key: String, data: Data, fetch: @escaping S3.Fetch) async throws {
         switch self {
         case .bucket(let c): try await S3.put(c, key: key, data: data, fetch: fetch)
         case .drive(let d): try await d.put(key, data: data)
+        case .vault(let v): try await v.with(fetch: fetch).put(key, data: data)
         }
     }
     public func get(_ key: String, fetch: @escaping S3.Fetch) async throws -> Data? {
         switch self {
         case .bucket(let c): try await S3.get(c, key: key, fetch: fetch)
         case .drive(let d): try await d.get(key, via: fetch)
+        case .vault(let v): try await v.with(fetch: fetch).get(key)
         }
     }
     /// The bytes in a file of their own — the bucket's through `download`,
@@ -390,18 +394,21 @@ public enum LibraryRemote: Sendable {
         switch self {
         case .bucket(let c): try await S3.getFile(c, key: key, download: download)
         case .drive(let d): try await d.getFile(key)
+        case .vault(let v): try await v.getFile(key)
         }
     }
     public func head(_ key: String, fetch: @escaping S3.Fetch) async throws -> S3.Head? {
         switch self {
         case .bucket(let c): try await S3.head(c, key: key, fetch: fetch)
         case .drive(let d): try await d.head(key, via: fetch)
+        case .vault(let v): try await v.with(fetch: fetch).head(key)
         }
     }
     public func delete(_ key: String, fetch: @escaping S3.Fetch) async throws {
         switch self {
         case .bucket(let c): try await S3.delete(c, key: key, fetch: fetch)
         case .drive(let d): try await d.delete(key, via: fetch)
+        case .vault(let v): try await v.with(fetch: fetch).delete(key)
         }
     }
     /// A copy in the remote's own trash — Drive has one, a bucket does not.
@@ -409,6 +416,7 @@ public enum LibraryRemote: Sendable {
         switch self {
         case .bucket: nil
         case .drive(let d): try await d.trashedCopy(key, via: fetch)
+        case .vault(let v): try await v.with(fetch: fetch).trashedCopy(key)
         }
     }
     /// Out of the trash again; false when there is nothing there (or no trash).
@@ -417,6 +425,7 @@ public enum LibraryRemote: Sendable {
         switch self {
         case .bucket: false
         case .drive(let d): try await d.restoreFromTrash(key, via: fetch)
+        case .vault(let v): try await v.with(fetch: fetch).restoreFromTrash(key)
         }
     }
     /// Every key that starts with `keyPrefix`.
@@ -424,7 +433,9 @@ public enum LibraryRemote: Sendable {
         switch self {
         case .bucket(let c): try await S3.list(c, prefix: keyPrefix, fetch: fetch).map(\.key)
         case .drive(let d): try await d.list(keyPrefix: keyPrefix, nameContains: "", via: fetch).map(\.key)
+        case .vault(let v): try await v.with(fetch: fetch).keys(under: keyPrefix)
         }
     }
     public var isDrive: Bool { if case .drive = self { true } else { false } }
+    public var isVault: Bool { if case .vault = self { true } else { false } }
 }
