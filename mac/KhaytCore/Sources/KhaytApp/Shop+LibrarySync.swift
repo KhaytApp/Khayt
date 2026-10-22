@@ -13,10 +13,31 @@ extension Shop {
     /// "backed up" proved on a remote that is no longer the one in use both
     /// turn on it.
     func refreshLibraryRemote() {
-        let id = CloudLibrary.remoteIdentity(settingsDict)
-        if id != libraryRemoteId { libraryRemoteId = id }
-        let has = id != nil
+        let settings = settingsDict
+        let has = CloudLibrary.remoteInUse(settings) != .none
         if has != libraryHasRemote { libraryHasRemote = has }
+        guard let driveKey = CloudLibrary.driveSettingsKey(settings) else {
+            let id = CloudLibrary.remoteIdentity(settings)
+            if id != libraryRemoteId { libraryRemoteId = id }
+            return
+        }
+        // Drive: the account is in the sign-in, which has to be opened.
+        if let held = driveIdentityCache, held.key == driveKey {
+            if libraryRemoteId != held.id { libraryRemoteId = held.id }
+            return
+        }
+        if libraryRemoteId != nil { libraryRemoteId = nil }
+        let build = source.build
+        Task { [weak self] in
+            guard let d = await CloudLibrary.libraryDrive(settings: settings, build: build) else { return }
+            let id = CloudLibrary.driveIdentity(d.config, folder: CloudLibrary.driveFolder(settings))
+            guard let self, CloudLibrary.driveSettingsKey(self.settingsDict) == driveKey else { return }
+            self.driveIdentityCache = (driveKey, id)
+            if self.libraryRemoteId != id {
+                self.libraryRemoteId = id
+                self.syncIndexChanged()
+            }
+        }
     }
 
     /// Open this library's index — or, the first time, build it from the
@@ -43,7 +64,7 @@ extension Shop {
                 if let open = current ?? LibrarySyncIndex.open(primary: primary, folder: folder) {
                     return (open, open.reconcile(roots: all, models: probes))
                 }
-                let keep = LibrarySyncIndex.takeLegacy(primary: primary)
+                let keep = LibrarySyncIndex.takeLegacy(primary: primary, folder: folder, ids: Set(probes.map(\.id)))
                 return (LibrarySyncIndex.migrate(primary: primary, folder: folder, roots: all,
                                                  models: probes, keep: keep), true)
             }
@@ -124,23 +145,25 @@ extension Shop {
             : words.callIt("mac.delete_kept_n", ["n": .number(Double(kept.count))])
     }
 
-    /// The disk said something the index did not: put the index right, from
-    /// the folder — after this draw, never during it.
-    func correctSyncIndex(_ file: LibraryFile) {
-        guard let index = syncIndex, let roots = libraryRoots?.roots else { return }
+    /// The disk said something the index did not: put the index right from
+    /// the folder, read by the SAME per-file rule (`LibrarySyncIndex.files`).
+    ///
+    /// Scheduled, never done in the call that noticed — that is a view's
+    /// body — and once per model while one is pending. A correction that
+    /// changes no file's state writes nothing and redraws nothing
+    /// (`LibrarySyncIndex.correct`), so a reading the two agree on cannot
+    /// start a loop.
+    func scheduleSyncCorrection(_ file: LibraryFile) {
+        guard let index = syncIndex, let roots = libraryRoots?.roots,
+              !syncCorrecting.contains(file.id) else { return }
+        syncCorrecting.insert(file.id)
         let probe = LibrarySyncIndex.Probe(id: file.id, externalPath: file.externalPath)
         Task { @MainActor [weak self] in
-            let found = await PinWork.run {
-                LibrarySyncIndex.files(of: probe, roots: roots, at: StoreWriter.iso(Date()))
-            }
-            // A file still proved online keeps its stamp.
-            var merged = found
-            for (name, was) in index.entry(file.id)?.files ?? [:]
-            where was.state == .backedUp && found[name]?.state == .local {
-                merged[name] = was
-            }
-            index.replaceFiles([file.id: merged])
-            self?.syncIndexChanged()
+            let read = await PinWork.run { LibrarySyncIndex.read(probe, roots: roots, at: StoreWriter.iso(Date())) }
+            let changed = index.correct(probe.id, found: read.files, dirMtimeMs: read.dirMtimeMs)
+            guard let self else { return }
+            self.syncCorrecting.remove(probe.id)
+            if changed { self.syncIndexChanged() }
         }
     }
 

@@ -81,6 +81,10 @@ final class Shop {
     /// Which remote that is (`CloudLibrary.remoteIdentity`): a "backed up"
     /// proved anywhere else reads as on this Mac only.
     var libraryRemoteId: String?
+    /// The Drive identity, for the sealed settings it was opened from.
+    @ObservationIgnored var driveIdentityCache: (key: String, id: String)?
+    /// Models whose index entry is being read again from the disk.
+    @ObservationIgnored var syncCorrecting: Set<String> = []
     /// A model an open job needs, waiting for "Free Up Space anyway".
     var pendingFreeUp: LibraryFile?
 
@@ -2741,7 +2745,12 @@ final class Shop {
     /// asked of a JavaScript rule, which reads records rather than `LibraryFile`
     /// — and re-encoding the decoded ones per keystroke would be a hop for a
     /// round trip.
-    var libraryRows: [JSONValue] = []
+    var libraryRows: [JSONValue] = [] { didSet { libraryRowsRevision &+= 1 } }
+    /// Bumped with every change to `libraryRows`. The chips' caches key on
+    /// THIS, not `filesRevision`: a load assigns `files` well before it
+    /// assigns these rows, and a recount between the two cached the old rows'
+    /// counts under the new book's revision.
+    @ObservationIgnored private(set) var libraryRowsRevision = 0
 
     /// Recount the chips. Called from the setters below rather than by the
     /// views, so a chip cannot be added to a screen and quietly left stale.

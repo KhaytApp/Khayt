@@ -184,26 +184,43 @@ enum CloudLibrary {
     }
 
     /// WHICH remote a backup was proved on, as a string an index can keep and
-    /// compare: the provider, and the bucket and its folder or the Drive
-    /// folder. Nil when the library has none. Read from the settings without
-    /// opening a secret, so a tile can ask it.
+    /// compare: the provider, and the bucket and its folder — or, for Drive,
+    /// the ACCOUNT and the folder (`driveIdentity`). Read from the settings
+    /// without opening a secret, so a tile can ask it; nil for none, and for
+    /// Drive, whose account needs its sign-in opened (`Shop.refreshLibraryRemote`).
     static func remoteIdentity(_ settings: [String: JSONValue]) -> String? {
         guard case .object(let library)? = settings["printLibrary"] else { return nil }
         let s3 = section(library, "s3")
-        switch remoteInUse(settings) {
-        case .bucket: return bucketIdentity(endpoint: text(s3, "endpoint"), bucket: text(s3, "bucket"),
-                                            prefix: text(s3, "prefix"))
-        case .drive: return "gdrive:" + driveFolder(settings)
-        case .none: return nil
-        }
+        guard remoteInUse(settings) == .bucket else { return nil }
+        return bucketIdentity(endpoint: text(s3, "endpoint"), bucket: text(s3, "bucket"), prefix: text(s3, "prefix"))
+    }
+
+    /// What the Drive identity is worked out from, as stored (sealed): when
+    /// this has not changed, neither has the identity.
+    static func driveSettingsKey(_ settings: [String: JSONValue]) -> String? {
+        guard remoteInUse(settings) == .drive, case .object(let library)? = settings["printLibrary"] else { return nil }
+        let gd = section(library, "gdrive")
+        return [text(gd, "clientId"), text(gd, "refreshToken"), driveFolder(settings)].joined(separator: "\n")
     }
 
     /// The same, for the remote a file actually came from or went to.
     static func remoteIdentity(of remote: LibraryRemote, settings: [String: JSONValue]) -> String {
         switch remote {
         case .bucket(let c): return bucketIdentity(endpoint: c.endpoint, bucket: c.bucket, prefix: c.prefix)
-        case .drive: return "gdrive:" + driveFolder(settings)
+        case .drive(let d): return driveIdentity(d.config, folder: driveFolder(settings))
         }
+    }
+
+    /// A Drive account, without its address: this Mac does not keep the
+    /// account's email (the book would carry it to every device), so the
+    /// account is its sign-in — the OAuth client and the refresh token,
+    /// hashed — and the folder. Signing in again, even to the same account,
+    /// reads as another remote until the next backup proves each file again:
+    /// the safe way round.
+    nonisolated static func driveIdentity(_ c: DriveClient.Config, folder: String) -> String {
+        let digest = SHA256.hash(data: Data((c.clientId + "\n" + c.refreshToken).utf8))
+            .map { String(format: "%02x", $0) }.joined()
+        return "gdrive:" + digest.prefix(16) + "/" + folder
     }
 
     nonisolated static func bucketIdentity(endpoint: String, bucket: String, prefix: String) -> String {
@@ -745,33 +762,54 @@ extension Shop {
     }
 
     /// Is this model's file in the cloud rather than on this Mac?
+    ///
+    /// THE DISK IS THE TRUTH; the index is only how a tile avoids asking.
+    /// The question is about the RECORD'S OWN FILE (`sourceFile.filename`),
+    /// read by the per-file rule the index is built with
+    /// (`LibrarySyncIndex.files`), so the two cannot disagree about the same
+    /// folder. Where the index does disagree it is put right after this call
+    /// (`scheduleSyncCorrection`) — and only then.
     func isInCloudOnly(_ file: LibraryFile) -> Bool {
-        // THE DISK IS THE TRUTH; the index is only how a tile avoids asking.
-        // A file that is here is here, whatever the index says — and the
-        // index is put right from the folder (`correctSyncIndex`), after
-        // this draw.
-        let indexSays = syncIndex?.state(file.id, remote: libraryRemoteId)
-        let answer = isInCloudOnlyOnDisk(file)
-        if let indexSays, (indexSays == .online) != answer { correctSyncIndex(file) }
-        return answer
+        let reading = cloudOnlyReading(file)
+        if let own = reading.own, let seen = reading.disk[own], let index = syncIndex {
+            let held = index.entry(file.id)?.files[own]?.state
+            if held == nil || (held == .online) != (seen.state == .online) { scheduleSyncCorrection(file) }
+        }
+        return reading.answer
     }
 
-    /// `isInCloudOnly`, from the disk alone.
-    private func isInCloudOnlyOnDisk(_ file: LibraryFile) -> Bool {
+    /// What the disk says: the answer, the record's own file's name when the
+    /// per-file reading has it, and that reading.
+    private func cloudOnlyReading(_ file: LibraryFile)
+    -> (answer: Bool, own: String?, disk: [String: LibrarySyncIndex.FileEntry]) {
         // A LINKED model in a cloud drive's folder that the drive has not
         // downloaded (`LinkedCloud`): listed, there, and in the cloud. Shown
         // as one moved to the bucket is, with Bring Back to fetch it.
-        if file.isLinked, let url = modelFile(for: file) { return LinkedCloud.isOnlineOnly(url) }
-        guard modelFile(for: file) == nil, let dir = directory(for: file) else { return false }
+        if file.isLinked {
+            guard let url = modelFile(for: file) else { return (false, nil, [:]) }
+            let online = LinkedCloud.isOnlineOnly(url)
+            return (online, url.lastPathComponent, [url.lastPathComponent: .init(state: online ? .online : .local)])
+        }
+        guard let dir = directory(for: file) else { return (false, nil, [:]) }
         let contents = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
-        // A `.cloud` sidecar (moved off this Mac) or an `.online` marker (put
+        let disk = LibrarySyncIndex.files(of: contents)
+        // The record names its file, and the folder says where that file is:
+        // here, or moved out (`.cloud`) or never here (`.online`). A pack's
+        // other files do not decide it.
+        if let own = file.sourceFile?.filename, !own.isEmpty, let seen = disk[own] {
+            return (seen.state == .online, own, disk)
+        }
+        // A record whose name matches nothing in its folder: the folder's one
+        // model, if it has one (`modelFile`), else any sidecar or marker. A
+        // `.cloud` sidecar (moved off this Mac) or an `.online` marker (put
         // in the bucket by the shop, never here — `LibraryStorage`). A stray
         // `<model>.online.cloud` — the desktop's tier sweep moving a MARKER
         // off when its size floor is 0 — is the marker's sidecar: never a
         // model (`soleModel`), never tiered again (the shared rule skips
         // sidecars), and Bring Back puts the marker back from it, verified.
         // `LibraryA65ReviewTests.strayOnlineCloud` holds all of that.
-        return contents.contains { $0.hasSuffix(".cloud") || $0.hasSuffix(Shop.onlineExt) }
+        guard modelFile(for: file) == nil else { return (false, nil, disk) }
+        return (contents.contains { $0.hasSuffix(".cloud") || $0.hasSuffix(Shop.onlineExt) }, nil, disk)
     }
 
     /// Put a test file in the bucket, read it back, and take it away again —

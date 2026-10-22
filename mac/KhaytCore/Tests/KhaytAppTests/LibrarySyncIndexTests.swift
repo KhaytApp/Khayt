@@ -71,9 +71,27 @@ struct LibrarySyncIndexTests {
         let legacy = LibrarySyncIndex.legacyLocation(primary: root.path)
         let old = #"{"v":1,"root":"\#(root.path)","models":{"PF-1":{"state":"local","keep":true},"PF-2":{"state":"online"}}}"#
         try Data(old.utf8).write(to: legacy)
-        let keep = LibrarySyncIndex.takeLegacy(primary: root.path)
-        #expect(keep == ["PF-1"])
+        // Beside a library folder that is not this Mac's own support folder
+        // — a NAS, a cloud drive: removed, but its keeps are not taken.
+        #expect(LibrarySyncIndex.takeLegacy(primary: root.path, folder: support, ids: ["PF-1"]).isEmpty)
         #expect(!FileManager.default.fileExists(atPath: legacy.path), "left where another Mac may read it")
+        // One that names another library is not ours to delete.
+        let other = #"{"v":1,"root":"/Volumes/NAS/elsewhere","models":{"PF-1":{"state":"local","keep":true}}}"#
+        try Data(other.utf8).write(to: legacy)
+        #expect(LibrarySyncIndex.takeLegacy(primary: root.path, folder: support, ids: ["PF-1"]).isEmpty)
+        #expect(FileManager.default.fileExists(atPath: legacy.path))
+        try Data("not json".utf8).write(to: legacy)
+        #expect(LibrarySyncIndex.takeLegacy(primary: root.path, folder: support, ids: ["PF-1"]).isEmpty)
+        #expect(FileManager.default.fileExists(atPath: legacy.path), "a file it cannot read is left alone")
+        // The built-in vault: the legacy file sat in this Mac's own support
+        // folder. Its keeps are taken — for models in this book only.
+        try Data(old.utf8).write(to: legacy)
+        let keep = LibrarySyncIndex.takeLegacy(primary: root.path, folder: legacy.deletingLastPathComponent(),
+                                               ids: ["PF-1", "PF-2"])
+        #expect(keep == ["PF-1"])
+        try Data(old.utf8).write(to: legacy)
+        #expect(LibrarySyncIndex.takeLegacy(primary: root.path, folder: legacy.deletingLastPathComponent(),
+                                            ids: ["PF-2"]).isEmpty, "a keep for a model not in this book")
 
         try Self.folder(root, "PF-1", ["a.3mf"])
         try Self.folder(root, "PF-2", ["b.stl.cloud", "c.stl"])
@@ -83,7 +101,7 @@ struct LibrarySyncIndexTests {
         #expect(index.url == url && FileManager.default.fileExists(atPath: url.path))
         #expect(index.isKept("PF-1"))
         #expect(index.state("PF-2", remote: Self.remote) == .local, "one file of two moved out")
-        #expect(index.entry("PF-2")?.files["b.stl"]?.state == .online)
+        #expect(index.entry("PF-2")?.files["b.stl"]?.state == LibrarySyncIndex.State.online)
         let side = root.appending(path: LibraryLocation.itemDirName("PF-2")).appending(path: "b.stl.cloud")
         #expect(FileManager.default.fileExists(atPath: side.path), "the sidecars stay")
         #expect(LibrarySyncIndex.open(primary: root.path, folder: support)?.snapshot == index.snapshot)
@@ -205,6 +223,11 @@ struct LibrarySyncIndexTests {
             of: .bucket(S3Config(endpoint: "https://acc.r2.example", bucket: "lib", region: "auto",
                                  accessKeyId: "k", secretAccessKey: "s", prefix: "shop")),
             settings: shop.settingsDict), "a file brought back from the bucket in use is stamped the same")
+        // Drive: the account (its sign-in) is part of it, not only the folder.
+        let one = DriveClient.Config(clientId: "c", clientSecret: "s", refreshToken: "account-1", folderName: "F")
+        let two = DriveClient.Config(clientId: "c", clientSecret: "s", refreshToken: "account-2", folderName: "F")
+        #expect(CloudLibrary.driveIdentity(one, folder: "F") != CloudLibrary.driveIdentity(two, folder: "F"))
+        #expect(CloudLibrary.driveIdentity(one, folder: "F") == CloudLibrary.driveIdentity(one, folder: "F"))
     }
 
     @Test("a tile's badge is a lookup, and says nothing for a shop with no cloud")
@@ -261,6 +284,45 @@ struct LibrarySyncIndexTests {
         try FileManager.default.createSymbolicLink(at: dir.appending(path: "c.3mf"),
                                                    withDestinationURL: elsewhere.appending(path: "x"))
         #expect(CloudLibrary.files(in: dir, root: root.path, includingMarkers: false).map(\.filename) == ["a.3mf"])
+    }
+
+    @Test("a known folder that gained a file is read again on the next load")
+    func reconcileReReadsChangedFolder() throws {
+        let (root, support) = try Self.folders()
+        let dir = try Self.folder(root, "PF-1", ["a.3mf"])
+        let probe = LibrarySyncIndex.Probe(id: "PF-1", externalPath: nil)
+        let index = LibrarySyncIndex.migrate(primary: root.path, folder: support, roots: [root.path], models: [probe])
+        #expect(!index.reconcile(roots: [root.path], models: [probe]))
+        // A folder's mtime has a resolution; make sure it moves.
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -60)],
+                                              ofItemAtPath: dir.path)
+        #expect(index.reconcile(roots: [root.path], models: [probe]), "an mtime change is noted")
+        try Data("x".utf8).write(to: dir.appending(path: "b.3mf.cloud"))
+        try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: dir.path)
+        #expect(index.reconcile(roots: [root.path], models: [probe]))
+        #expect(index.entry("PF-1")?.files["b.3mf"]?.state == LibrarySyncIndex.State.online)
+        #expect(!index.reconcile(roots: [root.path], models: [probe]), "read again only once")
+    }
+
+    @Test("tags changed on another device: the counts follow, though the files revision did not move")
+    func countsFollowNewRows() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        func rows(_ tag: String) -> [JSONValue] {
+            (1...4).map { .object(["id": .string("PF-\($0)"), "name": .string("M\($0)"), "tags": .array([.string(tag)])]) }
+        }
+        shop.pretendLibrary(rows("dragon"))
+        shop.libraryRows = rows("dragon")
+        shop.clearLibraryFilter()
+        shop.shelf = .library(nil)
+        shop.recountLibrarySoon()
+        await shop.settleLibraryFacets()
+        #expect(shop.libraryFacets.tags.map(\.name) == ["dragon"])
+        // The book's rows replaced as a sync would, `files` untouched.
+        shop.libraryRows = rows("egg")
+        shop.recountLibrarySoon()
+        await shop.settleLibraryFacets()
+        #expect(shop.libraryFacets.tags.map(\.name) == ["egg"], "the cached counts of the old rows were shown")
     }
 
     @Test("wired: tile, inspector, Show menu, every move recorded once per pass, guards on the one-model path")
@@ -353,6 +415,42 @@ extension LibraryEditPerfTests {
                 try await Task.sleep(for: .milliseconds(20))
             }
             #expect(index.state(file.id, remote: nil) == .local, "the index was not corrected from the disk")
+        }
+    }
+
+    @Test("a record's own file moved out beside two others: online only, agreed once, and never written again")
+    func ownFileMovedOutBesideOthers() async throws {
+        try await withPerfBook(PerfBook.synthesize(models: 6)) { shop, _ in
+            await shop.settleSyncIndex()
+            let index = try #require(shop.syncIndex)
+            let file = try #require(shop.files.first { !$0.isLinked })
+            let own = try #require(file.sourceFile?.filename)
+            let primary = try #require(shop.libraryRoots?.primary)
+            let dir = URL(fileURLWithPath: primary).appending(path: LibraryLocation.itemDirName(file.id))
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            // The layout that looped: no sole model, so the old disk rule said
+            // cloud-only while the per-file re-read said local.
+            for name in [own + ".cloud", "part-a.stl", "part-b.stl"] {
+                try Data("x".utf8).write(to: dir.appending(path: name))
+            }
+            @MainActor func settle() async throws {
+                for _ in 0..<50 where !shop.syncCorrecting.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+                try await Task.sleep(for: .milliseconds(30))
+            }
+            #expect(shop.isInCloudOnly(file), "the record's own file is not here")
+            try await settle()
+            #expect(index.entry(file.id)?.files[own]?.state == LibrarySyncIndex.State.online)
+            #expect(shop.storageState(for: file) == .local, "the pack's other files are here")
+            let revision = shop.librarySyncRevision
+            let written = try FileManager.default.attributesOfItem(atPath: index.url.path)[.modificationDate] as? Date
+            for _ in 0..<3 {
+                #expect(shop.isInCloudOnly(file))
+                try await settle()
+            }
+            #expect(shop.librarySyncRevision == revision, "a reading both agree on redrew the library")
+            let after = try FileManager.default.attributesOfItem(atPath: index.url.path)[.modificationDate] as? Date
+            #expect(after == written, "a reading both agree on wrote the index")
+            #expect(shop.syncCorrecting.isEmpty)
         }
     }
 

@@ -70,6 +70,10 @@ final class LibrarySyncIndex: @unchecked Sendable {
         var files: [String: FileEntry] = [:]
         /// "Keep on this Mac": Free up space never moves it out.
         var keep: Bool?
+        /// The folder's modification time when `files` was read from it: a
+        /// file added or removed since changes it, and the next load reads
+        /// the folder again (`reconcile`).
+        var dirMtimeMs: Double?
     }
 
     struct Disk: Codable, Equatable, Sendable {
@@ -157,17 +161,26 @@ final class LibrarySyncIndex: @unchecked Sendable {
     /// folder, and that file removed — it was in a place another Mac may
     /// share. Its states are not carried over: they are read again from the
     /// sidecars, per file, which the old file did not record.
-    nonisolated static func takeLegacy(primary: String) -> Set<String> {
+    ///
+    /// Removed only once it has been read and names THIS library folder —
+    /// anything else there is not ours to delete. Its Keep choices are taken
+    /// only when it sat in this Mac's own support folder (the built-in
+    /// vault's case) and only for models in this book: beside a library
+    /// folder on a NAS or a cloud drive, another Mac may have written it, and
+    /// its keeps are that Mac's.
+    nonisolated static func takeLegacy(primary: String, folder: URL, ids: Set<String>) -> Set<String> {
         let url = legacyLocation(primary: primary)
         guard let data = try? Data(contentsOf: url) else { return [] }
-        defer { try? FileManager.default.removeItem(at: url) }
         struct Old: Decodable {
             struct E: Decodable { var keep: Bool? }
             var root: String
             var models: [String: E]
         }
         guard let old = try? JSONDecoder().decode(Old.self, from: data), old.root == primary else { return [] }
-        return Set(old.models.filter { $0.value.keep == true }.keys)
+        try? FileManager.default.removeItem(at: url)
+        let ownFolder = url.deletingLastPathComponent().standardizedFileURL.path == folder.standardizedFileURL.path
+        guard ownFolder else { return [] }
+        return Set(old.models.filter { $0.value.keep == true && ids.contains($0.key) }.keys)
     }
 
     /// A first index, read from the sidecars under every root, and written.
@@ -176,7 +189,8 @@ final class LibrarySyncIndex: @unchecked Sendable {
         let at = StoreWriter.iso(now)
         var disk = Disk(root: primary, migratedAt: at)
         for model in models {
-            var entry = Entry(files: files(of: model, roots: roots, at: at))
+            let read = read(model, roots: roots, at: at)
+            var entry = Entry(files: read.files, dirMtimeMs: read.dirMtimeMs)
             if keep.contains(model.id) { entry.keep = true }
             disk.models[model.id] = entry
         }
@@ -191,6 +205,37 @@ final class LibrarySyncIndex: @unchecked Sendable {
         let id: String
         /// For a linked model, its own file.
         let externalPath: String?
+    }
+
+    /// A model's files as its folder says now, with the folder's mtime.
+    nonisolated static func read(_ model: Probe, roots: [String], at: String)
+    -> (files: [String: FileEntry], dirMtimeMs: Double?) {
+        let found = files(of: model, roots: roots, at: at)
+        guard (model.externalPath ?? "").isEmpty,
+              let dir = LibraryLocation.directory(for: model.id, roots: roots) else { return (found, nil) }
+        return (found, dirMtime(dir))
+    }
+
+    nonisolated static func dirMtime(_ dir: URL) -> Double? {
+        (try? dir.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+            .map { ($0.timeIntervalSince1970 * 1000).rounded() }
+    }
+
+    /// What a folder says now, over what was known: a file the disk sees as
+    /// here keeps a "backed up" stamp it had — the disk cannot see a backup —
+    /// and everything else is the disk's.
+    nonisolated static func merge(_ found: [String: FileEntry], over known: [String: FileEntry]?) -> [String: FileEntry] {
+        var out = found
+        for (name, was) in known ?? [:] where was.state == .backedUp && found[name]?.state == .local {
+            out[name] = was
+        }
+        return out
+    }
+
+    /// Do two readings of a model's files say the same, file by file? Stamps
+    /// and times aside: only where each file is.
+    nonisolated static func sameFacts(_ a: [String: FileEntry], _ b: [String: FileEntry]) -> Bool {
+        a.mapValues(\.state) == b.mapValues(\.state)
     }
 
     /// A model's files as its folder (or, linked, its drive) says now. One
@@ -252,17 +297,23 @@ final class LibrarySyncIndex: @unchecked Sendable {
         save()
     }
 
-    /// Replace what is known of models' files with what their folders say.
-    func replaceFiles(_ found: [String: [String: FileEntry]]) {
-        guard !found.isEmpty else { return }
-        lock.withLock {
-            for (id, files) in found {
-                var e = disk.models[id] ?? Entry()
-                e.files = files
-                disk.models[id] = e
-            }
+    /// Put a model's files right from what its folder says now — merged
+    /// over what was known (`merge`). Writes nothing, and returns false, when
+    /// that changes no file's state: a check that agrees costs no write.
+    @discardableResult
+    func correct(_ id: String, found: [String: FileEntry], dirMtimeMs: Double?) -> Bool {
+        let changed: Bool = lock.withLock {
+            let known = disk.models[id]
+            let next = Self.merge(found, over: known?.files)
+            guard known == nil || !Self.sameFacts(next, known?.files ?? [:]) else { return false }
+            var e = known ?? Entry()
+            e.files = next
+            e.dirMtimeMs = dirMtimeMs
+            disk.models[id] = e
+            return true
         }
-        save()
+        if changed { save() }
+        return changed
     }
 
     /// "Keep on this Mac", on or off.
@@ -291,11 +342,23 @@ final class LibrarySyncIndex: @unchecked Sendable {
         let current = lock.withLock { disk.models }
         let inBook = Set(models.map(\.id))
         let gone = Set(current.keys).subtracting(inBook)
-        var fresh: [String: [String: FileEntry]] = [:]
+        var fresh: [String: (files: [String: FileEntry], dirMtimeMs: Double?)] = [:]
         var stale: [String: [String: FileEntry]] = [:]
         for model in models {
             guard let known = current[model.id] else {
-                fresh[model.id] = Self.files(of: model, roots: roots, at: at)
+                fresh[model.id] = Self.read(model, roots: roots, at: at)
+                continue
+            }
+            // A folder that gained or lost a file since it was read — an
+            // import into it, the other app moving one out — is read again.
+            if (model.externalPath ?? "").isEmpty,
+               let dir = LibraryLocation.directory(for: model.id, roots: roots),
+               let mtime = Self.dirMtime(dir), mtime != known.dirMtimeMs {
+                let read = Self.read(model, roots: roots, at: at)
+                let next = Self.merge(read.files, over: known.files)
+                if !Self.sameFacts(next, known.files) || known.dirMtimeMs != read.dirMtimeMs {
+                    fresh[model.id] = (next, read.dirMtimeMs)
+                }
                 continue
             }
             for (name, file) in known.files where file.state == .backedUp {
@@ -309,7 +372,9 @@ final class LibrarySyncIndex: @unchecked Sendable {
         guard !fresh.isEmpty || !gone.isEmpty || !stale.isEmpty else { return false }
         lock.withLock {
             for id in gone { disk.models[id] = nil }
-            for (id, files) in fresh { disk.models[id] = Entry(files: files, keep: disk.models[id]?.keep) }
+            for (id, read) in fresh {
+                disk.models[id] = Entry(files: read.files, keep: disk.models[id]?.keep, dirMtimeMs: read.dirMtimeMs)
+            }
             for (id, files) in stale {
                 for (name, file) in files { disk.models[id]?.files[name] = file }
             }

@@ -1877,7 +1877,7 @@ extension Shop {
                      _ ask: ([JSONValue]) async throws -> [KhaytEngine.GroupCount]) async -> [KhaytEngine.GroupCount] {
             let pool = libraryPool(skipping: axis, searched: searched)
             var h = Hasher()
-            h.combine(filesRevision)
+            h.combine(libraryRowsRevision)
             for row in pool { h.combine(Self.rowText(row, "id")) }
             let key = h.finalize()
             if let held = facetCountMemo[name], held.key == key { return held.rows }
@@ -1903,11 +1903,12 @@ extension Shop {
             // across the bridge, per machine, and was most of a recount
             // (240 ms of 300 at 6,600 models, Oct 2026).
             let ids: Set<String>
-            if let held = readyMemo[machine.id], held.revision == filesRevision, held.loaded == loaded {
+            let rowsAt = libraryRowsRevision
+            if let held = readyMemo[machine.id], held.revision == rowsAt, held.loaded == loaded {
                 ids = held.ids
             } else {
                 ids = Set((try? await engine.readyToPrint(libraryRows, loaded: loaded)) ?? [])
-                readyMemo[machine.id] = (filesRevision, loaded, ids)
+                readyMemo[machine.id] = (rowsAt, loaded, ids)
             }
             byMachine[machine.id] = ids
             let count = libraryPool(skipping: .ready, searched: searched).count { ids.contains(Self.rowText($0, "id")) }
