@@ -937,7 +937,7 @@ extension Shop {
         guard config.tierEnabled else { cloudLibraryProblem = words.callIt("mac.cloudlib_tier_off"); return nil }
         guard let plan = await tierPlan(engine: engine, config: config, roots: roots) else { return nil }
         // Never one the shop said to keep on this Mac.
-        let candidates = notKept(plan.candidates)
+        let candidates = await notKept(plan.candidates)
         let titles = Dictionary(files.map { (LibraryLocation.itemDirName($0.id), $0.title) },
                                 uniquingKeysWith: { a, _ in a })
         return FreeUpPreview(count: candidates.count,
@@ -967,7 +967,7 @@ extension Shop {
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false; cloudProgress = nil }
         guard let plan = await tierPlan(engine: engine, config: config, roots: roots) else { return }
-        let candidates = notKept(plan.candidates).filter { confirmed.contains($0.fullPath) }
+        let candidates = await notKept(plan.candidates).filter { confirmed.contains($0.fullPath) }
         let idOf = modelIdsByFolder()
         let remote = libraryRemoteId
         // One write and one recount for the pass, not one per model.
@@ -1156,7 +1156,7 @@ extension Shop {
         let all = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
         let inCloud = all.filter { $0.filename.hasSuffix(".cloud") }.count
         guard let plan = await tierPlan(engine: engine, config: config, roots: roots) else { return nil }
-        let candidates = notKept(plan.candidates)
+        let candidates = await notKept(plan.candidates)
         return (candidates.count, (try? await engine.formatBytes(candidates.reduce(0) { $0 + $1.size })) ?? "", inCloud)
     }
 

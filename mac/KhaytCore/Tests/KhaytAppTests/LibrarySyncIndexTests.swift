@@ -248,6 +248,23 @@ struct LibrarySyncIndexTests {
         #expect(Words.own["mac.storage_free_one_help"]?["ar"]?.contains("«أعده من السحابة»") == true)
     }
 
+    @Test("Free up space waits for the index to open: a Keep set before launch is not skipped")
+    func keptBeforeIndexLands() async throws {
+        let (root, support) = try Self.folders()
+        let shop = await Self.shop(root, support)
+        shop.syncIndex?.setKeep("PF-6", true)
+        // As at launch: the index is still opening in its task when Free up
+        // space reads it.
+        let opened = shop.syncIndex
+        shop.syncIndex = nil
+        shop.syncIndexTask = Task { @MainActor in shop.syncIndex = opened }
+        let files = ["PF-5", "PF-6"].map {
+            KhaytEngine.TierFile(filename: "m.3mf", fullPath: "/x/\($0)/m.3mf", size: 10, mtimeMs: 0,
+                                 id: LibraryLocation.itemDirName($0), lastUsedMs: nil)
+        }
+        #expect(await shop.notKept(files).map(\.fullPath) == ["/x/PF-5/m.3mf"])
+    }
+
     @Test("Keep on this Mac takes a model out of Free up space, and the delete question names it")
     func kept() async throws {
         let (root, support) = try Self.folders()
@@ -257,7 +274,7 @@ struct LibrarySyncIndexTests {
             KhaytEngine.TierFile(filename: "m.3mf", fullPath: "/x/\($0)/m.3mf", size: 10, mtimeMs: 0,
                                  id: LibraryLocation.itemDirName($0), lastUsedMs: nil)
         }
-        #expect(shop.notKept(files).map(\.fullPath) == ["/x/PF-5/m.3mf"])
+        #expect(await shop.notKept(files).map(\.fullPath) == ["/x/PF-5/m.3mf"])
         var plan = LibraryDeletePlan()
         plan.keptOnline = ["PF-5"]
         #expect(shop.keptModelsNotice(plan) == nil)
@@ -336,7 +353,7 @@ struct LibrarySyncIndexTests {
         #expect(inspector.contains("shop.freeUpSpace(model: file, anyway: true)"), "an open job is not asked about")
         #expect(try src("LibraryFilterBar.swift").contains("\"online-only\", \"this-mac-only\"]"))
         let cloud = try src("CloudLibrary.swift")
-        #expect(cloud.contains("notKept(plan.candidates)"))
+        #expect(cloud.contains("await notKept(plan.candidates)"))
         #expect(cloud.contains("defer { recordSync(sync) }"), "a bulk pass records model by model")
         #expect(cloud.contains("CloudLibrary.remoteIdentity(of: from, settings: settings)"),
                 "Bring Back does not stamp the remote the bytes came from")

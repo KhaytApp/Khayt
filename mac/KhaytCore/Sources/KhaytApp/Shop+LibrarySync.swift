@@ -185,7 +185,10 @@ extension Shop {
     }
 
     /// The tier plan's models, less the ones the shop asked to keep here.
-    func notKept(_ candidates: [KhaytEngine.TierFile]) -> [KhaytEngine.TierFile] {
+    func notKept(_ candidates: [KhaytEngine.TierFile]) async -> [KhaytEngine.TierFile] {
+        // The index opens in a background task at load. Read before it lands,
+        // every kept model looked unkept and went to the cloud.
+        await settleSyncIndex()
         guard let index = syncIndex else { return candidates }
         let ids = modelIdsByFolder()
         return candidates.filter { file in
@@ -232,6 +235,8 @@ extension Shop {
         guard let engine, let config = await cloudConfig() else {
             cloudLibraryProblem = words.callIt("mac.cloudlib_not_set_up"); return
         }
+        await settleSyncIndex()
+        guard !isKeptOnThisMac(file) else { return }
         guard !cloudLibraryBusy else { return }
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false }
