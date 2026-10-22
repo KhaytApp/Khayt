@@ -236,6 +236,22 @@ final class OfflineWriteTests: XCTestCase {
         XCTAssertNil(try record("printLog", "O-1")["quoteAcceptedAt"], "only a quote is accepted")
     }
 
+    func testACancelIsStampedOnTheLocalDayAndUnstampedWhenUndone() throws {
+        // The cancel day places the VAT reversal in a period, as
+        // `lib/order-status.js` stamps it on the Mac.
+        let now = ISO8601DateFormatter().date(from: "2026-10-21T22:30:00Z")!
+        try writer.setOrderStatus(orderId: "O-1", to: "cancelled", now: now)
+        XCTAssertEqual(try record("printLog", "O-1")["cancelledAt"], .string(BookWriter.localDay(now)))
+
+        let later = now.addingTimeInterval(3 * 86_400)
+        try writer.setOrderStatus(orderId: "O-1", to: "cancelled", now: later)
+        XCTAssertEqual(try record("printLog", "O-1")["cancelledAt"], .string(BookWriter.localDay(now)),
+                       "staying cancelled keeps the first day")
+
+        try writer.setOrderStatus(orderId: "O-1", to: "pending", now: later)
+        XCTAssertNil(try record("printLog", "O-1")["cancelledAt"], "a job brought back is not cancelled")
+    }
+
     func testTwoEditsToOneRecordTravelAsOne() async throws {
         try writer.setOrderStatus(orderId: "O-1", to: "qc")
         try writer.setOrderStatus(orderId: "O-1", to: "completed")
