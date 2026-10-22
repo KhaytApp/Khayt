@@ -67,13 +67,14 @@ extension StoreWriter {
 
     /// `updateRecord`, on the write chain without holding the main thread.
     /// Returns what `change` returned, or nil when the record is not in the
-    /// book (and nothing was changed).
+    /// book (and nothing was changed). `forceStamp`: see `changeRecord`.
     @discardableResult
     static func updateRecordOffMain<T: Sendable>(_ build: StoreReader.Build, collection: String, id: String,
+                                                 forceStamp: Bool = false,
                                                  change: @escaping @Sendable (inout [String: JSONValue]) -> T)
         async throws -> T? {
         try await updateOffMain(build) { root -> T? in
-            changeRecord(&root, collection: collection, id: id, change: change)
+            changeRecord(&root, collection: collection, id: id, forceStamp: forceStamp, change: change)
         }
     }
 
@@ -81,14 +82,22 @@ extension StoreWriter {
     /// A change that changed nothing is not an edit: stamping it would bump
     /// `rev`/`updatedAt` and win the next sync merge for nothing. Nil when
     /// the record is not in the book.
+    ///
+    /// `forceStamp` stamps even a no-op. Only for a value that records
+    /// something that ALREADY HAPPENED outside the book (the portal page was
+    /// published or taken down): the same value on disk may be another Mac's
+    /// stale stamp-less copy, and unstamped it loses the LWW merge to that
+    /// Mac's older edit — the book would then say the page is up when it is
+    /// down, or the reverse.
     static func changeRecord<T>(_ root: inout [String: JSONValue], collection: String, id: String,
+                                forceStamp: Bool = false,
                                 change: (inout [String: JSONValue]) -> T) -> T? {
         guard case .array(var rows)? = root[collection],
               let index = rows.firstIndex(where: { Shop.recordId($0) == id }),
               case .object(var record) = rows[index] else { return nil }
         let before = record
         let out = change(&record)
-        guard record != before else { return out }
+        guard forceStamp || record != before else { return out }
         stamp(&record)
         rows[index] = .object(record)
         root[collection] = .array(rows)

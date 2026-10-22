@@ -4,6 +4,26 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **beta.5 review fixes: filed VAT, portal sync, Bambu sessions, runout, PIN lockouts.**
+  - A cancel, void or credit after a filed period is now dated by that event,
+    not by the job's last save. A job cancelled on 20 December and saved again
+    on 3 January for a payment or a note used to put its VAT reversal in Q1,
+    so the Q4 return left it out. The reversal now stays in Q4. The sync stamp
+    `updatedAt` is only used for an edit that has no event date. The Mac's copy
+    of the rule is the same file.
+  - Mac: publishing or taking down a customer's portal page now always stamps
+    the job. Before, a job that already showed the same value was not stamped,
+    and another Mac's older copy could win the sync merge.
+  - Mac: changing a Bambu's access code, host or port keeps the printer's
+    last-known state. The new connection used to start empty while the
+    five-minute full-state limit was still running. Two quick reconnects at the
+    same time can no longer leave a second MQTT connection open.
+  - The runout alert now fires when a job starts on a head that was already
+    empty.
+  - Mac: wrong-PIN lockouts on the LAN server now use the same clock as the
+    pairing window, a clock that only moves forward. Changing the Mac's date
+    no longer lifts or extends a lockout.
+
 - **Khayt Vault: the encryption format for cloud files and share links.**
   The building block for keeping a shop's files in Khayt Cloud and sharing
   them by link, without the server ever holding a key that opens them. Files

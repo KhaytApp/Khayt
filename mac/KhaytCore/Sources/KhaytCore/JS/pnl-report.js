@@ -163,31 +163,46 @@
   }
 
   /**
-   * The day this job last changed: the LATEST of every stamp it carries —
-   * `cancelledAt`, its last `statusHistory` cancel, `voidedAt`, `creditedAt`,
-   * each credit note's `issuedAt`, the sync stamp `updatedAt` — each as its
-   * local day, so a change is never dated before it happened (a phone cancel
-   * with only `updatedAt` lands when it was made). '' when nothing says.
+   * The day this job last changed. When the job carries an EVENT stamp —
+   * `cancelledAt`, its last `statusHistory` cancel (or the un-cancel after
+   * it), `voidedAt`, `creditedAt`, each credit note's `issuedAt` — the change
+   * day is the LATEST of those, never the sync stamp `updatedAt`: a later
+   * save (a payment, a note, a phone's sync stamp) must not drag a December
+   * reversal into January's return. `updatedAt` is only the fallback for an
+   * edit with no event stamp (a phone cancel with only `updatedAt` still
+   * lands when it was made). Each as its local day; '' when nothing says.
    * ONE day per job, whichever filed period is asked about, so the
    * adjustments for one job always land together.
    */
-  function stampsOf(o) {
+  function eventStampsOf(o) {
     if (!o) return [];
-    const out = [o.cancelledAt, o.voidedAt, o.creditedAt, o.updatedAt];
-    if (o.status === 'cancelled' && Array.isArray(o.statusHistory)) {
-      for (let i = o.statusHistory.length - 1; i >= 0; i--) {
-        const h = o.statusHistory[i];
-        if (h && h.status === 'cancelled') { out.push(h.at); break; }
-      }
+    const out = [o.cancelledAt, o.voidedAt, o.creditedAt];
+    const h = Array.isArray(o.statusHistory) ? o.statusHistory : [];
+    for (let i = h.length - 1; i >= 0; i--) {
+      if (!h[i] || h[i].status !== 'cancelled') continue;
+      // Still cancelled: the cancel is the event. Un-cancelled since: the
+      // first move out of Cancelled after it is.
+      if (o.status === 'cancelled') out.push(h[i].at);
+      else if (h[i + 1]) out.push(h[i + 1].at);
+      break;
     }
     for (const n of Array.isArray(o.creditNotes) ? o.creditNotes : []) out.push(n && n.issuedAt);
     return out.filter((x) => typeof x === 'string' && x);
   }
 
+  /** Every stamp the job carries, the sync stamp included (touchedSince). */
+  function stampsOf(o) {
+    if (!o) return [];
+    return eventStampsOf(o).concat(typeof o.updatedAt === 'string' && o.updatedAt ? [o.updatedAt] : []);
+  }
+
   function changeDayOf(o, V) {
-    let latest = '';
-    for (const st of stampsOf(o)) { const d = V.localDay(st); if (d > latest) latest = d; }
-    return latest;
+    const latestOf = (stamps) => {
+      let latest = '';
+      for (const st of stamps) { const d = V.localDay(st); if (d > latest) latest = d; }
+      return latest;
+    };
+    return latestOf(eventStampsOf(o)) || latestOf(o && typeof o.updatedAt === 'string' && o.updatedAt ? [o.updatedAt] : []);
   }
 
   /**

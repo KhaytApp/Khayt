@@ -26,6 +26,7 @@ struct LanSecurityReviewTests {
     /// `linkLocalLockoutIsPerDevice` on a loaded CI run (alpha.62).
     static func server(pin: String = "24682468", devices: LanDevices? = nil,
                        measureDelay: TimeInterval = 0, now: Date? = nil,
+                       wall: (() -> Date)? = nil, lockoutClock: (() -> TimeInterval)? = nil,
                        book: (([String: JSONValue]) -> [String: JSONValue])? = nil) async throws -> LanServer {
         let shop = Shop()
         await shop.load(.sample)
@@ -33,7 +34,13 @@ struct LanSecurityReviewTests {
         let store = book.map { $0(shop.lanBook) } ?? shop.lanBook
         var host = LanServer.Host(store: { store }, pin: pin, engine: engine)
         if let devices { host.devices = devices }
-        if let now { host.now = { now } }
+        if let now {
+            host.now = { now }
+            // The lockouts run on their own (monotonic) clock: pinned too.
+            host.lockoutClock = { now.timeIntervalSince1970 }
+        }
+        if let wall { host.now = wall }
+        if let lockoutClock { host.lockoutClock = lockoutClock }
         host.intakeToken = "intake-token-for-tests"
         host.pricing = { store }
         host.measure = { _, _ in
@@ -428,5 +435,43 @@ struct LanSecurityReviewTests {
         }
         #expect(huge.hasPrefix("HTTP/1.1 413"), Comment(rawValue: huge))
         #expect(huge.contains("too-large"), Comment(rawValue: huge))
+    }
+}
+
+/// beta.5 review: the wrong-PIN lockout is timed on the monotonic clock the
+/// pairing window uses, so moving the Mac's date neither lifts nor extends it.
+@MainActor
+struct LanLockoutClockTests {
+    final class Box: @unchecked Sendable {
+        var wall = Date(timeIntervalSince1970: 1_800_000_000)
+        var ticks: TimeInterval = 1_000
+    }
+
+    @Test("the wall clock moving forward does not lift a wrong-PIN lockout; the monotonic clock does")
+    func lockoutIgnoresTheWallClock() async throws {
+        let box = Box()
+        let server = try await LanSecurityReviewTests.server(wall: { box.wall }, lockoutClock: { box.ticks })
+        let from = "192.168.1.77"
+        for i in 0..<10 {
+            _ = await server.respond(to: LanSecurityReviewTests.get("/api/queue", from: from,
+                                                                     headers: ["x-khayt-pin": "wrong-\(i)"]))
+        }
+        let right = ["x-khayt-pin": "24682468"]
+        #expect(await server.respond(to: LanSecurityReviewTests.get("/api/queue", from: from, headers: right)).status == 429)
+        box.wall = box.wall.addingTimeInterval(86_400)      // somebody sets the date a day forward
+        #expect(await server.respond(to: LanSecurityReviewTests.get("/api/queue", from: from, headers: right)).status == 429,
+                "the wall clock lifted the lockout")
+        box.ticks += 61
+        #expect(await server.respond(to: LanSecurityReviewTests.get("/api/queue", from: from, headers: right)).status == 200)
+    }
+
+    @Test("the real lockout clock is the pairing window's monotonic one by default")
+    func defaultIsMonotonic() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let host = LanServer.Host(store: { [:] }, pin: "24682468", engine: engine)
+        let a = host.lockoutClock(), b = LanPairingWindow.monotonic()
+        #expect(abs(b - a) < 5)
     }
 }

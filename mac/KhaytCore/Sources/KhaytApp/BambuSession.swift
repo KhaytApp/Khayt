@@ -101,13 +101,19 @@ actor BambuSession {
     init(config: Config, accessCode: String,
          makeLink: @escaping @Sendable (Config) -> BambuLink,
          now: @escaping @Sendable () -> Date = { Date() },
-         ledger: PushallLedger = .shared) {
+         ledger: PushallLedger = .shared,
+         carrying held: JSONValue? = nil) {
         self.config = config
         self.accessCode = accessCode
         self.makeLink = makeLink
         self.now = now
         self.ledger = ledger
         self.nextAttempt = .distantPast
+        // A replaced session for the SAME printer starts from the state the
+        // old one held: the shared ledger refuses pushall for five minutes,
+        // so a blank start would have no full report to lay deltas over.
+        // `heardAt` stays nil, so it is not "fresh" until the printer speaks.
+        self.held = held
     }
 
     // MARK: State
@@ -611,11 +617,22 @@ final class BambuWatch {
 
     /// The session for this machine, started if new, replaced if its config
     /// changed.
+    ///
+    /// Every `await` here lets another caller in, so the slot is re-read after
+    /// each one: a session another caller stored meanwhile is returned when it
+    /// matches and stopped when it does not — never overwritten while still
+    /// connected (a second MQTT client for one printer). A session replaced
+    /// for the same printer (new code, host or port) hands its held state on.
     func session(for id: String, config: BambuSession.Config, accessCode: String) async -> BambuSession {
-        if let s = sessions[id], s.config == config { return s }
-        if let old = sessions.removeValue(forKey: id) { await old.stop() }
+        var carried: JSONValue?
+        while let current = sessions[id] {
+            if current.config == config { return current }
+            sessions[id] = nil
+            if carried == nil, current.config.serial == config.serial { carried = await current.held }
+            await current.stop()
+        }
         let s = BambuSession(config: config, accessCode: accessCode,
-                             makeLink: makeLink, now: now, ledger: ledger)
+                             makeLink: makeLink, now: now, ledger: ledger, carrying: carried)
         sessions[id] = s
         await s.begin()
         return s

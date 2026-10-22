@@ -215,7 +215,11 @@
       // runout on a printer nobody is printing on.
       const onJob = !isFailedPoll(s) && (isPrinting(s.state) || /paus/i.test(String(s.state || '')));
       const outNow = onJob && s.filamentOut === true;
-      const outBefore = p && p.filamentOut === true;
+      // The previous poll through the SAME gate: an idle machine that sat
+      // empty before the job started was not "out" on a job, so a job started
+      // on that empty head is news the moment it reports printing.
+      const onJobBefore = !!p && !isFailedPoll(p) && (isPrinting(p.state) || /paus/i.test(String(p.state || '')));
+      const outBefore = onJobBefore && p.filamentOut === true;
       if (cfg.notifyRunout && outNow && !outBefore && offCooldown('runout')) {
         alerts.push({
           machineId,

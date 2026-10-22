@@ -78,11 +78,12 @@
  * lib/order-status.js when a job is cancelled (as `quoteAcceptedAt` is), and
  * removed when it is un-cancelled. Every writer — Mac, desktop, iPhone — must
  * write that one field in that one format. A job's change day is read from
- * `cancelledAt`, the last `statusHistory` entry to `cancelled`, `voidedAt`,
- * `creditedAt`, each credit note's `issuedAt` and the sync stamp `updatedAt`,
- * each as its local
- * day — the LATEST of all of them that exist, so it is never earlier than
- * the change itself. With none, the change lands on the first day after the
+ * its EVENT stamps — `cancelledAt`, the last `statusHistory` entry to
+ * `cancelled` (or the un-cancel after it), `voidedAt`, `creditedAt`, each
+ * credit note's `issuedAt` — each as its local day, the LATEST of those that
+ * exist. The sync stamp `updatedAt` is only the fallback for an edit with no
+ * event stamp: a later save (a payment, a note, a phone's sync stamp) never
+ * moves a reversal into a later period. With none, the change lands on the first day after the
  * filed period. A job DELETED from the book carries no stamp at all (the
  * book keeps no deletion day the rule is handed), so its reversal is dated
  * TODAY (`ctx.now`) — and, while that period is open, moves with the calendar
@@ -253,7 +254,8 @@
 
   /**
    * The local day the job's invoice was undone, or '' when nothing says.
-   * The EARLIEST of the stamps that apply (see THE CANCEL'S DAY).
+   * The LATEST of the event stamps that apply, never `updatedAt` (see THE
+   * CHANGE'S DAY).
    */
   function reversalDayOf(o) {
     if (!o || typeof o !== 'object') return '';
@@ -271,7 +273,7 @@
     if (o.voidedAt) { const d = localDay(o.voidedAt); if (d) days.push(d); }
     if (o.creditedAt) { const d = localDay(o.creditedAt); if (d) days.push(d); }
     days.sort();
-    return days[0] || '';
+    return days[days.length - 1] || '';
   }
 
   /**
