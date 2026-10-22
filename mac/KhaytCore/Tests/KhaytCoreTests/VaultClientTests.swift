@@ -26,14 +26,15 @@ struct VaultClientTests {
             return u
         }
         var spool: URL { dir.appending(path: "spool") }
+        var library: URL { dir.appending(path: "Library") }
+        /// Each device's own app folder, as each Mac has its own book folder.
+        func appFolder(_ device: String) -> URL { dir.appending(path: "Support \(device)/khayt") }
         func sync(_ device: String = "mac-a") -> VaultSync {
-            VaultSync(client: stub.client(), keys: keys,
-                      stateURL: VaultSync.stateURL(libraryRoot: dir.appending(path: "Library \(device)"),
-                                                   shopId: VaultStub.shopId, deviceId: device),
+            VaultSync(client: stub.client(), keys: keys, appFolder: appFolder(device), libraryRoot: library,
                       deviceId: device)
         }
         func remote(_ device: String = "mac-a") -> VaultRemote {
-            VaultRemote(sync: sync(device), spoolRoot: dir.appending(path: "spool-\(device)"), download: stub.download)
+            VaultRemote(sync: sync(device), spoolRoot: dir.appending(path: "spool-\(device)"))
         }
         func job(_ src: URL, key: String = "k", fileId: String? = nil, base: Int? = nil) -> VaultUpload.Job {
             VaultUpload.Job(source: src, spoolKey: key, fileId: fileId, baseVersion: base, name: src.lastPathComponent,
@@ -86,7 +87,7 @@ struct VaultClientTests {
         #expect(row.headVersion?.bytes == data.count + 3 * 16)
         let out = b.dir.appending(path: "back.stl")
         let r = try await VaultDownload.run(row, client: b.stub.client(), keys: b.keys, lastSeenSeq: nil,
-                                            to: out, download: b.stub.download)
+                                            to: out)
         #expect(try Data(contentsOf: out) == data)
         #expect(r.sha256 == meta.sha256 && r.seq == 1)
     }
@@ -101,7 +102,7 @@ struct VaultClientTests {
                                                               keys: b.keys, spoolRoot: b.spool))
         let out = b.dir.appending(path: "empty-back")
         try await VaultDownload.run(try await b.feedRow(c.fileId), client: b.stub.client(), keys: b.keys,
-                                    lastSeenSeq: nil, to: out, download: b.stub.download)
+                                    lastSeenSeq: nil, to: out)
         #expect(try Data(contentsOf: out).isEmpty)
     }
 
@@ -133,7 +134,7 @@ struct VaultClientTests {
         for i in 0..<3 { #expect(b.stub.objects[keys[i]] == sealedBefore[i]) }
         let out = b.dir.appending(path: "back")
         try await VaultDownload.run(try await b.feedRow(c.fileId), client: b.stub.client(), keys: b.keys,
-                                    lastSeenSeq: nil, to: out, download: b.stub.download)
+                                    lastSeenSeq: nil, to: out)
         #expect(try Data(contentsOf: out) == data)
     }
 
@@ -207,7 +208,7 @@ struct VaultClientTests {
         let out = b.file("existing.stl", Data("keep me".utf8))
         await #expect(throws: VaultCrypto.Failure.self) {
             try await VaultDownload.run(try await b.feedRow(c.fileId), client: b.stub.client(), keys: b.keys,
-                                        lastSeenSeq: nil, to: out, download: b.stub.download)
+                                        lastSeenSeq: nil, to: out)
         }
         #expect(try Data(contentsOf: out) == Data("keep me".utf8))
         #expect(try FileManager.default.contentsOfDirectory(atPath: b.dir.path).filter { $0.contains(".vault-") }.isEmpty)
@@ -221,7 +222,7 @@ struct VaultClientTests {
         b.stub.versions["\(c.fileId)|1"]!.manifestHash = String(repeating: "0", count: 64)
         await #expect(throws: VaultDownload.Failure.serverManifestDiffers) {
             try await VaultDownload.run(try await b.feedRow(c.fileId), client: b.stub.client(), keys: b.keys,
-                                        lastSeenSeq: nil, to: b.dir.appending(path: "o"), download: b.stub.download)
+                                        lastSeenSeq: nil, to: b.dir.appending(path: "o"))
         }
     }
 
@@ -243,9 +244,10 @@ struct VaultClientTests {
         let st = s.load()
         #expect(st.files[c1.fileId] == nil && st.files[c2.fileId] != nil)
         #expect(st.rev == b.stub.rev)
-        // The state file is beside the library root, not in it, and per device.
-        #expect(s.stateURL.lastPathComponent == ".Library mac-a.khayt-vault.shop_test.mac-a.json")
-        #expect(s.stateURL.deletingLastPathComponent().standardizedFileURL == b.dir.standardizedFileURL)
+        // The state file is in the app's own folder, named for the shop and the root's path.
+        let h = VaultCrypto.hex(VaultCrypto.sha256(Data(b.library.standardizedFileURL.path.utf8))).prefix(16)
+        #expect(s.stateURL == b.appFolder("mac-a").appending(path: "vault-state.shop_test.\(h).json"))
+        #expect(!s.stateURL.path.hasPrefix(b.library.path))
         #expect(try await s.pull().isEmpty, "nothing new since the last rev")
     }
 
@@ -302,29 +304,145 @@ struct VaultClientTests {
         // B never saw A's v2; its upload is based on v1.
         let job = VaultUpload.Job(source: b.file("b.stl", Self.bytes(10, seed: 3)), spoolKey: "b",
                                   fileId: z.sync.load().keys["m"], baseVersion: 1, lastSeq: 1,
-                                  knownManifests: z.sync.load().files.values.first!.manifests,
                                   name: "m", key: "m", deviceId: "mac-b")
         let o = try await VaultUpload.run(job, client: z.sync.client, keys: b.keys, spoolRoot: b.dir.appending(path: "sb"))
         let (c, _) = try committed(o)
         #expect(c.conflict && c.version == 3)
         let changes = try await z.sync.record(o, key: "m", recordId: nil)
         #expect(changes.contains(.conflict(fileId: c.fileId, recordId: nil, versions: [1, 2, 3])))
-        // B's record replaced A's, so v2's pinned manifest is gone from it
-        // until A's next pull writes it back (`heal`).
-        let before = try VaultMeta.open(try await b.feedRow(c.fileId), vaultKey: b.keys.vaultKey, lastSeenSeq: nil).meta
-        let v2 = try #require(try await b.feedRow(c.fileId).versions.first { $0.version == 2 })
-        #expect(before.manifestHash(for: v2.uploadId) == nil)
-        try await a.sync.pull()
-        // Both versions are still downloadable and verify.
+        // B's shop record replaced A's, but each version carries its own
+        // sealed record, so both still download and verify.
         let row = try await b.feedRow(c.fileId)
-        #expect(try VaultMeta.open(row, vaultKey: b.keys.vaultKey, lastSeenSeq: nil).meta
-            .manifestHash(for: v2.uploadId) == v2.manifestHash)
         for v in [2, 3] {
             try await VaultDownload.run(row, version: v, client: b.stub.client(), keys: b.keys, lastSeenSeq: nil,
-                                        to: b.dir.appending(path: "v\(v)"), download: b.stub.download)
+                                        to: b.dir.appending(path: "v\(v)"))
         }
         #expect(try Data(contentsOf: b.dir.appending(path: "v2")) == Self.bytes(10, seed: 2))
         #expect(try Data(contentsOf: b.dir.appending(path: "v3")) == Self.bytes(10, seed: 3))
+    }
+
+    @Test("Vault: a version with no record, or one sealed for another upload, is not downloaded")
+    func versionMetaIsRequired() async throws {
+        let b = Bench()
+        let (c1, _) = try committed(try await VaultUpload.run(b.job(b.file("1.stl", Self.bytes(10, seed: 1)), key: "1"),
+                                                               client: b.stub.client(), keys: b.keys, spoolRoot: b.spool))
+        let (c2, _) = try committed(try await VaultUpload.run(b.job(b.file("2.stl", Self.bytes(10, seed: 2)), key: "2"),
+                                                               client: b.stub.client(), keys: b.keys, spoolRoot: b.spool))
+        let out = b.dir.appending(path: "o")
+        // Another upload's record, served in this one's place.
+        b.stub.versions["\(c1.fileId)|1"]!.versionMeta = b.stub.versions["\(c2.fileId)|1"]!.versionMeta
+        await #expect(throws: VaultCrypto.Failure.authentication) {
+            try await VaultDownload.run(try await b.feedRow(c1.fileId), client: b.stub.client(), keys: b.keys,
+                                        lastSeenSeq: nil, to: out)
+        }
+        // The shop record served as the version record.
+        b.stub.versions["\(c1.fileId)|1"]!.versionMeta = b.stub.storedMeta(c1.fileId)!
+        await #expect(throws: VaultCrypto.Failure.self) {
+            try await VaultDownload.run(try await b.feedRow(c1.fileId), client: b.stub.client(), keys: b.keys,
+                                        lastSeenSeq: nil, to: out)
+        }
+        #expect(!FileManager.default.fileExists(atPath: out.path))
+    }
+
+    @Test("Vault: the state file moves from beside the root to the app folder, this device's only")
+    func stateMigrates() async throws {
+        let b = Bench()
+        try FileManager.default.createDirectory(at: b.library, withIntermediateDirectories: true)
+        var mine = VaultSyncState(shopId: VaultStub.shopId, deviceId: "mac-a"); mine.rev = 41
+        let theirs = VaultSyncState(shopId: VaultStub.shopId, deviceId: "mac-b")
+        let oldMine = VaultSync.legacyStateURL(libraryRoot: b.library, shopId: VaultStub.shopId, deviceId: "mac-a")
+        let oldTheirs = VaultSync.legacyStateURL(libraryRoot: b.library, shopId: VaultStub.shopId, deviceId: "mac-b")
+        #expect(oldMine.lastPathComponent == ".Library.khayt-vault.shop_test.mac-a.json")
+        try JSONEncoder().encode(mine).write(to: oldMine)
+        try JSONEncoder().encode(theirs).write(to: oldTheirs)
+        let s = b.sync("mac-a")
+        #expect(s.load().rev == 41)
+        #expect(!FileManager.default.fileExists(atPath: oldMine.path))
+        #expect(FileManager.default.fileExists(atPath: oldTheirs.path), "another device's file is not ours to move")
+        // Once moved, a stray old file never overwrites the new one.
+        try JSONEncoder().encode(VaultSyncState(shopId: VaultStub.shopId, deviceId: "mac-a")).write(to: oldMine)
+        #expect(!VaultSync.migrateLegacyState(to: s.stateURL, libraryRoot: b.library, shopId: VaultStub.shopId,
+                                              deviceId: "mac-a"))
+        #expect(b.sync("mac-a").load().rev == 41)
+    }
+
+    /// A raw /complete, so the stub's refusals can be seen for bodies this
+    /// client would never send.
+    func rawComplete(_ b: Bench, _ uploadId: String, _ body: [String: Any]) async throws -> Int {
+        var r = try CloudReader.request(b.stub.connection, token: VaultStub.token, method: "POST",
+                                        tail: "/vault/uploads/\(uploadId)/complete")
+        r.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return S3.status(try await b.stub.fetch(r).1)
+    }
+
+    @Test("Vault: /complete without versionMeta is refused (422), as khayt-cloud #130 does")
+    func completeNeedsVersionMeta() async throws {
+        let b = Bench()
+        let up = try await b.stub.client().startUpload(fileId: nil, baseVersion: nil, sizes: [16],
+                                                       tag: String(repeating: "b", count: 64), deviceId: nil)
+        try await b.stub.client().put(up.parts[0], body: Data(count: 16))
+        let base: [String: Any] = ["manifestHash": String(repeating: "c", count: 64),
+                                   "wrappedKey": Data(count: 60).base64EncodedString(),
+                                   "meta": Data(count: 40).base64EncodedString()]
+        #expect(try await rawComplete(b, up.uploadId, base) == 422)
+        var big = base; big["versionMeta"] = Data(count: 256 * 1024).base64EncodedString()
+        #expect(try await rawComplete(b, up.uploadId, big) == 422, "over 256 KB")
+        #expect(VaultClient.failure(422, Data(#"{"error":"versionMeta is required"}"#.utf8))
+                == .invalid("versionMeta is required"))
+    }
+
+    @Test("Vault: blobs must be standard base64 with padding; this client always sends that")
+    func blobsArePaddedBase64() async throws {
+        #expect(VaultStub.paddedBase64(Data([1, 2, 3, 4]).base64EncodedString()))   // "AQIDBA=="
+        #expect(!VaultStub.paddedBase64("AQIDBA"))                                  // unpadded
+        #expect(!VaultStub.paddedBase64("AQID-_=="))                                // base64url
+        #expect(!VaultStub.paddedBase64("AQ=D"))
+        let b = Bench()
+        let up = try await b.stub.client().startUpload(fileId: nil, baseVersion: nil, sizes: [16],
+                                                       tag: String(repeating: "d", count: 64), deviceId: nil)
+        try await b.stub.client().put(up.parts[0], body: Data(count: 16))
+        let ok = Data(count: 61).base64EncodedString()   // 61 bytes: ends in "="
+        let unpadded = String(ok.prefix { $0 != "=" })
+        let body: [String: Any] = ["manifestHash": String(repeating: "c", count: 64), "wrappedKey": unpadded,
+                                   "versionMeta": ok, "meta": ok]
+        #expect(try await rawComplete(b, up.uploadId, body) == 422)
+        var v = body; v["wrappedKey"] = ok; v["versionMeta"] = unpadded
+        #expect(try await rawComplete(b, up.uploadId, v) == 422)
+        // The real client end to end: every blob it sends passes the stub's check.
+        _ = try committed(try await VaultUpload.run(b.job(b.file("p.stl", Self.bytes(61))), client: b.stub.client(),
+                                                     keys: b.keys, spoolRoot: b.spool))
+    }
+
+    @Test("Vault: version numbers can have gaps (an aborted upload uses its number); nothing assumes head-1")
+    func versionGaps() async throws {
+        let b = Bench()
+        let a = b.remote("mac-a"), z = b.remote("mac-b")
+        try await a.putFile("m", file: b.file("v1.stl", Self.bytes(10, seed: 1)))
+        let fileId = try #require(a.sync.load().keys["m"])
+        try await z.sync.pull()
+        // v2 is started and given up: the number is gone for good.
+        let gone = try await b.stub.client().startUpload(fileId: fileId, baseVersion: 1, sizes: [26],
+                                                         tag: String(repeating: "e", count: 64), deviceId: "mac-a")
+        #expect(gone.version == 2)
+        try await b.stub.client().abandon(uploadId: gone.uploadId)
+        try await a.putFile("m", file: b.file("v3.stl", Self.bytes(10, seed: 3)))
+        let row = try await b.feedRow(fileId)
+        #expect(row.versions.map(\.version) == [1, 3] && row.head == 3)
+        // One new version from one device: a change, not a conflict.
+        let changes = try await z.sync.pull()
+        #expect(changes.count == 1)
+        guard case .changed(let id, _)? = changes.first else { Issue.record("\(changes)"); return }
+        #expect(id == fileId)
+        for v in [1, 3] {
+            try await VaultDownload.run(row, version: v, client: b.stub.client(), keys: b.keys, lastSeenSeq: nil,
+                                        to: b.dir.appending(path: "g\(v)"))
+        }
+        #expect(try Data(contentsOf: b.dir.appending(path: "g3")) == Self.bytes(10, seed: 3))
+        #expect(try await z.get("m") == Self.bytes(10, seed: 3))
+        // Pruning the non-head version leaves a file with one version, number 3.
+        try await b.stub.client().prune(fileId: fileId, version: 1)
+        await #expect(throws: VaultClient.Failure.isHead) { try await b.stub.client().prune(fileId: fileId, version: 3) }
+        #expect(try await b.feedRow(fileId).versions.map(\.version) == [3])
     }
 
     // MARK: - As a LibraryRemote

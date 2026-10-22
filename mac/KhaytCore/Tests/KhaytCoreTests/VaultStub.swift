@@ -37,7 +37,8 @@ final class VaultStub: @unchecked Sendable {
     struct File { var fileId: String; var nextVersion = 1; var head: Int?; var meta: String?; var metaRev = 0
                   var trashedAt: String?; var rev = 0; var purged = false }
     struct Version { var fileId: String; var version: Int; var uploadId: String; var bytes: Int; var chunks: Int
-                     var wrappedKey: String; var manifestHash: String; var tag: String; var deviceId: String? }
+                     var wrappedKey: String; var manifestHash: String; var versionMeta: String; var tag: String
+                     var deviceId: String? }
     struct Upload { var uploadId: String; var fileId: String; var version: Int; var sizes: [Int]; var tag: String
                     var baseVersion: Int?; var deviceId: String? }
 
@@ -50,7 +51,6 @@ final class VaultStub: @unchecked Sendable {
     }
     func client() -> VaultClient { VaultClient(connection: connection, token: Self.token, fetch: fetch) }
     var fetch: S3.Fetch { { [self] r in try handle(r) } }
-    var download: S3.Download { S3.download(over: fetch) }
 
     // MARK: - Routing
 
@@ -89,7 +89,7 @@ final class VaultStub: @unchecked Sendable {
             let urls = (from..<min(v.chunks, from + count)).map {
                 ["index": $0, "url": "https://store.test/o/\(key(v.fileId, v.version, $0))"] as [String: Any]
             }
-            return reply(url, 200, ["urls": urls, "expiresAt": "later"])
+            return reply(url, 200, ["urls": urls, "expiresAt": "later", "versionMeta": v.versionMeta])
         case ("DELETE", 4, "files") where parts[2] == "v":
             let k = "\(parts[1])|\(parts[3])"
             guard versions[k] != nil, var f = files[parts[1]] else { return reply(url, 404, ["reason": "unknown-version"]) }
@@ -185,9 +185,15 @@ final class VaultStub: @unchecked Sendable {
 
     func complete(_ url: URL, _ uploadId: String, _ b: [String: Any]) -> (Data, URLResponse) {
         guard let up = uploads[uploadId] else { return reply(url, 404, ["reason": "unknown-upload"]) }
-        guard let mh = b["manifestHash"] as? String, mh.count == 64, let wk = b["wrappedKey"] as? String else {
+        guard let mh = b["manifestHash"] as? String, mh.count == 64, let wk = b["wrappedKey"] as? String,
+              Self.paddedBase64(wk) else {
             return reply(url, 422, ["error": "shape"])
         }
+        // khayt-cloud #130: required, at most 256 KB, standard base64 with padding.
+        guard let vm = b["versionMeta"] as? String, !vm.isEmpty, vm.utf8.count <= 256 * 1024, Self.paddedBase64(vm) else {
+            return reply(url, 422, ["error": "versionMeta is required (standard base64, at most 256 KB)"])
+        }
+        if let m = b["meta"] as? String, !Self.paddedBase64(m) { return reply(url, 422, ["error": "meta must be base64"]) }
         let bad = up.sizes.indices.filter { objects[key(up.fileId, up.version, $0)]?.count != up.sizes[$0] }
         if !bad.isEmpty { return reply(url, 409, ["reason": "parts-missing", "indexes": bad]) }
         var f = files[up.fileId]!
@@ -196,7 +202,8 @@ final class VaultStub: @unchecked Sendable {
         let conflict = f.head != nil && f.head != up.baseVersion
         versions["\(f.fileId)|\(up.version)"] = Version(fileId: f.fileId, version: up.version, uploadId: uploadId,
                                                         bytes: up.sizes.reduce(0, +), chunks: up.sizes.count,
-                                                        wrappedKey: wk, manifestHash: mh, tag: up.tag, deviceId: up.deviceId)
+                                                        wrappedKey: wk, manifestHash: mh, versionMeta: vm, tag: up.tag,
+                                                        deviceId: up.deviceId)
         f.head = up.version
         if let meta { f.meta = meta; f.metaRev += 1 }
         rev += 1; f.rev = rev
@@ -214,6 +221,7 @@ final class VaultStub: @unchecked Sendable {
             let vs = versions.values.filter { $0.fileId == f.fileId }.sorted { $0.version < $1.version }.map {
                 ["version": $0.version, "bytes": $0.bytes, "chunks": $0.chunks, "chunkBytes": VaultCrypto.chunkBytes,
                  "uploadId": $0.uploadId, "wrappedKey": $0.wrappedKey, "manifestHash": $0.manifestHash,
+                 "versionMeta": $0.versionMeta,
                  "createdAt": "now", "deviceId": $0.deviceId ?? NSNull()] as [String: Any]
             }
             return ["fileId": f.fileId, "head": f.head!, "meta": f.meta ?? NSNull(), "metaRev": f.metaRev,
@@ -224,7 +232,9 @@ final class VaultStub: @unchecked Sendable {
 
     func setMeta(_ url: URL, _ fileId: String, _ b: [String: Any]) -> (Data, URLResponse) {
         guard var f = files[fileId], f.head != nil, !f.purged else { return reply(url, 404, ["reason": "unknown-file"]) }
-        guard let meta = b["meta"] as? String, let base = b["baseMetaRev"] as? Int else { return reply(url, 422, ["error": "x"]) }
+        guard let meta = b["meta"] as? String, Self.paddedBase64(meta), let base = b["baseMetaRev"] as? Int else {
+            return reply(url, 422, ["error": "meta must be standard base64"])
+        }
         if f.metaRev != base { return reply(url, 409, ["reason": "stale", "metaRev": f.metaRev, "meta": f.meta ?? NSNull()]) }
         f.meta = meta; f.metaRev += 1; rev += 1; f.rev = rev; files[fileId] = f
         return reply(url, 200, ["metaRev": f.metaRev, "rev": rev])
@@ -243,6 +253,21 @@ final class VaultStub: @unchecked Sendable {
         for k in versions.keys where k.hasPrefix(fileId + "|") { versions[k] = nil }
         f.purged = true; f.head = nil; f.meta = nil; rev += 1; f.rev = rev; files[fileId] = f
         return reply(url, 200, ["ok": true, "purged": true])
+    }
+
+    /// Standard base64 WITH padding, as the cloud insists: the alphabet with
+    /// + and /, a length that is a multiple of 4, and at most two `=` at the end.
+    static func paddedBase64(_ s: String) -> Bool {
+        guard !s.isEmpty, s.utf8.count % 4 == 0 else { return false }
+        var pad = 0
+        for (i, c) in s.utf8.enumerated() {
+            if c == UInt8(ascii: "=") { pad += 1; if i < s.utf8.count - 2 { return false }; continue }
+            if pad > 0 { return false }
+            let ok = (65...90).contains(c) || (97...122).contains(c) || (48...57).contains(c)
+                || c == UInt8(ascii: "+") || c == UInt8(ascii: "/")
+            if !ok { return false }
+        }
+        return pad <= 2
     }
 
     // MARK: - Test helpers

@@ -266,36 +266,38 @@ carry the rest, and hex or base64 both work.
 This section is about `VaultClient`, `VaultUpload`, `VaultDownload` and `VaultSync` in
 KhaytCore. Another client may do these things differently and still read the same vault.
 
-- **Wire encoding.** `wrappedKey` and `meta` go to the cloud as standard base64, with padding.
-- **The meta record's JSON** (`VaultMeta`) is
-  `{seq, uploadId, manifestHash, size, sha256, name, path, kind, key?, recordId?, manifests}`.
-  - `uploadId` is the upload the record is sealed for, and `manifestHash` is that upload's
-    pinned hash.
-  - `manifests` maps every upload the writer knows of to its manifestHash. The cloud keeps
-    one meta record per file, not one per version, so when two devices commit at once, the
-    second record replaces the first and drops the other version's pinned hash. The device
-    that made that version adds it back on its next pull (`VaultSync.heal`).
-  - A reader pins a version only from the record or from manifests it took earlier from an
-    authenticated record. It never takes the hash the server lists beside the version.
-- **The record field.** A library record that has a vault copy carries
-  **`vaultFileId`**, the vault's `fileId`. The meta record carries the library record's id as
-  `recordId`, so the link can be followed in either direction. `VaultSync` never writes the
-  book. It reports changes, and the app writes `vaultFileId`.
-- **The per-device state file** sits beside the library root, never inside it:
-  `<parent of root>/.<root name>.khayt-vault.<shopId>.<deviceId>.json`.
+- **Wire encoding.** Blobs (`wrappedKey`, `meta`, `versionMeta`) are standard base64 with
+  padding, and the cloud refuses anything else with 422. IDs are base64url without padding.
+- **Version numbers can have gaps.** An aborted upload still uses up its number, so nothing
+  may assume that version `head − 1` exists.
+- **The shop meta record's JSON** (`VaultMeta`) is
+  `{seq, uploadId, manifestHash, size, sha256, name, path, kind, key?, recordId?}`. It names
+  the file. It is not what a download trusts: a download pins each version's own record (see
+  "Version meta record"), so a version committed by another device verifies even after a
+  later shop record has replaced the one that came with it.
+- **The record field.** A library record that has a vault copy carries **`vaultFileId`**,
+  the vault's `fileId`. The meta record carries the library record's id as `recordId`, so
+  the link can be followed in either direction. `VaultSync` never writes the book. It
+  reports changes, and the app writes `vaultFileId`.
+- **The per-device state file** lives in the app's own folder (on the Mac, the book's
+  folder): `<app folder>/vault-state.<shopId>.<first 16 hex of sha256(root path)>.json`.
   - It holds the feed's `rev`, each file's last-seen `seq`, the key → fileId and
     recordId → fileId indexes, and the last feed row of each file. Those rows are
     ciphertext and wraps only.
   - It is kept out of the book because the last-seen `seq` protects against rollback only if
     it is this device's own memory.
-  - It is kept out of the root because a root can be a synced folder that a scan would walk.
+  - It is kept out of the library root and its parent because either can be iCloud, a NAS
+    or a shared folder.
+  - Earlier builds of this branch wrote it beside the root, as
+    `.<root name>.khayt-vault.<shopId>.<deviceId>.json`. That file is moved into the app
+    folder once. Only this device's file is moved.
 - **Uploads spool.** Sealed chunks are written to disk before any part is sent. A resumed
   upload re-sends those exact bytes. A spool that was never fully sealed is abandoned
   (`DELETE /uploads/{id}`) and the upload starts again. The raw DK is never written to disk.
-- **Downloads take two passes.** The cloud keeps only the manifest's hash, not its list of
-  chunk hashes, so the ciphertext is fetched to disk first. `ChunkReader` is then built over
-  the chunks' hashes and checks the manifest before any chunk is opened. The plaintext is
-  renamed into place only after `finish()`.
+- **Downloads take one pass.** The version record supplies every chunk hash up front.
+  Each chunk is fetched into memory, checked and opened by `ChunkReader`, and appended to a
+  temporary file. No ciphertext ever touches disk. The file is renamed into place only after
+  `finish()`.
 
 ## API map
 

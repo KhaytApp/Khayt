@@ -394,7 +394,7 @@ public enum LibraryRemote: Sendable {
         switch self {
         case .bucket(let c): try await S3.getFile(c, key: key, download: download)
         case .drive(let d): try await d.getFile(key)
-        case .vault(let v): try await v.getFile(key)
+        case .vault(let v): try await v.getFile(key)   // its own transport: chunks come through the client
         }
     }
     public func head(_ key: String, fetch: @escaping S3.Fetch) async throws -> S3.Head? {

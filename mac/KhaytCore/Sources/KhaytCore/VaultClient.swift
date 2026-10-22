@@ -13,9 +13,9 @@ import Foundation
 /// with NO Authorization header: a shop token sent to object storage would be
 /// a token handed to a third party.
 ///
-/// **Wire encoding.** The contract leaves it to the client: `wrappedKey` and
-/// `meta` are standard base64 (with padding) of the raw bytes
-/// `VaultCrypto` makes. Hashes and tags are lowercase hex, as the format says.
+/// **Wire encoding.** Blobs (`wrappedKey`, `meta`, `versionMeta`) are
+/// standard base64 with padding of the raw bytes `VaultCrypto` makes. IDs are
+/// base64url without padding. Hashes and tags are lowercase hex, as the format says.
 public struct VaultClient: Sendable {
     public let connection: CloudReader.Connection
     let token: String
@@ -134,8 +134,11 @@ public struct VaultClient: Sendable {
         public let uploadId: String
         public let wrappedKey: String
         /// As the server stores it, which it never checks. Readers pin the
-        /// one in the authenticated meta record instead (`VaultDownload`).
+        /// one in the version's own sealed record instead (`VaultDownload`).
         public let manifestHash: String
+        /// This version's sealed record (`VaultCrypto.decryptVersionMeta`):
+        /// its whole manifest, size and seq. Base64.
+        public let versionMeta: String?
         public let createdAt: String?
         public let deviceId: String?
 
@@ -223,10 +226,12 @@ public struct VaultClient: Sendable {
         return try parts(of: o)
     }
 
-    /// POST /uploads/{id}/complete. `meta` is required on a file's first version.
-    public func complete(uploadId: String, manifestHash: String, wrappedKey: Data,
+    /// POST /uploads/{id}/complete. `versionMeta` is always required; `meta`
+    /// is required on a file's first version.
+    public func complete(uploadId: String, manifestHash: String, wrappedKey: Data, versionMeta: Data,
                          meta: Data?) async throws -> Committed {
-        var body: [String: Any] = ["manifestHash": manifestHash, "wrappedKey": wrappedKey.base64EncodedString()]
+        var body: [String: Any] = ["manifestHash": manifestHash, "wrappedKey": wrappedKey.base64EncodedString(),
+                                   "versionMeta": versionMeta.base64EncodedString()]
         if let meta { body["meta"] = meta.base64EncodedString() }
         let o = try await call("POST", "/vault/uploads/\(try VaultCrypto.id(uploadId, "uploadId"))/complete",
                                body: body, expect: [201])
@@ -273,28 +278,34 @@ public struct VaultClient: Sendable {
         return (metaRev, rev)
     }
 
+    public struct ChunkPage: Codable, Sendable, Equatable {
+        public let urls: [ChunkURL]
+        /// The version's sealed record, as in the feed. Base64.
+        public let versionMeta: String?
+    }
+
     /// GET …/v/{n}/chunks?from&count≤256: presigned GETs, 15 minutes each.
-    public func chunkURLs(fileId: String, version: Int, from: Int, count: Int = 256) async throws -> [ChunkURL] {
+    public func chunkURLs(fileId: String, version: Int, from: Int, count: Int = 256) async throws -> ChunkPage {
         let (data, _) = try await raw("GET",
                                       "/vault/files/\(try VaultCrypto.id(fileId, "fileId"))/v/\(version)/chunks?from=\(from)&count=\(min(256, max(1, count)))",
                                       body: nil, expect: [200])
-        struct R: Decodable { let urls: [ChunkURL] }
-        do { return try JSONDecoder().decode(R.self, from: data).urls }
+        do { return try JSONDecoder().decode(ChunkPage.self, from: data) }
         catch { throw Failure.badReply("chunks") }
     }
 
-    /// Fetch one chunk from its presigned URL, straight to a file.
-    public func getChunk(_ chunk: ChunkURL, download: S3.Download) async throws -> URL {
+    /// Fetch one chunk from its presigned URL, into memory: one chunk is
+    /// 4 MiB + 16 at most, and the caller holds one at a time.
+    public func getChunk(_ chunk: ChunkURL) async throws -> Data {
         var r = URLRequest(url: try presigned(chunk.url))
         r.httpMethod = "GET"
         r.timeoutInterval = 300
-        let (file, response) = try await download(r)
+        let (data, response) = try await fetch(r)
         let code = S3.status(response)
-        guard (200..<300).contains(code) else {
-            try? FileManager.default.removeItem(at: file)
+        guard (200..<300).contains(code) else { throw Failure.transfer(method: "GET", index: chunk.index, status: code) }
+        guard data.count <= VaultCrypto.chunkBytes + VaultCrypto.tagBytes else {
             throw Failure.transfer(method: "GET", index: chunk.index, status: code)
         }
-        return file
+        return data
     }
 
     /// DELETE /files/{id}: to Trash for 30 days.

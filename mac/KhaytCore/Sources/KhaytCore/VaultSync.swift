@@ -4,17 +4,21 @@ import Foundation
 /// per file, and which library record and which `LibraryRemote` key each
 /// vault file belongs to.
 ///
-/// ── WHERE IT LIVES, AND WHY NOT IN THE BOOK ─────────────────────────────
+/// ── WHERE IT LIVES, AND WHY NOT IN THE BOOK OR THE LIBRARY ──────────────
 ///
-/// Beside the library root, never inside it and never in the book:
-/// `<parent of root>/.<root name>.khayt-vault.<shopId>.<deviceId>.json`
-/// (`VaultSync.stateURL`). The book syncs to every device, and the last-seen
-/// `seq` is worth something only if it is THIS device's memory: a value
-/// another device wrote is the very thing a rolled-back server could also
-/// have served. Not inside the root either, because a library root can be an
-/// iCloud or shared folder (`LibraryLocation`), and a scan must not pick it
-/// up as a model. The device id is in the name so that a parent folder that
-/// does sync still keeps one file per device.
+/// In the app's own per-device folder, the book's folder on the Mac:
+/// `<app folder>/vault-state.<shopId>.<hash of the root's path>.json`
+/// (`VaultSync.stateURL(appFolder:libraryRoot:shopId:)`).
+///
+/// * Not in the book: the book syncs to every device, and the last-seen
+///   `seq` is worth something only as THIS device's memory. A value another
+///   device wrote is the very thing a rolled-back server could also serve.
+/// * Not in or beside the library root: a root, or its parent, can be iCloud,
+///   a NAS or a shared folder (`LibraryLocation`), which would carry the file
+///   to other devices. A file written beside the root by an earlier build is
+///   moved here once (`migrateLegacyState`).
+/// * The root's path is hashed into the name, so two libraries on one Mac
+///   keep two states.
 ///
 /// It holds ciphertext and wraps only (the last feed row of each file), never
 /// a key. Losing it costs a full re-pull and the rollback memory, nothing else.
@@ -39,10 +43,6 @@ public struct VaultSyncState: Codable, Equatable, Sendable {
         public var metaRev = 0
         public var trashed = false
         public var recordId: String?
-        /// Every upload's manifestHash this device has seen in an
-        /// AUTHENTICATED meta record. Kept so an older or conflicting version
-        /// stays verifiable after a later record stops listing it.
-        public var manifests: [String: String] = [:]
         /// The last feed row, as the cloud sent it.
         public var row: VaultClient.FeedFile?
     }
@@ -78,18 +78,55 @@ public struct VaultSync: Sendable {
         self.client = client; self.keys = keys; self.stateURL = stateURL; self.deviceId = deviceId
     }
 
+    /// The state for the library at `libraryRoot`, kept in `appFolder` (on
+    /// the Mac, the book's folder: `StoreReader.Build.vaultStateFolder()`). A
+    /// state an earlier build wrote beside the root is moved there first.
+    public init(client: VaultClient, keys: VaultKeys, appFolder: URL, libraryRoot: URL, deviceId: String) {
+        let url = Self.stateURL(appFolder: appFolder, libraryRoot: libraryRoot, shopId: client.connection.shopId)
+        Self.migrateLegacyState(to: url, libraryRoot: libraryRoot, shopId: client.connection.shopId, deviceId: deviceId)
+        self.init(client: client, keys: keys, stateURL: url, deviceId: deviceId)
+    }
+
     public func with(fetch: @escaping S3.Fetch) -> VaultSync {
         VaultSync(client: client.with(fetch: fetch), keys: keys, stateURL: stateURL, deviceId: deviceId)
     }
 
-    /// `<parent>/.<root name>.khayt-vault.<shopId>.<deviceId>.json`: beside
-    /// the root, per device (see `VaultSyncState`).
-    public static func stateURL(libraryRoot: URL, shopId: String, deviceId: String) -> URL {
-        let safe = { (s: String) in String(s.unicodeScalars.map {
-            CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_" ? Character($0) : "_" }) }
+    static func safe(_ s: String) -> String {
+        String(s.unicodeScalars.map {
+            CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_" ? Character($0) : "_" })
+    }
+
+    /// `<appFolder>/vault-state.<shopId>.<first 16 hex of sha256(root path)>.json`.
+    public static func stateURL(appFolder: URL, libraryRoot: URL, shopId: String) -> URL {
+        let path = libraryRoot.standardizedFileURL.path
+        let h = VaultCrypto.hex(VaultCrypto.sha256(Data(path.utf8))).prefix(16)
+        return appFolder.appending(path: "vault-state.\(safe(shopId)).\(h).json")
+    }
+
+    /// Where an earlier build kept it: beside the root, one file per device.
+    static func legacyStateURL(libraryRoot: URL, shopId: String, deviceId: String) -> URL {
         let root = libraryRoot.standardizedFileURL
         return root.deletingLastPathComponent()
             .appending(path: ".\(root.lastPathComponent).khayt-vault.\(safe(shopId)).\(safe(deviceId)).json")
+    }
+
+    /// Move THIS device's state from beside the root to `url`, once. Another
+    /// device's file beside the root (a synced parent carried it here) is
+    /// left alone: it is not this device's memory. Nothing happens when `url`
+    /// already exists. Returns whether a file was moved.
+    @discardableResult
+    public static func migrateLegacyState(to url: URL, libraryRoot: URL, shopId: String, deviceId: String) -> Bool {
+        let fm = FileManager.default
+        let old = legacyStateURL(libraryRoot: libraryRoot, shopId: shopId, deviceId: deviceId)
+        guard !fm.fileExists(atPath: url.path), let d = try? Data(contentsOf: old),
+              let s = try? JSONDecoder().decode(VaultSyncState.self, from: d),
+              s.shopId == shopId, s.deviceId == deviceId else { return false }
+        do {
+            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try d.write(to: url, options: .atomic)
+            try fm.removeItem(at: old)
+            return true
+        } catch { return false }
     }
 
     public enum Change: Equatable, Sendable {
@@ -118,6 +155,7 @@ public struct VaultSync: Sendable {
     }
 
     func save(_ s: VaultSyncState) throws {
+        try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         let enc = JSONEncoder()
         enc.outputFormatting = .sortedKeys
         try enc.encode(s).write(to: stateURL, options: .atomic)
@@ -135,21 +173,8 @@ public struct VaultSync: Sendable {
 
     /// Every page since the last `rev`, applied and saved page by page.
     /// `localEdits`: library record ids with local changes not yet uploaded.
-    ///
-    /// Then heals: a version whose manifest this device knows (its own
-    /// upload, or one an earlier record listed) but which today's record no
-    /// longer lists is written back into the record (`heal`). The cloud keeps
-    /// one meta per file, so a racing commit's record silently drops the
-    /// other version's pinned manifest, and without this nobody could verify
-    /// that version again.
     @discardableResult
     public func pull(localEdits: Set<String> = []) async throws -> [Change] {
-        let changes = try await pullPages(localEdits: localEdits)
-        try await heal()
-        return changes
-    }
-
-    func pullPages(localEdits: Set<String> = []) async throws -> [Change] {
         try await locked {
             var st = load()
             var out: [Change] = []
@@ -161,23 +186,6 @@ public struct VaultSync: Sendable {
                 if !page.more || page.files.isEmpty { break }
             }
             return out
-        }
-    }
-
-    /// Put every manifest this device can vouch for, for a version the
-    /// cloud still keeps, back into that file's record.
-    func heal() async throws {
-        let st = load()
-        for (fileId, e) in st.files {
-            guard let row = e.row, !row.purged,
-                  let meta = try? VaultMeta.open(row, vaultKey: keys.vaultKey, lastSeenSeq: nil).meta else { continue }
-            let missing = row.versions.compactMap { v -> (String, String)? in
-                guard meta.manifestHash(for: v.uploadId) == nil, let h = e.manifests[v.uploadId] else { return nil }
-                return (v.uploadId, h)
-            }
-            guard !missing.isEmpty else { continue }
-            let add = Dictionary(missing, uniquingKeysWith: { a, _ in a })
-            _ = try? await setMeta(fileId: fileId) { var m = $0; m.manifests.merge(add) { a, _ in a }; return m }
         }
     }
 
@@ -206,8 +214,6 @@ public struct VaultSync: Sendable {
         e.metaRev = f.metaRev
         e.row = f
         e.recordId = meta.recordId ?? e.recordId
-        e.manifests.merge(meta.manifests) { a, _ in a }
-        e.manifests[meta.uploadId] = meta.manifestHash
         let wasTrashed = old?.trashed ?? false
         e.trashed = f.trashed
         e.head = f.head
@@ -254,8 +260,6 @@ public struct VaultSync: Sendable {
                 fileId = c.fileId
                 var e = st.files[fileId] ?? VaultSyncState.Entry()
                 e.seq = max(e.seq ?? 0, meta.seq)
-                e.manifests.merge(meta.manifests) { a, _ in a }
-                e.manifests[meta.uploadId] = meta.manifestHash
                 e.recordId = recordId ?? e.recordId
                 if c.conflict { conflict = true } else { e.head = c.version }
                 st.files[fileId] = e
@@ -286,16 +290,15 @@ public struct VaultSync: Sendable {
             next.size = current.size
             next.sha256 = current.sha256
             next.seq = current.seq
-            next.manifests.merge(current.manifests) { a, _ in a }
             let sealed = try next.sealed(vaultKey: keys.vaultKey, fileId: fileId)
             do {
                 _ = try await client.setMeta(fileId: fileId, meta: sealed, baseMetaRev: row.metaRev)
-                try await pullPages()
+                try await pull()
                 return next
             } catch VaultClient.Failure.stale {
                 // The newer record reaches us through the feed, where it is
                 // opened against the versions it may be sealed for.
-                try await pullPages()
+                try await pull()
             }
         }
         throw VaultClient.Failure.stale(metaRev: load().files[fileId]?.metaRev ?? 0, meta: nil)
@@ -332,8 +335,8 @@ actor AsyncLock {
 ///
 /// **The verified rule holds unchanged.** `head` answers with no etag, which
 /// `etagVerdict` calls unusable, so `CloudLibrary.ensureInBucket` proves a
-/// vault copy by downloading it (`getFile`, which itself pins the manifest
-/// from the authenticated meta record) and comparing SHA-256 before any
+/// vault copy by downloading it (`getFile`, which itself pins every chunk
+/// to the version's own sealed record) and comparing SHA-256 before any
 /// local copy is removed. `verify` is the cheaper HEAD-equivalent for callers
 /// that want one: a fresh feed, the meta record opened, and its pinned
 /// sha256, size and manifest compared with what the cloud lists for the head.
@@ -341,14 +344,13 @@ public struct VaultRemote: Sendable {
     public let sync: VaultSync
     /// Where uploads keep their sealed chunks until they commit.
     public let spoolRoot: URL
-    public let download: S3.Download
 
-    public init(sync: VaultSync, spoolRoot: URL, download: @escaping S3.Download) {
-        self.sync = sync; self.spoolRoot = spoolRoot; self.download = download
+    public init(sync: VaultSync, spoolRoot: URL) {
+        self.sync = sync; self.spoolRoot = spoolRoot
     }
 
     public func with(fetch: @escaping S3.Fetch) -> VaultRemote {
-        VaultRemote(sync: sync.with(fetch: fetch), spoolRoot: spoolRoot, download: download)
+        VaultRemote(sync: sync.with(fetch: fetch), spoolRoot: spoolRoot)
     }
 
     /// The head row of the file `key` names, after a fresh pull.
@@ -378,7 +380,7 @@ public struct VaultRemote: Sendable {
         let name = String(key.split(separator: "/").last ?? Substring(key))
         let job = VaultUpload.Job(source: file, spoolKey: "key:" + key, fileId: live?.fileId,
                                   baseVersion: live?.entry.head, lastSeq: live?.entry.seq,
-                                  knownManifests: live?.entry.manifests ?? [:], name: name,
+                                  name: name,
                                   kind: (name as NSString).pathExtension.lowercased(), key: key,
                                   recordId: recordId ?? live?.entry.recordId, deviceId: sync.deviceId)
         let outcome = try await VaultUpload.run(job, client: sync.client, keys: sync.keys, spoolRoot: spoolRoot,
@@ -390,8 +392,7 @@ public struct VaultRemote: Sendable {
     public func getFile(_ key: String) async throws -> URL? {
         guard let cur = try await current(key), !cur.entry.trashed, let row = cur.entry.row else { return nil }
         let dest = FileManager.default.temporaryDirectory.appending(path: "khayt-vault-\(UUID().uuidString)")
-        try await VaultDownload.run(row, client: sync.client, keys: sync.keys, lastSeenSeq: cur.entry.seq,
-                                    alsoVouched: cur.entry.manifests, to: dest, download: download)
+        try await VaultDownload.run(row, client: sync.client, keys: sync.keys, lastSeenSeq: cur.entry.seq, to: dest)
         return dest
     }
 
@@ -413,8 +414,11 @@ public struct VaultRemote: Sendable {
         guard let cur = try await current(key), !cur.entry.trashed, let row = cur.entry.row,
               let v = row.headVersion else { return false }
         let meta = try VaultMeta.open(row, vaultKey: sync.keys.vaultKey, lastSeenSeq: cur.entry.seq).meta
-        return meta.uploadId == v.uploadId && meta.manifestHash == v.manifestHash
-            && meta.sha256 == sha256 && meta.size == size && v.plaintextSize == size
+        guard let b64 = v.versionMeta, let sealed = Data(base64Encoded: b64) else { return false }
+        let vm = try VaultCrypto.decryptVersionMeta(vaultKey: sync.keys.vaultKey, fileId: cur.fileId,
+                                                    uploadId: v.uploadId, sealed: sealed, lastSeenSeq: nil)
+        return meta.uploadId == v.uploadId && meta.manifestHash == vm.manifestHash && v.manifestHash == vm.manifestHash
+            && meta.sha256 == sha256 && meta.size == size && vm.size == size && v.plaintextSize == size
     }
 
     /// To the vault's Trash (30 days). A file another key also names is

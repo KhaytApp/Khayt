@@ -18,13 +18,9 @@ public struct VaultKeys: Sendable {
 }
 
 /// The JSON inside a shop meta record (`docs/vault-format.md` "Shop meta
-/// record"). The format fixes only `seq`; the rest is this client's.
-///
-/// `manifests` maps EVERY upload this writer knows of to its manifestHash.
-/// The cloud keeps one meta per file, not one per version, so a commit that
-/// races another device's would otherwise leave the losing version with no
-/// authenticated manifestHash at all and no way to verify it on download.
-/// Each writer carries the map forward and adds its own upload.
+/// record"). The format fixes only `seq`; the rest is this client's. What a
+/// download pins is not this, but each version's own sealed record
+/// (`VaultCrypto.decryptVersionMeta`), which every version has.
 public struct VaultMeta: Codable, Equatable, Sendable {
     public var seq: Int
     /// The upload this record was sealed for, and its pinned manifest.
@@ -42,20 +38,13 @@ public struct VaultMeta: Codable, Equatable, Sendable {
     public var key: String?
     /// The library record's id (`docs/vault-format.md` "Client state").
     public var recordId: String?
-    public var manifests: [String: String]
 
     public init(seq: Int, uploadId: String, manifestHash: String, size: Int, sha256: String,
                 name: String, path: String = "", kind: String = "", key: String? = nil,
-                recordId: String? = nil, manifests: [String: String] = [:]) {
+                recordId: String? = nil) {
         self.seq = seq; self.uploadId = uploadId; self.manifestHash = manifestHash
         self.size = size; self.sha256 = sha256; self.name = name; self.path = path; self.kind = kind
-        self.key = key; self.recordId = recordId; self.manifests = manifests
-    }
-
-    /// The pinned manifestHash for one upload of this file, or nil when this
-    /// record cannot vouch for it.
-    public func manifestHash(for uploadId: String) -> String? {
-        uploadId == self.uploadId ? manifestHash : manifests[uploadId]
+        self.key = key; self.recordId = recordId
     }
 
     public func sealed(vaultKey: Data, fileId: String) throws -> Data {
@@ -101,11 +90,13 @@ public struct VaultMeta: Codable, Equatable, Sendable {
 /// 2. POST, and only then encrypt: `uploadId` is in every chunk's AAD and in
 ///    the chunk key, so nothing can be sealed before the cloud answers.
 /// 3. Seal each chunk under a fresh DK into the SPOOL, a directory on disk,
+///    seal the version's own record (its whole manifest) and the shop meta,
 ///    then write the spool's state as `sealed` in one atomic rename. The raw
 ///    DK is never written anywhere; only its wrap under the vault key is.
 /// 4. PUT the parts, three at a time, each from its spool file, recording
 ///    each one sent.
-/// 5. /complete. A 409 parts-missing re-PUTs the STORED ciphertext.
+/// 5. /complete with the wrapped DK, the version record and the meta. A
+///    409 parts-missing re-PUTs the STORED ciphertext.
 ///
 /// **Never re-encrypt.** A crash after step 3 resumes from the spool: the
 /// same uploadId, the same sealed bytes, fresh presigned URLs. A crash before
@@ -134,8 +125,6 @@ public enum VaultUpload {
         public var baseVersion: Int?
         /// The last `seq` this device saw for the file; the new head gets one more.
         public var lastSeq: Int?
-        /// Carried forward into the new record's `manifests`.
-        public var knownManifests: [String: String]
         public var name: String
         public var path: String
         public var kind: String
@@ -144,11 +133,11 @@ public enum VaultUpload {
         public var deviceId: String?
 
         public init(source: URL, spoolKey: String, fileId: String? = nil, baseVersion: Int? = nil,
-                    lastSeq: Int? = nil, knownManifests: [String: String] = [:], name: String,
+                    lastSeq: Int? = nil, name: String,
                     path: String = "", kind: String = "", key: String? = nil, recordId: String? = nil,
                     deviceId: String? = nil) {
             self.source = source; self.spoolKey = spoolKey; self.fileId = fileId
-            self.baseVersion = baseVersion; self.lastSeq = lastSeq; self.knownManifests = knownManifests
+            self.baseVersion = baseVersion; self.lastSeq = lastSeq
             self.name = name; self.path = path; self.kind = kind; self.key = key
             self.recordId = recordId; self.deviceId = deviceId
         }
@@ -189,6 +178,7 @@ public enum VaultUpload {
         var chunkHashes: [String] = []
         var manifestHash: String = ""
         var wrappedKey: String = ""
+        var versionMeta: String = ""
         var meta: String = ""
         var metaJSON: VaultMeta?
         var sent: [Int] = []
@@ -298,12 +288,15 @@ public enum VaultUpload {
         s.manifestHash = try VaultCrypto.manifestHash(size: s.size, chunkHashes: hashes)
         s.wrappedKey = try VaultCrypto.wrapDkForShop(vaultKey: keys.vaultKey, dk: dk, fileId: s.fileId,
                                                      uploadId: s.uploadId).base64EncodedString()
-        var manifests = job.knownManifests
-        manifests[s.uploadId] = s.manifestHash
         let meta = VaultMeta(seq: (job.lastSeq ?? 0) + 1, uploadId: s.uploadId, manifestHash: s.manifestHash,
                              size: s.size, sha256: s.sourceSha256, name: job.name, path: job.path, kind: job.kind,
-                             key: job.key, recordId: job.recordId, manifests: manifests)
+                             key: job.key, recordId: job.recordId)
         _ = try VaultCrypto.checkMetaSeq(meta.seq, lastSeen: nil)
+        // The version's own record: its whole manifest, so a reader can check
+        // every chunk as it streams.
+        s.versionMeta = try VaultCrypto.encryptVersionMeta(vaultKey: keys.vaultKey, fileId: s.fileId, uploadId: s.uploadId,
+                                                           size: s.size, chunkHashes: hashes, seq: meta.seq)
+            .base64EncodedString()
         s.meta = try meta.sealed(vaultKey: keys.vaultKey, fileId: s.fileId).base64EncodedString()
         s.metaJSON = meta
         s.sealed = true
@@ -320,12 +313,13 @@ public enum VaultUpload {
         try await putParts(todo, state: &s, dir: dir, client: client, concurrency: concurrency,
                            firstPage: firstPage, progress: progress)
         guard let wrapped = Data(base64Encoded: s.wrappedKey), let meta = Data(base64Encoded: s.meta),
+              let versionMeta = Data(base64Encoded: s.versionMeta), !versionMeta.isEmpty,
               let metaJSON = s.metaJSON else { throw VaultCrypto.Failure.badInput("spool is not sealed") }
         for _ in 0..<3 {
             progress?(Progress(phase: .completing, done: n, total: n))
             do {
                 let done = try await client.complete(uploadId: s.uploadId, manifestHash: s.manifestHash,
-                                                     wrappedKey: wrapped, meta: meta)
+                                                     wrappedKey: wrapped, versionMeta: versionMeta, meta: meta)
                 try? FileManager.default.removeItem(at: dir)
                 return .committed(done, meta: metaJSON)
             } catch VaultClient.Failure.partsMissing(let missing) {

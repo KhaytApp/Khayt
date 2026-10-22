@@ -56,8 +56,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     upload that stops halfway carries on with the same encrypted bytes instead of starting
     over.
   - A file the shop has already uploaded is linked to the copy that is there, not sent again.
-  - Downloads are checked against the file's sealed record before they replace anything on
-    disk. A changed or swapped chunk fails the download and leaves the old file where it was.
+  - Downloads check every chunk against the version's own sealed record as it arrives, in
+    one pass, and replace nothing on disk until the whole file is proved. A changed or
+    swapped chunk fails the download and leaves the old file where it was.
+  - Each Mac keeps its own sync state in the app's folder, not next to the library, so a
+    library on iCloud or a NAS doesn't carry one Mac's state to another.
   - When two devices change the same file at once, both versions are kept. Neither replaces
     the other.
   - The vault can also be used as a third place for the library's cloud copies, next to a
