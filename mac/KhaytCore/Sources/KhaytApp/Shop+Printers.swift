@@ -383,7 +383,9 @@ extension Shop {
     func printRunsStamp(_ jobId: String) -> String {
         guard case .object(let o)? = orderRows.first(where: { Self.recordId($0) == jobId }) else { return jobId }
         let runs: Int = if case .array(let a)? = o["printRuns"] { a.count } else { 0 }
-        return "\(jobId)|\(Self.plainString(o["machineId"]) ?? "")|\(Self.plainString(o["plannedMachineId"]) ?? "")|\(runs)"
+        // And its timelapse, noted minutes after the finish edge.
+        let lapse = o["printerTimelapse"] == nil ? "" : "|t"
+        return "\(jobId)|\(Self.plainString(o["machineId"]) ?? "")|\(Self.plainString(o["plannedMachineId"]) ?? "")|\(runs)\(lapse)"
     }
 
     /// What is on a machine's plate, for the sheet that offers to drop one.

@@ -4632,6 +4632,101 @@ public actor KhaytEngine {
                           [printerApi], as: [String: String].self)
     }
 
+    // MARK: - Finding a camera the printer does not announce
+
+    /// One step of `lib/webcam.js discoverySteps`: either a still to try
+    /// (`snapshotUrl`) or a list to ask the printer for (`listUrl`).
+    public struct CameraStep: Codable, Sendable, Equatable {
+        /// `configured` | `printer_list` | `camera_files` | `guess`.
+        public let source: String
+        public let snapshotUrl: String?
+        public let listUrl: String?
+    }
+
+    /// The order a camera is looked for in: the saved one, what the printer
+    /// says, a vendor's known file (Snapmaker's `monitor.jpg`), the guesses.
+    public func cameraDiscoverySteps(printerApi: JSONValue, webcam: JSONValue) throws -> [CameraStep] {
+        try runtime.call2("globalThis.KhaytWebcam.discoverySteps(ARG0, ARG1)",
+                          [printerApi, webcam], as: [CameraStep].self)
+    }
+
+    /// A camera to try, out of what a step's list returned.
+    public struct CameraCandidate: Codable, Sendable, Equatable {
+        public let snapshotUrl: String
+        public let streamUrl: String?
+        public let flipH: Bool?
+        public let flipV: Bool?
+        public let rotate: Int?
+        /// `snapmaker` for the U1's `monitor.jpg`; nil otherwise.
+        public let vendor: String?
+    }
+
+    public func cameraCandidate(step: CameraStep, body: JSONValue, printerApi: JSONValue) throws -> CameraCandidate? {
+        let s = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(step))
+        return try runtime.call2("globalThis.KhaytWebcam.candidateFromStep(ARG0, ARG1, ARG2)",
+                                 [s, body, printerApi], as: CameraCandidate?.self)
+    }
+
+    /// How old a still is and whether the camera is paused — judged on the
+    /// printer's own clock (`Last-Modified` against the same reply's `Date`).
+    public struct StillAge: Decodable, Sendable, Equatable {
+        public let ageS: Double?
+        public let paused: Bool
+    }
+
+    public func stillAge(lastModified: String?, date: String?, now: Date) throws -> StillAge {
+        try runtime.call2("globalThis.KhaytWebcam.stillAge(ARG0)",
+                          [.object(["lastModified": lastModified.map(JSONValue.string) ?? .null,
+                                    "date": date.map(JSONValue.string) ?? .null,
+                                    "nowMs": .number((now.timeIntervalSince1970 * 1000).rounded())])],
+                          as: StillAge.self)
+    }
+
+    /// `same` | `enable` | `replace` | `new`, or nil — see `suggestionFor`.
+    public func cameraSuggestion(saved: JSONValue, found: String) throws -> String? {
+        try runtime.call2("globalThis.KhaytWebcam.suggestionFor(ARG0, ARG1)",
+                          [saved, .object(["snapshotUrl": .string(found)])], as: String?.self)
+    }
+
+    // MARK: - A print's timelapse, where the printer keeps it
+
+    /// The video (and cover) a finished Moonraker job recorded, matched by
+    /// name and start time against the camera folder's listing.
+    public struct TimelapseMatch: Codable, Sendable, Equatable {
+        public let video: String
+        public let cover: String?
+        public let bytes: Double?
+
+        public init(video: String, cover: String?, bytes: Double?) {
+            self.video = video; self.cover = cover; self.bytes = bytes
+        }
+    }
+
+    public func matchTimelapse(job: JSONValue, files: JSONValue) throws -> TimelapseMatch? {
+        try runtime.call2("globalThis.KhaytWebcam.matchTimelapse(ARG0, ARG1)",
+                          [job, files], as: TimelapseMatch?.self)
+    }
+
+    /// What a job keeps: the machine and the file names, never a URL.
+    public func timelapseRecord(machineId: String, match: TimelapseMatch, at: String) throws -> JSONValue {
+        let m = try JSONValue.decode(JSONValue.self, from: JSONEncoder().encode(match))
+        return try runtime.call2("globalThis.KhaytWebcam.timelapseRecord(ARG0, ARG1, ARG2)",
+                                 [.string(machineId), m, .string(at)], as: JSONValue.self)
+    }
+
+    /// Where to watch a job's timelapse now, resolved against the machine.
+    public struct TimelapseLink: Decodable, Sendable, Equatable {
+        public let machineId: String
+        public let videoUrl: String
+        public let coverUrl: String?
+        public let bytes: Double?
+    }
+
+    public func timelapseLink(order: JSONValue, machine: JSONValue) throws -> TimelapseLink? {
+        try runtime.call2("globalThis.KhaytWebcam.timelapseLink(ARG0, ARG1)",
+                          [order, machine], as: TimelapseLink?.self)
+    }
+
 
     // MARK: - The printer's own photo at the end of a print
 
