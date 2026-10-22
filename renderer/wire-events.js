@@ -1690,6 +1690,10 @@ function wireEvents() {
     if (btn.dataset.act === 'log-nozzle-change') logNozzleChange(btn.dataset.id);
     if (btn.dataset.act === 'import-history') importPrinterHistory(btn.dataset.id);
     if (btn.dataset.act === 'slice-print') sliceAndPrintForMachine(btn.dataset.id);
+    if (btn.dataset.act === 'printer-pause') printerJobCommand(btn.dataset.id, 'pause');
+    if (btn.dataset.act === 'printer-resume') printerJobCommand(btn.dataset.id, 'resume');
+    if (btn.dataset.act === 'printer-cancel') printerJobCommand(btn.dataset.id, 'cancel');
+    if (btn.dataset.act === 'printer-drop') openDropObject(btn.dataset.id);
   });
 
   // Feature 8 (new): Locations settings
