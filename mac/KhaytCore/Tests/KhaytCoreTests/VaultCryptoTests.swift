@@ -15,7 +15,7 @@ struct VaultCryptoTests {
     struct Vectors: Decodable {
         struct Inputs: Decodable {
             let shopDek, dk, fileId, uploadId, grantId, linkSecret, password: String
-            let shopWrapNonce, grantWrapNonce, metaNonce, metaJson, linkMetaNonce: String
+            let shopWrapNonce, grantWrapNonce, metaNonce, metaJson, linkMetaNonce, metaSeqTooBigJson: String
         }
         struct Derived: Decodable {
             let vaultKey, chunkKey, dedupeKey, linkKeyNoPassword, passwordNfcHex, linkPasswordScrypt,
@@ -37,7 +37,7 @@ struct VaultCryptoTests {
         }
         struct Wrap: Decodable { let aad, nonce, wrapped: String }
         struct Wraps: Decodable { let shop, grantNoPassword, grantPassword: Wrap }
-        struct Meta: Decodable { let aad, nonce, json, sealed: String }
+        struct Meta: Decodable { let aad, nonce, json, sealed, sealedSeqTooBig: String }
         struct LinkMetaVec: Decodable { let aad, nonce, json, sealedNoPassword, sealedPassword: String }
 
         let inputs: Inputs
@@ -192,6 +192,26 @@ struct VaultCryptoTests {
         #expect(try VaultCrypto.checkMetaSeq(6, lastSeen: 5) == 6)
         #expect(throws: VaultCrypto.Failure.rollback(seq: 4, lastSeen: 5)) { try VaultCrypto.checkMetaSeq(4, lastSeen: 5) }
         #expect(throws: VaultCrypto.Failure.self) { try VaultCrypto.checkMetaSeq(-1, lastSeen: nil) }
+        #expect(try VaultCrypto.checkMetaSeq((1 << 53) - 1, lastSeen: nil) == (1 << 53) - 1)
+        #expect(throws: VaultCrypto.Failure.self) { try VaultCrypto.checkMetaSeq(1 << 53, lastSeen: nil) }
+        #expect(throws: VaultCrypto.Failure.self) { try VaultCrypto.checkMetaSeq(5, lastSeen: 1 << 53) }
+    }
+
+    @Test("seq 2^53 is refused on write and on read (the shared vector)")
+    func seqTooBig() throws {
+        let fid = v.inputs.fileId, uid = v.inputs.uploadId
+        let tooBig = VaultCrypto.Failure.badInput("meta seq must be an integer from 0 to 2^53-1")
+        for json in [v.inputs.metaSeqTooBigJson, #"{"seq":9007199254740993}"#, #"{"seq":9223372036854775807}"#] {
+            #expect(throws: tooBig, "\(json)") {
+                try VaultCrypto.encryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid, json: Data(json.utf8))
+            }
+        }
+        _ = try VaultCrypto.encryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
+                                        json: Data(#"{"seq":9007199254740991}"#.utf8))
+        #expect(throws: tooBig) {
+            try VaultCrypto.decryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
+                                        sealed: Self.h(v.meta.sealedSeqTooBig), lastSeenSeq: nil)
+        }
     }
 
     @Test("link meta record: byte for byte under both link keys, validated, and the share-page path")

@@ -13,7 +13,9 @@
     "grantWrapNonce": "202122232425262728292a2b",
     "metaNonce": "303132333435363738393a3b",
     "metaJson": "{\"seq\":7,\"name\":\"Benchy بنشي.3mf\",\"type\":\"model/3mf\",\"size\":40}",
-    "linkMetaNonce": "404142434445464748494a4b"
+    "linkMetaNonce": "404142434445464748494a4b",
+    "metaSeqTooBigJson": "{\"seq\":9007199254740992}",
+    "metaSeqTooBigNonce": "505152535455565758595a5b"
   },
   "plaintextRule": "byte k = (k * 31 + 7) mod 256",
   "derived": {
@@ -186,7 +188,8 @@
     "aad": "khayt-vault-meta|f_7Qm2xK9a|u_01JB4ZP3",
     "nonce": "303132333435363738393a3b",
     "json": "{\"seq\":7,\"name\":\"Benchy بنشي.3mf\",\"type\":\"model/3mf\",\"size\":40}",
-    "sealed": "303132333435363738393a3b30cd2f70094ae0ca4def36255a8f63bf97115cc2afa26afce6eb8d443df01585baf0b3bf1a83a2408f59cae203bab68135e5697d4ba5b4d5206ee0418d832d43436f6de51aa1f8c1946e48643aaea76f20f0bd"
+    "sealed": "303132333435363738393a3b30cd2f70094ae0ca4def36255a8f63bf97115cc2afa26afce6eb8d443df01585baf0b3bf1a83a2408f59cae203bab68135e5697d4ba5b4d5206ee0418d832d43436f6de51aa1f8c1946e48643aaea76f20f0bd",
+    "sealedSeqTooBig": "505152535455565758595a5b7a41b4f88aea98e9447e1f8d653aee5ed857ea7d146e1a4f574fec39cf41e829391e00664175ecf2"
   },
   "linkMeta": {
     "aad": "khayt-link-meta|g_Hn8r2Lw5|f_7Qm2xK9a",

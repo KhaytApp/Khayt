@@ -466,8 +466,12 @@ public enum VaultCrypto {
         utf8(Label.metaAad + "|" + (try id(fileId, "fileId")) + "|" + (try id(uploadId, "uploadId")))
     }
 
+    /// 0 ≤ seq ≤ 2^53−1, the JS twin's `Number.isSafeInteger`: a JS reader
+    /// cannot tell 2^53 from 2^53+1, so neither twin accepts either.
+    public static let maxSeq = (1 << 53) - 1
+
     static func checkSeqValue(_ seq: Int) throws {
-        guard seq >= 0, seq <= maxSize else { throw Failure.badInput("meta seq must be an integer from 0 to 2^53") }
+        guard seq >= 0, seq <= maxSeq else { throw Failure.badInput("meta seq must be an integer from 0 to 2^53-1") }
     }
 
     /// Refuse a meta record older than one this reader has already seen.
@@ -490,13 +494,17 @@ public enum VaultCrypto {
             throw Failure.badInput("meta record must be a JSON object")
         }
         guard let n = obj["seq"] as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID() else {
-            throw Failure.badInput("meta seq must be an integer from 0 to 2^53")
+            throw Failure.badInput("meta seq must be an integer from 0 to 2^53-1")
         }
+        // Any Int64 above 2^53−1 converts to a double ≥ 2^53, so the bound
+        // below refuses it rather than rounding it into range.
         let d = n.doubleValue
-        guard d.rounded() == d, d >= 0, d <= Double(maxSize) else {
-            throw Failure.badInput("meta seq must be an integer from 0 to 2^53")
+        guard d.rounded() == d, d >= 0, d <= Double(maxSeq) else {
+            throw Failure.badInput("meta seq must be an integer from 0 to 2^53-1")
         }
-        return Int(d)
+        let seq = Int(d)
+        try checkSeqValue(seq)
+        return seq
     }
 
     /// nonce(12) || ct || tag(16) over the JSON bytes as given, aad

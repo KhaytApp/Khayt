@@ -177,8 +177,12 @@ wrapKey(kek, key, aad) = sealN(kek, key, aad)                    (12 + 32 + 16 =
 meta = sealN(vaultKey, utf8(json), utf8("khayt-vault-meta|" + fileId + "|" + uploadId))
 ```
 
-`json` is a JSON object that must carry `seq`, an integer from 0 to 2^53 that increases with
-every new head of the file. The JSON text is sealed byte for byte. The pinned
+`json` is a JSON object that must carry `seq`, an integer that increases with every new head
+of the file. Writers must emit, and readers must accept, only `0 ≤ seq ≤ 2^53−1`
+(`Number.isSafeInteger` in JS, checked on the parsed value before any arithmetic), and both
+twins refuse anything else. A JS reader cannot tell 2^53 from 2^53+1, so the twins could
+not otherwise agree on what was seen. The vectors include a record sealed with `seq = 2^53`
+(`meta.sealedSeqTooBig`) that both twins must refuse. The JSON text is sealed byte for byte. The pinned
 `manifestHash` for that upload goes in this record.
 
 `checkMetaSeq(seq, lastSeen)` refuses a `seq` lower than the reader's last-seen value. An

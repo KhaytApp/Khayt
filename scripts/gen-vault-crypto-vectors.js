@@ -51,6 +51,9 @@ const inputs = {
   metaNonce: '303132333435363738393a3b',
   metaJson: '{"seq":7,"name":"Benchy بنشي.3mf","type":"model/3mf","size":40}',
   linkMetaNonce: '404142434445464748494a4b',
+  // seq = 2^53: one past the largest safe integer. Both twins must refuse it.
+  metaSeqTooBigJson: '{"seq":9007199254740992}',
+  metaSeqTooBigNonce: '505152535455565758595a5b',
 };
 
 function chunkNonce(i) {
@@ -160,7 +163,9 @@ function build() {
       grantPassword: { kek: 'linkKeyPassword', aad: grantAad, nonce: inputs.grantWrapNonce,
         wrapped: grantWrap(linkKeyPassword).toString('hex') },
     },
-    meta: { aad: metaAad, nonce: inputs.metaNonce, json: inputs.metaJson, sealed: meta.toString('hex') },
+    meta: { aad: metaAad, nonce: inputs.metaNonce, json: inputs.metaJson, sealed: meta.toString('hex'),
+      sealedSeqTooBig: Buffer.concat([H(inputs.metaSeqTooBigNonce), seal(vaultKey, H(inputs.metaSeqTooBigNonce),
+        Buffer.from(inputs.metaSeqTooBigJson, 'utf8'), Buffer.from(metaAad, 'utf8'))]).toString('hex') },
     linkMeta: { aad: linkMetaAad, nonce: inputs.linkMetaNonce, json: linkMetaJson,
       sealedNoPassword: linkMeta(linkKeyNoPassword), sealedPassword: linkMeta(linkKeyPassword) },
   };

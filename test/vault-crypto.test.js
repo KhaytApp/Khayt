@@ -140,6 +140,18 @@ test('checkMetaSeq: equal is fine, lower is a rollback, nothing remembered accep
   assert.throws(() => V.checkMetaSeq(4, 5), /rollback/);
   assert.throws(() => V.checkMetaSeq(-1, null), /seq/);
   assert.throws(() => V.checkMetaSeq('5', null), /seq/);
+  assert.equal(V.checkMetaSeq(2 ** 53 - 1, null), 2 ** 53 - 1);
+  assert.throws(() => V.checkMetaSeq(2 ** 53, null), /2\^53-1/);
+  assert.throws(() => V.checkMetaSeq(5, 2 ** 53), /2\^53-1/);
+});
+
+test('seq 2^53 is refused on write and on read (the shared vector)', async () => {
+  await assert.rejects(V.encryptMeta(vk, fileId, uploadId, inputs.metaSeqTooBigJson), /2\^53-1/);
+  await assert.rejects(V.encryptMeta(vk, fileId, uploadId, '{"seq":9007199254740993}'), /2\^53-1/);
+  await V.encryptMeta(vk, fileId, uploadId, '{"seq":9007199254740991}');
+  // sealed by node:crypto, so authentic: only the seq rule can refuse it
+  await assert.rejects(V.decryptMeta(vk, fileId, uploadId, H(vec.meta.sealedSeqTooBig)), /2\^53-1/);
+  await assert.rejects(V.decryptMetaText(vk, fileId, uploadId, H(vec.meta.sealedSeqTooBig)), /2\^53-1/);
 });
 
 test('link meta record: byte for byte under both link keys, validated, and back', async () => {
