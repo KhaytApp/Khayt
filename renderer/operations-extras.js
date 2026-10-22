@@ -156,6 +156,8 @@ function processRecurringOrders() {
       timerPausedMs: null,
       // Clear fields that must not carry over from the parent order
       survey: null,
+      // The parent's timelapse is a video of THAT print, not of this one.
+      printerTimelapse: null,
       paymentStatus: null,
       invoiceId: null,
       giftCardCode: null,

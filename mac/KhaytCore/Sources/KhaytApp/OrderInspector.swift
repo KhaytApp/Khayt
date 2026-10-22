@@ -38,6 +38,7 @@ private struct Detail: View {
     @State private var papers: [KhaytEngine.OrderDocument] = []
     /// Where this app last sent the job — nil for one it never sent.
     @State private var printed: KhaytEngine.PrintedOn?
+    @State private var timelapse: KhaytEngine.TimelapseLink?
 
     var body: some View {
         ScrollView {
@@ -71,6 +72,9 @@ private struct Detail: View {
                 }
                 if job.machineId?.isEmpty == false || printed != nil {
                     JobMachineLine(shop: shop, job: job, printed: printed)
+                }
+                if let timelapse {
+                    TimelapseLine(shop: shop, link: timelapse)
                 }
                 Divider()
                 money
@@ -188,6 +192,7 @@ private struct Detail: View {
         // Asked again when a send lands, not only when another job is picked.
         .task(id: shop.printRunsStamp(job.id)) {
             printed = await shop.printedOn(job.id)
+            timelapse = await shop.timelapseLink(job.id)
         }
         .shopSheet(item: $editing) { part in
             EditPartSheet(shop: shop, orderId: job.id, part: part)

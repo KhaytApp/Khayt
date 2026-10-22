@@ -474,6 +474,8 @@ final class Activator: NSObject, NSApplicationDelegate {
                     CameraTile(frame: .picture(Snapshot.plateBytes()),
                                webcam: nil, words: Snapshot.subject?.words)
                     CameraTile(frame: .waiting, webcam: nil, words: Snapshot.subject?.words)
+                    CameraTile(frame: .paused(Snapshot.plateBytes()), webcam: nil,
+                               words: Snapshot.subject?.words)
                     CameraTile(frame: .failed("unreachable"), webcam: nil,
                                words: Snapshot.subject?.words)
                 }

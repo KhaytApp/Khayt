@@ -154,6 +154,9 @@ extension Shop {
         }
         FinishCamera.lastOutcome[machine.id] = photo
         await printFinished(ended)
+        // The printer's timelapse, written a little after the end — looked
+        // for on its own, so the event above is not held for minutes.
+        Task { await self.noteTimelapse(ended, machine: machine) }
     }
 
     /// ── THE FINISH SEAM ───────────────────────────────────────────────────

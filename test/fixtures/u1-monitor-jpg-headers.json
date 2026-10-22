@@ -1,0 +1,13 @@
+{
+  "_note": "GET http://192.168.68.56:7125/server/files/camera/monitor.jpg on a Snapmaker U1 (stock firmware), 2026-10-22, about ten minutes after a print ended. Status line and headers verbatim; the body (103087 bytes of JPEG) is not kept.",
+  "status": 200,
+  "headers": {
+    "Server": "TornadoServer/6.2",
+    "Content-Type": "image/jpeg",
+    "Date": "Thu, 22 Oct 2026 12:07:07 GMT",
+    "Accept-Ranges": "bytes",
+    "Last-Modified": "Thu, 22 Oct 2026 12:01:03 GMT",
+    "Content-Disposition": "attachment; filename=\"monitor.jpg\"; filename*=UTF-8''monitor.jpg",
+    "Content-Length": "103087"
+  }
+}

@@ -111,6 +111,8 @@ final class FinishCamera {
         } else if !machine.hasCamera {
             photo = .noCamera
         } else if let jobId {
+            // `.picture` only: a `.paused` frame is a picture of the plate as
+            // it was minutes ago, not of the finished print.
             if case .picture(let data) = await Camera.fetch(machine, shop: shop, get: get) {
                 photo = await attach(jobId, data) ? .attached(jobId) : .notWritten
             } else {

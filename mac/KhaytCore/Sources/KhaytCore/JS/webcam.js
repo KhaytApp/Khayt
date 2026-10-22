@@ -489,8 +489,318 @@
     return { ok: true, reason: null };
   }
 
+  // ── FINDING A CAMERA THE PRINTER DOES NOT ANNOUNCE ─────────────────────────
+  //
+  // A Snapmaker U1 on stock firmware has a working camera and tells nobody.
+  // Measured on the bench, 2026-10-22:
+  //
+  //     GET /server/webcams/list              → {"result": {"webcams": []}}
+  //     GET /server/files/roots               → … {"name": "camera", "path": "/oem/printer_data/camera"}
+  //     GET /server/files/list?root=camera    → monitor.jpg (~100 KB) + a .mp4/.jpg pair per print
+  //     GET /server/files/camera/monitor.jpg  → 200 image/jpeg, on :7125 and on :80
+  //
+  // So the still is a FILE that Snapmaker's own camera service rewrites while
+  // somebody watches, served by Moonraker's ordinary file route. Nothing in
+  // Khayt had ever looked there, and the derived `:8080/?action=snapshot`
+  // reaches nothing on that firmware.
+  //
+  // The order a camera is looked for in, best first:
+  //
+  //   1. the camera the shop already saved — if it answers, nothing changes;
+  //   2. what the printer says it has (`/server/webcams/list`, OctoPrint's
+  //      `/api/settings`);
+  //   3. a vendor's known file (Snapmaker's `camera/monitor.jpg`);
+  //   4. the conventional guesses (`webcamCandidates`).
+  //
+  // Every step is a suggestion for the owner to accept. Discovery never writes
+  // a webcam block: a saved camera is the shop's decision, and a probe that
+  // "fixed" one would be the app overruling the owner on a guess.
+
+  /** Moonraker's flat camera folder, where Snapmaker keeps the still and the timelapses. */
+  const CAMERA_FILES_PATH = '/server/files/list?root=camera';
+  /** The live still Snapmaker's camera service keeps rewriting. */
+  const SNAPMAKER_MONITOR = 'monitor.jpg';
+
+  /**
+   * A still this old is a PAUSED camera, not a live one.
+   *
+   * Snapmaker only refreshes `monitor.jpg` while one of its own clients asks it
+   * to: the U1 sends `notify_camera_monitoring_to_stop` when the last one goes.
+   * Measured on the bench: the file was 2 s old mid-print and stopped changing
+   * about four minutes after the print ended. A picture of the plate as it was
+   * an hour ago, drawn as if it were now, is worse than no picture: it says the
+   * print is fine after it has failed.
+   */
+  const PAUSED_AFTER_S = 30;
+
+  /**
+   * The printer's API address WITH its port, for a request to the API itself.
+   *
+   * `normalizeWebcamUrl` builds against `host` alone, which is right for a
+   * camera (crowsnest and nginx have their own ports) and wrong for the API:
+   * a book that keeps `port: 7125` beside a bare host would send
+   * `/server/webcams/list` to port 80. Both apps default a Moonraker to 7125
+   * when no port is written at all (`PrinterWatch.defaultPort`, main.js).
+   */
+  function apiWithPort(printerApi) {
+    const p = printerApi || {};
+    const host = String(p.host || '').trim().replace(/\/+$/, '');
+    if (!host) return p;
+    const bare = host.replace(/^https?:\/\//i, '');
+    if (/:\d+$/.test(bare) || (bare.match(/:/g) || []).length > 1) return p;
+    const type = String(p.type || '').toLowerCase();
+    const port = Number(p.port) > 0 ? Number(p.port) : (type === 'moonraker' ? 7125 : 0);
+    if (!port) return p;
+    return Object.assign({}, p, { host: `${host}:${port}` });
+  }
+
+  /** Steps in the order above. The app runs them; nothing here touches the network. */
+  function discoverySteps(printerApi, webcam) {
+    const steps = [];
+    const saved = webcam && String(webcam.snapshotUrl || '').trim();
+    if (saved) steps.push({ source: 'configured', snapshotUrl: saved });
+    const detect = detectUrlFor(apiWithPort(printerApi));
+    if (detect) steps.push({ source: 'printer_list', listUrl: detect });
+    const type = String((printerApi && printerApi.type) || '').toLowerCase();
+    if (type === 'moonraker') {
+      const files = normalizeWebcamUrl(CAMERA_FILES_PATH, apiWithPort(printerApi));
+      if (files) steps.push({ source: 'camera_files', listUrl: files });
+    }
+    for (const c of webcamCandidates(printerApi)) {
+      if (c && c.snapshotUrl) steps.push({ source: 'guess', snapshotUrl: c.snapshotUrl });
+    }
+    // One address is asked once, whichever step named it first.
+    const seen = new Set();
+    return steps.filter((s) => {
+      const k = s.snapshotUrl || s.listUrl;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+
+  /** The `result` array of `/server/files/list`, whether or not it is wrapped. */
+  function fileRows(body) {
+    const rows = Array.isArray(body) ? body : (body && Array.isArray(body.result) ? body.result : []);
+    return rows.filter((r) => r && typeof r === 'object' && typeof r.path === 'string');
+  }
+
+  /**
+   * A path inside the camera folder that may be put in a URL.
+   *
+   * The folder is flat on the U1, and the name comes from the printer, not
+   * the owner — but a book carries it later (a job's timelapse), and a book
+   * arrives by restore and sync. So: one segment, no dot-dot, no separators,
+   * and only the two kinds of file the folder is for.
+   */
+  function safeCameraFile(path) {
+    const p = String(path || '');
+    if (!p || p.length > 255) return false;
+    if (/[\/\\\u0000-\u001f]/.test(p) || p.startsWith('.')) return false;
+    return /\.(jpe?g|mp4)$/i.test(p);
+  }
+
+  /** The URL of one file in the printer's camera folder, on the printer's own host. */
+  function cameraFileUrl(printerApi, path) {
+    if (!safeCameraFile(path)) return '';
+    return normalizeWebcamUrl('/server/files/camera/' + encodeURIComponent(path), apiWithPort(printerApi));
+  }
+
+  /**
+   * Snapmaker's still, from `/server/files/list?root=camera`, or null.
+   * `modifiedS` is the printer's own clock, for the age check below.
+   */
+  function parseCameraFiles(body, printerApi) {
+    const row = fileRows(body).find((r) => r.path === SNAPMAKER_MONITOR);
+    if (!row) return null;
+    const snapshotUrl = cameraFileUrl(printerApi, row.path);
+    if (!snapshotUrl) return null;
+    const m = Number(row.modified);
+    return {
+      snapshotUrl, streamUrl: '', flipH: false, flipV: false, rotate: 0,
+      vendor: 'snapmaker', modifiedS: Number.isFinite(m) ? m : null,
+    };
+  }
+
+  /** Whatever a list step returned, as a camera to try, or null. */
+  function candidateFromStep(step, body, printerApi) {
+    if (!step) return null;
+    if (step.source === 'printer_list') return parseDetected(body, printerApi);
+    if (step.source === 'camera_files') return parseCameraFiles(body, printerApi);
+    if (step.snapshotUrl) {
+      const snapshotUrl = normalizeWebcamUrl(step.snapshotUrl, printerApi);
+      return snapshotUrl ? { snapshotUrl, streamUrl: '' } : null;
+    }
+    return null;
+  }
+
+  /**
+   * How old a still is, and whether that makes the camera paused.
+   *
+   * Judged on the PRINTER'S clock where it can be: `Last-Modified` against the
+   * same response's `Date`, both written by the printer, so a Mac whose clock is
+   * minutes out does not call a live camera paused. The asking machine's clock
+   * is the fallback when the response carries no `Date`. A camera that sends no
+   * `Last-Modified` at all — mjpg-streamer, crowsnest — is a live source by
+   * nature and is not judged: `paused` is false and `ageS` null.
+   */
+  function stillAge(input) {
+    const i = input || {};
+    const parse = (v) => {
+      if (v == null || v === '') return NaN;
+      const n = Date.parse(String(v));
+      return Number.isFinite(n) ? n : NaN;
+    };
+    let modified = parse(i.lastModified);
+    if (!Number.isFinite(modified) && Number.isFinite(Number(i.fileModifiedS)) && i.fileModifiedS != null) {
+      modified = Number(i.fileModifiedS) * 1000;
+    }
+    if (!Number.isFinite(modified)) return { ageS: null, paused: false };
+    let now = parse(i.date);
+    if (!Number.isFinite(now)) now = Number(i.nowMs);
+    if (!Number.isFinite(now)) return { ageS: null, paused: false };
+    const ageS = Math.max(0, Math.round((now - modified) / 1000));
+    return { ageS, paused: ageS > PAUSED_AFTER_S };
+  }
+
+  /**
+   * Should a found camera be offered to the owner, and how?
+   *
+   * `same` — it is the saved, switched-on camera: nothing to offer.
+   * `enable` — it is the saved address, switched off: offer to switch it on.
+   * `replace` — a different address from a saved one: offer, never apply.
+   * `new` — nothing saved: offer.
+   */
+  function suggestionFor(saved, found) {
+    const s = saved || {};
+    const url = found && found.snapshotUrl;
+    if (!url) return null;
+    const savedUrl = String(s.snapshotUrl || '').trim();
+    if (savedUrl && savedUrl === url) return s.enabled ? 'same' : 'enable';
+    return savedUrl ? 'replace' : 'new';
+  }
+
+  // ── A PRINT'S TIMELAPSE, WHERE THE PRINTER KEEPS IT ───────────────────────
+  //
+  // The U1 records one per print into the same camera folder, as a pair:
+  //
+  //     d0de11b4e5a09b4119ca41bdab22300d_PLA_4h29m_20260803192022.mp4
+  //     d0de11b4e5a09b4119ca41bdab22300d_PLA_4h29m_20260803192022.jpg
+  //
+  // The stem is the G-code file's, and the stamp is when the job STARTED.
+  // Matched against the bench's history: job 00004E,
+  // `d0de11b4…_PLA_4h29m.gcode`, start_time 2026-08-03 19:20:22.8 UTC, ended
+  // 00:00:33 — the cover was written 1 s after the end and the video 35 s
+  // after. So at the moment a print finishes its video does not exist yet, and
+  // a lookup is retried rather than asked once.
+  //
+  // The history entry does NOT point at it: `auxiliary_data` is `[]` on every
+  // one of the bench's 246 jobs, and no other field names a file. The match is
+  // by name and time, and both must agree.
+
+  /** `folder/Name_PLA_1h.gcode` → `Name_PLA_1h`. */
+  function gcodeStem(filename) {
+    const base = String(filename || '').split('/').pop();
+    return base.replace(/\.(gcode|gco|g|bgcode)$/i, '');
+  }
+
+  /** `…_YYYYMMDDHHMMSS.ext` → { stem, stampS (as UTC), ext }, or null. */
+  function splitTimelapseName(path) {
+    const m = /^(.*)_(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\.(mp4|jpe?g)$/i.exec(String(path || ''));
+    if (!m) return null;
+    const stampS = Date.UTC(+m[2], +m[3] - 1, +m[4], +m[5], +m[6], +m[7]) / 1000;
+    if (!Number.isFinite(stampS)) return null;
+    return { stem: m[1], stampS, ext: m[8].toLowerCase() };
+  }
+
+  /**
+   * The timelapse a finished job recorded, from its history entry and the
+   * camera folder's listing — or null.
+   *
+   * Both halves must agree, because names repeat: a shop reprints the same
+   * file, and every copy of `Assembly_PLA_15h27m` would otherwise claim the
+   * first video. So the stem must be the job's, and the video must have been
+   * written while the job ran or within half an hour of its end. The stamp is
+   * compared to the start allowing for a printer whose clock writes local time
+   * (whole quarter hours, ±14 h), and the closest wins.
+   */
+  function matchTimelapse(job, filesBody) {
+    const j = job || {};
+    const stem = gcodeStem(j.filename);
+    const start = Number(j.start_time ?? j.startTime);
+    const end = Number(j.end_time ?? j.endTime);
+    if (!stem || !Number.isFinite(start)) return null;
+    const latest = (Number.isFinite(end) ? end : start) + 1800;
+    const rows = fileRows(filesBody).filter((r) => safeCameraFile(r.path));
+    const offBy = (stampS) => {
+      const d = stampS - start;
+      const k = Math.max(-56, Math.min(56, Math.round(d / 900)));
+      return Math.abs(d - k * 900);
+    };
+    let best = null;
+    for (const r of rows) {
+      const n = splitTimelapseName(r.path);
+      if (!n || n.ext !== 'mp4' || n.stem !== stem) continue;
+      const mod = Number(r.modified);
+      if (!Number.isFinite(mod) || mod < start - 60 || mod > latest) continue;
+      const miss = offBy(n.stampS);
+      if (miss > 120) continue;
+      if (!best || miss < best.miss) best = { row: r, miss };
+    }
+    if (!best) return null;
+    const coverPath = best.row.path.replace(/\.mp4$/i, '.jpg');
+    const cover = rows.find((r) => r.path === coverPath);
+    const size = Number(best.row.size);
+    return {
+      video: best.row.path,
+      cover: cover ? cover.path : null,
+      bytes: Number.isFinite(size) ? size : null,
+    };
+  }
+
+  /**
+   * What a job keeps: the machine and the FILE NAMES, never a URL.
+   *
+   * A URL in the book would be an address that travels to the phone and the
+   * cloud and comes back by restore and sync, chosen by whoever wrote it. A
+   * file name is resolved at the moment it is opened, against the machine's
+   * own host and through the same camera rules as everything else.
+   */
+  function timelapseRecord(machineId, match, at) {
+    if (!machineId || !match || !safeCameraFile(match.video)) return null;
+    const out = { machineId: String(machineId), video: match.video, at: String(at || '') };
+    if (match.cover && safeCameraFile(match.cover)) out.cover = match.cover;
+    if (Number.isFinite(Number(match.bytes)) && match.bytes != null) out.bytes = Number(match.bytes);
+    return out;
+  }
+
+  /**
+   * Where to watch a job's timelapse now, or null: the job's record resolved
+   * against the machine it names. Null when the record is malformed or the
+   * machine has gone or no longer speaks Moonraker.
+   */
+  function timelapseLink(order, machine) {
+    const t = order && order.printerTimelapse;
+    if (!t || typeof t !== 'object' || !safeCameraFile(t.video)) return null;
+    if (!machine || String(machine.id) !== String(t.machineId)) return null;
+    const api = machine.printerApi || {};
+    if (String(api.type || '').toLowerCase() !== 'moonraker') return null;
+    const videoUrl = cameraFileUrl(api, t.video);
+    if (!videoUrl) return null;
+    const coverUrl = t.cover ? cameraFileUrl(api, t.cover) : '';
+    const bytes = Number(t.bytes);
+    return {
+      machineId: String(t.machineId), videoUrl, coverUrl: coverUrl || null,
+      bytes: Number.isFinite(bytes) && t.bytes != null ? bytes : null,
+    };
+  }
+
   const api = {
     STREAM_TYPES, TIMELAPSE_MODES, ROTATIONS, SNAPSHOT_TYPE,
+    CAMERA_FILES_PATH, SNAPMAKER_MONITOR, PAUSED_AFTER_S,
+    apiWithPort, discoverySteps, parseCameraFiles, candidateFromStep, stillAge, suggestionFor,
+    safeCameraFile, cameraFileUrl, gcodeStem, splitTimelapseName, matchTimelapse,
+    timelapseRecord, timelapseLink,
     defaultWebcam, normalizeWebcamUrl, deriveWebcamUrls, webcamCandidates,
     parseOctoprintSettings, parseMoonrakerWebcams,
     detectPathFor, detectUrlFor, parseDetected,
