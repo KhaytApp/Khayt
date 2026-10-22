@@ -83,6 +83,10 @@ final class LanServer {
         /// The phones enrolled to sign their requests instead of sending the
         /// PIN. The app hands over the Keychain's; a test gets its own.
         var devices: LanDevices = .inMemory()
+        /// The window the owner opens for a new phone (`LanPairingWindow`).
+        /// Nil — a test that never asked for one — is a window never opened:
+        /// enrolment is refused `pairing-closed`.
+        var pairing: LanPairingWindow? = nil
         /// This Mac's identity key (`LanIdentity`), asked for when a route
         /// needs it. A test hands its own, so parallel tests never share one.
         var identity: @Sendable () -> Curve25519.Signing.PrivateKey? = { LanIdentity.key() }
@@ -900,8 +904,22 @@ final class LanServer {
             return .json(200, #"{"alg":"ed25519","sig":"\#(sig)"}"#)
 
         // ── A PHONE ENROLS, AND THE PIN STOPS TRAVELLING (see `LanDevices`) ──
+        //
+        // ── ONLY WHILE THE OWNER HAS OPENED A WINDOW (`LanPairingWindow`) ──
+        //
+        // Closed, the answer comes before the PIN is read: it counts towards
+        // no lockout and says nothing about whether the PIN was right. Open,
+        // `pinGate` judges the PIN against the window's own count, so guesses
+        // made outside it cannot hold the shop's new phone out.
         case ("/api/devices", false) where request.method == "POST":
+            guard Self.hostIsLocal(request.headers["host"]) else {
+                return .json(421, #"{"error":"host-not-local"}"#)
+            }
+            guard host.pairing?.isOpen() == true else { return .json(403, LanPairingWindow.closedBody) }
             if let refused = await pinGate(request) { return refused }
+            // Re-asked: another phone may have paired, or the clock run out,
+            // while the PIN was being checked.
+            guard let window = host.pairing, window.isOpen() else { return .json(403, LanPairingWindow.closedBody) }
             guard let identity = host.identity() else { return .json(503, #"{"error":"no_identity"}"#) }
             guard case .object(let asked)? = try? JSONDecoder().decode(JSONValue.self, from: request.body),
                   case .string(let publicKey)? = asked["publicKey"] else {
@@ -913,6 +931,7 @@ final class LanServer {
                                                          identity: identity, now: host.now()) else {
                 return .json(400, #"{"error":"publicKey"}"#)
             }
+            window.paired(name: String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(LanDevices.maxName)))
             return .json(200, #"{"deviceId":"\#(enrolled.deviceId)","publicKey":"\#(enrolled.publicKey)","sig":"\#(enrolled.sig)"}"#)
 
         case ("/api/queue", true):
@@ -2185,6 +2204,29 @@ final class LanServer {
         // guessing. Oct 2026 review.
         let key = Self.pinThrottleKey(request.remote)
         let record = failures[key]
+        // ── WHILE A PAIRING WINDOW IS OPEN, ITS OWN COUNT DECIDES ─────────
+        //
+        // The lockout below is what a guesser on the Wi-Fi holds shut, and
+        // the phone being paired asks through it (its PIN check, its identity,
+        // its enrolment). For the window the owner opened, the window's count
+        // stands in for it: wrong PINs still add to the lockout here, for
+        // after the window. In the window, `perAddress` wrong PINs shut that
+        // address out of it, and `maxWrong` from all addresses close it.
+        if let window = host.pairing, window.isOpen() {
+            // Per address: one guesser is shut out of the window, not the
+            // window shut for everyone (`LanPairingWindow`).
+            if window.lockedOut(key) { return .json(429, LanPairingWindow.lockedBody) }
+            guard Self.constantTimeEqual(provided, host.pin) else {
+                if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
+                    failures[key] = bumped
+                }
+                window.noteWrong(from: key)
+                sweepFailures(now: now)
+                return .json(401, #"{"error":"Unauthorized"}"#)
+            }
+            failures.removeValue(forKey: key)
+            return nil
+        }
         if (try? await host.engine.lanIsLockedOut(record, now: now)) == true {
             return .json(429, #"{"error":"Too many attempts — try again in 1 minute"}"#)
         }
@@ -2583,9 +2625,11 @@ extension Shop {
     }
 
     func startLanServer() async {
-        stopLanServer()
+        // A restart (a settings save) keeps an open pairing window; a start
+        // that fails, or comes up on loopback, closes it below.
+        stopLanServer(keepPairing: true)
         lanProblem = nil
-        guard let engine else { lanProblem = words.callIt("mac.move_no_engine"); return }
+        guard let engine else { lanPairing.serverStopped(); lanProblem = words.callIt("mac.move_no_engine"); return }
         let config = lanConfig
         // Sealed on disk by whichever app wrote it; opened here, once, and
         // handed to the server — never read back out of the book per request.
@@ -2596,6 +2640,7 @@ extension Shop {
         host.intakeToken = intakeToken
         host.calendarToken = calendarToken
         host.devices = lanDeviceStore
+        host.pairing = lanPairing
         host.library = { [weak self] q, folder, offset, limit in
             self?.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit) ?? .object([:])
         }
@@ -2612,6 +2657,7 @@ extension Shop {
         host.machinesLive = { [weak self] in self?.machinesLive() ?? [] }
         host.failed = { [weak self] said in
             guard let self else { return }
+            self.lanPairing.serverStopped()
             self.lanProblem = self.words.callIt("mac.lan_failed", ["error": .string(said)])
         }
         var carrierSecrets: [String: String] = [:]
@@ -2658,6 +2704,8 @@ extension Shop {
             lanServer = server
             lanRunning = config
             lanCalendarToken = calendarToken
+            // On loopback no phone can reach it, so there is nothing to pair.
+            if !config.bindLan { lanPairing.serverStopped() }
             // The server refuses a short PIN on every owner route; the shop
             // is told why here rather than finding its phone locked out.
             if LanServer.pinTooShort(pin) {
@@ -2665,6 +2713,7 @@ extension Shop {
                                           ["n": .number(Double(LanServer.minimumPin))])
             }
         } catch {
+            lanPairing.serverStopped()
             lanProblem = Self.lanFailure(error, port: Int(config.port), words: words)
         }
     }
@@ -3046,7 +3095,10 @@ extension Shop {
         return "\(base)calendar.ics?token=\(token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token)"
     }
 
-    func stopLanServer() {
+    /// Stopping closes an open pairing window (`LanPairingWindow`): no phone
+    /// can reach a server that is not there. `keepPairing` is a restart.
+    func stopLanServer(keepPairing: Bool = false) {
+        if !keepPairing { lanPairing.serverStopped() }
         lanServer?.stop()
         lanServer = nil
         lanRunning = nil

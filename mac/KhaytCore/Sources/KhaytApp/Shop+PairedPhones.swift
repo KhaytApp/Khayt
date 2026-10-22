@@ -21,6 +21,16 @@ extension Shop {
         pairedPhones = lanDeviceStore.list()
     }
 
+    /// Open the window a new phone may pair in, for `LanPairingWindow.length`.
+    func openPairing() {
+        guard permitted("settings", "edit") else { return }
+        lanPairing.open()
+    }
+
+    func closePairing() {
+        lanPairing.close()
+    }
+
     func signOutPhone(_ id: String) {
         guard permitted("settings", "edit") else { return }
         lanDeviceStore.remove(id)
@@ -58,6 +68,7 @@ struct PairedPhones: View {
                 }
             }
         }
+        PairAPhone(shop: shop)
         Text(shop.words.callIt("mac.phones_hint"))
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -70,5 +81,94 @@ struct PairedPhones: View {
                       cancel: shop.words.callIt("common.cancel")) { phone in
                 shop.signOutPhone(phone.id)
             }
+    }
+}
+
+/// "Pair a phone": the window a new phone may enrol in (`LanPairingWindow`),
+/// with what is left of it, and how the last one ended.
+struct PairAPhone: View {
+    let shop: Shop
+
+    /// Running, and listening where a phone can reach it.
+    private var reachable: Bool { shop.lanURL != nil && shop.lanRunning?.bindLan == true }
+
+    var body: some View {
+        let window = shop.lanPairing
+        VStack(alignment: .leading, spacing: 4) {
+            if let deadline = window.deadline {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    // Each tick reads the window's own monotonic deadline, the
+                    // one the server reads, never the wall clock.
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        Text(shop.words.callIt("mac.pair_waiting", ["time": .string(
+                            Self.clock(window.remaining() ?? 0, locale: shop.words.locale))]))
+                            .monospacedDigit()
+                    }
+                    Spacer(minLength: 0)
+                    Button(shop.words.callIt("common.close")) { shop.closePairing() }
+                        .controlSize(.small)
+                        .accessibilityIdentifier("pair-close")
+                }
+                if window.lockedAddresses > 0 {
+                    Text(shop.words.callIt("mac.pair_locked_some"))
+                        .font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(shop.words.callIt("mac.pair_open_hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // Shut it on time even when no phone asks. Re-armed for
+                    // each new deadline; sleeps again if it woke early.
+                    .task(id: deadline) {
+                        while let left = window.remaining(), !Task.isCancelled {
+                            try? await Task.sleep(for: .seconds(left))
+                        }
+                        guard !Task.isCancelled else { return }
+                        _ = window.isOpen()
+                    }
+            } else {
+                HStack {
+                    Button(shop.words.callIt("mac.pair_open")) { shop.openPairing() }
+                        // `lockAllows`, not `permitted`: see the sign-out button.
+                        .disabled(!shop.lockAllows("settings", "edit") || !reachable)
+                        .accessibilityIdentifier("pair-open")
+                    Spacer(minLength: 0)
+                }
+                if shop.lanURL != nil, !reachable {
+                    Text(shop.words.callIt("mac.pair_loopback"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let said = Self.outcome(window.lastClosed, words: shop.words) {
+                    Text(said.text)
+                        .font(.caption)
+                        .foregroundStyle(said.warn ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .onChange(of: window.lastClosed) { _, closed in
+            if case .paired? = closed { shop.refreshPairedPhones() }
+        }
+    }
+
+    /// "1:45", rounded up, in the digits this Mac asked for (`Digits`).
+    static func clock(_ seconds: TimeInterval, locale: Locale) -> String {
+        Duration.seconds(max(0, Int(seconds.rounded(.up))))
+            .formatted(Duration.TimeFormatStyle(pattern: .minuteSecond).locale(locale))
+    }
+
+    /// What the last window came to; nil for one closed by the owner, or none yet.
+    static func outcome(_ closed: LanPairingWindow.Closed?, words: Words) -> (text: String, warn: Bool)? {
+        switch closed {
+        case .paired(let name)?:
+            let shown = name.isEmpty ? words.callIt("mac.phones_unnamed") : name
+            return (words.callIt("mac.pair_done", ["name": .string(shown)]), false)
+        case .timedOut?: return (words.callIt("mac.pair_timed_out"), false)
+        case .tooManyWrong?: return (words.callIt("mac.pair_too_many"), true)
+        case .serverStopped?: return (words.callIt("mac.pair_server_stopped"), false)
+        case .byOwner?, nil: return nil
+        }
     }
 }
