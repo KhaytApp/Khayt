@@ -262,7 +262,7 @@ struct LibrarySyncIndexTests {
         plan.keptOnline = ["PF-5"]
         #expect(shop.deleteKeptLine(plan) == nil)
         plan.keptOnline = ["PF-5", "PF-6"]
-        #expect(shop.deleteKeptLine(plan) == shop.words.callIt("mac.delete_kept_one"))
+        #expect(shop.deleteKeptLine(plan) == shop.words.callIt("mac.delete_kept_single"))
     }
 
     @Test("one model's files: the record's own folder in the primary root, never a symlink or elsewhere")

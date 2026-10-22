@@ -144,6 +144,12 @@ final class Words {
         n.formatted(.number.locale(locale))
     }
 
+    /// Keys whose `_one` form is the whole phrase with no number in it, in
+    /// a way `واحد` cannot spot: «طُبع مرة» — "printed once" — says the count
+    /// with «مرة» alone. Listed rather than guessed: a bare noun in `_one`
+    /// still wants its numeral.
+    nonisolated static let wholeSingulars: Set<String> = ["mac.printed_n"]
+
     func counting(_ n: Int, _ key: String) -> String {
         // ── ARABIC COUNTS TWO OF A THING DIFFERENTLY ──────────────────────
         //
@@ -210,6 +216,9 @@ final class Words {
         // A literal (UTF-16) search, not `contains`: in "يومًا واحدًا" the
         // tanween joins the last letter into one grapheme, which hides واحد.
         if n == 1, said.range(of: "واحد", options: .literal) != nil { return said }
+        // …or says "once" in a word of its own (`wholeSingulars`): «طُبع مرة»
+        // is "printed once", and a numeral before it read "1 printed once".
+        if n == 1, Self.wholeSingulars.contains(key) { return said }
         // A plain space, not a non-breaking one. Binding the numeral to the
         // word is tempting and wrong here: eight existing tests read this
         // output back and compare it to "2 days", and a caller that has to
@@ -2718,9 +2727,9 @@ final class Words {
         "mac.storage_free_in_use": ["en": "Free Up Space never moves a model an open job needs. Remove this Mac’s copy anyway? It is fetched again when the job opens it.",
                                     "ar": "لا ينقل «توفير المساحة» أبدًا نموذجًا يحتاجه عمل مفتوح. هل تحذف نسخة هذا الماك رغم ذلك؟ ستُنزَّل مجددًا عندما يفتحه العمل."],
         "mac.storage_free_anyway": ["en": "Free Up Space Anyway", "ar": "وفّر المساحة رغم ذلك"],
-        "mac.delete_kept_one": ["en": "One of these is set to Keep on This Mac. Remove from This Mac takes its copy here anyway and turns that off.",
+        "mac.delete_kept_single": ["en": "One of these is set to Keep on This Mac. Remove from This Mac takes its copy here anyway and turns that off.",
                                 "ar": "أحدها مضبوط على «إبقاء على هذا الماك». «إزالة من هذا الجهاز» ستحذف نسخته هنا رغم ذلك وتوقف هذا الخيار."],
-        "mac.delete_kept_n": ["en": "{n} of these are set to Keep on This Mac. Remove from This Mac takes their copies here anyway and turns that off.",
+        "mac.delete_kept_many": ["en": "{n} of these are set to Keep on This Mac. Remove from This Mac takes their copies here anyway and turns that off.",
                               "ar": "{n} منها مضبوطة على «إبقاء على هذا الماك». «إزالة من هذا الجهاز» ستحذف نسخها هنا رغم ذلك وتوقف هذا الخيار."],
         "mac.unarchive_both_one": ["en": "The converted copy stays in the library; you’ll have both.",
                                    "ar": "تبقى النسخة المحوّلة في المكتبة، وسيكون لديك الاثنتان."],

@@ -141,8 +141,8 @@ extension Shop {
         let kept = keptAmong(plan.keptOnline)
         guard !kept.isEmpty else { return nil }
         return kept.count == 1
-            ? words.callIt("mac.delete_kept_one")
-            : words.callIt("mac.delete_kept_n", ["n": .number(Double(kept.count))])
+            ? words.callIt("mac.delete_kept_single")
+            : words.callIt("mac.delete_kept_many", ["n": .number(Double(kept.count))])
     }
 
     /// The disk said something the index did not: put the index right from
