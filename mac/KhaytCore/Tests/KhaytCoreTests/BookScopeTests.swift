@@ -19,6 +19,7 @@ import KhaytCore
             "waitingList": .array([]),
             // The three quarters of a real book that no companion screen shows.
             "printFiles": .array([.object(["id": .string("f1")])]),
+            // The catalogue, which the phone's Catalogue screen shows.
             "products": .array([.object(["id": .string("p1")])]),
             "expenses": .array([.object(["id": .string("e1")])]),
             "auditLog": .array([.object(["id": .string("a1")])]),
@@ -37,11 +38,12 @@ import KhaytCore
     @Test("history is left on the Mac, and the phone is told which parts")
     func historyStaysBehind() {
         let cut = BookScope.take(from: shop(orders: []))
-        for left in ["printFiles", "products", "auditLog"] {
+        for left in ["printFiles", "auditLog"] {
             #expect(cut.store[left] == nil, "\(left) travelled and no screen shows it")
             #expect(cut.taken.omitted.contains(left),
                     "\(left) was withheld silently — the phone cannot tell that from empty")
         }
+        #expect(cut.store["products"] != nil, "the phone's Catalogue screen reads it")
     }
 
     @Test("unfinished work travels whatever its age")
@@ -152,5 +154,33 @@ import KhaytCore
         #expect(ids.contains("LATE-FOLD"))
         #expect(!ids.contains("E1199"))
         #expect(cut.taken.collections["expenses"] == .init(whole: false, sent: 1_000, available: 1_201))
+    }
+
+    @Test("a product travels with its small pictures but without the Mac's file paths")
+    func productsLeaveTheirPathsBehind() {
+        let product: JSONValue = .object([
+            "id": .string("PROD-1"), "nameEn": .string("Lamp"), "basePrice": .number(40),
+            "thumbnail": .string("data:image/jpeg;base64,AAA"),
+            "imagePath": .string("/Users/someone/Library/Khayt/products/PROD-1-a.jpg"),
+            "docs": .array([.object(["path": .string("/Users/someone/manual.pdf")])]),
+            "images": .array([.object(["id": .string("a"), "path": .string("/Users/someone/x.jpg"),
+                                       "thumbnail": .string("data:image/jpeg;base64,BBB")])]),
+        ])
+        let cut = BookScope.take(from: ["products": .array([product])])
+        guard case .array(let rows)? = cut.store["products"], case .object(let o)? = rows.first else {
+            Issue.record("no products"); return
+        }
+        #expect(o["imagePath"] == nil)
+        #expect(o["docs"] == nil)
+        #expect(o["thumbnail"] == .string("data:image/jpeg;base64,AAA"))
+        #expect(o["basePrice"] == .number(40))
+        guard case .array(let images)? = o["images"], case .object(let first)? = images.first else {
+            Issue.record("no images"); return
+        }
+        #expect(first["path"] == nil)
+        #expect(first["thumbnail"] == .string("data:image/jpeg;base64,BBB"))
+        #expect(cut.taken.collections["products"]?.whole == true)
+        // The same trim for a record a cloud change folds in.
+        #expect(BookScope.trimmed(["products": .array([product])]) == ["products": .array([.object(o)])])
     }
 }

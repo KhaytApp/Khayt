@@ -929,6 +929,15 @@ final class KhaytAPIClient: ObservableObject {
         throw try decodeAPIError(body, status: http.statusCode)
     }
 
+    // MARK: - The catalogue
+
+    /// What the shop sells, from the book this phone keeps: the Mac's prices,
+    /// the small picture each product carries, and counted stock.
+    func fetchCatalogue() async throws -> CataloguePage {
+        guard let reader, holdsBook else { throw KhaytAPIError.server(L10n.tr("catalogue.no_book")) }
+        return try await reader.catalogue(language: L10n.usesArabicLayout ? "ar" : "en")
+    }
+
     // MARK: - The shop's library
 
     /// The built-in sample shop is open: nothing here talks to a Mac.

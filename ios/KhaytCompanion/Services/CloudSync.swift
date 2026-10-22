@@ -208,13 +208,14 @@ struct CloudSync {
         for _ in 1...3 {
             let local = try book.read()
             let attempt = try await engine.foldDeltas(base: local, deltas: payloads)
-            if try book.swap(from: local, to: attempt.store) { folded = attempt; break }
+            // A change carries the whole record, file paths and all: off again.
+            if try book.swap(from: local, to: BookScope.trimmed(attempt.store)) { folded = attempt; break }
         }
         guard let folded else { throw CompanionBook.Failure.busy }
         // …and into the baseline, so none of it reads as pending.
         if let baseline = book.baseline() {
             let seen = try await engine.foldDeltas(base: baseline, deltas: payloads)
-            try book.replaceBaseline(with: seen.store)
+            try book.replaceBaseline(with: BookScope.trimmed(seen.store))
         }
         s.seenRev = reply.rev
         return (s, .changes(folded.applied + folded.removed))

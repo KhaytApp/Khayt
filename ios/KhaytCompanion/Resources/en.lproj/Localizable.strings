@@ -817,3 +817,19 @@
 "library.from_copy" = "Away from the shop: this is your library as of the last Khayt Cloud sync, and prices are worked out on this phone.";
 "library.priced_here" = "Worked out on this phone with your prices. A model in several colours is costed on one spool, so the Mac's figure can differ a little.";
 "library.no_copy" = "The Mac can't be reached. Sign in to Khayt Cloud in Settings and sync once, and your library comes with you.";
+
+/* Catalogue */
+"catalogue.title" = "Catalogue";
+"catalogue.search" = "Search products";
+"catalogue.ungrouped" = "Other";
+"catalogue.empty" = "No products yet. Add them in the Catalogue on your Mac.";
+"catalogue.no_match" = "No product matches that.";
+"catalogue.partial" = "Showing the first 2,000 products. Search to find others on your Mac.";
+"catalogue.no_book" = "The catalogue comes with the shop's book. Sync with Khayt Cloud or your Mac first.";
+"catalogue.in_stock" = "%lld in stock";
+"catalogue.out_of_stock" = "Out of stock";
+"catalogue.description" = "Description";
+"catalogue.price.override" = "Your own price";
+"catalogue.price.rounded" = "Rounded from the calculated price";
+"catalogue.price.calculated" = "Calculated";
+"home.catalogue.sub" = "What you sell, with prices and stock";

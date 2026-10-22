@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: the catalogue.** Home has a Catalogue row (also in the + menu)
+  listing what the shop sells. Each product shows its picture, its price as
+  the Mac shows it, and stock where you count it, grouped and searchable.
+  A product's page gives the price for any quantity and why it's that
+  price, print time, weight and material, and the description. It also has
+  Send the price and Make it a quote. The phone now receives the catalogue
+  in its pull from the Mac and Khayt Cloud. File paths on the Mac and
+  attached documents are left behind.
+
 - **iPhone: every library picture, away from the shop too.** On the shop's
   Wi-Fi the phone now fetches every picture the Mac or PC has for the
   library in the background, not only models you opened. It keeps a small
