@@ -1731,6 +1731,11 @@ final class Shop {
     /// Machines with a command in flight, so the buttons can say so and cannot
     /// be pressed twice.
     var printerBusy: Set<String> = []
+    /// Which of pause/resume/cancel each protocol can take, learned from
+    /// `lib/printer-commands.js` the first time a card for that protocol is
+    /// drawn (`learnPrinterVerbs`). Absent until then, and a card draws no
+    /// command until it is known, rather than a button that fails on press.
+    var printerVerbs: [String: Set<PrinterVerb>] = [:]
 
     /// A job this app is about to cancel, held for the confirmation.
     ///

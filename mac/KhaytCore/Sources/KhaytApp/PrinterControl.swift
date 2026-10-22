@@ -19,16 +19,42 @@ import KhaytCore
 /// about what to send a printer that is mid-job.
 ///
 /// What IS here: the socket, and the guards around it.
+/// What a shop asked a printer to do.
+enum PrinterVerb: String, CaseIterable, Sendable {
+    case pause, resume, cancel
+
+    /// Everything except pausing changes what the machine is doing in a way
+    /// a person cannot take back by pressing the other button.
+    var isDestructive: Bool { self == .cancel }
+}
+
 @MainActor
 enum PrinterControl {
 
-    /// What a shop asked for.
-    enum Verb: String, CaseIterable, Sendable {
-        case pause, resume, cancel
+    /// What a shop asked for. Declared at the top level as `PrinterVerb` so
+    /// state can hold a set of them without naming this enum.
+    typealias Verb = PrinterVerb
 
-        /// Everything except pausing changes what the machine is doing in a way
-        /// a person cannot take back by pressing the other button.
-        var isDestructive: Bool { self == .cancel }
+    /// Which verbs this protocol can take at all, from `lib/printer-commands.js`.
+    ///
+    /// Asked of the shared module rather than listed here: the module is what
+    /// `send` builds requests from, so a list in Swift would be a second answer
+    /// that drifts the first time a protocol learns a verb. A bridge failure is
+    /// "none", which hides the buttons — the safe direction for a command.
+    static func verbs(for type: String, engine: KhaytEngine) async -> Set<Verb> {
+        var out: Set<Verb> = []
+        for verb in Verb.allCases where (try? await engine.printerSupports(type: type, command: verb.rawValue)) == true {
+            out.insert(verb)
+        }
+        return out
+    }
+
+    /// May the card draw this verb? Only when it is known AND the protocol
+    /// has it. `known` nil means "not asked yet", and that draws nothing too:
+    /// a button that appears and then vanishes is worse than one that appears
+    /// a moment late.
+    static func offers(_ verb: Verb, _ known: Set<Verb>?) -> Bool {
+        known?.contains(verb) == true
     }
 
     enum Failure: Error, CustomStringConvertible {

@@ -3423,6 +3423,19 @@ final class Words {
         "mac.by_bytes":      ["en": "by file position", "ar": "حسب موضع الملف"],
         "mac.nozzle_temp":   ["en": "Nozzle",        "ar": "الفوهة"],
         "mac.bed_temp":      ["en": "Bed",           "ar": "المنصة"],
+        // The richer card. Short: they are tooltips and captions on a card
+        // already carrying a bar and a filename.
+        "mac.chamber_temp":  ["en": "Chamber",       "ar": "الحجرة"],
+        "mac.part_fan":      ["en": "Part cooling fan", "ar": "مروحة تبريد القطعة"],
+        "mac.speed_factor":  ["en": "Speed (100% is as sliced)", "ar": "السرعة (100% كما في التقطيع)"],
+        "mac.flow_factor":   ["en": "Flow (100% is as sliced)",  "ar": "التدفق (100% كما في التقطيع)"],
+        "mac.layer_of":      ["en": "Layer {layer} of {total}", "ar": "الطبقة {layer} من {total}"],
+        "mac.filament_out":  ["en": "Out of filament", "ar": "نفد الخيط"],
+        "mac.printer_says":  ["en": "What the printer says", "ar": "ما تقوله الطابعة"],
+        // A card under a running print with no buttons on it reads as a
+        // feature somebody forgot to draw; this says it is on purpose.
+        "mac.printer_no_control": ["en": "Khayt cannot pause or cancel this printer yet. Use the printer itself or its own app.",
+                                   "ar": "لا يستطيع خيط إيقاف هذه الطابعة مؤقتًا أو إلغاء طباعتها بعد. استخدم الطابعة نفسها أو تطبيقها."],
         // Said out loud rather than left blank: a card that shows nothing looks
         // broken, and a shop would go back to the other app not knowing why.
         "mac.not_polled":    ["en": "Khayt watches this printer; this app does not speak {protocol} yet.",

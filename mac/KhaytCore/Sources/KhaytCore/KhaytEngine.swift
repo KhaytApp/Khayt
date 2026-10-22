@@ -5394,6 +5394,15 @@ public actor KhaytEngine {
             as: PrinterRequest.self)
     }
 
+    /// Can this protocol do this verb at all? `lib/printer-commands.js`'s
+    /// `supports`, which builds the command and looks for `unsupported` — so
+    /// the button a card draws and the request a press sends come from one
+    /// table. A Bambu or Elegoo card drew Pause and Cancel and failed on press.
+    public func printerSupports(type: String, command: String) throws -> Bool {
+        try runtime.call2("KhaytPrinterCommands.supports(ARG0, ARG1)",
+                          [.string(type), .string(command)], as: Bool.self)
+    }
+
     /// Does this protocol need the running job's id before it can be told
     /// anything? PrusaLink does, and a stale id answers 404.
     public func printerCommandNeedsJobId(type: String) throws -> Bool {
@@ -9081,6 +9090,42 @@ public actor KhaytEngine {
         try runtime.call2("KhaytMoonraker.QUERY", [], as: String.self)
     }
 
+    /// What to watch on one Klipper machine, from its `/printer/objects/list`.
+    ///
+    /// `lib/moonraker.js`'s `discover`, which hands the sensors to
+    /// `lib/filament-sensors.js` — the rule the desktop has used since Sep
+    /// 2026 and the Mac never asked. A hardcoded sensor name finds nothing on
+    /// the U1 (its four are `filament_motion_sensor eN_filament`), which is
+    /// why the names are discovered at all.
+    public struct MoonrakerWatch: Codable, Sendable, Equatable {
+        public let sensors: [String]
+        public let chamber: String?
+        public let headFans: [String]
+
+        public init(sensors: [String] = [], chamber: String? = nil, headFans: [String] = []) {
+            self.sensors = sensors; self.chamber = chamber; self.headFans = headFans
+        }
+
+        /// Nothing discovered: the query is the bare `QUERY`, and a runout
+        /// reads "cannot say".
+        public static let nothing = MoonrakerWatch()
+
+        var json: JSONValue {
+            .object(["sensors": .array(sensors.map(JSONValue.string)),
+                     "chamber": chamber.map(JSONValue.string) ?? .null,
+                     "headFans": .array(headFans.map(JSONValue.string))])
+        }
+    }
+
+    public func moonrakerDiscover(_ listReply: [String: JSONValue]) throws -> MoonrakerWatch {
+        try runtime.call2("KhaytMoonraker.discover(ARG0)", [.object(listReply)], as: MoonrakerWatch.self)
+    }
+
+    /// The objects query for one machine, with what discovery found added.
+    public func moonrakerQuery(watching: MoonrakerWatch) throws -> String {
+        try runtime.call2("KhaytMoonraker.queryWith(ARG0)", [watching.json], as: String.self)
+    }
+
     /// Which extruder is printing, when it is not toolhead zero.
     ///
     /// Nil for a single-head machine — and nil is the answer that means "the
@@ -9134,19 +9179,22 @@ public actor KhaytEngine {
     /// moment and a measurement from another.
     public func moonrakerStatus(_ reply: [String: JSONValue],
                                 hot: [String: JSONValue]?, hotName: String?,
-                                fileMeta: [String: JSONValue]? = nil) throws -> PrinterStatus {
+                                fileMeta: [String: JSONValue]? = nil,
+                                watching: MoonrakerWatch = .nothing) throws -> PrinterStatus {
         // ARG3 is the slicer's metadata for the file being printed. Without it
         // the adapter extrapolates the time left from however much of the print
         // has happened, which two percent in is worthless — this printer said
         // twenty-two and a half hours on a four-and-a-half-hour file.
         //
-        // `sensorNames` is not passed from here and never has been: the fourth
-        // argument to `readStatus` is the discovered filament-sensor list, and
-        // this app does not discover them yet. It stays `null` so the metadata
-        // lands in the fifth position rather than being read as sensors.
+        // ARG4 is what `moonrakerDiscover` found. It was `null` here until Oct
+        // 2026 — "this app does not discover them yet" — so a Klipper machine
+        // on the Mac reported `filamentOut: null` on every poll and the runout
+        // alert, switched on by default, could not fire. The module reads the
+        // sensors off it; the chamber and head fans are found in the reply by
+        // name, so they only need to have been ASKED for (`moonrakerQuery`).
         try runtime.call2(#"""
         (function () {
-          var s = KhaytMoonraker.readStatus(ARG0, ARG1, ARG2, null, ARG3);
+          var s = KhaytMoonraker.readStatus(ARG0, ARG1, ARG2, ARG4, ARG3);
           s.actuals = KhaytPrinterActuals.extractActuals('moonraker', ARG0, {});
           return s;
         })()
@@ -9154,7 +9202,8 @@ public actor KhaytEngine {
                           [.object(reply),
                            hot.map(JSONValue.object) ?? .null,
                            hotName.map(JSONValue.string) ?? .null,
-                           fileMeta.map(JSONValue.object) ?? .null],
+                           fileMeta.map(JSONValue.object) ?? .null,
+                           watching.json],
                           as: PrinterStatus.self)
     }
 
@@ -9582,6 +9631,44 @@ public actor KhaytEngine {
         /// Snapmaker U1 does). Nil or empty means it cannot say.
         public let loaded: [LoadedSlot]?
 
+        /// HAS THE PRINTING HEAD RUN OUT. Three-way, and the nil is load-
+        /// bearing: a machine with no filament sensor is not a machine with
+        /// filament, it is one that cannot say. `lib/filament-sensors.js`
+        /// decides, from the sensors `PrinterWatch` discovered; until Oct 2026
+        /// this field did not exist here, so `printer-alerts` never saw a
+        /// runout on the Mac at all.
+        public var filamentOut: Bool? = nil
+
+        // ── THE RICHER CARD ──────────────────────────────────────────────
+        //
+        // Each one nil when the protocol does not report it, never 0: a fan
+        // nobody measured is not a fan that is off. The readers in `lib/`
+        // decide what each protocol means by them; see each module's notes
+        // for the vendor source of every field.
+
+        /// The live head's set temperature. 0 is "heater off", nil is "not said".
+        public var targetNozzle: Double? = nil
+        public var targetBed: Double? = nil
+        /// The air around the print — a chamber heater, or a sensor named for
+        /// the chamber, cavity or enclosure. Nil target for a sensor that has
+        /// none (the U1's cavity is measured, not heated).
+        public var tempChamber: Double? = nil
+        public var targetChamber: Double? = nil
+        /// "Layer 412 of 750". Both or neither (`printer-status.layerPair`).
+        /// Doubles across the bridge: a Bambu report arrives through
+        /// `BambuReport`'s JSON numbers, not as whole Swift integers.
+        public var layer: Double? = nil
+        public var totalLayers: Double? = nil
+        /// The printing head's part fan, 0-100.
+        public var fanPart: Double? = nil
+        /// Speed and flow overrides as percentages — 100 is "as sliced".
+        public var speedFactor: Double? = nil
+        public var flowFactor: Double? = nil
+        /// The printer's own word on what is wrong, or why it paused. Nil
+        /// when it has nothing to say (Klipper's "Printer is ready" is not
+        /// news, nor is PrusaLink's "OK").
+        public var message: String? = nil
+
         /// One reading. Null rather than zero for a side nobody measured: a
         /// zero-length or zero-second reading is a printer that has not run,
         /// and reporting it as 0 g would tell a shop the print was free.
@@ -9603,6 +9690,13 @@ public actor KhaytEngine {
             self.filename = filename; self.timeRemaining = timeRemaining
             self.tempNozzle = tempNozzle; self.tempBed = tempBed; self.type = type
             self.actuals = actuals; self.loaded = loaded
+        }
+
+        /// The layer pair as whole numbers, when the printer gave both.
+        public var layers: (current: Int, total: Int)? {
+            guard let layer, let totalLayers, layer.isFinite, totalLayers.isFinite,
+                  totalLayers > 0, layer >= 0 else { return nil }
+            return (Int(layer.rounded()), Int(totalLayers.rounded()))
         }
     }
 

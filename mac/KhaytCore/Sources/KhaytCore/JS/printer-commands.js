@@ -184,7 +184,22 @@
     return type === 'prusalink';
   }
 
-  const api = { COMMANDS, buildCommand, requiresJobId };
+  /**
+   * Can this protocol do this command AT ALL — the question a button asks
+   * before it is drawn, not the one a press asks of a particular job.
+   *
+   * Answered by building the command and seeing whether it comes back
+   * `unsupported`, so there is one table of what each protocol can do and not
+   * a second list beside it that drifts. The job id is a stand-in because
+   * PrusaLink's endpoints are keyed by one and say "no active job" without it,
+   * which is a fact about this moment and not about the protocol.
+   */
+  function supports(type, command) {
+    const built = buildCommand(type, command, requiresJobId(type) ? '0' : null, {});
+    return !!built && !built.unsupported;
+  }
+
+  const api = { COMMANDS, buildCommand, requiresJobId, supports };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytPrinterCommands = api;
 
