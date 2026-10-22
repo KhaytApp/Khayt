@@ -45,6 +45,7 @@ public enum VaultCrypto {
         public static let chunkAad = "khayt-vault-v1"
         public static let dkAad = "khayt-vault-dk"
         public static let metaAad = "khayt-vault-meta"
+        public static let vmetaAad = "khayt-vault-vmeta"
         public static let linkInfo = "khayt-link-v1"
         public static let linkPwSalt = "khayt-link-pw"
         public static let linkDkAad = "khayt-link-dk"
@@ -472,6 +473,10 @@ public enum VaultCrypto {
 
     // MARK: - Shop metadata record
 
+    static func vmetaAad(fileId: String, uploadId: String) throws -> Data {
+        utf8(Label.vmetaAad + "|" + (try id(fileId, "fileId")) + "|" + (try id(uploadId, "uploadId")))
+    }
+
     static func metaAad(fileId: String, uploadId: String) throws -> Data {
         utf8(Label.metaAad + "|" + (try id(fileId, "fileId")) + "|" + (try id(uploadId, "uploadId")))
     }
@@ -517,8 +522,8 @@ public enum VaultCrypto {
         return seq
     }
 
-    /// A version meta record shares the shop record's AAD, so a shop record
-    /// may never look like one: `manifest` is reserved for it.
+    /// Belt and braces beside the version record's own AAD label: a shop
+    /// record may never look like one, so `manifest` is reserved for it.
     static func refuseManifestKey(_ json: Data) throws {
         if let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any], obj["manifest"] != nil {
             throw Failure.badInput("a shop meta record has no manifest")
@@ -565,20 +570,19 @@ public enum VaultCrypto {
         return "{\"manifest\":" + m + ",\"size\":\(size),\"seq\":\(seq)}"
     }
 
-    /// Sealed under the vault key with the shop meta AAD
-    /// "khayt-vault-meta|" + fileId + "|" + uploadId.
+    /// Sealed under the vault key with its own AAD
+    /// "khayt-vault-vmeta|" + fileId + "|" + uploadId.
     public static func encryptVersionMeta(vaultKey: Data, fileId: String, uploadId: String, size: Int,
                                           chunkHashes: [String], seq: Int, chunkBytes: Int = chunkBytes,
                                           nonce: Data? = nil) throws -> Data {
         let text = try versionMetaJSON(size: size, chunkHashes: chunkHashes, seq: seq, chunkBytes: chunkBytes)
-        return try sealWithNonce(vaultKey, utf8(text), aad: try metaAad(fileId: fileId, uploadId: uploadId), nonce: nonce)
+        return try sealWithNonce(vaultKey, utf8(text), aad: try vmetaAad(fileId: fileId, uploadId: uploadId), nonce: nonce)
     }
 
-    /// Open a version record. Its bytes must be EXACTLY the canonical form,
-    /// which also refuses a shop meta record served in its place.
+    /// Open a version record. Its bytes must be EXACTLY the canonical form.
     public static func decryptVersionMeta(vaultKey: Data, fileId: String, uploadId: String, sealed: Data,
                                           lastSeenSeq: Int?) throws -> VersionMeta {
-        let json = try openWithNonce(vaultKey, sealed, aad: try metaAad(fileId: fileId, uploadId: uploadId))
+        let json = try openWithNonce(vaultKey, sealed, aad: try vmetaAad(fileId: fileId, uploadId: uploadId))
         let shape = Failure.badInput("version meta must be {manifest, size, seq}")
         guard let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
               let m = obj["manifest"] as? [String: Any], let hashes = m["chunks"] as? [String],
@@ -605,33 +609,55 @@ public enum VaultCrypto {
 
     // MARK: - Link metadata record
 
-    /// What a share page opens with the linkKey: which upload to fetch and the
-    /// authenticated manifestHash to pin it with.
+    /// What a share page opens with the linkKey: which upload to fetch, its
+    /// whole manifest (so every chunk is checked as it streams) and the
+    /// authenticated manifestHash that manifest must hash to.
     public struct LinkMeta: Codable, Equatable, Sendable {
+        /// The manifest as its canonical JSON object {v, chunkBytes, size, chunks}.
+        public struct Manifest: Codable, Equatable, Sendable {
+            public let v: Int
+            public let chunkBytes: Int
+            public let size: Int
+            public let chunks: [String]
+        }
         public let uploadId: String
+        public let manifest: Manifest
         public let manifestHash: String
         public let name: String
         public let size: Int
         public let kind: String
 
-        public init(uploadId: String, manifestHash: String, name: String, size: Int, kind: String) {
-            self.uploadId = uploadId; self.manifestHash = manifestHash
+        public init(uploadId: String, chunkHashes: [String], chunkBytes: Int = VaultCrypto.chunkBytes,
+                    manifestHash: String, name: String, size: Int, kind: String) {
+            self.uploadId = uploadId
+            self.manifest = Manifest(v: VaultCrypto.version, chunkBytes: chunkBytes, size: size, chunks: chunkHashes)
+            self.manifestHash = manifestHash
             self.name = name; self.size = size; self.kind = kind
         }
 
+        /// Every field, and sha256 of the manifest (rebuilt canonically) must
+        /// equal manifestHash.
         func validated() throws -> LinkMeta {
             _ = try VaultCrypto.id(uploadId, "uploadId")
             guard VaultCrypto.isHex64(manifestHash) else { throw Failure.badInput("link meta manifestHash") }
             try VaultCrypto.checkSize(size)
+            guard manifest.v == VaultCrypto.version, manifest.chunkBytes > 0, manifest.size == size else {
+                throw Failure.badInput("link meta manifest")
+            }
+            guard try VaultCrypto.manifestHash(size: size, chunkHashes: manifest.chunks,
+                                               chunkBytes: manifest.chunkBytes) == manifestHash else {
+                throw Failure.manifestMismatch("link meta manifest does not match manifestHash")
+            }
             return self
         }
 
         /// The bytes `JSON.stringify` writes for this object in the fixed key
-        /// order {uploadId, manifestHash, name, size, kind}.
+        /// order {uploadId, manifest, manifestHash, name, size, kind}.
         public func canonicalJSON() throws -> Data {
             _ = try validated()
             let q = VaultCrypto.jsonString
-            return VaultCrypto.utf8("{\"uploadId\":\(q(uploadId)),\"manifestHash\":\(q(manifestHash)),"
+            let m = try VaultCrypto.manifestJSON(size: size, chunkHashes: manifest.chunks, chunkBytes: manifest.chunkBytes)
+            return VaultCrypto.utf8("{\"uploadId\":\(q(uploadId)),\"manifest\":\(m),\"manifestHash\":\(q(manifestHash)),"
                                     + "\"name\":\(q(name)),\"size\":\(size),\"kind\":\(q(kind))}")
         }
     }
@@ -670,7 +696,7 @@ public enum VaultCrypto {
     public static func decryptLinkMeta(linkKey: Data, grantId: String, fileId: String, sealed: Data) throws -> LinkMeta {
         let json = try openWithNonce(linkKey, sealed, aad: try linkMetaAad(grantId: grantId, fileId: fileId))
         guard let m = try? JSONDecoder().decode(LinkMeta.self, from: json) else {
-            throw Failure.badInput("link meta must be a JSON object with uploadId, manifestHash, name, size, kind")
+            throw Failure.badInput("link meta must be a JSON object with uploadId, manifest, manifestHash, name, size, kind")
         }
         return try m.validated()
     }

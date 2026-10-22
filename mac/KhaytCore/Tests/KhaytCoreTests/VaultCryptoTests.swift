@@ -246,15 +246,17 @@ struct VaultCryptoTests {
             try VaultCrypto.decryptVersionMeta(vaultKey: vaultKey, fileId: fid, uploadId: "u_other",
                                                sealed: Self.h(vm.sealed), lastSeenSeq: nil)
         }
-        // The two records share an AAD, so each refuses the other.
-        #expect(throws: VaultCrypto.Failure.self) {
+        #expect(vm.aad == "khayt-vault-vmeta|\(fid)|\(uid)")
+        // Separate AAD labels: neither record opens as the other.
+        #expect(throws: VaultCrypto.Failure.authentication) {
             try VaultCrypto.decryptVersionMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
                                                sealed: Self.h(v.meta.sealed), lastSeenSeq: nil)
         }
-        #expect(throws: VaultCrypto.Failure.badInput("a shop meta record has no manifest")) {
+        #expect(throws: VaultCrypto.Failure.authentication) {
             try VaultCrypto.decryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
                                         sealed: Self.h(vm.sealed), lastSeenSeq: nil)
         }
+        // And, belt and braces, a shop record may not carry a manifest.
         #expect(throws: VaultCrypto.Failure.self) {
             try VaultCrypto.encryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
                                         json: Data(#"{"seq":1,"manifest":{}}"#.utf8))
@@ -287,20 +289,40 @@ struct VaultCryptoTests {
                 try VaultCrypto.decryptLinkMeta(linkKey: lk, grantId: gid, fileId: "f_other", sealed: sealed)
             }
         }
-        // link meta → pinned manifestHash → file
+        // link meta → its own manifest, pinned by manifestHash → a reader
+        // that checks each chunk as it streams
         let lk = Self.h(v.derived.linkKeyNoPassword)
         let lm = try VaultCrypto.decryptLinkMeta(linkKey: lk, grantId: gid, fileId: fid,
                                                  sealed: Self.h(v.linkMeta.sealedNoPassword))
+        #expect(lm.manifest.chunks == f25.chunks.map(\.sha256))
         let gdk = try VaultCrypto.unwrapDkForGrant(linkKey: lk, wrapped: Self.h(v.wraps.grantNoPassword.wrapped),
                                                    grantId: gid, fileId: fid, uploadId: lm.uploadId)
-        let pt = try VaultCrypto.decryptFile(dk: gdk, fileId: fid, uploadId: lm.uploadId,
-                                             sealedChunks: f25.chunks.map { Self.h($0.sealed!) }, size: lm.size,
-                                             chunkHashes: f25.chunks.map(\.sha256),
-                                             expectedManifestHash: lm.manifestHash, chunkBytes: 16)
+        let reader = try VaultCrypto.ChunkReader(dk: gdk, fileId: fid, uploadId: lm.uploadId, size: lm.size,
+                                                 chunkHashes: lm.manifest.chunks, expectedManifestHash: lm.manifestHash,
+                                                 chunkBytes: lm.manifest.chunkBytes)
+        var pt = Data()
+        for c in f25.chunks { pt.append(try reader.push(Self.h(c.sealed!))) }
+        _ = try reader.finish()
         #expect(pt == Self.plaintext(40))
-        let bad = VaultCrypto.LinkMeta(uploadId: "a|b", manifestHash: want.manifestHash, name: "", size: 1, kind: "")
+        let bad = VaultCrypto.LinkMeta(uploadId: "a|b", chunkHashes: lm.manifest.chunks, chunkBytes: 16,
+                                       manifestHash: want.manifestHash, name: "", size: 40, kind: "")
         #expect(throws: VaultCrypto.Failure.self) {
             try VaultCrypto.encryptLinkMeta(linkKey: lk, grantId: gid, fileId: fid, meta: bad)
+        }
+        // A manifest that does not hash to manifestHash: refused writing, and
+        // reading a record sealed authentically around it.
+        let swapped = VaultCrypto.LinkMeta(uploadId: lm.uploadId, chunkHashes: lm.manifest.chunks.reversed(),
+                                           chunkBytes: 16, manifestHash: lm.manifestHash, name: lm.name,
+                                           size: lm.size, kind: lm.kind)
+        #expect(throws: VaultCrypto.Failure.self) {
+            try VaultCrypto.encryptLinkMeta(linkKey: lk, grantId: gid, fileId: fid, meta: swapped)
+        }
+        let swappedJSON = v.linkMeta.json.replacingOccurrences(of: lm.manifest.chunks[0], with: "X")
+            .replacingOccurrences(of: lm.manifest.chunks[2], with: lm.manifest.chunks[0])
+            .replacingOccurrences(of: "X", with: lm.manifest.chunks[2])
+        let forged = try VaultCrypto.sealWithNonce(lk, Data(swappedJSON.utf8), aad: Data(v.linkMeta.aad.utf8), nonce: nil)
+        #expect(throws: VaultCrypto.Failure.manifestMismatch("link meta manifest does not match manifestHash")) {
+            try VaultCrypto.decryptLinkMeta(linkKey: lk, grantId: gid, fileId: fid, sealed: forged)
         }
     }
 

@@ -202,7 +202,7 @@ meta record holds only one `manifestHash`, and the cloud keeps one shop record p
 
 ```
 versionMetaJson = {"manifest":<manifestJson>,"size":N,"seq":S}
-versionMeta     = sealN(vaultKey, utf8(versionMetaJson), utf8("khayt-vault-meta|" + fileId + "|" + uploadId))
+versionMeta     = sealN(vaultKey, utf8(versionMetaJson), utf8("khayt-vault-vmeta|" + fileId + "|" + uploadId))
 ```
 
 - `<manifestJson>` is the exact manifest string from the Manifest section, inlined
@@ -211,9 +211,9 @@ versionMeta     = sealN(vaultKey, utf8(versionMetaJson), utf8("khayt-vault-meta|
 - Writers build the string by hand. Readers refuse any record whose bytes are not exactly
   the canonical form they would write themselves for the parsed values. The trusted
   `manifestHash` is the hash of the inlined manifest.
-- **The AAD is the shop meta record's AAD.** So each record refuses to be read as the other:
-  a shop meta record must not carry a `manifest` key (both twins refuse one on write and on
-  read), and a version record must be canonical, which no shop record is.
+- **It has its own AAD label**, `khayt-vault-vmeta`, so neither record opens as the other.
+  As a second guard, a shop meta record must not carry a `manifest` key, and both twins
+  refuse one on write and on read.
 - The cloud requires it on `/complete`. It comes back in the feed's `versions[]` and on the
   chunks route.
 
@@ -221,15 +221,27 @@ versionMeta     = sealN(vaultKey, utf8(versionMetaJson), utf8("khayt-vault-meta|
 
 ```
 linkMeta = sealN(linkKey, utf8(json), utf8("khayt-link-meta|" + grantId + "|" + fileId))
-json     = {"uploadId":"…","manifestHash":"<64 hex>","name":"…","size":N,"kind":"…"}
+json     = {"uploadId":"…","manifest":<manifestJson>,"manifestHash":"<64 hex>","name":"…","size":N,"kind":"…"}
 ```
 
-This is what a share page opens first. It names the upload to fetch and carries the
-**authenticated** `manifestHash` that the page passes to the reader. Writers emit the keys
-in exactly this order, with `JSON.stringify` escaping; Swift's `LinkMeta.canonicalJSON()`
-reproduces those bytes. Readers validate every field: `uploadId` must be an ID,
-`manifestHash` must be 64 lowercase hex characters, `size` must be in range, and `name`
-and `kind` must be strings.
+This is what a share page opens first. It names the upload to fetch and carries the whole
+manifest, so the page has every chunk hash before the first chunk and can check each chunk
+as it streams. It also carries the **authenticated** `manifestHash`.
+
+- **Key order.** Writers emit the keys in exactly this order, with `JSON.stringify`
+  escaping. The manifest is inlined as its canonical JSON object `{v, chunkBytes, size,
+  chunks}`, which is exactly what `JSON.stringify` writes for it. Swift's
+  `LinkMeta.canonicalJSON()` reproduces those bytes.
+- **Validation.** Readers check every field:
+  - `uploadId` must be an ID;
+  - `manifestHash` must be 64 lowercase hex characters;
+  - `size` must be in range and equal `manifest.size`;
+  - `manifest.v` must be 1;
+  - `name` and `kind` must be strings;
+  - `sha256` of the manifest, rebuilt canonically from its fields, must equal
+    `manifestHash`.
+- **Size.** A 5 GiB file has about 1,280 chunks, which makes the record about 90 KB.
+  That is why the cloud's cap on `linkMeta` is 256 KB.
 
 **Links have no rollback protection, and that is accepted.** A share page keeps no memory
 between visits, so it has no last-seen anything to compare against. A server that serves an
@@ -240,8 +252,8 @@ carries `uploadId` and the chunk key derives from it, so an old wrap with new ch
 reverse, fails.
 
 The share page's full path: `linkKey` → `decryptLinkMeta` → `unwrapDkForGrant(…, linkMeta.uploadId)` →
-`createReader(DK, fileId, linkMeta.uploadId, manifest, linkMeta.manifestHash)` → push the
-chunks → `finish()`.
+`createReader(DK, fileId, linkMeta.uploadId, linkMeta.manifest, linkMeta.manifestHash,
+{chunkBytes: linkMeta.manifest.chunkBytes})` → push each chunk as it arrives → `finish()`.
 
 ## Encoding on the wire
 

@@ -15,7 +15,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   one for the Mac and iPhone (`VaultCrypto.swift`), and both are checked
   against the same test vectors. The format is written up in
   `docs/vault-format.md`. Each version also carries its own sealed record with its full
-  list of chunk hashes, so a download can check every chunk as it arrives. Nothing uses it
+  list of chunk hashes, so a download can check every chunk as it arrives. A share link's
+  record carries the same list, so a share page can do the same. Nothing uses it
   yet.
 
 - **Desktop: pause, resume and cancel a print from the machine card.**

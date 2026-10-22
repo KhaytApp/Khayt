@@ -171,9 +171,11 @@ test('version meta record: byte for byte, canonical only, and never a shop recor
   assert.equal(back.manifestJson, f.manifestJson);
   await assert.rejects(V.decryptVersionMeta(vk, fileId, uploadId, H(vec.versionMeta.sealed), 8), /rollback/);
   await rejects(V.decryptVersionMeta(vk, fileId, 'u_other', H(vec.versionMeta.sealed)), 'another uploadId');
-  // The two records share an AAD, so each refuses the other.
-  await assert.rejects(V.decryptVersionMeta(vk, fileId, uploadId, H(vec.meta.sealed)), /version meta/);
-  await assert.rejects(V.decryptMeta(vk, fileId, uploadId, H(vec.versionMeta.sealed)), /no manifest/);
+  assert.equal(vec.versionMeta.aad, `khayt-vault-vmeta|${fileId}|${uploadId}`);
+  // Separate AAD labels: neither record opens as the other.
+  await rejects(V.decryptVersionMeta(vk, fileId, uploadId, H(vec.meta.sealed)), 'shop record as version record');
+  await rejects(V.decryptMeta(vk, fileId, uploadId, H(vec.versionMeta.sealed)), 'version record as shop record');
+  // And, belt and braces, a shop record may not carry a manifest.
   await assert.rejects(V.encryptMeta(vk, fileId, uploadId, { seq: 1, manifest: {} }), /no manifest/);
   // Same values, other spacing: authentic but not canonical.
   const loose = vec.versionMeta.json.replace('"size":', '"size": ');
@@ -192,8 +194,10 @@ test('link meta record: byte for byte under both link keys, validated, and back'
   for (const [kk, sk] of [['linkKeyNoPassword', 'sealedNoPassword'], ['linkKeyPassword', 'sealedPassword']]) {
     const lk = H(vec.derived[kk]);
     // From an object (canonical key order) and from the exact string: same bytes.
+    const m = want.manifest;
     const a = await V.encryptLinkMeta(lk, grantId, fileId, { kind: want.kind, size: want.size, name: want.name,
-      manifestHash: want.manifestHash, uploadId: want.uploadId }, { _nonce: H(vec.linkMeta.nonce) });
+      manifestHash: want.manifestHash, uploadId: want.uploadId,
+      manifest: { chunks: m.chunks, size: m.size, chunkBytes: m.chunkBytes, v: m.v } }, { _nonce: H(vec.linkMeta.nonce) });
     const b = await V.encryptLinkMeta(lk, grantId, fileId, vec.linkMeta.json, { _nonce: H(vec.linkMeta.nonce) });
     assert.equal(hx(a), vec.linkMeta[sk], kk);
     assert.equal(hx(b), vec.linkMeta[sk], kk);
@@ -201,13 +205,31 @@ test('link meta record: byte for byte under both link keys, validated, and back'
     await rejects(V.decryptLinkMeta(lk, 'g_other', fileId, a));
     await rejects(V.decryptLinkMeta(lk, grantId, 'f_other', a));
   }
-  // The share page's whole path: link meta → pinned manifestHash → file.
+  // The share page's whole path: link meta → its own manifest, pinned by
+  // manifestHash → a reader that checks every chunk as it streams.
   const f25 = vec.files.find((x) => x.name === 'two-and-a-half-chunks');
   const lm = await V.decryptLinkMeta(H(vec.derived.linkKeyNoPassword), grantId, fileId, H(vec.linkMeta.sealedNoPassword));
+  assert.deepEqual(lm.manifest.chunks, f25.chunks.map((c) => c.sha256));
   const gdk = await V.unwrapDkForGrant(H(vec.derived.linkKeyNoPassword), H(vec.wraps.grantNoPassword.wrapped), grantId, fileId, uploadId);
-  const pt = await V.decryptFile(gdk, fileId, lm.uploadId, f25.chunks.map((c) => H(c.sealed)),
-    { size: lm.size, chunks: f25.chunks.map((c) => c.sha256) }, lm.manifestHash, { chunkBytes: 16 });
-  assert.deepEqual(pt, plaintext(40));
+  const r = await V.createReader(gdk, fileId, lm.uploadId, lm.manifest, lm.manifestHash, { chunkBytes: lm.manifest.chunkBytes });
+  const parts = [];
+  for (const c of f25.chunks) parts.push(await r.push(H(c.sealed)));
+  await r.finish();
+  assert.deepEqual(Buffer.concat(parts.map((p) => Buffer.from(p))), Buffer.from(plaintext(40)));
+  // A manifest that does not hash to manifestHash is refused, writing and reading.
+  const swapped = { ...want, manifest: { ...want.manifest, chunks: [...want.manifest.chunks].reverse() } };
+  await assert.rejects(V.encryptLinkMeta(vk, grantId, fileId, swapped), /does not match manifestHash/);
+  {
+    // Sealed by node:crypto, so authentic: only the hash rule can refuse it.
+    const crypto = require('node:crypto');
+    const lk = H(vec.derived.linkKeyNoPassword), nonce = H(vec.linkMeta.nonce);
+    const c = crypto.createCipheriv('aes-256-gcm', lk, nonce);
+    c.setAAD(Buffer.from(vec.linkMeta.aad, 'utf8'));
+    const ct = Buffer.concat([c.update(Buffer.from(JSON.stringify(swapped), 'utf8')), c.final(), c.getAuthTag()]);
+    await assert.rejects(V.decryptLinkMeta(lk, grantId, fileId, Buffer.concat([nonce, ct])), /does not match manifestHash/);
+  }
+  await assert.rejects(V.encryptLinkMeta(vk, grantId, fileId, { ...want, manifest: undefined }), /manifest/);
+  await assert.rejects(V.encryptLinkMeta(vk, grantId, fileId, { ...want, size: 41 }), /manifest/);
   await assert.rejects(V.encryptLinkMeta(vk, grantId, fileId, { ...want, manifestHash: 'nope' }), /manifestHash/);
   await assert.rejects(V.encryptLinkMeta(vk, grantId, fileId, { ...want, uploadId: 'a|b' }), /uploadId/);
 });
