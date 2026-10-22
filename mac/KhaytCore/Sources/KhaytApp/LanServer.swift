@@ -2210,14 +2210,17 @@ final class LanServer {
         // the phone being paired asks through it (its PIN check, its identity,
         // its enrolment). For the window the owner opened, the window's count
         // stands in for it: wrong PINs still add to the lockout here, for
-        // after the window, but only `LanPairingWindow.maxWrong` of them in
-        // the window shut it — and the window, not the PIN, is what closes.
+        // after the window. In the window, `perAddress` wrong PINs shut that
+        // address out of it, and `maxWrong` from all addresses close it.
         if let window = host.pairing, window.isOpen() {
+            // Per address: one guesser is shut out of the window, not the
+            // window shut for everyone (`LanPairingWindow`).
+            if window.lockedOut(key) { return .json(429, LanPairingWindow.lockedBody) }
             guard Self.constantTimeEqual(provided, host.pin) else {
                 if let bumped = try? await host.engine.lanBumpFailure(record, now: now) {
                     failures[key] = bumped
                 }
-                window.noteWrong()
+                window.noteWrong(from: key)
                 sweepFailures(now: now)
                 return .json(401, #"{"error":"Unauthorized"}"#)
             }

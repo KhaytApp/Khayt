@@ -105,6 +105,11 @@ struct PairAPhone: View {
                         .controlSize(.small)
                         .accessibilityIdentifier("pair-close")
                 }
+                if window.lockedAddresses > 0 {
+                    Text(shop.words.callIt("mac.pair_locked_some"))
+                        .font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Text(shop.words.callIt("mac.pair_open_hint"))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

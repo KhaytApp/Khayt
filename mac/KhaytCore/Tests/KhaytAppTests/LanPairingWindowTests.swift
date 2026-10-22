@@ -40,20 +40,33 @@ struct LanPairingWindowTests {
         #expect(window.lastClosed == .timedOut && window.until == nil)
     }
 
-    @Test("closed by the owner, by a pairing, or by too many wrong PINs, and said which")
+    @Test("closed by the owner, by a pairing, or by many wrong PINs from many addresses, and said which")
     func windowCloses() {
         let window = LanPairingWindow()
         window.open(); window.close()
         #expect(!window.isOpen() && window.lastClosed == .byOwner)
         window.open(); window.paired(name: "Turki's iPhone")
         #expect(!window.isOpen() && window.lastClosed == .paired(name: "Turki's iPhone"))
+
         window.open()
-        for _ in 1..<LanPairingWindow.maxWrong { #expect(!window.noteWrong()) }
-        #expect(window.isOpen())
-        #expect(window.noteWrong())
-        #expect(!window.isOpen() && window.lastClosed == .tooManyWrong)
+        for _ in 0..<(LanPairingWindow.perAddress * 4) { #expect(!window.noteWrong(from: "192.168.1.66")) }
+        #expect(window.isOpen(), "one address, however many guesses, never closes it")
+        #expect(window.lockedOut("192.168.1.66") && !window.lockedOut("192.168.1.20"))
+        #expect(window.lockedAddresses == 1)
         window.open()
-        #expect(window.wrong == 0, "a new window starts its own count")
+        #expect(window.wrong == 0 && !window.lockedOut("192.168.1.66"), "a new window starts its own count")
+
+        var closed = false
+        for i in 0..<LanPairingWindow.maxWrong { closed = window.noteWrong(from: "10.0.0.\(i % 10)") }
+        #expect(closed && !window.isOpen() && window.lastClosed == .tooManyWrong)
+    }
+
+    @Test("the numbers: five an address, fifty in all, and that bounds a guesser at 1 in 2 million a window")
+    func theNumbers() {
+        #expect(LanPairingWindow.perAddress == 5 && LanPairingWindow.maxWrong == 50)
+        #expect(LanPairingWindow.maxWrong / LanPairingWindow.perAddress == 10, "addresses needed to close it")
+        let pins = pow(10, Double(LanServer.minimumPin))
+        #expect(Double(LanPairingWindow.maxWrong) / pins <= 5e-7)
     }
 
     @Test("the countdown is in Western digits for Arabic, and each ending is worded")
@@ -67,7 +80,7 @@ struct LanPairingWindowTests {
         #expect(PairAPhone.outcome(.paired(name: "Bench"), words: words)?.text.contains("Bench") == true)
         #expect(PairAPhone.outcome(.tooManyWrong, words: words)?.warn == true)
         for key in ["mac.pair_open", "mac.pair_waiting", "mac.pair_open_hint", "mac.pair_done",
-                    "mac.pair_timed_out", "mac.pair_too_many"] {
+                    "mac.pair_timed_out", "mac.pair_too_many", "mac.pair_locked_some"] {
             #expect(Words.own[key]?["en"]?.isEmpty == false && Words.own[key]?["ar"]?.isEmpty == false, "\(key)")
         }
     }
@@ -139,17 +152,75 @@ struct LanPairingWindowTests {
         #expect(bench.devices.count == 1)
     }
 
-    @Test("too many wrong PINs inside the window close it, rather than hand out guesses")
-    func wrongInsideCloses() async throws {
+    @Test("five wrong PINs shut one address out of the window, and the window stays open")
+    func oneAddressLockedOut() async throws {
         let bench = try await LanServerTests.Bench()
         defer { bench.stop() }
         bench.pairing.open()
-        for _ in 0..<LanPairingWindow.maxWrong {
+        for _ in 0..<LanPairingWindow.perAddress {
             #expect(try await Self.enrol(bench, pin: "00000000").status == 401)
         }
-        #expect(bench.pairing.lastClosed == .tooManyWrong)
-        #expect(try await Self.enrol(bench).status == 403)
+        let locked = try await Self.enrol(bench)
+        #expect(locked.status == 429)
+        #expect(locked.text == LanPairingWindow.lockedBody, "the right PIN is not even looked at")
+        #expect(bench.pairing.isOpen())
         #expect(bench.devices.count == 0)
+    }
+
+    // MARK: - Several addresses, straight into the router
+
+    static func server(_ window: LanPairingWindow) async throws -> (LanServer, LanDevices) {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        let store = shop.lanBook
+        let devices = LanDevices.inMemory()
+        var host = LanServer.Host(store: { store }, pin: pin, engine: engine)
+        host.devices = devices
+        host.pairing = window
+        let identity = Curve25519.Signing.PrivateKey()
+        host.identity = { identity }
+        return (LanServer(host: host), devices)
+    }
+
+    static func enrol(_ server: LanServer, from remote: String, pin: String) async -> LanServer.Response {
+        await server.respond(to: LanServer.Request(
+            method: "POST", path: "/api/devices", query: [:],
+            headers: ["host": "192.168.1.20:3219", "content-type": "application/json", "x-khayt-pin": pin],
+            body: Data(ask().1.utf8), remote: remote))
+    }
+
+    @Test("one address guessing five times and more does not stop a second address pairing in the same window")
+    func guesserDoesNotBlockAnotherAddress() async throws {
+        let window = LanPairingWindow()
+        let (server, devices) = try await Self.server(window)
+        window.open()
+        for i in 0..<(LanPairingWindow.perAddress + 3) {
+            _ = await Self.enrol(server, from: "192.168.1.66", pin: "guess-\(i)00")
+        }
+        let guesser = await Self.enrol(server, from: "192.168.1.66", pin: Self.pin)
+        #expect(guesser.status == 429, "the guesser is out of this window, even with the right PIN")
+        #expect(window.isOpen())
+        let phone = await Self.enrol(server, from: "192.168.1.31", pin: Self.pin)
+        #expect(phone.status == 200, "the shop's phone, on its own address, pairs")
+        #expect(devices.count == 1)
+        #expect(window.lastClosed == .paired(name: "Bench phone"))
+    }
+
+    @Test("only fifty wrong PINs from ten addresses close the window for everyone")
+    func manyAddressesClose() async throws {
+        let window = LanPairingWindow()
+        let (server, devices) = try await Self.server(window)
+        window.open()
+        for i in 0..<(LanPairingWindow.maxWrong - 1) {
+            _ = await Self.enrol(server, from: "10.0.0.\(i % 10 + 1)", pin: "guess-\(i)00")
+        }
+        #expect(window.isOpen(), "forty-nine is not yet fifty")
+        _ = await Self.enrol(server, from: "10.0.0.11", pin: "guess-last")
+        #expect(!window.isOpen() && window.lastClosed == .tooManyWrong)
+        let phone = await Self.enrol(server, from: "192.168.1.31", pin: Self.pin)
+        #expect(phone.status == 403 && String(decoding: phone.body, as: UTF8.self).contains("pairing-closed"))
+        #expect(devices.count == 0)
     }
 
     @Test("a phone that already enrolled keeps working with the window closed")

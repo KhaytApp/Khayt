@@ -148,13 +148,18 @@ that can be replayed or turned back into the PIN.
 - **Native Mac only: a pairing window.** The Mac takes an enrolment only while its
   owner has clicked **Pair a phone** (Settings ▸ Online): for 120 seconds, until one
   phone has enrolled, or until the owner closes it. Outside it, **403**
-  `{"reason":"pairing-closed","error":"…"}` comes back before the PIN is read, so it
-  counts towards no lockout and says nothing about the PIN. While the window is open,
-  a PIN sent without a device key (on any route) is judged by the window's own count
-  instead of the per-address and whole-server lockouts, so guesses made before it
-  cannot hold the new phone out; 10 wrong PINs close the window. The phone retries a
-  `pairing-closed` a minute later, and its pairing screen asks the person to click
-  Pair a phone. The desktop (`lib/lan-server.js`) has no window yet.
+  `{"reason":"pairing-closed","error":"On the Mac, click Pair a phone, then try again"}`
+  comes back before the PIN is read, so it counts towards no lockout and says nothing
+  about the PIN. While the window is open, a PIN sent without a device key (on any
+  route) is judged by the window's own count instead of the per-address and
+  whole-server lockouts, so guesses made before it cannot hold the new phone out.
+  That count is per address (an IPv4 address, or an IPv6 /64): after 5 wrong PINs an
+  address gets **429** `{"reason":"pairing-locked","error":"Too many wrong PINs from
+  this device. Try again in the next pairing window"}` for the rest of the window,
+  right PIN or not, while other addresses can still pair. The window closes for
+  everyone at 50 wrong PINs in all (at least 10 addresses): with an 8-digit PIN that
+  bounds a guesser at 50 in 10^8 per window. The desktop (`lib/lan-server.js`) has no
+  window yet.
 
 **A signed request** carries, in place of `x-khayt-pin`:
 

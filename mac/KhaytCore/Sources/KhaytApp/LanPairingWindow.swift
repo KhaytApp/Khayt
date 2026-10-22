@@ -20,8 +20,30 @@ import Observation
 /// While it is open, a PIN sent by a caller without a device key is judged
 /// against THIS window's own count, not the lockout a guesser outside it built
 /// up — so the phone in the owner's hand gets through even if the counters
-/// were held shut a minute ago. The window is not a free run at the PIN: after
-/// `maxWrong` wrong PINs from anyone, it closes, and the Mac says why.
+/// were held shut a minute ago.
+///
+/// ── COUNTED PER ADDRESS, SO A GUESSER CANNOT SHUT IT FOR EVERYONE ────────
+///
+/// Wrong PINs inside the window are counted per address (the server's
+/// `pinThrottleKey`: an IPv4 address, or an IPv6 /64). After `perAddress` of
+/// them that address is out of THIS window, and every other address can still
+/// pair. A first cut closed the whole window after 10 wrong PINs from anyone,
+/// which handed the guesser the very denial of service the window removes:
+/// close every window the owner opens.
+///
+/// The window closes for everyone only at `maxWrong` wrong PINs in all, which
+/// takes `maxWrong / perAddress` = 10 different addresses (or /64s). That total
+/// is what bounds guessing: a PIN is at least `LanServer.minimumPin` = 8
+/// characters and the phone types digits, so 10^8 PINs, and one window gives at
+/// most 50 wrong tries — 50 in 10^8, 1 in 2 million, per window. A shop that
+/// opened a window ten times a day for a year with a guesser present every time
+/// would face 3,650 windows: under 0.2% in all. A longer PIN divides that by 10
+/// per digit.
+///
+/// The cost: a guesser sharing the new phone's address (the same IPv6 /64, or
+/// the same IPv4 behind a NAT) locks that phone out of the window too. On a
+/// shop's Wi-Fi, IPv4 addresses are per device, and the phone pairs over IPv4
+/// unless the Mac was reached by an IPv6 address.
 ///
 /// Phones that already enrolled sign their requests and never come here.
 @MainActor @Observable
@@ -30,8 +52,10 @@ final class LanPairingWindow {
     /// About two minutes: long enough to pick up a phone, open Khayt and type
     /// the PIN; short enough that a guesser has little time to try.
     static let length: TimeInterval = 120
-    /// Wrong PINs, from anyone, that close the window early.
-    static let maxWrong = 10
+    /// Wrong PINs from one address before that address is out of the window.
+    static let perAddress = 5
+    /// Wrong PINs, from every address together, that close the window.
+    static let maxWrong = 50
 
     /// Why the window last closed. Nil: it has not been opened since launch.
     enum Closed: Equatable {
@@ -44,8 +68,12 @@ final class LanPairingWindow {
     /// When the open window shuts by itself; nil when closed.
     private(set) var until: Date?
     private(set) var lastClosed: Closed?
-    /// Wrong PINs in the window now open.
+    /// Wrong PINs in the window now open, from every address.
     private(set) var wrong = 0
+    /// Wrong PINs in the window now open, by address (`pinThrottleKey`).
+    private(set) var wrongBy: [String: Int] = [:]
+    /// Addresses out of the window now open, for the pane to mention.
+    var lockedAddresses: Int { wrongBy.values.filter { $0 >= Self.perAddress }.count }
 
     @ObservationIgnored let now: () -> Date
 
@@ -57,6 +85,7 @@ final class LanPairingWindow {
     func open() {
         until = now().addingTimeInterval(Self.length)
         wrong = 0
+        wrongBy = [:]
     }
 
     /// Whether a phone may enrol now. Past the deadline, this closes it.
@@ -67,6 +96,11 @@ final class LanPairingWindow {
             return false
         }
         return true
+    }
+
+    /// Whether `address` has spent its wrong PINs in this window.
+    func lockedOut(_ address: String) -> Bool {
+        (wrongBy[address] ?? 0) >= Self.perAddress
     }
 
     /// Seconds left, rounded up; nil when closed. Reads the clock only, so a
@@ -88,11 +122,13 @@ final class LanPairingWindow {
         shut(.paired(name: name))
     }
 
-    /// One wrong PIN while open. Returns true when that closed the window.
+    /// One wrong PIN from `address` while open. Returns true when that closed
+    /// the window for everyone.
     @discardableResult
-    func noteWrong() -> Bool {
+    func noteWrong(from address: String) -> Bool {
         guard until != nil else { return false }
         wrong += 1
+        wrongBy[address, default: 0] += 1
         if wrong >= Self.maxWrong {
             shut(.tooManyWrong)
             return true
@@ -103,6 +139,7 @@ final class LanPairingWindow {
     private func shut(_ why: Closed) {
         until = nil
         wrong = 0
+        wrongBy = [:]
         lastClosed = why
     }
 
@@ -110,4 +147,7 @@ final class LanPairingWindow {
     /// sentence for a client that only shows `error`.
     nonisolated static let closedBody =
         #"{"reason":"pairing-closed","error":"On the Mac, click Pair a phone, then try again"}"#
+    /// The 429 body for an address that has spent its wrong PINs in this window.
+    nonisolated static let lockedBody =
+        #"{"reason":"pairing-locked","error":"Too many wrong PINs from this device. Try again in the next pairing window"}"#
 }
