@@ -42,6 +42,12 @@ struct LibraryQueryTests {
         let q = LibraryQuery.parse(raw)
         let group = try #require(q.tokens.first { $0.field == .group })
         #expect(LibraryQuery.removing(group, from: raw) == "dragon tag:pla")
+        // The SECOND of two identical tokens is the second one, and a value's
+        // own spaces are left as typed.
+        let twice = #"tag:pla  group:"A  B" tag:pla"#
+        let tokens = LibraryQuery.parse(twice).tokens
+        #expect(LibraryQuery.removing(tokens[2], from: twice) == #"tag:pla  group:"A  B""#)
+        #expect(LibraryQuery.removing(tokens[0], from: twice) == #"group:"A  B" tag:pla"#)
     }
 
     @Test("narrowing is allowed only when the new search is inside the old one")

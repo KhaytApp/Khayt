@@ -51,9 +51,11 @@ struct LibraryQuery: Equatable, Sendable {
         let value: String
         /// `value`, folded — what is matched.
         let folded: String
-        /// The token's exact text in the search, quotes and all — what
-        /// removing its chip takes out.
+        /// The token's exact text in the search, quotes and all.
         let source: String
+        /// Where it sits in the search, in Characters — what removing its chip
+        /// takes out. Two chips with the same text are two places.
+        let range: Range<Int>
     }
 
     /// The free text, folded, as one phrase (the search always matched the
@@ -100,7 +102,7 @@ struct LibraryQuery: Equatable, Sendable {
                 let trimmed = value.trimmingCharacters(in: .whitespaces)
                 if !trimmed.isEmpty {
                     tokens.append(Token(field: field, value: trimmed, folded: SearchText.fold(trimmed),
-                                        source: String(chars[start..<k])))
+                                        source: String(chars[start..<k]), range: start..<k))
                 }
                 i = k
                 continue
@@ -128,11 +130,17 @@ struct LibraryQuery: Equatable, Sendable {
         return true
     }
 
-    /// The search with one token's text taken out.
+    /// The search with one token's text taken out — at the place it was
+    /// parsed from, not the first place the same text appears — and the
+    /// rest of what was typed exactly as it was, spaces in quotes included.
     static func removing(_ token: Token, from raw: String) -> String {
-        guard let range = raw.range(of: token.source) else { return raw }
-        var out = raw
-        out.removeSubrange(range)
-        return out.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let chars = Array(raw)
+        guard token.range.upperBound <= chars.count,
+              String(chars[token.range]) == token.source else { return raw }
+        let before = String(chars[..<token.range.lowerBound])
+        let after = String(chars[token.range.upperBound...])
+        let left = before.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
+        let right = after.replacingOccurrences(of: "^\\s+", with: "", options: .regularExpression)
+        return left.isEmpty || right.isEmpty ? left + right : left + " " + right
     }
 }
