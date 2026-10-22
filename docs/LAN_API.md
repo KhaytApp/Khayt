@@ -146,8 +146,10 @@ that can be replayed or turned back into the PIN.
 - **404/405** → a computer that predates this; the phone keeps sending the PIN and asks
   again a day later. **503** (no identity key) → the same.
 - **Native Mac only: a pairing window.** The Mac takes an enrolment only while its
-  owner has clicked **Pair a phone** (Settings ▸ Online): for 120 seconds, until one
-  phone has enrolled, or until the owner closes it. Outside it, **403**
+  owner has clicked **Pair a phone** (Settings ▸ Online): for 120 seconds on a
+  monotonic clock (a date change cannot extend it), until one phone has enrolled,
+  until the owner closes it, or until the LAN server stops. The button is off while
+  the server listens on loopback only. Outside the window, **403**
   `{"reason":"pairing-closed","error":"On the Mac, click Pair a phone, then try again"}`
   comes back before the PIN is read, so it counts towards no lockout and says nothing
   about the PIN. While the window is open, a PIN sent without a device key (on any
@@ -155,11 +157,17 @@ that can be replayed or turned back into the PIN.
   whole-server lockouts, so guesses made before it cannot hold the new phone out.
   That count is per address (an IPv4 address, or an IPv6 /64): after 5 wrong PINs an
   address gets **429** `{"reason":"pairing-locked","error":"Too many wrong PINs from
-  this device. Try again in the next pairing window"}` for the rest of the window,
-  right PIN or not, while other addresses can still pair. The window closes for
-  everyone at 50 wrong PINs in all (at least 10 addresses): with an 8-digit PIN that
-  bounds a guesser at 50 in 10^8 per window. The desktop (`lib/lan-server.js`) has no
-  window yet.
+  this device. It can't pair until you click Pair a phone again on the Mac"}` for the
+  rest of the window, right PIN or not, while other addresses can still pair. The
+  window closes for everyone at 50 wrong PINs in all.
+- **What the 50 is, and is not.** It raises the bar from one device to ten
+  addresses; it is not a barrier against someone deliberate. One machine on the LAN
+  can take ten addresses (`ifconfig … alias`), and the 403 above tells a poller the
+  moment a window opens, so a determined guesser gets about 50 tries per window the
+  owner opens. Against an 8-digit PIN that is 50 in 10^8 (1 in 2 million) per window;
+  what actually protects the shop is the PIN's length and how rarely the window is
+  open. A guesser who closes the window early is seen: the Mac says so. The desktop
+  (`lib/lan-server.js`) has no window yet.
 
 **A signed request** carries, in place of `x-khayt-pin`:
 

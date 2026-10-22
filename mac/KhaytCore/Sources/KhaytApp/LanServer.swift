@@ -2625,9 +2625,11 @@ extension Shop {
     }
 
     func startLanServer() async {
-        stopLanServer()
+        // A restart (a settings save) keeps an open pairing window; a start
+        // that fails, or comes up on loopback, closes it below.
+        stopLanServer(keepPairing: true)
         lanProblem = nil
-        guard let engine else { lanProblem = words.callIt("mac.move_no_engine"); return }
+        guard let engine else { lanPairing.serverStopped(); lanProblem = words.callIt("mac.move_no_engine"); return }
         let config = lanConfig
         // Sealed on disk by whichever app wrote it; opened here, once, and
         // handed to the server — never read back out of the book per request.
@@ -2655,6 +2657,7 @@ extension Shop {
         host.machinesLive = { [weak self] in self?.machinesLive() ?? [] }
         host.failed = { [weak self] said in
             guard let self else { return }
+            self.lanPairing.serverStopped()
             self.lanProblem = self.words.callIt("mac.lan_failed", ["error": .string(said)])
         }
         var carrierSecrets: [String: String] = [:]
@@ -2701,6 +2704,8 @@ extension Shop {
             lanServer = server
             lanRunning = config
             lanCalendarToken = calendarToken
+            // On loopback no phone can reach it, so there is nothing to pair.
+            if !config.bindLan { lanPairing.serverStopped() }
             // The server refuses a short PIN on every owner route; the shop
             // is told why here rather than finding its phone locked out.
             if LanServer.pinTooShort(pin) {
@@ -2708,6 +2713,7 @@ extension Shop {
                                           ["n": .number(Double(LanServer.minimumPin))])
             }
         } catch {
+            lanPairing.serverStopped()
             lanProblem = Self.lanFailure(error, port: Int(config.port), words: words)
         }
     }
@@ -3089,7 +3095,10 @@ extension Shop {
         return "\(base)calendar.ics?token=\(token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token)"
     }
 
-    func stopLanServer() {
+    /// Stopping closes an open pairing window (`LanPairingWindow`): no phone
+    /// can reach a server that is not there. `keepPairing` is a restart.
+    func stopLanServer(keepPairing: Bool = false) {
+        if !keepPairing { lanPairing.serverStopped() }
         lanServer?.stop()
         lanServer = nil
         lanRunning = nil

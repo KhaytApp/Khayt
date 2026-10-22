@@ -25,19 +25,50 @@ struct LanPairingWindowTests {
 
     // MARK: - The window alone, on its own clock
 
+    final class Ticks: @unchecked Sendable { var t: TimeInterval = 5_000 }
+
     @Test("the window opens for two minutes, counts down, and shuts by itself on time")
     func windowClock() {
-        let box = LanServerTests.ClockBox(Date(timeIntervalSince1970: 1_800_000_000))
-        let window = LanPairingWindow(now: { box.now })
+        let ticks = Ticks()
+        let window = LanPairingWindow(clock: { ticks.t })
         #expect(!window.isOpen() && window.remaining() == nil && window.lastClosed == nil, "closed until opened")
         window.open()
         #expect(window.isOpen())
         #expect(window.remaining() == 120)
-        box.now = box.now.addingTimeInterval(119.5)
-        #expect(window.isOpen() && window.remaining() == 1)
-        box.now = box.now.addingTimeInterval(0.5)
+        ticks.t += 119.5
+        #expect(window.isOpen() && window.remaining() == 0.5)
+        ticks.t += 0.5
         #expect(!window.isOpen(), "shut at the deadline, not a tick after")
-        #expect(window.lastClosed == .timedOut && window.until == nil)
+        #expect(window.lastClosed == .timedOut && window.deadline == nil)
+    }
+
+    @Test("the deadline is monotonic: the server's wall clock going back does not keep it open")
+    func wallClockCannotExtend() async throws {
+        let ticks = Ticks()
+        let window = LanPairingWindow(clock: { ticks.t })
+        let wall = LanServerTests.ClockBox(Date(timeIntervalSince1970: 1_800_000_000))
+        let (server, _) = try await Self.server(window, now: { wall.now })
+        window.open()
+        ticks.t += LanPairingWindow.length - 10
+        wall.now = wall.now.addingTimeInterval(-86_400)   // somebody sets the date back a day
+        #expect(window.isOpen() && window.remaining() == 10)
+        ticks.t += 10
+        let late = await Self.enrol(server, from: "192.168.1.31", pin: Self.pin)
+        #expect(late.status == 403, "still shut on time")
+        #expect(window.lastClosed == .timedOut)
+        let real = LanPairingWindow.monotonic()
+        #expect(real > 0 && LanPairingWindow.monotonic() >= real, "the real clock only goes forward")
+    }
+
+    @Test("the server stopping closes an open window; a restart on a settings save does not")
+    func serverStopCloses() async {
+        let shop = Shop()
+        shop.lanPairing.open()
+        shop.stopLanServer(keepPairing: true)
+        #expect(shop.lanPairing.isOpen())
+        shop.stopLanServer()
+        #expect(!shop.lanPairing.isOpen() && shop.lanPairing.lastClosed == .serverStopped)
+        #expect(PairAPhone.outcome(.serverStopped, words: Words()) != nil)
     }
 
     @Test("closed by the owner, by a pairing, or by many wrong PINs from many addresses, and said which")
@@ -72,7 +103,7 @@ struct LanPairingWindowTests {
     @Test("the countdown is in Western digits for Arabic, and each ending is worded")
     func shownToTheShop() {
         let ar = Digits.locale(language: "ar", followsMac: false)
-        #expect(PairAPhone.clock(105, locale: ar) == "1:45")
+        #expect(PairAPhone.clock(104.2, locale: ar) == "1:45", "rounded up")
         #expect(PairAPhone.clock(-3, locale: ar) == "0:00")
         let words = Words()
         #expect(PairAPhone.outcome(nil, words: words) == nil)
@@ -80,7 +111,8 @@ struct LanPairingWindowTests {
         #expect(PairAPhone.outcome(.paired(name: "Bench"), words: words)?.text.contains("Bench") == true)
         #expect(PairAPhone.outcome(.tooManyWrong, words: words)?.warn == true)
         for key in ["mac.pair_open", "mac.pair_waiting", "mac.pair_open_hint", "mac.pair_done",
-                    "mac.pair_timed_out", "mac.pair_too_many", "mac.pair_locked_some"] {
+                    "mac.pair_timed_out", "mac.pair_too_many", "mac.pair_locked_some",
+                    "mac.pair_server_stopped", "mac.pair_loopback"] {
             #expect(Words.own[key]?["en"]?.isEmpty == false && Words.own[key]?["ar"]?.isEmpty == false, "\(key)")
         }
     }
@@ -169,7 +201,7 @@ struct LanPairingWindowTests {
 
     // MARK: - Several addresses, straight into the router
 
-    static func server(_ window: LanPairingWindow) async throws -> (LanServer, LanDevices) {
+    static func server(_ window: LanPairingWindow, now: (() -> Date)? = nil) async throws -> (LanServer, LanDevices) {
         let shop = Shop()
         await shop.load(.sample)
         let engine = try #require(shop.engine)
@@ -178,6 +210,7 @@ struct LanPairingWindowTests {
         var host = LanServer.Host(store: { store }, pin: pin, engine: engine)
         host.devices = devices
         host.pairing = window
+        if let now { host.now = now }
         let identity = Curve25519.Signing.PrivateKey()
         host.identity = { identity }
         return (LanServer(host: host), devices)

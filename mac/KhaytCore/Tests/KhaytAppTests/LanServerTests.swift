@@ -62,7 +62,7 @@ struct LanServerTests {
             host.calendarToken = calendarToken
             host.identity = { identity }
             host.devices = devices
-            let pairing = LanPairingWindow(now: { box.now })
+            let pairing = LanPairingWindow(clock: { box.now.timeIntervalSince1970 })
             self.pairing = pairing
             host.pairing = pairing
             host.library = { [shop] q, folder, offset, limit in

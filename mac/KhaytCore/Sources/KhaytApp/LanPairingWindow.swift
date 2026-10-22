@@ -45,6 +45,13 @@ import Observation
 /// shop's Wi-Fi, IPv4 addresses are per device, and the phone pairs over IPv4
 /// unless the Mac was reached by an IPv6 address.
 ///
+/// ── A MONOTONIC DEADLINE ──────────────────────────────────────────────────
+///
+/// The deadline is read off a clock that only goes forward and keeps counting
+/// while the Mac sleeps (`CLOCK_MONOTONIC`, mach continuous time), never the
+/// wall clock: setting the Mac's date back must not keep the window open.
+/// The server and the pane both ask `remaining()`, so they agree.
+///
 /// Phones that already enrolled sign their requests and never come here.
 @MainActor @Observable
 final class LanPairingWindow {
@@ -63,10 +70,13 @@ final class LanPairingWindow {
         case timedOut
         case byOwner
         case tooManyWrong
+        /// The LAN server stopped, or came back up where no phone can reach it.
+        case serverStopped
     }
 
-    /// When the open window shuts by itself; nil when closed.
-    private(set) var until: Date?
+    /// When the open window shuts by itself, in `clock` seconds; nil when closed.
+    private(set) var deadline: TimeInterval?
+    var isOpenNow: Bool { deadline != nil }
     private(set) var lastClosed: Closed?
     /// Wrong PINs in the window now open, from every address.
     private(set) var wrong = 0
@@ -75,23 +85,30 @@ final class LanPairingWindow {
     /// Addresses out of the window now open, for the pane to mention.
     var lockedAddresses: Int { wrongBy.values.filter { $0 >= Self.perAddress }.count }
 
-    @ObservationIgnored let now: () -> Date
+    /// Seconds on a monotonic clock. Injectable so a test can move it.
+    @ObservationIgnored let clock: () -> TimeInterval
 
-    init(now: @escaping () -> Date = { Date() }) {
-        self.now = now
+    init(clock: @escaping () -> TimeInterval = LanPairingWindow.monotonic) {
+        self.clock = clock
+    }
+
+    /// `CLOCK_MONOTONIC`: forward only, untouched by a date change, and still
+    /// counting while the Mac sleeps (unlike `systemUptime`).
+    nonisolated static func monotonic() -> TimeInterval {
+        TimeInterval(clock_gettime_nsec_np(CLOCK_MONOTONIC)) / 1_000_000_000
     }
 
     /// Open it (again) for `length` from now, with a fresh count.
     func open() {
-        until = now().addingTimeInterval(Self.length)
+        deadline = clock() + Self.length
         wrong = 0
         wrongBy = [:]
     }
 
     /// Whether a phone may enrol now. Past the deadline, this closes it.
     func isOpen() -> Bool {
-        guard let until else { return false }
-        if now() >= until {
+        guard let deadline else { return false }
+        if clock() >= deadline {
             shut(.timedOut)
             return false
         }
@@ -103,18 +120,24 @@ final class LanPairingWindow {
         (wrongBy[address] ?? 0) >= Self.perAddress
     }
 
-    /// Seconds left, rounded up; nil when closed. Reads the clock only, so a
+    /// Seconds left; nil when closed or run out. Reads the clock only, so a
     /// view may call it as often as it draws.
-    func remaining(at date: Date? = nil) -> Int? {
-        guard let until else { return nil }
-        let left = until.timeIntervalSince(date ?? now())
-        return left > 0 ? Int(left.rounded(.up)) : nil
+    func remaining() -> TimeInterval? {
+        guard let deadline else { return nil }
+        let left = deadline - clock()
+        return left > 0 ? left : nil
     }
 
     /// The owner closed it.
     func close() {
-        guard until != nil else { return }
+        guard deadline != nil else { return }
         shut(.byOwner)
+    }
+
+    /// The server went down, or is up where no phone can reach it.
+    func serverStopped() {
+        guard deadline != nil else { return }
+        shut(.serverStopped)
     }
 
     /// A phone paired: the window has done its job.
@@ -126,7 +149,7 @@ final class LanPairingWindow {
     /// the window for everyone.
     @discardableResult
     func noteWrong(from address: String) -> Bool {
-        guard until != nil else { return false }
+        guard deadline != nil else { return false }
         wrong += 1
         wrongBy[address, default: 0] += 1
         if wrong >= Self.maxWrong {
@@ -137,7 +160,7 @@ final class LanPairingWindow {
     }
 
     private func shut(_ why: Closed) {
-        until = nil
+        deadline = nil
         wrong = 0
         wrongBy = [:]
         lastClosed = why
@@ -149,5 +172,5 @@ final class LanPairingWindow {
         #"{"reason":"pairing-closed","error":"On the Mac, click Pair a phone, then try again"}"#
     /// The 429 body for an address that has spent its wrong PINs in this window.
     nonisolated static let lockedBody =
-        #"{"reason":"pairing-locked","error":"Too many wrong PINs from this device. Try again in the next pairing window"}"#
+        #"{"reason":"pairing-locked","error":"Too many wrong PINs from this device. It can't pair until you click Pair a phone again on the Mac"}"#
 }
