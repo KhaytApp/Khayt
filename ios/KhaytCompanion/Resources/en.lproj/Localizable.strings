@@ -460,10 +460,12 @@
 "pair.pin.foot" = "Kept in the iPhone Keychain, never sent anywhere but this Mac.";
 "pair.pin.wrong" = "That PIN was refused. Check Settings → Online on the Mac or PC.";
 "pair.window_closed" = "On the Mac, click Pair a phone (Settings → Online), then try again.";
+"pair.window_locked" = "Too many wrong PINs from this phone. On the Mac, click Pair a phone again (Settings → Online), then try with the right PIN.";
 "settings.secure.body" = "This phone still signs in with the owner PIN. On the Mac, click Pair a phone (Settings → Online), then tap Secure this phone.";
 "settings.secure.button" = "Secure this phone";
 "settings.secure.done" = "Done. This phone now signs in with its own key.";
 "settings.secure.failed" = "The Mac didn't answer. Check you're on the shop's Wi-Fi and try again.";
+"settings.secure.closed" = "The Mac isn't taking phones right now. On the Mac, click Pair a phone (Settings → Online), then tap Secure this phone again within 2 minutes.";
 "pair.connect" = "Connect";
 "pair.finish" = "Open the board";
 "pair.pull.title" = "Copying the shop’s book";

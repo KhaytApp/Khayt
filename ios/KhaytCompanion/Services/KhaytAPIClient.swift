@@ -1482,7 +1482,9 @@ final class KhaytAPIClient: ObservableObject {
 
     /// `closed`: the Mac takes a new phone only while its owner has clicked
     /// "Pair a phone" (Settings ▸ Online), and that window is shut.
-    enum Enrolment: Equatable { case enrolled, unsupported, failed, closed }
+    /// `locked`: this phone gave too many wrong PINs while the window was open
+    /// (429 `pairing-locked`); it waits for the next window, like `closed`.
+    enum Enrolment: Equatable { case enrolled, unsupported, failed, closed, locked }
 
     private struct EnrolAnswer: Decodable { let deviceId: String; let publicKey: String; let sig: String }
 
@@ -1512,7 +1514,7 @@ final class KhaytAPIClient: ObservableObject {
         // in the clear, and a window may stay shut for good: retrying each
         // minute would send it sixty times as often as before. Settings offers
         // "Secure this phone" for when the owner opens the window.
-        case .failed, .closed: enrolNotBefore = now.addingTimeInterval(3600)
+        case .failed, .closed, .locked: enrolNotBefore = now.addingTimeInterval(3600)
         }
         return result
     }
@@ -1541,6 +1543,7 @@ final class KhaytAPIClient: ObservableObject {
               let status = (response as? HTTPURLResponse)?.statusCode else { return .failed }
         if [404, 405, 503].contains(status) { return .unsupported }
         if status == 403, Self.pairingClosed(data) { return .closed }
+        if status == 429, Self.pairingReason(data) == "pairing-locked" { return .locked }
         guard status == 200,
               let answer = try? JSONDecoder().decode(EnrolAnswer.self, from: data),
               // The PIN or the Mac may have changed while this was in flight.
@@ -1563,6 +1566,9 @@ final class KhaytAPIClient: ObservableObject {
 
     private func decodeAPIError(_ data: Data, status: Int) throws -> KhaytAPIError {
         if status == 401 { return Self.unauthorizedKind(data) }
+        // Locked out of the Mac's pairing window, on ANY PIN-checked route
+        // while it is open: say what to do, in this app's words.
+        if status == 429, Self.pairingReason(data) == "pairing-locked" { return .server(L10n.tr("pair.window_locked")) }
         if let decoded = try? JSONDecoder().decode(APIErrorResponse.self, from: data),
            let msg = decoded.error, !msg.isEmpty {
             return .server(msg)
@@ -1573,10 +1579,13 @@ final class KhaytAPIClient: ObservableObject {
 
 extension KhaytAPIClient {
     /// The Mac's "no pairing window is open" answer to `POST /api/devices`.
-    nonisolated static func pairingClosed(_ body: Data) -> Bool {
+    nonisolated static func pairingClosed(_ body: Data) -> Bool { pairingReason(body) == "pairing-closed" }
+
+    /// The `reason` of a refusal, when it carries one.
+    nonisolated static func pairingReason(_ body: Data) -> String? {
         guard case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body),
-              case .string(let reason)? = o["reason"] else { return false }
-        return reason == "pairing-closed"
+              case .string(let reason)? = o["reason"] else { return nil }
+        return reason
     }
 
     /// Which 401 this is. The native Mac refuses an owner PIN shorter than 8

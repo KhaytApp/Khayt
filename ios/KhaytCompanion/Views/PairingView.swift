@@ -304,12 +304,14 @@ struct PairingView: View {
         if settings.macIdentityKey.isEmpty, let key = await api.fetchIdentityKey() {
             settings.macIdentityKey = key
         }
-        if !settings.macIdentityKey.isEmpty,
-           await api.enrolDevice(name: UIDevice.current.name) == .closed {
-            settings.macIdentityKey = ""
-            failure = L10n.tr("pair.window_closed")
-            CompanionHaptics.warning()
-            return
+        if !settings.macIdentityKey.isEmpty {
+            let result = await api.enrolDevice(name: UIDevice.current.name)
+            if result == .closed || result == .locked {
+                settings.macIdentityKey = ""
+                failure = L10n.tr(result == .closed ? "pair.window_closed" : "pair.window_locked")
+                CompanionHaptics.warning()
+                return
+            }
         }
 
         // ── AND THEN ASK FOR THE BOOK, BUT DO NOT INSIST ─────────────────

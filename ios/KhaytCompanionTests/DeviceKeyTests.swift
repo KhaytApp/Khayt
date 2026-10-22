@@ -161,6 +161,21 @@ final class DeviceKeyTests: XCTestCase {
         XCTAssertFalse(L10n.tr("pair.window_closed").isEmpty)
     }
 
+    func testAPhoneLockedOutOfTheWindowWaitsForTheNextOne() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        StubMac.pairingLocked = true
+        let now = Date()
+        let result = await api.enrolDevice(name: "Test iPhone", now: now)
+        XCTAssertEqual(result, .locked)
+        XCTAssertNil(s.device)
+        XCTAssertEqual(api.lastEnrolment, .locked)
+        XCTAssertFalse(api.wantsEnrolment(now: now.addingTimeInterval(600)), "each try carries the PIN")
+        // Any PIN-checked route says so in this app's words.
+        do { _ = try await api.fetchQueue(); XCTFail("a locked phone was let in") }
+        catch { XCTAssertEqual(error.localizedDescription, L10n.tr("pair.window_locked")) }
+    }
+
     func testAMacThatForgotThePhoneGetsThePinAndAFreshEnrolment() async throws {
         let s = pairedSettings()
         let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
@@ -246,13 +261,15 @@ final class StubMac: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var revoked = false
     /// The native Mac with no "Pair a phone" window open.
     nonisolated(unsafe) static var pairingClosed = false
+    /// This phone shut out of the open window after too many wrong PINs.
+    nonisolated(unsafe) static var pairingLocked = false
     nonisolated(unsafe) static var clockAhead: TimeInterval = 0
     nonisolated(unsafe) static var key: SymmetricKey?
     static let identity = Curve25519.Signing.PrivateKey()
     static let deviceId = "dev_stubPhone0001"
 
     static func reset() {
-        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil; pairingClosed = false
+        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil; pairingClosed = false; pairingLocked = false
     }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-stub.invalid" }
@@ -267,6 +284,14 @@ final class StubMac: URLProtocol, @unchecked Sendable {
         var signedOK = false
         var answer: (Int, Any) = (404, ["error": "not found"])
 
+        if Self.pairingLocked {
+            let body = Data(#"{"reason":"pairing-locked","error":"Too many wrong PINs from this device. Try again in the next pairing window"}"#.utf8)
+            let response = HTTPURLResponse(url: url, statusCode: 429, httpVersion: "HTTP/1.1", headerFields: nil)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: body)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
         if Self.pairingClosed, url.path() == "/api/devices" {
             // Before the PIN is looked at, as the Mac does.
             answer = (403, ["reason": "pairing-closed", "error": "On the Mac, click Pair a phone, then try again"])

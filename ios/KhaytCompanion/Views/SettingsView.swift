@@ -47,7 +47,7 @@ struct SettingsView: View {
                     cloudCard
                     eyebrow(L10n.tr("settings.connection"))
                     macCard
-                    if api.lastEnrolment == .closed, settings.device == nil, settings.isPaired, !settings.isSampleShop {
+                    if api.lastEnrolment == .closed || api.lastEnrolment == .locked, settings.device == nil, settings.isPaired, !settings.isSampleShop {
                         secureCard
                     }
                     unpairButton
@@ -225,7 +225,8 @@ struct SettingsView: View {
                     defer { securing = false }
                     switch await api.secureThisPhone(name: UIDevice.current.name) {
                     case .enrolled: secureAnswer = L10n.tr("settings.secure.done")
-                    case .closed: secureAnswer = L10n.tr("pair.window_closed")
+                    case .closed: secureAnswer = L10n.tr("settings.secure.closed")
+                    case .locked: secureAnswer = L10n.tr("pair.window_locked")
                     case .unsupported, .failed: secureAnswer = L10n.tr("settings.secure.failed")
                     }
                 }
