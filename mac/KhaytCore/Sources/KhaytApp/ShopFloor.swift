@@ -1796,6 +1796,27 @@ private struct Live: View {
                     shop.droppingFrom = machine
                 }
             }
+            // A Bambu's speed preset (confirmed — it changes a running print)
+            // and its chamber light (straight through — it changes nothing).
+            if machine.printerApi?.type == "bambu" {
+                Menu(shop.words.callIt("mac.printer_speed")) {
+                    ForEach(1...4, id: \.self) { level in
+                        Button(shop.words.callIt("mac.printer_speed_\(level)")) {
+                            shop.confirmingSpeed = Shop.SpeedChange(machine: machine, level: level)
+                        }
+                    }
+                }
+                .fixedSize()
+                Menu(shop.words.callIt("mac.printer_light")) {
+                    Button(shop.words.callIt("mac.printer_light_on")) {
+                        Task { await shop.control(machine, .light(true)) }
+                    }
+                    Button(shop.words.callIt("mac.printer_light_off")) {
+                        Task { await shop.control(machine, .light(false)) }
+                    }
+                }
+                .fixedSize()
+            }
             Spacer()
         }
         .buttonStyle(.bordered)

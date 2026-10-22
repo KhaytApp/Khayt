@@ -1356,6 +1356,9 @@ final class PrinterWatch {
             switch trouble {
             case .malformed: return ("mac.pw_malformed", [:])
             case .certificateChanged: return ("mac.pw_cert_changed", [:])
+            case .notBambu(let why): return ("mac.pw_cert_not_bambu", ["why": .string(why)])
+            case .otherPrinter(let name):
+                return ("mac.pw_cert_other_printer", ["name": .string(name.isEmpty ? "?" : name)])
             case .refused(let code): return ("mac.pw_code_refused", ["code": .string(String(code))])
             case .silent:
                 // NAMING DEVELOPER MODE FIRST IS THE POINT OF THIS MESSAGE.

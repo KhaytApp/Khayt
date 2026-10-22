@@ -5382,6 +5382,9 @@ public actor KhaytEngine {
         public let sdcp: Sdcp?
         public struct Mqtt: Decodable, Sendable {
             public let topic: String
+            /// The report's top-level key the reply comes back under —
+            /// `print` for job verbs and speed, `system` for the light.
+            public let section: String?
             public let command: String
             public let sequenceId: String
             public let payload: String
@@ -5425,6 +5428,17 @@ public actor KhaytEngine {
             [.string(type), .string(command), jobId.map(JSONValue.string) ?? .null,
              .string(duetFlavour), .string(printerSlug), .number(Double(sequenceId)),
              .string(mainboardId), .string(requestId), .number(Double(timestamp))],
+            as: PrinterRequest.self)
+    }
+
+    /// A Bambu control beyond the job verbs — `speed` (1-4) or `light`
+    /// ("on"/"off") — as `lib/printer-commands.js` `buildControl` shapes it.
+    public func printerControl(type: String, control: String, value: JSONValue,
+                               sequenceId: Int) throws -> PrinterRequest {
+        try runtime.call2("""
+            KhaytPrinterCommands.buildControl(ARG0, ARG1, ARG2,
+              { transports: ['http', 'mqtt', 'sdcp'], sequenceId: ARG3 })
+            """, [.string(type), .string(control), value, .number(Double(sequenceId))],
             as: PrinterRequest.self)
     }
 

@@ -164,8 +164,15 @@ enum BambuMqtt {
         case silent
         case closed(String)
         /// The printer presented a different certificate from the one it
-        /// presented the first time — see `BambuPin`.
+        /// presented the first time — see `BambuPin`. No longer raised since
+        /// trust is `BambuTrust`'s; kept so an old sentence still has a home.
         case certificateChanged
+        /// The certificate does not chain to Bambu Lab's CAs: whatever
+        /// answered is not a Bambu printer, so the access code was not sent.
+        case notBambu(String)
+        /// A genuine Bambu, but its certificate names another serial — the
+        /// address now belongs to a different printer.
+        case otherPrinter(String)
         /// A printer that HAD been talking on a held connection stopped for
         /// longer than the watchdog allows, and is being reconnected. Not
         /// `silent`: that one means Developer Mode, and this printer has
@@ -180,6 +187,14 @@ enum BambuMqtt {
     }
 }
 
+/// ── NO LONGER DECIDES TRUST (Oct 2026) ────────────────────────────────────
+///
+/// A printer is now trusted by `BambuTrust`: chained to Bambu Lab's CAs and
+/// named after the machine's serial. This store is still cleared when an
+/// access code is saved, and its tests still run, but no connection consults
+/// it. It is left for a follow-up to remove, rather than deleted in the same
+/// change that replaced it.
+///
 /// ── TRUST ON FIRST USE, FOR A CERTIFICATE NOTHING CAN VERIFY ──────────────
 ///
 /// A Bambu's certificate is self-signed for a name that is not its address,
@@ -364,30 +379,33 @@ extension BambuPin.Store {
     }
 }
 
-/// Set by the TLS verify block, read when the connection fails.
+/// Set by the TLS verify block, read when the connection fails, so the failure
+/// is reported as the certificate refusal it was and not as a dropped socket.
 final class PinVerdict: @unchecked Sendable {
     private let lock = NSLock()
-    private var changed = false
-    func markChanged() { lock.withLock { changed = true } }
-    var wasChanged: Bool { lock.withLock { changed } }
+    private var refusal: BambuMqtt.Trouble?
+    func refuse(_ why: BambuMqtt.Trouble) { lock.withLock { refusal = why } }
+    var refused: BambuMqtt.Trouble? { lock.withLock { refusal } }
 }
 
 extension BambuMqtt {
-    /// A TLS connection to a Bambu's MQTT port, its certificate pinned on
-    /// first use (`BambuPin`). One place, so the one-shot conversation and the
-    /// held session (`BambuSession`) cannot trust certificates differently.
+    /// A TLS connection to a Bambu's MQTT port. The printer is trusted only
+    /// if its certificate chains to Bambu Lab's CAs AND is named after this
+    /// machine's serial (`BambuTrust`). One place, so the one-shot
+    /// conversation and the held session (`BambuSession`) cannot trust
+    /// certificates differently.
     static func connection(host: String, port: UInt16, serial: String,
                            verdict: PinVerdict) -> NWConnection {
         let options = NWProtocolTLS.Options()
-        // Nothing to verify the certificate AGAINST, so it is pinned on first
-        // use — see `BambuPin`.
-        let pinKey = BambuPin.key(serial: serial, host: host)
         sec_protocol_options_set_verify_block(
             options.securityProtocolOptions,
             { _, trust, complete in
-                guard let print = BambuPin.fingerprint(trust) else { complete(false); return }
-                if BambuPin.accept(print, key: pinKey) { complete(true) }
-                else { verdict.markChanged(); complete(false) }
+                let ref = sec_trust_copy_ref(trust).takeRetainedValue()
+                switch BambuTrust.evaluate(ref, serial: serial) {
+                case .trusted: complete(true)
+                case .notBambu(let why): verdict.refuse(.notBambu(why)); complete(false)
+                case .otherPrinter(let name): verdict.refuse(.otherPrinter(name)); complete(false)
+                }
             },
             DispatchQueue.global(qos: .userInitiated))
         return NWConnection(
@@ -413,9 +431,9 @@ extension BambuMqtt {
 /// ── SELF-SIGNED, AND WHY THAT IS NOT A HOLE HERE ──────────────────────────
 ///
 /// A Bambu printer presents a certificate it signed itself, for a name that is
-/// not its LAN address, and there is no way to obtain a real one for a device
-/// on a home network. So it cannot be VERIFIED — it is pinned on first use
-/// instead (`BambuPin`, Sep 2026), which the other app does not yet do.
+/// not its LAN address. It is verified against Bambu Lab's own CAs and the
+/// machine's serial instead (`BambuTrust`, Oct 2026; trust-on-first-use
+/// `BambuPin` before that).
 ///
 /// What makes that acceptable is what is sent: the access code goes only to the
 /// address the shop typed, the channel is still encrypted against a passive
@@ -488,8 +506,7 @@ actor BambuConversation {
                     clientId: id, username: "bblp",
                     password: self.accessCode)), completion: .idempotent)
             case .failed(let error):
-                let trouble: BambuMqtt.Trouble = verdict.wasChanged
-                    ? .certificateChanged : .closed(error.localizedDescription)
+                let trouble: BambuMqtt.Trouble = verdict.refused ?? .closed(error.localizedDescription)
                 Task { await box.fail(trouble) }
             case .cancelled:
                 Task { await box.fail(BambuMqtt.Trouble.closed("cancelled")) }

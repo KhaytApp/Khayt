@@ -115,6 +115,42 @@ enum PrinterControl {
                                   sequenceId: mqtt.sequenceId)
     }
 
+    /// A Bambu control beyond the job verbs. Speed needs LAN/Developer Mode
+    /// like every MQTT command; the light is harmless and goes straight
+    /// through from the UI. Speed is confirmed there while printing.
+    enum Control: Equatable, Sendable {
+        case speed(Int)          // 1 silent · 2 standard · 3 sport · 4 ludicrous
+        case light(Bool)
+    }
+
+    static func control(_ control: Control, to machine: Machine, engine: KhaytEngine,
+                        build: StoreReader.Build?) async throws {
+        guard machine.printerApi?.type == "bambu" else {
+            throw Failure.unsupported("This printer type has no such control.")
+        }
+        let base = try await PrinterWatch.baseURL(machine, engine: engine)
+        var code = ""
+        if let sealed = machine.printerApi?.accessCode, !sealed.isEmpty, let build {
+            code = (try? await Secrets.open(sealed, for: build)) ?? ""
+        }
+        let config = try PrinterWatch.bambuConfig(machine, base: base, accessCode: code)
+        let session = await BambuWatch.shared.session(for: machine.id, config: config, accessCode: code)
+        let seq = await session.nextSequence()
+        let request: KhaytEngine.PrinterRequest
+        switch control {
+        case .speed(let level):
+            request = try await engine.printerControl(type: "bambu", control: "speed",
+                                                      value: .number(Double(level)), sequenceId: seq)
+        case .light(let on):
+            request = try await engine.printerControl(type: "bambu", control: "light",
+                                                      value: .string(on ? "on" : "off"), sequenceId: seq)
+        }
+        if let why = request.unsupported { throw Failure.unsupported(why) }
+        guard let mqtt = request.mqtt else { throw Failure.refused("The printer's command could not be built.") }
+        try await session.command(payload: mqtt.payload, command: mqtt.command,
+                                  sequenceId: mqtt.sequenceId, section: mqtt.section ?? "print")
+    }
+
     /// An Elegoo resin printer: one SDCP frame, Cmd 129 / 131 / 130, and its Ack.
     private static func sendSdcp(_ verb: Verb, to machine: Machine, base: URL,
                                  engine: KhaytEngine) async throws {

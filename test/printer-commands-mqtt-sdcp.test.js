@@ -114,3 +114,36 @@ test('opts.transports: absent means [\'http\'] (unsupported); naming the transpo
   assert.deepEqual(buildCommand('moonraker', 'pause', null, { transports: ['mqtt'] }),
     { method: 'POST', path: '/printer/print/pause' });
 });
+
+const { buildControl, SPEEDS } = require('../lib/printer-commands.js');
+
+test('Bambu speed presets are print.print_speed with the level as a string (OpenBambuAPI)', () => {
+  assert.deepEqual({ ...SPEEDS }, { 1: 'silent', 2: 'standard', 3: 'sport', 4: 'ludicrous' });
+  for (const level of [1, 2, 3, 4]) {
+    const d = buildControl('bambu', 'speed', level, { transports: ['mqtt'], sequenceId: 4 });
+    assert.equal(d.mqtt.payload, `{"print":{"sequence_id":"4","command":"print_speed","param":"${level}"}}`);
+    assert.equal(d.mqtt.section, 'print');
+    assert.equal(d.mqtt.command, 'print_speed');
+  }
+  for (const bad of [0, 5, 2.5, '2; M112', null, 'sport']) {
+    assert.ok(buildControl('bambu', 'speed', bad, { transports: ['mqtt'] }).unsupported, String(bad));
+  }
+});
+
+test('the chamber light is system.ledctrl chamber_light, flashing fields always present (ha-bambulab values)', () => {
+  assert.equal(buildControl('bambu', 'light', 'on', { transports: ['mqtt'], sequenceId: 9 }).mqtt.payload,
+    '{"system":{"sequence_id":"9","command":"ledctrl","led_node":"chamber_light","led_mode":"on","led_on_time":500,"led_off_time":500,"loop_times":0,"interval_time":0}}');
+  const off = buildControl('bambu', 'light', 'off', { transports: ['mqtt'], sequenceId: 10 });
+  assert.match(off.mqtt.payload, /"led_mode":"off"/);
+  assert.equal(off.mqtt.section, 'system');
+  assert.equal(off.mqtt.command, 'ledctrl');
+  assert.ok(buildControl('bambu', 'light', 'flashing', { transports: ['mqtt'] }).unsupported);
+});
+
+test('controls share the transports gate, and no other protocol has them', () => {
+  assert.ok(buildControl('bambu', 'speed', 2).unsupported);
+  assert.ok(buildControl('bambu', 'light', 'on', { transports: ['http'] }).unsupported);
+  assert.ok(buildControl('moonraker', 'speed', 2, { transports: ['http', 'mqtt'] }).unsupported);
+  assert.ok(buildControl('bambu', 'fan', 1, { transports: ['mqtt'] }).unsupported);
+  assert.equal(buildCommand('bambu', 'pause', null, { transports: ['mqtt'] }).mqtt.section, 'print');
+});

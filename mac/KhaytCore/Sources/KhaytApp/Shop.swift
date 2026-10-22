@@ -1739,6 +1739,16 @@ final class Shop {
     /// each other's undo.
     var confirmingCancel: Machine?
 
+    /// A Bambu speed preset about to be set on a running print, held for the
+    /// confirmation. Ludicrous on a part sliced for standard is a way to lose it.
+    struct SpeedChange: Identifiable, Equatable {
+        let machine: Machine
+        let level: Int
+        var id: String { machine.id + "#\(level)" }
+        static func == (a: SpeedChange, b: SpeedChange) -> Bool { a.id == b.id }
+    }
+    var confirmingSpeed: SpeedChange?
+
     /// The machine whose plate is being looked at, for dropping one object.
     var droppingFrom: Machine?
 

@@ -138,7 +138,7 @@ actor BambuSession {
     private nonisolated let box = LinkBox()
 
     private var stateWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
-    private var commandWaiters: [String: (command: String, resume: CheckedContinuation<Result<Void, BambuMqtt.Trouble>, Never>)] = [:]
+    private var commandWaiters: [String: (command: String, section: String, resume: CheckedContinuation<Result<Void, BambuMqtt.Trouble>, Never>)] = [:]
 
     // MARK: Lifecycle
 
@@ -365,7 +365,7 @@ actor BambuSession {
     /// `result: "success"` returns, `"fail"` throws `commandRefused` with the
     /// printer's reason, and no reply throws `unconfirmed` — the command may
     /// have happened, and the shop is told to look rather than told it failed.
-    func command(payload: String, command: String, sequenceId: String,
+    func command(payload: String, command: String, sequenceId: String, section: String = "print",
                  timeout: Duration = .seconds(8)) async throws {
         if stopped { throw BambuMqtt.Trouble.closed("cancelled") }
         if phase != .subscribed {
@@ -374,7 +374,7 @@ actor BambuSession {
             guard phase == .subscribed else { throw trouble ?? .silent }
         }
         let result: Result<Void, BambuMqtt.Trouble> = await withCheckedContinuation { resume in
-            commandWaiters[sequenceId] = (command, resume)
+            commandWaiters[sequenceId] = (command, section, resume)
             send(BambuMqtt.publish(topic: "device/\(config.serial)/request", payload: payload))
             Task { [weak self] in
                 try? await Task.sleep(for: timeout)
@@ -399,9 +399,15 @@ actor BambuSession {
     private func answerCommand(_ payload: String) {
         guard !commandWaiters.isEmpty,
               let data = payload.data(using: .utf8),
-              case .object(let report)? = try? JSONValue.decode(JSONValue.self, from: data),
-              case .object(let p)? = report["print"],
-              case .string(let command)? = p["command"],
+              case .object(let report)? = try? JSONValue.decode(JSONValue.self, from: data) else { return }
+        // `print` for job verbs and speed, `system` for the light.
+        for section in Set(commandWaiters.values.map(\.section)) {
+            if case .object(let p)? = report[section] { answer(p, in: section) }
+        }
+    }
+
+    private func answer(_ p: [String: JSONValue], in section: String) {
+        guard case .string(let command)? = p["command"],
               case .string(let result)? = p["result"] else { return }
         let seq: String? = {
             switch p["sequence_id"] {
@@ -413,8 +419,9 @@ actor BambuSession {
         // By sequence; a reply with none is matched by its verb alone.
         let id: String?
         if let seq { id = commandWaiters[seq] != nil ? seq : nil }
-        else { id = commandWaiters.first(where: { $0.value.command == command })?.key }
-        guard let id, let waiter = commandWaiters[id], waiter.command == command else { return }
+        else { id = commandWaiters.first(where: { $0.value.command == command && $0.value.section == section })?.key }
+        guard let id, let waiter = commandWaiters[id], waiter.command == command,
+              waiter.section == section else { return }
         if result.lowercased() == "success" {
             settleCommand(id, .success(()))
         } else {
@@ -494,8 +501,7 @@ final class NetworkBambuLink: BambuLink, @unchecked Sendable {
                 self.emit(.ready)
                 self.receive()
             case .failed(let error):
-                self.emit(.failed(self.verdict.wasChanged ? BambuMqtt.Trouble.certificateChanged
-                                                          : BambuMqtt.Trouble.closed(error.localizedDescription)))
+                self.emit(.failed(self.verdict.refused ?? BambuMqtt.Trouble.closed(error.localizedDescription)))
             case .waiting(let error):
                 // Unreachable for now. Said, and left to the session's backoff
                 // rather than NWConnection's own retry, so there is one clock.
