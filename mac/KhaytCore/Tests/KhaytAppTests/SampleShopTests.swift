@@ -32,11 +32,11 @@ struct SampleShopTests {
     /// reads as one the sample never runs. Measured against the FILE those
     /// answers change every day the calendar moves; measured against the book
     /// the app shows, they do not change at all.
-    static func book() throws -> [String: JSONValue] {
+    static func book(asOf day: Date = Date()) throws -> [String: JSONValue] {
         let url = Bundle.module.url(forResource: "sample-shop", withExtension: "json")!
         let raw = try JSONDecoder().decode(JSONValue.self, from: try Data(contentsOf: url))
         guard case .object(let o) = raw else { throw Oops.shape }
-        return SampleBook.rebased(o, to: Date())
+        return SampleBook.rebased(o, to: day)
     }
 
     enum Oops: Error { case shape }
@@ -784,13 +784,19 @@ extension SampleShopTests {
     @Test("the sample servicing reaches several machines, a sold one, and another year")
     func maintenanceCostSpan() async throws {
         let engine = try KhaytEngine()
-        let book = try Self.book()
+        // At the anchor, not today. Rebasing moves every day by the same
+        // count, but a YEAR is not moved with them: 32 days after the anchor
+        // the one entry from last year (30 Nov) crossed into January, and the
+        // year filter lost its case overnight. A test asking whether the
+        // sample spans a year boundary has to ask on the day it was written.
+        let anchor = try #require(SampleBook.anchor)
+        let book = try Self.book(asOf: anchor)
         let machines = Shop.rows(book, "machines")
         // Through the constant, not a literal: a literal here is how the
         // sample and the app agreed on a key no real book has.
         let log = Shop.rows(book, ServiceLogEdit.collection)
         #expect(!log.isEmpty, "nothing was ever serviced — the card draws its empty state only")
-        let year = MachineProfitPage.thisYear()
+        let year = Int(SampleBook.anchorDay.prefix(4)) ?? 0
         let rows = try await engine.maintenanceCost(machines: machines, entries: log, year: year)
         #expect(rows.count >= 3, "too few machines serviced to be worth ranking")
         #expect(rows.contains { $0.orphan },
