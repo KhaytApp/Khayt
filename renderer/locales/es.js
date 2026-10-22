@@ -4692,6 +4692,16 @@
   "pnl.vat_inclusive": "Tus precios incluyen el IVA, así que se descuenta de cada venta y los ingresos se muestran sin él.",
   "pnl.vat_exclusive": "El IVA se suma a tus precios, así que los ingresos son el precio antes de él.",
   "pnl.vat_missing": "Gastos de este período sin IVA registrado: {n}. No se recupera nada de ellos; añade el IVA de la factura del proveedor para reclamarlo.",
+  "pnl.vat_adjustment": "Ajuste de un período presentado",
+  "pnl.vat_adjustment_note": "Facturas de declaraciones presentadas que se cancelaron, anularon o abonaron después de presentarlas: {n}. Su IVA se revierte aquí, en el primer período abierto, y las declaraciones presentadas quedan como se presentaron.",
+  "pnl.vat_returns": "Declaraciones de IVA",
+  "pnl.vat_filed": "Presentada",
+  "pnl.vat_filed_hint": "Marca una declaración como presentada cuando la envíes. Desde entonces, una factura de ese período que se cancele, anule o abone se ajusta en el siguiente período abierto en lugar de cambiar las cifras presentadas.",
+  "pnl.vat_returns_none": "Ningún período de declaración de este intervalo ha terminado todavía.",
+  "pnl.vat_filing": "Las declaraciones de IVA se presentan",
+  "pnl.vat_filing_quarterly": "Trimestralmente",
+  "pnl.vat_filing_monthly": "Mensualmente",
+  "pnl.vat_filing_hint": "En Arabia Saudí, la ZATCA exige declaraciones mensuales si las ventas imponibles anuales superan los 40 millones de SAR; si no, trimestrales.",
   "pnl.exported_as": "Pérdidas y ganancias exportadas como",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

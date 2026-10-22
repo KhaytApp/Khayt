@@ -2872,7 +2872,16 @@ function pnlInputsForRange() {
         && !(KhaytOrderStatus.isFinished(o) && inRange(o.date, analyticsRange, 'analytics')))
       .map(o => ({ taxOnly: true, revenue: 0, cogs: 0,
                    vat: KhaytTax.computeTax(orderNetRevenueBase(o), taxProfile).taxTotal }))
-      .filter(r => r.vat > 0));
+      .filter(r => r.vat > 0))
+    // A FILED RETURN IS NOT REWRITTEN (lib/vat-periods.js): the P&L's own
+    // corrections for invoices from filed periods undone after filing — the
+    // filed period keeps its VAT, the reversal counts where it landed.
+    .concat((typeof KhaytPnl.vatCorrections === 'function'
+      ? KhaytPnl.vatCorrections(printLog || [], { settings, clients: (typeof clients !== 'undefined' ? clients : []),
+          currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined })
+      : [])
+      .filter(c => inRange(c.day, analyticsRange, 'analytics'))
+      .map(c => ({ taxOnly: true, revenue: 0, cogs: 0, vat: c.vat })));
   const expenseRows = (expenses || [])
     .filter(e => inRange(e.date, analyticsRange, 'analytics'))
     // Date and receipt tax travel too: lib/pnl-report.js recognises a machine

@@ -4692,6 +4692,16 @@
   "pnl.vat_inclusive": "価格は税込みのため、各売上から税額を差し引き、収益は税抜きで表示しています。",
   "pnl.vat_exclusive": "税は価格に上乗せされるため、収益は税加算前の価格です。",
   "pnl.vat_missing": "この期間で消費税が記録されていない経費：{n} 件。これらからは何も控除されません。仕入先の請求書の税額を入力すると控除できます。",
+  "pnl.vat_adjustment": "申告済み期間の調整",
+  "pnl.vat_adjustment_note": "申告後に取消・無効化・返金された、申告済み期間の請求書: {n}件。その税額は最初の未申告期間であるここで戻し、申告済みの数字は申告したとおりに残します。",
+  "pnl.vat_returns": "消費税申告",
+  "pnl.vat_filed": "申告済み",
+  "pnl.vat_filed_hint": "申告を提出したら申告済みにしてください。以後、その期間の請求書が取消・無効化・返金されても、申告済みの数字は変えずに次の未申告期間で調整します。",
+  "pnl.vat_returns_none": "この期間内に終了した申告期間はまだありません。",
+  "pnl.vat_filing": "申告の頻度",
+  "pnl.vat_filing_quarterly": "四半期ごと",
+  "pnl.vat_filing_monthly": "毎月",
+  "pnl.vat_filing_hint": "サウジアラビアでは、年間課税売上高が4,000万SARを超える事業者は毎月、それ以外は四半期ごとにZATCAへ申告します。",
   "pnl.exported_as": "損益をエクスポートしました：",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

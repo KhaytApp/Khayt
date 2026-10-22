@@ -513,6 +513,25 @@ function exportGaztVatReturn(period) {
     }
   }
 
+  // A FILED RETURN IS NOT REWRITTEN (lib/vat-periods.js): an invoice from a
+  // period the shop marked filed, cancelled, voided or credited after filing,
+  // keeps its VAT in that period and is reversed in the first open one. The
+  // corrections are the P&L's own (KhaytPnl.vatCorrections), each counted
+  // where its day falls; the reversals are also totalled on their own line.
+  let adjSales = 0, adjVat = 0;
+  if (vatRegistered && typeof KhaytPnl.vatCorrections === 'function') {
+    const corrections = KhaytPnl.vatCorrections(printLog, {
+      settings, clients: (typeof clients !== 'undefined' ? clients : []),
+      currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined,
+    });
+    for (const c of corrections) {
+      if (!(c.day >= fromDate && c.day <= toDate)) continue;
+      box1 += c.sales;
+      box3 += c.vat;
+      if (c.kind === 'adjustment') { adjSales += c.sales; adjVat += c.vat; }
+    }
+  }
+
   const periodExp = (expenses || []).filter(e => e.date >= fromDate && e.date <= toDate);
   const box6 = periodExp.reduce((s, e) => s + (+e.amount || 0), 0);
   // No expense record carries a VAT figure — the form has never had the field —
@@ -540,6 +559,7 @@ function exportGaztVatReturn(period) {
           <tr><td>${boxNo(1)}</td><td>Sales at the standard rate (net of ${escapeHtml(taxName)})</td><td>${fmtMoney(box1)}</td></tr>
           <tr><td>${boxNo(2)}</td><td>Sales at zero rate</td><td>${fmtMoney(box2)}</td></tr>
           <tr><td>${boxNo(3)}</td><td>${escapeHtml(taxName)} collected on sales</td><td>${fmtMoney(box3)}</td></tr>
+          ${(adjVat || adjSales) ? `<tr><td></td><td>of which: adjustment for a filed period (sales ${fmtMoney(adjSales)})</td><td>${fmtMoney(adjVat)}</td></tr>` : ''}
           <tr><td>${boxNo(6)}</td><td>Total purchases</td><td>${fmtMoney(box6)}</td></tr>
           <tr><td>${boxNo(7)}</td><td>${escapeHtml(taxName)} paid on purchases (recoverable)</td><td>${box7Known ? fmtMoney(box7) : '&mdash;'}</td></tr>
           <tr class="net"><td colspan="2">Net ${escapeHtml(taxName)} payable</td><td>${fmtMoney(netVat)}</td></tr>

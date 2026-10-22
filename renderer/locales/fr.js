@@ -4692,6 +4692,16 @@
   "pnl.vat_inclusive": "Vos prix incluent la TVA : elle est retirée de chaque vente et le chiffre d’affaires est affiché hors TVA.",
   "pnl.vat_exclusive": "La TVA s’ajoute à vos prix : le chiffre d’affaires est le prix avant TVA.",
   "pnl.vat_missing": "Dépenses de cette période sans TVA enregistrée : {n}. Rien n’est récupéré dessus ; ajoutez la TVA de la facture du fournisseur pour la déduire.",
+  "pnl.vat_adjustment": "Régularisation d’une période déclarée",
+  "pnl.vat_adjustment_note": "Factures de déclarations déposées annulées ou créditées après le dépôt : {n}. Leur TVA est régularisée ici, dans la première période ouverte, et les déclarations déposées restent telles qu’elles ont été déposées.",
+  "pnl.vat_returns": "Déclarations de TVA",
+  "pnl.vat_filed": "Déposée",
+  "pnl.vat_filed_hint": "Marquez une déclaration comme déposée une fois envoyée. Ensuite, une facture de cette période annulée ou créditée est régularisée dans la période ouverte suivante au lieu de modifier les montants déclarés.",
+  "pnl.vat_returns_none": "Aucune période de déclaration de cet intervalle n’est encore terminée.",
+  "pnl.vat_filing": "Les déclarations de TVA sont déposées",
+  "pnl.vat_filing_quarterly": "Trimestriellement",
+  "pnl.vat_filing_monthly": "Mensuellement",
+  "pnl.vat_filing_hint": "En Arabie saoudite, la ZATCA impose des déclarations mensuelles au-delà de 40 millions SAR de ventes taxables par an, sinon trimestrielles.",
   "pnl.exported_as": "Compte de résultat exporté sous",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

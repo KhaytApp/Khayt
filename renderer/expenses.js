@@ -883,7 +883,9 @@ function _doExportTaxSummary(periodLabel, fromDate, toDate) {
     timeEntries: (typeof timeEntries !== 'undefined' ? timeEntries : []),
   });
   for (const r of vatRows) {
-    if (!(r.vatCollected > 0)) continue;
+    // A month holding only the reversal of a FILED period's invoice
+    // (lib/vat-periods.js) has negative VAT, and is a line all the same.
+    if (!r.vatCollected && !r.taxableSales) continue;
     if (!monthMap[r.period]) monthMap[r.period] = { orders: 0, revenue: 0, vatCollected: 0, taxableSales: 0, shipping: 0 };
     monthMap[r.period].vatCollected = r.vatCollected;
     monthMap[r.period].taxableSales = r.taxableSales || 0;

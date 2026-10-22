@@ -4692,6 +4692,16 @@
   "pnl.vat_inclusive": "Fiyatlarınız KDV dahildir; KDV her satıştan çıkarılır ve gelir KDV hariç gösterilir.",
   "pnl.vat_exclusive": "KDV fiyatlarınızın üzerine eklenir; gelir, KDV’den önceki fiyattır.",
   "pnl.vat_missing": "Bu dönemde KDV’si kaydedilmemiş giderler: {n}. Bunlardan hiçbir şey indirilmez; indirmek için tedarikçi faturasındaki KDV’yi ekleyin.",
+  "pnl.vat_adjustment": "Beyan edilmiş dönem için düzeltme",
+  "pnl.vat_adjustment_note": "Beyandan sonra iptal edilen, geçersiz kılınan veya alacaklandırılan, beyan edilmiş dönemlere ait faturalar: {n}. KDV'leri burada, ilk açık dönemde düzeltilir; verilen beyannameler verildiği gibi kalır.",
+  "pnl.vat_returns": "KDV beyannameleri",
+  "pnl.vat_filed": "Verildi",
+  "pnl.vat_filed_hint": "Beyannameyi verdikten sonra verildi olarak işaretleyin. Bundan sonra o döneme ait iptal edilen, geçersiz kılınan veya alacaklandırılan bir fatura, verilen rakamları değiştirmek yerine sonraki açık dönemde düzeltilir.",
+  "pnl.vat_returns_none": "Bu aralıkta henüz biten bir beyan dönemi yok.",
+  "pnl.vat_filing": "KDV beyannamesi verilir",
+  "pnl.vat_filing_quarterly": "Üç ayda bir",
+  "pnl.vat_filing_monthly": "Aylık",
+  "pnl.vat_filing_hint": "Suudi Arabistan'da ZATCA, yıllık vergiye tabi satışları 40 milyon SAR'ı aşan işletmelerden aylık, diğerlerinden üç aylık beyanname ister.",
   "pnl.exported_as": "Kâr ve zarar şu adla dışa aktarıldı:",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

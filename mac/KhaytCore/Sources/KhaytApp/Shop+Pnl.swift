@@ -79,10 +79,15 @@ extension Shop {
             "vatSales": words.callIt("pnl.vat_sales"),
             "vatOutput": words.callIt("pnl.vat_output"),
             "vatInput": words.callIt("pnl.vat_input"),
+            "vatAdjustment": words.callIt("pnl.vat_adjustment"),
         ]
         if let vat, vat.applies {
             labels["vatNet"] = words.callIt(vat.net < 0 ? "pnl.vat_refund" : "pnl.vat_net")
             labels["vatMode"] = words.callIt(vat.mode == "exclusive" ? "pnl.vat_exclusive" : "pnl.vat_inclusive")
+            if vat.hasAdjustment {
+                labels["vatAdjustmentNote"] = words.callIt("pnl.vat_adjustment_note",
+                                                           ["n": .number(Double(vat.adjustments ?? 0))])
+            }
             if vat.expensesWithoutVat > 0 {
                 labels["vatMissing"] = words.callIt("pnl.vat_missing",
                                                     ["n": .number(Double(vat.expensesWithoutVat))])
@@ -148,6 +153,64 @@ extension Shop {
                 .replacingOccurrences(of: "\u{2069}", with: ""),
             currency: currency, rightToLeft: words.isRTL, language: words.language,
             shopName: shopName)
+    }
+
+    // MARK: - Filed VAT returns
+
+    /// The return periods the VAT card offers to mark filed: those in the
+    /// chosen span that have ended (the last eight for "all time"), newest
+    /// first, in the shop's filing frequency. Empty without an engine.
+    func vatFilingPeriods(now: Date = Date()) async -> [KhaytEngine.VatFilingPeriod] {
+        guard let engine else { return [] }
+        let resolved = pnlRange.resolve(now: now)
+        if resolved == .invalid { return [] }
+        let bounds = resolved.bounds
+        return (try? await engine.vatFilingPeriods(settings: settingsDict, from: bounds?.from,
+                                                   to: bounds?.to,
+                                                   today: Calendar.book.dayString(now))) ?? []
+    }
+
+    /// Mark a VAT return period filed, or not.
+    ///
+    /// ── A FILED RETURN IS NOT REWRITTEN ──────────────────────────────────
+    ///
+    /// Once marked, a cancel, void or credit of an invoice dated in the
+    /// period stops changing it: the reversal lands in the first open period
+    /// as an adjustment (lib/vat-periods.js). The mark records which of the
+    /// period's invoices were ALREADY reversed — read from the book on disk,
+    /// inside the write — so marking never changes the period's own figures.
+    /// Only the shop's explicit mark counts; a deadline passing marks nothing.
+    func setVatPeriodFiled(_ period: String, filed: Bool) async {
+        vatFiledProblem = nil
+        guard lockAllows("settings", "edit") else {
+            vatFiledProblem = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
+            return
+        }
+        guard let build = source.build else { vatFiledProblem = words.callIt("mac.settings_sample"); return }
+        guard let engine else { vatFiledProblem = words.callIt("mac.move_no_engine"); return }
+        do {
+            try await StoreWriter.update(
+                storeURL: build.storeURL,
+                owns: { StoreLock.weOwnIt(build) },
+                whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
+            ) { root in
+                try await Self.applyVatFiled(to: &root, period: period, filed: filed,
+                                             engine: engine, now: Date())
+            }
+            await load(source)
+        } catch {
+            vatFiledProblem = self.said(error)
+        }
+    }
+
+    /// The filed-mark write, on a book already read: the seam the tests use.
+    static func applyVatFiled(to root: inout [String: JSONValue], period: String, filed: Bool,
+                              engine: KhaytEngine, now: Date) async throws {
+        let jobs: [JSONValue]
+        if case .array(let rows)? = root["printLog"] { jobs = rows } else { jobs = [] }
+        let settings = try await engine.vatMarkFiled(Self.settings(root), period: period, filed: filed,
+                                                     orders: jobs, now: now)
+        root["settings"] = .object(settings)
     }
 
     /// The statement's page, on the invoice's paper: the same A4 the PDF uses.

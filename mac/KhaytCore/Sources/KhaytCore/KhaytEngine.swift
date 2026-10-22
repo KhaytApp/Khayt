@@ -553,6 +553,11 @@ public actor KhaytEngine {
         // must be: this consults them through their globals, and without them
         // it does not raise — it reports every order at its gross price and no
         // tax collected at all.
+        // The shop's VAT return periods and which it has filed: pnl-report
+        // asks it, through its global, where a reversal of a filed period's
+        // invoice lands. Without it no correction is made and a filed period
+        // reads as an open one.
+        "vat-periods",
         "pnl-report",
         // The VAT owed for the span the P&L covers: it sums the P&L's own
         // rows, and asks TAX (above) only for the shop's mode and rates.
@@ -8093,6 +8098,40 @@ public actor KhaytEngine {
             "(function(){var rows = KhaytPnl.pnlByPeriod(ARG0, ARG1, \(PnlInputs.context));"
           + " return {rows: rows, vat: KhaytVatSummary.summarize(rows, {settings: ARG2, expenses: ARG1, range: ARG12})};})()",
             input.arguments, as: PnlStatement.self)
+    }
+
+    /// A VAT return period the shop can mark filed: `lib/vat-periods.js`
+    /// `filingPeriods`. `period` is the key the mark is written under.
+    public struct VatFilingPeriod: Decodable, Sendable, Equatable, Identifiable {
+        public let period: String
+        public let from: String
+        public let to: String
+        public let filed: Bool
+        public var id: String { period }
+    }
+
+    /// The return periods in `from`…`to` (or the last eight, for no span)
+    /// that have ENDED by `today`, newest first, each with whether it is
+    /// marked filed. In the shop's own frequency (`vatFilingFrequency`).
+    public func vatFilingPeriods(settings: [String: JSONValue], from: String?, to: String?,
+                                 today: String) throws -> [VatFilingPeriod] {
+        try runtime.call2(
+            "KhaytVatPeriods.filingPeriods(ARG0, {from: ARG1, to: ARG2, today: ARG3})",
+            [.object(settings), .string(from ?? ""), .string(to ?? ""), .string(today)],
+            as: [VatFilingPeriod].self)
+    }
+
+    /// The settings with `period` marked FILED — the snapshot of the invoices
+    /// already reversed taken from `orders`, the book's jobs as they are on
+    /// disk (`lib/vat-periods.js` `markFiled`) — or, `filed: false`, with the
+    /// mark taken off.
+    public func vatMarkFiled(_ settings: [String: JSONValue], period: String, filed: Bool,
+                             orders: [JSONValue], now: Date) throws -> [String: JSONValue] {
+        try runtime.call2(
+            "ARG4 ? KhaytVatPeriods.markFiled(ARG0, ARG1, ARG2, new Date(ARG3)) : KhaytVatPeriods.unmarkFiled(ARG0, ARG1)",
+            [.object(settings), .string(period), .array(orders),
+             .number(now.timeIntervalSince1970 * 1000), .bool(filed)],
+            as: [String: JSONValue].self)
     }
 
     /// The same statement as files: a CSV and the HTML a PDF is printed from

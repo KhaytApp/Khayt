@@ -4693,6 +4693,16 @@
   "pnl.vat_inclusive": "Your prices include VAT, so it is taken out of each sale and revenue is shown without it.",
   "pnl.vat_exclusive": "VAT is added on top of your prices, so revenue is the price before it.",
   "pnl.vat_missing": "Expenses in this period with no VAT recorded: {n}. Nothing is reclaimed on them; add the VAT from the supplier’s invoice to claim it.",
+  "pnl.vat_adjustment": "Adjustment for a filed period",
+  "pnl.vat_adjustment_note": "Invoices from filed returns cancelled, voided or credited after filing: {n}. Their VAT is reversed here, in the first open period, and the filed returns stay as they were filed.",
+  "pnl.vat_returns": "VAT returns",
+  "pnl.vat_filed": "Filed",
+  "pnl.vat_filed_hint": "Mark a return filed once it is submitted. From then on, a cancelled, voided or credited invoice from that period is adjusted in the next open period instead of changing the filed figures.",
+  "pnl.vat_returns_none": "No return period in this span has ended yet.",
+  "pnl.vat_filing": "VAT returns are filed",
+  "pnl.vat_filing_quarterly": "Quarterly",
+  "pnl.vat_filing_monthly": "Monthly",
+  "pnl.vat_filing_hint": "In Saudi Arabia, ZATCA requires monthly returns when annual taxable sales exceed SAR 40 million; otherwise quarterly.",
   "pnl.exported_as": "Profit & Loss exported as",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

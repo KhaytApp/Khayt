@@ -4693,6 +4693,16 @@
   "pnl.vat_inclusive": "Seus preços incluem o imposto, então ele é retirado de cada venda e a receita aparece sem ele.",
   "pnl.vat_exclusive": "O imposto é somado aos seus preços, então a receita é o preço antes dele.",
   "pnl.vat_missing": "Despesas deste período sem imposto registrado: {n}. Nada é recuperado delas; adicione o imposto da nota do fornecedor para recuperá-lo.",
+  "pnl.vat_adjustment": "Ajuste de um período declarado",
+  "pnl.vat_adjustment_note": "Faturas de declarações entregues que foram canceladas, anuladas ou creditadas após a entrega: {n}. O imposto delas é estornado aqui, no primeiro período aberto, e as declarações entregues ficam como foram entregues.",
+  "pnl.vat_returns": "Declarações de imposto",
+  "pnl.vat_filed": "Entregue",
+  "pnl.vat_filed_hint": "Marque uma declaração como entregue depois de enviá-la. A partir daí, uma fatura desse período que for cancelada, anulada ou creditada é ajustada no próximo período aberto, sem alterar os valores entregues.",
+  "pnl.vat_returns_none": "Nenhum período de declaração deste intervalo terminou ainda.",
+  "pnl.vat_filing": "As declarações de imposto são entregues",
+  "pnl.vat_filing_quarterly": "Trimestralmente",
+  "pnl.vat_filing_monthly": "Mensalmente",
+  "pnl.vat_filing_hint": "Na Arábia Saudita, a ZATCA exige declarações mensais quando as vendas tributáveis anuais passam de 40 milhões de SAR; caso contrário, trimestrais.",
   "pnl.exported_as": "Lucros e perdas exportados como",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
