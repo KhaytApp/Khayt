@@ -435,6 +435,11 @@ extension BambuMqtt {
                               pins: BambuPin.Store = BambuPin.store) -> Bool {
         switch said {
         case .trusted:
+            // Pinned too. A printer that has once proved itself to Bambu's CAs
+            // must not later be let in by an unverified certificate: without
+            // this, an impostor on its address with a self-signed one would be
+            // the FIRST use the pin ever saw, and would get the access code.
+            if let print = fingerprint() { pins.write(pinKey, print) }
             verdict.markVerified(true)
             return true
         case .otherPrinter(let name):

@@ -80,7 +80,11 @@ struct BambuTrustTests {
         let ok = PinVerdict()
         #expect(BambuMqtt.trustDecision(.trusted, fingerprint: { "aa" }, pinKey: key, verdict: ok, pins: pins))
         #expect(ok.byBambu == true)
-        #expect(pins.read(key) == nil, "a verified printer is not pinned")
+        #expect(pins.read(key) == "aa", "a verified printer is pinned, so an unverified impostor cannot take its place")
+        let impostor = PinVerdict()
+        #expect(!BambuMqtt.trustDecision(.notBambu("self-signed"), fingerprint: { "zz" },
+                                         pinKey: key, verdict: impostor, pins: pins))
+        #expect(impostor.refused == .certificateChanged)
 
         let other = PinVerdict()
         #expect(!BambuMqtt.trustDecision(.otherPrinter("01P00A000000001"), fingerprint: { "aa" },

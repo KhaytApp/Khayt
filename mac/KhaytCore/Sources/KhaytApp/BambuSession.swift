@@ -514,7 +514,7 @@ final class NetworkBambuLink: BambuLink, @unchecked Sendable {
             case .waiting(let error):
                 // Unreachable for now. Said, and left to the session's backoff
                 // rather than NWConnection's own retry, so there is one clock.
-                self.emit(.failed(BambuMqtt.Trouble.closed(error.localizedDescription)))
+                self.emit(.failed(self.verdict.refused ?? BambuMqtt.Trouble.closed(error.localizedDescription)))
             default:
                 break
             }
