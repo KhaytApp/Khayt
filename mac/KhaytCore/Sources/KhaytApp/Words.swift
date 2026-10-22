@@ -2688,6 +2688,14 @@ final class Words {
         "mac.unarchive_model": ["en": "Restore from Archive", "ar": "استعادة من الأرشيف"],
         "mac.unarchive_n_models": ["en": "Restore {n} Models from Archive", "ar": "استعادة {n} نماذج من الأرشيف"],
         "mac.lib_archived": ["en": "Archived", "ar": "المؤرشفة"],
+        // The search box's tokens (`LibraryQuery`), as their chips name them.
+        "mac.lib_token_tag": ["en": "Tag", "ar": "الوسم"],
+        "mac.lib_token_group": ["en": "Group", "ar": "المجموعة"],
+        "mac.lib_token_category": ["en": "Category", "ar": "التصنيف"],
+        "mac.lib_token_material": ["en": "Material", "ar": "الخامة"],
+        "mac.lib_token_creator": ["en": "Creator", "ar": "المصمم"],
+        "mac.lib_token_printer": ["en": "Ready on", "ar": "جاهز على"],
+        "mac.lib_token_remove": ["en": "Remove {name}", "ar": "إزالة {name}"],
         // A model's title (`Shop.rename`); the file keeps its own name.
         "mac.rename_model": ["en": "Rename", "ar": "إعادة تسمية"],
         "mac.rename_model_undo": ["en": "Rename Model", "ar": "إعادة تسمية النموذج"],

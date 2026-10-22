@@ -8,6 +8,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Mac: rename a model.** Press the pencil beside a model's title, right-click it, or use Model ▸ Rename… to change the name the library shows. The file keeps its own name, and Undo puts the old title back.
 
+- **Mac: search the library by field.** Plain search now also finds a model by its notes, category and group. Type `tag:`, `group:`, `category:`, `material:`, `creator:` or `printer:` before a word to search only that field, and put quotes around a value with spaces (`group:"Saudi Kings"`). The field names work in Arabic too (`وسم:`, `مجموعة:`, `فئة:`, `خامة:`, `مصمم:`, `طابعة:`). Each one shows as a chip above the library, and clicking the chip removes it. The filter counts now follow the search as well.
+
 - **Desktop: pause, resume and cancel a print from the machine card.**
   While a printer is printing, its card in Settings → Printers now has Pause
   (or Resume when it is paused) and Cancel print, and a Klipper printer also

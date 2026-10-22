@@ -1795,13 +1795,12 @@ extension Shop {
         if axis != .duplicates, libraryDuplicatesOnly {
             rows = rows.filter { duplicateOf[Self.rowText($0, "id")] != nil }
         }
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return rows }
-        return rows.filter { row in
-            Self.rowText(row, "title").lowercased().contains(q)
-                || Self.rowText(row, "material").lowercased().contains(q)
-                || Self.rowTags(row).contains { $0.lowercased().contains(q) }
-        }
+        // The search the grid runs, tokens and all — it read `title`, which
+        // no record has, so a search narrowed the grid and not the counts.
+        let query = LibraryQuery.parse(SearchText.fold(search.trimmingCharacters(in: .whitespaces)))
+        guard !query.isEmpty else { return rows }
+        let matches = searchMatcher(query)
+        return rows.filter { row in libraryFile(id: Self.rowText(row, "id")).map(matches) ?? false }
     }
 
     /// How many times a record says it has been printed.
@@ -2046,7 +2045,7 @@ extension Shop {
         if !q.isEmpty {
             // The file's name too, and folded — see `LibraryFile.matches`.
             libraryMemo.work.rowsSearched += rows.count
-            rows = rows.filter { matchesSearch($0, q) }
+            rows = rows.filter(searchMatcher(LibraryQuery.parse(q)))
         }
         // Side by side: the copies of one model together, oldest first.
         if libraryDuplicatesOnly {

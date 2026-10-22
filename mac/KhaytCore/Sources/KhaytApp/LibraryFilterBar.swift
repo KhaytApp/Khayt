@@ -170,6 +170,15 @@ struct LibraryFilterBar: View {
                 .help(shop.words.callIt("mac.lib_view_help"))
             }
 
+            // WHAT THE SEARCH BOX IS FILTERING ON, one chip per token, each
+            // with the way to take it off. Read from the box itself
+            // (`LibraryQuery`), so a chip and the text cannot disagree.
+            ForEach(Array(LibraryQuery.parse(shop.search).tokens.enumerated()), id: \.offset) { _, token in
+                TokenChip(token: token, words: shop.words) {
+                    shop.search = LibraryQuery.removing(token, from: shop.search)
+                }
+            }
+
             menu("mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed", "archived"])
             menu("mac.lib_printer", prefix: "ready:")
             menu("mac.lib_creator", prefix: "creator:")
@@ -222,5 +231,32 @@ struct LibraryFilterBar: View {
             .menuStyle(.button)
             .fixedSize()
         }
+    }
+}
+
+/// One search token as a chip: "Tag: dragon ⓧ". The whole chip removes it —
+/// a target the size of a word rather than of the cross.
+private struct TokenChip: View {
+    let token: LibraryQuery.Token
+    let words: Words
+    let remove: () -> Void
+
+    private var label: String { words.callIt(token.field.wordKey) + ": " + token.value }
+
+    var body: some View {
+        Button(action: remove) {
+            HStack(spacing: 4) {
+                Text(label).lineLimit(1).truncationMode(.tail)
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8).padding(.vertical, 2)
+            .background(Khayt.brand.opacity(0.14), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: 220)
+        .fixedSize(horizontal: false, vertical: true)
+        .help(words.callIt("mac.lib_token_remove", ["name": .string(label)]))
+        .accessibilityLabel(words.callIt("mac.lib_token_remove", ["name": .string(label)]))
     }
 }

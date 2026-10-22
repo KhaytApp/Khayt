@@ -86,7 +86,28 @@ final class LibraryMemo {
 
     /// Each model's search text, folded, for the book revision it was made at.
     var foldedRevision = -1
-    var folded: [LibraryFile.ID: [String]] = [:]
+    var folded: [LibraryFile.ID: Folded] = [:]
+
+    /// One model's text, folded once: what the free search reads, and what
+    /// each kind of token (`LibraryQuery.Field`) reads.
+    struct Folded {
+        var free: [String]
+        var tags: [String]
+        var group: String
+        var category: String
+        var materials: [String]
+        var creators: [String]
+
+        init(_ file: LibraryFile) {
+            let f = SearchText.fold
+            free = file.searchFields.map(f)
+            tags = (file.tags ?? []).map(f)
+            group = f(file.groupName ?? "")
+            category = f(file.category ?? "")
+            materials = [file.material ?? "", file.parsed?.filamentType ?? ""].map(f)
+            creators = [file.creator ?? "", file.source ?? ""].map(f)
+        }
+    }
 
     /// `files` by id, for the book revision it was made at.
     var byIdRevision = -1
@@ -132,12 +153,16 @@ extension Shop {
         let memo = libraryMemo
         if memo.shownKey == key { return memo.shown }
         let rows: [LibraryFile]
-        if let old = memo.shownKey, old.sameView(as: key), !old.query.isEmpty, key.query.contains(old.query) {
+        if let old = memo.shownKey, old.sameView(as: key), !old.query.isEmpty,
+           LibraryQuery.parse(key.query).narrows(from: LibraryQuery.parse(old.query)) {
             // Typed one more letter: everything the longer search finds, the
-            // shorter one found too, already filtered and in order.
+            // shorter one found too, already filtered and in order. Asked of
+            // the PARSED search, not the string: `tag` → `tag:` is longer and
+            // not narrower (`LibraryQuery.narrows`).
             memo.work.narrowed += 1
             memo.work.rowsSearched += memo.shown.count
-            rows = memo.shown.filter { matchesSearch($0, key.query) }
+            let matches = searchMatcher(LibraryQuery.parse(key.query))
+            rows = memo.shown.filter(matches)
         } else {
             memo.work.builds += 1
             rows = buildShownFiles(query: key.query)
@@ -150,20 +175,65 @@ extension Shop {
     /// Does this model's search text hold `q` (already folded)? The same
     /// answer as `LibraryFile.matches(folded:)`, from text folded once.
     func matchesSearch(_ file: LibraryFile, _ q: String) -> Bool {
+        searchMatcher(LibraryQuery.parse(q))(file)
+    }
+
+    /// One model's folded text, from the memo.
+    func foldedText(_ file: LibraryFile) -> LibraryMemo.Folded {
         let memo = libraryMemo
         if memo.foldedRevision != filesRevision {
             memo.foldedRevision = filesRevision
             memo.folded = [:]
         }
-        let fields: [String]
-        if let known = memo.folded[file.id] {
-            fields = known
-        } else {
-            fields = file.searchFields.map(SearchText.fold)
-            memo.folded[file.id] = fields
-            memo.work.folds += 1
+        if let known = memo.folded[file.id] { return known }
+        let made = LibraryMemo.Folded(file)
+        memo.folded[file.id] = made
+        memo.work.folds += 1
+        return made
+    }
+
+    /// The test a search puts each model to, made once per pass: what
+    /// `printer:` asks is worked out here for the whole book (which models are
+    /// ready on a machine of that name), not once per model.
+    ///
+    /// `printer:` is the Ready on menu typed: a model every colour of which is
+    /// loaded on a machine whose name holds the value, in a material that
+    /// fits — so, like that menu, it finds nothing on a machine that does not
+    /// say what it has loaded.
+    func searchMatcher(_ query: LibraryQuery) -> (LibraryFile) -> Bool {
+        let readyFor: [[String: Bool]] = query.tokens.filter { $0.field == .printer }.map { token in
+            var ids: [String: Bool] = [:]
+            for machine in machines where SearchText.fold(machine.name).localizedStandardContains(token.folded) {
+                for id in readyByMachine[machine.id] ?? [] { ids[id] = true }
+            }
+            return ids
         }
-        return fields.contains { !$0.isEmpty && $0.localizedStandardContains(q) }
+        let text = query.text
+        let tokens = query.tokens
+        return { [self] file in
+            let f = foldedText(file)
+            if !text.isEmpty, !f.free.contains(where: { !$0.isEmpty && $0.localizedStandardContains(text) }) {
+                return false
+            }
+            var printer = 0
+            for token in tokens {
+                let v = token.folded
+                func any(_ fields: [String]) -> Bool { fields.contains { !$0.isEmpty && $0.localizedStandardContains(v) } }
+                let ok: Bool
+                switch token.field {
+                case .tag: ok = any(f.tags)
+                case .group: ok = any([f.group])
+                case .category: ok = any([f.category])
+                case .material: ok = any(f.materials)
+                case .creator: ok = any(f.creators)
+                case .printer:
+                    ok = readyFor[printer][file.id] == true
+                    printer += 1
+                }
+                if !ok { return false }
+            }
+            return true
+        }
     }
 
     /// `shownEntries` and the model tiles in it, from the memo when nothing
