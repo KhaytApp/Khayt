@@ -195,6 +195,10 @@ final class Camera {
         var request = URLRequest(url: aimed)
         request.timeoutInterval = 5
         request.httpMethod = "GET"
+        // Never a cached still. `URLSession.shared` keeps an HTTP cache, and
+        // a Moonraker file reply carries `Last-Modified`, so a heuristic-fresh
+        // copy of the plate as it was could be handed back as now.
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         // The credential the printer's own adapters send. It reaches the
         // printer and nowhere else — which is only true BECAUSE the host was
         // checked and the request aimed at the checked address above, and is

@@ -91,6 +91,11 @@ struct MachineSheet: View {
     @State private var camLooking = false
     /// A camera a look found that is not the one saved — offered, never applied.
     @State private var camOffer: CameraOffer?
+    /// The look in flight, so the sheet's own quiet look can give way to Find
+    /// and neither outlives the sheet.
+    @State private var camLook: Task<Void, Never>?
+    /// The quiet look runs once per sheet, not on every `.task` re-run.
+    @State private var camLookedOnce = false
 
     /// When this machine is out of action. Loaded from the record and written
     /// back through the shared rule, which drops a window that cannot be read.
@@ -233,13 +238,17 @@ struct MachineSheet: View {
             // quietly: the shop's U1 has a dead `:8080` address switched off,
             // and its camera is one GET away. Only on a real book — the sample
             // shop's printers are not on this network.
-            if existing != nil, shop.source.build != nil, !(camEnabled && !camSnapshot.isEmpty),
+            if !camLookedOnce, existing != nil, shop.source.build != nil, !(camEnabled && !camSnapshot.isEmpty),
                ["moonraker", "octoprint", "prusalink"].contains(apiType),
                !apiHost.trimmingCharacters(in: .whitespaces).isEmpty {
+                camLookedOnce = true
                 findCamera(quiet: true)
             }
         }
         .onAppear(perform: fill)
+        // A look still running when the sheet goes would write into a sheet
+        // nobody is looking at, and keep asking the printer for nothing.
+        .onDisappear { camLook?.cancel(); camLook = nil }
         .machineLifeDialogs(shop: shop, ask: $lifeAsk) { dismiss() }
     }
 
@@ -1105,6 +1114,11 @@ struct MachineSheet: View {
     private func findCamera() { findCamera(quiet: false) }
 
     private func findCamera(quiet: Bool) {
+        // Find wins: a quiet look still running gives way, and its answer is
+        // never written over Find's (every write below asks `isCancelled`).
+        // A quiet look never interrupts a Find.
+        if quiet, camLook != nil { return }
+        camLook?.cancel()
         if !quiet { camNote = nil }
         camOffer = nil
         camLooking = true
@@ -1114,8 +1128,10 @@ struct MachineSheet: View {
         let build = shop.source.build
         let savedUrl = camSnapshot.trimmingCharacters(in: .whitespaces)
         let savedOn = camEnabled
-        Task {
-            defer { camLooking = false }
+        camLook = Task {
+            defer {
+                if !Task.isCancelled { camLooking = false; camLook = nil }
+            }
             guard let engine = shop.engine, !host.isEmpty else {
                 if !quiet { camNote = shop.words.callIt("mac.cam_needs_host") }
                 return
@@ -1158,9 +1174,11 @@ struct MachineSheet: View {
                 } else {
                     candidate = try? await engine.cameraCandidate(step: step, body: .null, printerApi: row)
                 }
+                if Task.isCancelled { return }
                 guard let candidate,
                       let answer = await Self.probeStill(candidate.snapshotUrl, printerApi: row, engine: engine)
                 else { continue }
+                if Task.isCancelled { return }
                 let kind = (try? await engine.cameraSuggestion(saved: saved, found: candidate.snapshotUrl)) ?? "new"
                 if kind == "same" {
                     if !quiet {
@@ -1171,7 +1189,7 @@ struct MachineSheet: View {
                 camOffer = CameraOffer(url: candidate.snapshotUrl, kind: kind, answer: answer)
                 return
             }
-            if !quiet { camNote = shop.words.callIt("mac.cam_none") }
+            if !quiet, !Task.isCancelled { camNote = shop.words.callIt("mac.cam_none") }
         }
     }
 

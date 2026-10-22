@@ -182,3 +182,56 @@ struct CameraDiscoveryTests {
         #expect(TimelapseLine.size(nil, words) == "—")
     }
 }
+
+/// The verifier's findings on the first pass (C1, C3, C4).
+@MainActor
+struct CameraReviewFixTests {
+
+    @Test("a record write that changes nothing is not stamped")
+    func aNoOpIsNotStamped() {
+        var root: [String: JSONValue] = ["printLog": .array([
+            .object(["id": .string("J1"), "rev": .number(4), "updatedAt": .string("2026-10-01T00:00:00.000Z"),
+                     "printerTimelapse": .object(["video": .string("a_20260101000000.mp4")])]),
+        ])]
+        let before = root
+        let wrote = StoreWriter.changeRecord(&root, collection: "printLog", id: "J1") { job -> Bool in
+            guard job["printerTimelapse"] == nil else { return false }
+            job["printerTimelapse"] = .string("x")
+            return true
+        }
+        #expect(wrote == false)
+        #expect(root == before, "rev/updatedAt moved on a write that changed nothing")
+
+        // And a real change is stamped.
+        _ = StoreWriter.changeRecord(&root, collection: "printLog", id: "J1") { $0["notes"] = .string("n") }
+        guard case .array(let rows)? = root["printLog"], case .object(let j)? = rows.first else {
+            Issue.record("no row"); return
+        }
+        #expect(j["rev"] == .number(5))
+    }
+
+    @Test("a still is never served from a cache")
+    func theStillIsNotCached() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let machine = try CameraDiscoveryTests.machine(snapshot: CameraDiscoveryTests.monitor)
+        var policy: URLRequest.CachePolicy?
+        _ = await Camera.fetch(machine, shop: shop) { request in
+            policy = request.cachePolicy
+            return try CameraDiscoveryTests.monitorReply(request)
+        }
+        #expect(policy == .reloadIgnoringLocalAndRemoteCacheData)
+    }
+
+    @Test("the timelapse player reads in bounded ranges and knows the total")
+    func theLoaderRanges() {
+        #expect(PinnedVideoLoader.range(offset: 0, end: 1) == (0, 1))
+        #expect(PinnedVideoLoader.range(offset: 0, end: nil) == (0, PinnedVideoLoader.chunk - 1))
+        let far = PinnedVideoLoader.range(offset: 10, end: 100_000_000)
+        #expect(far.1 - far.0 + 1 == PinnedVideoLoader.chunk)
+        #expect(PinnedVideoLoader.total("bytes 0-1/59481447") == 59481447)
+        #expect(PinnedVideoLoader.total(nil) == nil)
+        // The player is never handed the printer's http address.
+        #expect(PinnedVideoLoader.playerURL.scheme == "khayt-timelapse")
+    }
+}

@@ -171,14 +171,25 @@ struct TimelapseLine: View {
     }
 }
 
-/// The video, played from the printer. AVPlayer streams it by byte range
-/// (Moonraker answers `Accept-Ranges: bytes`), so a 100 MB file starts at
-/// once and nothing lands on disk.
+/// The video, played from the printer, by byte range (Moonraker's file route
+/// answers `Accept-Ranges: bytes`), so a 100 MB file starts at once and
+/// nothing lands on disk.
+///
+/// ── THE PLAYER NEVER DIALS THE PRINTER ITSELF ────────────────────────────
+///
+/// `AVPlayer` given an http URL follows a redirect wherever it points, after
+/// every check this app made — so a printer (or whatever answers at its
+/// address) could bounce the player onto loopback or anywhere else. Instead
+/// the player is handed a private scheme, and every byte it asks for is
+/// fetched by `PinnedVideoLoader` from the address that was checked, with
+/// redirects refused and no cache, exactly as a still is.
 private struct TimelapsePlayer: View {
     let url: URL
     let words: Words
     let close: () -> Void
     @State private var player: AVPlayer?
+    /// Held here: an asset keeps its loader delegate weakly.
+    @State private var loader: PinnedVideoLoader?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -192,10 +203,109 @@ private struct TimelapsePlayer: View {
                 .frame(minWidth: 560, minHeight: 360)
         }
         .onAppear {
-            let p = AVPlayer(url: url)
+            let made = PinnedVideoLoader(real: url)
+            let asset = AVURLAsset(url: PinnedVideoLoader.playerURL)
+            asset.resourceLoader.setDelegate(made, queue: made.queue)
+            loader = made
+            let p = AVPlayer(playerItem: AVPlayerItem(asset: asset))
             player = p
             p.play()
         }
-        .onDisappear { player?.pause(); player = nil }
+        .onDisappear { player?.pause(); player = nil; loader = nil }
+    }
+}
+
+/// Every byte a timelapse player reads, fetched from the checked address in
+/// ranged chunks, with redirects refused (`RefuseRedirects`) and no cache.
+/// A reply that is not `206 Partial Content` fails the read rather than
+/// pulling a whole video into memory.
+final class PinnedVideoLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecked Sendable {
+    static let playerURL = URL(string: "khayt-timelapse://printer/timelapse.mp4")!
+    /// Two megabytes a request: a few seconds of a timelapse.
+    static let chunk: Int64 = 2 * 1024 * 1024
+
+    let real: URL
+    let queue = DispatchQueue(label: "app.khayt.timelapse-loader")
+    private let session: URLSession
+    /// Touched on `queue` only.
+    private var running: [ObjectIdentifier: URLSessionDataTask] = [:]
+
+    private final class Box: @unchecked Sendable {
+        let request: AVAssetResourceLoadingRequest
+        init(_ r: AVAssetResourceLoadingRequest) { request = r }
+    }
+
+    init(real: URL) {
+        self.real = real
+        let config = URLSessionConfiguration.ephemeral
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.urlCache = nil
+        config.timeoutIntervalForRequest = 15
+        session = URLSession(configuration: config, delegate: RefuseRedirects.shared, delegateQueue: nil)
+    }
+
+    deinit { session.invalidateAndCancel() }
+
+    func resourceLoader(_ resourceLoader: AVAssetResourceLoader,
+                        shouldWaitForLoadingOfRequestedResource request: AVAssetResourceLoadingRequest) -> Bool {
+        fetch(Box(request))
+        return true
+    }
+
+    func resourceLoader(_ resourceLoader: AVAssetResourceLoader, didCancel request: AVAssetResourceLoadingRequest) {
+        running.removeValue(forKey: ObjectIdentifier(request))?.cancel()
+    }
+
+    /// The range this read wants next, inclusive, at most one chunk.
+    static func range(offset: Int64, end: Int64?) -> (Int64, Int64) {
+        (offset, min(end ?? (offset + chunk - 1), offset + chunk - 1))
+    }
+
+    /// `bytes 0-1/59481447` → 59481447.
+    static func total(_ contentRange: String?) -> Int64? {
+        guard let s = contentRange, let slash = s.lastIndex(of: "/") else { return nil }
+        return Int64(s[s.index(after: slash)...].trimmingCharacters(in: .whitespaces))
+    }
+
+    /// On `queue`.
+    private func fetch(_ box: Box) {
+        let r = box.request
+        let offset: Int64
+        var end: Int64?
+        if let d = r.dataRequest {
+            offset = d.currentOffset > 0 ? d.currentOffset : d.requestedOffset
+            if !d.requestsAllDataToEndOfResource { end = d.requestedOffset + Int64(d.requestedLength) - 1 }
+        } else {
+            offset = 0; end = 1
+        }
+        let (from, to) = Self.range(offset: offset, end: end)
+        var q = URLRequest(url: real)
+        q.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        q.setValue("bytes=\(from)-\(to)", forHTTPHeaderField: "Range")
+        let key = ObjectIdentifier(r)
+        let task = session.dataTask(with: q) { [weak self] data, response, error in
+            guard let self else { return }
+            self.queue.async {
+                let r = box.request
+                guard self.running.removeValue(forKey: key) != nil else { return }   // cancelled
+                guard error == nil, let http = response as? HTTPURLResponse, http.statusCode == 206,
+                      let data else {
+                    r.finishLoading(with: error ?? URLError(.badServerResponse)); return
+                }
+                let total = Self.total(http.value(forHTTPHeaderField: "Content-Range"))
+                if let info = r.contentInformationRequest {
+                    info.contentType = "public.mpeg-4"
+                    info.isByteRangeAccessSupported = true
+                    if let total { info.contentLength = total }
+                }
+                guard let d = r.dataRequest else { r.finishLoading(); return }
+                d.respond(with: data)
+                let reached = from + Int64(data.count)
+                let wanted = end.map { $0 + 1 } ?? total ?? reached
+                if data.isEmpty || reached >= wanted { r.finishLoading() } else { self.fetch(box) }
+            }
+        }
+        running[key] = task
+        task.resume()
     }
 }
