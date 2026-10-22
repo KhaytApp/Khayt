@@ -4,6 +4,21 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Khayt Vault: the encryption format for cloud files and share links.**
+  The building block for keeping a shop's files in Khayt Cloud and sharing
+  them by link, without the server ever holding a key that opens them. Files
+  are sealed in 4 MiB chunks under a fresh key for each upload. Each chunk is
+  bound to its file, its upload and its place in the file, so a chunk that is
+  moved, dropped or swapped refuses to open. Keys come from the shop's
+  existing cloud key, and a link can also have a password. There are two
+  matching implementations, one for the browser (`lib/vault-crypto.js`) and
+  one for the Mac and iPhone (`VaultCrypto.swift`), and both are checked
+  against the same test vectors. The format is written up in
+  `docs/vault-format.md`. Each version also carries its own sealed record with its full
+  list of chunk hashes, so a download can check every chunk as it arrives. A share link's
+  record carries the same list, so a share page can do the same. Nothing uses it
+  yet.
+
 - **Mac: a Klipper printer that runs out of filament now raises the runout alert.** The Mac never looked up a printer's filament sensors, so the runout alert (on by default) could not fire for any machine. It now finds them once per printer, the same way the desktop does. A Snapmaker U1's four head sensors are read, and only the printing head's sensor counts: an empty spare head is not a runout. The alert reaches the Mac notification, Telegram and ntfy like the others.
 
 - **Mac: the machine card shows more of what the printer reports.** It shows layer count ("Layer 412 of 750"), target temperatures ("212/220°"), and the chamber temperature (the U1's cavity sensor, or any heater or sensor named for the chamber or enclosure). While a print runs, it also shows the part fan, plus speed and flow when someone has changed them from 100%. It shows the printer's own message, such as a Klipper fault or the reason a macro paused, and "Out of filament" when the printing head has run out. Each protocol reports only the fields its vendor's documents name. OctoPrint, PrusaLink, Duet, Repetier and Elegoo report what they have. Bambu adds layers only, because its other fields have no vendor documentation. The desktop already gets the new fields from the shared readers but doesn't show them yet.
