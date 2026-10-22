@@ -22,7 +22,7 @@
 ## 2. Concepts
 
 - **Assembly** = a product (or order line) whose BOM = **N printed parts** (`parts[]`) **+ M non-printed components** (`components[]`).
-- **Printed part** = the existing `part` object; `qty` = how many of that part the assembly needs.
+- **Printed part** = the existing `part` object; `qty` = how many of that part the order (or product) prints in all — the whole line, not a count per assembly.
 - **Component** = a reference to a `consumables[]` row + a quantity per assembly unit (e.g. `{consumableId, qtyPerUnit}`).
 - A **standalone product** is just an assembly with `components[] = []` and one part — fully backward compatible.
 
@@ -33,7 +33,7 @@
 **On `product` and `order` (the BOM):**
 - `parts[]` — unchanged (the printed BOM). Each part keeps `qty`, `partStatus`, `fileRef`/`printFileRef`.
 - `components[]` (new) — `{ id, consumableId, qtyPerUnit, name? }`. `qtyPerUnit` = units of the consumable per **one** assembly. `name` cached for display if the consumable is later deleted.
-- `assemblyQty` (new, order only, default 1) — how many finished assemblies this order makes. Effective component draw = `qtyPerUnit × assemblyQty`. (Printed parts already encode their own `qty`; for a true assembly the convention is part.qty is *per assembly* × assemblyQty — see Edge cases.)
+- `assemblyQty` (new, on the product and the order; absent, zero or negative reads as 1) — how many finished assemblies this order makes. It scales the **components only**: component draw = `qtyPerUnit × assemblyQty`, and component cost = one assembly's `computeComponentsCost` × `assemblyQty` (`lib/order-new.js` `componentsCost`, and `lib/product-pricing.js` for the catalogue). Printed parts are **not** multiplied by it — each part's own `qty` is already its total count (see Edge cases).
 - `assemblyStatus` (new, order only, **derived not stored as truth**) — rollup of `parts[].partStatus`; see §5.
 
 **On `consumables[]`** — unchanged. Components point at existing rows by `consumableId`.
@@ -45,8 +45,8 @@
 ## 4. Cost & material rollup
 
 **Cost** (extends the existing cart rollup in `updateGrandTotal`, build.js ~337):
-- Printed parts: `Σ computePartBaseCost(part) × part.qty` — **unchanged code path**.
-- Components: `Σ (consumable.cost × qtyPerUnit)` over `components[]`, where `consumable.cost` is the per-unit cost on the `consumables` row. Add this as a new bucket folded into the **material** chip (same pattern as `extraMaterials`/packaging in `computePartBreakdown`), so the breakdown still sums to the committed base.
+- Printed parts: `Σ partTotalCost(part)` (`lib/calculator-cost.js`) — the piece cost (`computePartBaseCost`) × `part.qty` (1 when absent), with the shop's packaging spread across the line once rather than once a piece. The catalogue (`lib/product-pricing.js`) and a job (the cart) use this same line cost, so a product and a job taken from it agree.
+- Components: `Σ (consumable.cost × qtyPerUnit)` over `components[]` for ONE assembly (`computeComponentsCost`), where `consumable.cost` is the per-unit cost on the `consumables` row — then × `assemblyQty`. Add this as a new bucket folded into the **material** chip (same pattern as `extraMaterials`/packaging in `computePartBreakdown`), so the breakdown still sums to the committed base.
 - Total assembly base = printed-parts base + components base, then margin/tiers/discount apply exactly as today (build.js).
 
 **Material deduction** (extends `deductFilamentForOrder`):
@@ -85,13 +85,13 @@
 - **One part fails QC → reprint just that part** — set `part.partStatus='qc_fail'`; a "Reprint part" action re-queues *only* that part (its `printWeight×qty` re-reserves via `partGramsConsumed`); the rest of the assembly is untouched. The order does **not** revert to `pending` wholesale.
 - **Consumable stock-out** — at deduction, if `qtyPerUnit×assemblyQty > stock`, clamp to 0 and warn (`cons.low`); do not block completion (mirrors current filament under-stock behavior — deducts what's there, flags low). Surface a pre-flight check in the editor (like `checkSpoolOvercommit`).
 - **Deleted consumable** — `components[].name` cache renders a "missing component" badge; cost contribution → 0; no crash.
-- **assemblyQty vs part.qty** — document the convention: for an assembly, `part.qty` is **per finished unit**; building 3 of an assembly that needs 2 of part X sets `part.qty=2`, `assemblyQty=3`, total prints = 6. Validation warns if the owner appears to have double-counted.
+- **assemblyQty vs part.qty** — `part.qty` is the **total** number of that part printed, and `assemblyQty` multiplies the components only. Building 3 of an assembly that needs 2 of part X and 4 magnets sets `part.qty=6`, `assemblyQty=3`: 6 prints of X (cost `partTotalCost` at qty 6) and 12 magnets (`4 × 3`). Setting `part.qty=2` there costs and prints 2 of X, not 6 — nothing multiplies a part by `assemblyQty`.
 
 ---
 
 ## 8. Test plan & Definition of Done
 
-- **Cost rollup:** product with 2 parts + 2 components → assembly base == `Σ computePartBaseCost×qty + Σ consumable.cost×qtyPerUnit`; breakdown chips still sum to base.
+- **Cost rollup:** product with 2 parts + 2 components → assembly base == `Σ partTotalCost(part) + Σ consumable.cost×qtyPerUnit × assemblyQty`; breakdown chips still sum to base.
 - **Deduction:** complete an assembly order → each part's filament deducts via existing `deductFilamentForOrder` path (reuse those tests) **and** each component's consumable `stock -= qtyPerUnit×assemblyQty`; `materialDeducted` prevents double-deduct on re-run.
 - **Status rollup:** all parts `qc_pass` + Assembled tick → `assemblyStatus='assembled'`; otherwise `completed` is blocked.
 - **Reprint:** fail one part → only that part re-queues; sibling parts' status and the order's other parts unchanged.
