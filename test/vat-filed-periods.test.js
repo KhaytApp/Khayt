@@ -379,6 +379,19 @@ test('a save AFTER the cancel never moves the reversal: December cancel, January
   assert.equal(V.reversalDayOf(cancelled), '2026-12-20');
 });
 
+test('a credit note added AFTER the cancel moves nothing: the reversal stays in December', () => {
+  const job = invoice();
+  const settings = V.markFiled(VAT15, '2026-Q3', [job], instant(2026, 10, 3));
+  const cancelled = { ...job, status: 'cancelled', cancelledAt: '2026-12-20',
+    statusHistory: [{ status: 'cancelled', at: instant(2026, 12, 20) }],
+    creditNotes: [{ id: 'CN-9', amount: 115, issuedAt: instant(2027, 1, 5) }], updatedAt: instant(2027, 1, 5) };
+  const adj = vatCorrections([cancelled], { settings }).find((c) => c.kind === 'adjustment');
+  assert.equal(adj.day, '2026-12-20');
+  // Not reversed: a credit note still dates its own change.
+  const credited = { ...job, creditNotes: [{ id: 'CN-9', amount: 115, issuedAt: instant(2027, 1, 5) }] };
+  assert.equal(vatCorrections([credited], { settings }).find((c) => c.kind === 'adjustment').day, '2027-01-05');
+});
+
 test('un-cancelled after a filed reversal: the un-cancel day is the change, not a later save', () => {
   const job = invoice();
   let settings = V.markFiled(VAT15, '2026-Q3', [job], instant(2026, 10, 3));
