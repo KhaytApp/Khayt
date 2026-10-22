@@ -44,11 +44,21 @@ final class Camera {
         /// The camera answered and has no frame — warming up, or busy. NOT a
         /// fault, and drawn differently from one.
         case waiting
+        /// A real picture that has stopped changing — Snapmaker's
+        /// `monitor.jpg` once no Snapmaker client is watching. Drawn as the
+        /// last frame it is, never as live, and never taken as a finish photo.
+        case paused(Data)
         case failed(String)
     }
 
     private(set) var frames: [String: Frame] = [:]
     private var task: Task<Void, Never>?
+
+    /// When a paused camera is next asked. A still that has not changed for
+    /// minutes will not change in the next five seconds, so it is asked once a
+    /// minute instead — enough to notice it waking up.
+    private var nextAsk: [String: Date] = [:]
+    static let pausedEvery: TimeInterval = 60
 
     /// How often a still is refetched. A print changes slowly; a camera tile is
     /// for "is it still going and does the plate look right", not for watching
@@ -77,8 +87,15 @@ final class Camera {
             // Not a printer in service: retired has left the shop, and under
             // service is on the bench, usually switched off — asking its camera
             // every few seconds would only draw a failure.
-            guard machine.hasCamera, machine.inService else { frames[machine.id] = .none; continue }
-            frames[machine.id] = await Self.fetch(machine, shop: shop)
+            guard machine.hasCamera, machine.inService else {
+                frames[machine.id] = nil; nextAsk[machine.id] = nil; continue
+            }
+            let now = Date()
+            if let due = nextAsk[machine.id], due > now { continue }
+            let frame = await Self.fetch(machine, shop: shop)
+            frames[machine.id] = frame
+            if case .paused = frame { nextAsk[machine.id] = now.addingTimeInterval(Self.pausedEvery) }
+            else { nextAsk[machine.id] = nil }
         }
     }
 
@@ -178,6 +195,10 @@ final class Camera {
         var request = URLRequest(url: aimed)
         request.timeoutInterval = 5
         request.httpMethod = "GET"
+        // Never a cached still. `URLSession.shared` keeps an HTTP cache, and
+        // a Moonraker file reply carries `Last-Modified`, so a heuristic-fresh
+        // copy of the plate as it was could be handed back as now.
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         // The credential the printer's own adapters send. It reaches the
         // printer and nowhere else — which is only true BECAUSE the host was
         // checked and the request aimed at the checked address above, and is
@@ -232,6 +253,20 @@ final class Camera {
                 // A camera with nothing to show is not a camera that is broken.
                 return refusal == "no_frame_yet" ? .waiting : .failed(refusal)
             }
+            // ── A PICTURE THAT HAS STOPPED CHANGING ──────────────────────
+            //
+            // Snapmaker rewrites `monitor.jpg` only while one of its own
+            // clients watches. On the bench it was 2 s old mid-print and
+            // frozen four minutes after the end — and a frozen plate drawn as
+            // live says a print is fine after it has failed. Judged on the
+            // printer's clock (`stillAge`), so a Mac that is minutes out does
+            // not call a live camera paused.
+            if let age = try? await engine.stillAge(lastModified: http?.value(forHTTPHeaderField: "Last-Modified"),
+                                                    date: http?.value(forHTTPHeaderField: "Date"),
+                                                    now: Date()),
+               age.paused {
+                return .paused(data)
+            }
             return .picture(data)
         } catch {
             return .failed("unreachable")
@@ -267,6 +302,29 @@ struct CameraTile: View {
                     // module's content-type check already refused the obvious
                     // cases; this is the one it cannot see.
                     Placeholder(note: words?.callIt("mac.cam_unreachable"))
+                }
+            case .paused(let data):
+                // The last frame, dimmed and labelled — never drawn as live.
+                ZStack(alignment: .bottom) {
+                    if let image = NSImage(data: data) {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .rotationEffect(.degrees(Double(webcam?.rotate ?? 0)))
+                            .scaleEffect(x: (webcam?.flipH ?? false) ? -1 : 1,
+                                         y: (webcam?.flipV ?? false) ? -1 : 1)
+                            .saturation(0)
+                            .opacity(0.45)
+                    } else {
+                        Placeholder(note: nil)
+                    }
+                    if let note = words?.callIt("mac.cam_paused") {
+                        Text(note)
+                            .font(.caption.weight(.medium))
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(.regularMaterial, in: Capsule())
+                            .padding(6)
+                    }
                 }
             case .waiting:
                 // Warming up, not broken — and it says which, in words. A

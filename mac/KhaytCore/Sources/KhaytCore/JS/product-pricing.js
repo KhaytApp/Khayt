@@ -27,6 +27,15 @@ const num = (v, fallback) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+/** lib/print-rates.js, by whichever route this host loads modules. */
+const printRates = () => {
+  if (typeof global !== 'undefined' && global.KhaytPrintRates) return global.KhaytPrintRates;
+  if (typeof require === 'function') {
+    try { return require('./print-rates.js'); } catch (e) { return null; }
+  }
+  return null;
+};
+
 /**
  * Price one product.
  *
@@ -60,17 +69,22 @@ function priceProduct(product, opts) {
    * which is why this looks correct in a casual test. The renderer never saw
    * any of it, because its globals happened to be there.
    *
-   * ── AND NO RATES ARE INJECTED, DELIBERATELY ─────────────────────────────
+   * ── A RATE THE PART NEVER SAID IS KHAYT'S DEFAULT, AS IN A JOB ──────────
    *
-   * A first draft merged `print-rates` defaults under each part, the way
-   * `costPart` does for a JOB's part. That is a behaviour change wearing a
-   * refactor's clothes: `productDefaultPricing` never did it, so every
-   * catalogue product in every existing shop would have gained labour, power
-   * and wear it was not priced with, and every price would have moved on the
-   * next save. A lift must return what it replaced.
+   * A part is costed through `KhaytPrintRates.withRates` with the shop's
+   * settings: every rate it carries wins, and one it does not carry (no
+   * labour, no wear) is the shop's default — Khayt's figures with the shop's
+   * own tariff over them, the ones a new part starts at on either app's sheet.
+   * That is the same merge the Mac's `costPart` makes for a job, so a job
+   * taken from the product costs what the catalogue says.
    *
-   * A product's part is costed with whatever rates it carries. Where it carries
-   * none, those terms are zero — which is what the shop has been charging.
+   * It did not used to: an earlier draft held these at zero so that no stored
+   * price would move on the next save. The Mac then filled the defaults in on
+   * the job and the catalogue did not, so a part with no labour saved on it
+   * listed at its material cost and opened a job at material plus 90 an hour.
+   * Stored prices still do not move: a product is priced again only when
+   * somebody edits it and saves, on a sheet that shows the figure it will
+   * write and says when the saved price is kept.
    */
   const ctx = { inventory: opts.inventory || [], settings: opts.settings || {}, consumables: opts.consumables || [] };
 
@@ -88,14 +102,16 @@ function priceProduct(product, opts) {
   // This moves no stored price. A product carries the price it was saved
   // with; it is priced again only when somebody opens and saves it, on a
   // sheet that shows the figure it will save.
-  const partsCost = list.reduce((sum, p) => {
+  const PRt = printRates();
+  const partsCost = list.reduce((sum, raw) => {
+    const p = PRt ? PRt.withRates(raw, { settings: ctx.settings }) : raw;
     if (CC && typeof CC.partTotalCost === 'function') {
       return sum + (+CC.partTotalCost(p, ctx) || 0);
     }
     if (CC && typeof CC.computePartBaseCost === 'function') {
       return sum + (+CC.computePartBaseCost(p, ctx) || 0) * Math.max(1, +(p && p.qty) || 1);
     }
-    return sum + (+p.baseCost || 0);
+    return sum + (+(p && p.baseCost) || 0);
   }, 0);
 
   // Non-printed components folded into the unit cost, for a product that is an

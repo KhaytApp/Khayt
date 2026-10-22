@@ -4706,6 +4706,16 @@
   "pnl.vat_inclusive": "您的价格含税，因此从每笔销售中扣除税额，收入以不含税金额显示。",
   "pnl.vat_exclusive": "税额加在您的价格之上，因此收入为加税前的价格。",
   "pnl.vat_missing": "本期未记录增值税的支出：{n} 笔。这些支出不会抵扣任何税额；请填写供应商发票上的税额以申请抵扣。",
+  "pnl.vat_adjustment": "已申报期间的调整",
+  "pnl.vat_adjustment_note": "申报后对已申报期间发票的更改（取消、作废、贷项、编辑或倒签日期）：{n} 项。差额在第一个未申报期间（此处）调整，已申报的申报表保持原样。",
+  "pnl.vat_returns": "增值税申报",
+  "pnl.vat_filed": "已申报",
+  "pnl.vat_filed_hint": "申报提交后将其标记为已申报。此后其数字不再变化：之后的取消、作废、贷项、编辑或倒签日期的发票，将在下一个未申报期间调整。",
+  "pnl.vat_returns_none": "此范围内尚无已结束的申报期间。",
+  "pnl.vat_filing": "增值税申报频率",
+  "pnl.vat_filing_quarterly": "按季度",
+  "pnl.vat_filing_monthly": "按月",
+  "pnl.vat_filing_hint": "在沙特阿拉伯，年应税销售额超过 4000 万里亚尔的企业须按月向 ZATCA 申报，其他企业按季度申报。",
   "pnl.exported_as": "损益表已导出为",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

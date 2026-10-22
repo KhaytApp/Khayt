@@ -1778,6 +1778,11 @@ final class Shop {
     /// Machines with a command in flight, so the buttons can say so and cannot
     /// be pressed twice.
     var printerBusy: Set<String> = []
+    /// Which of pause/resume/cancel each protocol can take, learned from
+    /// `lib/printer-commands.js` the first time a card for that protocol is
+    /// drawn (`learnPrinterVerbs`). Absent until then, and a card draws no
+    /// command until it is known, rather than a button that fails on press.
+    var printerVerbs: [String: Set<PrinterVerb>] = [:]
 
     /// A job this app is about to cancel, held for the confirmation.
     ///
@@ -1785,6 +1790,16 @@ final class Shop {
     /// no printer asks twice. Pause and resume go straight through — they are
     /// each other's undo.
     var confirmingCancel: Machine?
+
+    /// A Bambu speed preset about to be set on a running print, held for the
+    /// confirmation. Ludicrous on a part sliced for standard is a way to lose it.
+    struct SpeedChange: Identifiable, Equatable {
+        let machine: Machine
+        let level: Int
+        var id: String { machine.id + "#\(level)" }
+        static func == (a: SpeedChange, b: SpeedChange) -> Bool { a.id == b.id }
+    }
+    var confirmingSpeed: SpeedChange?
 
     /// The machine whose plate is being looked at, for dropping one object.
     var droppingFrom: Machine?
@@ -2576,6 +2591,9 @@ final class Shop {
     /// What stopped the last settings save, and what it did.
     var settingsProblem: String?
     var settingsNote: String?
+    /// Why the last "Filed" toggle on a VAT return could not be written
+    /// (Shop+Pnl.swift `setVatPeriodFiled`).
+    var vatFiledProblem: String?
     /// Which pane the Settings window shows. On the shop so a snapshot run can
     /// turn the pages.
     var settingsPane: SettingsPane = .business

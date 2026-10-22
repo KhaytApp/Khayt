@@ -175,6 +175,12 @@
     if (has(f, 'supplierPhone')) out.supplierPhone = text('supplierPhone');
     if (has(f, 'currency'))      out.currency      = f.currency || 'SAR';
     if (has(f, 'enableZatca'))   out.enableZatca   = !!f.enableZatca;
+    // How often the shop files its VAT return (lib/vat-periods.js): ZATCA
+    // puts annual taxable turnover over SAR 40M on monthly, everyone else on
+    // quarterly. Anything but 'monthly' is quarterly. The filed marks
+    // (`vatFiledPeriods`) are written by their own toggle, not this form, and
+    // ride through on `...s` above.
+    if (has(f, 'vatFilingFrequency')) out.vatFilingFrequency = f.vatFilingFrequency === 'monthly' ? 'monthly' : 'quarterly';
 
     // Written from the live profile so the legacy VAT fields and the tax
     // profile can never drift apart into two different answers. Only when the

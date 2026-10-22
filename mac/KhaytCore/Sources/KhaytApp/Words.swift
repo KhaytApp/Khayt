@@ -1748,6 +1748,20 @@ final class Words {
         "mac.pnl_col_operating": ["en": "Operating costs", "ar": "تكاليف التشغيل"],
         // The net income card adds up every period in the book.
         "mac.pnl_all_time": ["en": "all time", "ar": "منذ البداية"],
+        // A filed VAT return (PnlControls.swift VatSummaryCard).
+        "mac.vat_unfile_title": ["en": "Mark {period} as not filed?", "ar": "هل تعلّم {period} غير مُقدَّم؟"],
+        "mac.vat_unfile_message": ["en": "This forgets what you filed for {period}. Only do this if the return was not actually filed.",
+                                   "ar": "هذا ينسى ما قدّمته عن {period}. لا تفعل ذلك إلا إذا لم يُقدَّم الإقرار فعلًا."],
+        "mac.vat_unfile_confirm": ["en": "Mark as not filed", "ar": "علّمه غير مُقدَّم"],
+        "mac.vat_refile_title": ["en": "File {period} again?", "ar": "هل تعلّم {period} مُقدَّمًا من جديد؟"],
+        "mac.vat_refile_message": ["en": "Khayt kept what you filed for this period. Restore it, or record the book as it is now if you filed an amended return.",
+                                   "ar": "احتفظ خيط بما قدّمته عن هذه الفترة. استعده، أو سجّل الدفتر كما هو الآن إن قدّمت إقرارًا معدَّلًا."],
+        "mac.vat_refile_restore": ["en": "Restore what you filed", "ar": "استعد ما قدّمته"],
+        "mac.vat_refile_fresh": ["en": "Record the book as it is now", "ar": "سجّل الدفتر كما هو الآن"],
+        "mac.vat_filed_part_of": ["en": "Filed as part of {period}", "ar": "مُقدَّم ضمن {period}"],
+        "mac.vat_filed_later": ["en": "{later} is filed after {period} and already corrects it. Un-file {later} first.", "ar": "الفترة {later} مُقدَّمة بعد {period} وتصحّحها بالفعل. ألغِ تقديم {later} أولًا."],
+        "mac.vat_filed_overlap": ["en": "{period} overlaps {other}, which is already marked filed.",
+                                  "ar": "تتداخل {period} مع {other} المُعلَّمة مُقدَّمة."],
         // A failure allowance learned from the shop's own history —
         // lib/failure-rate.js. Offered beside the field, never applied alone.
         "mac.fail_suggest": [
@@ -2088,6 +2102,34 @@ final class Words {
                               "ar": "لم تُجب أي كاميرا على العناوين المعتادة لهذا النوع من الطابعات. إن كنت تعرف العنوان فاكتبه أعلاه."],
         "mac.cam_needs_host": ["en": "Give the printer an address first — a camera is looked for on the same machine.",
                                "ar": "أعطِ الطابعة عنواناً أولاً — تُطلب الكاميرا من الجهاز نفسه."],
+        // A camera a look found: offered, never applied. The saved address
+        // is the shop's, and only the owner replaces it.
+        "mac.cam_offer_title": ["en": "Found a camera", "ar": "وُجدت كاميرا"],
+        "mac.cam_offer_new":   ["en": "Use it for this printer? Nothing changes until you save.",
+                                "ar": "استخدامها لهذه الطابعة؟ لا يتغير شيء حتى تحفظ."],
+        "mac.cam_offer_replace": ["en": "It is not the address saved here, and the saved one did not answer. The saved one stays unless you use this.",
+                                  "ar": "ليس هذا العنوان المحفوظ هنا، والمحفوظ لم يُجب. يبقى المحفوظ ما لم تستخدم هذا."],
+        "mac.cam_offer_enable": ["en": "This is the address saved here, switched off. Switch it on?",
+                                 "ar": "هذا هو العنوان المحفوظ هنا، وهو مطفأ. تشغيله؟"],
+        "mac.cam_offer_paused": ["en": "Its picture is paused right now: the printer refreshes it only while its own screen or app is watching.",
+                                 "ar": "صورتها متوقفة الآن: لا تحدّثها الطابعة إلا أثناء مشاهدة شاشتها أو تطبيقها."],
+        "mac.cam_offer_use":   ["en": "Use this camera", "ar": "استخدم هذه الكاميرا"],
+        "mac.cam_offer_not_now": ["en": "Not now", "ar": "ليس الآن"],
+        "mac.cam_found_paused": ["en": "Found a camera. Its picture is paused until the printer's own screen or app watches it.",
+                                 "ar": "وُجدت كاميرا. صورتها متوقفة حتى تشاهدها شاشة الطابعة أو تطبيقها."],
+        "mac.cam_saved_answered": ["en": "The saved camera answered with a picture.",
+                                   "ar": "أجابت الكاميرا المحفوظة بصورة."],
+        "mac.cam_saved_paused": ["en": "The saved camera answered, but its picture is paused.",
+                                 "ar": "أجابت الكاميرا المحفوظة، لكن صورتها متوقفة."],
+        // On the tile: the last frame, dimmed, never drawn as live.
+        "mac.cam_paused":      ["en": "Camera paused", "ar": "الكاميرا متوقفة"],
+        // A finished job's timelapse, kept on the printer.
+        "mac.timelapse_watch": ["en": "Watch timelapse", "ar": "شاهد الفيديو المتسارع"],
+        "mac.timelapse_on_printer": ["en": "{size} on {machine}. It plays from the printer and is not copied into the book.",
+                                     "ar": "{size} على {machine}. يُعرض من الطابعة ولا يُنسخ إلى الدفتر."],
+        "mac.timelapse_gone":  ["en": "The printer did not answer, or no longer has this video.",
+                                "ar": "لم تُجب الطابعة، أو لم يعد هذا الفيديو عليها."],
+        "mac.timelapse_title": ["en": "Timelapse", "ar": "الفيديو المتسارع"],
         "mac.cam_same_host": ["en": "A path is enough — /webcam/?action=snapshot. It is read from the printer's own address, and only from there.",
                               "ar": "المسار يكفي — ‎/webcam/?action=snapshot‎. تُقرأ من عنوان الطابعة نفسه، ومنه وحده."],
         // Finishing a job, and what it really took.
@@ -2346,6 +2388,20 @@ final class Words {
                                 "ar": "رفضت الطابعة رمز الوصول (CONNACK {code}). يظهر الرمز على شاشة الطابعة نفسها، في قسم وضع الشبكة المحلية فقط."],
         "mac.pw_bambu_silent": ["en": "The printer accepted the connection and then said nothing. That is what happens when Developer Mode is off — LAN-only Mode alone does not open MQTT. Both are in the same menu on the printer (Settings → LAN Mode, or WLAN/Network on P1 and A1).",
                                 "ar": "قبلت الطابعة الاتصال ثم لم تقل شيئًا. هذا ما يحدث حين يكون وضع المطوّر (Developer Mode) مطفأً — وضع الشبكة المحلية وحده لا يفتح MQTT. كلاهما في القائمة نفسها على الطابعة (Settings ← LAN Mode، أو WLAN/Network في P1 وA1)."],
+        "mac.mach_cert_unverified": ["en": "Certificate not verified by Bambu Lab. This printer is trusted because it presented the same certificate as the first time it connected.",
+                                     "ar": "الشهادة غير موثّقة من Bambu Lab. هذه الطابعة موثوقة لأنها قدّمت الشهادة نفسها التي قدّمتها أول مرة اتصلت فيها."],
+        "mac.pw_cert_not_bambu": ["en": "The device at this address did not present a Bambu Lab certificate, so the access code was not sent. Check the address is the printer's ({why}).",
+                                  "ar": "لم يقدّم الجهاز على هذا العنوان شهادة من Bambu Lab، لذا لم يُرسَل رمز الوصول. تأكد أن العنوان هو عنوان الطابعة ({why})."],
+        "mac.pw_cert_other_printer": ["en": "A different Bambu printer answered at this address (its certificate names serial {name}), so the access code was not sent. Check the address and the serial on the machine sheet.",
+                                      "ar": "أجابت طابعة Bambu أخرى على هذا العنوان (شهادتها تحمل الرقم التسلسلي {name})، لذا لم يُرسَل رمز الوصول. تحقق من العنوان والرقم التسلسلي في نافذة الآلة."],
+        "mac.pw_bambu_quiet": ["en": "The printer stopped sending updates for over a minute. Khayt is reconnecting.",
+                               "ar": "توقفت الطابعة عن إرسال التحديثات لأكثر من دقيقة. يعيد خيط الاتصال بها."],
+        "mac.pw_bambu_refused": ["en": "The printer refused the command: {why}. On firmware with Bambu's authorization control, LAN commands are accepted only while Developer Mode is on.",
+                                 "ar": "رفضت الطابعة الأمر: {why}. في البرامج الثابتة التي فيها التحكم بالتفويض من Bambu، لا تُقبل أوامر الشبكة المحلية إلا ووضع المطوّر (Developer Mode) مفعّل."],
+        "mac.pw_bambu_refused_bare": ["en": "The printer refused the command. On firmware with Bambu's authorization control, LAN commands are accepted only while Developer Mode is on.",
+                                      "ar": "رفضت الطابعة الأمر. في البرامج الثابتة التي فيها التحكم بالتفويض من Bambu، لا تُقبل أوامر الشبكة المحلية إلا ووضع المطوّر (Developer Mode) مفعّل."],
+        "mac.pw_unconfirmed": ["en": "The command was sent, but the printer did not confirm it. Check the printer before trying again.",
+                               "ar": "أُرسل الأمر، لكن الطابعة لم تؤكده. تحقق من الطابعة قبل المحاولة مجددًا."],
         "mac.nozzle_wear":   ["en": "Nozzle wear",     "ar": "تآكل الفوهة"],
         // The dashed rectangle behind a bed plan. Without this the drawing
         // reads as a rendering fault rather than as a comparison.
@@ -3496,6 +3552,19 @@ final class Words {
         "mac.by_bytes":      ["en": "by file position", "ar": "حسب موضع الملف"],
         "mac.nozzle_temp":   ["en": "Nozzle",        "ar": "الفوهة"],
         "mac.bed_temp":      ["en": "Bed",           "ar": "المنصة"],
+        // The richer card. Short: they are tooltips and captions on a card
+        // already carrying a bar and a filename.
+        "mac.chamber_temp":  ["en": "Chamber",       "ar": "الحجرة"],
+        "mac.part_fan":      ["en": "Part cooling fan", "ar": "مروحة تبريد القطعة"],
+        "mac.speed_factor":  ["en": "Speed (100% is as sliced)", "ar": "السرعة (100% كما في التقطيع)"],
+        "mac.flow_factor":   ["en": "Flow (100% is as sliced)",  "ar": "التدفق (100% كما في التقطيع)"],
+        "mac.layer_of":      ["en": "Layer {layer} of {total}", "ar": "الطبقة {layer} من {total}"],
+        "mac.filament_out":  ["en": "Out of filament", "ar": "نفد الخيط"],
+        "mac.printer_says":  ["en": "What the printer says", "ar": "ما تقوله الطابعة"],
+        // A card under a running print with no buttons on it reads as a
+        // feature somebody forgot to draw; this says it is on purpose.
+        "mac.printer_no_control": ["en": "Khayt cannot pause or cancel this printer yet. Use the printer itself or its own app.",
+                                   "ar": "لا يستطيع خيط إيقاف هذه الطابعة مؤقتًا أو إلغاء طباعتها بعد. استخدم الطابعة نفسها أو تطبيقها."],
         // Said out loud rather than left blank: a card that shows nothing looks
         // broken, and a shop would go back to the other app not knowing why.
         "mac.not_polled":    ["en": "Khayt watches this printer; this app does not speak {protocol} yet.",
@@ -3977,6 +4046,18 @@ final class Words {
         "plug.auto_off_done": ["en": "Turned off {name}: the print finished and it has cooled.", "ar": "أُطفئت {name}: انتهت الطباعة وبردت."],
         "mac.printer_resume": ["en": "Resume",       "ar": "استئناف"],
         "mac.printer_cancel": ["en": "Cancel print", "ar": "إلغاء الطباعة"],
+        "mac.printer_speed":  ["en": "Speed", "ar": "السرعة"],
+        "mac.printer_speed_1": ["en": "Silent", "ar": "صامت"],
+        "mac.printer_speed_2": ["en": "Standard", "ar": "قياسي"],
+        "mac.printer_speed_3": ["en": "Sport", "ar": "رياضي"],
+        "mac.printer_speed_4": ["en": "Ludicrous", "ar": "فائق"],
+        "mac.printer_light":  ["en": "Light", "ar": "الإضاءة"],
+        "mac.printer_light_on": ["en": "Chamber light on", "ar": "تشغيل إضاءة الحجرة"],
+        "mac.printer_light_off": ["en": "Chamber light off", "ar": "إطفاء إضاءة الحجرة"],
+        "mac.speed_ask":      ["en": "Set {machine} to {speed} speed?", "ar": "ضبط {machine} على السرعة {speed}؟"],
+        "mac.speed_set":      ["en": "Set speed", "ar": "ضبط السرعة"],
+        "mac.speed_why":      ["en": "This changes the print that is running now. A faster mode than the file was sliced for can cost quality or the print.",
+                               "ar": "هذا يغيّر الطباعة الجارية الآن. وضع أسرع مما قُطّع له الملف قد يكلّف الجودة أو الطباعة نفسها."],
         "mac.cancel_ask":     ["en": "Cancel the print on {machine}?",
                                "ar": "إلغاء الطباعة على {machine}؟"],
         "mac.cancel_why":     ["en": "Everything printed so far is scrap. The printer will not ask again.",
@@ -4554,8 +4635,8 @@ final class Words {
         // What a part costs besides its filament.
         "mac.part_rates":    ["en": "Labour, power and wear",
                               "ar": "العمالة والكهرباء والاستهلاك"],
-        "mac.part_no_rates": ["en": "A part here carries no labour, power or wear, so it is costed at its filament alone. Add it again with the figures above to price it in full.",
-                              "ar": "أحد الأجزاء لا يحمل عمالة أو كهرباء أو استهلاكاً، فتُحتسب كلفته من الخيط وحده. أضفه من جديد بالأرقام أعلاه لتسعيره بالكامل."],
+        "mac.part_no_rates": ["en": "A part here has no rates of its own, so its labour, power and wear are costed at your default rates. To set its own, edit the part and fill in the fields above.",
+                              "ar": "أحد الأجزاء ليست له أسعار خاصة، فتُحتسب العمالة والكهرباء والاستهلاك فيه بأسعارك الافتراضية. لتحديد أسعاره، عدّل الجزء واملأ الحقول أعلاه."],
         "mac.tracking_link_copied": ["en": "Tracking link copied. The customer sees the stage, the shipping and, once done, a short survey.",
                                      "ar": "نُسخ رابط المتابعة. يرى العميل المرحلة والشحن، وبعد الإنجاز استبياناً قصيراً."],
         // ── A printer's working life: under service, retired, deleted ─────

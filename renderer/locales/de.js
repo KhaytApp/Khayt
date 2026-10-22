@@ -4706,6 +4706,16 @@
   "pnl.vat_inclusive": "Ihre Preise enthalten die USt.; sie wird aus jedem Verkauf herausgerechnet und der Umsatz ohne sie gezeigt.",
   "pnl.vat_exclusive": "Die USt. wird auf Ihre Preise aufgeschlagen; der Umsatz ist der Preis davor.",
   "pnl.vat_missing": "Ausgaben in diesem Zeitraum ohne erfasste USt.: {n}. Darauf wird nichts erstattet; tragen Sie die USt. aus der Lieferantenrechnung ein.",
+  "pnl.vat_adjustment": "Korrektur für einen eingereichten Zeitraum",
+  "pnl.vat_adjustment_note": "Änderungen nach der Einreichung an Rechnungen eingereichter Voranmeldungen (storniert, annulliert, gutgeschrieben, geändert oder rückdatiert): {n}. Die Differenz wird hier, im ersten offenen Zeitraum, korrigiert; die eingereichten Voranmeldungen bleiben unverändert.",
+  "pnl.vat_returns": "Umsatzsteuer-Voranmeldungen",
+  "pnl.vat_filed": "Eingereicht",
+  "pnl.vat_filed_hint": "Markieren Sie eine Voranmeldung nach dem Einreichen als eingereicht. Danach ändern sich ihre Zahlen nicht mehr: eine spätere Stornierung, Annullierung, Gutschrift, Änderung oder rückdatierte Rechnung wird im nächsten offenen Zeitraum korrigiert.",
+  "pnl.vat_returns_none": "In dieser Spanne ist noch kein Meldezeitraum abgeschlossen.",
+  "pnl.vat_filing": "Umsatzsteuer-Voranmeldungen werden abgegeben",
+  "pnl.vat_filing_quarterly": "Vierteljährlich",
+  "pnl.vat_filing_monthly": "Monatlich",
+  "pnl.vat_filing_hint": "In Saudi-Arabien verlangt die ZATCA monatliche Erklärungen ab einem steuerpflichtigen Jahresumsatz von über 40 Mio. SAR, sonst vierteljährliche.",
   "pnl.exported_as": "Gewinn und Verlust exportiert als",
 };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

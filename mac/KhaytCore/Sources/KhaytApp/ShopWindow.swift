@@ -739,6 +739,28 @@ struct WindowSheets: ViewModifier {
             } message: {
                 Text(shop.words.callIt("mac.cancel_why"))
             }
+            // A Bambu speed preset on a running print: confirmed, naming the
+            // machine and the preset.
+            .confirmationDialog(
+                shop.words.callIt("mac.speed_ask", [
+                    "machine": .string(shop.confirmingSpeed?.machine.name ?? ""),
+                    "speed": .string(shop.words.callIt("mac.printer_speed_\(shop.confirmingSpeed?.level ?? 2)")),
+                ]),
+                isPresented: Binding(get: { shop.confirmingSpeed != nil },
+                                     set: { if !$0 { shop.confirmingSpeed = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button(shop.words.callIt("mac.speed_set")) {
+                    guard let change = shop.confirmingSpeed else { return }
+                    shop.confirmingSpeed = nil
+                    Task { await shop.control(change.machine, .speed(change.level)) }
+                }
+                Button(shop.words.callIt("common.cancel"), role: .cancel) {
+                    shop.confirmingSpeed = nil
+                }
+            } message: {
+                Text(shop.words.callIt("mac.speed_why"))
+            }
             // Signing out, in the other app's words. Nothing is deleted, so it
             // is not the destructive role; it still asks, because sync stops.
             .confirmationDialog(

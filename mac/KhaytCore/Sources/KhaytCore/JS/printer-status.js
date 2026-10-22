@@ -343,12 +343,44 @@
     return flat;
   }
 
+  /**
+   * "Layer 412 of 750", or nothing.
+   *
+   * Both numbers or neither. A current layer with no total cannot be drawn
+   * as "x of y", and a total with no current one is the trap `layerProgressPct`
+   * records: Klipper's "not set" read as layer zero. Every protocol that
+   * reports layers goes through here, so a Repetier idling at `layer: 0` with
+   * no job and a Klipper whose slicer never set the layer both say nothing.
+   *
+   * @returns {{layer: number|null, totalLayers: number|null}}
+   */
+  function layerPair(current, total) {
+    const n = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    const cur = n(current);
+    const all = n(total);
+    if (cur === null || all === null || all <= 0 || cur < 0) return { layer: null, totalLayers: null };
+    return { layer: Math.round(cur), totalLayers: Math.round(all) };
+  }
+
+  /**
+   * A 0..1 factor as a whole percentage, or null.
+   *
+   * Klipper's `speed_factor`, a fan's `speed` and RepRapFirmware's
+   * `speedFactor` are all fractions of one. A number that is not there is
+   * null, never 0 — a fan reported at 0% is a fan that is off, and saying that
+   * about a fan nobody measured is a reading a shop can act on.
+   */
+  function percentOfOne(value) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null;
+    return Math.round(value * 100);
+  }
+
   // duetHeaterTemp used to live here and has moved to lib/duet.js, next to the
   // two transports that need it. This file is the CROSS-adapter normaliser —
   // progress, ETA, clamping — and a Duet heater-index rule was never that.
   const api = {
     reading, normalizeProgress, fileProgressPct, etaSeconds, etaWithEstimate, layerProgressPct, moonrakerProgress,
-    explainPrinterHttp, vendorMessage,
+    explainPrinterHttp, vendorMessage, layerPair, percentOfOne,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytPrinterStatus = api;
