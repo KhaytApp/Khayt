@@ -106,8 +106,12 @@ struct PrinterRunoutTests {
         #expect(row["filamentOut"] == .bool(true))
         #expect(PrinterWatch.cacheEntry(status, at: Date())["filamentOut"] == .bool(true))
 
+        // On a job: a runout is only news while something is printing (an idle
+        // head left empty is not one), and this reply is the idle U1's.
+        var printing = row
+        printing["state"] = .string("printing")
         let out = try await engine.printerAlerts(
-            was: [:], now: watch.statusCache, settings: [:],
+            was: [:], now: [machine.id: .object(printing)], settings: [:],
             machines: [.object(["id": .string(machine.id), "name": .string("U1")])],
             state: .object([:]), enable: .sensible)
         #expect(out.alerts.map(\.type) == ["runout"])
@@ -226,14 +230,17 @@ struct PrinterRunoutTests {
         for type in PrinterWatch.everyProtocol {
             let verbs = await PrinterControl.verbs(for: type, engine: engine)
             switch type {
-            case "bambu", "sdcp": #expect(verbs.isEmpty, "\(type) drew Pause and Cancel that failed on press")
+            // Bambu over MQTT and Elegoo over SDCP, which this app speaks (the
+            // desktop, HTTP only, still gets none from the same table).
+            case "bambu", "sdcp": #expect(verbs == all, "\(type)")
             case "repetier": #expect(verbs == [.resume, .cancel])
             default: #expect(verbs == all, "\(type)")
             }
             // And the predicate agrees with what a press would build.
             for verb in PrinterControl.Verb.allCases {
                 let built = try await engine.printerCommand(type: type, command: verb.rawValue,
-                                                            jobId: type == "prusalink" ? "7" : nil)
+                                                            jobId: type == "prusalink" ? "7" : nil,
+                                                            mainboardId: type == "sdcp" ? "MB1" : "")
                 #expect(PrinterControl.offers(verb, verbs) == (built.unsupported == nil), "\(type) \(verb)")
             }
         }

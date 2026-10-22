@@ -321,7 +321,10 @@
    * which is a fact about this moment and not about the protocol.
    */
   function supports(type, command, opts) {
-    const built = buildCommand(type, command, requiresJobId(type) ? '0' : null, opts || {});
+    // SDCP's mainboard id is the same kind of fact as PrusaLink's job id: one
+    // printer's, read at press time, and nothing to do with the protocol.
+    const o = Object.assign({ mainboardId: '0' }, opts || {});
+    const built = buildCommand(type, command, requiresJobId(type) ? '0' : null, o);
     return !!built && !built.unsupported;
   }
 
