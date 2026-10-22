@@ -201,7 +201,10 @@ test('a product saved under the old one-piece cost shows its real, thinner margi
   require('../lib/calculator-cost.js');
   require('../lib/product-pricing.js');
   const p = { id: 's', name: 'Stand', basePrice: 25.74, price: 25.74, baseCost: 19.8, defaultMargin: 30,
-              parts: [{ printWeight: 180, printTime: 2, spoolCost: 110, spoolWeight: 1000, qty: 3 }] };
+              // Every rate said, and said zero: the figure is the filament alone.
+              parts: [{ printWeight: 180, printTime: 2, spoolCost: 110, spoolWeight: 1000, qty: 3,
+                        wearRate: 0, powerDraw: 0, elecRate: 0, prepTime: 0, postTime: 0,
+                        laborRate: 0, failureRate: 0 }] };
   const r = productRates({ products: [p] }, deps);
   assert.equal(of(r, 's').price, 25.74, 'the stored price, as stored');
   assert.equal(of(r, 's').cost, 59.4, 'costed by its parts, all three of them');

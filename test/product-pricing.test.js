@@ -7,6 +7,11 @@ require('../lib/calculator-cost.js');
 require('../lib/product-price.js');
 const pricing = require('../lib/product-pricing.js');
 
+// Every rate SAID, and said zero, so a figure below is the filament alone. A
+// rate a part does not carry is the shop's default (see the last tests here).
+const NO_RATES = Object.freeze({ wearRate: 0, powerDraw: 0, elecRate: 0, prepTime: 0, postTime: 0,
+                                 laborRate: 0, failureRate: 0 });
+
 const PART = {
   name: 'Stand', material: 'PETG', printWeight: 180, supportWeight: 0,
   printTime: 4.5, qty: 1, spoolCost: 85, spoolWeight: 1000,
@@ -57,11 +62,11 @@ test('the cost CONTEXT changes the answer, so it is not optional', () => {
   // which is why this looks fine in a casual test.
   const shelf = [{ id: 'R1', materialType: 'resin' }];
   const part = { filamentId: 'R1', printWeight: 120, printTime: 3, qty: 1,
-                 spoolCost: 220, spoolWeight: 500 };
+                 spoolCost: 220, spoolWeight: 500, ...NO_RATES };
   const withShelf = pricing.priceProduct({ defaultMargin: 0, parts: [part] }, { inventory: shelf });
   const without = pricing.priceProduct({ defaultMargin: 0, parts: [part] }, {});
   // 220/1000 x 120 = 26.40 as resin; 220/500 x 120 = 52.80 as filament. Both
-  // material only — no rates are injected here, see the module's note.
+  // material only — the part says every rate is zero.
   assert.equal(withShelf.cost, 26.4, 'resin is priced per litre');
   assert.equal(without.cost, 52.8, 'without the shelf it takes the filament formula');
   assert.notEqual(without.cost, withShelf.cost, 'the shelf made no difference — is the ctx reaching through?');
@@ -84,7 +89,7 @@ test('pricingFields writes the three fields it owns and no others', () => {
 });
 
 test('a product with no margin of its own is priced at the shop default, as a sale from it is', () => {
-  const part = { name: 'P', printWeight: 1000, spoolCost: 100, spoolWeight: 1000, qty: 1 };
+  const part = { name: 'P', printWeight: 1000, spoolCost: 100, spoolWeight: 1000, qty: 1, ...NO_RATES };
   // The shop quotes at 50: the catalogue said cost × 1.3, the counter sale cost × 1.5.
   assert.equal(pricing.priceProduct({ parts: [part] }, { settings: { defaultMargin: 50 } }).basePrice, 150);
   assert.equal(pricing.priceProduct({ parts: [part] }, { settings: {} }).basePrice, 130, 'no shop default: 30');
@@ -100,7 +105,7 @@ test('a product with no margin of its own is priced at the shop default, as a sa
 // The catalogue costed the part ONCE (19.80, priced 25.74); a job from the
 // same product counts all three (59.40, priced 77.22).
 const STAND = { name: 'Stand', material: 'PLA', printWeight: 180, printTime: 2,
-                spoolCost: 110, spoolWeight: 1000, qty: 3 };
+                spoolCost: 110, spoolWeight: 1000, qty: 3, ...NO_RATES };
 
 test('a part ×3 is costed three times, as a job from the product costs it', () => {
   const out = pricing.priceProduct({ defaultMargin: 30, parts: [STAND] }, {});
@@ -119,9 +124,15 @@ test('a part ×3 is costed three times, as a job from the product costs it', () 
 // `assemblyQty`, and its margin.
 function jobFrom(product, ctx) {
   const CC = require('../lib/calculator-cost.js');
+  const PR = require('../lib/print-rates.js');
   require('../lib/pricing.js');
   const N = require('../lib/order-new.js');
-  const parts = (product.parts || []).map((p) => Object.assign({}, p, { baseCost: CC.partTotalCost(p, ctx) }));
+  // At the part's own rates and the shop's default for any it never carried
+  // (`withRates`), as `appendProductParts` and the Mac's `costPart` take it.
+  const parts = (product.parts || []).map((p) => {
+    const rated = PR.withRates(p, { settings: ctx.settings });
+    return Object.assign({}, rated, { baseCost: CC.partTotalCost(rated, ctx) });
+  });
   return N.newOrder({
     parts, project: 'From the catalogue', margin: product.defaultMargin,
     components: product.components, assemblyQty: product.assemblyQty,
@@ -131,6 +142,11 @@ function jobFrom(product, ctx) {
     consumables: ctx.consumables || [],
   });
 }
+
+// A part saved with none of its rates — an older Mac build's save, an
+// import, the Mac's sample book — and only some of the others.
+const RATELESS = { name: 'Bracket', material: 'PETG', printWeight: 180, printTime: 4.5,
+                   spoolCost: 85, spoolWeight: 1000, qty: 2, prepTime: 0.1 };
 
 test('the catalogue prices a product exactly as a job from it does, on every shape', () => {
   const consumables = [{ id: 'mag', cost: 0.35 }, { id: 'box', cost: 2.1 }];
@@ -145,6 +161,8 @@ test('the catalogue prices a product exactly as a job from it does, on every sha
     'components': { defaultMargin: 30, parts: [STAND], components: comps },
     'components, assemblyQty 2': { defaultMargin: 30, parts: [STAND, second], components: comps, assemblyQty: 2 },
     'assemblyQty with no components': { defaultMargin: 25, parts: [STAND], assemblyQty: 3 },
+    'a part with no labour or wear': { defaultMargin: 30, parts: [RATELESS] },
+    'rate-less beside a rated part': { defaultMargin: 35, parts: [RATELESS, second], components: comps },
   };
   for (const [name, product] of Object.entries(shapes)) {
     const ctx = { inventory: [], settings, consumables };
@@ -154,4 +172,31 @@ test('the catalogue prices a product exactly as a job from it does, on every sha
     assert.equal(listed.price, job.price, `${name}: catalogue ${listed.price} vs job ${job.price}`);
     assert.equal(listed.cost, +jobCost.toFixed(2), `${name}: catalogue cost ${listed.cost} vs job ${jobCost}`);
   }
+});
+
+/* ── A rate the part never carried is the shop's default ─────────────────── */
+
+test('a part with no labour or wear is costed at the shop defaults, as the job path costs it', () => {
+  const CC = require('../lib/calculator-cost.js');
+  const PR = require('../lib/print-rates.js');
+  const settings = { elecRate: 0.3 };
+  const out = pricing.priceProduct({ defaultMargin: 30, parts: [RATELESS] }, { inventory: [], settings });
+  // One piece: 180 g at 0.085 = 15.30; wear 0.75 x 4.5 = 3.375; power 150 W x
+  // 4.5 h at the shop's 0.30 = 0.2025; labour (0.1 its own + 0.5 default) x 90
+  // = 54; +10 % = 80.164. Two of them: 160.33.
+  assert.equal(out.cost, 160.33);
+  // The very merge the Mac's `costPart` makes for a job's part.
+  const merged = Object.assign({}, PR.ratesFor({ settings }), RATELESS);
+  assert.equal(out.cost, +CC.partTotalCost(merged, { inventory: [], settings }).toFixed(2));
+  assert.deepEqual(PR.withRates(RATELESS, { settings }), merged);
+});
+
+test('a rate the part DID carry wins, zero included', () => {
+  const said = Object.assign({}, RATELESS, NO_RATES, { prepTime: 0.1 });
+  const out = pricing.priceProduct({ defaultMargin: 0, parts: [said] }, { settings: {} });
+  assert.equal(out.cost, 30.6, '180 g at 0.085, twice: a zero rate is a rate, not a blank');
+  const withLabour = Object.assign({}, RATELESS, { laborRate: 40 });
+  const a = pricing.priceProduct({ defaultMargin: 0, parts: [withLabour] }, { settings: {} });
+  const b = pricing.priceProduct({ defaultMargin: 0, parts: [RATELESS] }, { settings: {} });
+  assert.ok(a.cost < b.cost, "the part's own 40 an hour beat the default 90");
 });

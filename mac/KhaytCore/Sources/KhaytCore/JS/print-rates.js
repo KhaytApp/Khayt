@@ -180,7 +180,26 @@
     return out;
   }
 
-  const api = { DEFAULTS, MAX_ELEC_RATE, ratesFor, defaultsFor, shopTariff };
+  /**
+   * A part with the rates it is COSTED at: `ratesFor(opts)` under it, and
+   * every field the part carries over them. The one merge every costing of a
+   * part goes through — the Mac's `costPart` (a job's part, typed or taken
+   * from a product), the catalogue (`lib/product-pricing.js`) and the desktop's
+   * job-from-product (`appendProductParts`) — so one part cannot cost one
+   * figure in the catalogue and another in the job taken from it.
+   *
+   * Only a field the part does not HAVE takes the rate. One it carries wins,
+   * zero, blank and null included: a figure somebody wrote down is what to
+   * charge, and these are only what to assume when nobody said.
+   *
+   * @param {object} part
+   * @param {object} [opts] as `ratesFor`
+   */
+  function withRates(part, opts) {
+    return Object.assign({}, ratesFor(opts), part && typeof part === 'object' ? part : {});
+  }
+
+  const api = { DEFAULTS, MAX_ELEC_RATE, ratesFor, defaultsFor, shopTariff, withRates };
   Object.assign(global, { KhaytPrintRates: api });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

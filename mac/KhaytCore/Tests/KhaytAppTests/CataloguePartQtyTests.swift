@@ -87,6 +87,54 @@ struct CataloguePartQtyTests {
         }
     }
 
+    /// A product part saved WITHOUT its labour and wear — a part made by an
+    /// older build, an import, the sample book's. A job taken from it is costed
+    /// by `costPart`, which fills the shop's default for every rate the part
+    /// never carried; the catalogue (`lib/product-pricing.js`) used to hold
+    /// those at zero, so the product listed at its filament and the job opened
+    /// at filament plus 90 an hour. Both go through `KhaytPrintRates.withRates`.
+    static let rateless: [String: JSONValue] = [
+        "name": .string("Stand"), "material": .string("PLA"),
+        "spoolCost": .number(110), "spoolWeight": .number(1000),
+        "printWeight": .number(180), "printTime": .number(2), "qty": .number(2),
+        "prepTime": .number(0.25), "laborRate": .null,
+    ]
+
+    @Test("a part with no labour or wear costs the same in the catalogue and in a job taken from it")
+    func ratelessPartAgrees() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let engine = try #require(shop.engine)
+        var part = Self.rateless
+        part.removeValue(forKey: "laborRate")      // never said: the default
+        let product = Product(id: "PROD-rateless", names: ["en": "Stand"], descriptions: [:],
+                              margin: 30, group: "", category: "", createdAt: "2026-10-22",
+                              rest: ["parts": .array([.object(part)])])
+        let drafts = await shop.jobParts(from: product)
+        let draft = try #require(drafts.first)
+        let listed = try await engine.priceProduct(
+            .object(["defaultMargin": .number(30), "parts": .array([.object(part)])]),
+            inventory: shop.inventoryRows, settings: shop.settingsDict, consumables: shop.consumableRows)
+        #expect(abs(draft.cost * Double(draft.qty) - listed.cost) < 0.005,
+                Comment(rawValue: "job \(draft.cost) x \(draft.qty) vs catalogue \(listed.cost)"))
+        // And it is the defaults that filled the gap, not zero: 180 g at 0.11
+        // is 19.80 a piece, so a catalogue at material alone would say 39.60.
+        let rates = try #require(draft.rates)
+        #expect(rates.prepTime == 0.25, "the part's own prep time was overridden")
+        #expect(rates.laborRate == 90 && rates.wearRate == 0.75)
+        #expect(listed.cost > 39.6 + 1, Comment(rawValue: "catalogue \(listed.cost)"))
+
+        // A rate the part DID write down is kept — a null included, which the
+        // cost model reads as zero on both paths.
+        let saidNull = try await engine.costPart(.object(Self.rateless), inventory: [], settings: [:])
+        #expect(saidNull.rates.laborRate == 0)
+        let listedNull = try await engine.priceProduct(
+            .object(["defaultMargin": .number(30), "parts": .array([.object(Self.rateless)])]),
+            inventory: [], settings: [:], consumables: [])
+        #expect(abs(saidNull.cost * 2 - listedNull.cost) < 0.005,
+                Comment(rawValue: "job \(saidNull.cost) x 2 vs catalogue \(listedNull.cost)"))
+    }
+
     @Test("a part that never named a spool keeps its spool cost through the sheet; one whose spool was removed loses it")
     func recordKeepsUnlinkedSpoolCost() throws {
         let raw: [String: JSONValue] = ["name": .string("Bracket"), "material": .string("PETG"),
@@ -111,8 +159,10 @@ struct CataloguePartQtyTests {
     @Test("the sheet shows an old ×3 product's SAVED price and today's beside it; an up-to-date one says nothing")
     func sheetSaysTheSavedPrice() async throws {
         let engine = try KhaytEngine()
-        let stand: [String: JSONValue] = ["name": .string("Stand"), "printWeight": .number(180), "printTime": .number(2),
+        // Every rate said, and said zero, so the figures are the filament's alone.
+        var stand: [String: JSONValue] = ["name": .string("Stand"), "printWeight": .number(180), "printTime": .number(2),
                                           "spoolCost": .number(110), "spoolWeight": .number(1000), "qty": .number(3)]
+        for key in ProductSheet.PartRow.rateKeys { stand[key] = .number(0) }
         let live = try await engine.priceProduct(.object(["defaultMargin": .number(30), "parts": .array([.object(stand)])]),
                                                  inventory: [], settings: [:], consumables: [])
         #expect(live.price == 77.22)
@@ -175,7 +225,11 @@ extension LibraryEditPerfTests {
         "baseCost": .number(19.8), "basePrice": .number(25.74), "price": .number(25.74),
         "parts": .array([.object(["name": .string("Stand"), "filamentId": .string("SP1"), "material": .string("PLA"),
                                   "printWeight": .number(180), "printTime": .number(2),
-                                  "spoolCost": .number(110), "spoolWeight": .number(1000), "qty": .number(3)])]),
+                                  "spoolCost": .number(110), "spoolWeight": .number(1000), "qty": .number(3),
+                                  // Every rate said, and said zero: the filament alone.
+                                  "wearRate": .number(0), "powerDraw": .number(0), "elecRate": .number(0),
+                                  "prepTime": .number(0), "postTime": .number(0), "laborRate": .number(0),
+                                  "failureRate": .number(0)])]),
     ]
 
     /// The spool the stand is printed from, at the price it was costed with —
@@ -248,7 +302,9 @@ extension LibraryEditPerfTests {
                                   "printWeight": .number(200), "printTime": .number(3),
                                   "spoolCost": .number(100), "spoolWeight": .number(1000),
                                   "supportWeight": .number(0), "qty": .number(1),
-                                  "laborRate": .number(0), "failureRate": .number(0)])]),
+                                  "laborRate": .number(0), "failureRate": .number(0),
+                                  "wearRate": .number(0), "powerDraw": .number(0), "elecRate": .number(0),
+                                  "prepTime": .number(0), "postTime": .number(0)])]),
     ]
 
     @Test("a part with its own spool cost and no spool keeps it: untouched save is a no-op, a grams edit prices with it")

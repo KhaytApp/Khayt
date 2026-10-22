@@ -3096,7 +3096,13 @@ function renderCatalog() {
  *  current numbers and any later calculator changes. */
 function appendProductParts(p) {
   for (const part of (p.parts || [])) {
-    const partCopy = { ...part, id: uid('PRT') };
+    // At the rates the catalogue costs it at (`KhaytPrintRates.withRates`, as
+    // lib/product-pricing.js does): its own, and the shop's default for any it
+    // never carried. Written onto the job's part, as the calculator writes all
+    // seven on every part it saves, so the job records what it was charged.
+    const PRt = (typeof window !== 'undefined' && window.KhaytPrintRates) || null;
+    const rated = PRt ? PRt.withRates(part, { settings: typeof settings !== 'undefined' ? settings : {} }) : part;
+    const partCopy = { ...rated, id: uid('PRT') };
     if (!partCopy.material && partCopy.filamentId) {
       const inv = inventory.find(i => i.id === partCopy.filamentId);
       if (inv) partCopy.material = inv.material;

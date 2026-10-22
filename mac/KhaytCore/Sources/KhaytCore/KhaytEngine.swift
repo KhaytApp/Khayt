@@ -11002,7 +11002,7 @@ public actor KhaytEngine {
                          machine: JSONValue? = nil, preset: JSONValue? = nil) throws -> Double {
         try runtime.call2("""
             KhaytCalculatorCost.computePartBaseCost(
-              Object.assign({}, KhaytPrintRates.ratesFor({ machine: ARG3, preset: ARG4, settings: ARG2 }), ARG0),
+              KhaytPrintRates.withRates(ARG0, { machine: ARG3, preset: ARG4, settings: ARG2 }),
               { inventory: ARG1, settings: ARG2 })
             """,
                           [part, .array(inventory), .object(settings),
@@ -11022,7 +11022,7 @@ public actor KhaytEngine {
                               preset: JSONValue? = nil) throws -> CostParts {
         try runtime.call2("""
             KhaytCalculatorCost.computePartBreakdown(
-              Object.assign({}, KhaytPrintRates.ratesFor({ machine: ARG3, preset: ARG4, settings: ARG2 }), ARG0),
+              KhaytPrintRates.withRates(ARG0, { machine: ARG3, preset: ARG4, settings: ARG2 }),
               { inventory: ARG1, settings: ARG2 })
             """,
                           [part, .array(inventory), .object(settings),
@@ -11455,11 +11455,12 @@ public actor KhaytEngine {
                          consumables: [JSONValue] = []) throws -> CostedPart {
         try runtime.call2("""
             (function (part, inventory, settings, machine, preset, consumables) {
-              var rates = KhaytPrintRates.ratesFor({ machine: machine, preset: preset, settings: settings });
-              // The part's own values beat the rates, and this merged object is
-              // what BOTH the figure and the record are made from — so what gets
-              // written down is what was charged, not a second guess at it.
-              var costed = Object.assign({}, rates, part);
+              // The part's own values beat the rates (`withRates`, the same
+              // merge the catalogue costs a product's part with), and this
+              // merged object is what BOTH the figure and the record are made
+              // from — so what gets written down is what was charged, not a
+              // second guess at it.
+              var costed = KhaytPrintRates.withRates(part, { machine: machine, preset: preset, settings: settings });
               var ctx = { inventory: inventory, settings: settings, consumables: consumables };
               return {
                 cost: KhaytCalculatorCost.computePartBaseCost(costed, ctx),
