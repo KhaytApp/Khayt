@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: a job cancelled from the phone records the day.** The phone now
+  stamps `cancelledAt` with the local day when it moves a job to Cancelled in
+  its own copy of the book, and removes it when the job leaves Cancelled, as
+  the Mac does. That day places the VAT reversal in the right period.
+
 - **iPhone: pairing during the Mac's "Pair a phone" window.** The Mac now
   takes a new phone only while its owner has clicked Pair a phone
   (Settings → Online). The iPhone gets its own key straight after the PIN
