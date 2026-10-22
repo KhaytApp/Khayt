@@ -241,7 +241,8 @@ struct LibraryGrid: View {
              selected: shop.fileSelection.contains(file.id),
              words: shop.words,
              group: Cell.groupShown(for: file, shelf: shop.shelf),
-             openGroup: { shop.showGroup($0) })
+             openGroup: { shop.showGroup($0) },
+             storage: shop.storageBadge(for: file))
             .onTapGesture {
                 // SwiftUI's tap gesture does not report modifiers, so they are
                 // read from the event that is arriving. Without this, ⌘-click
@@ -584,6 +585,9 @@ struct Cell: View {
     /// Opening that group. A closure rather than the shop, for the same reason
     /// as `words`.
     var openGroup: (String) -> Void = { _ in }
+    /// Where its bytes are, from the index (`Shop.storageBadge`) — nil draws
+    /// nothing. Handed in, never looked up: a tile asks no disk anything.
+    var storage: LibrarySyncIndex.State? = nil
 
     /// Which group a tile names: the model's own, unless the grid is already
     /// INSIDE it.
@@ -617,6 +621,20 @@ struct Cell: View {
                 // filaments and three swaps is the difference between a print
                 // that runs unattended and one someone has to stand over.
                 .overlay(alignment: .bottomLeading) { Palette(file: file, words: words) }
+                // WHERE IT IS: on this Mac only, backed up, or online only. The
+                // corner the palette leaves; read aloud, never only seen.
+                .overlay(alignment: .bottomTrailing) {
+                    if let storage {
+                        Image(systemName: Shop.storageSymbol(storage))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(storage == .online ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.secondary))
+                            .padding(4)
+                            .background(.thinMaterial, in: Circle())
+                            .padding(6)
+                            .help(words.callIt(Shop.storageWordKey(storage)))
+                            .accessibilityLabel(words.callIt(Shop.storageWordKey(storage)))
+                    }
+                }
                 // WHAT KIND OF FILE THIS IS. Khayt indexes twenty-two
                 // extensions and the tile never said which one it was looking
                 // at — a `.step` a customer sent and a `.3mf` ready for the

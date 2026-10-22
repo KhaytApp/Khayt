@@ -101,7 +101,7 @@ struct LibraryArchiveTests {
         let many = try String(contentsOf: GroupFromRightClickTests.source("GroupMenu.swift"), encoding: .utf8)
         #expect(many.contains("shop.archive(aside)") && many.contains("shop.unarchive(back)"))
         let bar = try String(contentsOf: GroupFromRightClickTests.source("LibraryFilterBar.swift"), encoding: .utf8)
-        #expect(bar.contains("\"archived\"]"), "the Archived view is not in the Show menu")
+        #expect(bar.contains("\"never-printed\", \"archived\""), "the Archived view is not in the Show menu")
         for key in ["mac.archive_model", "mac.archive_n_models", "mac.unarchive_model", "mac.unarchive_n_models",
                     "mac.lib_archived", "mac.archived_on", "mac.archived_undated", "mac.archive_help"] {
             let entry = try #require(Words.own[key], "\(key) is missing")

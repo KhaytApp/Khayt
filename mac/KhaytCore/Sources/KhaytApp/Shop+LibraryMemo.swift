@@ -39,6 +39,9 @@ final class LibraryMemo {
         var creator: String?
         var printNext: Bool
         var duplicates: Bool
+        var storage: LibraryStorageFilter?
+        /// `librarySyncRevision`: a model moved out or brought back.
+        var sync: Int
         var sort: LibrarySort
         /// Trimmed and folded.
         var query: String
@@ -143,6 +146,7 @@ extension Shop {
                      neverPrinted: libraryNeverPrintedOnly, readyOn: libraryReadyOn,
                      category: libraryCategory, tag: libraryTag, creator: libraryCreator,
                      printNext: libraryPrintNextOnly, duplicates: libraryDuplicatesOnly,
+                     storage: libraryStorage, sync: libraryStorage == nil ? 0 : librarySyncRevision,
                      sort: librarySort,
                      query: SearchText.fold(search.trimmingCharacters(in: .whitespaces)))
     }

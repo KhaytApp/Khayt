@@ -57,6 +57,17 @@ struct LibraryFilterBar: View {
                 shop.libraryShowArchived.toggle()
             })
         }
+        // WHERE THE BYTES ARE (`LibrarySyncIndex`): a pair, one on at a time.
+        for (id, filter, key) in [("online-only", LibraryStorageFilter.onlineOnly, "mac.lib_online_only"),
+                                  ("this-mac-only", LibraryStorageFilter.thisMacOnly, "mac.lib_this_mac_only")] {
+            let count = filter == .onlineOnly ? facets.onlineOnly : facets.thisMacOnly
+            if count > 0 || shop.libraryStorage == filter {
+                out.append(FilterChipModel(id: id, label: shop.words.callIt(key), count: count,
+                                           on: shop.libraryStorage == filter) {
+                    shop.libraryStorage = shop.libraryStorage == filter ? nil : filter
+                })
+            }
+        }
         // A chip that is ON stays on the row even at zero. Its count can fall to
         // nothing when another chip narrows past it, and a filter that vanishes
         // while still narrowing the screen leaves a shop looking at an empty
@@ -179,7 +190,8 @@ struct LibraryFilterBar: View {
                 }
             }
 
-            menu("mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed", "archived"])
+            menu("mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed", "archived",
+                                        "online-only", "this-mac-only"])
             menu("mac.lib_printer", prefix: "ready:")
             menu("mac.lib_creator", prefix: "creator:")
             menu("mac.category", prefix: "category:")

@@ -692,6 +692,10 @@ extension Shop {
 
     /// Is this model's file in the cloud rather than on this Mac?
     func isInCloudOnly(_ file: LibraryFile) -> Bool {
+        // The index first, when it already knows (`LibrarySyncIndex`); the
+        // folder below stays the answer for everything it does not — a model
+        // the other app moved out since is found there.
+        if syncIndex?.state(file.id) == .online, !file.isLinked { return true }
         // A LINKED model in a cloud drive's folder that the drive has not
         // downloaded (`LinkedCloud`): listed, there, and in the cloud. Shown
         // as one moved to the bucket is, with Bring Back to fetch it.
@@ -738,6 +742,7 @@ extension Shop {
     func backUpToCloud(ids: [String]) async {
         guard let engine, let config = await cloudConfig(), config.backsUp else { return }
         var failed = 0
+        var backedUp: [String: LibrarySyncIndex.State] = [:]
         for file in files where ids.contains(file.id) {
             guard let url = modelFile(for: file) else { continue }
             // Never a file its drive has not downloaded: uploading it reads
@@ -748,9 +753,13 @@ extension Shop {
             if file.isLinked, LinkedCloud.isOnlineOnly(url) { continue }
             let key = S3.objectKey(prefix: config.prefix, id: LibraryLocation.itemDirName(file.id),
                                    filename: url.lastPathComponent)
-            do { try await CloudLibrary.ensureInBucket(config.remote, key: key, file: url, engine: engine) }
+            do {
+                try await CloudLibrary.ensureInBucket(config.remote, key: key, file: url, engine: engine)
+                backedUp[file.id] = .backedUp
+            }
             catch { failed += 1 }
         }
+        recordSync(backedUp)
         if failed > 0 { cloudLibraryProblem = words.callIt("mac.cloudlib_backup_some_failed", ["n": .number(Double(failed))]) }
     }
 
@@ -769,13 +778,19 @@ extension Shop {
             printFiles: fileRows, orders: orderRows)
             .filter { !$0.filename.hasSuffix(".cloud") }
         var done = 0, failed = 0
+        let folderIds = modelIdsByFolder()
+        var proved: [String: LibrarySyncIndex.State] = [:]
         for file in all {
             cloudProgress = (done: done, total: all.count, name: file.filename)
             let key = S3.objectKey(prefix: config.prefix, id: file.id ?? "", filename: file.filename)
-            do { try await CloudLibrary.ensureInBucket(config.remote, key: key, file: URL(fileURLWithPath: file.fullPath), engine: engine) }
+            do {
+                try await CloudLibrary.ensureInBucket(config.remote, key: key, file: URL(fileURLWithPath: file.fullPath), engine: engine)
+                if let id = folderIds[file.id ?? ""], syncIndex?.state(id) != .online { proved[id] = .backedUp }
+            }
             catch { failed += 1 }
             done += 1
         }
+        recordSync(proved)
         cloudLibraryNote = words.callIt("mac.cloudlib_backed_up_all", ["n": .number(Double(done - failed)),
                                                               "total": .number(Double(all.count))])
         if failed > 0 { cloudLibraryProblem = words.callIt("mac.cloudlib_backup_some_failed", ["n": .number(Double(failed))]) }
@@ -816,12 +831,14 @@ extension Shop {
         }
         guard config.tierEnabled else { cloudLibraryProblem = words.callIt("mac.cloudlib_tier_off"); return nil }
         guard let plan = await tierPlan(engine: engine, config: config, roots: roots) else { return nil }
+        // Never one the shop said to keep on this Mac.
+        let candidates = notKept(plan.candidates)
         let titles = Dictionary(files.map { (LibraryLocation.itemDirName($0.id), $0.title) },
                                 uniquingKeysWith: { a, _ in a })
-        return FreeUpPreview(count: plan.candidates.count,
-                             size: (try? await engine.formatBytes(plan.bytes)) ?? "",
-                             names: plan.candidates.map { titles[$0.id ?? ""] ?? $0.filename },
-                             paths: Set(plan.candidates.map(\.fullPath)),
+        return FreeUpPreview(count: candidates.count,
+                             size: (try? await engine.formatBytes(candidates.reduce(0) { $0 + $1.size })) ?? "",
+                             names: candidates.map { titles[$0.id ?? ""] ?? $0.filename },
+                             paths: Set(candidates.map(\.fullPath)),
                              destination: words.callIt(config.isDrive ? "mac.cloudlib_where_drive" : "mac.cloudlib_where_bucket"))
     }
 
@@ -845,7 +862,8 @@ extension Shop {
         cloudLibraryBusy = true
         defer { cloudLibraryBusy = false; cloudProgress = nil }
         guard let plan = await tierPlan(engine: engine, config: config, roots: roots) else { return }
-        let candidates = plan.candidates.filter { confirmed.contains($0.fullPath) }
+        let candidates = notKept(plan.candidates).filter { confirmed.contains($0.fullPath) }
+        let idOf = modelIdsByFolder()
         var moved = 0, freed = 0.0
         var failures: [String] = []
         for (i, file) in candidates.enumerated() {
@@ -853,17 +871,10 @@ extension Shop {
             let url = URL(fileURLWithPath: file.fullPath)
             let key = S3.objectKey(prefix: config.prefix, id: file.id ?? "", filename: file.filename)
             do {
-                let proved = try await CloudLibrary.ensureInBucket(config.remote, key: key, file: url, engine: engine)
-                // The sidecar FIRST, then the file: a crash between the two
-                // leaves both, which is a model that is here and also noted as
-                // in the cloud — never one that is neither.
-                let text = try await engine.sidecarText(size: proved.size, sha256: proved.sha256, key: key,
-                                                        provider: config.provider,
-                                                        at: ISO8601DateFormatter().string(from: Date()))
-                try Data(text.utf8).write(to: CloudLibrary.sidecar(for: url), options: .atomic)
-                try FileManager.default.removeItem(at: url)
+                let size = try await moveOut(url, key: key, config: config, engine: engine)
+                if let id = idOf[file.id ?? ""] { recordSync([id: .online]) }
                 moved += 1
-                freed += Double(proved.size)
+                freed += Double(size)
             } catch {
                 failures.append(file.filename + ": " + cloudSay(error))
             }
@@ -874,6 +885,22 @@ extension Shop {
                                                      "size": .string(human)])
         if !failures.isEmpty { cloudLibraryProblem = failures.prefix(3).joined(separator: "\n") }
         await load(source)
+    }
+
+    /// One model's bytes out of this Mac: proved online (a second, separate
+    /// request — `ensureInBucket`), the sidecar written, then the file
+    /// removed. The sidecar FIRST, then the file: a crash between the two
+    /// leaves both, which is a model that is here and also noted as in the
+    /// cloud — never one that is neither. Returns the size freed.
+    func moveOut(_ url: URL, key: String, config: CloudLibrary.Config,
+                 engine: KhaytEngine) async throws -> Int {
+        let proved = try await CloudLibrary.ensureInBucket(config.remote, key: key, file: url, engine: engine)
+        let text = try await engine.sidecarText(size: proved.size, sha256: proved.sha256, key: key,
+                                                provider: config.provider,
+                                                at: ISO8601DateFormatter().string(from: Date()))
+        try Data(text.utf8).write(to: CloudLibrary.sidecar(for: url), options: .atomic)
+        try FileManager.default.removeItem(at: url)
+        return proved.size
     }
 
     /// The remotes a moved model may be on, the one its sidecar names first
@@ -906,6 +933,7 @@ extension Shop {
             cloudLibraryBusy = true
             defer { cloudLibraryBusy = false }
             await bringDownLinked(file)
+            if let url = modelFile(for: file), !LinkedCloud.isOnlineOnly(url) { recordSync([file.id: .local]) }
             await load(source)
             return
         }
@@ -916,7 +944,11 @@ extension Shop {
         defer { cloudLibraryBusy = false }
         for name in sidecars {
             let model = dir.appending(path: String(name.dropLast(".cloud".count)))
-            do { try await CloudLibrary.bringBack(model, remotes: { await self.cloudRemotes(for: $0) }, engine: engine) }
+            do {
+                try await CloudLibrary.bringBack(model, remotes: { await self.cloudRemotes(for: $0) }, engine: engine)
+                // Back, and still where it was fetched from.
+                recordSync([file.id: .backedUp])
+            }
             catch { cloudLibraryProblem = words.callIt("mac.cloudlib_bring_back_failed") + " " + cloudSay(error) }
         }
         let markers = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
@@ -940,6 +972,7 @@ extension Shop {
         }
         do {
             let model = try await Shop.bringDown(marker, config: c, engine: engine, download: CloudLibrary.download)
+            recordSync([id: .backedUp])
             if let same = try await Shop.fillDownloaded(id: id, file: model, storeURL: build.storeURL, engine: engine,
                                                         owns: { StoreLock.weOwnIt(build) },
                                                         whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }) {
@@ -962,11 +995,13 @@ extension Shop {
             .filter { $0.filename.hasSuffix(".cloud") }
         var back = 0
         var failures: [String] = []
+        let folderIds = modelIdsByFolder()
         for (i, side) in sidecars.enumerated() {
             cloudProgress = (done: i, total: sidecars.count, name: side.filename)
             let model = URL(fileURLWithPath: String(side.fullPath.dropLast(".cloud".count)))
             do {
                 try await CloudLibrary.bringBack(model, remotes: { await self.cloudRemotes(for: $0) }, engine: engine)
+                if let id = folderIds[side.id ?? ""] { recordSync([id: .backedUp]) }
                 back += 1
             } catch { failures.append(model.lastPathComponent + ": " + cloudSay(error)) }
         }
@@ -995,7 +1030,8 @@ extension Shop {
         let all = await Task.detached { CloudLibrary.libraryFiles(root: roots.primary) }.value
         let inCloud = all.filter { $0.filename.hasSuffix(".cloud") }.count
         guard let plan = await tierPlan(engine: engine, config: config, roots: roots) else { return nil }
-        return (plan.candidates.count, (try? await engine.formatBytes(plan.bytes)) ?? "", inCloud)
+        let candidates = notKept(plan.candidates)
+        return (candidates.count, (try? await engine.formatBytes(candidates.reduce(0) { $0 + $1.size })) ?? "", inCloud)
     }
 
     // MARK: - Is every moved model still there?

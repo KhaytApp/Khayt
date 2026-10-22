@@ -60,6 +60,19 @@ final class Shop {
         didSet { if libraryShowArchived != oldValue { libraryViewChanged() } }
     }
 
+    /// Where each model's bytes are on this Mac — see `LibrarySyncIndex`.
+    /// Nil until the book's library has been looked at, and for the sample.
+    @ObservationIgnored var syncIndex: LibrarySyncIndex?
+    @ObservationIgnored var syncIndexTask: Task<Void, Never>?
+    /// Bumped on every change to `syncIndex`, which is how a tile's badge and
+    /// the library's lists know to look again.
+    var librarySyncRevision = 0
+    /// Online only, or on this Mac only — the Show menu's storage pair.
+    var libraryStorage: LibraryStorageFilter? { didSet { libraryViewChanged() } }
+    /// Whether the library has somewhere online to be, so "on this Mac only"
+    /// is worth saying on a tile at all.
+    var libraryHasRemote = false
+
     /// The model whose title is being edited in the inspector, from its
     /// pencil, the right-click menu or Model ▸ Rename. One field, wherever it
     /// was asked for, so the three cannot each grow their own.
@@ -831,6 +844,7 @@ final class Shop {
                 LibraryLocation.resolveRoots(settings: Self.librarySettings(root),
                                              defaultRoot: LibraryLocation.defaultRoot(for: build))
             }
+            openSyncIndex()
             fileSelection = []
             groupSelection = []
             // Read, never taken. This app does not write, and a reader that

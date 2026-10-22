@@ -1742,6 +1742,9 @@ extension Shop {
         /// Models put aside (`LibraryFile.archivedAt`), for the Show menu's
         /// Archived view — in the shelf, over what the other chips leave.
         var archived = 0
+        /// Not on this Mac, and on this Mac with no copy online.
+        var onlineOnly = 0
+        var thisMacOnly = 0
         struct Ready: Equatable, Identifiable {
             let machineId: String
             let machineName: String
@@ -1751,10 +1754,11 @@ extension Shop {
         var isEmpty: Bool {
             categories.isEmpty && tags.isEmpty && unfiled == 0 && neverPrinted == 0 && ready.isEmpty
                 && creators.isEmpty && printNext == 0 && duplicates == 0 && archived == 0
+                && onlineOnly == 0 && thisMacOnly == 0
         }
     }
 
-    enum LibraryAxis { case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates, archived }
+    enum LibraryAxis { case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates, archived, storage }
 
     /// What one axis counts: the shelf, the search, and the other two chips.
     private func libraryPool(skipping axis: LibraryAxis) -> [JSONValue] {
@@ -1794,6 +1798,10 @@ extension Shop {
         }
         if axis != .duplicates, libraryDuplicatesOnly {
             rows = rows.filter { duplicateOf[Self.rowText($0, "id")] != nil }
+        }
+        if axis != .storage, let storage = libraryStorage {
+            let index = syncIndex
+            rows = rows.filter { storage.matches(index?.state(Self.rowText($0, "id"))) }
         }
         // The search the grid runs, tokens and all — it read `title`, which
         // no record has, so a search narrowed the grid and not the counts.
@@ -1879,10 +1887,22 @@ extension Shop {
         let printNext = ids(.printNext).count { byId[$0]?.isPrintNext == true }
         let dupes = ids(.duplicates).count { duplicateOf[$0] != nil }
         let archived = libraryPool(skipping: .archived).count { !Self.rowText($0, "archivedAt").isEmpty }
+        // Only once there is an index to read: before it, every model would
+        // count as "on this Mac only", which is a guess.
+        var onlineOnly = 0, thisMacOnly = 0
+        if let index = syncIndex {
+            for row in libraryPool(skipping: .storage) {
+                let state = index.state(Self.rowText(row, "id"))
+                if LibraryStorageFilter.onlineOnly.matches(state) { onlineOnly += 1 }
+                else if LibraryStorageFilter.thisMacOnly.matches(state) { thisMacOnly += 1 }
+            }
+            // "On this Mac only" says something only beside somewhere else.
+            if !libraryHasRemote && onlineOnly == 0 { thisMacOnly = 0 }
+        }
         let facets = LibraryFacets(categories: categories, tags: tags,
                                    unfiled: unfiled, neverPrinted: never, ready: ready,
                                    creators: creators, printNext: printNext, duplicates: dupes,
-                                   archived: archived)
+                                   archived: archived, onlineOnly: onlineOnly, thisMacOnly: thisMacOnly)
         if facets != libraryFacets { libraryFacets = facets }
     }
 
@@ -1950,7 +1970,7 @@ extension Shop {
         libraryCategory != nil || libraryTag != nil || libraryUnfiledOnly
             || libraryNeverPrintedOnly || libraryReadyOn != nil
             || libraryCreator != nil || libraryPrintNextOnly || libraryDuplicatesOnly
-            || libraryShowArchived
+            || libraryShowArchived || libraryStorage != nil
     }
 
     func clearLibraryFilter() {
@@ -1963,6 +1983,7 @@ extension Shop {
         libraryPrintNextOnly = false
         libraryDuplicatesOnly = false
         libraryShowArchived = false
+        libraryStorage = nil
     }
 
     /// ── DUPLICATES, in the library already there ─────────────────────────
@@ -2042,6 +2063,11 @@ extension Shop {
         }
         if libraryPrintNextOnly { rows = rows.filter(\.isPrintNext) }
         if libraryDuplicatesOnly { rows = rows.filter { duplicateOf[$0.id] != nil } }
+        // Where the bytes are, from the index — one lookup a model.
+        if let storage = libraryStorage {
+            let index = syncIndex
+            rows = rows.filter { storage.matches(index?.state($0.id)) }
+        }
         if !q.isEmpty {
             // The file's name too, and folded — see `LibraryFile.matches`.
             libraryMemo.work.rowsSearched += rows.count

@@ -2696,6 +2696,23 @@ final class Words {
         "mac.lib_token_creator": ["en": "Creator", "ar": "المصمم"],
         "mac.lib_token_printer": ["en": "Ready on", "ar": "جاهز على"],
         "mac.lib_token_remove": ["en": "Remove {name}", "ar": "إزالة {name}"],
+        // Where a model's bytes are (`LibrarySyncIndex`): the tile badge, the
+        // Show menu pair, and the inspector's Storage section.
+        "mac.lib_online_only": ["en": "Online only", "ar": "على الإنترنت فقط"],
+        "mac.lib_this_mac_only": ["en": "On this Mac only", "ar": "على هذا الماك فقط"],
+        "mac.storage_section": ["en": "Storage", "ar": "التخزين"],
+        "mac.storage_state_local": ["en": "On this Mac only", "ar": "على هذا الماك فقط"],
+        "mac.storage_state_backed_up": ["en": "On this Mac and backed up online", "ar": "على هذا الماك ومنسوخ على الإنترنت"],
+        "mac.storage_state_online": ["en": "Online only, not on this Mac", "ar": "على الإنترنت فقط، وليس على هذا الماك"],
+        "mac.storage_free_one": ["en": "Free Up Space", "ar": "توفير المساحة"],
+        "mac.storage_free_one_help": ["en": "Remove this Mac’s copy once the copy online has been checked. Bring Back fetches it again.",
+                                      "ar": "احذف نسخة هذا الماك بعد التحقق من النسخة على الإنترنت. يعيدها زر «استعادة» متى شئت."],
+        "mac.storage_free_kept": ["en": "This model is kept on this Mac. Turn off Keep on This Mac first.",
+                                  "ar": "هذا النموذج محفوظ على هذا الماك. أوقف «إبقاء على هذا الماك» أولًا."],
+        "mac.storage_freed_one": ["en": "Freed {size}. The model is online only now.", "ar": "وُفّر {size}. النموذج على الإنترنت فقط الآن."],
+        "mac.storage_keep": ["en": "Keep on This Mac", "ar": "إبقاء على هذا الماك"],
+        "mac.storage_keep_help": ["en": "Free Up Space never moves this model off this Mac. If it is online only, it is brought back first.",
+                                  "ar": "لن ينقل «توفير المساحة» هذا النموذج من هذا الماك أبدًا. وإن كان على الإنترنت فقط فسيُعاد أولًا."],
         // A model's title (`Shop.rename`); the file keeps its own name.
         "mac.rename_model": ["en": "Rename", "ar": "إعادة تسمية"],
         "mac.rename_model_undo": ["en": "Rename Model", "ar": "إعادة تسمية النموذج"],

@@ -44,6 +44,10 @@ struct LibraryInspector: View {
             PhotoSection(shop: shop, file: file)
             LayerRule()
             theFile(file)
+            if shop.libraryHasRemote || shop.storageState(for: file) == .online {
+                LayerRule()
+                StorageSection(shop: shop, file: file)
+            }
             if let sliced = slicedSection(file) {
                 LayerRule()
                 sliced
@@ -973,5 +977,50 @@ private struct ModelTitle: View {
     private func save() {
         shop.rename(file.id, to: draft)
         shop.renamingFileId = nil
+    }
+}
+
+/// Where this model's bytes are, and the two things a shop can do about it
+/// for this model alone: free its space now, or keep it here for good.
+///
+/// Free up space is the verified path the whole-library pass takes
+/// (`Shop.moveOut`): the copy online is asked for again and checked before the
+/// file here goes. Keep on this Mac brings a model back first when it is
+/// online only, and from then on Free up space leaves it alone.
+private struct StorageSection: View {
+    let shop: Shop
+    let file: LibraryFile
+
+    var body: some View {
+        let state = shop.storageState(for: file) ?? (shop.isInCloudOnly(file) ? .online : .local)
+        let kept = shop.isKeptOnThisMac(file)
+        DetailSection(shop.words.callIt("mac.storage_section")) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(shop.words.callIt(Shop.storageWordKey(state)), systemImage: Shop.storageSymbol(state))
+                    .font(.callout)
+                HStack(spacing: 8) {
+                    // A vault model on this Mac, with somewhere to go.
+                    if !file.isLinked, state != .online, shop.libraryHasRemote {
+                        Button { Task { await shop.freeUpSpace(model: file) } } label: {
+                            Label(shop.words.callIt("mac.storage_free_one"), systemImage: "icloud.and.arrow.up")
+                        }
+                        .disabled(kept || shop.cloudLibraryBusy || !shop.canWrite)
+                        .help(shop.words.callIt(kept ? "mac.storage_free_kept" : "mac.storage_free_one_help"))
+                    }
+                    Toggle(shop.words.callIt("mac.storage_keep"), isOn: Binding(
+                        get: { kept },
+                        set: { on in Task { await shop.keepOnThisMac(file, on) } }))
+                        .toggleStyle(.checkbox)
+                        .disabled(shop.cloudLibraryBusy || shop.syncIndex == nil)
+                        .help(shop.words.callIt("mac.storage_keep_help"))
+                    if shop.cloudLibraryBusy { ProgressView().controlSize(.small) }
+                }
+                .controlSize(.small)
+                if let note = shop.cloudLibraryNote {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
     }
 }

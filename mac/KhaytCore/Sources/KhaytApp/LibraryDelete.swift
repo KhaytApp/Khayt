@@ -458,6 +458,7 @@ extension Shop {
                 do {
                     try await Self.removeLocalCopy(copy, remote: remote, provider: r.provider, engine: engine,
                                                    fetch: CloudLibrary.fetch)
+                    recordSync([id: .online])
                     removed += 1
                 } catch {
                     failures.append(copy.model.lastPathComponent + ": " + cloudSay(error))
