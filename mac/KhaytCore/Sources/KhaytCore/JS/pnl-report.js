@@ -94,42 +94,6 @@
     return true;
   }
 
-  /**
-   * Would this job be a tax point had its invoice NOT been undone?
-   *
-   * `isTaxPoint` answers false for a cancelled, voided or credited job, and
-   * that is right for an open period: its VAT simply is not owed. A FILED
-   * period has to know more — whether the job HAD an invoice that went into
-   * the return — because a reversal after filing is an adjustment in a later
-   * period, not a rewrite of the filed one (lib/vat-periods.js).
-   *
-   * A cancelled job's earlier stage is read off `statusHistory` (the last
-   * entry that is not the cancel); with no history, it had an invoice when it
-   * carries an invoice number or an acceptance stamp, or when its id is not a
-   * quote's — a QUOTE cancelled before anyone said yes never had one.
-   */
-  function wouldBeTaxPoint(o, settings) {
-    if (!o || typeof o !== 'object') return false;
-    let status = o.status;
-    if (status === 'cancelled') {
-      let prior = '';
-      const h = Array.isArray(o.statusHistory) ? o.statusHistory : [];
-      for (let i = h.length - 1; i >= 0; i--) {
-        const st = h[i] && h[i].status;
-        if (st && st !== 'cancelled' && st !== 'voided') { prior = st; break; }
-      }
-      if (prior) status = prior;
-      else {
-        if (o.nonBusiness === true) return false;
-        if (o.status === 'split' && Array.isArray(o.splitInto) && o.splitInto.length > 0) return false;
-        if (o.invoiceNumber || o.invoiceNum || o.quoteAcceptedAt || o.clientApprovedAt) return true;
-        const prefix = ((settings && settings.quotePrefix) || 'QUO') + '-';
-        return !(typeof o.id === 'string' && o.id.startsWith(prefix));
-      }
-    }
-    return isTaxPoint(Object.assign({}, o, { status, voidedAt: undefined, creditedAt: undefined }));
-  }
-
   function vatPeriodsModule() {
     if (typeof global !== 'undefined' && global.KhaytVatPeriods) return global.KhaytVatPeriods;
     if (typeof require === 'function') {
@@ -140,110 +104,194 @@
 
   /* ── A FILED RETURN IS NOT REWRITTEN ──────────────────────────────────────
    *
-   * The owner's rule (2026-10-22, lib/vat-periods.js has it in full): a job
-   * whose invoice is dated in a period the shop has marked FILED keeps, in
-   * that period, the VAT the return was filed with; whatever undid it after
-   * filing — a cancel, a void, a credit note — is an ADJUSTMENT in the first
-   * open period on or after the day it happened.
+   * The owner's rule (2026-10-22, lib/vat-periods.js has it in full): once a
+   * VAT return is FILED, its figures do not move. Whatever changes afterwards
+   * — an invoice cancelled, voided or credited, its amount edited, a new
+   * invoice booked or backdated into the period — is an ADJUSTMENT in the
+   * first open period after it.
    *
-   * `pnlByPeriod`'s own loop is the rule for every open period and is not
-   * touched. These are the CORRECTIONS to it, one list for every reader (the
-   * P&L, the VAT summary, the desktop's return and analytics): add each
-   * entry's `vat` and `sales` to the period holding its `day`, and the
-   * figures come out as the rule says. `kind` is `'filed'` (in the filed
-   * period itself, putting back what the return held) or `'adjustment'`
-   * (the reversal, in the period it lands in) — a screen shows the second as
-   * its own line. `period` is the filed return the entry concerns.
+   * `markFiled` stores what the return held, order by order (the SNAPSHOT,
+   * `filedSnapshot` below). Here every filed period is compared with what the
+   * open-period rule would put in it today (`taxEntryOf`, which IS
+   * `pnlByPeriod`'s own tax line, written out once):
    *
-   * Nothing at all for a shop with no filed marks, or no tax: the book reads
-   * exactly as it did.
+   *   - a `'filed'` entry, dated inside the period, of (filed − current), so
+   *     the period reads exactly what was filed;
+   *   - an `'adjustment'` of (current − filed), the same amount the other way,
+   *     on `landingDay(max(change day, the day after the period))` — the first
+   *     open period on or after it. `reason` says why: `'cancelled'` (cancelled
+   *     or voided), `'credited'`, `'changed'`, `'added'` (not in the return)
+   *     or `'removed'` (no longer in the book).
    *
-   * @param {Array} orders the jobs (a slice of the book is fine)
-   * @param {object} ctx `{ settings, clients, currencies }`
+   * `pnlByPeriod`'s own loop is untouched; these are the corrections to it, in
+   * one list for every reader (the P&L, the VAT summary, the desktop's tax
+   * summary and analytics): add each entry's `vat` and `sales` to the period
+   * holding its `day`. Nothing at all for a shop with no snapshot marks, or no
+   * tax: the book reads exactly as it did. A mark WITHOUT a snapshot (a bare
+   * `'2026-Q3'`) corrects nothing — its period reads as the open-period rule
+   * says, and only counts as filed for where other adjustments land.
+   *
    * @returns {Array<{orderId:string, day:string, vat:number, sales:number,
-   *   kind:'filed'|'adjustment', period:string}>}
+   *   kind:'filed'|'adjustment', reason:string, period:string}>}
    */
-  function vatCorrections(orders, ctx) {
+  function taxEnv(ctx) {
     const c = ctx || {};
     const settings = c.settings || {};
-    const V = vatPeriodsModule();
     const tax = (typeof global !== 'undefined' && global.KhaytTax) || null;
-    if (!V || !tax) return [];
-    const marks = V.filedMarks(settings);
-    if (!marks.length) return [];
+    if (!tax) return null;
     const profile = tax.profileFromSettings(settings);
-    if (!profile || !Array.isArray(profile.rates) || !profile.rates.length) return [];
-    const money = (typeof global !== 'undefined' && global.KhaytOrderMoney) || null;
-    const scope = (typeof global !== 'undefined' && global.KhaytBusinessScope) || null;
-    const moneyCtx = { settings, clients: c.clients || [] };
-    const known = c.currencies || null;
-    const vatOf = (charged) => (charged > 0 ? tax.computeTax(charged, profile).taxTotal : 0);
-    const salesOf = (charged) => (charged > 0 ? tax.netOfTax(charged, profile) : 0);
-    const out = [];
-    const push = (o, day, before, after, kind, period) => {
-      const vat = round2(vatOf(after) - vatOf(before));
-      const sales = round2(salesOf(after) - salesOf(before));
-      if (!vat && !sales) return;
-      out.push({ orderId: String(o.id), day, vat, sales, kind, period });
+    if (!profile || !Array.isArray(profile.rates) || !profile.rates.length) return null;
+    return {
+      settings, tax, profile,
+      money: (typeof global !== 'undefined' && global.KhaytOrderMoney) || null,
+      scope: (typeof global !== 'undefined' && global.KhaytBusinessScope) || null,
+      moneyCtx: { settings, clients: c.clients || [] },
+      known: c.currencies || null,
     };
+  }
 
-    for (const o of orders || []) {
-      if (!o || typeof o !== 'object') continue;
-      if (scope && !scope.countsForBusiness(o)) continue;
-      const taxDay = taxPointDate(o);
-      const mark = V.coveringMark(settings, taxDay, marks);
-      if (!mark) continue;
-      const nowTax = isTaxPoint(o);
-      const reversed = V.isReversed(o) && wouldBeTaxPoint(o, settings);
-      if (!nowTax && !reversed) continue;
+  /** The tax this job puts in the book under the open-period rule — the tax
+   *  line of `pnlByPeriod` — as `{ day, vat, sales }`, or null for none. */
+  function taxEntryOf(o, env) {
+    if (!o || typeof o !== 'object' || !isTaxPoint(o)) return null;
+    if (env.scope && !env.scope.countsForBusiness(o)) return null;
+    const charged = env.money ? env.money.orderNetRevenueBase(o, env.moneyCtx, env.known) : (+o.price || 0);
+    const vat = env.tax.computeTax(charged, env.profile).taxTotal;
+    const sales = env.tax.netOfTax(charged, env.profile);
+    if (!vat && !sales) return null;
+    return { day: taxPointDate(o), vat: round2(vat), sales: round2(sales) };
+  }
 
-      // What the job charges with a given set of credit notes taken off —
-      // in the shop's currency, as the P&L's own loop reads it.
-      const cur = money ? money.orderCurrency(o, moneyCtx, known) : null;
-      const toBase = (n) => (money ? money.convertToBase(n, cur, moneyCtx) : n);
-      const gross = money ? money.orderRevenueBase(o, moneyCtx, known) : (+o.price || 0);
-      const earning = money
-        ? money.orderNetRevenueBase(Object.assign({}, o, { creditNotes: [] }), moneyCtx, known) > 0
-        : gross > 0;
-      if (!earning) continue;
-      const chargedWith = (notes) =>
-        Math.max(0, gross - notes.reduce((s, n) => s + toBase(+(n && n.amount) || 0), 0));
-      const notes = Array.isArray(o.creditNotes) ? o.creditNotes.filter(Boolean) : [];
-      const chargedNow = chargedWith(notes);
-      const dflt = nowTax ? chargedNow : 0;
-      const landing = (stampDay) => V.landingDay(stampDay && stampDay > taxDay ? stampDay : taxDay, settings, marks);
-
-      if (reversed) {
-        // Undone BEFORE the return went in: it was out of the return, and
-        // stays out — the open-period rule, unchanged.
-        if (V.reversedBeforeFiling(o, mark)) continue;
-      } else if (Array.isArray(mark.reversedIds) && mark.reversedIds.includes(String(o.id))) {
-        // Undone when the period was filed and RESTORED since: the return
-        // held none of it, so the filed period keeps holding none, and the
-        // VAT now owed is owed in the first open period.
-        push(o, taxDay, dflt, 0, 'filed', mark.period);
-        push(o, landing(''), 0, chargedNow, 'adjustment', mark.period);
-        continue;
-      }
-
-      // In the return as filed: the period keeps what it was filed with —
-      // the price less the credit notes issued before filing — and every
-      // later credit, and a later cancel or void, is reversed forward.
-      const before = notes.filter((n) => V.creditBeforeFiling(n, mark));
-      const later = notes.filter((n) => !V.creditBeforeFiling(n, mark))
-        .map((n) => ({ n, day: V.localDay(n.issuedAt) }))
-        .sort((a, b) => a.day.localeCompare(b.day));
-      const filed = chargedWith(before);
-      push(o, taxDay, dflt, filed, 'filed', mark.period);
-      const running = before.slice();
-      for (const { n, day } of later) {
-        const c0 = chargedWith(running);
-        running.push(n);
-        push(o, landing(day), c0, chargedWith(running), 'adjustment', mark.period);
-      }
-      if (reversed) push(o, landing(V.reversalDayOf(o)), chargedWith(running), 0, 'adjustment', mark.period);
+  /**
+   * The day this job last changed in a way that moves its tax: the cancel or
+   * void (lib/vat-periods.js `reversalDayOf`), else its latest credit note,
+   * else the sync stamp `updatedAt`. '' when nothing says. ONE day per job,
+   * whichever filed period is asked about, so the adjustments for one job
+   * always land together (and marking a period filed cannot split them).
+   */
+  function changeDayOf(o, V) {
+    if (!o) return '';
+    if (V.isReversed(o)) return V.reversalDayOf(o);
+    let latest = '';
+    for (const n of Array.isArray(o.creditNotes) ? o.creditNotes : []) {
+      const d = V.localDay(n && n.issuedAt);
+      if (d > latest) latest = d;
     }
-    return out;
+    return latest || V.localDay(o.updatedAt);
+  }
+
+  function reasonFor(o, cur, filed) {
+    if (!o) return 'removed';
+    if (!filed) return 'added';
+    if (o.voidedAt || o.status === 'cancelled') return 'cancelled';
+    if (o.creditedAt || (cur.vat < filed.vat && Array.isArray(o.creditNotes) && o.creditNotes.length)) return 'credited';
+    return 'changed';
+  }
+
+  function vatCorrections(orders, ctx) {
+    const V = vatPeriodsModule();
+    const env = taxEnv(ctx);
+    if (!V || !env) return [];
+    const marks = V.filedMarks(env.settings);
+    const snapped = marks.filter((m) => m.orders);
+    if (!snapped.length) return [];
+    const byId = new Map();
+    const current = new Map();
+    for (const o of orders || []) {
+      if (!o || o.id == null) continue;
+      byId.set(String(o.id), o);
+      const e = taxEntryOf(o, env);
+      // With the mark the open-period rule's entry belongs to: the FIRST
+      // that covers its day, so overlapping marks never count a job twice.
+      if (e) current.set(String(o.id), Object.assign(e, { mark: V.coveringMark(env.settings, e.day, marks) }));
+    }
+    const out = [];
+    const push = (orderId, day, vat, sales, kind, reason, period) => {
+      vat = round2(vat); sales = round2(sales);
+      if (!vat && !sales) return;
+      out.push({ orderId, day, vat, sales, kind, reason, period });
+    };
+    for (const m of snapped) {
+      const ids = new Set(Object.keys(m.orders));
+      for (const [id, e] of current) if (e.mark === m) ids.add(id);
+      for (const id of ids) {
+        const o = byId.get(id) || null;
+        const e = current.get(id);
+        const cur = (e && e.mark === m) ? e : { vat: 0, sales: 0 };
+        const snap = m.orders[id];
+        const filed = snap ? { vat: +snap[0] || 0, sales: +snap[1] || 0 } : null;
+        const fv = filed ? filed.vat : 0, fs = filed ? filed.sales : 0;
+        if (round2(cur.vat - fv) === 0 && round2(cur.sales - fs) === 0) continue;
+        const reason = reasonFor(o, cur, filed);
+        // Inside the filed period, so a span holding it holds the correction:
+        // the job's own invoice day while that is still in the period (a
+        // cancelled job keeps its date), else the period's first day.
+        const own = o ? taxPointDate(o) : '';
+        const inside = cur.day || (own >= m.from && own <= m.to ? own : m.from);
+        push(id, inside, fv - cur.vat, fs - cur.sales, 'filed', reason, m.period);
+        const after = V.dayAfter(m.to);
+        const changed = changeDayOf(o, V);
+        push(id, V.landingDay(changed > after ? changed : after, env.settings, marks),
+          cur.vat - fv, cur.sales - fs, 'adjustment', reason, m.period);
+      }
+    }
+    // One job's adjustments from two filed periods that land on the same day
+    // are one change seen twice — the reversal of an invoice filed in Q3 and
+    // of that reversal filed in Q4. Netted, so a pair that cancels opens no
+    // row and counts no adjustment.
+    const merged = [];
+    const at = new Map();
+    for (const e of out) {
+      if (e.kind !== 'adjustment') { merged.push(e); continue; }
+      const k = e.orderId + '|' + e.day;
+      const prev = at.get(k);
+      if (prev) { prev.vat = round2(prev.vat + e.vat); prev.sales = round2(prev.sales + e.sales); }
+      else { const copy = Object.assign({}, e); at.set(k, copy); merged.push(copy); }
+    }
+    return merged.filter((e) => e.vat || e.sales);
+  }
+
+  /**
+   * What a period's return holds, order by order, AS THE BOOK SHOWS IT NOW:
+   * the open-period rule's entry for every job dated in it, plus whatever
+   * adjustment from an earlier filed period has landed in it. `markFiled`
+   * stores this; `vatCorrections` holds the period to it from then on.
+   * `settings` must not yet mark `key` filed. Rounded to the halala; a job
+   * with nothing in the period is left out.
+   *
+   * @returns {{ totals: {vat:number, sales:number}, orders: Object<string, [number, number]> }}
+   */
+  function filedSnapshot(orders, key, ctx) {
+    const V = vatPeriodsModule();
+    const env = taxEnv(ctx);
+    const empty = { totals: { vat: 0, sales: 0 }, orders: {} };
+    const bounds = V && V.periodBounds(key);
+    if (!V || !env || !bounds) return empty;
+    const per = new Map();
+    const add = (id, day, vat, sales) => {
+      if (!(day >= bounds.from && day <= bounds.to)) return;
+      const r = per.get(id) || [0, 0];
+      r[0] += vat; r[1] += sales;
+      per.set(id, r);
+    };
+    // The open-period rule, where no filed mark already covers the day.
+    const marks = V.filedMarks(env.settings);
+    for (const o of orders || []) {
+      if (!o || o.id == null) continue;
+      const e = taxEntryOf(o, env);
+      if (e && !V.coveringMark(env.settings, e.day, marks)) add(String(o.id), e.day, e.vat, e.sales);
+    }
+    for (const c of vatCorrections(orders, ctx)) add(c.orderId, c.day, c.vat, c.sales);
+    const out = {};
+    let vat = 0, sales = 0;
+    for (const id of Array.from(per.keys()).sort()) {
+      const [v, s] = per.get(id);
+      const rv = round2(v), rs = round2(s);
+      if (!rv && !rs) continue;
+      out[id] = [rv, rs];
+      vat += rv; sales += rs;
+    }
+    return { totals: { vat: round2(vat), sales: round2(sales) }, orders: out };
   }
 
   /* ── COST OF GOODS IS WHAT WAS STOCKED ─────────────────────────────────────
@@ -854,9 +902,10 @@
         ? money.convertToBase(+o.shippingCost || 0, money.orderCurrency(o, moneyCtx, known), moneyCtx)
         : (+o.shippingCost || 0);
     }
-    // A FILED RETURN IS NOT REWRITTEN: the corrections for jobs undone after
-    // their period was filed, each in the period holding its own day. None
-    // for a shop that has marked no return filed.
+    // A FILED RETURN IS NOT REWRITTEN: the corrections that hold each filed
+    // period to its snapshot and adjust the difference forward, each in the
+    // period holding its own day. None for a shop that has marked no return
+    // filed.
     for (const cor of vatCorrections(orders, c)) {
       const key = quarterOf(cor.day);
       if (!key || !inSpan(cor.day)) continue;
@@ -1043,8 +1092,8 @@
         // counts: revenue + revenueVat is what those jobs were billed.
         revenueVat: round2(row.revenueVat),
         vatReclaimable: round2(row.vatReclaimable),
-        // The part of `vatCollected` (and of `taxableSales`) that reverses an
-        // invoice from a FILED period — see A FILED RETURN IS NOT REWRITTEN.
+        // The part of `vatCollected` (and of `taxableSales`) that adjusts a
+        // FILED period — see A FILED RETURN IS NOT REWRITTEN.
         // Only on a row that has one, so every other row reads as it did.
         ...(row.adjustments ? {
           vatAdjustment: round2(row.vatAdjustment),
@@ -1281,7 +1330,7 @@
   }
 
   const api = { computePnl, pnlToCsv, pnlByPeriod, isInventoryPurchase, INVENTORY_CATEGORIES, stockShare, isTaxPoint, taxPointDate,
-    wouldBeTaxPoint, vatCorrections,
+    vatCorrections, filedSnapshot,
     reclaimableTaxOf, expenseNetOf,
     capitalPurchases, CAPITAL_CATEGORIES,
     labourCostOf, labourCounts, looksLikePayroll, payrollFixedCosts,

@@ -175,10 +175,11 @@ extension Shop {
     /// ── A FILED RETURN IS NOT REWRITTEN ──────────────────────────────────
     ///
     /// Once marked, a cancel, void or credit of an invoice dated in the
-    /// period stops changing it: the reversal lands in the first open period
-    /// as an adjustment (lib/vat-periods.js). The mark records which of the
-    /// period's invoices were ALREADY reversed — read from the book on disk,
-    /// inside the write — so marking never changes the period's own figures.
+    /// period stops changing it: the change lands in the first open period
+    /// as an adjustment (lib/vat-periods.js); so does an edit, or an invoice
+    /// backdated into it. The mark stores the period's figures job by job —
+    /// read from the book on disk, inside the write — so marking never changes
+    /// any figure, and the filed period reads what was filed from then on.
     /// Only the shop's explicit mark counts; a deadline passing marks nothing.
     func setVatPeriodFiled(_ period: String, filed: Bool) async {
         vatFiledProblem = nil
@@ -188,6 +189,8 @@ extension Shop {
         }
         guard let build = source.build else { vatFiledProblem = words.callIt("mac.settings_sample"); return }
         guard let engine else { vatFiledProblem = words.callIt("mac.move_no_engine"); return }
+        // The P&L's own currency table, so the snapshot is the screen's figures.
+        let currencies = Invoice.currencyTable(self)
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
@@ -195,7 +198,7 @@ extension Shop {
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
                 try await Self.applyVatFiled(to: &root, period: period, filed: filed,
-                                             engine: engine, now: Date())
+                                             currencies: currencies, engine: engine, now: Date())
             }
             await load(source)
         } catch {
@@ -205,11 +208,15 @@ extension Shop {
 
     /// The filed-mark write, on a book already read: the seam the tests use.
     static func applyVatFiled(to root: inout [String: JSONValue], period: String, filed: Bool,
+                              currencies: [String: JSONValue] = [:],
                               engine: KhaytEngine, now: Date) async throws {
         let jobs: [JSONValue]
         if case .array(let rows)? = root["printLog"] { jobs = rows } else { jobs = [] }
+        let clients: [JSONValue]
+        if case .array(let rows)? = root["clients"] { clients = rows } else { clients = [] }
         let settings = try await engine.vatMarkFiled(Self.settings(root), period: period, filed: filed,
-                                                     orders: jobs, now: now)
+                                                     orders: jobs, clients: clients,
+                                                     currencies: currencies, now: now)
         root["settings"] = .object(settings)
     }
 

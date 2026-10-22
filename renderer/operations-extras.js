@@ -513,11 +513,12 @@ function exportGaztVatReturn(period) {
     }
   }
 
-  // A FILED RETURN IS NOT REWRITTEN (lib/vat-periods.js): an invoice from a
-  // period the shop marked filed, cancelled, voided or credited after filing,
-  // keeps its VAT in that period and is reversed in the first open one. The
-  // corrections are the P&L's own (KhaytPnl.vatCorrections), each counted
-  // where its day falls; the reversals are also totalled on their own line.
+  // A FILED RETURN IS NOT REWRITTEN (lib/vat-periods.js): a period the shop
+  // marked filed reads what it was filed with, and any later change to it (a
+  // cancel, void, credit, edit, or an invoice backdated in) is adjusted in the
+  // first open period. The corrections are the P&L's own
+  // (KhaytPnl.vatCorrections), each counted where its day falls; the
+  // adjustments are also totalled on their own line.
   let adjSales = 0, adjVat = 0;
   if (vatRegistered && typeof KhaytPnl.vatCorrections === 'function') {
     const corrections = KhaytPnl.vatCorrections(printLog, {

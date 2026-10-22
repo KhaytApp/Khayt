@@ -44,7 +44,9 @@ struct VatFiledPeriodTests {
               case .array(let marks)? = settings["vatFiledPeriods"],
               case .object(let mark)? = marks.first else { Issue.record("no mark written"); return }
         #expect(mark["period"] == .string("2026-Q3"))
-        #expect(mark["reversedIds"] == .array([]), "the job was live when the return was filed")
+        #expect(mark["orders"] == .object(["INV-1": .array([.number(15), .number(100)])]),
+                "the snapshot: what the return held, job by job")
+        #expect(mark["totals"] == .object(["vat": .number(15), "sales": .number(100)]))
 
         // Cancelled on 5 October, as lib/order-status.js dates it.
         root["printLog"] = .array([.object(["id": .string("INV-1"), "invoiceNumber": .string("INV-1"),
@@ -68,6 +70,26 @@ struct VatFiledPeriodTests {
         let open = try await Self.statement(root, engine: engine, from: "2026-07-01", to: "2026-12-31")
         #expect(abs(open.vat.output) < 0.001)
         #expect(!open.vat.hasAdjustment)
+    }
+
+    @Test("an invoice edited, or backdated in, after filing is adjusted in the next open period")
+    func editAndBackdate() async throws {
+        let engine = try KhaytEngine()
+        var root: [String: JSONValue] = ["settings": .object(Self.vat15), "printLog": .array([Self.job()])]
+        try await Shop.applyVatFiled(to: &root, period: "2026-Q3", filed: true,
+                                     engine: engine, now: try Self.day(2026, 10, 3))
+        root["printLog"] = .array([
+            .object(["id": .string("INV-1"), "invoiceNumber": .string("INV-1"), "status": .string("completed"),
+                     "date": .string("2026-08-10"), "price": .number(230),
+                     "updatedAt": .string("2026-11-02T09:00:00.000Z")]),
+            .object(["id": .string("INV-2"), "invoiceNumber": .string("INV-2"), "status": .string("completed"),
+                     "date": .string("2026-09-12"), "price": .number(115)]),
+        ])
+        let q3 = try await Self.statement(root, engine: engine, from: "2026-07-01", to: "2026-09-30")
+        #expect(abs(q3.vat.output - 15) < 0.001, "the filed figure, whatever the book says now")
+        let q4 = try await Self.statement(root, engine: engine, from: "2026-10-01", to: "2026-12-31")
+        #expect(abs((q4.vat.adjustment ?? 0) - 30) < 0.001, "15 more on the edit, 15 on the backdated invoice")
+        #expect(q4.vat.adjustments == 2)
     }
 
     @Test("the card offers the ended return periods in the span, with the mark")

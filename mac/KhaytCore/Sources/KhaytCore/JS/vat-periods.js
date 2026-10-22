@@ -1,23 +1,23 @@
 'use strict';
 /**
  * The shop's VAT RETURN PERIODS, which of them it has FILED, and where a
- * reversal lands once the period it undoes is filed.
+ * change lands once the period it touches is filed.
  *
  * ── THE OWNER'S RULE (2026-10-22) ────────────────────────────────────────
  *
  * VAT is due on issued invoices (lib/pnl-report.js, VAT IS DUE WHEN THE
- * INVOICE IS ISSUED). When an invoiced job is cancelled, voided or credited,
- * its VAT used to vanish from the period it was BOOKED in, even when that
- * period's return had already been filed — so the figure on screen no longer
- * matched the figure the shop had sent ZATCA. Now:
+ * INVOICE IS ISSUED). A cancelled, voided or credited invoice used to take
+ * its VAT out of the period it was BOOKED in, an edited one to change it, and
+ * a backdated one to add to it — even when that period's return had already
+ * been filed, so the figure on screen stopped matching the one sent to ZATCA.
+ * Now:
  *
- *  - the period NOT filed: as before, the VAT simply drops out of it;
- *  - the period FILED: it stays exactly as it was filed, and the reversal —
- *    negative output VAT, negative taxable sales — lands in the FIRST OPEN
- *    period on or after the day of the cancel / void / credit (the period
- *    holding that day, or, if that one is filed too, the next one that is
- *    not). "We must adjust it next quarter or month depending on the
- *    business size."
+ *  - a period NOT filed works as before: its figures follow the book;
+ *  - a period FILED keeps exactly the figures it was filed with, and every
+ *    later change to it — negative or positive, output VAT and taxable sales —
+ *    lands in the FIRST OPEN period on or after the day of the change (and
+ *    never before the day after the filed period). "We must adjust it next
+ *    quarter or month depending on the business size."
  *
  * ── THE SETTINGS ──────────────────────────────────────────────────────────
  *
@@ -29,51 +29,39 @@
  * `settings.vatFiledPeriods`: the returns the shop has marked filed, one
  * record per period, written by `markFiled`:
  *
- *     { period: '2026-Q3' | '2026-09',     // the return's period key
+ *     { period: '2026-Q3' | '2026-09',       // the return's period key
  *       filedAt: '2026-10-20T09:12:00.000Z', // when it was marked (ISO)
- *       reversedIds: ['INV-2026-0012', …] } // see THE SNAPSHOT
+ *       totals: { vat: 1234.5, sales: 8230 },// what the return held
+ *       orders: { 'INV-2026-0012': [13.04, 86.96], … } } // the SNAPSHOT
  *
- * A bare string (`'2026-Q3'`) is read as a mark with no date and no snapshot.
+ * `orders` maps each job with tax in the period to `[vat, sales]`, rounded to
+ * the halala, as the book showed it when the period was marked — a job with
+ * none is left out (absent is zero). About 30 bytes a job: a shop with 300
+ * invoices a quarter carries ~9 KB per quarter, ~110 KB over three years.
+ *
  * ONLY AN EXPLICIT MARK COUNTS: a period whose deadline has passed is not
- * filed until the shop says so.
+ * filed until the shop says so. Marking a period filed never changes its own
+ * figures — it records them.
+ *
+ * A BARE STRING (`'2026-Q3'`), or any record without `orders`, is a mark with
+ * no snapshot. It counts as filed for where OTHER adjustments land, and
+ * corrects nothing itself: its period reads as the book says. That is the
+ * conservative reading — with nothing recorded, nothing is moved.
  *
  * A period key is either shape whatever the frequency is today, so a shop
- * that moves from quarterly to monthly keeps its old quarters filed. "Is this
- * day in a filed return" is asked of every mark that covers the day.
+ * that moves from quarterly to monthly keeps its old quarters filed. A period
+ * that overlaps one already marked cannot be marked as well.
  *
- * ── THE SNAPSHOT: WAS THE REVERSAL IN THE RETURN AS FILED? ────────────────
- *
- * A job cancelled in October whose invoice is dated in Q3 was OUT of the Q3
- * figure the shop saw — and filed — if the cancel came before the return
- * went in, and IN it if after. The cancel's date cannot always answer that:
- * the iPhone writes `status: 'cancelled'` and nothing else, books from before
- * `cancelledAt` carry no stamp at all, and a stamp that is a bare day cannot
- * order itself against a filing made the same afternoon. So `markFiled`
- * records the ids of the invoices dated in the period that were ALREADY
- * reversed when it was marked (`reversedIds`). A job on that list was out of
- * the return as filed and stays out (no adjustment); a reversed job NOT on it
- * was undone after filing, so the period keeps its VAT and the reversal moves
- * forward. Marking a period filed therefore never changes that period's
- * figures at the moment it is marked — what the shop just filed is what it
- * keeps seeing.
- *
- * A mark WITHOUT a snapshot (a bare string, or a record another build wrote)
- * falls back to dates: the reversal's local day against `filedAt`'s local day
- * (before it: out of the return), or, with no `filedAt`, against the period's
- * last day (a return cannot be filed before its period ends). A reversal with
- * no date at all is taken as before filing — what Khayt showed, and so what
- * the shop most likely filed — and is never moved.
- *
- * ── THE CANCEL'S DAY ──────────────────────────────────────────────────────
+ * ── THE CHANGE'S DAY ──────────────────────────────────────────────────────
  *
  * `cancelledAt`: the LOCAL calendar day, `YYYY-MM-DD`, stamped by
  * lib/order-status.js when a job is cancelled (as `quoteAcceptedAt` is), and
  * removed when it is un-cancelled. Every writer — Mac, desktop, iPhone — must
- * write that one field in that one format. Read, in order: `cancelledAt`, the
- * last `statusHistory` entry to `cancelled` (an ISO instant, read as its
- * local day), `voidedAt`, `creditedAt` — the earliest that applies. A
- * reversal with none lands in the first open period after the filed one it
- * undoes, never inside it.
+ * write that one field in that one format. A job's change day is its cancel
+ * or void (`cancelledAt`, else the last `statusHistory` entry to `cancelled`,
+ * then `voidedAt`, `creditedAt` — the earliest), else its latest credit
+ * note's `issuedAt`, else its sync stamp `updatedAt`, each read as its local
+ * day. With none, the change lands on the first day after the filed period.
  *
  * Pure: no DOM, no clock (the caller passes `now`), book days compared as
  * `YYYY-MM-DD` strings with calendar arithmetic on the numbers, so no time
@@ -180,7 +168,9 @@
       out.push({
         period, from: bounds.from, to: bounds.to,
         filedAt: typeof rec.filedAt === 'string' ? rec.filedAt : '',
-        reversedIds: Array.isArray(rec.reversedIds) ? rec.reversedIds.map(String) : null,
+        // The snapshot, or null for a mark that has none.
+        orders: rec.orders && typeof rec.orders === 'object' && !Array.isArray(rec.orders) ? rec.orders : null,
+        totals: rec.totals && typeof rec.totals === 'object' ? rec.totals : null,
       });
     }
     return out;
@@ -259,54 +249,30 @@
   }
 
   /**
-   * Was an event dated `stamp` already in effect when `mark`'s return was
-   * filed? Only for a mark without a snapshot — see THE SNAPSHOT. No date:
-   * before (it is never moved).
-   */
-  function beforeFiling(stamp, mark) {
-    const day = localDay(stamp);
-    if (!day) return true;
-    const filedDay = localDay(mark && mark.filedAt);
-    if (filedDay) return day < filedDay;
-    return day <= mark.to;
-  }
-
-  /** Was this job's whole reversal already in the return `mark` filed? */
-  function reversedBeforeFiling(o, mark) {
-    if (Array.isArray(mark.reversedIds)) return mark.reversedIds.includes(String(o && o.id));
-    return beforeFiling(reversalDayOf(o), mark);
-  }
-
-  /** Was this credit note already in the return `mark` filed? By its stamp. */
-  function creditBeforeFiling(note, mark) {
-    return beforeFiling(note && note.issuedAt, mark);
-  }
-
-  /**
    * Mark a return period filed. Returns NEW settings (the input untouched).
    *
-   * `orders` is the book's job list, from which the snapshot is taken: the
-   * ids of the invoices dated in the period that are already reversed. Re-
-   * marking a period replaces its record (a fresh snapshot, a fresh date).
-   * `now` is a Date or ISO string; it is required so the rule reads no clock.
+   * `orders` is the book's job list and `ctx` `{ clients, currencies }` what
+   * the P&L is asked with: the snapshot is the period's figures, job by job,
+   * exactly as the book shows them now (lib/pnl-report.js `filedSnapshot`).
+   * Re-marking a period takes a fresh snapshot. A period that OVERLAPS
+   * another marked one (a month inside a filed quarter) is refused — the
+   * settings come back unchanged. `now` is a Date or ISO string.
    */
-  function markFiled(settings, key, orders, now) {
+  function markFiled(settings, key, orders, now, ctx) {
     const s = settings || {};
     const bounds = periodBounds(key);
     if (!bounds) return { ...s };
+    const others = filedMarks(s).filter((m) => m.period !== key);
+    if (others.some((m) => m.from <= bounds.to && m.to >= bounds.from)) return { ...s };
     const P = pnl();
+    const without = unmarkFiled(s, key);
+    const c = ctx || {};
+    const snap = P && typeof P.filedSnapshot === 'function'
+      ? P.filedSnapshot(orders, key, { settings: without, clients: c.clients, currencies: c.currencies })
+      : { totals: { vat: 0, sales: 0 }, orders: {} };
     const at = now instanceof Date ? now.toISOString() : String(now || '');
-    const reversedIds = [];
-    for (const o of Array.isArray(orders) ? orders : []) {
-      if (!o || o.id == null || !isReversed(o)) continue;
-      if (P && typeof P.wouldBeTaxPoint === 'function' && !P.wouldBeTaxPoint(o, s)) continue;
-      const day = P ? P.taxPointDate(o) : String(o.date || '').slice(0, 10);
-      if (day >= bounds.from && day <= bounds.to) reversedIds.push(String(o.id));
-    }
-    const kept = (Array.isArray(s.vatFiledPeriods) ? s.vatFiledPeriods : [])
-      .filter((r) => (typeof r === 'string' ? r : r && r.period) !== key);
-    const record = { period: key, filedAt: at, reversedIds };
-    const list = kept.concat([record])
+    const record = { period: key, filedAt: at, totals: snap.totals, orders: snap.orders };
+    const list = without.vatFiledPeriods.concat([record])
       .sort((a, b) => String(typeof a === 'string' ? a : a.period).localeCompare(String(typeof b === 'string' ? b : b.period)));
     return { ...s, vatFiledPeriods: list };
   }
@@ -358,7 +324,7 @@
     FREQUENCIES, DEFAULT_FREQUENCY,
     frequencyOf, localDay, periodKeyOf, periodBounds, nextPeriodKey, periodsBetween, dayAfter,
     filedMarks, markFor, isFiled, coveringMark, landingDay, landingPeriod,
-    isReversed, reversalDayOf, reversedBeforeFiling, creditBeforeFiling,
+    isReversed, reversalDayOf,
     markFiled, unmarkFiled, filingPeriods,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

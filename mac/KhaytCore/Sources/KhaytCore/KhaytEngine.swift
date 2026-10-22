@@ -8121,16 +8121,21 @@ public actor KhaytEngine {
             as: [VatFilingPeriod].self)
     }
 
-    /// The settings with `period` marked FILED — the snapshot of the invoices
-    /// already reversed taken from `orders`, the book's jobs as they are on
-    /// disk (`lib/vat-periods.js` `markFiled`) — or, `filed: false`, with the
-    /// mark taken off.
+    /// The settings with `period` marked FILED — with the SNAPSHOT of what the
+    /// period holds, job by job, taken from `orders` (the book's jobs as they
+    /// are on disk) with the same `clients` and `currencies` the P&L is asked
+    /// with, so the snapshot is exactly the figures on screen
+    /// (`lib/vat-periods.js` `markFiled`) — or, `filed: false`, with the mark
+    /// taken off.
     public func vatMarkFiled(_ settings: [String: JSONValue], period: String, filed: Bool,
-                             orders: [JSONValue], now: Date) throws -> [String: JSONValue] {
+                             orders: [JSONValue], clients: [JSONValue] = [],
+                             currencies: [String: JSONValue] = [:], now: Date) throws -> [String: JSONValue] {
         try runtime.call2(
-            "ARG4 ? KhaytVatPeriods.markFiled(ARG0, ARG1, ARG2, new Date(ARG3)) : KhaytVatPeriods.unmarkFiled(ARG0, ARG1)",
+            "ARG4 ? KhaytVatPeriods.markFiled(ARG0, ARG1, ARG2, new Date(ARG3), {clients: ARG5, currencies: ARG6})"
+          + " : KhaytVatPeriods.unmarkFiled(ARG0, ARG1)",
             [.object(settings), .string(period), .array(orders),
-             .number(now.timeIntervalSince1970 * 1000), .bool(filed)],
+             .number(now.timeIntervalSince1970 * 1000), .bool(filed),
+             .array(clients), .object(currencies)],
             as: [String: JSONValue].self)
     }
 
