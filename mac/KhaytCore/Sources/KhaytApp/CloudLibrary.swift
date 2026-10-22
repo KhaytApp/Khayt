@@ -1003,6 +1003,7 @@ extension Shop {
     /// cloud — never one that is neither. Returns the size freed.
     func moveOut(_ url: URL, key: String, config: CloudLibrary.Config,
                  engine: KhaytEngine) async throws -> Int {
+        // lock: callers — freeUpSpace
         let proved = try await CloudLibrary.ensureInBucket(config.remote, key: key, file: url, engine: engine)
         let text = try await engine.sidecarText(size: proved.size, sha256: proved.sha256, key: key,
                                                 provider: config.provider,

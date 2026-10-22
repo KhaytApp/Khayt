@@ -7,7 +7,7 @@ import KhaytCore
 /// sidecars, kept per file in the app's own support folder and out of the
 /// book, read by the tiles and the Show menu without asking the disk — and
 /// overruled by the disk wherever a file is looked at.
-@MainActor
+@Suite(.serialized) @MainActor
 struct LibrarySyncIndexTests {
 
     /// A library folder and a support folder under a fresh temporary folder,

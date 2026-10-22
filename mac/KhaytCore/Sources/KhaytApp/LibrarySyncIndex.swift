@@ -177,6 +177,7 @@ final class LibrarySyncIndex: @unchecked Sendable {
             var models: [String: E]
         }
         guard let old = try? JSONDecoder().decode(Old.self, from: data), old.root == primary else { return [] }
+        // lock: system — retires this app's own earlier index file, once read; it holds no shop data.
         try? FileManager.default.removeItem(at: url)
         let ownFolder = url.deletingLastPathComponent().standardizedFileURL.path == folder.standardizedFileURL.path
         guard ownFolder else { return [] }
