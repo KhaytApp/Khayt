@@ -35,8 +35,12 @@ struct CatalogueView: View {
                 if let problem {
                     Section { V2Note(text: problem, tone: KhaytDesign.note).listRowBackground(Color.clear) }
                 }
-                if page?.whole == false {
-                    Section { V2Note(text: L10n.tr("catalogue.partial")).listRowBackground(Color.clear) }
+                if let page, !page.whole {
+                    // Never look complete when it is not: say how much is here.
+                    Section {
+                        V2Note(text: L10n.format("catalogue.partial", page.items.count, page.available ?? page.items.count))
+                            .listRowBackground(Color.clear)
+                    }
                 }
                 ForEach(groups, id: \.name) { group in
                     Section(group.name.isEmpty ? L10n.tr("catalogue.ungrouped") : group.name) {

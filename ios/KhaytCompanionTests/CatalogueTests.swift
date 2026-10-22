@@ -59,6 +59,46 @@ final class CatalogueTests: XCTestCase {
         ])
     }
 
+    func testTheCatalogueIsNeverSentFromThePhone() async throws {
+        // A product changed here, by any path: a newer rev and a field gone.
+        // Sync replaces whole records, and the phone's copy has no file paths,
+        // so sending it would wipe the Mac's photos and documents.
+        let book = CompanionBook(directory: dir.appendingPathComponent("send"))
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("send"), withIntermediateDirectories: true)
+        try book.replace(with: SampleShop.book(), scope: SampleShop.scope())
+        try book.update { root in
+            guard case .array(var rows)? = root["products"], case .object(var p) = rows[0] else { return }
+            p["rev"] = .number(99); p["nameEn"] = .string("Changed on the phone")
+            rows[0] = .object(p)
+            rows.append(.object(["id": .string("PROD-NEW"), "nameEn": .string("Made on the phone"), "rev": .number(1)]))
+            root["products"] = .array(rows)
+        }
+        let outbox = try await BookReader(book: book).pendingChanges()
+        let sent = try XCTUnwrap(outbox)
+        let collections = (sent.deltas + sent.tombstones).compactMap { d -> String? in
+            if case .object(let o) = d, case .string(let c)? = o["collection"] { return c } else { return nil }
+        }
+        XCTAssertFalse(collections.contains("products"), "the phone must never send a product")
+        XCTAssertTrue(sent.isEmpty)
+
+        // And a product deleted on the phone sends no tombstone either.
+        try book.update { root in root["products"] = .array([]) }
+        let afterDelete = try await BookReader(book: book).pendingChanges()
+        XCTAssertTrue(try XCTUnwrap(afterDelete).isEmpty)
+    }
+
+    func testACutCatalogueSaysHowMuchIsHere() async throws {
+        var scope = SampleShop.scope()
+        scope = BookScope.Taken(collections: scope.collections.merging(
+            ["products": .init(whole: false, sent: 4, available: 2_400)]) { $1 }, omitted: [], takenAt: scope.takenAt)
+        let book = CompanionBook(directory: dir.appendingPathComponent("cut"))
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("cut"), withIntermediateDirectories: true)
+        try book.replace(with: SampleShop.book(), scope: scope)
+        let page = try await BookReader(book: book).catalogue(language: "en")
+        XCTAssertFalse(page.whole)
+        XCTAssertEqual(page.available, 2_400)
+    }
+
     func testABookWithoutProductsIsAnEmptyCatalogue() async throws {
         var store = SampleShop.book()
         store["products"] = nil

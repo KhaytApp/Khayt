@@ -117,7 +117,7 @@ actor BookReader {
         for _ in 1...3 {
             let local = try book.read()
             var merged = upstream
-            let outbox = try await engine().changesToSend(local: local, server: baseline)
+            let outbox = try await Self.outbox(engine(), local: local, server: baseline)
             if !outbox.isEmpty {
                 merged = try await engine().foldDeltas(base: upstream, deltas: [outbox.wire]).store
             }
@@ -367,7 +367,35 @@ actor BookReader {
     func pendingChanges() async throws -> KhaytEngine.Outbox? {
         guard let baseline = book.baseline() else { return nil }
         let local = try book.read()
-        return try await engine().changesToSend(local: local, server: baseline)
+        return try await Self.outbox(engine(), local: local, server: baseline)
+    }
+
+    /// Collections the phone READS and never sends. The catalogue reaches
+    /// the phone without the Mac's file paths and documents (`BookScope.trimmed`),
+    /// and sync replaces whole records: a product sent back from here would
+    /// wipe them on the Mac. So they are left out of every outbox, whatever
+    /// happened to them on the phone.
+    nonisolated static let neverSent: Set<String> = ["products"]
+
+    /// What this phone sends: `changesToSend` over everything but `neverSent`.
+    /// Every outbox on the phone is built here.
+    nonisolated static func outbox(_ engine: KhaytEngine, local: [String: JSONValue],
+                                   server: [String: JSONValue]) async throws -> KhaytEngine.Outbox {
+        func without(_ store: [String: JSONValue]) -> [String: JSONValue] {
+            var out = store
+            for c in neverSent { out.removeValue(forKey: c) }
+            // A removal travels as a tombstone in its own list: one naming a
+            // never-sent collection stays behind too, or a product deleted
+            // here would delete it on the Mac.
+            if case .array(let stones)? = out["tombstones"] {
+                out["tombstones"] = .array(stones.filter { stone in
+                    guard case .object(let o) = stone, case .string(let c)? = o["collection"] else { return true }
+                    return !neverSent.contains(c)
+                })
+            }
+            return out
+        }
+        return try await engine.changesToSend(local: without(local), server: without(server))
     }
 
     /// Has this phone got anything to send?

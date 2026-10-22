@@ -824,7 +824,7 @@
 "catalogue.ungrouped" = "أخرى";
 "catalogue.empty" = "لا منتجات بعد. أضفها من الكتالوج على جهاز الماك.";
 "catalogue.no_match" = "لا يوجد منتج مطابق.";
-"catalogue.partial" = "تُعرض أول 2,000 منتج. ابحث عن البقية على جهاز الماك.";
+"catalogue.partial" = "تُعرض %1$lld من %2$lld منتج. ابحث عن البقية على الماك.";
 "catalogue.no_book" = "يصل الكتالوج مع دفتر الورشة. زامن مع سحابة خيط أو مع جهاز الماك أولًا.";
 "catalogue.in_stock" = "%lld في المخزون";
 "catalogue.out_of_stock" = "نفد المخزون";

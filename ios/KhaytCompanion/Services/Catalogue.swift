@@ -16,6 +16,8 @@ struct CataloguePage {
     var currency: String?
     /// The phone holds every product (`BookScope`); false means a capped list.
     var whole = true
+    /// How many the shop has, when the phone holds fewer.
+    var available: Int?
 }
 
 extension BookReader {
@@ -36,7 +38,9 @@ extension BookReader {
         }
         var currency: String?
         if case .string(let c)? = settings["currency"], !c.isEmpty { currency = c }
-        return CataloguePage(items: items, currency: currency, whole: holdsAll("products"))
+        let whole = holdsAll("products")
+        return CataloguePage(items: items, currency: currency, whole: whole,
+                             available: whole ? nil : scope()?.collections["products"]?.available)
     }
 
     /// Search across name, description, group and material: every word must

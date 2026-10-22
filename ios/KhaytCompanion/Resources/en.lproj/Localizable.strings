@@ -824,7 +824,7 @@
 "catalogue.ungrouped" = "Other";
 "catalogue.empty" = "No products yet. Add them in the Catalogue on your Mac.";
 "catalogue.no_match" = "No product matches that.";
-"catalogue.partial" = "Showing the first 2,000 products. Search to find others on your Mac.";
+"catalogue.partial" = "Showing %1$lld of %2$lld products. Search on your Mac for the others.";
 "catalogue.no_book" = "The catalogue comes with the shop's book. Sync with Khayt Cloud or your Mac first.";
 "catalogue.in_stock" = "%lld in stock";
 "catalogue.out_of_stock" = "Out of stock";

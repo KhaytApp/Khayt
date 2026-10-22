@@ -230,7 +230,7 @@ struct CloudSync {
         var (s, _) = try await pull(session)
         for attempt in 0..<2 {
             guard let baseline = book.baseline() else { return (s, .nothingToSend) }
-            let outbox = try await engine.changesToSend(local: try book.read(), server: baseline)
+            let outbox = try await BookReader.outbox(engine, local: try book.read(), server: baseline)
             guard !outbox.isEmpty else { return (s, .nothingToSend) }
             guard let base = s.seenRev else { return (s, .needsTheMac) }
             do {
