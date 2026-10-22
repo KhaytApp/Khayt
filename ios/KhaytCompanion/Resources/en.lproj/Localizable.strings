@@ -459,6 +459,7 @@
 "pair.pin.body" = "The owner PIN from Settings → LAN API on the Mac, 8 characters or more. The intake PIN will not work here.";
 "pair.pin.foot" = "Kept in the iPhone Keychain, never sent anywhere but this Mac.";
 "pair.pin.wrong" = "That PIN was refused. Check Settings → LAN API on the Mac.";
+"pair.window_closed" = "On the Mac, click Pair a phone (Settings → Online), then try again.";
 "pair.connect" = "Connect";
 "pair.finish" = "Open the board";
 "pair.pull.title" = "Copying the shop’s book";

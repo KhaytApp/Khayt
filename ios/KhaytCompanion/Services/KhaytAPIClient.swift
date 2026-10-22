@@ -1480,7 +1480,9 @@ final class KhaytAPIClient: ObservableObject {
 
     // MARK: - Enrolling this phone
 
-    enum Enrolment: Equatable { case enrolled, unsupported, failed }
+    /// `closed`: the Mac takes a new phone only while its owner has clicked
+    /// "Pair a phone" (Settings ▸ Online), and that window is shut.
+    enum Enrolment: Equatable { case enrolled, unsupported, failed, closed }
 
     private struct EnrolAnswer: Decodable { let deviceId: String; let publicKey: String; let sig: String }
 
@@ -1506,6 +1508,8 @@ final class KhaytAPIClient: ObservableObject {
         case .enrolled: enrolNotBefore = nil
         case .unsupported: enrolNotBefore = now.addingTimeInterval(86_400)
         case .failed: enrolNotBefore = now.addingTimeInterval(3600)
+        // Soon, not in an hour: the owner may be opening the window right now.
+        case .closed: enrolNotBefore = now.addingTimeInterval(60)
         }
         return result
     }
@@ -1522,6 +1526,7 @@ final class KhaytAPIClient: ObservableObject {
               let (data, response) = try? await send(url, method: "POST", body: body, auth: .pin),
               let status = (response as? HTTPURLResponse)?.statusCode else { return .failed }
         if [404, 405, 503].contains(status) { return .unsupported }
+        if status == 403, Self.pairingClosed(data) { return .closed }
         guard status == 200,
               let answer = try? JSONDecoder().decode(EnrolAnswer.self, from: data),
               // The PIN or the Mac may have changed while this was in flight.
@@ -1553,6 +1558,13 @@ final class KhaytAPIClient: ObservableObject {
 }
 
 extension KhaytAPIClient {
+    /// The Mac's "no pairing window is open" answer to `POST /api/devices`.
+    nonisolated static func pairingClosed(_ body: Data) -> Bool {
+        guard case .object(let o)? = try? JSONDecoder().decode(JSONValue.self, from: body),
+              case .string(let reason)? = o["reason"] else { return false }
+        return reason == "pairing-closed"
+    }
+
     /// Which 401 this is. The native Mac refuses an owner PIN shorter than 8
     /// characters with its own reason (#1713); that is not a wrong PIN, and
     /// telling a shop "that PIN was refused" would send it hunting for a typo.

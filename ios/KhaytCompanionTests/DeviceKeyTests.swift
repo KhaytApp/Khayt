@@ -142,6 +142,22 @@ final class DeviceKeyTests: XCTestCase {
         XCTAssertEqual(ConnectionSettings().device, s.device, "kept in the Keychain across launches")
     }
 
+    func testAMacWithNoPairingWindowIsAskedAgainSoonAndKeepsNothing() async throws {
+        let s = pairedSettings()
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        StubMac.pairingClosed = true
+        let now = Date()
+        let result = await api.enrolDevice(name: "Test iPhone", now: now)
+        XCTAssertEqual(result, .closed)
+        XCTAssertNil(s.device)
+        XCTAssertFalse(api.wantsEnrolment(now: now.addingTimeInterval(30)))
+        XCTAssertTrue(api.wantsEnrolment(now: now.addingTimeInterval(61)), "a minute, not an hour")
+        StubMac.pairingClosed = false
+        let again = await api.enrolDevice(name: "Test iPhone", now: now.addingTimeInterval(61))
+        XCTAssertEqual(again, .enrolled)
+        XCTAssertFalse(L10n.tr("pair.window_closed").isEmpty)
+    }
+
     func testAMacThatForgotThePhoneGetsThePinAndAFreshEnrolment() async throws {
         let s = pairedSettings()
         let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
@@ -225,13 +241,15 @@ final class StubMac: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var hasRoute = true
     nonisolated(unsafe) static var knowsDevice = true
     nonisolated(unsafe) static var revoked = false
+    /// The native Mac with no "Pair a phone" window open.
+    nonisolated(unsafe) static var pairingClosed = false
     nonisolated(unsafe) static var clockAhead: TimeInterval = 0
     nonisolated(unsafe) static var key: SymmetricKey?
     static let identity = Curve25519.Signing.PrivateKey()
     static let deviceId = "dev_stubPhone0001"
 
     static func reset() {
-        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil
+        seen = []; hasRoute = true; knowsDevice = true; revoked = false; clockAhead = 0; key = nil; pairingClosed = false
     }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-stub.invalid" }
@@ -246,7 +264,10 @@ final class StubMac: URLProtocol, @unchecked Sendable {
         var signedOK = false
         var answer: (Int, Any) = (404, ["error": "not found"])
 
-        if let device = request.value(forHTTPHeaderField: "x-khayt-device") {
+        if Self.pairingClosed, url.path() == "/api/devices" {
+            // Before the PIN is looked at, as the Mac does.
+            answer = (403, ["reason": "pairing-closed", "error": "On the Mac, click Pair a phone, then try again"])
+        } else if let device = request.value(forHTTPHeaderField: "x-khayt-device") {
             let time = Int(request.value(forHTTPHeaderField: "x-khayt-time") ?? "") ?? 0
             let nonce = request.value(forHTTPHeaderField: "x-khayt-nonce") ?? ""
             let mac = request.value(forHTTPHeaderField: "x-khayt-mac") ?? ""
