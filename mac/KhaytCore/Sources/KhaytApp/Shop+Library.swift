@@ -1330,6 +1330,40 @@ extension Shop {
         }
     }
 
+    /// Give a model a new title — its `name`, never its file.
+    ///
+    /// The FILE keeps the name it has: `originalName` and the folder are what
+    /// the vault, the sidecars and the other app find it by, and a past job
+    /// names the model by id. What a shop renames is what it reads on the tile
+    /// (`LibraryFile.title`). Through `editFiles`, so it is one write on the
+    /// store's chain and ⌘Z puts the old title back.
+    ///
+    /// Refused when the title is blank once trimmed — a blank `name` falls back
+    /// to the filename, which reads as the rename having been ignored — or
+    /// when nothing would change.
+    @discardableResult
+    func rename(_ id: LibraryFile.ID, to typed: String) -> Bool {
+        let title = Self.cleanTitle(typed)
+        guard !title.isEmpty, let file = libraryFile(id: id), file.name != title else { return false }
+        return editFiles([id], named: words.callIt("mac.rename_model_undo")) { record in
+            record["name"] = .string(title)
+        }
+    }
+
+    /// What a typed title is stored as: one line, trimmed. A newline pasted
+    /// into a title would break every one-line place it is drawn.
+    nonisolated static func cleanTitle(_ typed: String) -> String {
+        typed.components(separatedBy: .newlines).joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Start renaming a model: it becomes the selection, and the inspector
+    /// opens its title for editing.
+    func beginRename(_ file: LibraryFile) {
+        if fileSelection != [file.id] { select(file, modifiers: .replace) }
+        renamingFileId = file.id
+    }
+
     /// The selected models that are (true) or are not (false) put aside.
     func selectedArchiveIds(_ archived: Bool) -> Set<LibraryFile.ID> {
         Set(selectedFiles.filter { $0.isArchived == archived }.map(\.id))

@@ -672,6 +672,11 @@ private struct ModelMenu: View {
         Button(Words.upfront("mac.favourite")) { shop.toggleFavouriteOnSelection() }
             .keyboardShortcut("d", modifiers: [.command, .shift])
             .disabled(!canEdit)
+        // The inspector's title field, opened on the one selected model.
+        Button(Words.upfront("mac.rename_model") + "\u{2026}") {
+            if let one = shop.selectedFile { shop.beginRename(one) }
+        }
+            .disabled(!canEdit || shop.selectedFile == nil)
         // Two items rather than one that toggles: a frozen title cannot say
         // which it would do (see above), and Archive and Restore are not the
         // same act. Each is enabled only when the selection holds a model it

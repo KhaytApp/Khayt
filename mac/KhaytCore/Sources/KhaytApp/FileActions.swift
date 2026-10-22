@@ -163,6 +163,10 @@ struct ModelActions: View {
         Button(shop.words.callIt(allOn ? "mac.print_next_remove" : "mac.print_next_add")) {
             shop.setPrintNext(marked, on: !allOn)
         }
+        // The title, never the file: `Shop.rename`. This model alone — a
+        // title is one model's.
+        Button(shop.words.callIt("mac.rename_model") + "\u{2026}") { shop.beginRename(file) }
+            .disabled(!shop.canWrite)
         // Put aside, or brought back — the selection when this model is one
         // of it, as Print next above. Never a delete: `Shop.archive`.
         let restoring = file.isArchived

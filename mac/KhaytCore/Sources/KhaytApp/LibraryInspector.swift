@@ -263,9 +263,7 @@ struct LibraryInspector: View {
                 } else if file.isFavourite {
                     Image(systemName: "star.fill").foregroundStyle(Khayt.marked)
                 }
-                Text(file.title)
-                    .font(.title3.weight(.semibold))
-                    .textSelection(.enabled)
+                ModelTitle(shop: shop, file: file)
             }
             // PUT ASIDE, and said so where the eye is, with the way back. A
             // model found through Spotlight or a job opens here even while it
@@ -919,5 +917,61 @@ struct PartsSection: View {
 
     static func bytes(_ v: Double) -> String {
         Format.fileSize(Int64(v))
+    }
+}
+
+/// The model's title, and the field that renames it.
+///
+/// One field for every way in — the pencil here, the right-click menu, Model ▸
+/// Rename — through `Shop.renamingFileId`. Return saves, Escape or clicking
+/// away leaves the title as it was: a rename half-typed when the shop clicks
+/// another model must not land on the model it was typed for.
+private struct ModelTitle: View {
+    let shop: Shop
+    let file: LibraryFile
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    private var editing: Bool { shop.renamingFileId == file.id }
+
+    var body: some View {
+        Group {
+            if editing {
+                TextField(shop.words.callIt("mac.rename_model"), text: $draft)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.title3.weight(.semibold))
+                    .focused($focused)
+                    .onSubmit { save() }
+                    .onExitCommand { shop.renamingFileId = nil }
+                    .onChange(of: focused) { _, now in if !now { shop.renamingFileId = nil } }
+                    .onAppear {
+                        draft = file.name.isEmpty ? file.title : file.name
+                        focused = true
+                    }
+                    .accessibilityLabel(shop.words.callIt("mac.rename_model"))
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(file.title)
+                        .font(.title3.weight(.semibold))
+                        .textSelection(.enabled)
+                    if shop.canWrite {
+                        Button { shop.renamingFileId = file.id } label: {
+                            Image(systemName: "pencil")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .help(shop.words.callIt("mac.rename_model"))
+                        .accessibilityLabel(shop.words.callIt("mac.rename_model"))
+                    }
+                }
+            }
+        }
+        // Another model chosen while the field is open closes it.
+        .onChange(of: file.id) { _, _ in shop.renamingFileId = nil }
+    }
+
+    private func save() {
+        shop.rename(file.id, to: draft)
+        shop.renamingFileId = nil
     }
 }

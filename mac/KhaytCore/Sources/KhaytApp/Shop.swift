@@ -60,6 +60,11 @@ final class Shop {
         didSet { if libraryShowArchived != oldValue { libraryViewChanged() } }
     }
 
+    /// The model whose title is being edited in the inspector, from its
+    /// pencil, the right-click menu or Model ▸ Rename. One field, wherever it
+    /// was asked for, so the three cannot each grow their own.
+    var renamingFileId: LibraryFile.ID?
+
     /// How many are hidden right now, so the library can offer to show them
     /// rather than leave a shop wondering where a model went.
     var archivedCount: Int { files.count { $0.isArchived } }

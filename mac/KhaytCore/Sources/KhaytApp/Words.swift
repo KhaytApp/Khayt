@@ -2688,6 +2688,9 @@ final class Words {
         "mac.unarchive_model": ["en": "Restore from Archive", "ar": "استعادة من الأرشيف"],
         "mac.unarchive_n_models": ["en": "Restore {n} Models from Archive", "ar": "استعادة {n} نماذج من الأرشيف"],
         "mac.lib_archived": ["en": "Archived", "ar": "المؤرشفة"],
+        // A model's title (`Shop.rename`); the file keeps its own name.
+        "mac.rename_model": ["en": "Rename", "ar": "إعادة تسمية"],
+        "mac.rename_model_undo": ["en": "Rename Model", "ar": "إعادة تسمية النموذج"],
         "mac.archived_on": ["en": "Archived {date}", "ar": "أُرشف في {date}"],
         "mac.archived_undated": ["en": "Archived", "ar": "مؤرشف"],
         "mac.archive_help": ["en": "Take this model out of the library. Its file and its history stay, and Show ▸ Archived brings it back.",
