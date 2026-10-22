@@ -456,9 +456,9 @@
 "pair.manual.port" = "Port";
 "pair.signed_out" = "The Mac signed this phone out. Pair it again with the owner PIN.";
 "pair.pin.title" = "The owner PIN";
-"pair.pin.body" = "The owner PIN from Settings → LAN API on the Mac, 8 characters or more. The intake PIN will not work here.";
+"pair.pin.body" = "The owner PIN from Settings → Online on the Mac or PC, 8 characters or more. The intake PIN will not work here.";
 "pair.pin.foot" = "Kept in the iPhone Keychain, never sent anywhere but this Mac.";
-"pair.pin.wrong" = "That PIN was refused. Check Settings → LAN API on the Mac.";
+"pair.pin.wrong" = "That PIN was refused. Check Settings → Online on the Mac or PC.";
 "pair.window_closed" = "On the Mac, click Pair a phone (Settings → Online), then try again.";
 "settings.secure.body" = "This phone still signs in with the owner PIN. On the Mac, click Pair a phone (Settings → Online), then tap Secure this phone.";
 "settings.secure.button" = "Secure this phone";

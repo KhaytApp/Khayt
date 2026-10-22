@@ -142,7 +142,7 @@ final class DeviceKeyTests: XCTestCase {
         XCTAssertEqual(ConnectionSettings().device, s.device, "kept in the Keychain across launches")
     }
 
-    func testAMacWithNoPairingWindowIsAskedAgainSoonAndKeepsNothing() async throws {
+    func testAMacWithNoPairingWindowIsNotAskedAgainWithinTheHourAndKeepsNothing() async throws {
         let s = pairedSettings()
         let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
         StubMac.pairingClosed = true
