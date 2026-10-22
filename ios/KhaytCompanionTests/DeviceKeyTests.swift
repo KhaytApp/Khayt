@@ -150,11 +150,14 @@ final class DeviceKeyTests: XCTestCase {
         let result = await api.enrolDevice(name: "Test iPhone", now: now)
         XCTAssertEqual(result, .closed)
         XCTAssertNil(s.device)
-        XCTAssertFalse(api.wantsEnrolment(now: now.addingTimeInterval(30)))
-        XCTAssertTrue(api.wantsEnrolment(now: now.addingTimeInterval(61)), "a minute, not an hour")
+        XCTAssertEqual(api.lastEnrolment, .closed, "Settings offers to secure it")
+        XCTAssertFalse(api.wantsEnrolment(now: now.addingTimeInterval(600)),
+                       "every try sends the PIN: not again within the hour")
+        XCTAssertTrue(api.wantsEnrolment(now: now.addingTimeInterval(3601)))
         StubMac.pairingClosed = false
-        let again = await api.enrolDevice(name: "Test iPhone", now: now.addingTimeInterval(61))
-        XCTAssertEqual(again, .enrolled)
+        let again = await api.secureThisPhone(name: "Test iPhone")
+        XCTAssertEqual(again, .enrolled, "the owner opened the window: at once, whatever the wait")
+        XCTAssertNotNil(s.device)
         XCTAssertFalse(L10n.tr("pair.window_closed").isEmpty)
     }
 

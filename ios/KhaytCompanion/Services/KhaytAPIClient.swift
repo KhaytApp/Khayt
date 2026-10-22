@@ -1504,14 +1504,28 @@ final class KhaytAPIClient: ObservableObject {
     @discardableResult
     func enrolDevice(name: String, now: Date = Date()) async -> Enrolment {
         let result = await enrol(name: name)
+        lastEnrolment = result
         switch result {
         case .enrolled: enrolNotBefore = nil
         case .unsupported: enrolNotBefore = now.addingTimeInterval(86_400)
-        case .failed: enrolNotBefore = now.addingTimeInterval(3600)
-        // Soon, not in an hour: the owner may be opening the window right now.
-        case .closed: enrolNotBefore = now.addingTimeInterval(60)
+        // A shut window waits as long as a failure. Every try carries the PIN,
+        // in the clear, and a window may stay shut for good: retrying each
+        // minute would send it sixty times as often as before. Settings offers
+        // "Secure this phone" for when the owner opens the window.
+        case .failed, .closed: enrolNotBefore = now.addingTimeInterval(3600)
         }
         return result
+    }
+
+    /// How the last enrolment went, for Settings: `.closed` means the phone
+    /// still signs in with the PIN until the owner opens the Mac's window.
+    @Published private(set) var lastEnrolment: Enrolment?
+
+    /// Settings' "Secure this phone": enrol now, whatever the wait.
+    func secureThisPhone(name: String) async -> Enrolment {
+        if settings.macIdentityKey.isEmpty, let key = await fetchIdentityKey() { settings.macIdentityKey = key }
+        guard !settings.macIdentityKey.isEmpty else { return .failed }
+        return await enrolDevice(name: name)
     }
 
     private func enrol(name: String) async -> Enrolment {

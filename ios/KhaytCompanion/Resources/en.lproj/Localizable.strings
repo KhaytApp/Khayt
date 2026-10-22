@@ -460,6 +460,10 @@
 "pair.pin.foot" = "Kept in the iPhone Keychain, never sent anywhere but this Mac.";
 "pair.pin.wrong" = "That PIN was refused. Check Settings → LAN API on the Mac.";
 "pair.window_closed" = "On the Mac, click Pair a phone (Settings → Online), then try again.";
+"settings.secure.body" = "This phone still signs in with the owner PIN. On the Mac, click Pair a phone (Settings → Online), then tap Secure this phone.";
+"settings.secure.button" = "Secure this phone";
+"settings.secure.done" = "Done. This phone now signs in with its own key.";
+"settings.secure.failed" = "The Mac didn't answer. Check you're on the shop's Wi-Fi and try again.";
 "pair.connect" = "Connect";
 "pair.finish" = "Open the board";
 "pair.pull.title" = "Copying the shop’s book";

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @EnvironmentObject private var settings: ConnectionSettings
@@ -46,6 +47,9 @@ struct SettingsView: View {
                     cloudCard
                     eyebrow(L10n.tr("settings.connection"))
                     macCard
+                    if api.lastEnrolment == .closed, settings.device == nil, settings.isPaired, !settings.isSampleShop {
+                        secureCard
+                    }
                     unpairButton
                     foot(L10n.tr("settings.unpair.footer"))
                     Link(L10n.tr("settings.docs"),
@@ -205,6 +209,38 @@ struct SettingsView: View {
         .frame(minHeight: 52)
         .overlay(alignment: .bottom) { Rectangle().fill(KhaytDesign.hairline).frame(height: 1) }
     }
+
+    /// A phone that still signs in with the owner PIN, because the Mac's
+    /// "Pair a phone" window was shut when it tried: how to give it a key.
+    private var secureCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(L10n.tr("settings.secure.body"), systemImage: "lock.open")
+                .font(.khayt(13.5, relativeTo: .footnote)).foregroundStyle(KhaytDesign.ink)
+            if let secureAnswer {
+                Text(secureAnswer).font(.khayt(12.5, relativeTo: .footnote)).foregroundStyle(KhaytDesign.note)
+            }
+            Button {
+                Task {
+                    securing = true
+                    defer { securing = false }
+                    switch await api.secureThisPhone(name: UIDevice.current.name) {
+                    case .enrolled: secureAnswer = L10n.tr("settings.secure.done")
+                    case .closed: secureAnswer = L10n.tr("pair.window_closed")
+                    case .unsupported, .failed: secureAnswer = L10n.tr("settings.secure.failed")
+                    }
+                }
+            } label: {
+                Text(L10n.tr("settings.secure.button")).font(.khayt(15, .semibold, relativeTo: .body))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.bordered).tint(KhaytDesign.brand)
+            .disabled(securing)
+        }
+        .padding(14).card().padding(.top, 10)
+    }
+
+    @State private var securing = false
+    @State private var secureAnswer: String?
 
     /// The Mac's address and PIN, folded away: set once at pairing, and only
     /// opened when the shop's network changes.
