@@ -18,6 +18,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **Mac: Bambu speed presets and chamber light.** The card has new Speed (Silent, Standard, Sport, Ludicrous) and Light menus. A speed change asks first, because it changes the running print. The light switches straight away. Both are built in `lib/printer-commands.js` `buildControl` and gated by the same `opts.transports` as pause/resume/cancel.
 - **Mac: a Bambu card says why it paused or failed.** The printer's `print_error` and HMS codes now show as Bambu's own sentence plus the code, for example "AMS filament ran out… (0700_8011)". The text comes from `lib/bambu-faults.js`, a short table of common codes copied from ha-bambulab (MIT). A code that isn't in the table shows as the raw code.
 
+- **iPhone: pairing during the Mac's "Pair a phone" window.** The Mac now
+  takes a new phone only while its owner has clicked Pair a phone
+  (Settings → Online). The iPhone gets its own key straight after the PIN
+  check. When the window is shut, it says what to click on the Mac instead
+  of pairing a phone that would keep sending the PIN. A phone that still
+  signs in with the PIN gets a Secure this phone card in Settings. A shut
+  window is retried hourly, not every minute, because each try sends the PIN.
+
 - **Desktop: pause, resume and cancel a print from the machine card.**
   While a printer is printing, its card in Settings → Printers now has Pause
   (or Resume when it is paused) and Cancel print, and a Klipper printer also
@@ -25,6 +33,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   is scrap; Pause and Resume go straight through. A printer whose protocol
   can't take a command doesn't offer it: Bambu Lab printers have none, and
   Repetier has no Pause. The same controls as the Mac.
+
+- **Mac: a phone pairs only after you click Pair a phone.** Someone on the shop's Wi-Fi guessing the LAN PIN could trip the wrong-PIN lockout and stop the shop pairing its own new phone. Now Settings → Online has a Pair a phone button under Paired phones. It opens a two-minute window with a countdown, and the window closes after one phone pairs, when time runs out, or when you click Close. Outside the window the Mac refuses a new phone at once, without checking the PIN or counting the attempt. Inside it, earlier guesses don't lock the new phone out, and wrong PINs are counted per device: a device that gets the PIN wrong 5 times can't pair in that window, while other phones still can. The window closes for everyone after 50 wrong PINs in all. That makes a casual guesser need ten addresses instead of one, but it does not stop a deliberate one: a single computer can take ten addresses, so a long PIN is still what keeps the shop safe. The window also closes if the LAN server stops, and the button is off while the server listens on this Mac only. A changed clock can't keep the window open. Phones that are already paired are not affected.
 
 - **The catalogue now counts each part's quantity in a product's cost.** A part used three times in a product was costed once, so the catalogue suggested a price well under what a job made from that product costs. The catalogue and a job now agree. Saved product prices do not change by themselves: a product's price moves only when you open it, edit it and save. The catalogue's margin column now shows the real margin, so a product priced under the old rule may show a thin or negative margin. Review those products and re-save any you want re-priced.
 

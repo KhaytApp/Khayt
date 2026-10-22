@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Pairing, as `design/ios-v2/` draws it: three steps, each one screen.
 ///
@@ -291,6 +292,26 @@ struct PairingView: View {
             failure = error.localizedDescription
             CompanionHaptics.warning()
             return
+        }
+
+        // ── ENROL NOW, WHILE THE MAC'S PAIRING WINDOW IS OPEN ────────────
+        //
+        // The native Mac takes a new phone only while its owner has clicked
+        // "Pair a phone"; a phone paired outside that window would run on the
+        // PIN alone, sent on every request. So enrol here, and say what to do
+        // when the window is shut. A Mac or desktop without the route (404)
+        // or a failed try is not fatal: the phone enrols later by itself.
+        if settings.macIdentityKey.isEmpty, let key = await api.fetchIdentityKey() {
+            settings.macIdentityKey = key
+        }
+        if !settings.macIdentityKey.isEmpty {
+            let result = await api.enrolDevice(name: UIDevice.current.name)
+            if result == .closed || result == .locked {
+                settings.macIdentityKey = ""
+                failure = L10n.tr(result == .closed ? "pair.window_closed" : "pair.window_locked")
+                CompanionHaptics.warning()
+                return
+            }
         }
 
         // ── AND THEN ASK FOR THE BOOK, BUT DO NOT INSIST ─────────────────
