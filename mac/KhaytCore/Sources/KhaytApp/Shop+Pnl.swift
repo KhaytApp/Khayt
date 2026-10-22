@@ -182,12 +182,12 @@ extension Shop {
     /// any figure, and the filed period reads what was filed from then on.
     /// Only the shop's explicit mark counts; a deadline passing marks nothing.
     ///
-    /// WHERE IT LIVES: in the book's settings, on this Mac. Settings do not
-    /// travel through Khayt Cloud sync; the desktop app on this Mac reads the
-    /// same book and sees the marks. Un-filing archives the snapshot
-    /// (`vatUnfiledPeriods`) and filing again restores it; the card asks
-    /// before un-filing all the same.
-    func setVatPeriodFiled(_ period: String, filed: Bool) async {
+    /// WHERE IT LIVES: in the book's settings — this Mac's book. Settings do
+    /// not travel through Khayt Cloud sync. Un-filing archives the snapshot
+    /// (`vatUnfiledPeriods`); filing again restores it, or — `fresh`, for an
+    /// amended return — records the book as it is now. The card asks first
+    /// either way.
+    func setVatPeriodFiled(_ period: String, filed: Bool, fresh: Bool = false) async {
         vatFiledProblem = nil
         guard lockAllows("settings", "edit") else {
             vatFiledProblem = words.callIt(needsSignIn ? "mac.lock_sign_in_first" : "mac.lock_not_allowed")
@@ -195,15 +195,6 @@ extension Shop {
         }
         guard let build = source.build else { vatFiledProblem = words.callIt("mac.settings_sample"); return }
         guard let engine else { vatFiledProblem = words.callIt("mac.move_no_engine"); return }
-        // A period inside (or around) one already marked is not marked on its
-        // own — said, rather than a switch that silently springs back.
-        if filed, let other = try? await engine.vatFiledOverlap(settings: settingsDict, period: period),
-           !other.isEmpty {
-            vatFiledProblem = words.callIt("mac.vat_filed_overlap", [
-                "period": .string(MonthLabel.period(period, words: words)),
-                "other": .string(MonthLabel.period(other, words: words))])
-            return
-        }
         // The P&L's own currency table, so the snapshot is the screen's figures.
         let currencies = Invoice.currencyTable(self)
         do {
@@ -212,24 +203,41 @@ extension Shop {
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
-                try await Self.applyVatFiled(to: &root, period: period, filed: filed,
+                try await Self.applyVatFiled(to: &root, period: period, filed: filed, fresh: fresh,
                                              currencies: currencies, engine: engine, now: Date())
             }
             await load(source)
+        } catch let overlap as VatFiledOverlap {
+            // A period inside (or around) one already marked is not marked on
+            // its own — said, rather than a switch that silently springs back.
+            vatFiledProblem = words.callIt("mac.vat_filed_overlap", [
+                "period": .string(MonthLabel.period(period, words: words)),
+                "other": .string(MonthLabel.period(overlap.other, words: words))])
         } catch {
             vatFiledProblem = self.said(error)
         }
     }
 
+    /// Marking refused: the period overlaps `other`, already marked filed.
+    struct VatFiledOverlap: Error { let other: String }
+
     /// The filed-mark write, on a book already read: the seam the tests use.
+    /// The overlap is judged on THIS book — the one on disk, inside the write
+    /// — not on what the screen last loaded.
     static func applyVatFiled(to root: inout [String: JSONValue], period: String, filed: Bool,
+                              fresh: Bool = false,
                               currencies: [String: JSONValue] = [:],
                               engine: KhaytEngine, now: Date) async throws {
+        let stored = Self.settings(root)
+        if filed {
+            let other = try await engine.vatFiledOverlap(settings: stored, period: period)
+            if !other.isEmpty { throw VatFiledOverlap(other: other) }
+        }
         let jobs: [JSONValue]
         if case .array(let rows)? = root["printLog"] { jobs = rows } else { jobs = [] }
         let clients: [JSONValue]
         if case .array(let rows)? = root["clients"] { clients = rows } else { clients = [] }
-        let settings = try await engine.vatMarkFiled(Self.settings(root), period: period, filed: filed,
+        let settings = try await engine.vatMarkFiled(stored, period: period, filed: filed, fresh: fresh,
                                                      orders: jobs, clients: clients,
                                                      currencies: currencies, now: now)
         root["settings"] = .object(settings)

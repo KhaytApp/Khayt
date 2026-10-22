@@ -100,6 +100,9 @@ struct VatSummaryCard: View {
     @State private var returns: [KhaytEngine.VatFilingPeriod] = []
     /// The period the shop asked to un-file, awaiting its confirmation.
     @State private var unfiling: KhaytEngine.VatFilingPeriod?
+    /// The period being filed again over a kept snapshot, awaiting the choice
+    /// between restoring it and recording the book as it is now.
+    @State private var refiling: KhaytEngine.VatFilingPeriod?
 
     /// What the list of returns is asked again for: the span, the settings
     /// (a mark just written, a frequency just changed).
@@ -172,8 +175,9 @@ struct VatSummaryCard: View {
                         set: { on in
                             // Un-filing forgets what was filed in the screen's
                             // eyes: asked first, never on one click.
-                            if on { Task { await shop.setVatPeriodFiled(r.period, filed: true) } }
-                            else { unfiling = r }
+                            if !on { unfiling = r }
+                            else if r.archived == true { refiling = r }
+                            else { Task { await shop.setVatPeriodFiled(r.period, filed: true) } }
                         })) {
                         HStack {
                             Text(MonthLabel.period(r.period, words: words))
@@ -221,6 +225,26 @@ struct VatSummaryCard: View {
         } message: {
             Text(words.callIt("mac.vat_unfile_message",
                               ["period": .string(MonthLabel.period(unfiling?.period ?? "", words: words))]))
+        }
+        .confirmationDialog(
+            words.callIt("mac.vat_refile_title",
+                         ["period": .string(MonthLabel.period(refiling?.period ?? "", words: words))]),
+            isPresented: Binding(get: { refiling != nil }, set: { if !$0 { refiling = nil } }),
+            titleVisibility: .visible
+        ) {
+            // Restoring is the default: what was sent to the authority.
+            Button(words.callIt("mac.vat_refile_restore")) {
+                if let r = refiling { Task { await shop.setVatPeriodFiled(r.period, filed: true) } }
+                refiling = nil
+            }
+            .keyboardShortcut(.defaultAction)
+            Button(words.callIt("mac.vat_refile_fresh")) {
+                if let r = refiling { Task { await shop.setVatPeriodFiled(r.period, filed: true, fresh: true) } }
+                refiling = nil
+            }
+            Button(words.callIt("common.cancel"), role: .cancel) { refiling = nil }
+        } message: {
+            Text(words.callIt("mac.vat_refile_message"))
         }
     }
 }

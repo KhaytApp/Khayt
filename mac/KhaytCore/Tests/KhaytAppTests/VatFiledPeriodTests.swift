@@ -44,7 +44,7 @@ struct VatFiledPeriodTests {
               case .array(let marks)? = settings["vatFiledPeriods"],
               case .object(let mark)? = marks.first else { Issue.record("no mark written"); return }
         #expect(mark["period"] == .string("2026-Q3"))
-        #expect(mark["orders"] == .object(["INV-1": .array([.number(15), .number(100), .number(115)])]),
+        #expect(mark["orders"] == .object(["INV-1": .array([.number(15), .number(100), .number(115), .string("SAR")])]),
                 "the snapshot: what the return held, job by job")
         #expect(mark["totals"] == .object(["vat": .number(15), "sales": .number(100)]))
 
@@ -116,6 +116,22 @@ struct VatFiledPeriodTests {
         let months = try await engine.vatFilingPeriods(settings: monthly, from: "2026-08-01", to: "2026-08-31",
                                                        today: "2026-10-22")
         #expect(months.first?.partOf == "2026-Q3")
+
+        // A month inside the filed quarter is refused on the book itself.
+        var probe = root
+        await #expect(throws: Shop.VatFiledOverlap.self) {
+            try await Shop.applyVatFiled(to: &probe, period: "2026-08", filed: true,
+                                         engine: engine, now: try Self.day(2026, 11, 1))
+        }
+
+        // Off, then on FRESH: the amended return records the book as it is.
+        try await Shop.applyVatFiled(to: &root, period: "2026-Q3", filed: false,
+                                     engine: engine, now: try Self.day(2026, 11, 2))
+        try await Shop.applyVatFiled(to: &root, period: "2026-Q3", filed: true, fresh: true,
+                                     engine: engine, now: try Self.day(2026, 11, 2))
+        let amended = try await Self.statement(root, engine: engine, from: "2026-07-01", to: "2026-12-31")
+        #expect(abs(amended.vat.output) < 0.001)
+        #expect(!amended.vat.hasAdjustment)
     }
 
     @Test("the card offers the ended return periods in the span, with the mark")

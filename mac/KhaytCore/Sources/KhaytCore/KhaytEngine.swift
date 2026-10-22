@@ -8111,6 +8111,8 @@ public actor KhaytEngine {
         /// filed quarter) — it cannot be switched on its own. Empty or nil
         /// otherwise; nil from an older bundle.
         public let partOf: String?
+        /// Un-filed with its snapshot kept: filing again can restore it.
+        public let archived: Bool?
         public var id: String { period }
     }
 
@@ -8140,14 +8142,15 @@ public actor KhaytEngine {
     /// archived snapshot back) — or, `filed: false`, with the mark taken off
     /// and its snapshot archived in `vatUnfiledPeriods`.
     public func vatMarkFiled(_ settings: [String: JSONValue], period: String, filed: Bool,
+                             fresh: Bool = false,
                              orders: [JSONValue], clients: [JSONValue] = [],
                              currencies: [String: JSONValue] = [:], now: Date) throws -> [String: JSONValue] {
         try runtime.call2(
-            "ARG4 ? KhaytVatPeriods.markFiled(ARG0, ARG1, ARG2, new Date(ARG3), {clients: ARG5, currencies: ARG6})"
+            "ARG4 ? KhaytVatPeriods.markFiled(ARG0, ARG1, ARG2, new Date(ARG3), {clients: ARG5, currencies: ARG6}, {fresh: ARG7})"
           + " : KhaytVatPeriods.unmarkFiled(ARG0, ARG1)",
             [.object(settings), .string(period), .array(orders),
              .number(now.timeIntervalSince1970 * 1000), .bool(filed),
-             .array(clients), .object(currencies)],
+             .array(clients), .object(currencies), .bool(fresh)],
             as: [String: JSONValue].self)
     }
 
