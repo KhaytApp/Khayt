@@ -83,9 +83,10 @@ test('key wraps: shop and both grant wraps, byte for byte, and back', async () =
 
   for (const [k, kk] of [['grantNoPassword', 'linkKeyNoPassword'], ['grantPassword', 'linkKeyPassword']]) {
     const lk = H(vec.derived[kk]);
-    const g = await V.wrapDkForGrant(lk, dk, grantId, fileId, { _nonce: H(vec.wraps[k].nonce) });
+    const g = await V.wrapDkForGrant(lk, dk, grantId, fileId, uploadId, { _nonce: H(vec.wraps[k].nonce) });
     assert.equal(hx(g), vec.wraps[k].wrapped, k);
-    assert.deepEqual(await V.unwrapDkForGrant(lk, g, grantId, fileId), dk, k);
+    assert.deepEqual(await V.unwrapDkForGrant(lk, g, grantId, fileId, uploadId), dk, k);
+    await rejects(V.unwrapDkForGrant(lk, g, grantId, fileId, 'u_other'), `${k} under another upload`);
   }
 });
 
@@ -171,7 +172,7 @@ test('link meta record: byte for byte under both link keys, validated, and back'
   // The share page's whole path: link meta → pinned manifestHash → file.
   const f25 = vec.files.find((x) => x.name === 'two-and-a-half-chunks');
   const lm = await V.decryptLinkMeta(H(vec.derived.linkKeyNoPassword), grantId, fileId, H(vec.linkMeta.sealedNoPassword));
-  const gdk = await V.unwrapDkForGrant(H(vec.derived.linkKeyNoPassword), H(vec.wraps.grantNoPassword.wrapped), grantId, fileId);
+  const gdk = await V.unwrapDkForGrant(H(vec.derived.linkKeyNoPassword), H(vec.wraps.grantNoPassword.wrapped), grantId, fileId, uploadId);
   const pt = await V.decryptFile(gdk, fileId, lm.uploadId, f25.chunks.map((c) => H(c.sealed)),
     { size: lm.size, chunks: f25.chunks.map((c) => c.sha256) }, lm.manifestHash, { chunkBytes: 16 });
   assert.deepEqual(pt, plaintext(40));
@@ -258,11 +259,13 @@ test('streaming reader: succeeds only after the last chunk, refuses early end an
   assert.deepEqual(r3.finish(), { size: 0, chunks: 1 });
 });
 
-test('sizes above 2^53 are refused before anything else runs', async () => {
+test('sizes above 2^53-1 are refused before anything else runs', async () => {
   const huge = 2 ** 60;
   assert.throws(() => V.chunkCount(huge), /2\^53/);
-  assert.throws(() => V.chunkCount(2 ** 53 + 2), /2\^53/);
-  assert.equal(V.chunkCount(2 ** 53), 2 ** 53 / V.CHUNK_BYTES);
+  assert.throws(() => V.chunkCount(2 ** 53 + 2), /2\^53-1/);
+  assert.throws(() => V.chunkCount(2 ** 53), /2\^53-1/);
+  assert.equal(V.MAX_SIZE, Number.MAX_SAFE_INTEGER);
+  assert.equal(V.chunkCount(2 ** 53 - 1), Math.ceil((2 ** 53 - 1) / V.CHUNK_BYTES));
   assert.equal(V.chunkCount(2 ** 53 - 1, 3), Math.ceil((2 ** 53 - 1) / 3));
   // a huge-size manifest with junk hashes: the size check fires first
   assert.throws(() => V.manifestJson(huge, ['junk']), /2\^53/);
@@ -279,8 +282,8 @@ test('wraps refuse a wrong aad, a wrong kek and a tampered byte', async () => {
   await rejects(V.unwrapDkForShop(H(vec.derived.dedupeKey), w, fileId, uploadId));
   const t = H(vec.wraps.shop.wrapped); t[0] ^= 1;
   await rejects(V.unwrapDkForShop(vk, t, fileId, uploadId));
-  await rejects(V.unwrapDkForGrant(vk, w, grantId, fileId));
-  await rejects(V.unwrapDkForGrant(H(vec.derived.linkKeyNoPassword), H(vec.wraps.grantPassword.wrapped), grantId, fileId));
+  await rejects(V.unwrapDkForGrant(vk, w, grantId, fileId, uploadId));
+  await rejects(V.unwrapDkForGrant(H(vec.derived.linkKeyNoPassword), H(vec.wraps.grantPassword.wrapped), grantId, fileId, uploadId));
 });
 
 test('ids: only [A-Za-z0-9_-]{1,64} is accepted', async () => {
@@ -289,11 +292,35 @@ test('ids: only [A-Za-z0-9_-]{1,64} is accepted', async () => {
   for (const b of bad) {
     await assert.rejects(V.encryptChunk(dk, b, uploadId, 0, true, new Uint8Array(0)), /1-64/, JSON.stringify(b));
     await assert.rejects(V.encryptChunk(dk, fileId, b, 0, true, new Uint8Array(0)), /1-64/, JSON.stringify(b));
-    await assert.rejects(V.wrapDkForGrant(vk, dk, b, fileId), /1-64/, JSON.stringify(b));
+    await assert.rejects(V.wrapDkForGrant(vk, dk, b, fileId, uploadId), /1-64/, JSON.stringify(b));
   }
   await assert.rejects(V.encryptChunk(dk, 42, uploadId, 0, true, new Uint8Array(0)), /1-64/);
   await V.encryptChunk(dk, 'x'.repeat(64), 'A-z_0', 0, true, new Uint8Array(0));
   await assert.rejects(V.encryptChunk(dk, fileId, uploadId, 0, 1, new Uint8Array(0)), /boolean/);
+});
+
+test('newGrantId: 22 base64url characters that pass the ID check', async () => {
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) {
+    const g = V.newGrantId();
+    assert.match(g, /^[A-Za-z0-9_-]{22}$/);
+    assert.equal(V.unb64url(g).length, 16);
+    seen.add(g);
+    await V.wrapDkForGrant(vk, dk, g, fileId, uploadId); // the ID check accepts it
+  }
+  assert.equal(seen.size, 200);
+});
+
+test('reader refuses a concurrent push and is spent afterwards', async () => {
+  const r = await V.createReader(dk, fileId, uploadId, { size: f25.size, chunks: hashes25 }, f25.manifestHash,
+    { chunkBytes: 16 });
+  const first = r.push(sealedOf(0));
+  await assert.rejects(r.push(sealedOf(1)), /concurrent push/);
+  assert.throws(() => r.finish(), /in flight/);
+  await first;
+  await assert.rejects(r.push(sealedOf(1)), /already failed/);
+  assert.throws(() => r.finish(), /failed/);
+  assert.equal(r.done, false);
 });
 
 test('random paths: fresh data keys and nonces differ, and round-trip', async () => {

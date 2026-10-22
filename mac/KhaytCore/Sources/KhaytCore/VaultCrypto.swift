@@ -25,9 +25,10 @@ public enum VaultCrypto {
 
     public static let version = 1
     public static let chunkBytes = 4_194_304
-    /// The largest file size either twin accepts: 2^53, where a JS number
+    /// The largest file size either twin accepts: 2^53 − 1, JS's
+    /// `Number.MAX_SAFE_INTEGER`, past which a JS number
     /// stops counting every integer.
-    public static let maxSize = 1 << 53
+    public static let maxSize = (1 << 53) - 1
     public static let keyBytes = 32
     public static let nonceBytes = 12
     public static let tagBytes = 16
@@ -140,7 +141,7 @@ public enum VaultCrypto {
     }
 
     static func checkSize(_ size: Int) throws {
-        guard size >= 0, size <= maxSize else { throw Failure.badInput("size must be an integer from 0 to 2^53") }
+        guard size >= 0, size <= maxSize else { throw Failure.badInput("size must be an integer from 0 to 2^53-1") }
     }
 
     // MARK: - Primitives
@@ -213,6 +214,9 @@ public enum VaultCrypto {
     /// so they are unique only because this key is.
     public static func newDataKey() -> Data { random(keyBytes) }
     public static func newLinkSecret() -> Data { random(keyBytes) }
+    /// A fresh grant id: base64url of 16 random bytes, no padding, 22
+    /// characters, all inside the ID alphabet.
+    public static func newGrantId() -> String { base64url(random(16)) }
 
     /// Whether the UI should accept a link password: at least 10 Unicode
     /// scalars after NFC (the same count the JS twin makes). A leaked link
@@ -328,7 +332,9 @@ public enum VaultCrypto {
     /// plaintext. `finish()` succeeds only once the chunk sealed with last=1
     /// has opened and the total equals `size`. A stream that ends early fails
     /// there, a chunk after the last is refused, and any failure is final.
-    public struct ChunkReader {
+    /// A class, not a struct: a reader is one stream's state, and a struct
+    /// copy would let two copies each accept the same chunk positions.
+    public final class ChunkReader {
         let dk: Data, fileId: String, uploadId: String
         let size: Int, chunkHashes: [String], chunkBytes: Int
         public private(set) var next = 0
@@ -351,7 +357,7 @@ public enum VaultCrypto {
             self.size = size; self.chunkHashes = chunkHashes; self.chunkBytes = chunkBytes
         }
 
-        public mutating func push(_ sealed: Data) throws -> Data {
+        public func push(_ sealed: Data) throws -> Data {
             guard !failed else { throw Failure.stream("reader already failed") }
             guard !sawLast else { failed = true; throw Failure.stream("chunk after the last chunk") }
             do {
@@ -411,7 +417,7 @@ public enum VaultCrypto {
     public static func decryptFile(dk: Data, fileId: String, uploadId: String, sealedChunks: [Data],
                                    size: Int, chunkHashes: [String], expectedManifestHash: String,
                                    chunkBytes: Int = chunkBytes) throws -> Data {
-        var r = try ChunkReader(dk: dk, fileId: fileId, uploadId: uploadId, size: size, chunkHashes: chunkHashes,
+        let r = try ChunkReader(dk: dk, fileId: fileId, uploadId: uploadId, size: size, chunkHashes: chunkHashes,
                                 expectedManifestHash: expectedManifestHash, chunkBytes: chunkBytes)
         guard sealedChunks.count == chunkHashes.count else { throw Failure.manifestMismatch("chunk count mismatch") }
         var out = Data()
@@ -438,8 +444,9 @@ public enum VaultCrypto {
         utf8(Label.dkAad + "|" + (try id(fileId, "fileId")) + "|" + (try id(uploadId, "uploadId")))
     }
 
-    static func grantDkAad(grantId: String, fileId: String) throws -> Data {
-        utf8(Label.linkDkAad + "|" + (try id(grantId, "grantId")) + "|" + (try id(fileId, "fileId")))
+    static func grantDkAad(grantId: String, fileId: String, uploadId: String) throws -> Data {
+        utf8(Label.linkDkAad + "|" + (try id(grantId, "grantId")) + "|" + (try id(fileId, "fileId"))
+             + "|" + (try id(uploadId, "uploadId")))
     }
 
     public static func wrapDkForShop(vaultKey: Data, dk: Data, fileId: String, uploadId: String,
@@ -451,13 +458,16 @@ public enum VaultCrypto {
         try unwrapKey(kek: vaultKey, wrapped: wrapped, aad: try shopDkAad(fileId: fileId, uploadId: uploadId))
     }
 
-    public static func wrapDkForGrant(linkKey: Data, dk: Data, grantId: String, fileId: String,
+    public static func wrapDkForGrant(linkKey: Data, dk: Data, grantId: String, fileId: String, uploadId: String,
                                       nonce: Data? = nil) throws -> Data {
-        try wrapKey(kek: linkKey, key: dk, aad: try grantDkAad(grantId: grantId, fileId: fileId), nonce: nonce)
+        try wrapKey(kek: linkKey, key: dk, aad: try grantDkAad(grantId: grantId, fileId: fileId, uploadId: uploadId),
+                    nonce: nonce)
     }
 
-    public static func unwrapDkForGrant(linkKey: Data, wrapped: Data, grantId: String, fileId: String) throws -> Data {
-        try unwrapKey(kek: linkKey, wrapped: wrapped, aad: try grantDkAad(grantId: grantId, fileId: fileId))
+    public static func unwrapDkForGrant(linkKey: Data, wrapped: Data, grantId: String, fileId: String,
+                                        uploadId: String) throws -> Data {
+        try unwrapKey(kek: linkKey, wrapped: wrapped,
+                      aad: try grantDkAad(grantId: grantId, fileId: fileId, uploadId: uploadId))
     }
 
     // MARK: - Shop metadata record

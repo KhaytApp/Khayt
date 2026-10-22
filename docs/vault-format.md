@@ -29,7 +29,7 @@ all three, and bump `v`.
   combining mark (`"a|\u{301}b"`), and lone surrogates mean different things in the two
   languages. IDs are joined with `|` in AADs, and the allow-list is what keeps those joins
   unambiguous.
-- **Sizes.** A file `size` is an integer from 0 to 2^53. Both twins refuse anything larger
+- **Sizes.** A file `size` is an integer from 0 to 2^53−1 (`Number.MAX_SAFE_INTEGER`). Both twins refuse anything larger
   before doing anything else.
 
 ## Keys
@@ -41,6 +41,7 @@ all three, and bump `v`.
 | `dedupeKey` | `HKDF(DEK, utf8("khayt-vault-v1"), utf8("dedupe"))` | 32 |
 | `DK` (data key) | 32 random bytes, **fresh for every upload attempt** | 32 |
 | `chunkKey` | `HKDF(DK, utf8(uploadId), utf8("khayt-vault-chunk-v1"))` | 32 |
+| `grantId` | `newGrantId()`: base64url of 16 random bytes, no padding (22 characters) | 16 |
 | `linkSecret` | 32 random bytes, sent as base64url (no padding) in the URL `#fragment` | 32 |
 | `linkKey`, no password | `HKDF(linkSecret, utf8(grantId), utf8("khayt-link-v1"))` | 32 |
 | `linkKey`, password | `HKDF(linkSecret \|\| P, utf8(grantId), utf8("khayt-link-v1"))` | 32 |
@@ -169,7 +170,7 @@ wrapKey(kek, key, aad) = sealN(kek, key, aad)                    (12 + 32 + 16 =
 | Wrap | kek | aad |
 |---|---|---|
 | shop's copy of a file's DK | `vaultKey` | `utf8("khayt-vault-dk|" + fileId + "|" + uploadId)` |
-| a link grant's copy of a DK | `linkKey` | `utf8("khayt-link-dk|" + grantId + "|" + fileId)` |
+| a link grant's copy of a DK | `linkKey` | `utf8("khayt-link-dk|" + grantId + "|" + fileId + "|" + uploadId)` |
 
 ## Shop meta record
 
@@ -207,7 +208,15 @@ reproduces those bytes. Readers validate every field: `uploadId` must be an ID,
 `manifestHash` must be 64 lowercase hex characters, `size` must be in range, and `name`
 and `kind` must be strings.
 
-The share page's full path: `linkKey` → `decryptLinkMeta` → `unwrapDkForGrant` →
+**Links have no rollback protection, and that is accepted.** A share page keeps no memory
+between visits, so it has no last-seen anything to compare against. A server that serves an
+entirely old grant item that is consistent with itself (an old link meta, the grant DK wrap
+for that old upload, and that upload's chunks) passes every check, and the visitor sees the
+older version of the file. What the server cannot do is mix items: the grant DK wrap's AAD
+carries `uploadId` and the chunk key derives from it, so an old wrap with new chunks, or the
+reverse, fails.
+
+The share page's full path: `linkKey` → `decryptLinkMeta` → `unwrapDkForGrant(…, linkMeta.uploadId)` →
 `createReader(DK, fileId, linkMeta.uploadId, manifest, linkMeta.manifestHash)` → push the
 chunks → `finish()`.
 

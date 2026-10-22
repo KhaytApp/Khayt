@@ -124,10 +124,15 @@ struct VaultCryptoTests {
         for (wrap, key) in [(v.wraps.grantNoPassword, v.derived.linkKeyNoPassword),
                             (v.wraps.grantPassword, v.derived.linkKeyPassword)] {
             let g = try VaultCrypto.wrapDkForGrant(linkKey: Self.h(key), dk: dk, grantId: v.inputs.grantId,
-                                                   fileId: v.inputs.fileId, nonce: Self.h(wrap.nonce))
+                                                   fileId: v.inputs.fileId, uploadId: v.inputs.uploadId,
+                                                   nonce: Self.h(wrap.nonce))
             #expect(Self.hex(g) == wrap.wrapped)
             #expect(try VaultCrypto.unwrapDkForGrant(linkKey: Self.h(key), wrapped: g, grantId: v.inputs.grantId,
-                                                     fileId: v.inputs.fileId) == dk)
+                                                     fileId: v.inputs.fileId, uploadId: v.inputs.uploadId) == dk)
+            #expect(throws: VaultCrypto.Failure.authentication) {
+                try VaultCrypto.unwrapDkForGrant(linkKey: Self.h(key), wrapped: g, grantId: v.inputs.grantId,
+                                                 fileId: v.inputs.fileId, uploadId: "u_other")
+            }
         }
     }
 
@@ -238,7 +243,7 @@ struct VaultCryptoTests {
         let lm = try VaultCrypto.decryptLinkMeta(linkKey: lk, grantId: gid, fileId: fid,
                                                  sealed: Self.h(v.linkMeta.sealedNoPassword))
         let gdk = try VaultCrypto.unwrapDkForGrant(linkKey: lk, wrapped: Self.h(v.wraps.grantNoPassword.wrapped),
-                                                   grantId: gid, fileId: fid)
+                                                   grantId: gid, fileId: fid, uploadId: lm.uploadId)
         let pt = try VaultCrypto.decryptFile(dk: gdk, fileId: fid, uploadId: lm.uploadId,
                                              sealedChunks: f25.chunks.map { Self.h($0.sealed!) }, size: lm.size,
                                              chunkHashes: f25.chunks.map(\.sha256),
@@ -341,7 +346,7 @@ struct VaultCryptoTests {
                                         size: f25.size, chunkHashes: hashes,
                                         expectedManifestHash: f25.manifestHash, chunkBytes: 16)
         }
-        var r = try make()
+        let r = try make()
         _ = try r.push(sealed(0))
         _ = try r.push(sealed(1))
         #expect(!r.done)
@@ -352,12 +357,12 @@ struct VaultCryptoTests {
         #expect(throws: VaultCrypto.Failure.stream("chunk after the last chunk")) { try r.push(sealed(2)) }
         #expect(throws: VaultCrypto.Failure.stream("reader failed")) { try r.finish() }
 
-        var r2 = try make()
+        let r2 = try make()
         #expect(throws: VaultCrypto.Failure.self) { try r2.push(sealed(1)) }
         #expect(throws: VaultCrypto.Failure.stream("reader already failed")) { try r2.push(sealed(0)) }
 
         let e = try #require(v.files.first { $0.name == "empty" })
-        var r3 = try VaultCrypto.ChunkReader(dk: dk, fileId: v.inputs.fileId, uploadId: v.inputs.uploadId, size: 0,
+        let r3 = try VaultCrypto.ChunkReader(dk: dk, fileId: v.inputs.fileId, uploadId: v.inputs.uploadId, size: 0,
                                              chunkHashes: [e.chunks[0].sha256], expectedManifestHash: e.manifestHash,
                                              chunkBytes: 16)
         #expect(throws: VaultCrypto.Failure.stream("stream ended before the last chunk")) { try r3.finish() }
@@ -365,23 +370,24 @@ struct VaultCryptoTests {
         #expect(try r3.finish() == (0, 1))
     }
 
-    @Test("sizes above 2^53 are refused before anything else, and chunkCount cannot overflow")
+    @Test("sizes above 2^53-1 are refused before anything else, and chunkCount cannot overflow")
     func hugeSizes() throws {
-        let tooBig = [Int.max, Int.max - 1, (1 << 53) + 1, 1 << 60]
+        let tooBig = [Int.max, Int.max - 1, (1 << 53) + 1, 1 << 53, 1 << 60]
         for size in tooBig {
             #expect(throws: VaultCrypto.Failure.self) { try VaultCrypto.chunkCount(size: size) }
-            #expect(throws: VaultCrypto.Failure.badInput("size must be an integer from 0 to 2^53")) {
+            #expect(throws: VaultCrypto.Failure.badInput("size must be an integer from 0 to 2^53-1")) {
                 try VaultCrypto.manifestJSON(size: size, chunkHashes: ["junk"])
             }
-            #expect(throws: VaultCrypto.Failure.badInput("size must be an integer from 0 to 2^53")) {
+            #expect(throws: VaultCrypto.Failure.badInput("size must be an integer from 0 to 2^53-1")) {
                 try VaultCrypto.ChunkReader(dk: dk, fileId: "f", uploadId: "u", size: size,
                                             chunkHashes: ["junk"], expectedManifestHash: "x")
             }
         }
         #expect(throws: VaultCrypto.Failure.self) { try VaultCrypto.chunkCount(size: -1) }
-        #expect(try VaultCrypto.chunkCount(size: 1 << 53) == (1 << 53) / VaultCrypto.chunkBytes)
+        #expect(VaultCrypto.maxSize == (1 << 53) - 1)
+        #expect(try VaultCrypto.chunkCount(size: (1 << 53) - 1) == ((1 << 53) - 1) / VaultCrypto.chunkBytes + 1)
         #expect(try VaultCrypto.chunkCount(size: (1 << 53) - 1, chunkBytes: 3) == ((1 << 53) - 1) / 3 + 1)
-        #expect(try VaultCrypto.chunkCount(size: 1 << 53, chunkBytes: 1) == 1 << 53)
+        #expect(try VaultCrypto.chunkCount(size: (1 << 53) - 1, chunkBytes: 1) == (1 << 53) - 1)
     }
 
     @Test("wraps refuse a wrong aad, a wrong kek and a tampered nonce")
@@ -402,12 +408,13 @@ struct VaultCryptoTests {
             try VaultCrypto.unwrapDkForShop(vaultKey: vaultKey, wrapped: t, fileId: fid, uploadId: uid)
         }
         #expect(throws: VaultCrypto.Failure.authentication) {
-            try VaultCrypto.unwrapDkForGrant(linkKey: vaultKey, wrapped: w, grantId: v.inputs.grantId, fileId: fid)
+            try VaultCrypto.unwrapDkForGrant(linkKey: vaultKey, wrapped: w, grantId: v.inputs.grantId, fileId: fid,
+                                             uploadId: uid)
         }
         #expect(throws: VaultCrypto.Failure.authentication) {
             try VaultCrypto.unwrapDkForGrant(linkKey: Self.h(v.derived.linkKeyNoPassword),
                                              wrapped: Self.h(v.wraps.grantPassword.wrapped),
-                                             grantId: v.inputs.grantId, fileId: fid)
+                                             grantId: v.inputs.grantId, fileId: fid, uploadId: uid)
         }
     }
 
@@ -428,11 +435,24 @@ struct VaultCryptoTests {
                 try VaultCrypto.encryptChunk(dk: dk, fileId: "f", uploadId: b, index: 0, last: true, plaintext: Data())
             }
             #expect(throws: VaultCrypto.Failure.self) {
-                try VaultCrypto.wrapDkForGrant(linkKey: vaultKey, dk: dk, grantId: b, fileId: "f")
+                try VaultCrypto.wrapDkForGrant(linkKey: vaultKey, dk: dk, grantId: b, fileId: "f", uploadId: "u")
             }
         }
         _ = try VaultCrypto.encryptChunk(dk: dk, fileId: String(repeating: "x", count: 64), uploadId: "A-z_0",
                                          index: 0, last: true, plaintext: Data())
+    }
+
+    @Test("newGrantId: 22 base64url characters that pass the ID check")
+    func grantIds() throws {
+        var seen = Set<String>()
+        for _ in 0..<200 {
+            let g = VaultCrypto.newGrantId()
+            #expect(g.utf8.count == 22 && g.utf8.allSatisfy(VaultCrypto.isIdByte))
+            #expect(try VaultCrypto.unbase64url(g).count == 16)
+            #expect(try VaultCrypto.id(g, "grantId") == g)
+            seen.insert(g)
+        }
+        #expect(seen.count == 200)
     }
 
     @Test("random paths differ and round-trip; base64url has no + / =")

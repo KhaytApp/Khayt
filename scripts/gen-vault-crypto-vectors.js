@@ -125,7 +125,7 @@ function build() {
     { N: 32768, r: 8, p: 1, maxmem: 96 * 1024 * 1024 });
   const linkKeyPassword = hkdf(Buffer.concat([linkSecret, p]), grantSalt, 'khayt-link-v1');
 
-  const grantAad = `khayt-link-dk|${inputs.grantId}|${inputs.fileId}`;
+  const grantAad = `khayt-link-dk|${inputs.grantId}|${inputs.fileId}|${inputs.uploadId}`;
   const grantWrap = (kek) => Buffer.concat([H(inputs.grantWrapNonce),
     seal(kek, H(inputs.grantWrapNonce), dk, Buffer.from(grantAad, 'utf8'))]);
 

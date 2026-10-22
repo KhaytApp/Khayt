@@ -173,15 +173,15 @@
     },
     "grantNoPassword": {
       "kek": "linkKeyNoPassword",
-      "aad": "khayt-link-dk|g_Hn8r2Lw5|f_7Qm2xK9a",
+      "aad": "khayt-link-dk|g_Hn8r2Lw5|f_7Qm2xK9a|u_01JB4ZP3",
       "nonce": "202122232425262728292a2b",
-      "wrapped": "202122232425262728292a2b836fe262c314c7d53ab6c4996736f98ae858aa3f1a1878a6d4b858210368af230a7b4be0123d366d25fa51bcb82a3b08"
+      "wrapped": "202122232425262728292a2b836fe262c314c7d53ab6c4996736f98ae858aa3f1a1878a6d4b858210368af2315e18ea50b611a2e33ac8cda22e5a74c"
     },
     "grantPassword": {
       "kek": "linkKeyPassword",
-      "aad": "khayt-link-dk|g_Hn8r2Lw5|f_7Qm2xK9a",
+      "aad": "khayt-link-dk|g_Hn8r2Lw5|f_7Qm2xK9a|u_01JB4ZP3",
       "nonce": "202122232425262728292a2b",
-      "wrapped": "202122232425262728292a2bd2a9234a1ebc4c6e00ad90f9b576009dc8160c6f8f04b2d1a4a5ace4f306c225db4a9fa0aaee8d31bf41651003589026"
+      "wrapped": "202122232425262728292a2bd2a9234a1ebc4c6e00ad90f9b576009dc8160c6f8f04b2d1a4a5ace4f306c2259bc8c73a49a63f93ca5ca098e80b8cea"
     }
   },
   "meta": {
