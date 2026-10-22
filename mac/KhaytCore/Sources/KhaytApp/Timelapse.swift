@@ -155,7 +155,7 @@ struct TimelapseLine: View {
             }
         }
         .shopSheet(item: Binding(get: { playing.map(Playing.init) }, set: { playing = $0?.url })) { p in
-            TimelapsePlayer(url: p.url, words: shop.words) { playing = nil }
+            TimelapsePlayer(url: p.url, bytes: link.bytes, words: shop.words) { playing = nil }
         }
     }
 
@@ -185,6 +185,8 @@ struct TimelapseLine: View {
 /// redirects refused and no cache, exactly as a still is.
 private struct TimelapsePlayer: View {
     let url: URL
+    /// What the printer said the video weighed when the job was noted.
+    let bytes: Double?
     let words: Words
     let close: () -> Void
     @State private var player: AVPlayer?
@@ -203,11 +205,16 @@ private struct TimelapsePlayer: View {
                 .frame(minWidth: 560, minHeight: 360)
         }
         .onAppear {
-            let made = PinnedVideoLoader(real: url)
-            let asset = AVURLAsset(url: PinnedVideoLoader.playerURL)
+            let made = PinnedVideoLoader(real: url, cap: PinnedVideoLoader.cap(recorded: bytes))
+            // No reference the movie makes may be followed — local or remote.
+            let asset = AVURLAsset(url: PinnedVideoLoader.playerURL, options: [
+                AVURLAssetReferenceRestrictionsKey: AVAssetReferenceRestrictions.forbidAll.rawValue,
+            ])
             asset.resourceLoader.setDelegate(made, queue: made.queue)
             loader = made
             let p = AVPlayer(playerItem: AVPlayerItem(asset: asset))
+            // Not handed to AirPlay: another device would fetch it itself.
+            p.allowsExternalPlayback = false
             player = p
             p.play()
         }
@@ -216,96 +223,217 @@ private struct TimelapsePlayer: View {
 }
 
 /// Every byte a timelapse player reads, fetched from the checked address in
-/// ranged chunks, with redirects refused (`RefuseRedirects`) and no cache.
-/// A reply that is not `206 Partial Content` fails the read rather than
-/// pulling a whole video into memory.
+/// ranged chunks, with redirects refused and no cache.
+///
+/// A reply is held to the range that was ASKED for, before its body is
+/// buffered: `206 Partial Content`, a `Content-Range` starting at the asked
+/// offset and ending inside the asked range, and a declared length no larger
+/// than it. A body that runs past the range anyway is cut off as it arrives.
+/// The total the printer claims is clamped (`cap`), and every sum here
+/// saturates instead of overflowing.
 final class PinnedVideoLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecked Sendable {
     static let playerURL = URL(string: "khayt-timelapse://printer/timelapse.mp4")!
     /// Two megabytes a request: a few seconds of a timelapse.
     static let chunk: Int64 = 2 * 1024 * 1024
+    /// The largest video believed when the job did not record a size.
+    static let defaultCap: Int64 = 8 * 1024 * 1024 * 1024
 
-    let real: URL
-    let queue = DispatchQueue(label: "app.khayt.timelapse-loader")
-    private let session: URLSession
-    /// Touched on `queue` only.
-    private var running: [ObjectIdentifier: URLSessionDataTask] = [:]
-
-    private final class Box: @unchecked Sendable {
-        let request: AVAssetResourceLoadingRequest
-        init(_ r: AVAssetResourceLoadingRequest) { request = r }
+    /// The job's recorded size when it has one, else 8 GB.
+    static func cap(recorded: Double?) -> Int64 {
+        guard let b = recorded, b.isFinite, b >= 1, b < Double(defaultCap) else { return defaultCap }
+        return Int64(b)
     }
 
-    init(real: URL) {
+    let real: URL
+    let cap: Int64
+    let queue = DispatchQueue(label: "app.khayt.timelapse-loader")
+    private var session: URLSession!
+
+    /// One ranged read in flight. Touched on `queue` only.
+    private final class Read: @unchecked Sendable {
+        let request: AVAssetResourceLoadingRequest
+        let from: Int64, to: Int64, end: Int64?
+        var body = Data()
+        var total: Int64?
+        var refused = false
+        init(_ r: AVAssetResourceLoadingRequest, from: Int64, to: Int64, end: Int64?) {
+            request = r; self.from = from; self.to = to; self.end = end
+        }
+    }
+    private var reads: [Int: Read] = [:]
+    private var byRequest: [ObjectIdentifier: URLSessionDataTask] = [:]
+
+    init(real: URL, cap: Int64 = PinnedVideoLoader.defaultCap) {
         self.real = real
+        self.cap = max(1, cap)
+        super.init()
         let config = URLSessionConfiguration.ephemeral
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         config.urlCache = nil
         config.timeoutIntervalForRequest = 15
-        session = URLSession(configuration: config, delegate: RefuseRedirects.shared, delegateQueue: nil)
+        let callbacks = OperationQueue()
+        callbacks.maxConcurrentOperationCount = 1
+        callbacks.underlyingQueue = queue
+        session = URLSession(configuration: config, delegate: Wire(self), delegateQueue: callbacks)
     }
 
     deinit { session.invalidateAndCancel() }
 
     func resourceLoader(_ resourceLoader: AVAssetResourceLoader,
                         shouldWaitForLoadingOfRequestedResource request: AVAssetResourceLoadingRequest) -> Bool {
-        fetch(Box(request))
+        fetch(request)
         return true
     }
 
     func resourceLoader(_ resourceLoader: AVAssetResourceLoader, didCancel request: AVAssetResourceLoadingRequest) {
-        running.removeValue(forKey: ObjectIdentifier(request))?.cancel()
+        if let task = byRequest.removeValue(forKey: ObjectIdentifier(request)) {
+            reads[task.taskIdentifier] = nil
+            task.cancel()
+        }
     }
 
-    /// The range this read wants next, inclusive, at most one chunk.
-    static func range(offset: Int64, end: Int64?) -> (Int64, Int64) {
-        (offset, min(end ?? (offset + chunk - 1), offset + chunk - 1))
+    // MARK: - The arithmetic, overflow-safe and testable
+
+    /// `a + b`, stopping at `Int64.max` instead of trapping.
+    static func plus(_ a: Int64, _ b: Int64) -> Int64 {
+        let (v, over) = a.addingReportingOverflow(b)
+        return over ? (b > 0 ? .max : .min) : v
+    }
+
+    /// The range this read wants next, inclusive: at most one chunk, never
+    /// past the asked end, never past the last byte of a known total.
+    static func range(offset: Int64, end: Int64?, total: Int64? = nil) -> (Int64, Int64) {
+        var last = plus(offset, chunk - 1)
+        if let end { last = min(last, end) }
+        if let total, total > 0 { last = min(last, total - 1) }
+        return (offset, max(offset, last))
+    }
+
+    /// `bytes 0-1/59481447` → (0, 1, 59481447); `*` total → nil total.
+    static func contentRange(_ header: String?) -> (start: Int64, end: Int64, total: Int64?)? {
+        guard let h = header?.trimmingCharacters(in: .whitespaces), h.lowercased().hasPrefix("bytes ") else { return nil }
+        let rest = h.dropFirst(6)
+        let halves = rest.split(separator: "/", maxSplits: 1).map(String.init)
+        guard halves.count == 2 else { return nil }
+        let ends = halves[0].split(separator: "-", maxSplits: 1).map { Int64($0.trimmingCharacters(in: .whitespaces)) }
+        guard ends.count == 2, let a = ends[0], let b = ends[1], a >= 0, b >= a else { return nil }
+        let t = halves[1].trimmingCharacters(in: .whitespaces)
+        if t == "*" { return (a, b, nil) }
+        guard let total = Int64(t), total > b else { return nil }
+        return (a, b, total)
     }
 
     /// `bytes 0-1/59481447` → 59481447.
-    static func total(_ contentRange: String?) -> Int64? {
-        guard let s = contentRange, let slash = s.lastIndex(of: "/") else { return nil }
-        return Int64(s[s.index(after: slash)...].trimmingCharacters(in: .whitespaces))
+    static func total(_ header: String?) -> Int64? { contentRange(header)?.total }
+
+    /// Is this response the range that was asked for? The total it may be
+    /// trusted with, clamped to `cap`; nil when it is refused. Asked BEFORE
+    /// the body is read. `expectedLength` is -1 when the reply did not say.
+    static func admit(status: Int, contentRange header: String?, expectedLength: Int64,
+                      from: Int64, to: Int64, cap: Int64) -> (total: Int64?, ok: Bool) {
+        guard status == 206, let r = contentRange(header), r.start == from, r.end <= to else { return (nil, false) }
+        let room = plus(to - from, 1)
+        if expectedLength > room { return (nil, false) }
+        let total = r.total.map { min($0, cap) }
+        if let total, r.end >= total { return (nil, false) }
+        return (total, true)
     }
 
+    // MARK: - The reads
+
     /// On `queue`.
-    private func fetch(_ box: Box) {
-        let r = box.request
+    private func fetch(_ r: AVAssetResourceLoadingRequest, total: Int64? = nil) {
         let offset: Int64
         var end: Int64?
         if let d = r.dataRequest {
             offset = d.currentOffset > 0 ? d.currentOffset : d.requestedOffset
-            if !d.requestsAllDataToEndOfResource { end = d.requestedOffset + Int64(d.requestedLength) - 1 }
+            if !d.requestsAllDataToEndOfResource {
+                end = Self.plus(d.requestedOffset, Int64(max(1, d.requestedLength)) - 1)
+            }
         } else {
             offset = 0; end = 1
         }
-        let (from, to) = Self.range(offset: offset, end: end)
+        let (from, to) = Self.range(offset: offset, end: end, total: total)
         var q = URLRequest(url: real)
         q.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         q.setValue("bytes=\(from)-\(to)", forHTTPHeaderField: "Range")
-        let key = ObjectIdentifier(r)
-        let task = session.dataTask(with: q) { [weak self] data, response, error in
-            guard let self else { return }
-            self.queue.async {
-                let r = box.request
-                guard self.running.removeValue(forKey: key) != nil else { return }   // cancelled
-                guard error == nil, let http = response as? HTTPURLResponse, http.statusCode == 206,
-                      let data else {
-                    r.finishLoading(with: error ?? URLError(.badServerResponse)); return
-                }
-                let total = Self.total(http.value(forHTTPHeaderField: "Content-Range"))
-                if let info = r.contentInformationRequest {
-                    info.contentType = "public.mpeg-4"
-                    info.isByteRangeAccessSupported = true
-                    if let total { info.contentLength = total }
-                }
-                guard let d = r.dataRequest else { r.finishLoading(); return }
-                d.respond(with: data)
-                let reached = from + Int64(data.count)
-                let wanted = end.map { $0 + 1 } ?? total ?? reached
-                if data.isEmpty || reached >= wanted { r.finishLoading() } else { self.fetch(box) }
-            }
-        }
-        running[key] = task
+        let task = session.dataTask(with: q)
+        let read = Read(r, from: from, to: to, end: end)
+        read.total = total
+        reads[task.taskIdentifier] = read
+        byRequest[ObjectIdentifier(r)] = task
         task.resume()
+    }
+
+    /// The headers, before any of the body. On `queue`.
+    fileprivate func received(_ task: URLSessionDataTask, _ response: URLResponse) -> URLSession.ResponseDisposition {
+        guard let read = reads[task.taskIdentifier] else { return .cancel }
+        let http = response as? HTTPURLResponse
+        let verdict = Self.admit(status: http?.statusCode ?? 0,
+                                 contentRange: http?.value(forHTTPHeaderField: "Content-Range"),
+                                 expectedLength: response.expectedContentLength,
+                                 from: read.from, to: read.to, cap: cap)
+        guard verdict.ok else { read.refused = true; return .cancel }
+        if let t = verdict.total { read.total = t }
+        return .allow
+    }
+
+    /// Body bytes as they arrive; a body past the asked range is cut off.
+    fileprivate func got(_ task: URLSessionDataTask, _ data: Data) {
+        guard let read = reads[task.taskIdentifier], !read.refused else { return }
+        if Int64(read.body.count + data.count) > Self.plus(read.to - read.from, 1) {
+            read.refused = true
+            task.cancel()
+            return
+        }
+        read.body.append(data)
+    }
+
+    /// The read is over, one way or another. On `queue`.
+    fileprivate func done(_ task: URLSessionTask, _ error: Error?) {
+        guard let read = reads.removeValue(forKey: task.taskIdentifier) else { return }
+        let r = read.request
+        guard byRequest.removeValue(forKey: ObjectIdentifier(r)) != nil else { return }   // cancelled
+        guard !read.refused, error == nil else {
+            r.finishLoading(with: error ?? URLError(.badServerResponse)); return
+        }
+        if let info = r.contentInformationRequest {
+            info.contentType = "public.mpeg-4"
+            info.isByteRangeAccessSupported = true
+            if let t = read.total { info.contentLength = t }
+        }
+        guard let d = r.dataRequest else { r.finishLoading(); return }
+        d.respond(with: read.body)
+        let reached = Self.plus(read.from, Int64(read.body.count))
+        let wanted = read.end.map { Self.plus($0, 1) } ?? read.total ?? reached
+        let ceiling = read.total ?? .max
+        if read.body.isEmpty || reached >= wanted || reached >= ceiling { r.finishLoading() }
+        else { fetch(r, total: read.total) }
+    }
+
+    /// The session's delegate. Holds the loader weakly, so the session (which
+    /// keeps its delegate) does not keep the loader alive.
+    private final class Wire: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+        weak var owner: PinnedVideoLoader?
+        init(_ owner: PinnedVideoLoader) { self.owner = owner }
+
+        func urlSession(_ session: URLSession, task: URLSessionTask,
+                        willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+                        completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+            completionHandler(nil)   // a 3xx then fails `admit`
+        }
+
+        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void) {
+            completionHandler(owner?.received(dataTask, response) ?? .cancel)
+        }
+
+        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+            owner?.got(dataTask, data)
+        }
+
+        func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+            owner?.done(task, error)
+        }
     }
 }

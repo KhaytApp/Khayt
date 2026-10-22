@@ -230,8 +230,56 @@ struct CameraReviewFixTests {
         let far = PinnedVideoLoader.range(offset: 10, end: 100_000_000)
         #expect(far.1 - far.0 + 1 == PinnedVideoLoader.chunk)
         #expect(PinnedVideoLoader.total("bytes 0-1/59481447") == 59481447)
+        // Overflow-safe: an offset near the top saturates, and a known
+        // total caps the last byte.
+        #expect(PinnedVideoLoader.range(offset: .max - 5, end: nil).1 == .max)
+        #expect(PinnedVideoLoader.range(offset: 100, end: .max, total: 150) == (100, 149))
         #expect(PinnedVideoLoader.total(nil) == nil)
         // The player is never handed the printer's http address.
         #expect(PinnedVideoLoader.playerURL.scheme == "khayt-timelapse")
+    }
+
+    @Test("a 206 that starts somewhere else, or declares more than was asked, is refused before its body")
+    func aWrongRangeIsRefused() {
+        let cap = PinnedVideoLoader.cap(recorded: 59481447)
+        // The right one.
+        let ok = PinnedVideoLoader.admit(status: 206, contentRange: "bytes 0-2097151/59481447",
+                                         expectedLength: 2097152, from: 0, to: 2097151, cap: cap)
+        #expect(ok.ok && ok.total == 59481447)
+        // Wrong offset.
+        #expect(!PinnedVideoLoader.admit(status: 206, contentRange: "bytes 4096-2101247/59481447",
+                                         expectedLength: 2097152, from: 0, to: 2097151, cap: cap).ok)
+        // Ends past the asked range.
+        #expect(!PinnedVideoLoader.admit(status: 206, contentRange: "bytes 0-4194303/59481447",
+                                         expectedLength: 4194304, from: 0, to: 2097151, cap: cap).ok)
+        // Oversize declared body under a correct-looking range.
+        #expect(!PinnedVideoLoader.admit(status: 206, contentRange: "bytes 0-1/59481447",
+                                         expectedLength: 104_857_600, from: 0, to: 1, cap: cap).ok)
+        // A whole-file 200, a redirect, garbage.
+        #expect(!PinnedVideoLoader.admit(status: 200, contentRange: nil, expectedLength: 59481447,
+                                         from: 0, to: 1, cap: cap).ok)
+        #expect(!PinnedVideoLoader.admit(status: 302, contentRange: nil, expectedLength: -1,
+                                         from: 0, to: 1, cap: cap).ok)
+        #expect(!PinnedVideoLoader.admit(status: 206, contentRange: "bytes x-y/z", expectedLength: -1,
+                                         from: 0, to: 1, cap: cap).ok)
+    }
+
+    @Test("a huge claimed total is clamped, and never overflows")
+    func aHugeTotalIsClamped() {
+        let recorded = PinnedVideoLoader.cap(recorded: 59481447)
+        #expect(recorded == 59481447)
+        let huge = PinnedVideoLoader.admit(status: 206, contentRange: "bytes 0-1/9223372036854775807",
+                                           expectedLength: 2, from: 0, to: 1, cap: recorded)
+        #expect(huge.ok && huge.total == 59481447)
+        // No size recorded: 8 GB.
+        #expect(PinnedVideoLoader.cap(recorded: nil) == 8 * 1024 * 1024 * 1024)
+        #expect(PinnedVideoLoader.cap(recorded: .infinity) == PinnedVideoLoader.defaultCap)
+        #expect(PinnedVideoLoader.cap(recorded: 1e30) == PinnedVideoLoader.defaultCap)
+        // A total past Int64 does not parse as a total at all.
+        #expect(PinnedVideoLoader.total("bytes 0-1/99999999999999999999") == nil)
+        // A range that ends at or past the clamped total is refused.
+        #expect(!PinnedVideoLoader.admit(status: 206, contentRange: "bytes 0-99/9000000000000",
+                                         expectedLength: 100, from: 0, to: 99, cap: 50).ok)
+        #expect(PinnedVideoLoader.plus(.max, 1) == .max)
     }
 }

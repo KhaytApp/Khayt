@@ -248,7 +248,7 @@ struct MachineSheet: View {
         .onAppear(perform: fill)
         // A look still running when the sheet goes would write into a sheet
         // nobody is looking at, and keep asking the printer for nothing.
-        .onDisappear { camLook?.cancel(); camLook = nil }
+        .onDisappear { camLook?.cancel(); camLook = nil; camLooking = false }
         .machineLifeDialogs(shop: shop, ask: $lifeAsk) { dismiss() }
     }
 
@@ -1180,6 +1180,7 @@ struct MachineSheet: View {
                 else { continue }
                 if Task.isCancelled { return }
                 let kind = (try? await engine.cameraSuggestion(saved: saved, found: candidate.snapshotUrl)) ?? "new"
+                if Task.isCancelled { return }
                 if kind == "same" {
                     if !quiet {
                         camNote = shop.words.callIt(answer == .paused ? "mac.cam_saved_paused" : "mac.cam_saved_answered")
