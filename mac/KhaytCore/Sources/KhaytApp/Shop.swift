@@ -1595,6 +1595,10 @@ final class Shop {
     var linkedIsOnline: @Sendable (URL) -> Bool = { LinkedCloud.isOnlineOnly($0) }
     /// Phones paired with this Mac (`Shop+PairedPhones`), as last read.
     var pairedPhones: [LanDevices.Listed] = []
+    /// The window a new phone may pair in (Settings ▸ Online, "Pair a phone").
+    /// The Shop's, not the server's, so a restart of the server on a settings
+    /// save does not shut a window the owner just opened.
+    let lanPairing = LanPairingWindow()
     /// A test's own device store; the app uses the Keychain's (`.shared`).
     var lanDevicesForTests: LanDevices?
     /// Hands a linked file the app fetched back to its cloud drive, so its

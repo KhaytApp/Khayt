@@ -268,6 +268,9 @@ struct LanDeviceKeysTests {
         let phonePublic = phone.publicKey.rawRepresentation.base64EncodedString()
         let ask = #"{"publicKey":"\#(phonePublic)","name":"Bench phone"}"#
 
+        #expect(try await bench.post("/api/devices", json: ask, headers: ["x-khayt-pin": Self.pin]).status == 403,
+                "nobody enrols until the owner opens Pair a phone")
+        bench.pairing.open()
         #expect(try await bench.post("/api/devices", json: ask).status == 401, "enrolment needs the PIN")
         let reply = try await bench.post("/api/devices", json: ask, headers: ["x-khayt-pin": Self.pin])
         #expect(reply.status == 200)

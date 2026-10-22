@@ -34,6 +34,9 @@ struct LanServerTests {
         /// How many times the delta writer was actually entered.
         let foldCalls = Counter()
         var tokens = 0
+        /// The phones enrolled here, and the "Pair a phone" window, on the bench clock.
+        let devices = LanDevices.inMemory()
+        let pairing: LanPairingWindow
 
         init(pin: String = "24682468", intakeToken: String = "", recordFails: Bool = false,
              calendarToken: String = "", measures: Bool = true, sliced: Bool = false,
@@ -58,6 +61,10 @@ struct LanServerTests {
             host.intakeToken = intakeToken
             host.calendarToken = calendarToken
             host.identity = { identity }
+            host.devices = devices
+            let pairing = LanPairingWindow(now: { box.now })
+            self.pairing = pairing
+            host.pairing = pairing
             host.library = { [shop] q, folder, offset, limit in
                 shop.phoneLibrary(q: q, folder: folder, offset: offset, limit: limit)
             }

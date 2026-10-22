@@ -12,6 +12,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   can't take a command doesn't offer it: Bambu Lab printers have none, and
   Repetier has no Pause. The same controls as the Mac.
 
+- **Mac: a phone pairs only after you click Pair a phone.** Someone on the shop's Wi-Fi guessing the LAN PIN could trip the wrong-PIN lockout and stop the shop pairing its own new phone. Now Settings → Online has a Pair a phone button under Paired phones. It opens a two-minute window with a countdown, and the window closes after one phone pairs, when time runs out, when you click Close, or after 10 wrong PINs. Outside the window the Mac refuses a new phone at once, without checking the PIN or counting the attempt. Inside it, earlier guesses don't lock the new phone out. Phones that are already paired are not affected. iPhone: when no window is open, the pairing screen says "On the Mac, click Pair a phone (Settings → Online), then try again."
+
 - **The catalogue now counts each part's quantity in a product's cost.** A part used three times in a product was costed once, so the catalogue suggested a price well under what a job made from that product costs. The catalogue and a job now agree. Saved product prices do not change by themselves: a product's price moves only when you open it, edit it and save. The catalogue's margin column now shows the real margin, so a product priced under the old rule may show a thin or negative margin. Review those products and re-save any you want re-priced.
 
 - **Mac: a product part with no spool linked keeps its own spool cost.** Editing the grams of such a part did not re-price the product, because the sheet dropped the part's spool cost when it saved.

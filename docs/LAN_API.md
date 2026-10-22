@@ -145,6 +145,16 @@ that can be replayed or turned back into the PIN.
   it pinned changes.
 - **404/405** → a computer that predates this; the phone keeps sending the PIN and asks
   again a day later. **503** (no identity key) → the same.
+- **Native Mac only: a pairing window.** The Mac takes an enrolment only while its
+  owner has clicked **Pair a phone** (Settings ▸ Online): for 120 seconds, until one
+  phone has enrolled, or until the owner closes it. Outside it, **403**
+  `{"reason":"pairing-closed","error":"…"}` comes back before the PIN is read, so it
+  counts towards no lockout and says nothing about the PIN. While the window is open,
+  a PIN sent without a device key (on any route) is judged by the window's own count
+  instead of the per-address and whole-server lockouts, so guesses made before it
+  cannot hold the new phone out; 10 wrong PINs close the window. The phone retries a
+  `pairing-closed` a minute later, and its pairing screen asks the person to click
+  Pair a phone. The desktop (`lib/lan-server.js`) has no window yet.
 
 **A signed request** carries, in place of `x-khayt-pin`:
 

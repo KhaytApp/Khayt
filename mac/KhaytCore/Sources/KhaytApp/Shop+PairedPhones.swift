@@ -21,6 +21,16 @@ extension Shop {
         pairedPhones = lanDeviceStore.list()
     }
 
+    /// Open the window a new phone may pair in, for `LanPairingWindow.length`.
+    func openPairing() {
+        guard permitted("settings", "edit") else { return }
+        lanPairing.open()
+    }
+
+    func closePairing() {
+        lanPairing.close()
+    }
+
     func signOutPhone(_ id: String) {
         guard permitted("settings", "edit") else { return }
         lanDeviceStore.remove(id)
@@ -58,6 +68,7 @@ struct PairedPhones: View {
                 }
             }
         }
+        PairAPhone(shop: shop)
         Text(shop.words.callIt("mac.phones_hint"))
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -70,5 +81,78 @@ struct PairedPhones: View {
                       cancel: shop.words.callIt("common.cancel")) { phone in
                 shop.signOutPhone(phone.id)
             }
+    }
+}
+
+/// "Pair a phone": the window a new phone may enrol in (`LanPairingWindow`),
+/// with what is left of it, and how the last one ended.
+struct PairAPhone: View {
+    let shop: Shop
+
+    var body: some View {
+        let window = shop.lanPairing
+        VStack(alignment: .leading, spacing: 4) {
+            if let until = window.until {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text(shop.words.callIt("mac.pair_waiting", ["time": .string(
+                            Self.clock(window.remaining(at: context.date) ?? 0, locale: shop.words.locale))]))
+                            .monospacedDigit()
+                    }
+                    Spacer(minLength: 0)
+                    Button(shop.words.callIt("common.close")) { shop.closePairing() }
+                        .controlSize(.small)
+                        .accessibilityIdentifier("pair-close")
+                }
+                Text(shop.words.callIt("mac.pair_open_hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // Shut it on time even when no phone asks: the server
+                    // would refuse anyway, but the pane should not say
+                    // "waiting" with nothing left to wait for.
+                    .task(id: until) {
+                        let left = until.timeIntervalSince(window.now())
+                        if left > 0 { try? await Task.sleep(for: .seconds(left)) }
+                        guard !Task.isCancelled else { return }
+                        _ = window.isOpen()
+                    }
+            } else {
+                HStack {
+                    Button(shop.words.callIt("mac.pair_open")) { shop.openPairing() }
+                        // `lockAllows`, not `permitted`: see the sign-out button.
+                        .disabled(!shop.lockAllows("settings", "edit") || shop.lanURL == nil)
+                        .accessibilityIdentifier("pair-open")
+                    Spacer(minLength: 0)
+                }
+                if let said = Self.outcome(window.lastClosed, words: shop.words) {
+                    Text(said.text)
+                        .font(.caption)
+                        .foregroundStyle(said.warn ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .onChange(of: window.lastClosed) { _, closed in
+            if case .paired? = closed { shop.refreshPairedPhones() }
+        }
+    }
+
+    /// "1:45", in the digits this Mac asked for (`Digits`).
+    static func clock(_ seconds: Int, locale: Locale) -> String {
+        Duration.seconds(max(0, seconds))
+            .formatted(Duration.TimeFormatStyle(pattern: .minuteSecond).locale(locale))
+    }
+
+    /// What the last window came to; nil for one closed by the owner, or none yet.
+    static func outcome(_ closed: LanPairingWindow.Closed?, words: Words) -> (text: String, warn: Bool)? {
+        switch closed {
+        case .paired(let name)?:
+            let shown = name.isEmpty ? words.callIt("mac.phones_unnamed") : name
+            return (words.callIt("mac.pair_done", ["name": .string(shown)]), false)
+        case .timedOut?: return (words.callIt("mac.pair_timed_out"), false)
+        case .tooManyWrong?: return (words.callIt("mac.pair_too_many"), true)
+        case .byOwner?, nil: return nil
+        }
     }
 }
