@@ -194,6 +194,29 @@ that has lost its memory, cannot tell an old head from the current one. The AAD 
 record to its `uploadId`, so the server cannot pair one upload's meta with another
 upload's chunks.
 
+## Version meta record
+
+Every version also has a record of its own, so that a reader has the whole manifest (every
+chunk hash) before the first chunk arrives and can check each chunk as it streams. The shop
+meta record holds only one `manifestHash`, and the cloud keeps one shop record per file.
+
+```
+versionMetaJson = {"manifest":<manifestJson>,"size":N,"seq":S}
+versionMeta     = sealN(vaultKey, utf8(versionMetaJson), utf8("khayt-vault-meta|" + fileId + "|" + uploadId))
+```
+
+- `<manifestJson>` is the exact manifest string from the Manifest section, inlined
+  unchanged. `size` repeats the manifest's size, and `seq` is the file's `seq` for the
+  head this version became.
+- Writers build the string by hand. Readers refuse any record whose bytes are not exactly
+  the canonical form they would write themselves for the parsed values. The trusted
+  `manifestHash` is the hash of the inlined manifest.
+- **The AAD is the shop meta record's AAD.** So each record refuses to be read as the other:
+  a shop meta record must not carry a `manifest` key (both twins refuse one on write and on
+  read), and a version record must be canonical, which no shop record is.
+- The cloud requires it on `/complete`. It comes back in the feed's `versions[]` and on the
+  chunks route.
+
 ## Link meta record
 
 ```
@@ -238,6 +261,7 @@ carry the rest, and hex or base64 both work.
 | wraps | `wrapDkForShop` / `unwrapDkForShop`, `wrapDkForGrant` / `unwrapDkForGrant` | same names |
 | dedupe | `dedupeTag(dek, pt)`, `dedupeTagFromDigest(dek, sha)` | `dedupeTag(shopDek:plaintext:)`, `dedupeTag(shopDek:plaintextSha256:)` |
 | shop meta | `encryptMeta(vk, fileId, uploadId, json)`, `decryptMeta(…, lastSeenSeq)`, `checkMetaSeq` (sync) | `encryptMeta(…)`, `decryptMeta(…, lastSeenSeq:)` → `(json, seq)`, `checkMetaSeq` |
+| version meta | `versionMetaJson` (sync), `encryptVersionMeta(vk, fileId, uploadId, {size, chunkHashes, seq, chunkBytes?})`, `decryptVersionMeta(…, lastSeenSeq)` | `versionMetaJSON`, `encryptVersionMeta(…)`, `decryptVersionMeta(…, lastSeenSeq:)` → `VersionMeta` |
 | link meta | `encryptLinkMeta(lk, grantId, fileId, meta)`, `decryptLinkMeta(…)` | `encryptLinkMeta(…, meta: LinkMeta)`, `decryptLinkMeta(…)` |
 
 In the browser, load `lib/scrypt-js.js` before `lib/vault-crypto.js`, because a password

@@ -16,6 +16,8 @@ struct VaultCryptoTests {
         struct Inputs: Decodable {
             let shopDek, dk, fileId, uploadId, grantId, linkSecret, password: String
             let shopWrapNonce, grantWrapNonce, metaNonce, metaJson, linkMetaNonce, metaSeqTooBigJson: String
+            let versionMetaNonce: String
+            let versionMetaSeq: Int
         }
         struct Derived: Decodable {
             let vaultKey, chunkKey, dedupeKey, linkKeyNoPassword, passwordNfcHex, linkPasswordScrypt,
@@ -39,6 +41,7 @@ struct VaultCryptoTests {
         struct Wraps: Decodable { let shop, grantNoPassword, grantPassword: Wrap }
         struct Meta: Decodable { let aad, nonce, json, sealed, sealedSeqTooBig: String }
         struct LinkMetaVec: Decodable { let aad, nonce, json, sealedNoPassword, sealedPassword: String }
+        struct VersionMetaVec: Decodable { let aad, nonce, file, json, manifestHash, sealed: String }
 
         let inputs: Inputs
         let derived: Derived
@@ -46,6 +49,7 @@ struct VaultCryptoTests {
         let wraps: Wraps
         let meta: Meta
         let linkMeta: LinkMetaVec
+        let versionMeta: VersionMetaVec
     }
 
     static let v: Vectors = {
@@ -216,6 +220,51 @@ struct VaultCryptoTests {
         #expect(throws: tooBig) {
             try VaultCrypto.decryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
                                         sealed: Self.h(v.meta.sealedSeqTooBig), lastSeenSeq: nil)
+        }
+    }
+
+    @Test("version meta record: byte for byte, canonical only, and never a shop record")
+    func versionMeta() throws {
+        let fid = v.inputs.fileId, uid = v.inputs.uploadId, vm = v.versionMeta
+        let f = try #require(v.files.first { $0.name == vm.file })
+        let hashes = f.chunks.map(\.sha256)
+        #expect(try VaultCrypto.versionMetaJSON(size: f.size, chunkHashes: hashes, seq: v.inputs.versionMetaSeq,
+                                                chunkBytes: f.chunkBytes) == vm.json)
+        let sealed = try VaultCrypto.encryptVersionMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid, size: f.size,
+                                                        chunkHashes: hashes, seq: v.inputs.versionMetaSeq,
+                                                        chunkBytes: f.chunkBytes, nonce: Self.h(vm.nonce))
+        #expect(Self.hex(sealed) == vm.sealed)
+        let back = try VaultCrypto.decryptVersionMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
+                                                      sealed: Self.h(vm.sealed), lastSeenSeq: 7)
+        #expect(back.chunkHashes == hashes && back.size == f.size && back.chunkBytes == f.chunkBytes)
+        #expect(back.manifestHash == vm.manifestHash && back.manifestJSON == f.manifestJson)
+        #expect(throws: VaultCrypto.Failure.rollback(seq: 7, lastSeen: 8)) {
+            try VaultCrypto.decryptVersionMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
+                                               sealed: Self.h(vm.sealed), lastSeenSeq: 8)
+        }
+        #expect(throws: VaultCrypto.Failure.authentication) {
+            try VaultCrypto.decryptVersionMeta(vaultKey: vaultKey, fileId: fid, uploadId: "u_other",
+                                               sealed: Self.h(vm.sealed), lastSeenSeq: nil)
+        }
+        // The two records share an AAD, so each refuses the other.
+        #expect(throws: VaultCrypto.Failure.self) {
+            try VaultCrypto.decryptVersionMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
+                                               sealed: Self.h(v.meta.sealed), lastSeenSeq: nil)
+        }
+        #expect(throws: VaultCrypto.Failure.badInput("a shop meta record has no manifest")) {
+            try VaultCrypto.decryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
+                                        sealed: Self.h(vm.sealed), lastSeenSeq: nil)
+        }
+        #expect(throws: VaultCrypto.Failure.self) {
+            try VaultCrypto.encryptMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid,
+                                        json: Data(#"{"seq":1,"manifest":{}}"#.utf8))
+        }
+        // Authentic, the same values, other spacing: not canonical.
+        let loose = try VaultCrypto.sealWithNonce(vaultKey, Data(vm.json.replacingOccurrences(of: "\"size\":", with: "\"size\": ").utf8),
+                                                  aad: Data(vm.aad.utf8), nonce: nil)
+        #expect(throws: VaultCrypto.Failure.badInput("version meta is not canonical")) {
+            try VaultCrypto.decryptVersionMeta(vaultKey: vaultKey, fileId: fid, uploadId: uid, sealed: loose,
+                                               lastSeenSeq: nil)
         }
     }
 

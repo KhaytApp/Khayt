@@ -15,7 +15,9 @@
     "metaJson": "{\"seq\":7,\"name\":\"Benchy بنشي.3mf\",\"type\":\"model/3mf\",\"size\":40}",
     "linkMetaNonce": "404142434445464748494a4b",
     "metaSeqTooBigJson": "{\"seq\":9007199254740992}",
-    "metaSeqTooBigNonce": "505152535455565758595a5b"
+    "metaSeqTooBigNonce": "505152535455565758595a5b",
+    "versionMetaNonce": "606162636465666768696a6b",
+    "versionMetaSeq": 7
   },
   "plaintextRule": "byte k = (k * 31 + 7) mod 256",
   "derived": {
@@ -190,6 +192,14 @@
     "json": "{\"seq\":7,\"name\":\"Benchy بنشي.3mf\",\"type\":\"model/3mf\",\"size\":40}",
     "sealed": "303132333435363738393a3b30cd2f70094ae0ca4def36255a8f63bf97115cc2afa26afce6eb8d443df01585baf0b3bf1a83a2408f59cae203bab68135e5697d4ba5b4d5206ee0418d832d43436f6de51aa1f8c1946e48643aaea76f20f0bd",
     "sealedSeqTooBig": "505152535455565758595a5b7a41b4f88aea98e9447e1f8d653aee5ed857ea7d146e1a4f574fec39cf41e829391e00664175ecf2"
+  },
+  "versionMeta": {
+    "aad": "khayt-vault-meta|f_7Qm2xK9a|u_01JB4ZP3",
+    "nonce": "606162636465666768696a6b",
+    "file": "two-and-a-half-chunks",
+    "json": "{\"manifest\":{\"v\":1,\"chunkBytes\":16,\"size\":40,\"chunks\":[\"60d4f6a7ff76c1d4733ad4ddc323455fe8baf2afae964adf87c81ea9c93b4cea\",\"0fd083f451b798c73a79b2b6f284a7db36f95b493037ceb0f9966ab9e8d187c9\",\"5cf47e412d26b019d21b607bf1b12fe813cda941bab8f3441fb750d277679ed9\"]},\"size\":40,\"seq\":7}",
+    "manifestHash": "e4bf2291a2dec6eac533716366670f78ed467a6069957a4846820885a8b75a6d",
+    "sealed": "606162636465666768696a6b13ef4b0a239793e44a12c93e1a46fb628b812bd5cb27085305e7c84c264ea008049a3f7b9e6c9c9b11ee8c3c859056d2203ec269ecbdcca89d53adedd7e7e9e5496fbfa06012b142f151cc306943dcea1c14eb28c619f4716a78b694bcc71701423b568f72c3ee91eade23a582256a7a6bde0be0b67d446033cf9b9d582ab0fa9ed003d493eaa227ec094b3bc9bc07753899d2336ef7f1b9ba93b500dc948531e62193e4f47be9408aac64d4bcc935da792d09bc7ce20ec1bb4111fadcdd1383cd72da3d687ecfb4f10cabeb193489ec36316faddbd870536830f61668881c83857c214ff0b4c3385d92212df83b068a45538075266c1f89cbf3bc0bba2ee0c7e9442226575252e20d02671eb318e9400a4cd44c37ffe075f7ff6cfb088ef5c7c13f2a3c"
   },
   "linkMeta": {
     "aad": "khayt-link-meta|g_Hn8r2Lw5|f_7Qm2xK9a",

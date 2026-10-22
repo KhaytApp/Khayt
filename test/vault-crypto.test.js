@@ -155,6 +155,38 @@ test('seq 2^53 is refused on write and on read (the shared vector)', async () =>
   await assert.rejects(V.decryptMetaText(vk, fileId, uploadId, H(vec.meta.sealedSeqTooBig)), /2\^53-1/);
 });
 
+test('version meta record: byte for byte, canonical only, and never a shop record', async () => {
+  const f = vec.files.find((x) => x.name === vec.versionMeta.file);
+  const hashes = f.chunks.map((c) => c.sha256);
+  assert.equal(V.versionMetaJson(f.size, hashes, inputs.versionMetaSeq, f.chunkBytes), vec.versionMeta.json);
+  const sealed = await V.encryptVersionMeta(vk, fileId, uploadId,
+    { size: f.size, chunkHashes: hashes, seq: inputs.versionMetaSeq, chunkBytes: f.chunkBytes },
+    { _nonce: H(vec.versionMeta.nonce) });
+  assert.equal(hx(sealed), vec.versionMeta.sealed);
+  const back = await V.decryptVersionMeta(vk, fileId, uploadId, H(vec.versionMeta.sealed), 7);
+  assert.deepEqual(back.chunkHashes, hashes);
+  assert.equal(back.size, f.size);
+  assert.equal(back.chunkBytes, f.chunkBytes);
+  assert.equal(back.manifestHash, vec.versionMeta.manifestHash);
+  assert.equal(back.manifestJson, f.manifestJson);
+  await assert.rejects(V.decryptVersionMeta(vk, fileId, uploadId, H(vec.versionMeta.sealed), 8), /rollback/);
+  await rejects(V.decryptVersionMeta(vk, fileId, 'u_other', H(vec.versionMeta.sealed)), 'another uploadId');
+  // The two records share an AAD, so each refuses the other.
+  await assert.rejects(V.decryptVersionMeta(vk, fileId, uploadId, H(vec.meta.sealed)), /version meta/);
+  await assert.rejects(V.decryptMeta(vk, fileId, uploadId, H(vec.versionMeta.sealed)), /no manifest/);
+  await assert.rejects(V.encryptMeta(vk, fileId, uploadId, { seq: 1, manifest: {} }), /no manifest/);
+  // Same values, other spacing: authentic but not canonical.
+  const loose = vec.versionMeta.json.replace('"size":', '"size": ');
+  const crypto = require('node:crypto');
+  const nonce = H(vec.versionMeta.nonce);
+  const c = crypto.createCipheriv('aes-256-gcm', vk, nonce);
+  c.setAAD(Buffer.from(vec.versionMeta.aad, 'utf8'));
+  const ct = Buffer.concat([c.update(Buffer.from(loose, 'utf8')), c.final(), c.getAuthTag()]);
+  await assert.rejects(V.decryptVersionMeta(vk, fileId, uploadId, Buffer.concat([nonce, ct])), /canonical/);
+  await assert.rejects(V.encryptVersionMeta(vk, fileId, uploadId, { size: f.size, chunkHashes: hashes.slice(1), seq: 1,
+    chunkBytes: f.chunkBytes }), /chunk count/);
+});
+
 test('link meta record: byte for byte under both link keys, validated, and back', async () => {
   const want = JSON.parse(vec.linkMeta.json);
   for (const [kk, sk] of [['linkKeyNoPassword', 'sealedNoPassword'], ['linkKeyPassword', 'sealedPassword']]) {

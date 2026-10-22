@@ -517,11 +517,20 @@ public enum VaultCrypto {
         return seq
     }
 
+    /// A version meta record shares the shop record's AAD, so a shop record
+    /// may never look like one: `manifest` is reserved for it.
+    static func refuseManifestKey(_ json: Data) throws {
+        if let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any], obj["manifest"] != nil {
+            throw Failure.badInput("a shop meta record has no manifest")
+        }
+    }
+
     /// nonce(12) || ct || tag(16) over the JSON bytes as given, aad
     /// "khayt-vault-meta|" + fileId + "|" + uploadId. The JSON must carry `seq`.
     public static func encryptMeta(vaultKey: Data, fileId: String, uploadId: String, json: Data,
                                    nonce: Data? = nil) throws -> Data {
         _ = try metaSeq(json)
+        try refuseManifestKey(json)
         return try sealWithNonce(vaultKey, json, aad: try metaAad(fileId: fileId, uploadId: uploadId), nonce: nonce)
     }
 
@@ -531,7 +540,67 @@ public enum VaultCrypto {
                                    lastSeenSeq: Int?) throws -> (json: Data, seq: Int) {
         let json = try openWithNonce(vaultKey, sealed, aad: try metaAad(fileId: fileId, uploadId: uploadId))
         let seq = try checkMetaSeq(try metaSeq(json), lastSeen: lastSeenSeq)
+        try refuseManifestKey(json)
         return (json, seq)
+    }
+
+    // MARK: - Version meta record
+
+    /// One version's own record: its whole manifest (every chunk hash, so a
+    /// reader can check each chunk as it streams), its size and its seq.
+    public struct VersionMeta: Equatable, Sendable {
+        public let size: Int
+        public let chunkBytes: Int
+        public let chunkHashes: [String]
+        public let seq: Int
+        public let manifestJSON: String
+        public let manifestHash: String
+    }
+
+    /// The exact record bytes: {"manifest":<manifestJSON>,"size":N,"seq":S}.
+    public static func versionMetaJSON(size: Int, chunkHashes: [String], seq: Int,
+                                       chunkBytes: Int = chunkBytes) throws -> String {
+        let m = try manifestJSON(size: size, chunkHashes: chunkHashes, chunkBytes: chunkBytes)
+        try checkSeqValue(seq)
+        return "{\"manifest\":" + m + ",\"size\":\(size),\"seq\":\(seq)}"
+    }
+
+    /// Sealed under the vault key with the shop meta AAD
+    /// "khayt-vault-meta|" + fileId + "|" + uploadId.
+    public static func encryptVersionMeta(vaultKey: Data, fileId: String, uploadId: String, size: Int,
+                                          chunkHashes: [String], seq: Int, chunkBytes: Int = chunkBytes,
+                                          nonce: Data? = nil) throws -> Data {
+        let text = try versionMetaJSON(size: size, chunkHashes: chunkHashes, seq: seq, chunkBytes: chunkBytes)
+        return try sealWithNonce(vaultKey, utf8(text), aad: try metaAad(fileId: fileId, uploadId: uploadId), nonce: nonce)
+    }
+
+    /// Open a version record. Its bytes must be EXACTLY the canonical form,
+    /// which also refuses a shop meta record served in its place.
+    public static func decryptVersionMeta(vaultKey: Data, fileId: String, uploadId: String, sealed: Data,
+                                          lastSeenSeq: Int?) throws -> VersionMeta {
+        let json = try openWithNonce(vaultKey, sealed, aad: try metaAad(fileId: fileId, uploadId: uploadId))
+        let shape = Failure.badInput("version meta must be {manifest, size, seq}")
+        guard let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
+              let m = obj["manifest"] as? [String: Any], let hashes = m["chunks"] as? [String],
+              let v = exactInt(m["v"]), v == version, let cb = exactInt(m["chunkBytes"]), cb > 0,
+              let size = exactInt(obj["size"]), exactInt(m["size"]) == size else { throw shape }
+        let seq = try metaSeq(json)
+        guard try versionMetaJSON(size: size, chunkHashes: hashes, seq: seq, chunkBytes: cb)
+                == String(decoding: json, as: UTF8.self) else {
+            throw Failure.badInput("version meta is not canonical")
+        }
+        _ = try checkMetaSeq(seq, lastSeen: lastSeenSeq)
+        let mj = try manifestJSON(size: size, chunkHashes: hashes, chunkBytes: cb)
+        return VersionMeta(size: size, chunkBytes: cb, chunkHashes: hashes, seq: seq, manifestJSON: mj,
+                           manifestHash: hex(sha256(utf8(mj))))
+    }
+
+    /// A JSON integer (not a boolean, not a fraction) within 0…2^53−1.
+    static func exactInt(_ v: Any?) -> Int? {
+        guard let n = v as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID() else { return nil }
+        let d = n.doubleValue
+        guard d.rounded() == d, d >= 0, d <= Double(maxSize) else { return nil }
+        return Int(d)
     }
 
     // MARK: - Link metadata record
