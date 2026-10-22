@@ -52,8 +52,14 @@ public enum BambuReport {
     /// several times a second.
     public static func parse(_ payload: String) -> JSONValue? {
         guard let data = payload.data(using: .utf8),
-              let root = try? JSONValue.decode(JSONValue.self, from: data),
-              case .object(let obj) = root,
+              let root = try? JSONValue.decode(JSONValue.self, from: data) else { return nil }
+        return parse(value: root)
+    }
+
+    /// The same, over a report already parsed — the held state a persistent
+    /// connection keeps (`merge`).
+    public static func parse(value root: JSONValue) -> JSONValue? {
+        guard case .object(let obj) = root,
               case .object(let print)? = obj["print"]
         else { return nil }
         // A snapshot says at least one of these. A delta says none of them.
@@ -80,6 +86,48 @@ public enum BambuReport {
         out["layer"] = number(print["layer_num"]).map(JSONValue.number) ?? .null
         out["totalLayers"] = number(print["total_layer_num"]).map(JSONValue.number) ?? .null
         return .object(out)
+    }
+
+    // MARK: - Holding the state across deltas
+
+    /// `lib/bambu-report.js` `MERGE_DEPTH`.
+    public static let mergeDepth = 32
+    private static let forbiddenKeys: Set<String> = ["__proto__", "constructor", "prototype"]
+
+    /// Fold one report into the state held from the reports before it —
+    /// `mergeReport` in `lib/bambu-report.js`, whose header has the reasons.
+    ///
+    /// A P1 sends only what changed (OpenBambuAPI `mqtt.md`, `pushing.pushall`),
+    /// so a connection held open has to remember the last full report and lay
+    /// each delta over it, as ha-bambulab does (`models.py` `print_update`).
+    /// Only `print` merges; objects merge by key, arrays and everything else
+    /// are replaced; a message with no `print` object returns `held` as it was.
+    /// `BambuReportParityTests` holds this to the JavaScript.
+    public static func merge(_ held: JSONValue?, _ payload: String) -> JSONValue? {
+        guard let data = payload.data(using: .utf8),
+              let message = try? JSONValue.decode(JSONValue.self, from: data)
+        else { return held }
+        return merge(held, message: message)
+    }
+
+    public static func merge(_ held: JSONValue?, message: JSONValue) -> JSONValue? {
+        guard case .object(let obj) = message, case .object(let delta)? = obj["print"] else { return held }
+        var base: [String: JSONValue] = [:]
+        if case .object(let h)? = held, case .object(let p)? = h["print"] { base = p }
+        return .object(["print": .object(mergeInto(base, delta, depth: 1))])
+    }
+
+    private static func mergeInto(_ base: [String: JSONValue], _ delta: [String: JSONValue],
+                                  depth: Int) -> [String: JSONValue] {
+        var out = base.filter { !forbiddenKeys.contains($0.key) }
+        for (key, next) in delta where !forbiddenKeys.contains(key) {
+            if depth < mergeDepth, case .object(let n) = next, case .object(let was)? = out[key] {
+                out[key] = .object(mergeInto(was, n, depth: depth + 1))
+            } else {
+                out[key] = next
+            }
+        }
+        return out
     }
 
     /// `typeof x === 'number'` — the type, not a coercion.

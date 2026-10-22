@@ -288,6 +288,8 @@ final class PrinterWatch {
         task?.cancel()
         task = nil
         watching = nil
+        // Every held Bambu connection goes with the book (S2).
+        Task { await BambuWatch.shared.stopAll() }
         // The bookkeeping goes with it. A book closed and reopened has not been
         // offline for an hour, and carrying a stall clock across that would
         // raise an alert about a print that finished yesterday.
@@ -402,6 +404,10 @@ final class PrinterWatch {
     /// what its request queue does under load, on somebody's live print.
     private func sweep(shop: Shop) async {
         let forgot = forgetUnwatched(shop: shop)
+        // A Bambu deleted, retired or put under service keeps no connection
+        // open: its held session hangs up here, on the sweep after.
+        await BambuWatch.shared.retain(Set(shop.machines
+            .filter { Self.notWatched($0) == nil && $0.printerApi?.type == "bambu" }.map(\.id)))
         var asked = false
         for machine in shop.machines where Self.notWatched(machine) == nil {
             if Task.isCancelled { return }
@@ -547,7 +553,8 @@ final class PrinterWatch {
                let sealed = machine.printerApi?.accessCode, !sealed.isEmpty, let build = source {
                 accessCode = (try? await Secrets.open(sealed, for: build)) ?? ""
             }
-            let status = try await Self.ask(machine, engine: engine, key: key, accessCode: accessCode)
+            let status = try await Self.ask(machine, engine: engine, key: key, accessCode: accessCode,
+                                            held: true)
             let loadedBefore = readings[machine.id]?.status?.loaded ?? []
             readings[machine.id] = Reading(status: status, problem: nil, at: Date(),
                                            consecutiveFailures: 0, lastGood: status)
@@ -585,7 +592,14 @@ final class PrinterWatch {
     ///
     /// `key` and `accessCode` arrive OPENED, by the caller, at the point of
     /// use — this never reads the book's sealed fields itself.
+    ///
+    /// `held` is the poller: a Bambu is read from its held connection
+    /// (`BambuWatch`), started on first ask. The Test button passes false — it
+    /// reads a held connection when one already points at the same printer
+    /// with the same code, and otherwise asks once and hangs up, because a
+    /// draft on a sheet is not yet a machine to keep a connection open to.
     static func ask(_ machine: Machine, engine: KhaytEngine, key: String, accessCode: String,
+                    held: Bool = false,
                     fetch: @escaping (URLRequest) async throws -> (Data, URLResponse) = {
                         try await PrinterWatch.session.data(for: $0)
                     }) async throws -> KhaytEngine.PrinterStatus {
@@ -596,7 +610,8 @@ final class PrinterWatch {
         case "bambu":
             // Not `read`: there is no request and no response, so the seam
             // that every other protocol shares has nothing to stand in for.
-            return try await askBambu(machine, engine: engine, base: base, accessCode: accessCode)
+            return try await askBambu(machine, engine: engine, base: base, accessCode: accessCode,
+                                      held: held)
         default:
             return try await read(machine, engine: engine, base: base, key: key, fetch: fetch)
         }
@@ -700,17 +715,25 @@ final class PrinterWatch {
     /// nothing to subscribe to and the attempt would time out on the message
     /// about Developer Mode, which would be a lie.
     static func askBambu(_ machine: Machine, engine: KhaytEngine,
-                         base: URL, accessCode: String) async throws -> KhaytEngine.PrinterStatus {
-        let serial = (machine.printerApi?.serial ?? "").trimmingCharacters(in: .whitespaces)
-        guard !serial.isEmpty else { throw Refusal.needsSerial }
-        guard let host = base.host() else { throw Refusal.noHost }
-        // `exactly:`, not a conversion that traps: the port field takes any
-        // number, and 88830 saved once crashed the app on every launch.
-        guard let port = UInt16(exactly: machine.printerApi?.port ?? Int(BambuMqtt.defaultPort)), port > 0
-        else { throw Refusal.noHost }
+                         base: URL, accessCode: String,
+                         held: Bool = false) async throws -> KhaytEngine.PrinterStatus {
+        let config = try bambuConfig(machine, base: base, accessCode: accessCode)
 
-        let conversation = BambuConversation(host: host, port: port,
-                                             accessCode: accessCode, serial: serial)
+        // THE HELD CONNECTION (S2). One per machine, `pushall` at most every
+        // five minutes, deltas merged — see `BambuSession`. The first ask
+        // waits for the first full report; after that a sweep reads at once.
+        let watch = BambuWatch.shared
+        if held || watch.existing(machine.id, config: config) != nil {
+            let session = await watch.session(for: machine.id, config: config, accessCode: accessCode)
+            let state = try await session.status(wait: .seconds(8))
+            guard let status = try await engine.bambuStatus(held: state) else {
+                throw Refusal.unreadable("bambu")
+            }
+            return status
+        }
+
+        let conversation = BambuConversation(host: config.host, port: config.port,
+                                             accessCode: accessCode, serial: config.serial)
         let report = try await conversation.status()
         // The shared module decides what the report MEANS, and returns nothing
         // for a delta — which `status()` has already filtered for, so a nil
@@ -720,6 +743,20 @@ final class PrinterWatch {
             throw Refusal.unreadable("bambu")
         }
         return status
+    }
+
+    /// Where a Bambu is, checked: a serial (every topic is scoped by it), a
+    /// host that passed `baseURL`'s guard, and a port that is a port.
+    static func bambuConfig(_ machine: Machine, base: URL,
+                            accessCode: String) throws -> BambuSession.Config {
+        let serial = (machine.printerApi?.serial ?? "").trimmingCharacters(in: .whitespaces)
+        guard !serial.isEmpty else { throw Refusal.needsSerial }
+        guard let host = base.host() else { throw Refusal.noHost }
+        // `exactly:`, not a conversion that traps: the port field takes any
+        // number, and 88830 saved once crashed the app on every launch.
+        guard let port = UInt16(exactly: machine.printerApi?.port ?? Int(BambuMqtt.defaultPort)), port > 0
+        else { throw Refusal.noHost }
+        return BambuSession.Config(host: host, port: port, serial: serial, accessCode: accessCode)
     }
 
     static func read(_ machine: Machine, engine: KhaytEngine, base: URL, key: String,
@@ -1310,6 +1347,7 @@ final class PrinterWatch {
             // The printer ANSWERED. Its own words, not ours.
             case .refused(let why): return ("mac.pw_sdcp_refused", ["why": .string(why)])
             case .silent: return ("mac.pw_sdcp_silent", [:])
+            case .unconfirmed: return ("mac.pw_unconfirmed", [:])
             case .closed: return ("mac.pw_closed", [:])
             case .socket(let why): return ("mac.pw_unreachable", ["why": .string(why)])
             }
@@ -1329,6 +1367,11 @@ final class PrinterWatch {
                 // line. A message naming address, access code and LAN mode
                 // would be listing three things that are all correct.
                 return ("mac.pw_bambu_silent", [:])
+            case .wentQuiet: return ("mac.pw_bambu_quiet", [:])
+            case .commandRefused(let why):
+                return why.isEmpty ? ("mac.pw_bambu_refused_bare", [:])
+                                   : ("mac.pw_bambu_refused", ["why": .string(why)])
+            case .unconfirmed: return ("mac.pw_unconfirmed", [:])
             case .closed("hungUp"): return ("mac.pw_closed", [:])
             case .closed("cancelled"): return ("mac.pw_conn_closed", [:])
             case .closed(let why): return ("mac.pw_unreachable", ["why": .string(why)])

@@ -166,6 +166,17 @@ enum BambuMqtt {
         /// The printer presented a different certificate from the one it
         /// presented the first time — see `BambuPin`.
         case certificateChanged
+        /// A printer that HAD been talking on a held connection stopped for
+        /// longer than the watchdog allows, and is being reconnected. Not
+        /// `silent`: that one means Developer Mode, and this printer has
+        /// already proved Developer Mode is on.
+        case wentQuiet
+        /// The printer answered a command with `result: "fail"`. Its reason,
+        /// verbatim (may be empty).
+        case commandRefused(String)
+        /// A command went out and no reply naming it came back in time. It
+        /// may or may not have happened — the printer has to be looked at.
+        case unconfirmed
     }
 }
 
@@ -361,6 +372,36 @@ final class PinVerdict: @unchecked Sendable {
     var wasChanged: Bool { lock.withLock { changed } }
 }
 
+extension BambuMqtt {
+    /// A TLS connection to a Bambu's MQTT port, its certificate pinned on
+    /// first use (`BambuPin`). One place, so the one-shot conversation and the
+    /// held session (`BambuSession`) cannot trust certificates differently.
+    static func connection(host: String, port: UInt16, serial: String,
+                           verdict: PinVerdict) -> NWConnection {
+        let options = NWProtocolTLS.Options()
+        // Nothing to verify the certificate AGAINST, so it is pinned on first
+        // use — see `BambuPin`.
+        let pinKey = BambuPin.key(serial: serial, host: host)
+        sec_protocol_options_set_verify_block(
+            options.securityProtocolOptions,
+            { _, trust, complete in
+                guard let print = BambuPin.fingerprint(trust) else { complete(false); return }
+                if BambuPin.accept(print, key: pinKey) { complete(true) }
+                else { verdict.markChanged(); complete(false) }
+            },
+            DispatchQueue.global(qos: .userInitiated))
+        return NWConnection(
+            host: NWEndpoint.Host(host),
+            port: NWEndpoint.Port(rawValue: port) ?? .init(integerLiteral: 8883),
+            using: NWParameters(tls: options))
+    }
+
+    /// The `pushall` request: the object ha-bambulab sends
+    /// (`pybambu/commands.py` PUSH_ALL) and OpenBambuAPI documents, written
+    /// compactly (Python's `json.dumps` adds spaces; the printer parses JSON).
+    static let pushall = #"{"pushing":{"sequence_id":"0","command":"pushall"}}"#
+}
+
 // MARK: - The live connection
 
 /// One conversation with a Bambu printer: connect, subscribe, ask, take the
@@ -406,7 +447,7 @@ actor BambuConversation {
     func status() async throws -> String {
         try await run(
             ask: { BambuMqtt.publish(topic: "device/\(self.serial)/request",
-                                     payload: #"{"pushing":{"sequence_id":"0","command":"pushall"}}"#) },
+                                     payload: BambuMqtt.pushall) },
             take: { payload in
                 // A delta is not an answer. The shared module returns nil for
                 // one, and taking the first message regardless would report a
@@ -435,24 +476,8 @@ actor BambuConversation {
 
     private func run(ask: @escaping @Sendable () -> [UInt8],
                      take: @escaping @Sendable (String) -> String?) async throws -> String {
-        let options = NWProtocolTLS.Options()
-        // Nothing to verify the certificate AGAINST, so it is pinned on first
-        // use — see `BambuPin`.
-        let pinKey = BambuPin.key(serial: serial, host: host)
         let verdict = PinVerdict()
-        sec_protocol_options_set_verify_block(
-            options.securityProtocolOptions,
-            { _, trust, complete in
-                guard let print = BambuPin.fingerprint(trust) else { complete(false); return }
-                if BambuPin.accept(print, key: pinKey) { complete(true) }
-                else { verdict.markChanged(); complete(false) }
-            },
-            DispatchQueue.global(qos: .userInitiated))
-
-        let connection = NWConnection(
-            host: NWEndpoint.Host(host),
-            port: NWEndpoint.Port(rawValue: port) ?? .init(integerLiteral: 8883),
-            using: NWParameters(tls: options))
+        let connection = BambuMqtt.connection(host: host, port: port, serial: serial, verdict: verdict)
 
         let box = Mailbox()
         connection.stateUpdateHandler = { state in

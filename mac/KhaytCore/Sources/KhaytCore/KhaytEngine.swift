@@ -868,6 +868,10 @@ public actor KhaytEngine {
         // Swift's, because `lib/sdcp-client.js` cannot leave Node.
         "sdcp",
         "sdcp-reply",
+        // What a Bambu says is wrong: print_error and HMS codes, in words.
+        // The report itself is read by `BambuReport` (a Swift port); the
+        // faults are a table, and a table is not worth porting twice.
+        "bambu-faults",
         "report-records",
         // A report a shop named, kept in one shape for both apps.
         // What the machine itself remembers. The nozzle-wear counter reads
@@ -5359,8 +5363,8 @@ public actor KhaytEngine {
 
     /// One request to a printer, as `lib/printer-commands.js` shapes it.
     ///
-    /// `unsupported` is an answer, not an error: Bambu requires their own
-    /// connector for remote control now, and a shop is owed that sentence
+    /// `unsupported` is an answer, not an error: a protocol that cannot do
+    /// this (Repetier cannot pause) says so, and a shop is owed that sentence
     /// rather than a request that fails for reasons nobody can act on.
     public struct PrinterRequest: Decodable, Sendable {
         public let method: String?
@@ -5369,6 +5373,24 @@ public actor KhaytEngine {
         public let contentType: String?
         public let needsJobId: Bool?
         public let unsupported: String?
+        /// A Bambu command: MQTT, published to `device/<serial>/request`.
+        /// `payload` is the exact text to publish, serialised by the shared
+        /// module so both apps put the same bytes on the wire.
+        public let mqtt: Mqtt?
+        /// An Elegoo SDCP command: one WebSocket frame, and the Cmd and
+        /// RequestID its Ack will carry.
+        public let sdcp: Sdcp?
+        public struct Mqtt: Decodable, Sendable {
+            public let topic: String
+            public let command: String
+            public let sequenceId: String
+            public let payload: String
+        }
+        public struct Sdcp: Decodable, Sendable {
+            public let cmd: Int
+            public let requestId: String
+            public let frame: String
+        }
         /// A command that is genuinely more than one call — a Duet's cancel is
         /// M25 then M0. Run in order, stopping at the first failure. Missing
         /// from this type until Sep 2026, so a Duet cancel decoded as a request
@@ -5382,15 +5404,27 @@ public actor KhaytEngine {
     /// body and TOGGLES if you omit it, PrusaLink keys the endpoint by the
     /// running job's id, Duet changes shape between its two firmware lines.
     /// All of that is in the shared module and none of it is repeated here.
+    ///
+    /// This app carries MQTT (Bambu) and SDCP (Elegoo resin) itself, so it
+    /// says so (`transports`) and is handed those descriptors; an HTTP-only caller
+    /// is refused in words instead. `sequenceId` is Bambu's per-connection
+    /// counter, echoed in the printer's reply; `mainboardId`, `requestId` and
+    /// `timestamp` address and stamp an SDCP frame (0 = now).
     public func printerCommand(type: String, command: String, jobId: String? = nil,
-                               duetFlavour: String = "", printerSlug: String = "")
+                               duetFlavour: String = "", printerSlug: String = "",
+                               sequenceId: Int = 0, mainboardId: String = "",
+                               requestId: String = "", timestamp: Int = 0)
         throws -> PrinterRequest {
         try runtime.call2("""
             KhaytPrinterCommands.buildCommand(ARG0, ARG1, ARG2,
-              { duetFlavour: ARG3 || undefined, printerSlug: ARG4 || undefined })
+              { duetFlavour: ARG3 || undefined, printerSlug: ARG4 || undefined,
+                transports: ['http', 'mqtt', 'sdcp'], sequenceId: ARG5,
+                mainboardId: ARG6 || undefined, requestId: ARG7 || undefined,
+                timestamp: ARG8 || undefined })
             """,
             [.string(type), .string(command), jobId.map(JSONValue.string) ?? .null,
-             .string(duetFlavour), .string(printerSlug)],
+             .string(duetFlavour), .string(printerSlug), .number(Double(sequenceId)),
+             .string(mainboardId), .string(requestId), .number(Double(timestamp))],
             as: PrinterRequest.self)
     }
 
@@ -9436,8 +9470,30 @@ public actor KhaytEngine {
     /// regardless would report a printer as Idle on the strength of a message
     /// that said nothing about what it was doing.
     public func bambuStatus(report payload: String) throws -> PrinterStatus? {
-        guard let parsed = BambuReport.parse(payload) else { return nil }
-        let data = try JSONEncoder().encode(parsed)
+        guard let data = payload.data(using: .utf8),
+              let root = try? JSONValue.decode(JSONValue.self, from: data) else { return nil }
+        return try bambuStatus(held: root)
+    }
+
+    /// The same, over the state held across a persistent connection — the
+    /// last full report with every delta since laid over it (`BambuReport.merge`).
+    ///
+    /// Plus WHAT IS WRONG, when the report says: `print_error` and `hms[]` as
+    /// a sentence and the code to look it up by (`lib/bambu-faults.js`). Kept
+    /// in `fault`, never in `error` — `error` is what the alert rules read as
+    /// "the poll failed", and a printer naming a warning has not gone offline.
+    public func bambuStatus(held: JSONValue) throws -> PrinterStatus? {
+        guard let parsed = BambuReport.parse(value: held),
+              case .object(var fields) = parsed else { return nil }
+        // `report`, not `root`: this is a printer's MQTT report, not the book,
+        // and `StoreKeysAreTheOtherAppsTests` reads every `root["…"]` as a
+        // book key.
+        if case .object(let report) = held, let print = report["print"] {
+            let fault = try runtime.call2("globalThis.KhaytBambuFaults.faultText(ARG0)",
+                                          [print], as: String?.self)
+            fields["fault"] = fault.map(JSONValue.string) ?? .null
+        }
+        let data = try JSONEncoder().encode(JSONValue.object(fields))
         return try JSONDecoder().decode(PrinterStatus?.self, from: data)
     }
 
@@ -9477,6 +9533,30 @@ public actor KhaytEngine {
         /// DID reply as unreachable.
         case refused(String)
         case status(PrinterStatus)
+    }
+
+    /// Whether one frame off the socket is the printer's answer to a command
+    /// this app sent — nil to keep listening, `.ok`, or the printer's refusal.
+    /// `lib/sdcp-reply.js` `takeAck`: matched on Cmd and RequestID.
+    public enum SdcpAck: Sendable, Equatable {
+        case ok
+        case refused(String)
+    }
+
+    public func sdcpAck(frame: String, mainboardId: String, cmd: Int,
+                        requestId: String) throws -> SdcpAck? {
+        struct Taken: Decodable { let ok: Bool; let error: String? }
+        let taken: Taken? = try runtime.call2(#"""
+        (function (raw, board, cmd, req) {
+          var msg;
+          try { msg = JSON.parse(raw); } catch (e) { return null; }
+          if (!msg) return null;
+          return globalThis.KhaytSdcpReply.takeAck(msg, board, cmd, req) || null;
+        })(ARG0, ARG1, ARG2, ARG3)
+        """#, [.string(frame), .string(mainboardId), .number(Double(cmd)), .string(requestId)],
+                                              as: Taken?.self)
+        guard let taken else { return nil }
+        return taken.ok ? .ok : .refused(taken.error ?? "the printer refused")
     }
 
     public func sdcpRead(frame: String, mainboardId: String) throws -> SdcpFrame? {
@@ -9581,6 +9661,14 @@ public actor KhaytEngine {
         /// What is loaded, head by head, when the machine reports it (a
         /// Snapmaker U1 does). Nil or empty means it cannot say.
         public let loaded: [LoadedSlot]?
+        /// What the printer says is wrong, in words, with the code to look it
+        /// up by — a Bambu's `print_error` / HMS notices (`lib/bambu-faults.js`).
+        /// Nil when nothing is, and for every protocol that does not say.
+        ///
+        /// NOT `error`: `printer-alerts.isFailedPoll` reads `error` as "this
+        /// poll failed", so a printer reporting a warning would count toward
+        /// the offline alert.
+        public let fault: String?
 
         /// One reading. Null rather than zero for a side nobody measured: a
         /// zero-length or zero-second reading is a printer that has not run,
@@ -9598,11 +9686,11 @@ public actor KhaytEngine {
         /// and neither can put one on this Mac's wifi.
         public init(state: String, progress: Int, progressSource: String?, filename: String,
                     timeRemaining: Double?, tempNozzle: Double?, tempBed: Double?, type: String,
-                    actuals: Actuals? = nil, loaded: [LoadedSlot]? = nil) {
+                    actuals: Actuals? = nil, loaded: [LoadedSlot]? = nil, fault: String? = nil) {
             self.state = state; self.progress = progress; self.progressSource = progressSource
             self.filename = filename; self.timeRemaining = timeRemaining
             self.tempNozzle = tempNozzle; self.tempBed = tempBed; self.type = type
-            self.actuals = actuals; self.loaded = loaded
+            self.actuals = actuals; self.loaded = loaded; self.fault = fault
         }
     }
 

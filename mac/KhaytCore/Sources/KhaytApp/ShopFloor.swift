@@ -1804,7 +1804,7 @@ private struct Live: View {
 
         if let problem = shop.printerProblem[machine.id] {
             // The printer's refusal in the vocabulary of somebody who has to
-            // act on it — "Bambu requires Bambu Connect for remote job control"
+            // act on it — "The printer refused the command: …"
             // is a sentence, not a status code.
             Text(problem)
                 .font(.caption).foregroundStyle(Khayt.attention)
@@ -1825,6 +1825,15 @@ private struct Live: View {
                     Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left, shop.words))
                         .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
+            }
+            // WHY it is paused or failed, when the printer says (a Bambu's
+            // print_error / HMS notice, `lib/bambu-faults.js`). Bambu's own
+            // sentence and the code to look it up by — the code is what the
+            // printer's screen and Bambu's wiki use, in any language.
+            if let fault = status.fault, !fault.isEmpty {
+                Label { Text(verbatim: fault) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if isRunning(status.state) || isPaused(status.state) {
                 controls(status)

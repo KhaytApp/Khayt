@@ -2335,6 +2335,14 @@ final class Words {
                                 "ar": "رفضت الطابعة رمز الوصول (CONNACK {code}). يظهر الرمز على شاشة الطابعة نفسها، في قسم وضع الشبكة المحلية فقط."],
         "mac.pw_bambu_silent": ["en": "The printer accepted the connection and then said nothing. That is what happens when Developer Mode is off — LAN-only Mode alone does not open MQTT. Both are in the same menu on the printer (Settings → LAN Mode, or WLAN/Network on P1 and A1).",
                                 "ar": "قبلت الطابعة الاتصال ثم لم تقل شيئًا. هذا ما يحدث حين يكون وضع المطوّر (Developer Mode) مطفأً — وضع الشبكة المحلية وحده لا يفتح MQTT. كلاهما في القائمة نفسها على الطابعة (Settings ← LAN Mode، أو WLAN/Network في P1 وA1)."],
+        "mac.pw_bambu_quiet": ["en": "The printer stopped sending updates for over a minute. Khayt is reconnecting.",
+                               "ar": "توقفت الطابعة عن إرسال التحديثات لأكثر من دقيقة. يعيد خيط الاتصال بها."],
+        "mac.pw_bambu_refused": ["en": "The printer refused the command: {why}. On firmware with Bambu's authorization control, LAN commands are accepted only while Developer Mode is on.",
+                                 "ar": "رفضت الطابعة الأمر: {why}. في البرامج الثابتة التي فيها التحكم بالتفويض من Bambu، لا تُقبل أوامر الشبكة المحلية إلا ووضع المطوّر (Developer Mode) مفعّل."],
+        "mac.pw_bambu_refused_bare": ["en": "The printer refused the command. On firmware with Bambu's authorization control, LAN commands are accepted only while Developer Mode is on.",
+                                      "ar": "رفضت الطابعة الأمر. في البرامج الثابتة التي فيها التحكم بالتفويض من Bambu، لا تُقبل أوامر الشبكة المحلية إلا ووضع المطوّر (Developer Mode) مفعّل."],
+        "mac.pw_unconfirmed": ["en": "The command was sent, but the printer did not confirm it. Check the printer before trying again.",
+                               "ar": "أُرسل الأمر، لكن الطابعة لم تؤكده. تحقق من الطابعة قبل المحاولة مجددًا."],
         "mac.nozzle_wear":   ["en": "Nozzle wear",     "ar": "تآكل الفوهة"],
         // The dashed rectangle behind a bed plan. Without this the drawing
         // reads as a rendering fault rather than as a comparison.

@@ -38,14 +38,19 @@ struct PrinterControlTests {
         #expect(prusa.path?.contains("7") == true, "the job id is not in the path")
     }
 
-    /// "Bambu requires Bambu Connect for remote job control" is a sentence a
-    /// shop can act on. A request that failed obscurely is not.
+    /// A refusal is a sentence a shop can act on; a request that failed
+    /// obscurely is not. Bambu and SDCP are no longer refused on the Mac
+    /// (S11): it carries MQTT and SDCP itself, so it is handed those
+    /// commands — and never an HTTP path for them.
     @Test("a protocol that cannot be told anything says so")
     func unsupported() async throws {
         let e = try Self.engine()
         let bambu = try await e.printerCommand(type: "bambu", command: "pause")
-        #expect(bambu.unsupported?.isEmpty == false)
-        #expect(bambu.path == nil, "built a request for a protocol that has none")
+        #expect(bambu.unsupported == nil)
+        #expect(bambu.mqtt != nil)
+        #expect(bambu.path == nil, "built an HTTP request for a protocol that has none")
+        let repetier = try await e.printerCommand(type: "repetier", command: "pause")
+        #expect(repetier.unsupported?.isEmpty == false)
 
         let nothing = try await e.printerCommand(type: "", command: "pause")
         #expect(nothing.unsupported?.isEmpty == false)
