@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: pause, resume and cancel a print from the machine card.**
+  While a printer is printing, its card in Settings → Printers now has Pause
+  (or Resume when it is paused) and Cancel print, and a Klipper printer also
+  has Drop one object. Cancel asks first, because everything already printed
+  is scrap; Pause and Resume go straight through. A printer whose protocol
+  can't take a command doesn't offer it: Bambu Lab printers have none, and
+  Repetier has no Pause. The same controls as the Mac.
+
 - **The catalogue now counts each part's quantity in a product's cost.** A part used three times in a product was costed once, so the catalogue suggested a price well under what a job made from that product costs. The catalogue and a job now agree. Saved product prices do not change by themselves: a product's price moves only when you open it, edit it and save. The catalogue's margin column now shows the real margin, so a product priced under the old rule may show a thin or negative margin. Review those products and re-save any you want re-priced.
 
 - **Mac: a product part with no spool linked keeps its own spool cost.** Editing the grams of such a part did not re-price the product, because the sheet dropped the part's spool cost when it saved.
