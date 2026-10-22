@@ -200,3 +200,23 @@ test('a rate the part DID carry wins, zero included', () => {
   const b = pricing.priceProduct({ defaultMargin: 0, parts: [RATELESS] }, { settings: {} });
   assert.ok(a.cost < b.cost, "the part's own 40 an hour beat the default 90");
 });
+
+test('only a number the part says beats the default: null, blank, whitespace and text do not', () => {
+  const PR = require('../lib/print-rates.js');
+  const settings = {};
+  const base = { name: 'P', printWeight: 100, printTime: 2, spoolCost: 100, spoolWeight: 1000, qty: 1 };
+  const absent = pricing.priceProduct({ defaultMargin: 0, parts: [base] }, { settings });
+  for (const v of [null, '', ' ', undefined, 'n/a', NaN]) {
+    const part = Object.assign({}, base, { laborRate: v, wearRate: v });
+    assert.equal(PR.withRates(part, { settings }).laborRate, 90, `${JSON.stringify(v)} is not said: the default`);
+    assert.equal(PR.withRates(part, { settings }).wearRate, 0.75);
+    assert.equal(pricing.priceProduct({ defaultMargin: 0, parts: [part] }, { settings }).cost, absent.cost,
+      `a part with laborRate ${JSON.stringify(v)} costs as one without it`);
+  }
+  // A zero is said, as a number or as the desktop form's string.
+  assert.equal(PR.withRates(Object.assign({}, base, { laborRate: 0 }), { settings }).laborRate, 0);
+  assert.equal(PR.withRates(Object.assign({}, base, { laborRate: '0' }), { settings }).laborRate, 0);
+  assert.equal(PR.withRates(Object.assign({}, base, { laborRate: '40' }), { settings }).laborRate, 40);
+  // Fields that are not rates are the part's, untouched.
+  assert.equal(PR.withRates(Object.assign({}, base, { name: '' }), { settings }).name, '');
+});

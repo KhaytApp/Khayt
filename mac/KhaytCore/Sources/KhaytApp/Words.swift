@@ -4481,8 +4481,8 @@ final class Words {
         // What a part costs besides its filament.
         "mac.part_rates":    ["en": "Labour, power and wear",
                               "ar": "العمالة والكهرباء والاستهلاك"],
-        "mac.part_no_rates": ["en": "A part here carries no labour, power or wear, so it is costed at its filament alone. Add it again with the figures above to price it in full.",
-                              "ar": "أحد الأجزاء لا يحمل عمالة أو كهرباء أو استهلاكاً، فتُحتسب كلفته من الخيط وحده. أضفه من جديد بالأرقام أعلاه لتسعيره بالكامل."],
+        "mac.part_no_rates": ["en": "A part here has no rates of its own, so its labour, power and wear are costed at your default rates. To set its own, edit the part and fill in the fields above.",
+                              "ar": "أحد الأجزاء ليست له أسعار خاصة، فتُحتسب العمالة والكهرباء والاستهلاك فيه بأسعارك الافتراضية. لتحديد أسعاره، عدّل الجزء واملأ الحقول أعلاه."],
         "mac.tracking_link_copied": ["en": "Tracking link copied. The customer sees the stage, the shipping and, once done, a short survey.",
                                      "ar": "نُسخ رابط المتابعة. يرى العميل المرحلة والشحن، وبعد الإنجاز استبياناً قصيراً."],
         // ── A printer's working life: under service, retired, deleted ─────

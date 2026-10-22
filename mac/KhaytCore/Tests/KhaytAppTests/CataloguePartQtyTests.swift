@@ -124,10 +124,10 @@ struct CataloguePartQtyTests {
         #expect(rates.laborRate == 90 && rates.wearRate == 0.75)
         #expect(listed.cost > 39.6 + 1, Comment(rawValue: "catalogue \(listed.cost)"))
 
-        // A rate the part DID write down is kept — a null included, which the
-        // cost model reads as zero on both paths.
+        // A stored null is NOT a rate: it is "not said", and the default
+        // stands on both paths (`withRates` reads rates as a preset is read).
         let saidNull = try await engine.costPart(.object(Self.rateless), inventory: [], settings: [:])
-        #expect(saidNull.rates.laborRate == 0)
+        #expect(saidNull.rates.laborRate == 90)
         let listedNull = try await engine.priceProduct(
             .object(["defaultMargin": .number(30), "parts": .array([.object(Self.rateless)])]),
             inventory: [], settings: [:], consumables: [])
@@ -332,6 +332,49 @@ extension LibraryEditPerfTests {
             for key in ["spoolCost", "spoolWeight", "material", "laborRate", "failureRate"] {
                 #expect(part[key] == Self.unlinkedProduct.partField(key), Comment(rawValue: "\(key) was dropped or changed"))
             }
+        }
+    }
+
+    /// A part stored with NULL rates. The sheet reads a null as a blank field
+    /// and `record()` leaves it out; the save's `RoundTrip` merge puts the
+    /// untouched null back. While a null rate beat the default, the sheet
+    /// previewed the part at the default and the save wrote it at zero.
+    static let nullRatesProduct: [String: JSONValue] = [
+        "id": .string("PNR"), "nameEn": .string("Hook"), "defaultMargin": .number(30), "rev": .number(1),
+        "baseCost": .number(20), "basePrice": .number(26), "price": .number(26),
+        "parts": .array([.object(["name": .string("Hook"), "material": .string("PLA"),
+                                  "printWeight": .number(200), "printTime": .number(3),
+                                  "spoolCost": .number(100), "spoolWeight": .number(1000), "qty": .number(1),
+                                  "laborRate": .null, "wearRate": .null, "prepTime": .null,
+                                  "postTime": .null, "powerDraw": .null, "elecRate": .null,
+                                  "failureRate": .null])]),
+    ]
+
+    @Test("a part stored with null rates saves at the price the sheet previewed")
+    func nullRatesPreviewEqualsSave() async throws {
+        var book = PerfBook.synthesize(models: 5)
+        book["products"] = .array([.object(Self.nullRatesProduct)])
+        try await withPerfBook(book) { shop, url in
+            let opened = try #require(await shop.productForEditing("PNR"))
+            var sheet = ProductSheet.opening(opened)
+            #expect(!sheet.parts[0].hasRates, "the sheet read a null as a rate")
+            sheet.parts[0].grams = "250"
+            // What the sheet shows: `reprice`, over the rows as `record()` writes them.
+            let preview = try #require(await shop.priceProduct(
+                parts: sheet.parts.map { $0.record(spools: shop.spools, reclaimsTax: shop.reclaimsTax) },
+                margin: sheet.draft.margin, components: sheet.draft.rest["components"],
+                assemblyQty: sheet.draft.rest["assemblyQty"], rule: sheet.rule))
+            try await Self.saveFromSheet(shop, "PNR") { $0.parts[0].grams = "250" }
+            let saved = try #require(try Self.diskProduct(url, "PNR"))
+            guard case .array(let parts)? = saved["parts"], case .object(let part)? = parts.first else {
+                Issue.record("no part"); return
+            }
+            #expect(part["laborRate"] == .null, "the untouched null did not round-trip — the test proves nothing")
+            #expect(saved["price"] == .number(preview.price),
+                    Comment(rawValue: "sheet showed \(preview.price), save wrote \(String(describing: saved["price"]))"))
+            #expect(saved["baseCost"] == .number(preview.cost))
+            // And at the defaults, not at the filament alone (25.00).
+            #expect(preview.cost > 25 + 1, Comment(rawValue: "cost \(preview.cost)"))
         }
     }
 

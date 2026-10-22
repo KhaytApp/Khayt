@@ -188,15 +188,28 @@
    * job-from-product (`appendProductParts`) — so one part cannot cost one
    * figure in the catalogue and another in the job taken from it.
    *
-   * Only a field the part does not HAVE takes the rate. One it carries wins,
-   * zero, blank and null included: a figure somebody wrote down is what to
-   * charge, and these are only what to assume when nobody said.
+   * For the seven rates, only a NUMBER the part says wins — zero included, and
+   * a numeric string ("90", as the desktop form writes it). Absent, null,
+   * blank, whitespace or not a number is "not said" and the rate stands: the
+   * same `numeric` test a preset and a machine are read with above. A stored
+   * `laborRate: null` used to beat the default and cost labour at nothing,
+   * while the Mac's sheet (which reads null as a blank field) priced it at the
+   * default — a preview the save then did not write.
+   *
+   * Every other field is the part's, as it was.
    *
    * @param {object} part
    * @param {object} [opts] as `ratesFor`
    */
   function withRates(part, opts) {
-    return Object.assign({}, ratesFor(opts), part && typeof part === 'object' ? part : {});
+    const p = part && typeof part === 'object' ? part : {};
+    const rates = ratesFor(opts);
+    const out = Object.assign({}, rates, p);
+    for (const key of Object.keys(DEFAULTS)) {
+      const v = numeric(p[key]);
+      out[key] = v !== null ? v : rates[key];
+    }
+    return out;
   }
 
   const api = { DEFAULTS, MAX_ELEC_RATE, ratesFor, defaultsFor, shopTariff, withRates };
