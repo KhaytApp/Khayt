@@ -179,11 +179,53 @@ function repetierStatus({ stateData, listData, slug, normalizeProgress }) {
     timeRemaining: null,
     tempNozzle: num(nozzle && nozzle.tempRead),
     tempBed: num(bed && bed.tempRead),
+    // ── THE RICHER CARD, from fields with a source ──────────────────────
+    // `tempSet` on each temperature entry, `speedMultiply` / `flowMultiply`
+    // (both 100 in Repetier's own stateList example — percent already),
+    // `layer` on stateList and `ofLayer` on the listing (RepetierSharp's
+    // `PrinterState.CurrentLayer` and `Printer.LayerCount`), `heatedChambers`
+    // (RepetierSharp's `PrinterState`). The fan is `fans[0]` `{on, voltage}`
+    // in RepetierSharp and `fanOn` / `fanVoltage` in the vendor's older
+    // example; `setFanSpeed` documents the scale as "0-255".
+    ...repetierExtras(state, entry, nozzle, bed),
     type: 'repetier',
   };
 }
 
-const api = { repetierStatus, printerEntry, machineState, repetierBed, JOB_STATE_WORDS };
+/**
+ * Targets, chamber, layers, fan and speed/flow, from the same two payloads.
+ * Null for anything the server did not send. Layers only while a job runs:
+ * an idle Repetier reports `layer: 0` with no job, which is not "layer 0 of".
+ */
+function repetierExtras(state, entry, nozzle, bed) {
+  const chambers = Array.isArray(state.heatedChambers) ? state.heatedChambers : [];
+  const chamber = chambers.find((c) => c && typeof c === 'object') || null;
+  const fan = Array.isArray(state.fans) && state.fans[0] && typeof state.fans[0] === 'object'
+    ? state.fans[0]
+    : ('fanOn' in state || 'fanVoltage' in state ? { on: state.fanOn, voltage: state.fanVoltage } : null);
+  let fanPart = null;
+  if (fan) {
+    const v = num(fan.voltage);
+    if (fan.on === false) fanPart = 0;
+    else if (v !== null && v >= 0) fanPart = Math.round(Math.min(255, v) / 255 * 100);
+  }
+  const cur = num(state.layer);
+  const total = num(entry.ofLayer);
+  const hasLayers = cur !== null && cur >= 0 && total !== null && total > 0;
+  return {
+    targetNozzle: num(nozzle && nozzle.tempSet),
+    targetBed: num(bed && bed.tempSet),
+    tempChamber: num(chamber && chamber.tempRead),
+    targetChamber: num(chamber && chamber.tempSet),
+    layer: hasLayers ? Math.round(cur) : null,
+    totalLayers: hasLayers ? Math.round(total) : null,
+    fanPart,
+    speedFactor: num(state.speedMultiply),
+    flowFactor: num(state.flowMultiply),
+  };
+}
+
+const api = { repetierStatus, repetierExtras, printerEntry, machineState, repetierBed, JOB_STATE_WORDS };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 global.KhaytRepetier = api;
 

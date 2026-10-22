@@ -388,6 +388,18 @@ test('the lifted rules and the originals agree on every transition', () => {
             const moved = a.printLog.find((x) => x.id === o.id);
             if (moved) moved.materialDeducted = true;
           }
+          // A THIRD. A cancel is dated now (`cancelledAt`, the local day), so a
+          // cancelled invoice from a FILED VAT period can be reversed in the
+          // right later one (lib/vat-periods.js). The original stamped nothing.
+          // Pinned by test/vat-filed-periods.test.js.
+          if (target === 'cancelled' && o.status !== 'cancelled') {
+            const lifted = b.printLog.find((x) => x.id === o.id);
+            const orig = a.printLog.find((x) => x.id === o.id);
+            if (lifted && orig && lifted.status === 'cancelled') {
+              assert.match(String(lifted.cancelledAt), /^\d{4}-\d{2}-\d{2}$/);
+              orig.cancelledAt = lifted.cancelledAt;
+            }
+          }
           const label = `${o.id} ${o.status} → ${target} / ${JSON.stringify(settings)}`;
           assert.deepEqual(b.printLog, a.printLog, `order state diverged: ${label}`);
           assert.deepEqual(b.calls, a.calls, `effects diverged: ${label}`);

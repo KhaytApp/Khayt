@@ -148,7 +148,12 @@ test('Repetier can resume and cancel, and says precisely why it cannot pause', (
 test('protocols that genuinely cannot do this say why', () => {
   // An honest refusal beats a request built on a guess and sent at a running print.
   assert.match(buildCommand('repetier', 'pause').unsupported, /not supported yet/);
-  assert.match(buildCommand('bambu', 'pause').unsupported, /Bambu Connect/);
+  // A caller that cannot carry MQTT (main.js today) is refused in words, not
+  // handed a descriptor with no path to fetch. The old sentence blamed Bambu
+  // Connect, which is wrong for a Developer-Mode printer.
+  assert.match(buildCommand('bambu', 'pause').unsupported, /cannot send job commands to a Bambu/);
+  assert.doesNotMatch(buildCommand('bambu', 'pause').unsupported, /Bambu Connect/);
+  assert.match(buildCommand('sdcp', 'pause').unsupported, /Elegoo resin/);
   assert.match(buildCommand('', 'pause').unsupported, /unknown printer type/);
 });
 
@@ -178,4 +183,23 @@ test('the command path reuses the SSRF host allowlist', () => {
                         main.indexOf("ipcMain.handle('hub:printer-command'"));
   assert.match(fn, /resolvePrinterTarget\(host\)/, 'no resolved-and-pinned LAN host check');
   assert.match(fn, /redirect: 'manual'/, 'redirects are not pinned');
+});
+
+// ── WHICH BUTTONS A PROTOCOL GETS ─────────────────────────────────────────
+// The Mac drew Pause and Cancel on a Bambu and an Elegoo card and failed on
+// press ("requires Bambu Connect", "unknown printer type"). `supports` is the
+// question the card asks instead, and it is answered from `buildCommand`
+// itself, so the two cannot disagree.
+test('supports: answered from buildCommand, per protocol', () => {
+  const { supports, COMMANDS: verbs } = require('../lib/printer-commands');
+  for (const t of ['moonraker', 'octoprint', 'prusalink', 'duet']) {
+    for (const c of verbs) assert.equal(supports(t, c), true, `${t} ${c}`);
+  }
+  // PrusaLink is keyed by a job id; not having one NOW is not a missing verb.
+  assert.equal(supports('prusalink', 'pause'), true);
+  assert.deepEqual(verbs.map((c) => supports('repetier', c)), [false, true, true]);
+  for (const t of ['bambu', 'sdcp', '', 'nonsense']) {
+    for (const c of verbs) assert.equal(supports(t, c), false, `${t} ${c}`);
+  }
+  assert.equal(supports('moonraker', 'explode'), false);
 });

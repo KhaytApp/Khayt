@@ -141,7 +141,11 @@ struct CataloguePriceFidelityTests {
         let a = try await engine.productPricingFields(.object(Shop.pricingInput(for: typed, parts: [.object(Self.portraitPart)])),
                                                       inventory: Self.shelf, settings: [:], consumables: [])
         #expect(a["price"] == .number(42))
-        // The five-field part the old save wrote: 10.57 → 13.74 → rounded up to 15, not 13.74.
+        // The five-field part the old save wrote. Its rates are gone, so it is
+        // costed at the shop's defaults (as a job from it is): 10.57 of filament,
+        // 3.94 wear, 0.14 power, 0.75 h of labour at 90, +10 % = 90.36 →
+        // 117.47 → rounded up to 120, not 117.47. (It was 10.57 / 15 while the
+        // catalogue held a missing rate at zero and the job path did not.)
         var thin = Self.portraitPart
         for key in ["laborRate", "prepTime", "postTime", "elecRate", "powerDraw", "wearRate", "failureRate"] {
             thin.removeValue(forKey: key)
@@ -152,8 +156,8 @@ struct CataloguePriceFidelityTests {
         ], keys: [])
         let b = try await engine.productPricingFields(.object(Shop.pricingInput(for: rounded, parts: [.object(thin)])),
                                                       inventory: Self.shelf, settings: [:], consumables: [])
-        #expect(b["baseCost"] == .number(10.57))
-        #expect(b["price"] == .number(15), Comment(rawValue: "\(b)"))
+        #expect(b["baseCost"] == .number(90.36), Comment(rawValue: "\(b)"))
+        #expect(b["price"] == .number(120), Comment(rawValue: "\(b)"))
     }
 
     // MARK: - A job from the product is costed at the product's rates

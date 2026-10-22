@@ -182,6 +182,13 @@
     return m ? m[1] : null;
   }
 
+  /** A number, or null — never `Number(null)`'s 0 for a field that is absent. */
+  function num(v) {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
   /** Clamp to a whole 0-100. Mirrors lib/printer-status.js, deliberately. */
   function pct(value) {
     const n = Number(value);
@@ -248,6 +255,19 @@
       // Resin-specific, additive: consumables a shop actually replaces.
       tempUVLED: Number.isFinite(Number(s.TempOfUVLED)) ? Number(s.TempOfUVLED) : null,
       tempBox: Number.isFinite(Number(s.TempOfBox)) ? Number(s.TempOfBox) : null,
+      // The same two under the names every other adapter uses, so the card
+      // needs no resin case: the spec's `TempOfBox` is "Current Enclosure
+      // Temperature" and `TempTargetBox` is "Target Enclosure Temperature".
+      // Through `num`, not `Number(…) || …`: a box target of 0 is "not heating".
+      tempChamber: num(s.TempOfBox),
+      targetChamber: num(s.TempTargetBox),
+      // Layers under the shared names, both or neither — see `layerPair` in
+      // printer-status.js. `currentLayer`/`totalLayer` above are kept as they
+      // were for the callers that read them.
+      layer: Number(p.TotalLayer) > 0 && num(p.CurrentLayer) !== null ? Math.round(num(p.CurrentLayer)) : null,
+      totalLayers: Number(p.TotalLayer) > 0 && num(p.CurrentLayer) !== null ? Math.round(Number(p.TotalLayer)) : null,
+      // The refusal reason, under the name the card shows.
+      message: PRINT_ERROR[p.ErrorNumber] || null,
       releaseFilmCount: Number.isFinite(Number(s.ReleaseFilm)) ? Number(s.ReleaseFilm) : null,
       screenHours: Number.isFinite(Number(s.PrintScreen)) ? Math.round(Number(s.PrintScreen) / 3600) : null,
       mainboardId: msg && msg.MainboardID ? msg.MainboardID : null,

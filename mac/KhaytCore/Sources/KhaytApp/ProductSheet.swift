@@ -721,8 +721,9 @@ struct ProductSheet: View {
                 Text(shop.words.callIt("mac.part_rates")).font(.caption)
             }
             // A part already in the list that carries none of them is costed
-            // at its filament and nothing else, and says so — the same shape
-            // as the two notices below, and for the same reason.
+            // at the shop's default rates (`KhaytPrintRates.withRates`), and
+            // says so: its fields here are blank, so nothing else on the sheet
+            // shows what it is being charged at.
             if parts.contains(where: { !$0.hasRates }) {
                 Text(shop.words.callIt("mac.part_no_rates"))
                     .font(.caption).foregroundStyle(Khayt.attention)

@@ -553,6 +553,11 @@ public actor KhaytEngine {
         // must be: this consults them through their globals, and without them
         // it does not raise — it reports every order at its gross price and no
         // tax collected at all.
+        // The shop's VAT return periods and which it has filed: pnl-report
+        // asks it, through its global, where a reversal of a filed period's
+        // invoice lands. Without it no correction is made and a filed period
+        // reads as an open one.
+        "vat-periods",
         "pnl-report",
         // The VAT owed for the span the P&L covers: it sums the P&L's own
         // rows, and asks TAX (above) only for the shop's mode and rates.
@@ -868,6 +873,10 @@ public actor KhaytEngine {
         // Swift's, because `lib/sdcp-client.js` cannot leave Node.
         "sdcp",
         "sdcp-reply",
+        // What a Bambu says is wrong: print_error and HMS codes, in words.
+        // The report itself is read by `BambuReport` (a Swift port); the
+        // faults are a table, and a table is not worth porting twice.
+        "bambu-faults",
         "report-records",
         // A report a shop named, kept in one shape for both apps.
         // What the machine itself remembers. The nozzle-wear counter reads
@@ -5359,8 +5368,8 @@ public actor KhaytEngine {
 
     /// One request to a printer, as `lib/printer-commands.js` shapes it.
     ///
-    /// `unsupported` is an answer, not an error: Bambu requires their own
-    /// connector for remote control now, and a shop is owed that sentence
+    /// `unsupported` is an answer, not an error: a protocol that cannot do
+    /// this (Repetier cannot pause) says so, and a shop is owed that sentence
     /// rather than a request that fails for reasons nobody can act on.
     public struct PrinterRequest: Decodable, Sendable {
         public let method: String?
@@ -5369,6 +5378,27 @@ public actor KhaytEngine {
         public let contentType: String?
         public let needsJobId: Bool?
         public let unsupported: String?
+        /// A Bambu command: MQTT, published to `device/<serial>/request`.
+        /// `payload` is the exact text to publish, serialised by the shared
+        /// module so both apps put the same bytes on the wire.
+        public let mqtt: Mqtt?
+        /// An Elegoo SDCP command: one WebSocket frame, and the Cmd and
+        /// RequestID its Ack will carry.
+        public let sdcp: Sdcp?
+        public struct Mqtt: Decodable, Sendable {
+            public let topic: String
+            /// The report's top-level key the reply comes back under —
+            /// `print` for job verbs and speed, `system` for the light.
+            public let section: String?
+            public let command: String
+            public let sequenceId: String
+            public let payload: String
+        }
+        public struct Sdcp: Decodable, Sendable {
+            public let cmd: Int
+            public let requestId: String
+            public let frame: String
+        }
         /// A command that is genuinely more than one call — a Duet's cancel is
         /// M25 then M0. Run in order, stopping at the first failure. Missing
         /// from this type until Sep 2026, so a Duet cancel decoded as a request
@@ -5382,16 +5412,51 @@ public actor KhaytEngine {
     /// body and TOGGLES if you omit it, PrusaLink keys the endpoint by the
     /// running job's id, Duet changes shape between its two firmware lines.
     /// All of that is in the shared module and none of it is repeated here.
+    ///
+    /// This app carries MQTT (Bambu) and SDCP (Elegoo resin) itself, so it
+    /// says so (`transports`) and is handed those descriptors; an HTTP-only caller
+    /// is refused in words instead. `sequenceId` is Bambu's per-connection
+    /// counter, echoed in the printer's reply; `mainboardId`, `requestId` and
+    /// `timestamp` address and stamp an SDCP frame (0 = now).
     public func printerCommand(type: String, command: String, jobId: String? = nil,
-                               duetFlavour: String = "", printerSlug: String = "")
+                               duetFlavour: String = "", printerSlug: String = "",
+                               sequenceId: Int = 0, mainboardId: String = "",
+                               requestId: String = "", timestamp: Int = 0)
         throws -> PrinterRequest {
         try runtime.call2("""
             KhaytPrinterCommands.buildCommand(ARG0, ARG1, ARG2,
-              { duetFlavour: ARG3 || undefined, printerSlug: ARG4 || undefined })
+              { duetFlavour: ARG3 || undefined, printerSlug: ARG4 || undefined,
+                transports: ['http', 'mqtt', 'sdcp'], sequenceId: ARG5,
+                mainboardId: ARG6 || undefined, requestId: ARG7 || undefined,
+                timestamp: ARG8 || undefined })
             """,
             [.string(type), .string(command), jobId.map(JSONValue.string) ?? .null,
-             .string(duetFlavour), .string(printerSlug)],
+             .string(duetFlavour), .string(printerSlug), .number(Double(sequenceId)),
+             .string(mainboardId), .string(requestId), .number(Double(timestamp))],
             as: PrinterRequest.self)
+    }
+
+    /// A Bambu control beyond the job verbs — `speed` (1-4) or `light`
+    /// ("on"/"off") — as `lib/printer-commands.js` `buildControl` shapes it.
+    public func printerControl(type: String, control: String, value: JSONValue,
+                               sequenceId: Int) throws -> PrinterRequest {
+        try runtime.call2("""
+            KhaytPrinterCommands.buildControl(ARG0, ARG1, ARG2,
+              { transports: ['http', 'mqtt', 'sdcp'], sequenceId: ARG3 })
+            """, [.string(type), .string(control), value, .number(Double(sequenceId))],
+            as: PrinterRequest.self)
+    }
+
+    /// Can this protocol do this verb at all? `lib/printer-commands.js`'s
+    /// `supports`, which builds the command and looks for `unsupported` — so
+    /// the button a card draws and the request a press sends come from one
+    /// table. A Bambu or Elegoo card drew Pause and Cancel and failed on press.
+    public func printerSupports(type: String, command: String) throws -> Bool {
+        // With the transports THIS app can perform (Bambu's MQTT, Elegoo's
+        // SDCP socket); without them lib answers for the desktop, which only
+        // speaks HTTP.
+        try runtime.call2("KhaytPrinterCommands.supports(ARG0, ARG1, {transports: ['http', 'mqtt', 'sdcp']})",
+                          [.string(type), .string(command)], as: Bool.self)
     }
 
     /// Does this protocol need the running job's id before it can be told
@@ -8095,6 +8160,67 @@ public actor KhaytEngine {
             input.arguments, as: PnlStatement.self)
     }
 
+    /// A VAT return period the shop can mark filed: `lib/vat-periods.js`
+    /// `filingPeriods`. `period` is the key the mark is written under.
+    public struct VatFilingPeriod: Decodable, Sendable, Equatable, Identifiable {
+        public let period: String
+        public let from: String
+        public let to: String
+        public let filed: Bool
+        /// The marked period this one is filed AS PART OF (a month inside a
+        /// filed quarter) — it cannot be switched on its own. Empty or nil
+        /// otherwise; nil from an older bundle.
+        public let partOf: String?
+        /// Un-filed with its snapshot kept: filing again can restore it.
+        public let archived: Bool?
+        public var id: String { period }
+    }
+
+    /// The return periods in `from`…`to` (or the last eight, for no span)
+    /// that have ENDED by `today`, newest first, each with whether it is
+    /// marked filed. In the shop's own frequency (`vatFilingFrequency`).
+    public func vatFilingPeriods(settings: [String: JSONValue], from: String?, to: String?,
+                                 today: String) throws -> [VatFilingPeriod] {
+        try runtime.call2(
+            "KhaytVatPeriods.filingPeriods(ARG0, {from: ARG1, to: ARG2, today: ARG3})",
+            [.object(settings), .string(from ?? ""), .string(to ?? ""), .string(today)],
+            as: [VatFilingPeriod].self)
+    }
+
+    /// The marked period `period` overlaps, or "" — `lib/vat-periods.js`
+    /// `overlapOf`. Such a period cannot be marked, and the screen says why.
+    public func vatFiledOverlap(settings: [String: JSONValue], period: String) throws -> String {
+        try runtime.call2("KhaytVatPeriods.overlapOf(ARG0, ARG1)", [.object(settings), .string(period)],
+                          as: String.self)
+    }
+
+    /// The latest period marked filed after `period`, or "" — `lib/vat-periods.js`
+    /// `laterFiledOf`. While there is one, `period` cannot be un-filed.
+    public func vatFiledLater(settings: [String: JSONValue], period: String) throws -> String {
+        try runtime.call2("KhaytVatPeriods.laterFiledOf(ARG0, ARG1)", [.object(settings), .string(period)],
+                          as: String.self)
+    }
+
+    /// The settings with `period` marked FILED — with the SNAPSHOT of what the
+    /// period holds, job by job, taken from `orders` (the book's jobs as they
+    /// are on disk) with the same `clients` and `currencies` the P&L is asked
+    /// with, so the snapshot is exactly the figures on screen
+    /// (`lib/vat-periods.js` `markFiled`; a period un-filed before gets its
+    /// archived snapshot back) — or, `filed: false`, with the mark taken off
+    /// and its snapshot archived in `vatUnfiledPeriods`.
+    public func vatMarkFiled(_ settings: [String: JSONValue], period: String, filed: Bool,
+                             fresh: Bool = false,
+                             orders: [JSONValue], clients: [JSONValue] = [],
+                             currencies: [String: JSONValue] = [:], now: Date) throws -> [String: JSONValue] {
+        try runtime.call2(
+            "ARG4 ? KhaytVatPeriods.markFiled(ARG0, ARG1, ARG2, new Date(ARG3), {clients: ARG5, currencies: ARG6}, {fresh: ARG7})"
+          + " : KhaytVatPeriods.unmarkFiled(ARG0, ARG1)",
+            [.object(settings), .string(period), .array(orders),
+             .number(now.timeIntervalSince1970 * 1000), .bool(filed),
+             .array(clients), .object(currencies), .bool(fresh)],
+            as: [String: JSONValue].self)
+    }
+
     /// The same statement as files: a CSV and the HTML a PDF is printed from
     /// (`lib/pnl-report.js` `periodsToCsv` / `periodsToHtml`). `labels` are
     /// the shop's words, keyed like `STATEMENT_LABELS`; `periodLabel` is the
@@ -9081,6 +9207,42 @@ public actor KhaytEngine {
         try runtime.call2("KhaytMoonraker.QUERY", [], as: String.self)
     }
 
+    /// What to watch on one Klipper machine, from its `/printer/objects/list`.
+    ///
+    /// `lib/moonraker.js`'s `discover`, which hands the sensors to
+    /// `lib/filament-sensors.js` — the rule the desktop has used since Sep
+    /// 2026 and the Mac never asked. A hardcoded sensor name finds nothing on
+    /// the U1 (its four are `filament_motion_sensor eN_filament`), which is
+    /// why the names are discovered at all.
+    public struct MoonrakerWatch: Codable, Sendable, Equatable {
+        public let sensors: [String]
+        public let chamber: String?
+        public let headFans: [String]
+
+        public init(sensors: [String] = [], chamber: String? = nil, headFans: [String] = []) {
+            self.sensors = sensors; self.chamber = chamber; self.headFans = headFans
+        }
+
+        /// Nothing discovered: the query is the bare `QUERY`, and a runout
+        /// reads "cannot say".
+        public static let nothing = MoonrakerWatch()
+
+        var json: JSONValue {
+            .object(["sensors": .array(sensors.map(JSONValue.string)),
+                     "chamber": chamber.map(JSONValue.string) ?? .null,
+                     "headFans": .array(headFans.map(JSONValue.string))])
+        }
+    }
+
+    public func moonrakerDiscover(_ listReply: [String: JSONValue]) throws -> MoonrakerWatch {
+        try runtime.call2("KhaytMoonraker.discover(ARG0)", [.object(listReply)], as: MoonrakerWatch.self)
+    }
+
+    /// The objects query for one machine, with what discovery found added.
+    public func moonrakerQuery(watching: MoonrakerWatch) throws -> String {
+        try runtime.call2("KhaytMoonraker.queryWith(ARG0)", [watching.json], as: String.self)
+    }
+
     /// Which extruder is printing, when it is not toolhead zero.
     ///
     /// Nil for a single-head machine — and nil is the answer that means "the
@@ -9134,19 +9296,22 @@ public actor KhaytEngine {
     /// moment and a measurement from another.
     public func moonrakerStatus(_ reply: [String: JSONValue],
                                 hot: [String: JSONValue]?, hotName: String?,
-                                fileMeta: [String: JSONValue]? = nil) throws -> PrinterStatus {
+                                fileMeta: [String: JSONValue]? = nil,
+                                watching: MoonrakerWatch = .nothing) throws -> PrinterStatus {
         // ARG3 is the slicer's metadata for the file being printed. Without it
         // the adapter extrapolates the time left from however much of the print
         // has happened, which two percent in is worthless — this printer said
         // twenty-two and a half hours on a four-and-a-half-hour file.
         //
-        // `sensorNames` is not passed from here and never has been: the fourth
-        // argument to `readStatus` is the discovered filament-sensor list, and
-        // this app does not discover them yet. It stays `null` so the metadata
-        // lands in the fifth position rather than being read as sensors.
+        // ARG4 is what `moonrakerDiscover` found. It was `null` here until Oct
+        // 2026 — "this app does not discover them yet" — so a Klipper machine
+        // on the Mac reported `filamentOut: null` on every poll and the runout
+        // alert, switched on by default, could not fire. The module reads the
+        // sensors off it; the chamber and head fans are found in the reply by
+        // name, so they only need to have been ASKED for (`moonrakerQuery`).
         try runtime.call2(#"""
         (function () {
-          var s = KhaytMoonraker.readStatus(ARG0, ARG1, ARG2, null, ARG3);
+          var s = KhaytMoonraker.readStatus(ARG0, ARG1, ARG2, ARG4, ARG3);
           s.actuals = KhaytPrinterActuals.extractActuals('moonraker', ARG0, {});
           return s;
         })()
@@ -9154,7 +9319,8 @@ public actor KhaytEngine {
                           [.object(reply),
                            hot.map(JSONValue.object) ?? .null,
                            hotName.map(JSONValue.string) ?? .null,
-                           fileMeta.map(JSONValue.object) ?? .null],
+                           fileMeta.map(JSONValue.object) ?? .null,
+                           watching.json],
                           as: PrinterStatus.self)
     }
 
@@ -9436,8 +9602,30 @@ public actor KhaytEngine {
     /// regardless would report a printer as Idle on the strength of a message
     /// that said nothing about what it was doing.
     public func bambuStatus(report payload: String) throws -> PrinterStatus? {
-        guard let parsed = BambuReport.parse(payload) else { return nil }
-        let data = try JSONEncoder().encode(parsed)
+        guard let data = payload.data(using: .utf8),
+              let root = try? JSONValue.decode(JSONValue.self, from: data) else { return nil }
+        return try bambuStatus(held: root)
+    }
+
+    /// The same, over the state held across a persistent connection — the
+    /// last full report with every delta since laid over it (`BambuReport.merge`).
+    ///
+    /// Plus WHAT IS WRONG, when the report says: `print_error` and `hms[]` as
+    /// a sentence and the code to look it up by (`lib/bambu-faults.js`). Kept
+    /// in `fault`, never in `error` — `error` is what the alert rules read as
+    /// "the poll failed", and a printer naming a warning has not gone offline.
+    public func bambuStatus(held: JSONValue) throws -> PrinterStatus? {
+        guard let parsed = BambuReport.parse(value: held),
+              case .object(var fields) = parsed else { return nil }
+        // `report`, not `root`: this is a printer's MQTT report, not the book,
+        // and `StoreKeysAreTheOtherAppsTests` reads every `root["…"]` as a
+        // book key.
+        if case .object(let report) = held, let print = report["print"] {
+            let fault = try runtime.call2("globalThis.KhaytBambuFaults.faultText(ARG0)",
+                                          [print], as: String?.self)
+            fields["fault"] = fault.map(JSONValue.string) ?? .null
+        }
+        let data = try JSONEncoder().encode(JSONValue.object(fields))
         return try JSONDecoder().decode(PrinterStatus?.self, from: data)
     }
 
@@ -9477,6 +9665,30 @@ public actor KhaytEngine {
         /// DID reply as unreachable.
         case refused(String)
         case status(PrinterStatus)
+    }
+
+    /// Whether one frame off the socket is the printer's answer to a command
+    /// this app sent — nil to keep listening, `.ok`, or the printer's refusal.
+    /// `lib/sdcp-reply.js` `takeAck`: matched on Cmd and RequestID.
+    public enum SdcpAck: Sendable, Equatable {
+        case ok
+        case refused(String)
+    }
+
+    public func sdcpAck(frame: String, mainboardId: String, cmd: Int,
+                        requestId: String) throws -> SdcpAck? {
+        struct Taken: Decodable { let ok: Bool; let error: String? }
+        let taken: Taken? = try runtime.call2(#"""
+        (function (raw, board, cmd, req) {
+          var msg;
+          try { msg = JSON.parse(raw); } catch (e) { return null; }
+          if (!msg) return null;
+          return globalThis.KhaytSdcpReply.takeAck(msg, board, cmd, req) || null;
+        })(ARG0, ARG1, ARG2, ARG3)
+        """#, [.string(frame), .string(mainboardId), .number(Double(cmd)), .string(requestId)],
+                                              as: Taken?.self)
+        guard let taken else { return nil }
+        return taken.ok ? .ok : .refused(taken.error ?? "the printer refused")
     }
 
     public func sdcpRead(frame: String, mainboardId: String) throws -> SdcpFrame? {
@@ -9581,6 +9793,52 @@ public actor KhaytEngine {
         /// What is loaded, head by head, when the machine reports it (a
         /// Snapmaker U1 does). Nil or empty means it cannot say.
         public let loaded: [LoadedSlot]?
+        /// What the printer says is wrong, in words, with the code to look it
+        /// up by — a Bambu's `print_error` / HMS notices (`lib/bambu-faults.js`).
+        /// Nil when nothing is, and for every protocol that does not say.
+        ///
+        /// NOT `error`: `printer-alerts.isFailedPoll` reads `error` as "this
+        /// poll failed", so a printer reporting a warning would count toward
+        /// the offline alert.
+        public let fault: String?
+
+        /// HAS THE PRINTING HEAD RUN OUT. Three-way, and the nil is load-
+        /// bearing: a machine with no filament sensor is not a machine with
+        /// filament, it is one that cannot say. `lib/filament-sensors.js`
+        /// decides, from the sensors `PrinterWatch` discovered; until Oct 2026
+        /// this field did not exist here, so `printer-alerts` never saw a
+        /// runout on the Mac at all.
+        public var filamentOut: Bool? = nil
+
+        // ── THE RICHER CARD ──────────────────────────────────────────────
+        //
+        // Each one nil when the protocol does not report it, never 0: a fan
+        // nobody measured is not a fan that is off. The readers in `lib/`
+        // decide what each protocol means by them; see each module's notes
+        // for the vendor source of every field.
+
+        /// The live head's set temperature. 0 is "heater off", nil is "not said".
+        public var targetNozzle: Double? = nil
+        public var targetBed: Double? = nil
+        /// The air around the print — a chamber heater, or a sensor named for
+        /// the chamber, cavity or enclosure. Nil target for a sensor that has
+        /// none (the U1's cavity is measured, not heated).
+        public var tempChamber: Double? = nil
+        public var targetChamber: Double? = nil
+        /// "Layer 412 of 750". Both or neither (`printer-status.layerPair`).
+        /// Doubles across the bridge: a Bambu report arrives through
+        /// `BambuReport`'s JSON numbers, not as whole Swift integers.
+        public var layer: Double? = nil
+        public var totalLayers: Double? = nil
+        /// The printing head's part fan, 0-100.
+        public var fanPart: Double? = nil
+        /// Speed and flow overrides as percentages — 100 is "as sliced".
+        public var speedFactor: Double? = nil
+        public var flowFactor: Double? = nil
+        /// The printer's own word on what is wrong, or why it paused. Nil
+        /// when it has nothing to say (Klipper's "Printer is ready" is not
+        /// news, nor is PrusaLink's "OK").
+        public var message: String? = nil
 
         /// One reading. Null rather than zero for a side nobody measured: a
         /// zero-length or zero-second reading is a printer that has not run,
@@ -9598,11 +9856,18 @@ public actor KhaytEngine {
         /// and neither can put one on this Mac's wifi.
         public init(state: String, progress: Int, progressSource: String?, filename: String,
                     timeRemaining: Double?, tempNozzle: Double?, tempBed: Double?, type: String,
-                    actuals: Actuals? = nil, loaded: [LoadedSlot]? = nil) {
+                    actuals: Actuals? = nil, loaded: [LoadedSlot]? = nil, fault: String? = nil) {
             self.state = state; self.progress = progress; self.progressSource = progressSource
             self.filename = filename; self.timeRemaining = timeRemaining
             self.tempNozzle = tempNozzle; self.tempBed = tempBed; self.type = type
-            self.actuals = actuals; self.loaded = loaded
+            self.actuals = actuals; self.loaded = loaded; self.fault = fault
+        }
+
+        /// The layer pair as whole numbers, when the printer gave both.
+        public var layers: (current: Int, total: Int)? {
+            guard let layer, let totalLayers, layer.isFinite, totalLayers.isFinite,
+                  totalLayers > 0, layer >= 0 else { return nil }
+            return (Int(layer.rounded()), Int(totalLayers.rounded()))
         }
     }
 
@@ -11002,7 +11267,7 @@ public actor KhaytEngine {
                          machine: JSONValue? = nil, preset: JSONValue? = nil) throws -> Double {
         try runtime.call2("""
             KhaytCalculatorCost.computePartBaseCost(
-              Object.assign({}, KhaytPrintRates.ratesFor({ machine: ARG3, preset: ARG4, settings: ARG2 }), ARG0),
+              KhaytPrintRates.withRates(ARG0, { machine: ARG3, preset: ARG4, settings: ARG2 }),
               { inventory: ARG1, settings: ARG2 })
             """,
                           [part, .array(inventory), .object(settings),
@@ -11022,7 +11287,7 @@ public actor KhaytEngine {
                               preset: JSONValue? = nil) throws -> CostParts {
         try runtime.call2("""
             KhaytCalculatorCost.computePartBreakdown(
-              Object.assign({}, KhaytPrintRates.ratesFor({ machine: ARG3, preset: ARG4, settings: ARG2 }), ARG0),
+              KhaytPrintRates.withRates(ARG0, { machine: ARG3, preset: ARG4, settings: ARG2 }),
               { inventory: ARG1, settings: ARG2 })
             """,
                           [part, .array(inventory), .object(settings),
@@ -11455,11 +11720,12 @@ public actor KhaytEngine {
                          consumables: [JSONValue] = []) throws -> CostedPart {
         try runtime.call2("""
             (function (part, inventory, settings, machine, preset, consumables) {
-              var rates = KhaytPrintRates.ratesFor({ machine: machine, preset: preset, settings: settings });
-              // The part's own values beat the rates, and this merged object is
-              // what BOTH the figure and the record are made from — so what gets
-              // written down is what was charged, not a second guess at it.
-              var costed = Object.assign({}, rates, part);
+              // The part's own values beat the rates (`withRates`, the same
+              // merge the catalogue costs a product's part with), and this
+              // merged object is what BOTH the figure and the record are made
+              // from — so what gets written down is what was charged, not a
+              // second guess at it.
+              var costed = KhaytPrintRates.withRates(part, { machine: machine, preset: preset, settings: settings });
               var ctx = { inventory: inventory, settings: settings, consumables: consumables };
               return {
                 cost: KhaytCalculatorCost.computePartBaseCost(costed, ctx),

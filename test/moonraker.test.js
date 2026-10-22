@@ -138,7 +138,8 @@ test('the query asks for every object the reading needs, and no more', () => {
   // fields are optional in the parse on purpose, because a starting Klipper
   // omits them.
   assert.deepEqual(M.QUERY.split('&').sort(),
-    ['display_status', 'extruder', 'heater_bed', 'print_stats', 'print_task_config', 'toolhead', 'virtual_sdcard']);
+    ['display_status', 'extruder', 'fan', 'gcode_move', 'heater_bed', 'print_stats', 'print_task_config',
+     'toolhead', 'virtual_sdcard', 'webhooks']);
 });
 
 test('a U1 says what is loaded in each head; any other Klipper says nothing', () => {

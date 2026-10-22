@@ -209,7 +209,12 @@
       // machine and `null` is one with no sensor, and neither is a reason to
       // walk across a workshop. On a toolchanger it is already the LIVE head's
       // sensor — a spare head sitting empty is an empty slot, not a runout.
-      const outNow = s.filamentOut === true;
+      // And only on a job. An idle machine whose last head sits empty reads
+      // `false` on that head's sensor, and the first poll after launch has no
+      // previous status to compare with: without this, Khayt would announce a
+      // runout on a printer nobody is printing on.
+      const onJob = !isFailedPoll(s) && (isPrinting(s.state) || /paus/i.test(String(s.state || '')));
+      const outNow = onJob && s.filamentOut === true;
       const outBefore = p && p.filamentOut === true;
       if (cfg.notifyRunout && outNow && !outBefore && offCooldown('runout')) {
         alerts.push({
