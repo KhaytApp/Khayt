@@ -1808,6 +1808,27 @@ private struct Live: View {
                             shop.droppingFrom = machine
                         }
                     }
+                    // A Bambu's speed preset (confirmed — it changes a running print)
+                    // and its chamber light (straight through — it changes nothing).
+                    if type == "bambu" {
+                        Menu(shop.words.callIt("mac.printer_speed")) {
+                            ForEach(1...4, id: \.self) { level in
+                                Button(shop.words.callIt("mac.printer_speed_\(level)")) {
+                                    shop.confirmingSpeed = Shop.SpeedChange(machine: machine, level: level)
+                                }
+                            }
+                        }
+                        .fixedSize()
+                        Menu(shop.words.callIt("mac.printer_light")) {
+                            Button(shop.words.callIt("mac.printer_light_on")) {
+                                Task { await shop.control(machine, .light(true)) }
+                            }
+                            Button(shop.words.callIt("mac.printer_light_off")) {
+                                Task { await shop.control(machine, .light(false)) }
+                            }
+                        }
+                        .fixedSize()
+                    }
                     Spacer()
                 }
                 .buttonStyle(.bordered)
@@ -1845,6 +1866,15 @@ private struct Live: View {
                     Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left, shop.words))
                         .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
+            }
+            // WHY it is paused or failed, when the printer says (a Bambu's
+            // print_error / HMS notice, `lib/bambu-faults.js`). Bambu's own
+            // sentence and the code to look it up by — the code is what the
+            // printer's screen and Bambu's wiki use, in any language.
+            if let fault = status.fault, !fault.isEmpty {
+                Label { Text(verbatim: fault) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if isRunning(status.state) || isPaused(status.state) {
                 controls(status)

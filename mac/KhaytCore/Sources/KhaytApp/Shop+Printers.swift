@@ -246,6 +246,22 @@ extension Shop {
         }
     }
 
+    /// Speed preset or chamber light on a Bambu (S11 follow-on). Same gate
+    /// as `tell`; the speed is confirmed by the card first while printing.
+    func control(_ machine: Machine, _ control: PrinterControl.Control) async {
+        guard permitted("orders", "edit") else { printerProblem[machine.id] = moveProblem; return }
+        guard let engine else { return }
+        printerProblem[machine.id] = nil
+        printerBusy.insert(machine.id)
+        defer { printerBusy.remove(machine.id) }
+        do {
+            try await PrinterControl.control(control, to: machine, engine: engine, build: source.build)
+            await printers.refresh(machine, shop: self)
+        } catch {
+            printerProblem[machine.id] = PrinterWatch.problem(error, words)
+        }
+    }
+
     // MARK: - Sending a file to a printer
 
     /// The machines a file can be sent to: every one with a printer

@@ -205,6 +205,9 @@ final class Activator: NSObject, NSApplicationDelegate {
             // outlives its application is a timer running against a runtime
             // that is being dismantled.
             FloorStatus.shared.remove()
+            // Every held Bambu connection: MQTT DISCONNECT and close, now —
+            // there is no later in which an async stop would run.
+            BambuWatch.shared.hangUpAll()
             Snapshot.subject?.relinquish()
         }
     }

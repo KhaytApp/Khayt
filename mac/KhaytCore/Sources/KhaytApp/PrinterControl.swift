@@ -82,6 +82,12 @@ enum PrinterControl {
                      fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil) async throws {
         let type = machine.printerApi?.type ?? ""
         let base = try await PrinterWatch.baseURL(machine, engine: engine)
+
+        // NOT HTTP (S11). Same host guard (`baseURL`, above), same confirm
+        // flow in the UI — only the wire differs.
+        if type == "bambu" { return try await sendBambu(verb, to: machine, base: base, engine: engine, build: build) }
+        if type == "sdcp" { return try await sendSdcp(verb, to: machine, base: base, engine: engine) }
+
         let key = await self.key(for: machine, build: build)
 
         // PrusaLink first: its endpoints are keyed by the running job's id, and
@@ -106,6 +112,90 @@ enum PrinterControl {
             duetFlavour: PrinterWatch.knownDuetFlavour(for: base),
             printerSlug: machine.printerApi?.printerSlug ?? "")
         try await perform(request, base: base, key: key, type: type, engine: engine, fetch: fetch)
+    }
+
+    /// A Bambu: `print.pause` / `print.resume` / `print.stop` over the
+    /// machine's held MQTT connection (`BambuSession`), the one the poller
+    /// already keeps open — so a command is not a second client dialling in.
+    ///
+    /// Developer Mode is what Khayt needs to read a Bambu at all, and Bambu's
+    /// wiki says it opens the MQTT channel for "full control". So the command
+    /// is sent, and only the printer's own `result: "fail"` is reported as a
+    /// refusal (`BambuMqtt.Trouble.commandRefused`), in its words.
+    private static func sendBambu(_ verb: Verb, to machine: Machine, base: URL,
+                                  engine: KhaytEngine, build: StoreReader.Build?) async throws {
+        // The access code, opened at the moment of use exactly as the poller
+        // opens it — never displayed, never held by this file.
+        var code = ""
+        if let sealed = machine.printerApi?.accessCode, !sealed.isEmpty, let build {
+            code = (try? await Secrets.open(sealed, for: build)) ?? ""
+        }
+        let config = try PrinterWatch.bambuConfig(machine, base: base, accessCode: code)
+        let session = await BambuWatch.shared.session(for: machine.id, config: config, accessCode: code)
+        let seq = await session.nextSequence()
+        let request = try await engine.printerCommand(type: "bambu", command: verb.rawValue,
+                                                      sequenceId: seq)
+        if let why = request.unsupported { throw Failure.unsupported(why) }
+        guard let mqtt = request.mqtt else { throw Failure.refused("The printer's command could not be built.") }
+        try await session.command(payload: mqtt.payload, command: mqtt.command,
+                                  sequenceId: mqtt.sequenceId)
+    }
+
+    /// A Bambu control beyond the job verbs. Speed needs LAN/Developer Mode
+    /// like every MQTT command; the light is harmless and goes straight
+    /// through from the UI. Speed is confirmed there while printing.
+    enum Control: Equatable, Sendable {
+        case speed(Int)          // 1 silent · 2 standard · 3 sport · 4 ludicrous
+        case light(Bool)
+    }
+
+    static func control(_ control: Control, to machine: Machine, engine: KhaytEngine,
+                        build: StoreReader.Build?) async throws {
+        guard machine.printerApi?.type == "bambu" else {
+            throw Failure.unsupported("This printer type has no such control.")
+        }
+        let base = try await PrinterWatch.baseURL(machine, engine: engine)
+        var code = ""
+        if let sealed = machine.printerApi?.accessCode, !sealed.isEmpty, let build {
+            code = (try? await Secrets.open(sealed, for: build)) ?? ""
+        }
+        let config = try PrinterWatch.bambuConfig(machine, base: base, accessCode: code)
+        let session = await BambuWatch.shared.session(for: machine.id, config: config, accessCode: code)
+        let seq = await session.nextSequence()
+        let request: KhaytEngine.PrinterRequest
+        switch control {
+        case .speed(let level):
+            request = try await engine.printerControl(type: "bambu", control: "speed",
+                                                      value: .number(Double(level)), sequenceId: seq)
+        case .light(let on):
+            request = try await engine.printerControl(type: "bambu", control: "light",
+                                                      value: .string(on ? "on" : "off"), sequenceId: seq)
+        }
+        if let why = request.unsupported { throw Failure.unsupported(why) }
+        guard let mqtt = request.mqtt else { throw Failure.refused("The printer's command could not be built.") }
+        try await session.command(payload: mqtt.payload, command: mqtt.command,
+                                  sequenceId: mqtt.sequenceId, section: mqtt.section ?? "print")
+    }
+
+    /// An Elegoo resin printer: one SDCP frame, Cmd 129 / 131 / 130, and its Ack.
+    private static func sendSdcp(_ verb: Verb, to machine: Machine, base: URL,
+                                 engine: KhaytEngine) async throws {
+        let board = (machine.printerApi?.serial ?? machine.printerApi?.printerSlug ?? "")
+            .trimmingCharacters(in: .whitespaces)
+        guard !board.isEmpty else { throw PrinterWatch.Refusal.needsMainboardId }
+        guard let host = base.host(),
+              let url = URL(string: try await engine.sdcpWebsocketUrl(host)) else {
+            throw PrinterWatch.Refusal.noHost
+        }
+        // Unique per command, so this command's Ack is told from any other's.
+        let requestId = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        let request = try await engine.printerCommand(
+            type: "sdcp", command: verb.rawValue, mainboardId: board, requestId: requestId,
+            timestamp: Int(Date().timeIntervalSince1970))
+        if let why = request.unsupported { throw Failure.unsupported(why) }
+        guard let frame = request.sdcp else { throw Failure.refused("The printer's command could not be built.") }
+        try await SdcpSocket(url: url, mainboardId: board)
+            .command(frame: frame.frame, cmd: frame.cmd, requestId: frame.requestId, engine: engine)
     }
 
     /// What is on a Klipper plate right now.
@@ -150,8 +240,8 @@ enum PrinterControl {
                                 key: String, type: String, engine: KhaytEngine? = nil,
                                 fetch: ((URLRequest) async throws -> (Data, URLResponse))? = nil) async throws {
         // A protocol that cannot do this says so, and that sentence goes to the
-        // shop unchanged: "Bambu requires Bambu Connect for remote job control"
-        // is something to act on, unlike a request that fails obscurely.
+        // shop unchanged: "Pausing a Repetier print is not supported yet" is
+        // something to act on, unlike a request that fails obscurely.
         if let why = request.unsupported { throw Failure.unsupported(why) }
         // MORE THAN ONE CALL: in order, and the first refusal stops it. A Duet
         // cancel is a pause and then a stop; stopping without the pause having
