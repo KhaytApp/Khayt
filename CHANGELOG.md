@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: pairing during the Mac's "Pair a phone" window.** The Mac now
+  takes a new phone only while its owner has clicked Pair a phone
+  (Settings → Online). The iPhone gets its own key straight after the PIN
+  check. When the window is shut, it says what to click on the Mac instead
+  of pairing a phone that would keep sending the PIN. A phone that still
+  signs in with the PIN gets a Secure this phone card in Settings. A shut
+  window is retried hourly, not every minute, because each try sends the PIN.
+
 - **Desktop: pause, resume and cancel a print from the machine card.**
   While a printer is printing, its card in Settings → Printers now has Pause
   (or Resume when it is paused) and Cancel print, and a Klipper printer also
