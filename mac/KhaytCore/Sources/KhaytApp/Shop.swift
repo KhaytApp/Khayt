@@ -2534,6 +2534,9 @@ final class Shop {
     /// What stopped the last settings save, and what it did.
     var settingsProblem: String?
     var settingsNote: String?
+    /// Why the last "Filed" toggle on a VAT return could not be written
+    /// (Shop+Pnl.swift `setVatPeriodFiled`).
+    var vatFiledProblem: String?
     /// Which pane the Settings window shows. On the shop so a snapshot run can
     /// turn the pages.
     var settingsPane: SettingsPane = .business

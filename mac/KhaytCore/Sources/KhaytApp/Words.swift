@@ -1739,6 +1739,20 @@ final class Words {
         "mac.pnl_col_operating": ["en": "Operating costs", "ar": "تكاليف التشغيل"],
         // The net income card adds up every period in the book.
         "mac.pnl_all_time": ["en": "all time", "ar": "منذ البداية"],
+        // A filed VAT return (PnlControls.swift VatSummaryCard).
+        "mac.vat_unfile_title": ["en": "Mark {period} as not filed?", "ar": "هل تعلّم {period} غير مُقدَّم؟"],
+        "mac.vat_unfile_message": ["en": "This forgets what you filed for {period}. Only do this if the return was not actually filed.",
+                                   "ar": "هذا ينسى ما قدّمته عن {period}. لا تفعل ذلك إلا إذا لم يُقدَّم الإقرار فعلًا."],
+        "mac.vat_unfile_confirm": ["en": "Mark as not filed", "ar": "علّمه غير مُقدَّم"],
+        "mac.vat_refile_title": ["en": "File {period} again?", "ar": "هل تعلّم {period} مُقدَّمًا من جديد؟"],
+        "mac.vat_refile_message": ["en": "Khayt kept what you filed for this period. Restore it, or record the book as it is now if you filed an amended return.",
+                                   "ar": "احتفظ خيط بما قدّمته عن هذه الفترة. استعده، أو سجّل الدفتر كما هو الآن إن قدّمت إقرارًا معدَّلًا."],
+        "mac.vat_refile_restore": ["en": "Restore what you filed", "ar": "استعد ما قدّمته"],
+        "mac.vat_refile_fresh": ["en": "Record the book as it is now", "ar": "سجّل الدفتر كما هو الآن"],
+        "mac.vat_filed_part_of": ["en": "Filed as part of {period}", "ar": "مُقدَّم ضمن {period}"],
+        "mac.vat_filed_later": ["en": "{later} is filed after {period} and already corrects it. Un-file {later} first.", "ar": "الفترة {later} مُقدَّمة بعد {period} وتصحّحها بالفعل. ألغِ تقديم {later} أولًا."],
+        "mac.vat_filed_overlap": ["en": "{period} overlaps {other}, which is already marked filed.",
+                                  "ar": "تتداخل {period} مع {other} المُعلَّمة مُقدَّمة."],
         // A failure allowance learned from the shop's own history —
         // lib/failure-rate.js. Offered beside the field, never applied alone.
         "mac.fail_suggest": [
