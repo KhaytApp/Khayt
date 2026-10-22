@@ -148,7 +148,12 @@ test('Repetier can resume and cancel, and says precisely why it cannot pause', (
 test('protocols that genuinely cannot do this say why', () => {
   // An honest refusal beats a request built on a guess and sent at a running print.
   assert.match(buildCommand('repetier', 'pause').unsupported, /not supported yet/);
-  assert.match(buildCommand('bambu', 'pause').unsupported, /Bambu Connect/);
+  // A caller that cannot carry MQTT (main.js today) is refused in words, not
+  // handed a descriptor with no path to fetch. The old sentence blamed Bambu
+  // Connect, which is wrong for a Developer-Mode printer.
+  assert.match(buildCommand('bambu', 'pause').unsupported, /cannot send job commands to a Bambu/);
+  assert.doesNotMatch(buildCommand('bambu', 'pause').unsupported, /Bambu Connect/);
+  assert.match(buildCommand('sdcp', 'pause').unsupported, /Elegoo resin/);
   assert.match(buildCommand('', 'pause').unsupported, /unknown printer type/);
 });
 
