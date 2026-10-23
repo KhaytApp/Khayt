@@ -132,6 +132,13 @@ struct ScreenActions: View {
                                && shop.libraryRoots != nil) {
                     Task { await shop.rescanStorage() }
                 }
+                // THE SHOP'S SHARE LINKS, only when the library is in the
+                // vault, the one remote a link can share from.
+                if shop.libraryOnVault {
+                    NavyAction(label: shop.words.callIt("mac.vl_links"), symbol: "link") {
+                        shop.showingVaultLinks = true
+                    }
+                }
             } else if shop.showingCatalogue {
                 layoutSwitch
                 // THE CLOUD'S TWO WAYS IN. They were declared as toolbar items

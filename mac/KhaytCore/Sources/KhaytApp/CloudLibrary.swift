@@ -208,7 +208,7 @@ enum CloudLibrary {
         switch remote {
         case .bucket(let c): return bucketIdentity(endpoint: c.endpoint, bucket: c.bucket, prefix: c.prefix)
         case .drive(let d): return driveIdentity(d.config, folder: driveFolder(settings))
-        case .vault(let v): return "vault:" + v.sync.client.connection.shopId
+        case .vault(let v): return vaultIdentityPrefix + v.sync.client.connection.shopId
         }
     }
 
@@ -223,6 +223,9 @@ enum CloudLibrary {
             .map { String(format: "%02x", $0) }.joined()
         return "gdrive:" + digest.prefix(16) + "/" + folder
     }
+
+    /// A vault remote's identity starts with this (`Shop.libraryOnVault`).
+    nonisolated static let vaultIdentityPrefix = "vault:"
 
     nonisolated static func bucketIdentity(endpoint: String, bucket: String, prefix: String) -> String {
         func trim(_ s: String) -> String { s.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")) }

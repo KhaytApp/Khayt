@@ -10,6 +10,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - Bambu writes `0` for "the object's own filament" on the wall, sparse infill and solid infill filament settings, and `-1` for "auto" on the tree support wall count and raft first-layer expansion. Orca refuses those as out of range. They now get the values Orca writes itself for the same meaning (1, 1, 1, 0 and 2).
   - A file saved by Snapmaker Orca 2.4 itself (`Snapmaker_Orca-2.4.0`) is no longer relabelled as an OrcaSlicer file.
 
+- **Mac: private share links for files in Khayt Vault (built, still dark).**
+  - Right-click a model, or a selection, and choose Share by Private Link. You
+    can limit the number of downloads, set an end date, ask for a password and
+    add a note for yourself. Then Copy Link, or Send on WhatsApp.
+  - A new Share Links screen lists every link with its downloads used and
+    left, its end date, whether it was revoked, and who opened it lately (a
+    country and a kind of device; the cloud keeps no address). From there you
+    can add downloads, extend or revoke a link.
+  - The files stay end-to-end encrypted. The part of the link after `#`
+    unlocks them, and it never goes to Khayt Cloud. This Mac keeps it in its
+    own Keychain, never in the book, so Copy Link works again later only on
+    the Mac that made the link. The password is never stored or sent, and the
+    sheet says plainly that a password helps only if it is long, and that a
+    download limit cannot stop a downloaded file being copied.
+  - Send on WhatsApp opens the WhatsApp app directly, not a `wa.me` web
+    address, so the link is not put into a web request on the way.
+  - A big selection is sent in batches under the cloud's limits (500 files and
+    16 MB a request). If a later batch fails, the half-made link is revoked, so
+    a link is never quietly missing files. If even that revoke fails, or the
+    app quits mid-way, Share Links shows the link as incomplete, with no Copy
+    Link, and revokes it after ten minutes. A copied link is marked so that
+    clipboard managers do not show or keep it.
+  - All of this shows only when the library is stored in Khayt Vault, which no
+    shop can choose yet. In English and Arabic, light and dark.
+
 - **Desktop: the machine card shows the printer's full reading, and part prep/post time follow the shop's defaults.**
   - Under the live badge, the card now shows heater targets, the chamber, the
     current layer, the part fan, speed and flow, and the printer's own message.
