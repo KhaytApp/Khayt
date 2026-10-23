@@ -215,3 +215,37 @@ struct StoreWriterTests {
         #expect(seen["rev"] == .number(8))
     }
 }
+
+/// beta.5 review: a value that records something already done outside the
+/// book (the portal page went up or down) is stamped even when it is a no-op,
+/// so it wins LWW over another Mac's stale value.
+struct StoreWriterForceStampTests {
+    @Test("forceStamp stamps a write that changed nothing; the default still does not")
+    func forceStampStampsANoOp() {
+        var root: [String: JSONValue] = ["printLog": .array([
+            .object(["id": .string("J1"), "rev": .number(4), "updatedAt": .string("2026-10-01T00:00:00.000Z"),
+                     "cloudPublished": .bool(true)]),
+        ])]
+        let before = root
+        _ = StoreWriter.changeRecord(&root, collection: "printLog", id: "J1") { $0["cloudPublished"] = .bool(true) }
+        #expect(root == before, "the default no-op rule is unchanged")
+
+        _ = StoreWriter.changeRecord(&root, collection: "printLog", id: "J1", forceStamp: true) {
+            $0["cloudPublished"] = .bool(true)
+        }
+        guard case .array(let rows)? = root["printLog"], case .object(let j)? = rows.first else {
+            Issue.record("no row"); return
+        }
+        #expect(j["rev"] == .number(5))
+        #expect(j["updatedAt"] != .string("2026-10-01T00:00:00.000Z"))
+        #expect(j["cloudPublished"] == .bool(true))
+    }
+
+    @Test("a forced stamp on a missing record writes nothing")
+    func forceStampOnMissingRecord() {
+        var root: [String: JSONValue] = ["printLog": .array([])]
+        let out: Void? = StoreWriter.changeRecord(&root, collection: "printLog", id: "nope", forceStamp: true) { _ in }
+        #expect(out == nil)
+        #expect(root == ["printLog": .array([])])
+    }
+}

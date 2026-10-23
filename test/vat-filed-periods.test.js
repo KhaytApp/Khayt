@@ -344,16 +344,71 @@ test('settings moving after filing adjust nothing: an exchange rate, the tax mod
   assert.equal(vatCorrections([edited], { settings: exclusive }).filter((c) => c.kind === 'adjustment').length, 1);
 });
 
-test('the change day is the LATEST stamp: a phone cancel with only updatedAt lands when it was made', () => {
+test('updatedAt is the fallback: a phone cancel with only updatedAt lands when it was made', () => {
   const monthly = { ...VAT15, vatFilingFrequency: 'monthly' };
   const job = invoice({ date: '2026-09-10' });
   const settings = V.markFiled(monthly, '2026-09', [job], instant(2026, 10, 3));
   const phone = { ...job, status: 'cancelled', updatedAt: instant(2026, 12, 15) };
   const adj = vatCorrections([phone], { settings }).find((c) => c.kind === 'adjustment');
   assert.equal(adj.day, '2026-12-15', 'December, not October');
-  // A stale cancelledAt never pulls it earlier than the latest stamp.
+  // An event stamp wins over the sync stamp: the cancel is the change.
   const both = { ...phone, cancelledAt: '2026-10-20' };
-  assert.equal(vatCorrections([both], { settings }).find((c) => c.kind === 'adjustment').day, '2026-12-15');
+  assert.equal(vatCorrections([both], { settings }).find((c) => c.kind === 'adjustment').day, '2026-10-20');
+});
+
+test('a save AFTER the cancel never moves the reversal: December cancel, January payment stays in Q4', () => {
+  const job = invoice();
+  const settings = V.markFiled(VAT15, '2026-Q3', [job], instant(2026, 10, 3));
+  const cancelled = { ...job, status: 'cancelled', cancelledAt: '2026-12-20',
+    statusHistory: [{ status: 'cancelled', at: instant(2026, 12, 20) }], updatedAt: instant(2027, 1, 3) };
+  const adj = vatCorrections([cancelled], { settings }).find((c) => c.kind === 'adjustment');
+  assert.deepEqual([adj.day, adj.vat, adj.reason], ['2026-12-20', -15, 'cancelled']);
+  const rows = rowsOf([cancelled], settings);
+  assert.equal(row(rows, '2026-Q4').vatAdjustment, -15, 'the Q4 return carries the December reversal');
+  assert.equal((row(rows, '2027-Q1') || { vatAdjustment: 0 }).vatAdjustment, 0);
+  // Q4 filed in January holds the reversal in its snapshot.
+  const s4 = V.markFiled(settings, '2026-Q4', [cancelled], instant(2027, 1, 10));
+  const q4mark = s4.vatFiledPeriods.find((m) => m.period === '2026-Q4');
+  assert.equal(q4mark.totals.vat, -15);
+  // Voided / credited: the same — the event stamp, not the later save.
+  const voided = { ...job, voidedAt: instant(2026, 12, 20), updatedAt: instant(2027, 1, 3) };
+  assert.equal(vatCorrections([voided], { settings }).find((c) => c.kind === 'adjustment').day, '2026-12-20');
+  const credited = { ...job, creditNotes: [{ id: 'CN-1', amount: 115, issuedAt: instant(2026, 12, 20) }],
+    updatedAt: instant(2027, 1, 3) };
+  assert.equal(vatCorrections([credited], { settings }).find((c) => c.kind === 'adjustment').day, '2026-12-20');
+  assert.equal(V.reversalDayOf(cancelled), '2026-12-20');
+});
+
+test('a credit note added AFTER the cancel moves nothing: the reversal stays in December', () => {
+  const job = invoice();
+  const settings = V.markFiled(VAT15, '2026-Q3', [job], instant(2026, 10, 3));
+  const cancelled = { ...job, status: 'cancelled', cancelledAt: '2026-12-20',
+    statusHistory: [{ status: 'cancelled', at: instant(2026, 12, 20) }],
+    creditNotes: [{ id: 'CN-9', amount: 115, issuedAt: instant(2027, 1, 5) }], updatedAt: instant(2027, 1, 5) };
+  const adj = vatCorrections([cancelled], { settings }).find((c) => c.kind === 'adjustment');
+  assert.equal(adj.day, '2026-12-20');
+  // Not reversed: a credit note still dates its own change.
+  const credited = { ...job, creditNotes: [{ id: 'CN-9', amount: 115, issuedAt: instant(2027, 1, 5) }] };
+  assert.equal(vatCorrections([credited], { settings }).find((c) => c.kind === 'adjustment').day, '2027-01-05');
+});
+
+test('un-cancelled after a filed reversal: the un-cancel day is the change, not a later save', () => {
+  const job = invoice();
+  let settings = V.markFiled(VAT15, '2026-Q3', [job], instant(2026, 10, 3));
+  const cancelled = { ...job, status: 'cancelled', cancelledAt: '2026-10-05',
+    statusHistory: [{ status: 'completed', at: instant(2026, 8, 10) }, { status: 'cancelled', at: instant(2026, 10, 5) }] };
+  settings = V.markFiled(settings, '2026-Q4', [cancelled], instant(2027, 1, 10));
+  const back = { ...cancelled, status: 'completed', updatedAt: instant(2027, 4, 2),
+    statusHistory: [...cancelled.statusHistory, { status: 'completed', at: instant(2027, 3, 28) }] };
+  delete back.cancelledAt;
+  const adj = vatCorrections([back], { settings }).filter((c) => c.kind === 'adjustment');
+  assert.deepEqual(adj.map((c) => [c.day, c.vat]), [['2027-03-28', 15]], 'Q1, not Q2');
+  assert.equal(V.reversalDayOf(back), '', 'no longer reversed');
+});
+
+test('reversalDayOf takes the LATEST event stamp', () => {
+  const o = invoice({ status: 'cancelled', cancelledAt: '2026-10-05', voidedAt: instant(2026, 11, 2), updatedAt: instant(2027, 1, 3) });
+  assert.equal(V.reversalDayOf(o), '2026-11-02');
 });
 
 test('an overlapping period cannot be marked, and says what it is part of', () => {
