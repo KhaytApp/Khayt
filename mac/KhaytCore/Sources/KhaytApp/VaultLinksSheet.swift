@@ -339,7 +339,7 @@ struct VaultGrantRow: View {
             HStack {
                 Spacer()
                 Button(words.callIt("common.cancel")) { editingLock = false }
-                Button(words.callIt("common.save")) { Task { await saveLock() } }
+                Button(words.callIt("common.save")) { Task { await applyEmailLock() } }
                     .disabled(working || (try? lockCheck.get()) == nil)
             }
         }
@@ -429,7 +429,7 @@ struct VaultGrantRow: View {
         await run { try await $0.revoke(grant.grantId) }
     }
 
-    private func saveLock() async {
+    private func applyEmailLock() async {
         let list = VaultLinks.emails(in: lockText)
         await run { try await $0.setEmailLock(grant.grantId, list) }
         if problem == nil { editingLock = false }
