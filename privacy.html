@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy — Khayt</title>
+  <link rel="canonical" href="https://khaytapp.com/privacy/">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -14,196 +15,26 @@
       padding: 40px 20px;
     }
     .container { max-width: 720px; margin: 0 auto; }
-    h1 { font-size: 2rem; color: #6366f1; margin-bottom: 8px; }
-    .subtitle { color: #64748b; margin-bottom: 40px; font-size: 0.9rem; }
-    h2 { font-size: 1.1rem; color: #f1f5f9; margin: 32px 0 12px; font-weight: 600; }
-    p, li { color: #94a3b8; margin-bottom: 12px; }
-    ul { padding-left: 20px; }
-    li { margin-bottom: 6px; }
-    strong { color: #e2e8f0; }
-    a { color: #6366f1; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .card {
-      background: #1e293b;
-      border-radius: 12px;
-      padding: 24px;
-      margin-top: 40px;
-      border: 1px solid #334155;
-    }
-    .highlight {
-      background: #1e3a5f;
-      border-left: 3px solid #6366f1;
-      padding: 12px 16px;
-      border-radius: 0 8px 8px 0;
-      margin: 16px 0;
-    }
-    .highlight p { color: #bfdbfe; margin: 0; }
+    h1 { font-size: 2rem; color: #6366f1; margin-bottom: 16px; }
+    p { color: #94a3b8; margin-bottom: 12px; }
+    a { color: #818cf8; }
+    section + section { margin-top: 40px; padding-top: 32px; border-top: 1px solid #1e293b; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Privacy Policy</h1>
-    <p class="subtitle">Khayt — 3D Printing Production Management &nbsp;·&nbsp; Last updated: May 2025</p>
-
-    <div class="highlight">
-      <p><strong>Short version:</strong> Khayt stores all your data locally on your device. We do not collect, transmit, or have access to any of your business data.</p>
-    </div>
-
-    <h2>1. Who We Are</h2>
-    <p>
-      Khayt is a desktop application for 3D printing production management, invoicing, and analytics.
-      It is developed and maintained by Khayt (<a href="mailto:support@khaytapp.com">support@khaytapp.com</a>).
-    </p>
-
-    <h2>2. Data We Do NOT Collect</h2>
-    <p>Khayt is a local-first desktop application. We <strong>never</strong> collect:</p>
-    <ul>
-      <li>Your customer data, order information, or business records</li>
-      <li>Your inventory, pricing, or financial data</li>
-      <li>Personal information of any kind</li>
-      <li>Your files (models, photos, PDFs) or anything you typed</li>
-      <li>Your API keys, PINs, tokens or other secrets</li>
-    </ul>
-    <p>
-      The one thing sent without asking is a once-a-day anonymous count that an install exists,
-      which carries no identifier and which you can switch off. Crash reports and anonymous usage
-      counts are <strong>off by default</strong> and are only ever sent if you explicitly turn them
-      on — see <a href="#telemetry">section 8</a> for exactly what each contains.
-    </p>
-
-    <h2>3. Where Your Data Lives</h2>
-    <p>
-      All data you enter into Khayt is stored exclusively on your local device in the application's
-      data directory. Khayt does not sync your data to any cloud service operated by us.
-    </p>
-    <p>
-      Backup files you create are saved to locations you choose on your device. If you enable
-      iCloud Backup (macOS), your data is stored in your personal iCloud account — Khayt has
-      no access to it.
-    </p>
-
-    <h2>4. Optional Third-Party Integrations</h2>
-    <p>
-      Khayt supports optional integrations that you configure and control. When enabled, these
-      features may transmit data to the respective third-party service:
-    </p>
-    <ul>
-      <li><strong>Email notifications</strong> — uses the SMTP/API credentials you provide (SendGrid, Mailgun, or custom SMTP)</li>
-      <li><strong>Telegram notifications</strong> — uses the bot token and chat ID you provide via the Telegram Bot API</li>
-      <li><strong>ZATCA e-invoicing</strong> — submits invoices to the Saudi ZATCA authority as required by Saudi law</li>
-      <li><strong>BNPL payment links</strong> — uses Tabby, Tamara, or Stripe credentials you provide</li>
-      <li><strong>Salla / Zid webhooks</strong> — receives inbound orders from e-commerce platforms you configure</li>
-      <li><strong>LAN server / tunnel</strong> — exposes a local HTTP server on your network for customer portal and intake forms</li>
-    </ul>
-    <p>
-      None of these integrations are enabled by default. Khayt does not share your credentials
-      with any party other than the service you explicitly configure.
-    </p>
-
-    <h2>5. Automatic Updates</h2>
-    <p>
-      Khayt checks for software updates via GitHub Releases. This check sends a standard HTTPS
-      request to GitHub's servers (GitHub's privacy policy applies:
-      <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank">github.com/privacy</a>).
-      No personal data is transmitted during update checks. Updates are downloaded only if you
-      explicitly choose to install them.
-    </p>
-
-    <h2>6. API Keys and Secrets</h2>
-    <p>
-      API keys, tokens, and secrets you enter in Khayt (for email, Telegram, ZATCA, BNPL, etc.)
-      are encrypted at rest using your operating system's secure storage (macOS Keychain /
-      Windows Credential Store / Linux Secret Service). They are never transmitted to Khayt's servers.
-    </p>
-
-    <h2>7. Your Customers' Data (for shop owners)</h2>
-    <p>
-      Khayt stores the customer details <em>you</em> enter or that customers submit through your
-      intake form — names, phone, email, addresses, order history and any communication notes.
-      Under Saudi Arabia's Personal Data Protection Law (PDPL) — and equivalents such as the GDPR —
-      <strong>you are the data controller</strong> for that information. Khayt is a tool you run on
-      your own machine; we never receive your customers' records. If you enable optional cloud sync,
-      the data is end-to-end encrypted before it leaves your device, so we hold ciphertext, not
-      customer records.
-    </p>
-    <p>To help you meet your obligations, Khayt provides:</p>
-    <ul>
-      <li><strong>Consent at collection</strong> — your public intake form requires customers to
-        agree to a plain-language notice before submitting, and records that consent with a
-        timestamp and the exact wording shown.</li>
-      <li><strong>Right of access / portability</strong> — "Export this customer's data" produces a
-        machine-readable JSON file containing everything Khayt holds about one customer.</li>
-      <li><strong>Right to rectification</strong> — every customer field is editable.</li>
-      <li><strong>Right to erasure</strong> — deleting a customer offers a clear choice: unlink
-        (keep the order records you may be legally required to retain) or full erase (also remove
-        the name from those orders and purge intake submissions and communication logs). Orders
-        that carry an invoice or a payment keep the customer's name even then, because tax invoices
-        must be kept as issued. So does a gift card with a balance left, because that balance is
-        money the shop still owes them; a used-up gift card loses the name, and their loyalty points
-        are unlinked from them. A full erase also takes the customer's order tracking pages down from
-        Khayt Cloud, those of invoiced and paid orders included; if Khayt Cloud cannot be reached at
-        that moment, the app keeps trying until it can.</li>
-      <li><strong>Storage limitation</strong> — an optional retention setting anonymizes the contact
-        details on old intake submissions while keeping the operational record.</li>
-    </ul>
-    <p>
-      These are engineering tools, not legal advice. How long you keep records, and on what lawful
-      basis, is your decision as controller — please take qualified advice.
-    </p>
-
-    <h2 id="telemetry">8. Crash Reports and Usage Data</h2>
-    <p>
-      Apart from the anonymous install count below, Khayt sends <strong>nothing by default</strong>. You may optionally turn on two
-      separate, independently revocable options in <strong>Settings → Crash Reports &amp; Usage</strong>:
-    </p>
-    <ul>
-      <li><strong>Crash reports</strong> — the error type, a scrubbed message and stack trace,
-        your app version and OS family. On the Mac app this includes the crash reports macOS
-        gives the app about its own crashes: the exception, the signal, the build number, and
-        the crashing thread's frames as code offsets. File paths are reduced to a filename, and emails,
-        phone numbers, IBANs and long digit sequences are removed before anything is stored.</li>
-      <li><strong>Anonymous usage counts</strong> — which features were used, as counts and
-        fixed categories only. Never what was in them.</li>
-    </ul>
-    <p>
-      We <strong>never</strong> collect your orders, customers, prices, margins, inventory,
-      files, or any secret (API keys, PINs, tokens). There is no account or user id — only a
-      random install identifier created when you opt in. Opting out removes it from your shop's
-      data straight away; backups made before then still hold it until they are replaced, and
-      reports already sent keep it until Khayt Cloud deletes them on its regular schedule.
-      Turning an option off deletes anything queued locally straight away, without a restart.
-      You can inspect exactly what would be sent at any time via <em>"View what's collected"</em>.
-    </p>
-    <p id="active-count">
-      <strong>The anonymous install count — on unless you turn it off.</strong> So that we know roughly how many copies of Khayt are in use, each app sends Khayt Cloud one small message at most once a day, without asking first. It holds exactly six things: the platform (Mac, Windows, Linux or iPhone), the release channel (stable, beta or alpha), the app version, and three yes-or-no answers — whether this is the install's first count this week, this month, and ever. It carries no install identifier, shop, account or device name, so one install cannot be told from another, and Khayt Cloud does not store the address it came from. Like any web request, it passes through our network providers (Cloudflare and our hosting provider), which handle it under their own terms. The cloud does not keep the message itself: it adds one to a few daily totals per platform, channel and version, keeps those totals for 400 days, and only Khayt reads them. The count is not linked to you and is never used for tracking or advertising. To stop it, turn off <em>Count this install (anonymous)</em> in Settings; nothing is sent while it is off.
-    </p>
-
-    <h2>9. Children's Privacy</h2>
-    <p>
-      Khayt is a business productivity tool intended for adults. It is not directed at children
-      under the age of 13 and we do not knowingly collect information from children.
-    </p>
-
-    <h2>10. Changes to This Policy</h2>
-    <p>
-      We may update this Privacy Policy from time to time. Updates will be published at this URL.
-      We encourage you to review it periodically. Continued use of Khayt after changes constitutes
-      acceptance of the updated policy.
-    </p>
-
-    <h2>11. Contact</h2>
-    <p>
-      If you have any questions about this Privacy Policy, please contact us at
-      <a href="mailto:support@khaytapp.com">support@khaytapp.com</a>.
-    </p>
-
-    <div class="card">
-      <p style="color:#64748b; font-size:0.85rem;">
-        Khayt is source-available software licensed under the Functional Source License
-        (FSL-1.1-Apache-2.0). Source code is available at
-        <a href="https://github.com/khaytapp/Khayt">github.com/khaytapp/Khayt</a>.
-      </p>
-    </div>
+    <section lang="en">
+      <h1>Privacy Policy</h1>
+      <p>Khayt's privacy policy is published at <a href="https://khaytapp.com/privacy/">khaytapp.com/privacy</a>, in English and Arabic. It covers every Khayt app (Mac, iPhone, Windows and Linux) and Khayt Cloud.</p>
+      <p>That page is the only current version; the earlier copy that stood here is out of date.</p>
+      <p>Questions: <a href="mailto:support@khaytapp.com">support@khaytapp.com</a></p>
+    </section>
+    <section lang="ar" dir="rtl">
+      <h1>سياسة الخصوصية</h1>
+      <p>سياسة الخصوصية لخيط منشورة على <a href="https://khaytapp.com/privacy/?lang=ar">khaytapp.com/privacy</a> بالعربية والإنجليزية، وتشمل كل تطبيقات خيط (ماك والآيفون وويندوز ولينكس) وسحابة خيط.</p>
+      <p>تلك الصفحة هي النسخة الحالية الوحيدة، والنسخة السابقة التي كانت هنا قديمة.</p>
+      <p>للاستفسار: <a href="mailto:support@khaytapp.com">support@khaytapp.com</a></p>
+    </section>
   </div>
 </body>
 </html>

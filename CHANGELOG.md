@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **The repository's `privacy.html` now points to khaytapp.com/privacy.** The old page had fallen behind the published policy and contradicted it (it said nothing syncs to a Khayt cloud and that updates come only from GitHub). No app ships the file. It is now a short English and Arabic note naming khaytapp.com/privacy as the only current version.
+
 - **iPhone: the catalogue.** Home has a Catalogue row (also in the + menu)
   listing what the shop sells. Each product shows its picture, its price as
   the Mac shows it, and stock where you count it, grouped and searchable.
