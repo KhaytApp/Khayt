@@ -2694,7 +2694,7 @@ final class Words {
         "mac.vl_not_kept": ["en": "This Mac could not keep the link, so Copy Link will not be offered again later. Copy it now.", "ar": "لم يتمكن هذا الماك من حفظ الرابط، فلن يظهر «نسخ الرابط» لاحقًا. انسخه الآن."],
         "mac.vl_private_explain": ["en": "The part after # unlocks the files. It stays on this Mac and in the link you send; Khayt Cloud never receives it.", "ar": "الجزء الذي بعد علامة # هو مفتاح الملفات. يبقى على هذا الماك وفي الرابط الذي ترسله، ولا يصل إلى خيط السحابي أبدًا."],
         "mac.vl_err_not_allowed": ["en": "This sign-in cannot make or change share links.", "ar": "تسجيل الدخول هذا لا يسمح بإنشاء روابط المشاركة أو تعديلها."],
-        "mac.vl_err_vault_off": ["en": "Share links need the library to be stored in Khayt Vault.", "ar": "روابط المشاركة تتطلب أن تكون المكتبة محفوظة في خزنة خيط."],
+        "mac.vl_err_vault_off": ["en": "Share links need the library to be kept in your Khayt Vault.", "ar": "روابط المشاركة تتطلب أن تكون المكتبة محفوظة في خزنة خيط."],
         "mac.vl_err_missing": ["en": "{n} of these models have no copy in the vault yet. Back them up, then try again.", "ar": "{n} من هذه النماذج ليست لها نسخة في الخزنة بعد. انسخها احتياطيًا ثم حاول مرة أخرى."],
         "mac.vl_err_missing_n1": ["en": "One of these models has no copy in the vault yet. Back it up, then try again.", "ar": "أحد هذه النماذج ليست له نسخة في الخزنة بعد. انسخه احتياطيًا ثم حاول مرة أخرى."],
         "mac.vl_err_not_in_vault": ["en": "A file in this link is no longer in the vault.", "ar": "أحد الملفات في هذا الرابط لم يعد في الخزنة."],

@@ -262,7 +262,7 @@ struct VaultGrantRow: View {
             parts.append(words.callIt("mac.vl_device_" + (["phone", "tablet", "computer"].contains(d) ? d : "other")))
         }
         if let c = e.country, c.count == 2 {
-            parts.append(Locale(identifier: words.language).localizedString(forRegionCode: c) ?? c)
+            parts.append(words.locale.localizedString(forRegionCode: c) ?? c)
         }
         if let when = date(e.at) { parts.append(when) }
         return parts.joined(separator: " · ")
