@@ -47,12 +47,10 @@ struct VaultClientTests {
 
     /// Two full chunks and a short one: 8 MiB + 1000 bytes.
     static func bytes(_ n: Int = 2 * VaultCrypto.chunkBytes + 1000, seed: UInt8 = 1) -> Data {
-        var d = Data(count: n)
-        d.withUnsafeMutableBytes { p in
-            var x = UInt32(seed) &* 2654435761
-            for i in 0..<n { x = x &* 1664525 &+ 1013904223; p[i] = UInt8(truncatingIfNeeded: x >> 24) }
-        }
-        return d
+        var a = [UInt8](repeating: 0, count: n)
+        var x = UInt32(seed) &* 2654435761
+        for i in 0..<n { x = x &* 1664525 &+ 1013904223; a[i] = UInt8(truncatingIfNeeded: x >> 24) }
+        return Data(a)
     }
 
     final class Seen: @unchecked Sendable {
