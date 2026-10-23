@@ -253,3 +253,46 @@ struct FirstRun: View {
         .card(padding: 13)
     }
 }
+
+/// What the printers raised while nobody was looking, on the front door.
+///
+/// The poller records every alert it raises (`PrinterNotice.raised`), because
+/// a macOS banner is gone the moment it is swiped away. Only the classic
+/// dashboard drew that list; the Triage home, which is the one a shop opens on,
+/// did not, so "Snapmaker U1 ran out of filament" was a banner and a line on
+/// one card further down another screen, and nothing here.
+struct PrinterTrouble: View {
+    @Bindable var shop: Shop
+
+    var body: some View {
+        let notices = Array(shop.printers.notices.raised.prefix(3))
+        if !notices.isEmpty {
+            VStack(alignment: .leading, spacing: Space.md) {
+                SectionHead(title: shop.words.callIt("mac.printer_trouble"))
+                VStack(alignment: .leading, spacing: Space.sm) {
+                    ForEach(notices) { notice in
+                        HStack(alignment: .firstTextBaseline, spacing: Space.sm) {
+                            Image(systemName: notice.kind == "stall" ? "pause.circle" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(Khayt.attention)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(notice.title)
+                                    .font(TypeScale.body(13, weight: .semibold))
+                                    .foregroundStyle(Role.text)
+                                if !notice.body.isEmpty {
+                                    Text(verbatim: notice.body)
+                                        .font(TypeScale.body(11))
+                                        .foregroundStyle(Role.text2)
+                                        .lineLimit(1).truncationMode(.middle)
+                                }
+                            }
+                            Spacer(minLength: 12)
+                            Text(shop.words.say(notice.at, Date.FormatStyle(date: .omitted, time: .shortened)))
+                                .font(TypeScale.body(11)).monospacedDigit()
+                                .foregroundStyle(Role.text3)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -192,6 +192,9 @@ struct TriageContent: View {
                     TriageCard(card: card, shop: shop)
                 }
             }
+            // What the printers raised while nobody was looking. The poller
+            // records these, and only the classic dashboard drew them.
+            PrinterTrouble(shop: shop)
             HStack(alignment: .top, spacing: Space.xl) {
                 OnTheMachines(shop: shop).frame(maxWidth: .infinity)
                 TheShelf(shop: shop).frame(width: 300)
