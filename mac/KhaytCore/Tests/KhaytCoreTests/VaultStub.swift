@@ -51,6 +51,11 @@ final class VaultStub: @unchecked Sendable {
     /// a shop whose links Khayt turned off (403 links-disabled on a POST).
     var mailOff = false
     var linksDisabled = false
+    // Phase 3 (`VaultStub+Products.swift`).
+    var products: [String: Product] = [:]
+    var salesHooks: [String: String] = [:]
+    var noPublishing = false
+    var publishOff = false
     struct Logged { let method: String; let url: String; let body: Data; let headers: [String: String] }
 
     struct File { var fileId: String; var nextVersion = 1; var head: Int?; var meta: String?; var metaRev = 0
@@ -93,6 +98,9 @@ final class VaultStub: @unchecked Sendable {
         switch (m, parts.count, parts.first) {
         case ("GET", 1, "usage"): return usage(url)
         case (_, _, "grants"): return grantRoute(m, url, parts, r.httpBody ?? Data(), body)
+        case (_, _, "products"): return productRoute(m, url, parts, r.httpBody ?? Data(), body,
+                                                     contentType: r.value(forHTTPHeaderField: "Content-Type"))
+        case (_, _, "sales"): return salesRoute(m, url, parts, body)
         case ("POST", 1, "uploads"): return start(url, body)
         case ("GET", 3, "uploads") where parts[2] == "parts":
             guard let up = uploads[parts[1]] else { return reply(url, 404, ["error": "x", "reason": "unknown-upload"]) }

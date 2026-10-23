@@ -661,7 +661,11 @@ public struct VaultLinks: Sendable {
         }
     }
 
-    func prepare(_ s: Source) throws -> Prepared {
+    func prepare(_ s: Source) throws -> Prepared { try Self.prepare(s, keys: keys) }
+
+    /// The same for any holder of the shop's keys — a product's release
+    /// (`VaultProducts`) prepares its files exactly as a link does.
+    static func prepare(_ s: Source, keys: VaultKeys) throws -> Prepared {
         let row = s.row
         guard !row.purged, !row.trashed else { throw Failure.notShareable(fileId: row.fileId, why: "in the Trash") }
         guard let v = row.headVersion else { throw Failure.notShareable(fileId: row.fileId, why: "no current version") }
