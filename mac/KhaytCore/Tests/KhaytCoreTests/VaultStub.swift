@@ -34,6 +34,19 @@ final class VaultStub: @unchecked Sendable {
     var abandoned: [String] = []
     var seq = 0
 
+    // Phase 2: grants (`VaultStub+Grants.swift`). Every request is logged,
+    // so a test can prove what never went over the wire.
+    var requestLog: [Logged] = []
+    var grants: [String: Grant] = [:]
+    /// Ids another shop holds: a POST naming one gets 409 grant-exists.
+    var takenGrantIds: Set<String> = []
+    var grantPosts = 0
+    var grantPatches = 0
+    /// Fail the PATCH with this 1-based number (a later batch dying).
+    var failPatchNumber: Int?
+    var maxActiveLinks = 100
+    struct Logged { let method: String; let url: String; let body: Data; let headers: [String: String] }
+
     struct File { var fileId: String; var nextVersion = 1; var head: Int?; var meta: String?; var metaRev = 0
                   var trashedAt: String?; var rev = 0; var purged = false }
     struct Version { var fileId: String; var version: Int; var uploadId: String; var bytes: Int; var chunks: Int
@@ -57,7 +70,11 @@ final class VaultStub: @unchecked Sendable {
     func handle(_ r: URLRequest) throws -> (Data, URLResponse) {
         lock.lock(); defer { lock.unlock() }
         let url = r.url!
+        requestLog.append(Logged(method: r.httpMethod ?? "GET", url: url.absoluteString, body: r.httpBody ?? Data(),
+                                 headers: r.allHTTPHeaderFields ?? [:]))
         if url.host == "store.test" { return try object(r) }
+        // The public link route: no shop token, as a browser calls it.
+        if url.path.hasPrefix("/v1/s/") { return publicGrant(url) }
         guard r.value(forHTTPHeaderField: "Authorization") == "Bearer " + Self.token else { return reply(url, 401, ["error": "no"]) }
         guard r.value(forHTTPHeaderField: "x-delta-capable") == "1" else { return reply(url, 400, ["error": "header"]) }
         let prefix = "/v1/shops/\(Self.shopId)/vault/"
@@ -69,6 +86,7 @@ final class VaultStub: @unchecked Sendable {
         let m = r.httpMethod ?? "GET"
         switch (m, parts.count, parts.first) {
         case ("GET", 1, "usage"): return usage(url)
+        case (_, _, "grants"): return grantRoute(m, url, parts, r.httpBody ?? Data(), body)
         case ("POST", 1, "uploads"): return start(url, body)
         case ("GET", 3, "uploads") where parts[2] == "parts":
             guard let up = uploads[parts[1]] else { return reply(url, 404, ["error": "x", "reason": "unknown-upload"]) }

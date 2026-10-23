@@ -1,8 +1,8 @@
 import Foundation
 
 /// The Khayt Vault routes of Khayt Cloud, typed: `docs/api-contract.md`
-/// "Vault" in khayt-cloud, phase 1 (storage and sync). Phase 2 (links) is not
-/// here yet.
+/// "Vault" in khayt-cloud, phase 1 (storage and sync). Phase 2's grant
+/// routes (private share links) are in `VaultLinks.swift`.
 ///
 /// Every route goes through `CloudReader.request`, so the vault sends the same
 /// `x-delta-capable` header as every other request this app makes (see the
@@ -71,6 +71,16 @@ public struct VaultClient: Sendable {
         case badReply(String)
         /// A presigned PUT or GET that object storage refused.
         case transfer(method: String, index: Int, status: Int)
+        /// 409 grant-exists: some shop already used this grantId. Pick another.
+        case grantExists
+        /// 402 links-full: the plan's active links are used up.
+        case linksFull(limit: Int)
+        /// 402 no-links: the plan has no share links (Free).
+        case noLinks
+        /// 422 unknown-items: these files are not live, committed files here.
+        case unknownItems([String])
+        /// 422 downloads-cap: this plan caps a link's downloads at `limit`.
+        case downloadsCap(limit: Int)
 
         public var description: String {
             switch self {
@@ -92,6 +102,11 @@ public struct VaultClient: Sendable {
             case .http(let code, let why): return "Khayt Cloud answered \(code)\(why.isEmpty ? "" : ": " + why)."
             case .badReply(let why): return "Khayt Cloud's reply could not be read (\(why))."
             case .transfer(let m, let i, let s): return "Storage refused \(m) of part \(i) (\(s))."
+            case .grantExists: return "That link id is taken already."
+            case .linksFull(let limit): return "This plan's share links are all in use (\(limit))."
+            case .noLinks: return "This shop's plan has no share links."
+            case .unknownItems(let ids): return "\(ids.count) file(s) are no longer in the vault."
+            case .downloadsCap(let limit): return "This plan allows at most \(limit) downloads per link."
             }
         }
     }
@@ -354,13 +369,13 @@ public struct VaultClient: Sendable {
         }
     }
 
-    private func int(_ v: Any?) -> Int? {
+    func int(_ v: Any?) -> Int? {
         guard let n = v as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID() else { return nil }
         let d = n.doubleValue
         return d.rounded() == d ? Int(d) : nil
     }
 
-    private func call(_ method: String, _ tail: String, body: [String: Any]?, expect: Set<Int>) async throws -> [String: Any] {
+    func call(_ method: String, _ tail: String, body: [String: Any]?, expect: Set<Int>) async throws -> [String: Any] {
         let (data, _) = try await raw(method, tail, body: body, expect: expect)
         guard let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             throw Failure.badReply(method + " " + tail)
@@ -368,7 +383,7 @@ public struct VaultClient: Sendable {
         return o
     }
 
-    private func raw(_ method: String, _ tail: String, body: [String: Any]?, expect: Set<Int>) async throws -> (Data, Int) {
+    func raw(_ method: String, _ tail: String, body: [String: Any]?, expect: Set<Int>) async throws -> (Data, Int) {
         var request = try CloudReader.request(connection, token: token, method: method, tail: tail)
         if let body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -390,6 +405,11 @@ public struct VaultClient: Sendable {
         case (402, "vault-full"): return .vaultFull(used: n("used"), limit: n("limit"))
         case (402, "no-vault"): return .noVault
         case (402, "read-only"): return .readOnly
+        case (402, "links-full"): return .linksFull(limit: n("limit"))
+        case (402, "no-links"): return .noLinks
+        case (409, "grant-exists"): return .grantExists
+        case (422, "unknown-items"): return .unknownItems((o["fileIds"] as? [String]) ?? [])
+        case (422, "downloads-cap"): return .downloadsCap(limit: n("limit"))
         case (413, _): return .fileTooLarge(limit: n("limit"))
         case (409, "duplicate"):
             return .duplicate(fileId: (o["fileId"] as? String) ?? "", version: n("version"))
