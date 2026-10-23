@@ -46,6 +46,7 @@ enum CloudLibrary {
         var tier: JSONValue
         var tierEnabled: Bool
         var isDrive: Bool { if case .drive = remote { true } else { false } }
+        var isVault: Bool { if case .vault = remote { true } else { false } }
     }
 
     /// The bucket when it is switched on, else Google Drive when that is,
@@ -53,7 +54,15 @@ enum CloudLibrary {
     /// still be brought back) — `printLibRemote()` in the other app, which
     /// prefers the bucket when both are on. The order is `pick`, shared with
     /// `remoteInUse` so the settings pane and the library cannot disagree.
-    static func config(settings: [String: JSONValue], build: StoreReader.Build?) async -> Config? {
+    ///
+    /// THE VAULT is chosen in the book (`printLibrary.vault.enabled`) but
+    /// opened by the shop: it needs the cloud's data key, which only an
+    /// unlocked shop holds (`Shop.cloudDek`), so the caller passes it already
+    /// built (`Shop.vaultRemote`). Nil while the cloud is locked — the
+    /// library then has no remote to use, as with a secret sealed on another
+    /// Mac, and nothing is uploaded anywhere else instead.
+    static func config(settings: [String: JSONValue], build: StoreReader.Build?,
+                       vault: VaultRemote? = nil) async -> Config? {
         guard case .object(let library)? = settings["printLibrary"] else { return nil }
         let tier = library["tier"] ?? .object([:])
         var tierOn = false
@@ -61,7 +70,13 @@ enum CloudLibrary {
 
         let bucket = await libraryBucket(settings: settings, build: build)
         let drive = await libraryDrive(settings: settings, build: build)
-        switch pick(library, bucketUsable: bucket != nil, driveUsable: drive != nil) {
+        switch pick(library, bucketUsable: bucket != nil, driveUsable: drive != nil,
+                    vaultUsable: vaultConnected(settings)) {
+        case .vault:
+            guard let vault else { return nil }
+            // No prefix: a vault key is opaque and the vault is the shop's own.
+            return Config(remote: .vault(vault), prefix: "", backsUp: vaultBacksUp(section(library, "vault")),
+                          provider: "vault", tier: tier, tierEnabled: tierOn)
         case .bucket:
             guard let c = bucket else { return nil }
             return Config(remote: .bucket(c), prefix: c.prefix, backsUp: bucketBacksUp(section(library, "s3")),
@@ -155,7 +170,7 @@ enum CloudLibrary {
     /// book had NO `s3` block at all. So a shop with only Google Drive, just
     /// connected, was shown "A storage bucket": the missing bucket counted as
     /// a bucket that was backing up. Reported on alpha.54.
-    enum Remote: Equatable, Sendable { case none, drive, bucket }
+    enum Remote: Equatable, Sendable { case none, drive, bucket, vault }
 
     /// THE order, for `config` and `remoteInUse` alike: a bucket switched on,
     /// else Drive switched on, else a bucket kept but switched off. "Usable"
@@ -165,7 +180,13 @@ enum CloudLibrary {
     /// `enabled` is WHICH REMOTE, never whether new models are copied: that is
     /// `backUpNew` on each (see `bucketBacksUp`). Once it meant both, and
     /// turning the bucket's copy off switched the library to Google Drive.
-    static func pick(_ library: [String: JSONValue], bucketUsable: Bool, driveUsable: Bool) -> Remote {
+    ///
+    /// The vault comes FIRST when it is switched on: choosing it switches the
+    /// others off (`choose`), so a book where it is on and another is too was
+    /// written by something older than this, and the vault is the newer choice.
+    static func pick(_ library: [String: JSONValue], bucketUsable: Bool, driveUsable: Bool,
+                     vaultUsable: Bool = false) -> Remote {
+        if vaultUsable, on(section(library, "vault")) { return .vault }
         if bucketUsable, on(section(library, "s3")) { return .bucket }
         if driveUsable, on(section(library, "gdrive")) { return .drive }
         return bucketUsable ? .bucket : .none
@@ -180,7 +201,25 @@ enum CloudLibrary {
         let s3 = section(library, "s3"), gd = section(library, "gdrive")
         let bucketStored = ["endpoint", "bucket", "accessKeyId", "secretAccessKey"].allSatisfy { !text(s3, $0).isEmpty }
         let driveStored = !text(gd, "clientId").isEmpty && !text(gd, "refreshToken").isEmpty
-        return pick(library, bucketUsable: bucketStored, driveUsable: driveStored)
+        return pick(library, bucketUsable: bucketStored, driveUsable: driveStored,
+                    vaultUsable: vaultConnected(settings))
+    }
+
+    /// The vault can be the library's remote only on a book signed in to
+    /// Khayt Cloud: it is the shop's own space there.
+    static func vaultConnected(_ settings: [String: JSONValue]) -> Bool { Shop.cloudConnected(settings) }
+
+    /// The shop the vault belongs to, from the book's cloud sign-in.
+    static func vaultShopId(_ settings: [String: JSONValue]) -> String? {
+        guard case .object(let cloud)? = settings["cloud"] else { return nil }
+        let id = text(cloud, "shopId")
+        return id.isEmpty ? nil : id
+    }
+
+    /// New models are copied to the vault unless the shop said not to.
+    static func vaultBacksUp(_ v: [String: JSONValue]) -> Bool {
+        if case .bool(false)? = v["backUpNew"] { return false }
+        return true
     }
 
     /// WHICH remote a backup was proved on, as a string an index can keep and
@@ -191,6 +230,7 @@ enum CloudLibrary {
     static func remoteIdentity(_ settings: [String: JSONValue]) -> String? {
         guard case .object(let library)? = settings["printLibrary"] else { return nil }
         let s3 = section(library, "s3")
+        if remoteInUse(settings) == .vault, let shopId = vaultShopId(settings) { return vaultIdentityPrefix + shopId }
         guard remoteInUse(settings) == .bucket else { return nil }
         return bucketIdentity(endpoint: text(s3, "endpoint"), bucket: text(s3, "bucket"), prefix: text(s3, "prefix"))
     }
@@ -238,7 +278,7 @@ enum CloudLibrary {
         guard case .object(let library)? = settings["printLibrary"] else { return .none }
         let bucket = await libraryBucket(settings: settings, build: build) != nil
         let drive = await libraryDrive(settings: settings, build: build) != nil
-        return pick(library, bucketUsable: bucket, driveUsable: drive)
+        return pick(library, bucketUsable: bucket, driveUsable: drive, vaultUsable: vaultConnected(settings))
     }
 
     /// A Google account is signed in on this book: a refresh token is kept.
@@ -291,21 +331,29 @@ enum CloudLibrary {
     /// switch was only ever `enabled` has it written down as `backUpNew`
     /// before `enabled` is taken for the choice.
     static func choose(_ remote: Remote, in library: inout [String: JSONValue]) {
-        var s3 = section(library, "s3"), gd = section(library, "gdrive")
+        var s3 = section(library, "s3"), gd = section(library, "gdrive"), vault = section(library, "vault")
         let bucketExisted = ["endpoint", "bucket", "accessKeyId"].contains { !text(s3, $0).isEmpty }
         if bucketExisted, s3["backUpNew"] == nil { s3["backUpNew"] = .bool(on(s3)) }
         switch remote {
         case .bucket:
             s3["enabled"] = .bool(true)
             if !gd.isEmpty { gd["enabled"] = .bool(false) }
+            if !vault.isEmpty { vault["enabled"] = .bool(false) }
         case .drive:
             gd["enabled"] = .bool(true)
             if !s3.isEmpty { s3["enabled"] = .bool(false) }
+            if !vault.isEmpty { vault["enabled"] = .bool(false) }
+        case .vault:
+            vault["enabled"] = .bool(true)
+            if !s3.isEmpty { s3["enabled"] = .bool(false) }
+            if !gd.isEmpty { gd["enabled"] = .bool(false) }
         case .none:
-            break
+            // Leaving the vault: nothing else is switched on in its place.
+            if !vault.isEmpty { vault["enabled"] = .bool(false) }
         }
         if !s3.isEmpty { library["s3"] = .object(s3) }
         if !gd.isEmpty { library["gdrive"] = .object(gd) }
+        if !vault.isEmpty { library["vault"] = .object(vault) }
     }
 
     /// Who is signed in to Drive and how full it is, said for the status card.
@@ -331,6 +379,7 @@ enum CloudLibrary {
         guard case .object(let library)? = settings["printLibrary"] else { return o }
         switch using ?? remoteInUse(settings) {
         case .bucket: o.backsUp = bucketBacksUp(section(library, "s3"))
+        case .vault: o.backsUp = vaultBacksUp(section(library, "vault"))
         case .drive, .none: o.backsUp = driveBacksUp(section(library, "gdrive"))
         }
         let t = section(library, "tier")
@@ -374,6 +423,8 @@ enum CloudLibrary {
         if case .object(let l)? = settings["printLibrary"] { library = l }
         if using == .bucket {
             var s3 = section(library, "s3"); s3["backUpNew"] = .bool(o.backsUp); library["s3"] = .object(s3)
+        } else if using == .vault {
+            var v = section(library, "vault"); v["backUpNew"] = .bool(o.backsUp); library["vault"] = .object(v)
         } else {
             var gd = section(library, "gdrive"); gd["backUpNew"] = .bool(o.backsUp); library["gdrive"] = .object(gd)
         }
@@ -601,14 +652,20 @@ enum CloudLibrary {
     nonisolated static func route(provider: String?) -> Remote? {
         let p = (provider ?? "").trimmingCharacters(in: .whitespaces)
         if p.isEmpty { return nil }
+        if p == "vault" { return .vault }
         return p == "gdrive" ? .drive : .bucket
     }
 
     /// The remotes to ask for a moved model, in order: the one its sidecar
     /// names (else the one in use), then the other.
     nonisolated static func remoteOrder(provider: String?, current: Remote) -> [Remote] {
-        let first = route(provider: provider) ?? (current == .drive ? .drive : .bucket)
-        return first == .drive ? [.drive, .bucket] : [.bucket, .drive]
+        let first = route(provider: provider) ?? (current == .drive ? .drive : current == .vault ? .vault : .bucket)
+        // The vault is asked only for a model that went there, or while it is
+        // the remote in use: a book that never chose it has none to ask.
+        if first == .vault { return [.vault, .bucket, .drive] }
+        var order: [Remote] = first == .drive ? [.drive, .bucket] : [.bucket, .drive]
+        if current == .vault { order.append(.vault) }
+        return order
     }
 
     /// How many moved models switching to `target` would leave on the OTHER
@@ -762,7 +819,8 @@ extension Shop {
 
     /// The bucket, opened for one use. Nil when none is set up.
     func cloudConfig() async -> CloudLibrary.Config? {
-        await CloudLibrary.config(settings: settingsDict, build: source.build)
+        let vault = CloudLibrary.remoteInUse(settingsDict) == .vault ? await vaultRemote() : nil
+        return await CloudLibrary.config(settings: settingsDict, build: source.build, vault: vault)
     }
 
     /// Is this model's file in the cloud rather than on this Mac?
@@ -1033,6 +1091,8 @@ extension Shop {
                 if let d = await CloudLibrary.libraryDrive(settings: settings, build: build) {
                     out.append(.drive(DriveClient(d.config, fetch: CloudLibrary.fetch, download: CloudLibrary.download)))
                 }
+            case .vault:
+                if let v = await vaultRemote() { out.append(.vault(v)) }
             case .none: break
             }
         }
