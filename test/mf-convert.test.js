@@ -447,7 +447,7 @@ test('Snapmaker Orca 2.4: Bambu 2.x nozzle flow spelling and out-of-range values
   const proj = JSON.stringify({
     printer_model: 'X1C', nozzle_diameter: ['0.4'],
     filament_colour: ['#FF0000', '#00FF00'], filament_type: ['PLA', 'PLA'],
-    nozzle_volume_type: ['Standard'],
+    nozzle_volume_type: ['Standard', 'High Flow'],
     wall_filament: '0', sparse_infill_filament: '0', solid_infill_filament: '0', support_filament: '0',
     tree_support_wall_count: '-1', raft_first_layer_expansion: '-1',
   });
@@ -458,7 +458,8 @@ test('Snapmaker Orca 2.4: Bambu 2.x nozzle flow spelling and out-of-range values
   const r = convert(src, { targetId: 'snapmaker-u1' });
   assert.equal(r.ok, true);
   const out = JSON.parse(openZip(r.buffer).file('Metadata/project_settings.config').toString('utf8'));
-  assert.deepEqual(out.nozzle_volume_type, ['standard']);
+  // The source's hot end says nothing about the U1's: every entry is a new U1 project's `standard`.
+  assert.deepEqual(out.nozzle_volume_type, ['standard', 'standard']);
   assert.equal(out.wall_filament, '1');
   assert.equal(out.sparse_infill_filament, '1');
   assert.equal(out.solid_infill_filament, '1');

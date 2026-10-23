@@ -1985,9 +1985,11 @@
   // `standard` / `high_flow`. Bambu Studio 2.x writes `Standard` / `High Flow` (and `Hybrid`,
   // `TPU High Flow` on its own hot ends), which 2.4 "replaces" with nothing and warns about on
   // every open. Checked against Snapmaker Orca 2.4.0's binary and its own saved U1 projects.
-  // Only for Snapmaker Orca: mainline Orca keeps Bambu's spelling.
+  // Every entry becomes `standard`, what a new U1 project has: the source printer's hot end
+  // says nothing about the U1's, and `high_flow` would switch the U1 to its high-flow process
+  // values. Only for Snapmaker Orca: mainline Orca keeps Bambu's spelling.
   const SNAPMAKER_ORCA_VALUE_REMAP = {
-    nozzle_volume_type: { Standard: 'standard', 'High Flow': 'high_flow', Hybrid: 'standard', 'TPU High Flow': 'high_flow' },
+    nozzle_volume_type: { Standard: 'standard', 'High Flow': 'standard', Hybrid: 'standard', 'TPU High Flow': 'standard', high_flow: 'standard' },
   };
 
   // Bambu Studio 2.x writes values below Orca's ranges: `0` for "the object's own filament"
