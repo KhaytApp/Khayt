@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import KhaytCore
 
 /// A made-up print shop, so the app can be tried without one.
@@ -51,6 +52,23 @@ enum SampleShop {
                 "shopName": .string(label), "bizEn": .string(label), "bizAr": .string("ورشة الطباعة التجريبية"),
                 "currency": .string("USD"),
                 "enableVat": .bool(false), "language": .string("en"),
+                // Counted stock for two of the catalogue; the rest is not stocked.
+                "storefront": .object(["stockQty": .object(["PROD-S1": .number(6), "PROD-S2": .number(0)])]),
+            ]),
+            // The catalogue: one with a picture, a rounded price, an override,
+            // one never stocked — so every line of the screen is drawn.
+            "products": .array([
+                product("PROD-S1", "Desk lamp shade", "غطاء مصباح مكتب", group: "Home", base: 38.4,
+                        extra: ["priceRound": .object(["step": .number(5), "mode": .string("up")]),
+                                "thumbnail": .string(samplePicture(hue: 0.08))],
+                        part: (hours: 6.5, grams: 180, material: "PLA")),
+                product("PROD-S2", "Cable organiser (set of 4)", "منظم كابلات (٤ قطع)", group: "Office", base: 12,
+                        extra: ["thumbnail": .string(samplePicture(hue: 0.55))],
+                        part: (hours: 1.8, grams: 42, material: "PETG")),
+                product("PROD-S3", "Custom name plate", "لوحة اسم مخصصة", group: "Gifts", base: 21.6,
+                        extra: ["priceOverride": .number(25)], part: (hours: 2.4, grams: 55, material: "PLA")),
+                product("PROD-S4", "Replacement knob", "مقبض بديل", group: "Parts", base: 6.5,
+                        extra: [:], part: (hours: 0.6, grams: 9, material: "PETG")),
             ]),
             "machines": .array([
                 .object(["id": .string(x1c.0), "name": .string(x1c.1), "type": .string("fdm"),
@@ -124,6 +142,31 @@ enum SampleShop {
     }
 
     /// Every collection held whole — the sample is the entire shop.
+    private static func product(_ id: String, _ en: String, _ ar: String, group: String, base: Double,
+                                extra: [String: JSONValue], part: (hours: Double, grams: Double, material: String)) -> JSONValue {
+        var o: [String: JSONValue] = [
+            "id": .string(id), "nameEn": .string(en), "nameAr": .string(ar), "group": .string(group),
+            "basePrice": .number(base), "baseCost": .number((base / 1.3 * 100).rounded() / 100),
+            "parts": .array([.object(["qty": .number(1), "printTime": .number(part.hours),
+                                      "printWeight": .number(part.grams), "material": .string(part.material)])]),
+        ]
+        for (k, v) in extra { o[k] = v }
+        return .object(o)
+    }
+
+    /// A small made-up picture, as a product record carries one.
+    private static func samplePicture(hue: CGFloat) -> String {
+        let r = UIGraphicsImageRenderer(size: CGSize(width: 120, height: 120), format: {
+            let f = UIGraphicsImageRendererFormat(); f.scale = 1; return f }())
+        let data = r.jpegData(withCompressionQuality: 0.7) { ctx in
+            UIColor(hue: hue, saturation: 0.45, brightness: 0.9, alpha: 1).setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 120, height: 120))
+            UIColor(hue: hue, saturation: 0.7, brightness: 0.55, alpha: 1).setFill()
+            ctx.cgContext.fillEllipse(in: CGRect(x: 30, y: 30, width: 60, height: 60))
+        }
+        return "data:image/jpeg;base64," + data.base64EncodedString()
+    }
+
     static func scope(now: Date = Date()) -> BookScope.Taken {
         let store = book(now: now)
         var held: [String: BookScope.Taken.Held] = [:]
