@@ -171,6 +171,7 @@ wrapKey(kek, key, aad) = sealN(kek, key, aad)                    (12 + 32 + 16 =
 |---|---|---|
 | shop's copy of a file's DK | `vaultKey` | `utf8("khayt-vault-dk|" + fileId + "|" + uploadId)` |
 | a link grant's copy of a DK | `linkKey` | `utf8("khayt-link-dk|" + grantId + "|" + fileId + "|" + uploadId)` |
+| a released file's DK (phase 3b) | `productKey` | `utf8("khayt-product-dk|" + productId + "|" + fileId + "|" + uploadId)` |
 
 ## Shop meta record
 
@@ -254,6 +255,37 @@ reverse, fails.
 The share page's full path: `linkKey` → `decryptLinkMeta` → `unwrapDkForGrant(…, linkMeta.uploadId)` →
 `createReader(DK, fileId, linkMeta.uploadId, linkMeta.manifest, linkMeta.manifestHash,
 {chunkBytes: linkMeta.manifest.chunkBytes})` → push each chunk as it arrives → `finish()`.
+
+## Published files (phase 3b)
+
+```
+productKey  = 32 random bytes, fresh on EVERY release (newProductKey)
+productDk   = wrapKey(productKey, DK, utf8("khayt-product-dk|" + productId + "|" + fileId + "|" + uploadId))
+productMeta = sealN(productKey, utf8(json), utf8("khayt-product-meta|" + productId + "|" + fileId + "|" + uploadId))
+json        = the link meta record above, byte for byte, with json.uploadId == uploadId
+```
+
+A file a creator **sells** is readable by Khayt Cloud, and only that file. The reason is
+that a buyer who pays at night must get the file while the creator's Mac is asleep. Private
+vault files are never wrapped under a product key.
+
+- **Release.** The Mac makes a fresh `productKey` and sends it together with `productDk`
+  and `productMeta` for **every** file in the product. A release is the complete set, and
+  the cloud swaps the key and the items in one step. The Mac keeps nothing about a product:
+  no product key in the Keychain and none in the book.
+- **The cloud.** It seals `productKey` under its own server key, with AAD
+  `"khayt-product-pk|" + shopId + "|" + productId`. On a sale it unwraps, then makes an
+  ordinary link grant locked to the buyer's email, with no password:
+  `newGrantId`, `newLinkSecret`, `deriveLinkKey(secret, grantId, null)`, `wrapDkForGrant`,
+  and `encryptLinkMeta` of the decrypted record. The buyer's page is the share page,
+  unchanged.
+- **Binding.** Both AADs name the product, the file and the upload. A v1 wrap is never
+  served as v2, a wrap made for one product never opens for another, and neither label can
+  be read as a link's or the shop's.
+- **What the cloud can read, and for how long.** DKs are fresh per upload. A released
+  version therefore stays readable by the cloud while it is stored and either still on
+  sale or reachable through a buyer's link. Stopping a sale protects only the versions
+  that come after it.
 
 ## Encoding on the wire
 

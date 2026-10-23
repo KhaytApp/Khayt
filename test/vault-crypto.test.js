@@ -388,3 +388,55 @@ test('random paths: fresh data keys and nonces differ, and round-trip', async ()
   assert.deepEqual(V.unb64url(V.b64url(s)), s);
   assert.doesNotMatch(V.b64url(s), /[+/=]/);
 });
+
+// ── published files (phase 3b) ─────────────────────────────────────────
+
+test('a released file: DK under the product key, byte for byte, bound to product, file and upload', async () => {
+  const pk = H(inputs.productKey);
+  const w = await V.wrapDkForProduct(pk, dk, inputs.productId, fileId, uploadId, { _nonce: H(inputs.productWrapNonce) });
+  assert.equal(hx(w), vec.wraps.product.wrapped);
+  assert.deepEqual(await V.unwrapDkForProduct(pk, w, inputs.productId, fileId, uploadId), dk);
+  await rejects(V.unwrapDkForProduct(pk, w, 'p_other', fileId, uploadId), 'another product');
+  await rejects(V.unwrapDkForProduct(pk, w, inputs.productId, 'f_other', uploadId), 'another file');
+  await rejects(V.unwrapDkForProduct(pk, w, inputs.productId, fileId, 'u_other'), 'another version');
+  await rejects(V.unwrapDkForProduct(V.newProductKey(), w, inputs.productId, fileId, uploadId), 'another key');
+  // Never mistaken for a link's wrap or the shop's: same bytes, other labels.
+  await rejects(V.unwrapDkForGrant(pk, w, inputs.productId, fileId, uploadId), 'as a grant wrap');
+  await rejects(V.unwrapDkForShop(pk, w, fileId, uploadId), 'as the shop wrap');
+  await rejects(V.unwrapDkForProduct(H(vec.derived.linkKeyNoPassword), H(vec.wraps.grantNoPassword.wrapped),
+    grantId, fileId, uploadId), 'a grant wrap as a product wrap');
+  await assert.rejects(V.wrapDkForProduct(pk, dk, 'p|x', fileId, uploadId), /productId/);
+  await assert.rejects(V.wrapDkForProduct(new Uint8Array(16), dk, inputs.productId, fileId, uploadId), /product key/);
+});
+
+test('a released file: the share-page record under the product key, then a buyer link from it', async () => {
+  const pk = H(inputs.productKey);
+  const want = JSON.parse(vec.productMeta.json);
+  const sealed = await V.encryptProductMeta(pk, inputs.productId, fileId, uploadId, want, { _nonce: H(inputs.productMetaNonce) });
+  assert.equal(hx(sealed), vec.productMeta.sealed);
+  // The exact string seals to the same bytes.
+  assert.equal(hx(await V.encryptProductMeta(pk, inputs.productId, fileId, uploadId, vec.productMeta.json,
+    { _nonce: H(inputs.productMetaNonce) })), vec.productMeta.sealed);
+  const got = await V.decryptProductMeta(pk, inputs.productId, fileId, uploadId, sealed);
+  assert.deepEqual(got, want);
+  await rejects(V.decryptProductMeta(pk, 'p_other', fileId, uploadId, sealed));
+  await rejects(V.decryptProductMeta(pk, inputs.productId, fileId, 'u_other', sealed));
+  // Not a link record: the labels differ.
+  await rejects(V.decryptLinkMeta(pk, inputs.productId, fileId, sealed));
+  // The record must name the upload its AAD names.
+  await assert.rejects(V.encryptProductMeta(pk, inputs.productId, fileId, 'u_other', want), /uploadId does not match/);
+  const swapped = { ...want, manifest: { ...want.manifest, chunks: [...want.manifest.chunks].reverse() } };
+  await assert.rejects(V.encryptProductMeta(pk, inputs.productId, fileId, uploadId, swapped), /does not match manifestHash/);
+
+  // What the cloud does on a sale: unwrap under PK, make an ordinary
+  // phase-2 grant, and the buyer's page opens the file exactly as a share
+  // link's would — here, the shared vectors' own grant.
+  const pdk = await V.unwrapDkForProduct(pk, H(vec.wraps.product.wrapped), inputs.productId, fileId, uploadId);
+  const lk = await V.deriveLinkKey(H(inputs.linkSecret), grantId, null);
+  const gw = await V.wrapDkForGrant(lk, pdk, grantId, fileId, uploadId, { _nonce: H(inputs.grantWrapNonce) });
+  assert.equal(hx(gw), vec.wraps.grantNoPassword.wrapped);
+  const lm = await V.encryptLinkMeta(lk, grantId, fileId, got, { _nonce: H(inputs.linkMetaNonce) });
+  assert.equal(hx(lm), vec.linkMeta.sealedNoPassword);
+  assert.equal(V.newProductKey().length, 32);
+  assert.notDeepEqual(V.newProductKey(), V.newProductKey());
+});

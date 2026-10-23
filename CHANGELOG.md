@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Vault: the keys for selling a file (format only, nothing uses it yet).** `lib/vault-crypto.js` and its Swift twin gain a product key. On release, the Mac makes a fresh one, wraps each released version's file key under it and seals that version's share-page record under it. Each wrap names the product, the file and the version. This is what will let Khayt Cloud deliver a file someone has paid for while the creator's Mac is asleep. It applies only to files the creator chooses to sell; private vault files stay end to end. The format is in docs/vault-format.md, and node:crypto vectors pin both twins.
+
 - **Mac: share links for only the people you name, and links Khayt has turned off (built, still dark).**
   - The Share sheet has a new "Only these people" list. Type or paste email
     addresses, up to 50. Each person then has to enter a code that is emailed
