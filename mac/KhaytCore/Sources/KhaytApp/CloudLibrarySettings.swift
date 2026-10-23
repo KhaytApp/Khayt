@@ -99,6 +99,11 @@ struct CloudLibrarySettings: View {
     @State private var summary: (count: Int, size: String, inCloud: Int)?
     /// What "Free up space now" would move, held while the shop confirms it.
     @State private var freeUp: Shop.FreeUpPreview?
+    /// What the cloud says about the shop's vault — nil until asked. The
+    /// vault is offered only once it has answered `.ready`.
+    @State private var vault: Shop.VaultAvailability?
+    @State private var vaultUsage: (used: String, limit: String, fraction: Double)?
+    @State private var confirmLeavingVault = false
 
     /// Read from the book on the first frame, not in `.task`: the screen must
     /// not open on the wrong state and then jump. `status` is for pictures of
@@ -122,7 +127,7 @@ struct CloudLibrarySettings: View {
     private var waiting: Bool { connecting || shop.googleSignInURL != nil }
     /// The options apply to whatever the library is using, and are shown
     /// only while that is the one on screen.
-    private var ready: Bool { showsBucket ? remote == .bucket : remote == .drive }
+    private var ready: Bool { remote == .vault || (showsBucket ? remote == .bucket : remote == .drive) }
     /// A picture is taken of the sample shop, which cannot be written; its
     /// buttons are drawn as a real shop sees them rather than greyed.
     @Environment(\.photographFlat) private var photographing
@@ -134,11 +139,14 @@ struct CloudLibrarySettings: View {
     var body: some View {
         Group {
             Section(shop.words.callIt("mac.cloudlib_title")) {
-                if showsBucket { bucketBlock } else { driveBlock }
+                if remote == .vault { vaultCard } else if showsBucket { bucketBlock } else { driveBlock }
                 feedback
                 DisclosureGroup(shop.words.callIt("mac.cloudlib_advanced"), isExpanded: $advanced) {
                     advancedBlock
                 }
+            }
+            if remote != .vault, case .ready? = vault {
+                Section(shop.words.callIt("mac.vault_title")) { vaultOffer }
             }
             if ready {
                 Section(shop.words.callIt("mac.cloudlib_options")) { optionsBlock }
@@ -147,6 +155,78 @@ struct CloudLibrarySettings: View {
         .task(id: shop.settingsValue) { reload(); await refresh() }
         .task { providers = (try? await shop.engine?.storageProviders()) ?? [] }
         .onChange(of: draft.provider) { Task { await resolve() } }
+    }
+
+    // MARK: - The Khayt Vault
+
+    /// In use: what it is, how full, and the way out.
+    private var vaultCard: some View {
+        HStack(alignment: .top, spacing: Space.md) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(Khayt.done)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: Space.sm) {
+                Text(shop.words.callIt("mac.vault_in_use")).font(TypeScale.title())
+                Text(shop.words.callIt("mac.vault_in_use_why"))
+                    .font(TypeScale.body()).foregroundStyle(Role.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if shop.cloudDek == nil {
+                    // Chosen, and this Mac cannot open it: nothing is copied
+                    // anywhere until the cloud is unlocked here.
+                    Label(shop.words.callIt("mac.vault_locked"), systemImage: "lock")
+                        .font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let u = vaultUsage {
+                    VStack(alignment: .leading, spacing: Space.xs) {
+                        usageBar(u.fraction)
+                        Text(shop.words.callIt("mac.gdrive_usage_of", ["used": .string(Self.isolated(u.used)),
+                                                                       "limit": .string(Self.isolated(u.limit))]))
+                            .font(.caption).foregroundStyle(Role.text2)
+                    }
+                }
+                if lockedByBook { BookLockedNote(shop: shop) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button(shop.words.callIt("mac.vault_stop") + "\u{2026}") { confirmLeavingVault = true }
+                .disabled(locked)
+        }
+        .padding(.vertical, Space.xs)
+        .confirmationDialog(shop.words.callIt("mac.vault_stop_title"), isPresented: $confirmLeavingVault) {
+            Button(shop.words.callIt("mac.vault_stop")) {
+                Task { await shop.useVault(false); reload(reset: true); await refresh() }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(shop.words.callIt("mac.vault_stop_body"))
+        }
+    }
+
+    /// Offered, when the cloud has a vault for this shop and the library
+    /// keeps its copy somewhere else (or nowhere).
+    private var vaultOffer: some View {
+        HStack(alignment: .top, spacing: Space.md) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 22, weight: .regular))
+                .foregroundStyle(Khayt.brand)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: Space.sm) {
+                Text(shop.words.callIt("mac.vault_pitch"))
+                    .font(TypeScale.body()).foregroundStyle(Role.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if remote != .none {
+                    Text(shop.words.callIt("mac.vault_switch_note"))
+                        .font(.caption).foregroundStyle(Role.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button(shop.words.callIt("mac.vault_use")) {
+                    Task { await shop.useVault(true); reload(reset: true); await refresh() }
+                }
+                .disabled(locked)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, Space.xs)
     }
 
     // MARK: - Google Drive
@@ -602,6 +682,16 @@ struct CloudLibrarySettings: View {
             if let st = await shop.googleDriveStatus() { driveStatus = st }
         } else {
             driveStatus = nil
+        }
+        let v = await shop.vaultAvailability()
+        vault = v
+        if case .ready(let u) = v, let engine = shop.engine {
+            let limit = max(u.limits.maxVaultBytes, 1)
+            vaultUsage = (used: (try? await engine.formatBytes(Double(u.used.total))) ?? "",
+                          limit: (try? await engine.formatBytes(Double(u.limits.maxVaultBytes))) ?? "",
+                          fraction: min(1, Double(u.used.total) / Double(limit)))
+        } else {
+            vaultUsage = nil
         }
     }
 

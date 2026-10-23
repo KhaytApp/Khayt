@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the Khayt Vault can hold the library's online copy (built, hidden until Khayt Cloud switches the vault on).**
+  - Settings › Online storage offers "Use the Khayt Vault" once Khayt Cloud says the vault is available for this shop. Each model is encrypted on this Mac before it is uploaded, with a key Khayt Cloud never holds.
+  - In use, the pane shows how full the vault is, and Stop Using the Vault asks first. Stopping deletes nothing.
+  - Choosing the vault switches Google Drive and the bucket off for the library. Models already there stay there. New models go to the vault, and "Back up the whole library now" copies the rest.
+  - Models moved to the vault to free space come back from it.
+  - If Khayt Cloud is locked on this Mac, nothing is copied anywhere until it is unlocked.
+  - Choosing the vault is what turns on Share by Private Link.
+  - The desktop app does not use the vault. A book that chooses it there stops copying to Drive or the bucket on the desktop too.
+  - In English and Arabic.
+
 - **Mac: WhatsApp order updates can be sent for you, through your own WhatsApp Business account (ready, off until you set it up).**
   - Settings › Integrations has a new WhatsApp Business section. Enter your
     phone number ID and access token from Meta, and name the template you

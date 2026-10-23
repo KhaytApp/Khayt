@@ -19,10 +19,10 @@ struct VaultShareRequest: Identifiable {
 /// a model, the Links button on the library's strip, the sheets themselves —
 /// asks `libraryOnVault` first, and is absent, not disabled, otherwise.
 ///
-/// The vault is still dark in production: nothing in the settings selects it
-/// yet (`CloudLibrary.pick` knows a bucket and a Drive), so on every shop
-/// today this is false and none of it is drawn. It turns on with the remote,
-/// not with a separate switch, so the two cannot disagree.
+/// It turns on with the remote (`printLibrary.vault`, chosen in Settings ›
+/// Online storage), not with a separate switch, so the two cannot disagree.
+/// The cloud still answers 404 for the whole vault until it is switched on
+/// there, and the pane offers the vault only once the cloud answers.
 extension Shop {
 
     var libraryOnVault: Bool { libraryRemoteId?.hasPrefix(CloudLibrary.vaultIdentityPrefix) == true }
@@ -40,8 +40,7 @@ extension Shop {
     /// kept in this Mac's Keychain (see `VaultLinkSecret` for why there).
     /// Nil when the remote is not the vault, or its key will not open here.
     func vaultLinkEngine() async -> (links: VaultLinks, remote: VaultRemote)? {
-        guard libraryOnVault, let config = await CloudLibrary.config(settings: settingsDict, build: source.build),
-              case .vault(let v) = config.remote else { return nil }
+        guard libraryOnVault, let config = await cloudConfig(), case .vault(let v) = config.remote else { return nil }
         return (VaultLinks(client: v.sync.client, keys: v.sync.keys, secrets: VaultLinkKeychain()), v)
     }
 
