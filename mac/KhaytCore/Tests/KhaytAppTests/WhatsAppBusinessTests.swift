@@ -50,7 +50,12 @@ final class GraphStub: URLProtocol, @unchecked Sendable {
 /// pinned here is the Mac's side — that a move sends the template and writes
 /// the wamid to the log, that a failure writes nothing and says so, and that
 /// consent and the account survive a save.
+///
+/// Serialized because this file installs `WhatsAppCloud.sessionForTests`.
+/// The installs themselves run in `LibraryEditPerfTests` (also serialized),
+/// and no test in this suite reads the seam.
 @MainActor
+@Suite(.serialized)
 struct WhatsAppBusinessTests {
 
     static let token = "EAAG" + String(repeating: "t", count: 40)
