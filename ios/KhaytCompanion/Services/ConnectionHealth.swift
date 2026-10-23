@@ -97,7 +97,11 @@ final class ConnectionHealth: ObservableObject {
             do {
                 let queue = try await api.fetchQueue()
                 state = .connected
-                if macInReach { await pinMacIdentity(); await enrolThisPhone() }
+                if macInReach {
+                    await pinMacIdentity(); await enrolThisPhone()
+                    // On the shop's Wi-Fi: keep the library's pictures for later.
+                    Task { await api.keepAllLibraryPictures() }
+                }
                 await refreshWidgetsAndAlerts(status: status, queue: queue)
             } catch let err as KhaytAPIError {
                 lastStatus = nil

@@ -325,6 +325,7 @@ final class ConnectionSettings: ObservableObject {
         Task { await CompanionCache.shared.clear() }
         // And the library's pictures, which are the shop's too.
         Task { await LibraryThumbs.shared.clear() }
+        UserDefaults.standard.removeObject(forKey: KhaytAPIClient.picturesKeptAtKey)
         // And the book, which is the same argument with more in it: the cache
         // holds the answers this phone happened to ask for, the book holds the
         // shop. `forget` takes the `.prev` rollback copy too — it is the same

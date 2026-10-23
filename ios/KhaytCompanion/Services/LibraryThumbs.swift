@@ -1,5 +1,7 @@
 import CryptoKit
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 /// Library thumbnails kept on the phone, so a model looks the same away from
 /// the shop as it did on its Wi-Fi.
@@ -25,6 +27,24 @@ actor LibraryThumbs {
         self.budget = budget
         try? fileManager.createDirectory(at: self.directory, withIntermediateDirectories: true,
                                          attributes: [.protectionKey: FileProtectionType.complete])
+    }
+
+    /// A small copy of a picture, for keeping: at most `maxPixel` on its long
+    /// side, as JPEG. A 3MF's own picture is often 512 px or more of PNG, and
+    /// the library rows draw it at 52 and 112 points; at 320 px a few thousand
+    /// models fit the budget. Nil when ImageIO cannot read it.
+    nonisolated static func shrink(_ data: Data, maxPixel: Int = 320) -> Data? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                  kCGImageSourceCreateThumbnailFromImageAlways: true,
+                  kCGImageSourceCreateThumbnailWithTransform: true,
+                  kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+              ] as CFDictionary) else { return nil }
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(out, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: 0.75] as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return out as Data
     }
 
     /// A model id can hold anything a filename cannot.

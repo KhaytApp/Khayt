@@ -1016,8 +1016,9 @@ final class KhaytAPIClient: ObservableObject {
         let (data, response) = answer
         switch (response as? HTTPURLResponse)?.statusCode {
         case 200? where !data.isEmpty && data.count < 4_000_000:
-            await thumbShelf.put(id, data)
-            return use(data)
+            let small = LibraryThumbs.shrink(data) ?? data
+            await thumbShelf.put(id, small)
+            return use(small)
         case 404?:
             // The model has no picture any more.
             await thumbShelf.remove(id)
@@ -1025,6 +1026,37 @@ final class KhaytAPIClient: ObservableObject {
         default:
             return kept.map { use($0.data) }
         }
+    }
+
+    /// While the Mac answers: every library picture it has, kept small on the
+    /// phone, so the library looks the same away from the shop. Once every
+    /// twelve hours at most, one picture at a time, only the ones not kept
+    /// yet; it stops at the first sign the Mac has gone.
+    private var keepingPictures = false
+    static let picturesKeptAtKey = "khayt.library.picturesKeptAt"
+
+    @discardableResult
+    func keepAllLibraryPictures(now: Date = Date(), defaults: UserDefaults = .standard) async -> Int {
+        guard !settings.isSampleShop, !keepingPictures else { return 0 }
+        if let last = defaults.object(forKey: Self.picturesKeptAtKey) as? Date, now.timeIntervalSince(last) < 12 * 3600 { return 0 }
+        keepingPictures = true
+        defer { keepingPictures = false }
+        var fetched = 0, offset = 0
+        while !Task.isCancelled {
+            guard let page = try? await libraryPage(query: "", folder: "", offset: offset, limit: 200) else { return fetched }
+            let want = page.items.filter(\.thumb).map(\.id)
+            let kept = await thumbShelf.kept(want)
+            for id in want where !kept.contains(id) {
+                if Task.isCancelled { return fetched }
+                if await libraryThumb(id: id) != nil { fetched += 1 }
+                // The Mac stopped answering: try again on the next visit.
+                if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60 { return fetched }
+            }
+            offset += page.items.count
+            if page.items.isEmpty || offset >= page.total { break }
+        }
+        defaults.set(now, forKey: Self.picturesKeptAtKey)
+        return fetched
     }
 
     /// What a library model would cost: measured and priced on the Mac, or —
