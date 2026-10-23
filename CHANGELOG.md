@@ -24,6 +24,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     pairing window, a clock that only moves forward. Changing the Mac's date
     no longer lifts or extends a lockout.
 
+- **Mac: archive models by hand, and bring them back.** Right-click a model (or several), use the Model menu, or press Archive in the model's panel to take it out of the library. Nothing is deleted: the file and its history stay. Show ▸ Archived lists everything put aside, including originals a conversion replaced, and Restore from Archive brings a model back. Undo works for both. The library's filter counts no longer include archived models.
+
+- **Mac: rename a model.** Press the pencil beside a model's title, right-click it, or use Model ▸ Rename… to change the name the library shows. The file keeps its own name, and Undo puts the old title back.
+
+- **Mac: search the library by field.** Plain search now also finds a model by its notes, category and group. Type `tag:`, `group:`, `category:`, `material:`, `creator:` or `printer:` before a word to search only that field, and put quotes around a value with spaces (`group:"Saudi Kings"`). The field names work in Arabic too (`وسم:`, `مجموعة:`, `فئة:`, `خامة:`, `مصمم:`, `طابعة:`). Each one shows as a chip above the library, and clicking the chip removes it. The filter counts now follow the search as well.
+
+- **Mac: see where each model is stored.** When the library has online storage set up, each tile has a small badge: on this Mac only, backed up online, or online only. VoiceOver reads it out. Show ▸ Online only and Show ▸ On this Mac only filter the library. In a model's panel, Storage has Free Up Space, which removes this Mac's copy only after the copy online has been checked, and Keep on This Mac, which brings the model back if needed so Free up space never moves it out. This Mac keeps the information in `library-sync.json` beside the library folder, not in the book. It is filled from the existing `.cloud` and `.online` files the first time, and those files stay. A file found on this Mac always counts as on this Mac, whatever the stored state says. A model counts as backed up only while its copy is on the storage set up now and the file hasn't changed since. A model with one file of several moved online is not shown as online only. Free Up Space for one model asks first when an open job uses it, and Remove from This Mac says which models are set to Keep on This Mac before it removes their copies. Restoring an original whose converted copy is still in the library says you'll have both.
+
 - **Khayt Vault: the encryption format for cloud files and share links.**
   The building block for keeping a shop's files in Khayt Cloud and sharing
   them by link, without the server ever holding a key that opens them. Files

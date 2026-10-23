@@ -451,6 +451,11 @@ extension Shop {
         guard let engine else { return }
         var failures: [String] = []
         var removed = 0
+        // The person was told which of these are set to Keep on This Mac
+        // (`keptModelsNotice`) and went ahead: they are not kept any more.
+        syncIndex?.setKeep(Set(keptAmong(plan.keptOnline)), false)
+        var sync: FileStates = [:]
+        defer { recordSync(sync) }
         if !plan.keptOnline.isEmpty {
             let r = await deleteRemotes()
             for id in plan.keptOnline {
@@ -458,6 +463,8 @@ extension Shop {
                 do {
                     try await Self.removeLocalCopy(copy, remote: remote, provider: r.provider, engine: engine,
                                                    fetch: CloudLibrary.fetch)
+                    sync[id, default: [:]][copy.model.lastPathComponent] =
+                        Self.movedOut(copy.model, remote: libraryRemoteId)
                     removed += 1
                 } catch {
                     failures.append(copy.model.lastPathComponent + ": " + cloudSay(error))

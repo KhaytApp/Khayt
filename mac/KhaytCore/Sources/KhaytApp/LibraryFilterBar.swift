@@ -48,6 +48,26 @@ struct LibraryFilterBar: View {
                 shop.libraryDuplicatesOnly.toggle()
             })
         }
+        // THE ARCHIVED VIEW: what has been put aside, by hand or by a
+        // conversion, and the one place it can be restored from. Offered only
+        // when there is something in it, or while it is open.
+        if facets.archived > 0 || shop.libraryShowArchived {
+            out.append(FilterChipModel(id: "archived", label: shop.words.callIt("mac.lib_archived"),
+                                       count: facets.archived, on: shop.libraryShowArchived) {
+                shop.libraryShowArchived.toggle()
+            })
+        }
+        // WHERE THE BYTES ARE (`LibrarySyncIndex`): a pair, one on at a time.
+        for (id, filter, key) in [("online-only", LibraryStorageFilter.onlineOnly, "mac.lib_online_only"),
+                                  ("this-mac-only", LibraryStorageFilter.thisMacOnly, "mac.lib_this_mac_only")] {
+            let count = filter == .onlineOnly ? facets.onlineOnly : facets.thisMacOnly
+            if count > 0 || shop.libraryStorage == filter {
+                out.append(FilterChipModel(id: id, label: shop.words.callIt(key), count: count,
+                                           on: shop.libraryStorage == filter) {
+                    shop.libraryStorage = shop.libraryStorage == filter ? nil : filter
+                })
+            }
+        }
         // A chip that is ON stays on the row even at zero. Its count can fall to
         // nothing when another chip narrows past it, and a filter that vanishes
         // while still narrowing the screen leaves a shop looking at an empty
@@ -161,7 +181,17 @@ struct LibraryFilterBar: View {
                 .help(shop.words.callIt("mac.lib_view_help"))
             }
 
-            menu("mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed"])
+            // WHAT THE SEARCH BOX IS FILTERING ON, one chip per token, each
+            // with the way to take it off. Read from the box itself
+            // (`LibraryQuery`), so a chip and the text cannot disagree.
+            ForEach(Array(LibraryQuery.parse(shop.search).tokens.enumerated()), id: \.offset) { _, token in
+                TokenChip(token: token, words: shop.words) {
+                    shop.search = LibraryQuery.removing(token, from: shop.search)
+                }
+            }
+
+            menu("mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed", "archived",
+                                        "online-only", "this-mac-only"])
             menu("mac.lib_printer", prefix: "ready:")
             menu("mac.lib_creator", prefix: "creator:")
             menu("mac.category", prefix: "category:")
@@ -201,17 +231,52 @@ struct LibraryFilterBar: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
-                    Text(shop.words.callIt(key)).foregroundStyle(.secondary)
-                    if !on.isEmpty {
-                        Text(on.count == 1 ? on[0].label : "\(on.count)")
-                            .fontWeight(.semibold)
-                            .lineLimit(1)
-                    }
-                }
+                // ONE Text. A macOS button-style menu draws its label as a
+                // single title, and of an HStack of two it kept only the
+                // first: "Show" with Archived on read "Show" (Oct 2026
+                // capture), and every axis lost what it was set to.
+                Text(on.isEmpty ? shop.words.callIt(key)
+                     : shop.words.callIt(key) + ": " + (on.count == 1 ? on[0].label : shop.words.numeral(on.count)))
+                    .lineLimit(1)
             }
             .menuStyle(.button)
             .fixedSize()
+            // Rebuilt when what it is set to changes, so the button behind
+            // it takes the new title rather than keeping the first one.
+            .id(key + "|" + on.map(\.id).joined(separator: ","))
         }
+    }
+}
+
+/// One search token as a chip: "Tag: dragon ⓧ". The whole chip removes it —
+/// a target the size of a word rather than of the cross.
+private struct TokenChip: View {
+    let token: LibraryQuery.Token
+    let words: Words
+    let remove: () -> Void
+
+    /// The value cut at 28 characters: a chip sizes to its words, and one
+    /// pasted paragraph must not push the menus off the row.
+    private var label: String {
+        let value = token.value.count > 28 ? String(token.value.prefix(27)) + "\u{2026}" : token.value
+        return words.callIt(token.field.wordKey) + ": " + value
+    }
+
+    var body: some View {
+        Button(action: remove) {
+            HStack(spacing: 4) {
+                Text(label).lineLimit(1).truncationMode(.tail)
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8).padding(.vertical, 2)
+            .background(Khayt.brand.opacity(0.14), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        // Its own size, never stretched: a flexible chip took a share of the
+        // row's spare width and the chips stood apart (Oct 2026 capture).
+        .fixedSize()
+        .help(words.callIt("mac.lib_token_remove", ["name": .string(label)]))
+        .accessibilityLabel(words.callIt("mac.lib_token_remove", ["name": .string(label)]))
     }
 }

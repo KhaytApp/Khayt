@@ -222,6 +222,22 @@ struct ManyModels: View {
                 Button { Task { await shop.addEachToCatalogue(chosen) } } label: {
                     Label(shop.words.callIt("mac.catalogue_add_each", n), systemImage: "tag.circle")
                 }
+                // Put aside, or back — only the ones it would change, so a
+                // mixed selection says how many it really moves.
+                let aside = Set(chosen.filter { !$0.isArchived }.map(\.id))
+                let back = Set(chosen.filter(\.isArchived).map(\.id))
+                if !aside.isEmpty {
+                    Button { shop.archive(aside) } label: {
+                        Label(ModelActions.archiveTitle(restoring: false, count: aside.count, words: shop.words),
+                              systemImage: "archivebox")
+                    }
+                }
+                if !back.isEmpty {
+                    Button { shop.unarchive(back) } label: {
+                        Label(ModelActions.archiveTitle(restoring: true, count: back.count, words: shop.words),
+                              systemImage: "arrow.uturn.backward")
+                    }
+                }
             }
             .controlSize(.small)
             .disabled(!shop.canWrite)

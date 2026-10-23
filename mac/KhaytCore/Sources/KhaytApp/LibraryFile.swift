@@ -177,7 +177,8 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     }
     /// Whether the library's search finds this model: its title, its FILE's
     /// name (a shop that renamed "Benchy_v3_0.4mm.3mf" to "Boat" still
-    /// remembers the file), material, tags and creator — folded by
+    /// remembers the file), material, tags, creator, its notes, category and
+    /// group — folded by
     /// `SearchText`, so case, width, Latin accents and the Arabic letters a
     /// shop types either way do not decide what is found.
     func matches(search query: String) -> Bool {
@@ -196,6 +197,10 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
                       sourceFile?.filename ?? "", sourceFile?.originalName ?? ""]
         if let path = externalPath, !path.isEmpty { fields.append((path as NSString).lastPathComponent) }
         fields.append(contentsOf: tags ?? [])
+        // What the shop WROTE about it, and where it filed it: "the one with
+        // the brim note", "something in Saudi Kings" are how a model is
+        // remembered as often as by its name.
+        fields += [testedNotes ?? "", category ?? "", groupName ?? ""]
         return fields
     }
 
