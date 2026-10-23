@@ -443,6 +443,31 @@ test('Snapmaker Orca target: normalises Bambu enum values Orca rejects', () => {
   assert.equal(out.support_style, 'default');
 });
 
+test('Snapmaker Orca 2.4: Bambu 2.x nozzle flow spelling and out-of-range values are fixed', () => {
+  const proj = JSON.stringify({
+    printer_model: 'X1C', nozzle_diameter: ['0.4'],
+    filament_colour: ['#FF0000', '#00FF00'], filament_type: ['PLA', 'PLA'],
+    nozzle_volume_type: ['Standard', 'High Flow'],
+    wall_filament: '0', sparse_infill_filament: '0', solid_infill_filament: '0', support_filament: '0',
+    tree_support_wall_count: '-1', raft_first_layer_expansion: '-1',
+  });
+  const src = writeZip([
+    { name: '3D/3dmodel.model', data: MODEL },
+    { name: 'Metadata/project_settings.config', data: proj },
+  ]);
+  const r = convert(src, { targetId: 'snapmaker-u1' });
+  assert.equal(r.ok, true);
+  const out = JSON.parse(openZip(r.buffer).file('Metadata/project_settings.config').toString('utf8'));
+  // The source's hot end says nothing about the U1's: every entry is a new U1 project's `standard`.
+  assert.deepEqual(out.nozzle_volume_type, ['standard', 'standard']);
+  assert.equal(out.wall_filament, '1');
+  assert.equal(out.sparse_infill_filament, '1');
+  assert.equal(out.solid_infill_filament, '1');
+  assert.equal(out.support_filament, '0'); // 0 is valid there: "no specific filament"
+  assert.equal(out.tree_support_wall_count, '0');
+  assert.equal(out.raft_first_layer_expansion, '2');
+});
+
 test('Snapmaker U1: writes exact bed + printer preset name (plate layout stays correct)', () => {
   const proj = JSON.stringify({
     printer_model: 'X1C', printer_settings_id: 'Bambu Lab X1 Carbon 0.4 nozzle',

@@ -315,7 +315,9 @@ test('band-swap sends filament numbers to the head their colour prints on', () =
   assert.equal(r.report.bandSwap, true);
   const head = require('../lib/mf-convert').analyzeColorBands(buf).headOf.find((h) => h.state === 5).head;
   assert.equal(cfgOf(r.buffer).support_filament, String(head + 1));
-  assert.equal(cfgOf(r.buffer).wall_filament, '0');
+  // Bambu's 0 ("the object's own filament") is not a filament number, so the swap leaves it
+  // alone; Snapmaker Orca then gets its own spelling of the same meaning, 1 (Orca clamps 0 to 1).
+  assert.equal(cfgOf(r.buffer).wall_filament, '1');
 });
 
 test('PrusaSlicer\'s bare empty entries split, so the slot map applies', () => {
