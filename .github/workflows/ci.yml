@@ -303,6 +303,9 @@ jobs:
       - name: E2E smoke (Settings read-only for a manager)
         run: xvfb-run -a npm run test:e2e:settingsro
 
+      - name: E2E smoke (a filed VAT return keeps its figures)
+        run: xvfb-run -a npm run test:e2e:vatfiled
+
       - name: E2E smoke (full erase takes tracking pages down)
         run: xvfb-run -a npm run test:e2e:takedown
 

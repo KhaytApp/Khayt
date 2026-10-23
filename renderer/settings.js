@@ -5274,6 +5274,13 @@ function syncTaxControls() {
   if (sel) sel.value = settings.tax?.country || '';
   const modeEl = $('#set_taxMode');
   if (modeEl) modeEl.value = profile.mode;
+  const freqEl = $('#set_vatFilingFrequency');
+  if (freqEl) {
+    freqEl.value = KhaytVatPeriods.frequencyOf(settings);
+    // As the Mac: no VAT, no returns to file.
+    const vatOn = $('#set_enableVat') ? $('#set_enableVat').checked : !!settings.enableVat;
+    freqEl.disabled = !vatOn || settingsReadOnly();
+  }
   const hint = $('#taxModeHint');
   if (hint) {
     const rate = profile.rates.reduce((sum, r) => sum + r.percent, 0);
@@ -5413,6 +5420,15 @@ function loadSettingsIntoForm() {
       if ($('#set_enableVat')) $('#set_enableVat').checked = !!first;
       if ($('#set_vatRate') && first) $('#set_vatRate').value = first.percent;
       syncTaxControls();
+    });
+  }
+  // The filing frequency follows the VAT switch live, before Save.
+  const evEl = $('#set_enableVat');
+  if (evEl && !evEl.dataset.freqBound) {
+    evEl.dataset.freqBound = '1';
+    evEl.addEventListener('change', () => {
+      const f = $('#set_vatFilingFrequency');
+      if (f) f.disabled = !evEl.checked || settingsReadOnly();
     });
   }
   const tmEl = $('#set_taxMode');
@@ -5755,7 +5771,7 @@ function readSettingsForm() {
     quotePrefix: opt('#set_quotePrefix'), useIcloud: tick('#set_useIcloud'),
     monthlyGoal: opt('#set_monthlyGoal'), supplierPhone: opt('#set_supplierPhone'),
     currency: opt('#set_currency'), enableZatca: tick('#set_enableZatca'),
-    taxMode: opt('#set_taxMode'), taxCountry: opt('#set_taxCountry'),
+    taxMode: opt('#set_taxMode'), taxCountry: opt('#set_taxCountry'), vatFilingFrequency: opt('#set_vatFilingFrequency'),
     minMarginPct: opt('#set_minMarginPct'), elecRate: opt('#set_elecRate'),
     budgets: Object.fromEntries(EXP_CATEGORIES.map(c => [c, opt(`#set_budget_${c}`)])),
     workingHours: Object.fromEntries(['mon','tue','wed','thu','fri','sat','sun'].map(d => [d, opt(`#wh_${d}`)])),
