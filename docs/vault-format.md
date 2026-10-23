@@ -294,6 +294,13 @@ KhaytCore. Another client may do these things differently and still read the sam
 - **Uploads spool.** Sealed chunks are written to disk before any part is sent. A resumed
   upload re-sends those exact bytes. A spool that was never fully sealed is abandoned
   (`DELETE /uploads/{id}`) and the upload starts again. The raw DK is never written to disk.
+- **Share links (`VaultLinks`).** A grant shares each file's head version. The manifest in
+  its link meta comes from the version's own sealed record, never from the server's
+  listing. The link secret and the link key are kept in the device's Keychain only
+  (service `Khayt Vault Link`, account `<shopId>/<grantId>`, not synchronised), never in the
+  book. The password is never stored. The grant's `ownerNote` is the shop's own memo,
+  sealed as `sealN(vaultKey, utf8(note), utf8("khayt-grant-note|" + grantId))`. It is a
+  client record, not part of format v1, and the share page never reads it.
 - **Downloads take one pass.** The version record supplies every chunk hash up front.
   Each chunk is fetched into memory, checked and opened by `ChunkReader`, and appended to a
   temporary file. No ciphertext ever touches disk. The file is renamed into place only after

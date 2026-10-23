@@ -1890,6 +1890,12 @@ final class Shop {
     /// The job whose customer is being written to from a saved message.
     var messagingFor: Order?
 
+    // Stored for private share links (Shop+VaultLinks.swift).
+    /// The models a share link is being made for, while the sheet is up.
+    var sharingByLink: VaultShareRequest?
+    /// The Links sheet: every share link, its downloads and its events.
+    var showingVaultLinks = false
+
     /// The shop's own saved messages, in the order it keeps them.
     private(set) var messageTemplates: [MessageTemplate] = []
 

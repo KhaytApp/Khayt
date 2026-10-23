@@ -247,6 +247,14 @@ struct ModelActions: View {
             Task { await shop.startJob(fromModels: forJob, asQuote: false) }
         }
         .disabled(!shop.canMoveJobs)
+        // A PRIVATE LINK to this model, or to the selection it is part of.
+        // Absent unless the library's remote is the vault: there is nothing
+        // a link could share from a bucket or a Drive (`Shop.libraryOnVault`).
+        if shop.libraryOnVault {
+            Divider()
+            Button(shop.words.callIt("mac.vl_share") + "\u{2026}") { shop.shareByLink(file) }
+                .disabled(!shop.canWrite)
+        }
         Divider()
         Button(shop.words.callIt("mac.copy_name")) { FileActions.copy(file.title) }
         if let original = file.sourceFile?.originalName ?? file.originalName {

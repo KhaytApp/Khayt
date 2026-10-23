@@ -168,6 +168,7 @@ extension Shop {
     /// `SheetsDismissOnLockTests` reads the sources and fails if one is added
     /// without being put here.
     func dismissEverySheet() {
+        sharingByLink = nil; showingVaultLinks = false
         addingConsumable = false; addingExpense = false; addingMachine = false; addingSpool = false
         askingTheBook = false; checkingCloud = false; confirmingSignOut = false
         findingPrinters = false; importingSpoolman = false; issuingGiftCard = false
