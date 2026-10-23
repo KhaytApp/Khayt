@@ -97,6 +97,22 @@ before anyone relies on it:
 
 ## Where the Mac would plug in
 
+> **Built, Oct 23 2026.** Steps 1–4 below are in the Mac app, off until a shop
+> enters its own account. The account is `settings.smsConfig` (`provider:
+> 'whatsapp_cloud'`, `phoneNumberId`, sealed `token`), the templates are
+> `settings.whatsappTemplates`, and the customer's consent is
+> `client.whatsappOptIn: { at, how }`. `lib/whatsapp-message.js` holds
+> `wouldSend(before, after, ctx)`, `cloudMessage` and `templateParams` (the
+> parameter order is `TEMPLATE_PARAMS`), and `lib/whatsapp-send.js` builds
+> the template request and reads Meta's answer. On the Mac,
+> `WhatsAppCloud.swift` sends after the write, in `moveJob`, `markShipped`,
+> `ship` and `markDelivered`. It sends AUTOMATICALLY, with no approval
+> queue, because the words are the shop's own Meta-approved template.
+> `outboundFor` is unchanged. It answers which moves a host must refuse, a
+> host can always send this one, and listing it would have loaded the
+> WhatsApp rule into both renderer pages. The desktop's `lib/sms.js` still
+> sends `whatsapp_cloud` as free text.
+
 1. **Settings.** Add a WhatsApp provider section beside email: provider, phone
    number id or sender, and token. The token is sealed with `Secrets.seal`,
    never stored in the book in plain text. Then add the path to

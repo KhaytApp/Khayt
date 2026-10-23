@@ -1985,12 +1985,17 @@ extension Shop {
         var owed: [KhaytEngine.WebhookDelivery] = []
         var mail: OrderEmail?
         var portal: PortalRefresh?
+        // The job as the write found it, for the one question a move's result
+        // cannot answer: did the job step INTO a milestone the customer is
+        // told about on WhatsApp (`lib/whatsapp-message.js wouldSend`).
+        var wasOrder: JSONValue?
         do {
             try await StoreWriter.update(
                 storeURL: build.storeURL,
                 owns: { StoreLock.weOwnIt(build) },
                 whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) }
             ) { root in
+                wasOrder = Self.rows(root, "printLog").first(where: { Self.recordId($0) == id })
                 let out = try await Self.applyMove(
                     to: &root, id: id, stage: stage, engine: engine, words: self.words,
                     holdReason: holdReason, qcNotes: qcNotes, actuals: actuals)
@@ -2011,6 +2016,10 @@ extension Shop {
             // said out loud rather than swallowed: the whole point of the app
             // refusing these moves before was that a piece of the move would
             // silently not happen.
+            //
+            // WhatsApp first: it writes the customer's log, which starts from a
+            // clean `moveProblem`, so a failure the others report must come after.
+            await sendOwedWhatsApp(before: wasOrder, jobId: id)
             if let telegram { await tell(telegram) }
             if let mail { await post(mail) }
             if let portal { await refresh(portal) }

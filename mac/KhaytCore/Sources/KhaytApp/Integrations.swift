@@ -171,6 +171,10 @@ struct IntegrationsPane: View {
                 // been able to be set up for it.
                 TelegramSettings(shop: shop)
 
+                // And the customer's updates sent FOR the shop, through its
+                // own WhatsApp Business account. Saves itself: a sealed token.
+                WhatsAppBusinessSettings(shop: shop)
+
                 // A second way to reach a phone: ntfy, with no bot to set up.
                 NtfySettings(shop: shop)
 

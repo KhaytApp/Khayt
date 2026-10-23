@@ -772,3 +772,27 @@ test('the loyalty rates the Mac Payments pane edits are saved, within bounds', (
   // Not on the form: untouched.
   assert.equal(apply({ loyaltyRedeemRate: 0.03 }, { phone: '1' }, CTX).loyaltyRedeemRate, 0.03);
 });
+
+test('the WhatsApp Business account saves over what is stored, the token opaque', () => {
+  const stored = { smsConfig: { provider: 'twilio', accountSid: 'AC1', authToken: '__enc__x', from: '+1' } };
+  const out = apply(stored, { smsConfig: { provider: 'whatsapp_cloud', phoneNumberId: ' 1065 4035 ', token: 'sealed:abc' } }, CTX);
+  assert.deepEqual(out.smsConfig, {
+    provider: 'whatsapp_cloud', accountSid: 'AC1', authToken: '__enc__x', from: '+1',
+    phoneNumberId: '10654035', token: 'sealed:abc',
+  });
+  // Absent keeps the token; empty clears it; an unknown provider changes nothing.
+  assert.equal(apply(out, { smsConfig: { phoneNumberId: '10654035' } }, CTX).smsConfig.token, 'sealed:abc');
+  assert.equal(apply(out, { smsConfig: { token: '' } }, CTX).smsConfig.token, '');
+  assert.equal(apply(out, { smsConfig: { provider: 'pigeon' } }, CTX).smsConfig.provider, 'whatsapp_cloud');
+});
+
+test('the template map keeps the four milestones, named, and nothing else', () => {
+  const out = apply({}, { whatsappTemplates: {
+    ready: { name: ' order_ready ', langs: ['ar', ' en ', 'ar', ''] },
+    shipped: { name: '', langs: ['ar'] },
+    paid: { name: 'order_paid', langs: ['ar'] },
+  } }, CTX);
+  assert.deepEqual(out.whatsappTemplates, { ready: { name: 'order_ready', langs: ['ar', 'en'] } });
+  // A save that does not carry it leaves it alone.
+  assert.deepEqual(apply(out, { bizEn: 'x' }, CTX).whatsappTemplates, out.whatsappTemplates);
+});

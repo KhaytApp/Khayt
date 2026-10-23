@@ -4,6 +4,31 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: WhatsApp order updates can be sent for you, through your own WhatsApp Business account (ready, off until you set it up).**
+  - Settings › Integrations has a new WhatsApp Business section. Enter your
+    phone number ID and access token from Meta, and name the template you
+    had approved for each step: received, ready, shipped and delivered. A
+    step with no template sends nothing. The section shows the order Khayt
+    fills each template's variables in, and Check account confirms the
+    number and token with Meta without writing to anyone.
+  - Then Khayt sends the customer the update by itself when a job is
+    approved, finished, shipped or delivered. It sends only your approved
+    templates, never other text, and only to customers whose record says
+    they agreed to updates on WhatsApp. That agreement is a new tick on the
+    customer, with when and how it was given. It is separate from "do not
+    market to me".
+  - Each sent update goes into the customer's log with Meta's message id, so
+    the delivery reports already in Settings › Online mark it delivered and
+    read. An update is never sent twice for the same step.
+  - If Meta refuses a message, the job still moves. Khayt says why, for
+    example "Meta has paused this template" with Meta's code, writes nothing
+    to the log, and the job then offers "Send through WhatsApp Business" or
+    "Write it myself".
+  - The access token is locked on this Mac. It goes only to
+    graph.facebook.com, and never to Khayt Cloud or a phone. Until a shop
+    sets this up, nothing changes: updates open in WhatsApp for you to send.
+    In English and Arabic.
+
 - **Vault: the keys for selling a file (format only, nothing uses it yet).** `lib/vault-crypto.js` and its Swift twin gain a product key. On release, the Mac makes a fresh one, wraps each released version's file key under it and seals that version's share-page record under it. Each wrap names the product, the file and the version. This is what will let Khayt Cloud deliver a file someone has paid for while the creator's Mac is asleep. It applies only to files the creator chooses to sell; private vault files stay end to end. The format is in docs/vault-format.md, and node:crypto vectors pin both twins.
 
 - **Mac: share links for only the people you name, and links Khayt has turned off (built, still dark).**

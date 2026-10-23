@@ -610,6 +610,47 @@
           .filter((t) => (mail && mail.isTrigger ? mail.isTrigger(t) : true)),
       };
     }
+    // ── WHATSAPP BUSINESS, WHEN A FORM CARRIES IT ─────────────────────────
+    //
+    // `settings.smsConfig` is the account both apps read — the other app's
+    // SMS screen writes it straight into the book, the Mac saves through here
+    // — and `settings.whatsappTemplates` which approved template each
+    // milestone sends (`lib/whatsapp-message.js`). The token follows every
+    // other secret's rule: OPAQUE, sealed by the host before it arrives;
+    // absent keeps it, an empty string clears it. The fields the Mac does not
+    // show (Twilio's, Unifonic's) are kept as stored.
+    if (has(f, 'smsConfig') && f.smsConfig && typeof f.smsConfig === 'object') {
+      const g = f.smsConfig;
+      const held = s.smsConfig || {};
+      const known = ['none', 'twilio', 'whatsapp_cloud', 'unifonic', 'webhook'];
+      const asked = has(g, 'provider') ? String(g.provider || '') : '';
+      out.smsConfig = {
+        ...held,
+        provider: known.indexOf(asked) !== -1 ? asked : (held.provider || 'none'),
+        // Digits only: WhatsApp Manager shows the id with no spaces, and a
+        // space pasted with it is a path that 404s.
+        phoneNumberId: has(g, 'phoneNumberId')
+          ? String(g.phoneNumberId == null ? '' : g.phoneNumberId).replace(/\s+/g, '')
+          : (held.phoneNumberId || ''),
+        token: has(g, 'token') ? String(g.token || '') : (held.token || ''),
+      };
+    }
+    if (has(f, 'whatsappTemplates')) {
+      const g = f.whatsappTemplates && typeof f.whatsappTemplates === 'object' ? f.whatsappTemplates : {};
+      const map = {};
+      // The milestones `whatsapp-message.js` sends, and no others: a key
+      // nobody reads would sit in the book looking switched on.
+      for (const m of ['received', 'ready', 'shipped', 'delivered']) {
+        const t = g[m];
+        const name = String((t && t.name) || '').trim();
+        if (!name) continue;
+        const langs = (Array.isArray(t.langs) ? t.langs : [])
+          .map((x) => String(x || '').trim())
+          .filter((x, i, all) => x && all.indexOf(x) === i);
+        map[m] = { name, langs };
+      }
+      out.whatsappTemplates = map;
+    }
     if (has(f, 'printRisk')) {
       const pr = f.printRisk || {};
       // Validated THROUGH the reader that will read it back, not with a

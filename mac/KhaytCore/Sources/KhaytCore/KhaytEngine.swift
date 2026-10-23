@@ -273,6 +273,10 @@ public actor KhaytEngine {
         // language, and the message. `wa-template` is the placeholder rule
         // it fills with — the same one `WaTemplate.swift` ports.
         "wa-template",
+        // …and the request that SENDS one through the shop's own WhatsApp
+        // Business account, a template Meta approved. Before
+        // `whatsapp-message`, which asks it whether a template name is one.
+        "whatsapp-send",
         "whatsapp-message",
         "order-status",
         // ── HOW WRONG THE SHOP'S OWN ESTIMATES ARE ────────────────────────
@@ -8832,18 +8836,84 @@ public actor KhaytEngine {
                           as: String?.self)
     }
 
-    /// The line a sent update writes to the customer's log.
+    /// The line a sent update writes to the customer's log. `messageId` and
+    /// `template` only for one sent through WhatsApp Business: the line then
+    /// carries the id Meta's delivery reports name, and `status: "sent"`.
     public func whatsAppCommEntry(id: String, at: Date, text: String, orderId: String?,
-                                  milestone: String?, lang: String?) throws -> JSONValue {
+                                  milestone: String?, lang: String?,
+                                  messageId: String? = nil, template: String? = nil) throws -> JSONValue {
         try runtime.call2("""
             KhaytWhatsappMessage.commEntry({
-              id: ARG0, at: ARG1, text: ARG2, orderId: ARG3, milestone: ARG4, lang: ARG5
+              id: ARG0, at: ARG1, text: ARG2, orderId: ARG3, milestone: ARG4, lang: ARG5,
+              messageId: ARG6, template: ARG7
             })
             """,
             [.string(id), .string(StoreWriter.iso(at)), .string(text),
              orderId.map(JSONValue.string) ?? .null, milestone.map(JSONValue.string) ?? .null,
-             lang.map(JSONValue.string) ?? .null],
+             lang.map(JSONValue.string) ?? .null, messageId.map(JSONValue.string) ?? .null,
+             template.map(JSONValue.string) ?? .null],
             as: JSONValue.self)
+    }
+
+    // MARK: - WhatsApp Business: sent for the shop
+
+    /// Whether this change to a job is sent to its customer through the shop's
+    /// WhatsApp Business account, and with what — `cloudMessage`. `before` is
+    /// nil and `now` true for a send a person asked for from the job.
+    public func whatsAppCloudMessage(before: JSONValue?, after: JSONValue,
+                                     settings: [String: JSONValue], clients: [JSONValue],
+                                     shopLang: String, values: [String: String],
+                                     now: Bool = false) throws -> WhatsAppCloudMessage {
+        try runtime.call2("""
+            KhaytWhatsappMessage.cloudMessage(ARG0, ARG1, {
+              settings: ARG2, clients: ARG3, shopLang: ARG4, values: ARG5, now: ARG6
+            })
+            """,
+            [before ?? .null, after, .object(settings), .array(clients), .string(shopLang),
+             .object(values.mapValues(JSONValue.string)), .bool(now)],
+            as: WhatsAppCloudMessage.self)
+    }
+
+    /// Whether a `wouldSend` reason is one the shop should be told about —
+    /// the customer agreed and cannot be reached.
+    public func whatsAppIsUnreachable(_ reason: String) throws -> Bool {
+        try runtime.call2("KhaytWhatsappMessage.isUnreachable(ARG0)", [.string(reason)], as: Bool.self)
+    }
+
+    /// The template request, built and checked by `lib/whatsapp-send.js`. The
+    /// token is the OPENED one and goes only into the request's header.
+    public func whatsAppCloudRequest(phoneNumberId: String, token: String,
+                                     message: WhatsAppCloudMessage) throws -> WhatsAppCloudRequest {
+        try runtime.call2("""
+            KhaytWhatsappSend.buildRequest({
+              phoneNumberId: ARG0, token: ARG1, to: ARG2,
+              template: { name: ARG3, language: ARG4 }, params: ARG5
+            })
+            """,
+            [.string(phoneNumberId), .string(token), .string(message.to),
+             .string(message.template?.name ?? ""), .string(message.template?.language ?? ""),
+             .array(message.params.map(JSONValue.string))],
+            as: WhatsAppCloudRequest.self)
+    }
+
+    /// The request that checks a number id and token without writing to anyone.
+    public func whatsAppCheckRequest(phoneNumberId: String, token: String) throws -> WhatsAppCloudRequest {
+        try runtime.call2("KhaytWhatsappSend.buildCheckRequest({ phoneNumberId: ARG0, token: ARG1 })",
+                          [.string(phoneNumberId), .string(token)], as: WhatsAppCloudRequest.self)
+    }
+
+    /// What Meta's answer to a send (`check` false) or a check meant.
+    public func whatsAppCloudResult(status: Int, body: JSONValue, check: Bool = false) throws -> WhatsAppCloudResult {
+        try runtime.call2(check ? "KhaytWhatsappSend.readCheck(ARG0, ARG1)"
+                                : "KhaytWhatsappSend.readResponse(ARG0, ARG1)",
+                          [.number(Double(status)), body], as: WhatsAppCloudResult.self)
+    }
+
+    /// The template parameter order and suggested names, for the settings help.
+    public func whatsAppTemplateGuide() throws -> (params: [String: [String]], names: [String: String]) {
+        let params = try runtime.call2("KhaytWhatsappMessage.TEMPLATE_PARAMS", [], as: [String: [String]].self)
+        let names = try runtime.call2("KhaytWhatsappMessage.SUGGESTED_TEMPLATES", [], as: [String: String].self)
+        return (params, names)
     }
 
     /// What a milestone says when the shop has not written its own — the
