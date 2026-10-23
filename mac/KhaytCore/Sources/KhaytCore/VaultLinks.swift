@@ -826,7 +826,7 @@ public struct VaultLinks: Sendable {
     }
 
     /// The cloud's test (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`, at most 254).
-    static func isEmail(_ s: String) -> Bool {
+    public static func isEmail(_ s: String) -> Bool {
         guard s.count <= 254, !s.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.contains($0) })
         else { return false }
         let halves = s.split(separator: "@", omittingEmptySubsequences: false)

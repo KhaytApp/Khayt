@@ -169,6 +169,7 @@ extension Shop {
     /// without being put here.
     func dismissEverySheet() {
         sharingByLink = nil; showingVaultLinks = false
+        showingVaultProducts = false; makingProduct = nil
         addingConsumable = false; addingExpense = false; addingMachine = false; addingSpool = false
         askingTheBook = false; checkingCloud = false; confirmingSignOut = false
         findingPrinters = false; importingSpoolman = false; issuingGiftCard = false

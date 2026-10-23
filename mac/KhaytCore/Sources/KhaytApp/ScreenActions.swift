@@ -138,6 +138,10 @@ struct ScreenActions: View {
                     NavyAction(label: shop.words.callIt("mac.vl_links"), symbol: "link") {
                         shop.showingVaultLinks = true
                     }
+                    // Vault files listed for sale on makerrun.com.
+                    NavyAction(label: shop.words.callIt("mac.vp_products"), symbol: "tag") {
+                        shop.showingVaultProducts = true
+                    }
                 }
             } else if shop.showingCatalogue {
                 layoutSwitch
