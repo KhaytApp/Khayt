@@ -731,6 +731,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only the beta.5 scenes (live printer cards, the camera, Pair a
+            // phone, filed VAT periods), on the sample, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_B5"] == "1", let shop = subject {
+                await captureBeta5(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DELETE"] == "1", let shop = subject {
                 await captureLibraryStorage(shop, into: dir)
                 NSApp.terminate(nil)
@@ -784,6 +791,7 @@ final class Activator: NSObject, NSApplicationDelegate {
                 capturePanes(named: "03-dark-library", into: dir)
                 // A model selected, its inspector and the storage badges, dark.
                 if let subject { await captureLibrary1a(subject, into: dir, dark: true) }
+                if let subject { await captureBeta5(subject, into: dir, dark: true) }
                 subject?.shelf = .jobs(nil)
                 try? await Task.sleep(for: .milliseconds(700))
                 capture(named: "01-dark-jobs", into: dir)
@@ -951,6 +959,7 @@ final class Activator: NSObject, NSApplicationDelegate {
             shop.fileSelection = []
             await settle()
             await captureLibrary1a(shop, into: dir)
+            await captureBeta5(shop, into: dir, dark: false)
 
             await shop.load(Snapshot.forcedSample ? .sample : (Shop.available.first(where: \.isReal) ?? .sample))
             await settle()
@@ -1619,7 +1628,7 @@ final class Activator: NSObject, NSApplicationDelegate {
     /// Let SwiftUI apply the change and AppKit redraw before photographing it.
     /// Without this the picture is of the previous state, which is worse than
     /// no picture: it looks like the change did nothing.
-    private static func settle() async {
+    static func settle() async {
         try? await Task.sleep(for: .milliseconds(700))
     }
 

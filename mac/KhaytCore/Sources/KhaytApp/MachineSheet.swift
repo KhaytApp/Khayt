@@ -78,6 +78,10 @@ struct MachineSheet: View {
     /// snapshot run, which photographs the Connection tab as well — the only
     /// way the camera and plug sections there are ever seen before they ship.
     static var opensOn = "printer"
+    /// What the snapshot runner opens the camera section with: an offer a
+    /// look would have found. Nil outside it.
+    static var pretendOffer: CameraOffer?
+    static var pretendNote: String?
 
     // The camera. `camSnapshot` may be typed as a path — `/webcam/?action=snapshot`
     // — and the shared rule makes it absolute against the printer's host.
@@ -87,10 +91,10 @@ struct MachineSheet: View {
     @State private var camFlipH = false
     @State private var camFlipV = false
     /// What a probe found, or why it did not. Cleared by the next attempt.
-    @State private var camNote: String?
+    @State private var camNote: String? = MachineSheet.pretendNote
     @State private var camLooking = false
     /// A camera a look found that is not the one saved — offered, never applied.
-    @State private var camOffer: CameraOffer?
+    @State private var camOffer: CameraOffer? = MachineSheet.pretendOffer
     /// The look in flight, so the sheet's own quiet look can give way to Find
     /// and neither outlives the sheet.
     @State private var camLook: Task<Void, Never>?

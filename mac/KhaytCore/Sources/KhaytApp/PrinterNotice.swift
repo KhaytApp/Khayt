@@ -56,6 +56,11 @@ final class PrinterNotice {
         Task { await deliver(notice) }
     }
 
+    /// Record a notice without delivering it, for the snapshot runner: the
+    /// alert card is drawn from `raised`, and a macOS banner for a pretend
+    /// runout has no business appearing on a real desktop.
+    func recordForTesting(_ notice: Notice) { raised.insert(notice, at: 0) }
+
     private func deliver(_ notice: Notice) async {
         let centre = UNUserNotificationCenter.current()
         if !asked {

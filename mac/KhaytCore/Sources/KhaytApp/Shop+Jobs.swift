@@ -1814,7 +1814,7 @@ extension Shop {
     /// behind ~150 buttons but not by this, so a viewer saw every edit button
     /// live and was refused on the click (alpha.62 re-check). The functions
     /// still ask for themselves (`LockGate`); this is what the buttons show.
-    var canMoveJobs: Bool { source.isReal && ownership != nil && lockAllows("orders", "edit") }
+    var canMoveJobs: Bool { (source.isReal && ownership != nil || pretendsControl) && lockAllows("orders", "edit") }
 
     // ── WHICH COLUMNS WOULD TAKE THE CARD IN THE AIR ──────────────────────────
     //

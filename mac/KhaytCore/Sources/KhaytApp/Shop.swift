@@ -199,6 +199,11 @@ final class Shop {
     /// the controls that appear only then (a rename pencil, Restore) are in
     /// the picture. The sample has no build, so every write still refuses.
     var pretendsWritable = false
+    /// The snapshot runner asking the VAT card for a dialog: "unfile" or "refile".
+    var pretendVatDialog: String?
+    /// The snapshot runner drawing the machine cards as a shop that may press them
+    /// would see them (enabled), on the sample. Nothing is sent either way.
+    var pretendsControl = false
     /// The last refusal, for the screen to say out loud. A write that fails
     /// silently is worse than one that never ran.
     var writeProblem: String?

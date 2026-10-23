@@ -90,7 +90,9 @@ struct PairAPhone: View {
     let shop: Shop
 
     /// Running, and listening where a phone can reach it.
-    private var reachable: Bool { shop.lanURL != nil && shop.lanRunning?.bindLan == true }
+    private var reachable: Bool { Self.pretendReachable || (shop.lanURL != nil && shop.lanRunning?.bindLan == true) }
+    /// The snapshot runner has no LAN server to be reachable by.
+    static var pretendReachable = false
 
     var body: some View {
         let window = shop.lanPairing
