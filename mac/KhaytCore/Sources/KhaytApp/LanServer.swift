@@ -67,8 +67,14 @@ final class LanServer {
         /// The owner PIN, opened. Empty means "not configured": owner routes refuse.
         var pin: String
         var engine: KhaytEngine
-        /// The clock, for the page's "Updated 09:16" and the lockout arithmetic.
+        /// The wall clock, for the page's "Updated 09:16", sessions and dates.
         var now: () -> Date = { Date() }
+        /// Seconds on a clock that only goes forward, for the wrong-PIN
+        /// lockouts and the whole-server throttle — the pairing window's clock
+        /// (`LanPairingWindow.monotonic`). On the wall clock, setting the Mac's
+        /// date forward a minute lifted every lockout, and setting it back
+        /// held a shut address shut. Injectable so a test can move it.
+        var lockoutClock: () -> TimeInterval = LanPairingWindow.monotonic
         /// The time as the page prints it. Injectable so a test can render the
         /// same page twice and compare.
         var nowText: () -> String = { LanServer.clockText(Date()) }
@@ -2191,7 +2197,10 @@ final class LanServer {
         // Under the counter lock: see `lockCounters`.
         await lockCounters()
         defer { unlockCounters() }
-        let now = host.now()
+        // The lockout arithmetic runs on the monotonic clock, never the wall
+        // clock (see `Host.lockoutClock`). Every count below — per address,
+        // whole server, the sweep — reads this one `now`, so they agree.
+        let now = Date(timeIntervalSince1970: host.lockoutClock())
         // ── ONLY A STRANGER GETS THIS FAR ─────────────────────────────────
         //
         // An enrolled phone signs and has returned above, before any counter.

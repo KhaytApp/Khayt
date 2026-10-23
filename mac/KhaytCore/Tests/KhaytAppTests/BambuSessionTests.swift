@@ -464,3 +464,79 @@ struct BambuSessionTests {
         Issue.record("timed out waiting")
     }
 }
+
+/// beta.5 review: replacing a Bambu session keeps what the old one held, and
+/// two racing callers never leave a second MQTT client behind.
+@MainActor
+struct BambuSessionReplaceTests {
+    typealias F = BambuSessionTests
+
+    static func watch(_ clock: F.Clock, _ links: F.Links) -> BambuWatch {
+        let w = BambuWatch()
+        w.makeLink = { _ in links.make() }
+        w.now = { clock.now }
+        w.ledger = PushallLedger()
+        return w
+    }
+
+    @Test("a new code for the same printer carries the held state over; the deltas lay over it at once")
+    func replacementCarriesHeld() async throws {
+        let clock = F.Clock(), links = F.Links()
+        let watch = Self.watch(clock, links)
+        let a = await watch.session(for: "M-1", config: F.config, accessCode: "12345678")
+        await F.handshake(a)
+        await a.feed(.bytes(F.report(F.full)))
+        let before = try #require(await a.held)
+
+        let changed = BambuSession.Config(host: "192.168.68.71", port: 8883, serial: F.serial,
+                                          accessCode: "87654321")
+        let b = await watch.session(for: "M-1", config: changed, accessCode: "87654321")
+        #expect(a !== b)
+        #expect(await b.held == before, "the old session's state, not nil")
+        await F.handshake(b)
+        #expect(links.made.last?.published.isEmpty == true, "the ledger still refuses pushall")
+        await #expect(throws: (any Error).self, "not fresh until the printer speaks") { _ = try await b.status() }
+        await b.feed(.bytes(F.report(#"{"print":{"mc_percent":45}}"#)))
+        let engine = try KhaytEngine()
+        let read = try await engine.bambuStatus(held: try await b.status())
+        #expect(read?.progress == 45)
+        #expect(read?.filename == "bracket.3mf", "the delta laid over the carried full report")
+
+        // Another printer behind the same machine is a blank start.
+        let other = BambuSession.Config(host: "192.168.68.71", port: 8883, serial: "01P00A999999999",
+                                        accessCode: "87654321")
+        let c = await watch.session(for: "M-1", config: other, accessCode: "87654321")
+        #expect(await c.held == nil)
+        await watch.stopAll()
+    }
+
+    @Test("two callers racing a replacement end with ONE live session, the other stopped")
+    func racingReplacementLeavesOneClient() async throws {
+        let clock = F.Clock(), links = F.Links()
+        let watch = Self.watch(clock, links)
+        let a = await watch.session(for: "M-1", config: F.config, accessCode: "12345678")
+        let changed = BambuSession.Config(host: "192.168.68.71", port: 8883, serial: F.serial,
+                                          accessCode: "87654321")
+        async let x = watch.session(for: "M-1", config: changed, accessCode: "87654321")
+        async let y = watch.session(for: "M-1", config: changed, accessCode: "87654321")
+        let (sx, sy) = await (x, y)
+        #expect(sx === sy, "both callers got the one stored session")
+        #expect(watch.sessions["M-1"] === sx)
+        #expect(await a.stopped)
+        #expect(await sx.stopped == false)
+        #expect(links.made.filter { !$0.closed }.count == 1, "exactly one MQTT client still open")
+
+        // Racing callers that disagree: the slot ends with one session, the loser stopped.
+        let third = BambuSession.Config(host: "192.168.68.72", port: 8883, serial: F.serial,
+                                        accessCode: "11112222")
+        async let p = watch.session(for: "M-1", config: third, accessCode: "11112222")
+        async let q = watch.session(for: "M-1", config: F.config, accessCode: "12345678")
+        let (sp, sq) = await (p, q)
+        let live = try #require(watch.sessions["M-1"])
+        let loser = live === sp ? sq : sp
+        #expect(live !== loser)
+        #expect(await loser.stopped)
+        #expect(links.made.filter { !$0.closed }.count == 1)
+        await watch.stopAll()
+    }
+}

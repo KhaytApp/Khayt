@@ -395,3 +395,17 @@ test('an idle machine with an empty last head is not a runout, even on the first
   const paused = { [M]: { state: 'paused', progress: 47, filamentOut: true } };
   assert.deepEqual(types(computePrinterAlerts(printing({ filamentOut: false }), paused, fullSettings(), T0)), ['runout']);
 });
+
+test('a job started on an EMPTY head raises the runout: the idle poll before it is not "already out"', () => {
+  // beta.5 review: `outBefore` read the idle poll's raw filamentOut, so a job
+  // started on a head that sat empty never alerted at all.
+  const idleEmpty = { [M]: { state: 'standby', progress: 0, filamentOut: true } };
+  const startedEmpty = printing({ progress: 0, filamentOut: true });
+  assert.deepEqual(types(computePrinterAlerts(idleEmpty, startedEmpty, fullSettings(), T0)), ['runout']);
+  // A failed poll before it is not "already out" either.
+  const failed = { [M]: { error: 'unreachable', filamentOut: true } };
+  assert.deepEqual(types(computePrinterAlerts(failed, startedEmpty, fullSettings(), T0)), ['runout']);
+  // But out on the job last poll and still out now is still the same runout.
+  const pausedOut = { [M]: { state: 'paused', progress: 47, filamentOut: true } };
+  assert.deepEqual(types(computePrinterAlerts(pausedOut, printing({ filamentOut: true }), fullSettings(), T0)), []);
+});

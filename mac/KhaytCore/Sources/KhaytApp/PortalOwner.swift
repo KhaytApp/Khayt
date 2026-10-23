@@ -147,7 +147,9 @@ extension Shop {
             let creds = try await portalCredentials()
             let note = try await PortalClient.publish(request, baseUrl: creds.url, shopId: creds.shopId,
                                                       token: creds.token, engine: engine)
-            try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: id) { r in
+            // Forced: the page IS up now, so this must win the next merge
+            // even when the book already said true (see changeRecord).
+            try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: id, forceStamp: true) { r in
                 r["cloudPublished"] = .bool(true)
             }
             await load(source)
@@ -262,7 +264,8 @@ extension Shop {
             let creds = try await portalCredentials()
             try await PortalClient.unpublish(pubToken: tok, baseUrl: creds.url, shopId: creds.shopId,
                                              token: creds.token, engine: engine)
-            try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: id) { r in
+            // Forced: the page IS down now (see changeRecord).
+            try await StoreWriter.updateRecordOffMain(build, collection: "printLog", id: id, forceStamp: true) { r in
                 r["cloudPublished"] = .bool(false)
                 r[Self.takedownPendingKey] = nil
             }

@@ -60,6 +60,9 @@ struct LanServerTests {
                 icon: { LanServer.bundledIcon($0) })
             host.intakeToken = intakeToken
             host.calendarToken = calendarToken
+            // The lockouts read the monotonic clock; the bench moves it with
+            // the wall clock so `advance` lifts a lockout as before.
+            host.lockoutClock = { box.now.timeIntervalSince1970 }
             host.identity = { identity }
             host.devices = devices
             let pairing = LanPairingWindow(clock: { box.now.timeIntervalSince1970 })
