@@ -817,3 +817,19 @@
 "library.from_copy" = "أنت خارج الورشة: هذه مكتبتك كما كانت في آخر مزامنة مع سحابة خيط، والأسعار تُحسب على هذا الهاتف.";
 "library.priced_here" = "حُسب على هذا الهاتف بأسعارك. النموذج متعدد الألوان يُحسب على بكرة واحدة، فقد يختلف رقم الماك قليلًا.";
 "library.no_copy" = "تعذّر الوصول إلى الماك. سجّل الدخول إلى سحابة خيط من الإعدادات وزامِن مرة واحدة، فتصبح مكتبتك معك.";
+
+/* Catalogue */
+"catalogue.title" = "الكتالوج";
+"catalogue.search" = "ابحث في المنتجات";
+"catalogue.ungrouped" = "أخرى";
+"catalogue.empty" = "لا منتجات بعد. أضفها من الكتالوج على جهاز الماك.";
+"catalogue.no_match" = "لا يوجد منتج مطابق.";
+"catalogue.partial" = "تُعرض %1$lld من %2$lld منتج. ابحث عن البقية على الماك.";
+"catalogue.no_book" = "يصل الكتالوج مع دفتر الورشة. زامن مع سحابة خيط أو مع جهاز الماك أولًا.";
+"catalogue.in_stock" = "%lld في المخزون";
+"catalogue.out_of_stock" = "نفد المخزون";
+"catalogue.description" = "الوصف";
+"catalogue.price.override" = "سعرك الخاص";
+"catalogue.price.rounded" = "مقرّب من السعر المحسوب";
+"catalogue.price.calculated" = "محسوب";
+"home.catalogue.sub" = "ما تبيعه، بأسعاره ومخزونه";

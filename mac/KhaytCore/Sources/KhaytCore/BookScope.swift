@@ -87,6 +87,12 @@ public enum BookScope {
         // expenses is history no phone screen shows.
         ("suppliers", .whole(cap: 1_000)),
         ("expenses", .newest(1_000)),
+        // The phone's Catalogue screen (Oct 2026): what the shop sells, at the
+        // price the Mac shows (`KhaytEngine.catalogue`), with the small picture
+        // each record carries as a data URI. A product is a few KB plus its
+        // pictures' thumbnails; a shop's catalogue is hundreds, not thousands.
+        // The full-size photos stay on the Mac, as files beside the book.
+        ("products", .whole(cap: 2_000)),
     ]
 
     /// What a pull actually contained.
@@ -127,6 +133,40 @@ public enum BookScope {
         }
     }
 
+    /// Fields a phone has no use for, taken off a record before it travels.
+    ///
+    /// A product's pictures and documents are FILES on the Mac (`products/`
+    /// beside the book), and their paths name the Mac's user. The phone
+    /// shows the small picture the record carries as a data URI, so
+    /// `imagePath`, each image's `path` and `docs` stay behind. Applied by
+    /// `take` and by the phone to every record a cloud change folds in, so
+    /// a path never arrives by the side door either.
+    public static let leftBehind: [String: Set<String>] = ["products": ["imagePath", "docs"]]
+
+    public static func trimmed(_ record: JSONValue, in collection: String) -> JSONValue {
+        guard collection == "products", case .object(var o) = record else { return record }
+        for key in leftBehind[collection] ?? [] { o.removeValue(forKey: key) }
+        if case .array(let images)? = o["images"] {
+            o["images"] = .array(images.map { image in
+                guard case .object(var i) = image else { return image }
+                i.removeValue(forKey: "path")
+                return .object(i)
+            })
+        }
+        return .object(o)
+    }
+
+    /// `trimmed` over a whole book's working-set collections.
+    public static func trimmed(_ store: [String: JSONValue]) -> [String: JSONValue] {
+        var out = store
+        for collection in leftBehind.keys {
+            if case .array(let rows)? = store[collection] {
+                out[collection] = .array(rows.map { trimmed($0, in: collection) })
+            }
+        }
+        return out
+    }
+
     /// Cut a working set out of a whole book.
     ///
     /// `settings` always travels and is never counted as a collection: it is one
@@ -164,7 +204,7 @@ public enum BookScope {
             held[collection] = .init(whole: kept.count == rows.count,
                                      sent: kept.count,
                                      available: kept.count == rows.count ? nil : rows.count)
-            out[collection] = .array(kept)
+            out[collection] = .array(kept.map { trimmed($0, in: collection) })
         }
 
         // Every collection the book has that the phone is not getting.

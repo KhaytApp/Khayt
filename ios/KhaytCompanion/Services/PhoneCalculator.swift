@@ -197,7 +197,7 @@ extension BookReader {
         return CalculatorAnswer(costed: costed, quoted: quoted, qty: qty)
     }
 
-    private static func settings(_ store: [String: JSONValue]) -> [String: JSONValue] {
+    static func settings(_ store: [String: JSONValue]) -> [String: JSONValue] {
         if case .object(let s)? = store["settings"] { return s }
         return [:]
     }

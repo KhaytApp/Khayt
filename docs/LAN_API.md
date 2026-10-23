@@ -378,7 +378,7 @@ a client would count 200 orders and report a three-year-old shop as having done 
       "clients":   { "whole": true,  "sent": 31 },
       "inventory": { "whole": true,  "sent": 13 }
     },
-    "omitted": ["auditLog", "expenses", "printFiles", "products"],
+    "omitted": ["auditLog", "printFiles"],
     "takenAt": "2026-09-18T09:00:00.000Z"
   },
   "store": {

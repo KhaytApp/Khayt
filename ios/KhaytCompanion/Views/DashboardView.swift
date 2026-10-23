@@ -32,6 +32,7 @@ struct DashboardView: View {
     @State private var showAddSpool = false
     @State private var showQuote = false
     @State private var showLibrary = false
+    @State private var showCatalogue = false
     @State private var showWaste = false
     @State private var showExpense = false
     @State private var showIntake = false
@@ -86,6 +87,7 @@ struct DashboardView: View {
             .sheet(isPresented: $showAddSpool) { AddSpoolSheet { Task { await load() } } }
             .sheet(isPresented: $showQuote) { CalculatorScreen(asSheet: true) }
             .sheet(isPresented: $showLibrary) { LibraryView() }
+            .sheet(isPresented: $showCatalogue) { CatalogueView() }
             .sheet(isPresented: $showWaste) { LogWasteSheet() }
             .sheet(isPresented: $showExpense) { ExpenseSheet() }
             .sheet(isPresented: $showIntake) { IntakeView() }
@@ -116,6 +118,7 @@ struct DashboardView: View {
         money
         if widthClass == .compact { calculatorRow }
         libraryRow
+        catalogueRow
         section(L10n.tr("home.pipeline"), trailing: L10n.tr("pulse.tap_to_filter"))
         lanes
     }
@@ -201,6 +204,7 @@ struct DashboardView: View {
                 Button { scanningLabel = true } label: { Label(L10n.tr("scan.label.title"), systemImage: "qrcode.viewfinder") }
                 Button { pickingModel = true } label: { Label(L10n.tr("quote.file.pick"), systemImage: "cube") }
                 Button { showLibrary = true } label: { Label(L10n.tr("library.price"), systemImage: "books.vertical") }
+                Button { showCatalogue = true } label: { Label(L10n.tr("catalogue.title"), systemImage: "shippingbox") }
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .medium))
@@ -281,6 +285,10 @@ struct DashboardView: View {
     /// same counter question, about something the shop has printed before.
     private var libraryRow: some View {
         shortcutRow(icon: "books.vertical", title: L10n.tr("library.title"), sub: L10n.tr("home.library.sub")) { showLibrary = true }
+    }
+
+    private var catalogueRow: some View {
+        shortcutRow(icon: "shippingbox", title: L10n.tr("catalogue.title"), sub: L10n.tr("home.catalogue.sub")) { showCatalogue = true }
     }
 
     private func shortcutRow(icon: String, title: String, sub: String, action: @escaping () -> Void) -> some View {
@@ -525,7 +533,7 @@ struct DashboardView: View {
         for (name, show) in [("quote", { showQuote = true }), ("waste", { showWaste = true }),
                              ("expense", { showExpense = true }), ("addspool", { showAddSpool = true }),
                              ("intake", { showIntake = true }), ("settings", { showSettings = true }),
-                             ("library", { showLibrary = true })] as [(String, () -> Void)] {
+                             ("library", { showLibrary = true }), ("catalogue", { showCatalogue = true })] as [(String, () -> Void)] {
             if KhaytCompanionApp.ScreenshotOpen.take(name) != nil { show() }
         }
         if let id = KhaytCompanionApp.ScreenshotOpen.take("order:") { openOrder = queue.first { $0.id == id } }

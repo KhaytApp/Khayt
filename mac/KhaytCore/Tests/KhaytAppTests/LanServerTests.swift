@@ -353,6 +353,7 @@ struct LanServerTests {
         bench.book.value["printFiles"] = .array([.object(["id": .string("f1")])])
         bench.book.value["waTemplates"] = .array([.object(["id": .string("wa1"), "text": .string("Ready, {name}")])])
         bench.book.value["auditLog"] = .array([.object(["id": .string("a1")])])
+        bench.book.value["products"] = .array([.object(["id": .string("PROD-1"), "nameEn": .string("Lamp")])])
 
         let none = try await bench.get("/api/store")
         #expect(none.status == 401, "the shop's book must never be open on the LAN")
@@ -383,6 +384,7 @@ struct LanServerTests {
         #expect(sent.store["inventory"] != nil)
         // The shop's WhatsApp wording, which the phone's job update uses.
         #expect(sent.store["waTemplates"] != nil, "the phone was not sent the shop's WhatsApp templates")
+        #expect(sent.store["products"] != nil, "the phone was not sent the catalogue")
 
         // Said as a fact rather than a comparison, because a comparison against
         // `forCloud` would still pass if `forCloud` stopped masking.
