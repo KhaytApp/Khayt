@@ -50,6 +50,8 @@ public enum VaultCrypto {
         public static let linkPwSalt = "khayt-link-pw"
         public static let linkDkAad = "khayt-link-dk"
         public static let linkMetaAad = "khayt-link-meta"
+        public static let productDkAad = "khayt-product-dk"
+        public static let productMetaAad = "khayt-product-meta"
     }
 
     public enum Failure: Error, CustomStringConvertible, Equatable {
@@ -699,5 +701,61 @@ public enum VaultCrypto {
             throw Failure.badInput("link meta must be a JSON object with uploadId, manifest, manifestHash, name, size, kind")
         }
         return try m.validated()
+    }
+
+    // MARK: - Published files (vault phase 3b)
+    //
+    // `lib/vault-crypto.js`, the twin: a file a creator SELLS is readable by
+    // Khayt Cloud, and only that file. On Release the Mac makes a fresh product
+    // key and, per file, wraps that version's DK under it and seals the
+    // share-page record under it. Every AAD names product, file and upload. A
+    // fresh key per release; the Mac keeps nothing about a product.
+
+    /// A fresh product key, made on every release.
+    public static func newProductKey() -> Data { random(keyBytes) }
+
+    static func productDkAad(productId: String, fileId: String, uploadId: String) throws -> Data {
+        utf8(Label.productDkAad + "|" + (try id(productId, "productId")) + "|" + (try id(fileId, "fileId"))
+             + "|" + (try id(uploadId, "uploadId")))
+    }
+
+    static func productMetaAad(productId: String, fileId: String, uploadId: String) throws -> Data {
+        utf8(Label.productMetaAad + "|" + (try id(productId, "productId")) + "|" + (try id(fileId, "fileId"))
+             + "|" + (try id(uploadId, "uploadId")))
+    }
+
+    public static func wrapDkForProduct(productKey: Data, dk: Data, productId: String, fileId: String,
+                                        uploadId: String, nonce: Data? = nil) throws -> Data {
+        try wrapKey(kek: try key32(productKey, "product key"), key: dk,
+                    aad: try productDkAad(productId: productId, fileId: fileId, uploadId: uploadId), nonce: nonce)
+    }
+
+    public static func unwrapDkForProduct(productKey: Data, wrapped: Data, productId: String, fileId: String,
+                                          uploadId: String) throws -> Data {
+        try unwrapKey(kek: try key32(productKey, "product key"), wrapped: wrapped,
+                      aad: try productDkAad(productId: productId, fileId: fileId, uploadId: uploadId))
+    }
+
+    /// The share-page record for one released file, under the product key —
+    /// the same record and checks as `encryptLinkMeta`, and its `uploadId`
+    /// must be the upload the AAD names.
+    public static func encryptProductMeta(productKey: Data, productId: String, fileId: String, uploadId: String,
+                                          meta: LinkMeta, nonce: Data? = nil) throws -> Data {
+        guard meta.uploadId == uploadId else { throw Failure.badInput("product meta uploadId does not match") }
+        return try sealWithNonce(try key32(productKey, "product key"), try meta.canonicalJSON(),
+                                 aad: try productMetaAad(productId: productId, fileId: fileId, uploadId: uploadId),
+                                 nonce: nonce)
+    }
+
+    public static func decryptProductMeta(productKey: Data, productId: String, fileId: String, uploadId: String,
+                                          sealed: Data) throws -> LinkMeta {
+        let json = try openWithNonce(try key32(productKey, "product key"), sealed,
+                                     aad: try productMetaAad(productId: productId, fileId: fileId, uploadId: uploadId))
+        guard let m = try? JSONDecoder().decode(LinkMeta.self, from: json) else {
+            throw Failure.badInput("product meta must be a JSON object with uploadId, manifest, manifestHash, name, size, kind")
+        }
+        let v = try m.validated()
+        guard v.uploadId == uploadId else { throw Failure.badInput("product meta uploadId does not match") }
+        return v
     }
 }

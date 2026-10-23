@@ -18,6 +18,7 @@ struct VaultCryptoTests {
             let shopWrapNonce, grantWrapNonce, metaNonce, metaJson, linkMetaNonce, metaSeqTooBigJson: String
             let versionMetaNonce: String
             let versionMetaSeq: Int
+            let productId, productKey, productWrapNonce, productMetaNonce: String
         }
         struct Derived: Decodable {
             let vaultKey, chunkKey, dedupeKey, linkKeyNoPassword, passwordNfcHex, linkPasswordScrypt,
@@ -38,7 +39,8 @@ struct VaultCryptoTests {
             let manifestJson, manifestHash, dedupeTag: String
         }
         struct Wrap: Decodable { let aad, nonce, wrapped: String }
-        struct Wraps: Decodable { let shop, grantNoPassword, grantPassword: Wrap }
+        struct Wraps: Decodable { let shop, grantNoPassword, grantPassword, product: Wrap }
+        struct ProductMetaVec: Decodable { let aad, nonce, json, sealed: String }
         struct Meta: Decodable { let aad, nonce, json, sealed, sealedSeqTooBig: String }
         struct LinkMetaVec: Decodable { let aad, nonce, json, sealedNoPassword, sealedPassword: String }
         struct VersionMetaVec: Decodable { let aad, nonce, file, json, manifestHash, sealed: String }
@@ -50,6 +52,7 @@ struct VaultCryptoTests {
         let meta: Meta
         let linkMeta: LinkMetaVec
         let versionMeta: VersionMetaVec
+        let productMeta: ProductMetaVec
     }
 
     static let v: Vectors = {
@@ -115,6 +118,48 @@ struct VaultCryptoTests {
         let out = try VaultCrypto.encryptFile(dk: dk, fileId: v.inputs.fileId, uploadId: v.inputs.uploadId,
                                               plaintext: Self.plaintext(f.size))
         #expect(out.manifestHash == f.manifestHash)
+    }
+
+    @Test("a released file: DK and record under the product key, byte for byte, and a buyer grant from them")
+    func productKey() throws {
+        let i = v.inputs
+        let pk = Self.h(i.productKey)
+        let w = try VaultCrypto.wrapDkForProduct(productKey: pk, dk: dk, productId: i.productId, fileId: i.fileId,
+                                                 uploadId: i.uploadId, nonce: Self.h(i.productWrapNonce))
+        #expect(Self.hex(w) == v.wraps.product.wrapped)
+        #expect(try VaultCrypto.unwrapDkForProduct(productKey: pk, wrapped: w, productId: i.productId,
+                                                   fileId: i.fileId, uploadId: i.uploadId) == dk)
+        for (product, upload) in [("p_other", i.uploadId), (i.productId, "u_other")] {
+            #expect(throws: (any Error).self) {
+                try VaultCrypto.unwrapDkForProduct(productKey: pk, wrapped: w, productId: product,
+                                                   fileId: i.fileId, uploadId: upload)
+            }
+        }
+        // Never opens as a grant's wrap.
+        #expect(throws: (any Error).self) {
+            try VaultCrypto.unwrapDkForGrant(linkKey: pk, wrapped: w, grantId: i.productId,
+                                             fileId: i.fileId, uploadId: i.uploadId)
+        }
+
+        let meta = try JSONDecoder().decode(VaultCrypto.LinkMeta.self, from: Data(v.productMeta.json.utf8))
+        let sealed = try VaultCrypto.encryptProductMeta(productKey: pk, productId: i.productId, fileId: i.fileId,
+                                                        uploadId: i.uploadId, meta: meta,
+                                                        nonce: Self.h(i.productMetaNonce))
+        #expect(Self.hex(sealed) == v.productMeta.sealed)
+        let back = try VaultCrypto.decryptProductMeta(productKey: pk, productId: i.productId, fileId: i.fileId,
+                                                      uploadId: i.uploadId, sealed: sealed)
+        #expect(back == meta)
+        #expect(throws: (any Error).self) {
+            try VaultCrypto.encryptProductMeta(productKey: pk, productId: i.productId, fileId: i.fileId,
+                                               uploadId: "u_other", meta: meta)
+        }
+        // The cloud's sale path lands on the shared grant vectors exactly.
+        let g = try VaultCrypto.wrapDkForGrant(linkKey: Self.h(v.derived.linkKeyNoPassword), dk: dk,
+                                               grantId: i.grantId, fileId: i.fileId, uploadId: i.uploadId,
+                                               nonce: Self.h(v.wraps.grantNoPassword.nonce))
+        #expect(Self.hex(g) == v.wraps.grantNoPassword.wrapped)
+        #expect(VaultCrypto.newProductKey().count == 32)
+        #expect(VaultCrypto.newProductKey() != VaultCrypto.newProductKey())
     }
 
     @Test("key wraps: shop and both grants, byte for byte, and back")
