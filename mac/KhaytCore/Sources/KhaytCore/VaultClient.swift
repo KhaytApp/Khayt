@@ -81,6 +81,8 @@ public struct VaultClient: Sendable {
         case unknownItems([String])
         /// 422 downloads-cap: this plan caps a link's downloads at `limit`.
         case downloadsCap(limit: Int)
+        /// 422 not-yet: a feature the cloud has not built (the email lock).
+        case notYet
 
         public var description: String {
             switch self {
@@ -107,6 +109,7 @@ public struct VaultClient: Sendable {
             case .noLinks: return "This shop's plan has no share links."
             case .unknownItems(let ids): return "\(ids.count) file(s) are no longer in the vault."
             case .downloadsCap(let limit): return "This plan allows at most \(limit) downloads per link."
+            case .notYet: return "Khayt Cloud does not offer that yet."
             }
         }
     }
@@ -410,6 +413,7 @@ public struct VaultClient: Sendable {
         case (409, "grant-exists"): return .grantExists
         case (422, "unknown-items"): return .unknownItems((o["fileIds"] as? [String]) ?? [])
         case (422, "downloads-cap"): return .downloadsCap(limit: n("limit"))
+        case (422, "not-yet"): return .notYet
         case (413, _): return .fileTooLarge(limit: n("limit"))
         case (409, "duplicate"):
             return .duplicate(fileId: (o["fileId"] as? String) ?? "", version: n("version"))

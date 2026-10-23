@@ -100,6 +100,7 @@ extension VaultStub {
     func patchGrant(_ url: URL, _ gid: String, _ raw: Data, _ b: [String: Any]) -> (Data, URLResponse) {
         grantPatches += 1
         if failPatchNumber == grantPatches { return reply(url, 500, ["error": "boom"]) }
+        if failRevoke, b["revoke"] as? Bool == true { return reply(url, 503, ["error": "down"]) }
         guard raw.count <= Self.maxGrantBody else { return reply(url, 413, ["error": "body over 16 MB"]) }
         guard var g = grants[gid] else { return reply(url, 404, ["reason": "unknown-grant"]) }
         if let list = b["items"] as? [[String: Any]] {
@@ -179,6 +180,7 @@ extension VaultStub {
     }
 
     func grant(_ id: String) -> Grant? { lock.lock(); defer { lock.unlock() }; return grants[id] }
+    func revokeElsewhere(_ id: String) { lock.lock(); defer { lock.unlock() }; grants[id]?.revoked = true }
     var log: [Logged] { lock.lock(); defer { lock.unlock() }; return requestLog }
     func objectBytes(_ fileId: String, _ version: Int, _ i: Int) -> Data? {
         lock.lock(); defer { lock.unlock() }; return objects[key(fileId, version, i)]

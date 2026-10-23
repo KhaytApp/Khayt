@@ -22,7 +22,7 @@ struct VaultLinksSheet: View {
     @State private var grants: [VaultClient.Grant] = []
     @State private var names: [String: String] = [:]
     @State private var notes: [String: String] = [:]
-    @State private var here: Set<String> = []
+    @State private var local: [String: VaultLinks.Local] = [:]
     @State private var loading = true
     @State private var problem: String?
 
@@ -53,9 +53,9 @@ struct VaultLinksSheet: View {
             }
             ForEach(grants) { g in
                 VaultGrantRow(shop: shop, grant: g, names: names, note: notes[g.grantId],
-                              copyable: here.contains(g.grantId)) { updated in
+                              local: local[g.grantId] ?? .none) { updated in
                     if let i = grants.firstIndex(where: { $0.grantId == updated.grantId }) { grants[i] = updated }
-                    if updated.state == .revoked { here.remove(updated.grantId) }
+                    if updated.state != .ok { local[updated.grantId] = VaultLinks.Local.none }
                 }
                 Divider()
             }
@@ -83,15 +83,16 @@ struct VaultLinksSheet: View {
             return
         }
         do {
-            let list = try await engine.links.list()
+            // `tidy`: a link no longer live has its secret forgotten, and a
+            // half-made one left pending too long is revoked.
+            let (list, states) = await engine.links.tidy(try await engine.links.list())
             try? await engine.remote.sync.pull()
-            names = shop.vaultFileNames(engine.remote)
-            var n: [String: String] = [:], h: Set<String> = []
+            names = await shop.vaultFileNames(engine.remote)
+            var n: [String: String] = [:]
             for g in list {
                 if let text = engine.links.note(g) { n[g.grantId] = text }
-                if g.state == .ok, await engine.links.link(g.grantId) != nil { h.insert(g.grantId) }
             }
-            grants = list; notes = n; here = h
+            grants = list; notes = n; local = states
         } catch {
             problem = shop.linkProblem(error)
         }
@@ -104,7 +105,9 @@ struct VaultGrantRow: View {
     let grant: VaultClient.Grant
     let names: [String: String]
     let note: String?
-    let copyable: Bool
+    /// What this Mac knows: Copy Link only when `.copyable`; `.incomplete` is
+    /// a half-made link, shown as such, with Revoke.
+    let local: VaultLinks.Local
     let changed: (VaultClient.Grant) -> Void
 
     @State private var showingActivity = false
@@ -116,6 +119,7 @@ struct VaultGrantRow: View {
 
     private var words: Words { shop.words }
     private var live: Bool { grant.state == .ok }
+    private var incomplete: Bool { live && local == .incomplete }
 
     /// The note the shop wrote, else the first files' names.
     private var title: String {
@@ -130,6 +134,7 @@ struct VaultGrantRow: View {
     }
 
     private var stateWord: String {
+        if incomplete { return words.callIt("mac.vl_state_incomplete") }
         switch grant.state {
         case .ok: return words.callIt("mac.vl_state_ok")
         case .revoked: return words.callIt("mac.vl_state_revoked")
@@ -169,15 +174,20 @@ struct VaultGrantRow: View {
                 Text(stateWord)
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Capsule().fill(live ? Khayt.done.opacity(0.15) : Color.secondary.opacity(0.15)))
-                    .foregroundStyle(live ? Khayt.done : .secondary)
+                    .background(Capsule().fill(incomplete ? Khayt.attention.opacity(0.15)
+                                               : live ? Khayt.done.opacity(0.15) : Color.secondary.opacity(0.15)))
+                    .foregroundStyle(incomplete ? Khayt.attention : live ? Khayt.done : .secondary)
             }
             Text([Shop.say(words, "mac.vl_n_files", grant.items.count), downloadsLine, endLine].joined(separator: " · "))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
 
+            if incomplete {
+                Text(words.callIt("mac.vl_incomplete_explain"))
+                    .font(.caption).foregroundStyle(Khayt.attention).fixedSize(horizontal: false, vertical: true)
+            }
             // The row's actions: one primary, then one overflow.
             HStack(spacing: 8) {
-                if live && copyable {
+                if live && local == .copyable {
                     Button(words.callIt("mac.vl_copy_link")) { Task { await copy() } }
                 }
                 Button(words.callIt(showingActivity ? "mac.vl_hide_activity" : "mac.vl_activity")) {
@@ -188,13 +198,16 @@ struct VaultGrantRow: View {
                 Spacer()
                 if live {
                     Menu {
-                        Button(Shop.say(words, "mac.vl_add_downloads", 5)) { Task { await addDownloads(5) } }
-                        Button(Shop.say(words, "mac.vl_add_downloads", 25)) { Task { await addDownloads(25) } }
-                        Divider()
-                        Button(Shop.say(words, "mac.vl_extend_days", 7)) { Task { await extend(days: 7) } }
-                        Button(Shop.say(words, "mac.vl_extend_days", 30)) { Task { await extend(days: 30) } }
-                        Button(words.callIt("mac.vl_remove_end")) { Task { await extend(days: nil) } }
-                        Divider()
+                        // A half-made link is only for revoking.
+                        if !incomplete {
+                            Button(Shop.say(words, "mac.vl_add_downloads", 5)) { Task { await addDownloads(5) } }
+                            Button(Shop.say(words, "mac.vl_add_downloads", 25)) { Task { await addDownloads(25) } }
+                            Divider()
+                            Button(Shop.say(words, "mac.vl_extend_days", 7)) { Task { await extend(days: 7) } }
+                            Button(Shop.say(words, "mac.vl_extend_days", 30)) { Task { await extend(days: 30) } }
+                            Button(words.callIt("mac.vl_remove_end")) { Task { await extend(days: nil) } }
+                            Divider()
+                        }
                         Button(words.callIt("mac.vl_revoke") + "\u{2026}", role: .destructive) { askingRevoke = true }
                     } label: {
                         Image(systemName: "ellipsis.circle")

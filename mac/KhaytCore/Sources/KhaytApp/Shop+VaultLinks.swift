@@ -74,7 +74,13 @@ extension Shop {
         case VaultLinks.Failure.weakPassword: return words.callIt("mac.vl_password_rule")
         case VaultLinks.Failure.notShareable, VaultLinks.Failure.nothingToShare, VaultClient.Failure.unknownItems:
             return words.callIt("mac.vl_err_not_in_vault")
-        case VaultLinks.Failure.incomplete: return words.callIt("mac.vl_err_incomplete")
+        case VaultLinks.Failure.incomplete(_, _, _, let revoked, _):
+            // A cleanup revoke that failed is NOT "nothing was shared": the
+            // half-made link is live until the shop revokes it.
+            return words.callIt(revoked ? "mac.vl_err_incomplete" : "mac.vl_err_incomplete_live")
+        case VaultLinks.Failure.tooBig, VaultClient.Failure.fileTooLarge: return words.callIt("mac.vl_err_too_big")
+        case VaultClient.Failure.notFound("unknown-grant"): return words.callIt("mac.vl_err_unknown_grant")
+        case VaultClient.Failure.notYet: return words.callIt("mac.vl_err_not_yet")
         case VaultLinks.Failure.secretNotHere: return words.callIt("mac.vl_err_other_mac")
         case VaultClient.Failure.linksFull(let limit):
             return words.callIt("mac.vl_err_links_full", ["n": .number(Double(limit))])
@@ -90,8 +96,13 @@ extension Shop {
     }
 
     /// The vault's own names for its files, for the Links screen: fileId →
-    /// the name in the file's sealed record. Read from this Mac's sync state.
-    func vaultFileNames(_ remote: VaultRemote) -> [String: String] {
+    /// the name in the file's sealed record. Read from this Mac's sync state,
+    /// off the main actor: it reads a file and opens a record per vault file.
+    func vaultFileNames(_ remote: VaultRemote) async -> [String: String] {
+        await Task.detached(priority: .userInitiated) { Self.vaultFileNames(of: remote) }.value
+    }
+
+    nonisolated static func vaultFileNames(of remote: VaultRemote) -> [String: String] {
         let st = remote.sync.load()
         var out: [String: String] = [:]
         for (fid, e) in st.files {
@@ -110,7 +121,21 @@ extension Shop {
         words.callIt("mac.vl_whatsapp_text", ["link": .string(link.url)])
     }
 
-    func copyLink(_ link: VaultLink) { FileActions.copy(link.url) }
+    /// On the pasteboard marked CONCEALED and TRANSIENT (nspasteboard.org):
+    /// clipboard managers and history tools that honour the markers neither
+    /// show nor keep it. The link is a key to the files.
+    func copyLink(_ link: VaultLink) {
+        let item = NSPasteboardItem()
+        item.setString(link.url, forType: .string)
+        for marker in Self.secretPasteboardMarkers { item.setData(Data(), forType: marker) }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.writeObjects([item])
+    }
+
+    nonisolated static let secretPasteboardMarkers = [
+        NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"),
+        NSPasteboard.PasteboardType("org.nspasteboard.TransientType"),
+    ]
 
     /// Open WhatsApp on this Mac with the message ready, for the shop to
     /// choose who it goes to. True when WhatsApp opened; otherwise the link is

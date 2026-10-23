@@ -66,6 +66,27 @@ struct VaultLinksUITests {
         }
     }
 
+    @Test("Vault links UI: a failed cleanup is never reported as nothing shared, and the cloud's refusals read")
+    func problems() {
+        let shop = Shop()
+        let live = shop.linkProblem(VaultLinks.Failure.incomplete(grantId: "g", sent: 500, total: 501, revoked: false, why: ""))
+        let dead = shop.linkProblem(VaultLinks.Failure.incomplete(grantId: "g", sent: 500, total: 501, revoked: true, why: ""))
+        #expect(live == shop.words.callIt("mac.vl_err_incomplete_live") && dead == shop.words.callIt("mac.vl_err_incomplete"))
+        #expect(shop.linkProblem(VaultClient.Failure.fileTooLarge(limit: 0)) == shop.words.callIt("mac.vl_err_too_big"))
+        #expect(shop.linkProblem(VaultClient.Failure.notFound("unknown-grant")) == shop.words.callIt("mac.vl_err_unknown_grant"))
+        #expect(shop.linkProblem(VaultClient.Failure.notYet) == shop.words.callIt("mac.vl_err_not_yet"))
+    }
+
+    @Test("Vault links UI: a copied link is marked concealed and transient, for clipboard managers")
+    func pasteboardMarkers() throws {
+        #expect(Set(Shop.secretPasteboardMarkers.map(\.rawValue))
+                == ["org.nspasteboard.ConcealedType", "org.nspasteboard.TransientType"])
+        // Both copies go through copyLink: the button and the WhatsApp fallback.
+        let s = try Self.source("Shop+VaultLinks.swift")
+        #expect(!s.contains("FileActions.copy(link"))
+        #expect(s.components(separatedBy: "copyLink(link)").count - 1 >= 1)
+    }
+
     @Test("Vault links UI: the WhatsApp message carries the link, never the password")
     func message() throws {
         let shop = Shop()

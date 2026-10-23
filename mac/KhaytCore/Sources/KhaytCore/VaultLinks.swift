@@ -34,7 +34,9 @@ public struct VaultLink: Sendable, Equatable, CustomStringConvertible, CustomDeb
     /// The link a recipient pasted: `…/s/{grantId}#{secret}`, any origin.
     public static func parse(_ text: String) throws -> VaultLink {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let hash = t.firstIndex(of: "#"), let s = t.range(of: "/s/") else {
+        // "/s/" is looked for only BEFORE the "#": one in the fragment is
+        // part of the secret's text, and a range from it would run backwards.
+        guard let hash = t.firstIndex(of: "#"), let s = t.range(of: "/s/", range: t.startIndex..<hash) else {
             throw VaultCrypto.Failure.badInput("not a Khayt share link")
         }
         let origin = String(t[..<s.lowerBound])
@@ -71,31 +73,67 @@ public struct VaultLink: Sendable, Equatable, CustomStringConvertible, CustomDeb
 ///   still travel with the book, into backups and restores, and are opened on
 ///   whichever Mac can open them. Nothing but this Mac needs the secret: the
 ///   recipient has it in the URL already.
-/// * **This Mac's login Keychain**, one generic password per link, never
-///   synchronised to iCloud (`kSecAttrSynchronizable: false`), as
-///   `CloudKeyMemory` keeps the shop's DEK. The cost, accepted: "Copy link"
+/// * **This Mac's Keychain**, one generic password per link, never
+///   synchronised to iCloud and bound to this device
+///   (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`; which Keychain is
+///   in `VaultLinkKeychain`). The cost, accepted: "Copy link"
 ///   works only on the Mac that made the link. Another device sees the link,
 ///   its downloads and its events, and can revoke or extend it, which needs no
 ///   secret.
 ///
 /// The link key is kept beside the secret. For a password link it is the
-/// password's work, but anyone who can read this Keychain item can already
-/// read the shop's DEK from the item beside it, and with it every file. It
-/// adds no exposure, and adding a newer version to a password link then does
-/// not ask for the password again. The PASSWORD itself is never stored.
-public struct VaultLinkSecret: Sendable, Equatable, CustomStringConvertible {
+/// password's work. Whoever can read this app's Keychain items on this Mac
+/// can usually read the shop's DEK too (`CloudKeyMemory`, when the shop let
+/// the Mac remember it), and with it every file, so it adds little exposure
+/// there. On a Mac that does not remember the DEK, it opens this link's
+/// files without the password. It is kept so that adding a newer version to
+/// a password link does not ask for the password again. The PASSWORD itself
+/// is never stored.
+///
+/// ── THE PENDING MARKER ─────────────────────────────────────────────────
+///
+/// A link too big for one request is created with its first batch and grown
+/// with PATCHes. Until the last batch lands it is HALF-MADE: live on the
+/// cloud, missing files. `pendingSince` is set when the secret is first kept
+/// and cleared only after the last batch succeeds. While it is set, Copy Link
+/// is not offered; the Links sheet calls the link incomplete and offers
+/// Revoke; and `VaultLinks.tidy` revokes it once it is older than
+/// `VaultLinks.pendingGrace`, which covers an app that died mid-way.
+public struct VaultLinkSecret: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible,
+                               CustomReflectable {
     let secret: Data
     let linkKey: Data
-    init(secret: Data, linkKey: Data) { self.secret = secret; self.linkKey = linkKey }
+    /// Set while the link is half-made (see above). Whole seconds.
+    let pendingSince: Date?
+    init(secret: Data, linkKey: Data, pendingSince: Date? = nil) {
+        self.secret = secret; self.linkKey = linkKey
+        self.pendingSince = pendingSince.map { Date(timeIntervalSince1970: $0.timeIntervalSince1970.rounded(.down)) }
+    }
 
-    public var description: String { "VaultLinkSecret(withheld)" }
+    public var isPending: Bool { pendingSince != nil }
+    public var description: String { "VaultLinkSecret(withheld\(isPending ? ", pending" : ""))" }
+    public var debugDescription: String { description }
+    public var customMirror: Mirror { Mirror(self, children: ["pending": isPending], displayStyle: .struct) }
 
-    /// v1 || secret(32) || linkKey(32).
-    var bytes: Data { Data([1]) + secret + linkKey }
+    func done() -> VaultLinkSecret { VaultLinkSecret(secret: secret, linkKey: linkKey) }
+
+    /// v2 || secret(32) || linkKey(32) || pendingSince (u64 BE seconds, 0 = none).
+    /// v1 (no marker) is still read, as not pending.
+    var bytes: Data {
+        let t = UInt64(max(0, pendingSince?.timeIntervalSince1970 ?? 0))
+        return Data([2]) + secret + linkKey + Data((0..<8).reversed().map { UInt8(truncatingIfNeeded: t >> ($0 * 8)) })
+    }
     init?(bytes: Data) {
         let b = Data(bytes)
-        guard b.count == 65, b.first == 1 else { return nil }
-        secret = b.subdata(in: 1..<33); linkKey = b.subdata(in: 33..<65)
+        switch (b.first, b.count) {
+        case (1, 65):
+            secret = b.subdata(in: 1..<33); linkKey = b.subdata(in: 33..<65); pendingSince = nil
+        case (2, 73):
+            secret = b.subdata(in: 1..<33); linkKey = b.subdata(in: 33..<65)
+            let t = b.subdata(in: 65..<73).reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+            pendingSince = t == 0 ? nil : Date(timeIntervalSince1970: TimeInterval(t))
+        default: return nil
+        }
     }
 }
 
@@ -109,44 +147,82 @@ public protocol VaultLinkSecretStore: Sendable {
 /// this stays portable. Every call runs off the caller's actor, because
 /// `SecItemCopyMatching` blocks and a Keychain prompt in front of it would
 /// freeze a window.
+///
+/// ── WHICH KEYCHAIN ──────────────────────────────────────────────────────
+///
+/// The data-protection Keychain (`kSecUseDataProtectionKeychain`), readable
+/// after the first unlock and never leaving this device
+/// (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`), as on iOS. On a Mac
+/// that one needs the app's signed keychain entitlement. A build without it
+/// (an unsigned debug build) is refused with `errSecMissingEntitlement`, and
+/// then the item goes to the login Keychain with the same accessibility, as
+/// `LanIdentity` keeps its key. A read tries the data-protection Keychain
+/// first, then the login one; an item found only in the login one is moved
+/// to the data-protection one when it accepts it.
 public struct VaultLinkKeychain: VaultLinkSecretStore {
     public static let service = "Khayt Vault Link"
     public init() {}
 
-    static func query(_ shopId: String, _ grantId: String) -> [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: service,
-         kSecAttrAccount as String: shopId + "/" + grantId,
-         kSecAttrSynchronizable as String: false]
+    static func query(_ shopId: String, _ grantId: String, dataProtection: Bool) -> [String: Any] {
+        var q: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                kSecAttrService as String: service,
+                                kSecAttrAccount as String: shopId + "/" + grantId,
+                                kSecAttrSynchronizable as String: false]
+        if dataProtection { q[kSecUseDataProtectionKeychain as String] = true }
+        return q
+    }
+
+    /// Add, replacing any earlier item in that Keychain. The status.
+    static func add(_ value: Data, _ shopId: String, _ grantId: String, dataProtection: Bool) -> OSStatus {
+        let base = query(shopId, grantId, dataProtection: dataProtection)
+        SecItemDelete(base as CFDictionary)
+        var add = base
+        add[kSecValueData as String] = value
+        add[kSecAttrLabel as String] = "Khayt share link (\(grantId))"
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        return SecItemAdd(add as CFDictionary, nil)
+    }
+
+    static func read(_ shopId: String, _ grantId: String, dataProtection: Bool) -> Data? {
+        var q = query(shopId, grantId, dataProtection: dataProtection)
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess else { return nil }
+        return out as? Data
     }
 
     public func save(_ s: VaultLinkSecret, shopId: String, grantId: String) async -> Bool {
         let value = s.bytes
         return await Task.detached(priority: .utility) {
-            let base = Self.query(shopId, grantId)
-            SecItemDelete(base as CFDictionary)
-            var add = base
-            add[kSecValueData as String] = value
-            add[kSecAttrLabel as String] = "Khayt share link (\(grantId))"
-            return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+            if Self.add(value, shopId, grantId, dataProtection: true) == errSecSuccess {
+                // Not two copies: an older login-Keychain item would be read
+                // back if this one were ever lost.
+                SecItemDelete(Self.query(shopId, grantId, dataProtection: false) as CFDictionary)
+                return true
+            }
+            return Self.add(value, shopId, grantId, dataProtection: false) == errSecSuccess
         }.value
     }
 
     public func load(shopId: String, grantId: String) async -> VaultLinkSecret? {
         let raw = await Task.detached(priority: .userInitiated) { () -> Data? in
-            var q = Self.query(shopId, grantId)
-            q[kSecReturnData as String] = true
-            q[kSecMatchLimit as String] = kSecMatchLimitOne
-            var out: CFTypeRef?
-            guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess else { return nil }
-            return out as? Data
+            if let d = Self.read(shopId, grantId, dataProtection: true) { return d }
+            guard let d = Self.read(shopId, grantId, dataProtection: false) else { return nil }
+            // Written before this build, or where the data-protection one
+            // refused: move it over when it will take it.
+            if Self.add(d, shopId, grantId, dataProtection: true) == errSecSuccess {
+                SecItemDelete(Self.query(shopId, grantId, dataProtection: false) as CFDictionary)
+            }
+            return d
         }.value
         return raw.flatMap(VaultLinkSecret.init(bytes:))
     }
 
     public func forget(shopId: String, grantId: String) async {
         await Task.detached(priority: .utility) {
-            _ = SecItemDelete(Self.query(shopId, grantId) as CFDictionary)
+            _ = SecItemDelete(Self.query(shopId, grantId, dataProtection: true) as CFDictionary)
+            _ = SecItemDelete(Self.query(shopId, grantId, dataProtection: false) as CFDictionary)
         }.value
     }
 }
@@ -419,6 +495,10 @@ public struct VaultLinks: Sendable {
     /// Test-only seams: `internal`, so only `@testable` code reaches them.
     var scryptN = VaultCrypto.linkScrypt.n
     var newGrantId: @Sendable () -> String = { VaultCrypto.newGrantId() }
+    var now: @Sendable () -> Date = { Date() }
+
+    /// How long a half-made link may stay pending before `tidy` revokes it.
+    public static let pendingGrace: TimeInterval = 10 * 60
 
     public init(client: VaultClient, keys: VaultKeys, secrets: any VaultLinkSecretStore, origin: String? = nil) {
         self.client = client; self.keys = keys; self.secrets = secrets
@@ -476,7 +556,7 @@ public struct VaultLinks: Sendable {
         return (out, missing)
     }
 
-    public struct Options: Sendable, Equatable {
+    public struct Options: Sendable, Equatable, CustomReflectable {
         public var maxDownloads: Int?
         public var perFile = false
         public var expiresAt: Date?
@@ -490,6 +570,13 @@ public struct VaultLinks: Sendable {
                     maxDevices: Int? = nil, password: String? = nil, note: String? = nil) {
             self.maxDownloads = maxDownloads; self.perFile = perFile; self.expiresAt = expiresAt
             self.validForSec = validForSec; self.maxDevices = maxDevices; self.password = password; self.note = note
+        }
+        /// The password and the note never print.
+        public var customMirror: Mirror {
+            Mirror(self, children: ["maxDownloads": maxDownloads as Any, "perFile": perFile,
+                                    "expiresAt": expiresAt as Any, "validForSec": validForSec as Any,
+                                    "maxDevices": maxDevices as Any, "password": password == nil ? "none" : "withheld",
+                                    "note": note == nil ? "none" : "withheld"], displayStyle: .struct)
         }
         var limits: VaultClient.GrantLimits {
             VaultClient.GrantLimits(maxDownloads: maxDownloads, perFile: perFile && maxDownloads != nil ? true : nil,
@@ -514,12 +601,17 @@ public struct VaultLinks: Sendable {
     // MARK: Preparing items
 
     /// What sharing one file needs, worked out once (independent of the grant id).
-    struct Prepared: Sendable {
+    struct Prepared: Sendable, CustomReflectable {
         let fileId: String
         let version: Int
         let uploadId: String
         let dk: Data
         let meta: VaultCrypto.LinkMeta
+        /// The DK never prints.
+        var customMirror: Mirror {
+            Mirror(self, children: ["fileId": fileId, "version": version, "uploadId": uploadId, "dk": "withheld"],
+                   displayStyle: .struct)
+        }
     }
 
     func prepare(_ s: Source) throws -> Prepared {
@@ -622,10 +714,12 @@ public struct VaultLinks: Sendable {
             } catch VaultClient.Failure.grantExists {
                 continue   // someone, somewhere, has this id: a new id, a new secret, everything sealed again
             }
-            // Kept BEFORE the rest is sent, so a half-made link can still be
-            // found and revoked by this device if the app dies mid-way.
-            let kept = await secrets.save(VaultLinkSecret(secret: secret, linkKey: linkKey), shopId: shopId,
-                                          grantId: grantId)
+            // Kept BEFORE the rest is sent, marked PENDING while there is a
+            // rest: a half-made link is never offered for copying, and is
+            // found and revoked (`tidy`) if the app dies mid-way.
+            let whole = VaultLinkSecret(secret: secret, linkKey: linkKey)
+            let half = batches.count > 1 ? VaultLinkSecret(secret: secret, linkKey: linkKey, pendingSince: now()) : whole
+            var kept = await secrets.save(half, shopId: shopId, grantId: grantId)
             var sent = batches[0].count
             for batch in batches.dropFirst() {
                 do {
@@ -633,11 +727,15 @@ public struct VaultLinks: Sendable {
                     sent += batch.count
                 } catch {
                     let revoked = (try? await client.patchGrant(grantId, VaultClient.GrantPatch(revoke: true))) != nil
-                    await secrets.forget(shopId: shopId, grantId: grantId)
+                    // Forgotten only once it is dead. A revoke that failed
+                    // leaves the pending record, so Links shows the link as
+                    // incomplete with Revoke, and `tidy` tries again.
+                    if revoked { await secrets.forget(shopId: shopId, grantId: grantId) }
                     throw Failure.incomplete(grantId: grantId, sent: sent, total: items.count, revoked: revoked,
                                              why: String(describing: error))
                 }
             }
+            if batches.count > 1 { kept = await secrets.save(whole, shopId: shopId, grantId: grantId) }
             return Created(link: try VaultLink(origin: origin, grantId: grantId, secret: secret), createdAt: createdAt,
                            items: items.count, requests: batches.count, secretKept: kept)
         }
@@ -649,10 +747,52 @@ public struct VaultLinks: Sendable {
     public func list() async throws -> [VaultClient.Grant] { try await client.grants() }
     public func events(_ grantId: String) async throws -> [VaultClient.GrantEvent] { try await client.grantEvents(grantId) }
 
-    /// The link again, for "Copy link", when this device made it.
+    /// The link again, for "Copy link", when this device made it and it is
+    /// whole. Never for a half-made (pending) link.
     public func link(_ grantId: String) async -> VaultLink? {
-        guard let s = await secrets.load(shopId: shopId, grantId: grantId) else { return nil }
+        guard let s = await secrets.load(shopId: shopId, grantId: grantId), !s.isPending else { return nil }
         return try? VaultLink(origin: origin, grantId: grantId, secret: s.secret)
+    }
+
+    /// What this device knows of a link beyond the cloud's listing.
+    public enum Local: Sendable, Equatable {
+        /// Made elsewhere, or forgotten: no Copy Link here.
+        case none
+        /// Whole, and its secret is here: Copy Link.
+        case copyable
+        /// Half-made: no Copy Link; shown incomplete, with Revoke.
+        case incomplete
+    }
+
+    /// Bring this device's records level with the cloud's list, and say
+    /// what each link is here (for the Links sheet, on every load):
+    /// * a link the cloud no longer calls `ok` (revoked elsewhere, expired,
+    ///   used up) has its secret forgotten: a dead link is never copied;
+    /// * a link still pending after `pendingGrace` is revoked (the app died
+    ///   mid-way, or a cleanup revoke failed) and forgotten.
+    /// Returns the grants as they now stand, and each one's local state.
+    public func tidy(_ grants: [VaultClient.Grant]) async -> (grants: [VaultClient.Grant], local: [String: Local]) {
+        var out: [VaultClient.Grant] = [], local: [String: Local] = [:]
+        for var g in grants {
+            let kept = await secrets.load(shopId: shopId, grantId: g.grantId)
+            if g.state != .ok {
+                if kept != nil { await secrets.forget(shopId: shopId, grantId: g.grantId) }
+                local[g.grantId] = Local.none
+            } else if let kept, let since = kept.pendingSince {
+                if now().timeIntervalSince(since) > Self.pendingGrace,
+                   let revoked = try? await client.patchGrant(g.grantId, VaultClient.GrantPatch(revoke: true)) {
+                    await secrets.forget(shopId: shopId, grantId: g.grantId)
+                    g = revoked
+                    local[g.grantId] = Local.none
+                } else {
+                    local[g.grantId] = .incomplete
+                }
+            } else {
+                local[g.grantId] = kept == nil ? Local.none : .copyable
+            }
+            out.append(g)
+        }
+        return (out, local)
     }
 
     @discardableResult
@@ -662,6 +802,10 @@ public struct VaultLinks: Sendable {
     }
 
     /// A new end date, or none (`nil`).
+    ///
+    /// TODO(vault-links): a link with `validForSec` ends at first open +
+    /// validForSec as well; extending the date alone does not move that, and
+    /// the contract has no PATCH for it yet.
     @discardableResult
     public func extend(_ grantId: String, to date: Date?) async throws -> VaultClient.Grant {
         try await client.patchGrant(grantId, VaultClient.GrantPatch(expiresAt: date.map { .at(Self.iso($0)) } ?? .never))
@@ -677,6 +821,10 @@ public struct VaultLinks: Sendable {
 
     /// Add files to a link, or move files on it to their newer heads. Needs
     /// the link key this device kept when it made the link.
+    ///
+    /// TODO(vault-links): no screen calls this yet. Before one does, mark the
+    /// link pending across its PATCH batches as `create` does, and decide what
+    /// a failed later batch means for a link that was whole before.
     @discardableResult
     public func addItems(_ grantId: String, _ sources: [Source]) async throws -> VaultClient.Grant {
         guard !sources.isEmpty else { throw Failure.nothingToShare }

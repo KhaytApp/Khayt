@@ -28,7 +28,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
     address, so the link is not put into a web request on the way.
   - A big selection is sent in batches under the cloud's limits (500 files and
     16 MB a request). If a later batch fails, the half-made link is revoked, so
-    a link is never quietly missing files.
+    a link is never quietly missing files. If even that revoke fails, or the
+    app quits mid-way, Share Links shows the link as incomplete, with no Copy
+    Link, and revokes it after ten minutes. A copied link is marked so that
+    clipboard managers do not show or keep it.
   - All of this shows only when the library is stored in Khayt Vault, which no
     shop can choose yet. In English and Arabic, light and dark.
 

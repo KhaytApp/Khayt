@@ -44,6 +44,8 @@ final class VaultStub: @unchecked Sendable {
     var grantPatches = 0
     /// Fail the PATCH with this 1-based number (a later batch dying).
     var failPatchNumber: Int?
+    /// Refuse every revoke (a cleanup that cannot reach the cloud).
+    var failRevoke = false
     var maxActiveLinks = 100
     struct Logged { let method: String; let url: String; let body: Data; let headers: [String: String] }
 
