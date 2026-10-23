@@ -39,6 +39,9 @@ final class LibraryMemo {
         var creator: String?
         var printNext: Bool
         var duplicates: Bool
+        var storage: LibraryStorageFilter?
+        /// `librarySyncRevision`: a model moved out or brought back.
+        var sync: Int
         var sort: LibrarySort
         /// Trimmed and folded.
         var query: String
@@ -72,6 +75,9 @@ final class LibraryMemo {
         var folds = 0
         /// Questions put to the disk about a thumbnail.
         var diskChecks = 0
+        /// Searches a recount of the chips ran over the book — one per
+        /// recount, however many pools it counts.
+        var facetSearches = 0
     }
 
     var work = Work()
@@ -86,7 +92,51 @@ final class LibraryMemo {
 
     /// Each model's search text, folded, for the book revision it was made at.
     var foldedRevision = -1
-    var folded: [LibraryFile.ID: [String]] = [:]
+    var folded: [LibraryFile.ID: Folded] = [:]
+
+    /// One model's text, folded once: what the free search reads, and what
+    /// each kind of token (`LibraryQuery.Field`) reads.
+    ///
+    /// Held as UTF-8 bytes, folded and composed, and matched with `memmem`:
+    /// a recount runs the search over every model, and the Foundation
+    /// comparison of the same folded text took 80 ms per pass at 6,600 models
+    /// (Oct 2026 review bench). Both sides are folded by `SearchText` first,
+    /// so a byte match is the comparison the folding was for.
+    struct Folded {
+        var free: [[UInt8]]
+        var tags: [[UInt8]]
+        var group: [[UInt8]]
+        var category: [[UInt8]]
+        var materials: [[UInt8]]
+        var creators: [[UInt8]]
+
+        init(_ file: LibraryFile) {
+            func f(_ list: [String]) -> [[UInt8]] { list.map(Self.bytes).filter { !$0.isEmpty } }
+            free = f(file.searchFields)
+            tags = f(file.tags ?? [])
+            group = f([file.groupName ?? ""])
+            category = f([file.category ?? ""])
+            materials = f([file.material ?? "", file.parsed?.filamentType ?? ""])
+            creators = f([file.creator ?? "", file.source ?? ""])
+        }
+
+        /// Text as the matcher compares it.
+        static func bytes(_ text: String) -> [UInt8] {
+            Array(SearchText.fold(text).precomposedStringWithCanonicalMapping.utf8)
+        }
+
+        /// Does any of `fields` hold `needle`?
+        static func any(_ fields: [[UInt8]], _ needle: [UInt8]) -> Bool {
+            guard !needle.isEmpty else { return true }
+            return needle.withUnsafeBytes { n in
+                fields.contains { hay in
+                    hay.count >= n.count && hay.withUnsafeBytes { h in
+                        memmem(h.baseAddress, h.count, n.baseAddress, n.count) != nil
+                    }
+                }
+            }
+        }
+    }
 
     /// `files` by id, for the book revision it was made at.
     var byIdRevision = -1
@@ -122,6 +172,7 @@ extension Shop {
                      neverPrinted: libraryNeverPrintedOnly, readyOn: libraryReadyOn,
                      category: libraryCategory, tag: libraryTag, creator: libraryCreator,
                      printNext: libraryPrintNextOnly, duplicates: libraryDuplicatesOnly,
+                     storage: libraryStorage, sync: libraryStorage == nil ? 0 : librarySyncRevision,
                      sort: librarySort,
                      query: SearchText.fold(search.trimmingCharacters(in: .whitespaces)))
     }
@@ -132,12 +183,16 @@ extension Shop {
         let memo = libraryMemo
         if memo.shownKey == key { return memo.shown }
         let rows: [LibraryFile]
-        if let old = memo.shownKey, old.sameView(as: key), !old.query.isEmpty, key.query.contains(old.query) {
+        if let old = memo.shownKey, old.sameView(as: key), !old.query.isEmpty,
+           LibraryQuery.parse(key.query).narrows(from: LibraryQuery.parse(old.query)) {
             // Typed one more letter: everything the longer search finds, the
-            // shorter one found too, already filtered and in order.
+            // shorter one found too, already filtered and in order. Asked of
+            // the PARSED search, not the string: `tag` → `tag:` is longer and
+            // not narrower (`LibraryQuery.narrows`).
             memo.work.narrowed += 1
             memo.work.rowsSearched += memo.shown.count
-            rows = memo.shown.filter { matchesSearch($0, key.query) }
+            let matches = searchMatcher(LibraryQuery.parse(key.query))
+            rows = memo.shown.filter(matches)
         } else {
             memo.work.builds += 1
             rows = buildShownFiles(query: key.query)
@@ -150,20 +205,62 @@ extension Shop {
     /// Does this model's search text hold `q` (already folded)? The same
     /// answer as `LibraryFile.matches(folded:)`, from text folded once.
     func matchesSearch(_ file: LibraryFile, _ q: String) -> Bool {
+        searchMatcher(LibraryQuery.parse(q))(file)
+    }
+
+    /// One model's folded text, from the memo.
+    func foldedText(_ file: LibraryFile) -> LibraryMemo.Folded {
         let memo = libraryMemo
         if memo.foldedRevision != filesRevision {
             memo.foldedRevision = filesRevision
             memo.folded = [:]
         }
-        let fields: [String]
-        if let known = memo.folded[file.id] {
-            fields = known
-        } else {
-            fields = file.searchFields.map(SearchText.fold)
-            memo.folded[file.id] = fields
-            memo.work.folds += 1
+        if let known = memo.folded[file.id] { return known }
+        let made = LibraryMemo.Folded(file)
+        memo.folded[file.id] = made
+        memo.work.folds += 1
+        return made
+    }
+
+    /// The test a search puts each model to, made once per pass: what
+    /// `printer:` asks is worked out here for the whole book (which models are
+    /// ready on a machine of that name), not once per model.
+    ///
+    /// `printer:` is the Ready on menu typed: a model every colour of which is
+    /// loaded on a machine whose name holds the value, in a material that
+    /// fits — so, like that menu, it finds nothing on a machine that does not
+    /// say what it has loaded.
+    func searchMatcher(_ query: LibraryQuery) -> (LibraryFile) -> Bool {
+        let readyFor: [[String: Bool]] = query.tokens.filter { $0.field == .printer }.map { token in
+            var ids: [String: Bool] = [:]
+            for machine in machines where SearchText.fold(machine.name).localizedStandardContains(token.folded) {
+                for id in readyByMachine[machine.id] ?? [] { ids[id] = true }
+            }
+            return ids
         }
-        return fields.contains { !$0.isEmpty && $0.localizedStandardContains(q) }
+        let text = LibraryMemo.Folded.bytes(query.text)
+        let tokens = query.tokens.map { ($0.field, LibraryMemo.Folded.bytes($0.folded)) }
+        let any = LibraryMemo.Folded.any
+        return { [self] file in
+            let f = foldedText(file)
+            if !text.isEmpty, !any(f.free, text) { return false }
+            var printer = 0
+            for (field, v) in tokens {
+                let ok: Bool
+                switch field {
+                case .tag: ok = any(f.tags, v)
+                case .group: ok = any(f.group, v)
+                case .category: ok = any(f.category, v)
+                case .material: ok = any(f.materials, v)
+                case .creator: ok = any(f.creators, v)
+                case .printer:
+                    ok = readyFor[printer][file.id] == true
+                    printer += 1
+                }
+                if !ok { return false }
+            }
+            return true
+        }
     }
 
     /// `shownEntries` and the model tiles in it, from the memo when nothing

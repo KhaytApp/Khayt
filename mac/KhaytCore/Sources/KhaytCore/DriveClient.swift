@@ -56,7 +56,7 @@ public actor DriveClient {
         case noFolder
     }
 
-    let config: Config
+    public nonisolated let config: Config
     let fetch: S3.Fetch
     /// A model's bytes, straight to a file (`S3.Download`); over `fetch`
     /// unless the caller has a real one.

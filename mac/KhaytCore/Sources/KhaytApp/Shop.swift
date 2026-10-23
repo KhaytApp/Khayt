@@ -54,10 +54,47 @@ final class Shop {
     /// Only ever the book's own records: a put-aside model stays in here.
     func showLibraryFiles(_ next: [LibraryFile]) { files = next }
 
-    /// Show the models that have been put aside. Off: they are still there.
+    /// The Archived view: only the models that have been put aside, where they
+    /// can be restored. Off, they are still in the book, just not offered.
     var libraryShowArchived = false {
-        didSet { if libraryShowArchived != oldValue { pruneSelectionToVisible() } }
+        didSet { if libraryShowArchived != oldValue { libraryViewChanged() } }
     }
+
+    /// Where each model's bytes are on this Mac — see `LibrarySyncIndex`.
+    /// Nil until the book's library has been looked at, and for the sample.
+    @ObservationIgnored var syncIndex: LibrarySyncIndex?
+    @ObservationIgnored var syncIndexTask: Task<Void, Never>?
+    /// Which models can start on each machine, for the book revision and the
+    /// spools it was worked out from (`readLibraryFacets`).
+    /// The engine's category and tag counts, for the pool they were counted
+    /// over (a hash of the book revision and the pool's ids).
+    @ObservationIgnored var facetCountMemo: [String: (key: Int, rows: [KhaytEngine.GroupCount])] = [:]
+    @ObservationIgnored var readyMemo: [String: (revision: Int, loaded: [KhaytEngine.LoadedSlot], ids: Set<String>)] = [:]
+    /// Bumped on every change to `syncIndex`, which is how a tile's badge and
+    /// the library's lists know to look again.
+    var librarySyncRevision = 0
+    /// Online only, or on this Mac only — the Show menu's storage pair.
+    var libraryStorage: LibraryStorageFilter? { didSet { libraryViewChanged() } }
+    /// Whether the library has somewhere online to be, so "on this Mac only"
+    /// is worth saying on a tile at all.
+    var libraryHasRemote = false
+    /// Which remote that is (`CloudLibrary.remoteIdentity`): a "backed up"
+    /// proved anywhere else reads as on this Mac only.
+    var libraryRemoteId: String?
+    /// The Drive identity, for the sealed settings it was opened from.
+    @ObservationIgnored var driveIdentityCache: (key: String, id: String)?
+    /// Models whose index entry is being read again from the disk.
+    @ObservationIgnored var syncCorrecting: Set<String> = []
+    /// A part of the model inspector to bring into view ("model-title",
+    /// "model-storage") — for the snapshot run, which cannot scroll.
+    var libraryInspectorScrollTo: String?
+    /// A model an open job needs, waiting for "Free Up Space anyway".
+    var pendingFreeUp: LibraryFile?
+
+    /// The model whose title is being edited in the inspector, from its
+    /// pencil, the right-click menu or Model ▸ Rename. One field, wherever it
+    /// was asked for, so the three cannot each grow their own.
+    var renamingFileId: LibraryFile.ID?
 
     /// How many are hidden right now, so the library can offer to show them
     /// rather than leave a shop wondering where a model went.
@@ -157,7 +194,11 @@ final class Shop {
 
     /// May this app change anything? False for the sample, and false whenever
     /// the Electron app has the book.
-    var canWrite: Bool { ownership != nil }
+    var canWrite: Bool { ownership != nil || pretendsWritable }
+    /// The snapshot run's sample, drawn as a book this app could change, so
+    /// the controls that appear only then (a rename pencil, Restore) are in
+    /// the picture. The sample has no build, so every write still refuses.
+    var pretendsWritable = false
     /// The last refusal, for the screen to say out loud. A write that fails
     /// silently is worse than one that never ran.
     var writeProblem: String?
@@ -173,7 +214,7 @@ final class Shop {
     /// The tax's name in the app's language — "VAT", «ضريبة القيمة المضافة» —
     /// for a line that labels a figure with it. Nil for an unregistered shop.
     private(set) var taxName: String?
-    var settingsValue: JSONValue = .object([:])
+    var settingsValue: JSONValue = .object([:]) { didSet { refreshLibraryRemote() } }
 
     /// Give a shop a mail provider, for a test. The book on disk is not
     /// touched — `pretendMode`'s sibling, and there for the same reason.
@@ -865,6 +906,8 @@ final class Shop {
             // A library write that landed during the await above has put the
             // newer settings (group kinds, covers) on screen already.
             if libraryEpoch == readMark { settingsValue = root["settings"] ?? .object([:]) }
+            // After the settings: the index is read against THIS book's remote.
+            openSyncIndex()
             await readFeatures()
             if overtaken() { return }
             // A shop that has just switched to Simple must not be left looking
@@ -2727,7 +2770,12 @@ final class Shop {
     /// asked of a JavaScript rule, which reads records rather than `LibraryFile`
     /// — and re-encoding the decoded ones per keystroke would be a hop for a
     /// round trip.
-    var libraryRows: [JSONValue] = []
+    var libraryRows: [JSONValue] = [] { didSet { libraryRowsRevision &+= 1 } }
+    /// Bumped with every change to `libraryRows`. The chips' caches key on
+    /// THIS, not `filesRevision`: a load assigns `files` well before it
+    /// assigns these rows, and a recount between the two cached the old rows'
+    /// counts under the new book's revision.
+    @ObservationIgnored private(set) var libraryRowsRevision = 0
 
     /// Recount the chips. Called from the setters below rather than by the
     /// views, so a chip cannot be added to a screen and quietly left stale.

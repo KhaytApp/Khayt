@@ -17,7 +17,15 @@ struct LibraryInspector: View {
         if shop.selectedFiles.count > 1 {
             ManyModels(shop: shop)
         } else if let file = shop.selectedFile {
-            ScrollView { page(file) }
+            ScrollViewReader { proxy in
+                ScrollView { page(file) }
+                    .onChange(of: shop.libraryInspectorScrollTo) { _, to in
+                        if let to { proxy.scrollTo(to, anchor: .top) }
+                    }
+                    .onAppear {
+                        if let to = shop.libraryInspectorScrollTo { proxy.scrollTo(to, anchor: .top) }
+                    }
+            }
             // Keyed on the file, not on the book: these are facts about one
             // record and nothing else on this screen moves them.
             .task(id: file.id) {
@@ -44,6 +52,11 @@ struct LibraryInspector: View {
             PhotoSection(shop: shop, file: file)
             LayerRule()
             theFile(file)
+            if shop.libraryHasRemote || shop.storageState(for: file) == .online {
+                LayerRule()
+                StorageSection(shop: shop, file: file)
+                    .id("model-storage")
+            }
             if let sliced = slicedSection(file) {
                 LayerRule()
                 sliced
@@ -94,6 +107,7 @@ struct LibraryInspector: View {
             provenance(file)
             guides(file)
             actions(file)
+            if !file.isArchived { archiveButton(file) }
             if let notes = file.testedNotes, !notes.isEmpty {
                 LayerRule()
                 DetailSection(shop.words.callIt("doc.notes")) { Text(notes).textSelection(.enabled) }
@@ -145,6 +159,45 @@ struct LibraryInspector: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             quoteOrJob(file)
         }
+    }
+
+    /// "Archived 12 Oct 2026", and Restore beside it.
+    /// The note on a line of its own and Restore under it: side by side in
+    /// the inspector's width, the date broke over two lines.
+    private func archivedNote(_ file: LibraryFile) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(archivedSentence(file), systemImage: "archivebox")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { shop.unarchive([file.id]) } label: {
+                Label(shop.words.callIt("mac.unarchive_model"), systemImage: "arrow.uturn.backward")
+            }
+            .controlSize(.small)
+            .disabled(!shop.canWrite)
+        }
+    }
+
+    private func archivedSentence(_ file: LibraryFile) -> String {
+        // In the book's calendar (`Words.say`), never `Calendar.current`.
+        guard let when = Calendar.instant(file.archivedAt ?? "") else {
+            return shop.words.callIt("mac.archived_undated")
+        }
+        let day = shop.words.say(when, .dateTime.day().month(.abbreviated).year())
+        return shop.words.callIt("mac.archived_on", ["date": .string(day)])
+    }
+
+    /// Archive, on its own line under the rest: it changes what the library
+    /// offers, and does nothing to the file — so it is not with the buttons
+    /// that open the file.
+    private func archiveButton(_ file: LibraryFile) -> some View {
+        Button { shop.archive([file.id]) } label: {
+            Label(shop.words.callIt("mac.archive_model"), systemImage: "archivebox")
+        }
+        .controlSize(.small)
+        .disabled(!shop.canWrite)
+        .help(shop.words.callIt("mac.archive_help"))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Quote this model — or take the job — on its own figures, without
@@ -228,10 +281,13 @@ struct LibraryInspector: View {
                 } else if file.isFavourite {
                     Image(systemName: "star.fill").foregroundStyle(Khayt.marked)
                 }
-                Text(file.title)
-                    .font(.title3.weight(.semibold))
-                    .textSelection(.enabled)
+                ModelTitle(shop: shop, file: file)
             }
+            .id("model-title")
+            // PUT ASIDE, and said so where the eye is, with the way back. A
+            // model found through Spotlight or a job opens here even while it
+            // is archived, and should not read as one still on offer.
+            if file.isArchived { archivedNote(file) }
             if let problem = shop.writeProblem {
                 Label(problem, systemImage: "exclamationmark.triangle")
                     .font(.caption)
@@ -880,5 +936,122 @@ struct PartsSection: View {
 
     static func bytes(_ v: Double) -> String {
         Format.fileSize(Int64(v))
+    }
+}
+
+/// The model's title, and the field that renames it.
+///
+/// One field for every way in — the pencil here, the right-click menu, Model ▸
+/// Rename — through `Shop.renamingFileId`. Return saves, Escape or clicking
+/// away leaves the title as it was: a rename half-typed when the shop clicks
+/// another model must not land on the model it was typed for.
+private struct ModelTitle: View {
+    let shop: Shop
+    let file: LibraryFile
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    private var editing: Bool { shop.renamingFileId == file.id }
+
+    var body: some View {
+        Group {
+            if editing {
+                TextField(shop.words.callIt("mac.rename_model"), text: $draft)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.title3.weight(.semibold))
+                    .focused($focused)
+                    .onSubmit { save() }
+                    .onExitCommand { shop.renamingFileId = nil }
+                    .onChange(of: focused) { _, now in if !now { shop.renamingFileId = nil } }
+                    .onAppear {
+                        draft = file.name.isEmpty ? file.title : file.name
+                        focused = true
+                    }
+                    .accessibilityLabel(shop.words.callIt("mac.rename_model"))
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(file.title)
+                        .font(.title3.weight(.semibold))
+                        .textSelection(.enabled)
+                    if shop.canWrite {
+                        Button { shop.renamingFileId = file.id } label: {
+                            Image(systemName: "pencil")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .help(shop.words.callIt("mac.rename_model"))
+                        .accessibilityLabel(shop.words.callIt("mac.rename_model"))
+                    }
+                }
+            }
+        }
+        // Another model chosen while the field is open closes it.
+        .onChange(of: file.id) { _, _ in shop.renamingFileId = nil }
+    }
+
+    private func save() {
+        shop.rename(file.id, to: draft)
+        shop.renamingFileId = nil
+    }
+}
+
+/// Where this model's bytes are, and the two things a shop can do about it
+/// for this model alone: free its space now, or keep it here for good.
+///
+/// Free up space is the verified path the whole-library pass takes
+/// (`Shop.moveOut`): the copy online is asked for again and checked before the
+/// file here goes. Keep on this Mac brings a model back first when it is
+/// online only, and from then on Free up space leaves it alone.
+private struct StorageSection: View {
+    let shop: Shop
+    let file: LibraryFile
+
+    var body: some View {
+        let state = shop.storageState(for: file) ?? (shop.isInCloudOnly(file) ? .online : .local)
+        let kept = shop.isKeptOnThisMac(file)
+        DetailSection(shop.words.callIt("mac.storage_section")) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(shop.words.callIt(Shop.storageWordKey(state)), systemImage: Shop.storageSymbol(state))
+                    .font(.callout)
+                HStack(spacing: 8) {
+                    // A vault model on this Mac, with somewhere to go.
+                    if !file.isLinked, state != .online, shop.libraryHasRemote {
+                        Button { Task { await shop.freeUpSpace(model: file) } } label: {
+                            Label(shop.words.callIt("mac.storage_free_one"), systemImage: "icloud.and.arrow.up")
+                        }
+                        .disabled(kept || shop.cloudLibraryBusy || !shop.canWrite)
+                        .help(shop.words.callIt(kept ? "mac.storage_free_kept" : "mac.storage_free_one_help"))
+                    }
+                    Toggle(shop.words.callIt("mac.storage_keep"), isOn: Binding(
+                        get: { kept },
+                        set: { on in Task { await shop.keepOnThisMac(file, on) } }))
+                        .toggleStyle(.checkbox)
+                        .disabled(shop.cloudLibraryBusy || shop.syncIndex == nil)
+                        .help(shop.words.callIt("mac.storage_keep_help"))
+                    if shop.cloudLibraryBusy { ProgressView().controlSize(.small) }
+                }
+                .controlSize(.small)
+                if let note = shop.cloudLibraryNote {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        // An open job needs it: asked, as the whole-library pass never moves
+        // such a model at all.
+        .confirmationDialog(
+            shop.words.callIt("mac.storage_free_in_use_q"),
+            isPresented: Binding(get: { shop.pendingFreeUp?.id == file.id },
+                                 set: { if !$0 { shop.pendingFreeUp = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(shop.words.callIt("mac.storage_free_anyway")) {
+                shop.pendingFreeUp = nil
+                Task { await shop.freeUpSpace(model: file, anyway: true) }
+            }
+            Button(shop.words.callIt("common.cancel"), role: .cancel) { shop.pendingFreeUp = nil }
+        } message: {
+            Text(shop.words.callIt("mac.storage_free_in_use"))
+        }
     }
 }

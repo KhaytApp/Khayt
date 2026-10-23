@@ -144,6 +144,12 @@ final class Words {
         n.formatted(.number.locale(locale))
     }
 
+    /// Keys whose `_one` form is the whole phrase with no number in it, in
+    /// a way `واحد` cannot spot: «طُبع مرة» — "printed once" — says the count
+    /// with «مرة» alone. Listed rather than guessed: a bare noun in `_one`
+    /// still wants its numeral.
+    nonisolated static let wholeSingulars: Set<String> = ["mac.printed_n"]
+
     func counting(_ n: Int, _ key: String) -> String {
         // ── ARABIC COUNTS TWO OF A THING DIFFERENTLY ──────────────────────
         //
@@ -210,6 +216,9 @@ final class Words {
         // A literal (UTF-16) search, not `contains`: in "يومًا واحدًا" the
         // tanween joins the last letter into one grapheme, which hides واحد.
         if n == 1, said.range(of: "واحد", options: .literal) != nil { return said }
+        // …or says "once" in a word of its own (`wholeSingulars`): «طُبع مرة»
+        // is "printed once", and a numeral before it read "1 printed once".
+        if n == 1, Self.wholeSingulars.contains(key) { return said }
         // A plain space, not a non-breaking one. Binding the numeral to the
         // word is tempting and wrong here: eight existing tests read this
         // output back and compare it to "2 days", and a caller that has to
@@ -2152,7 +2161,9 @@ final class Words {
         // A model's print count, Mac-own so Arabic can count it: the shared
         // `cat.printed_n` has one form, and drew "طُبع 9 مرة".
         "mac.printed_n":     ["en": "printed {n}×", "ar": "طُبع {n} مرة"],
-        "mac.printed_n_one": ["en": "printed {n}×", "ar": "طُبع مرة واحدة"],
+        // "مرة" alone says once; "مرة واحدة" ran out of a tile's width
+        // beside a group name (KING Salman, Oct 2026 capture).
+        "mac.printed_n_one": ["en": "printed {n}×", "ar": "طُبع مرة"],
         "mac.printed_n_two": ["en": "printed 2×", "ar": "طُبع مرتين"],
         "mac.printed_n_few": ["en": "printed {n}×", "ar": "طُبع {n} مرات"],
         // An average in days. A whole number is counted; a fraction takes the
@@ -2737,6 +2748,59 @@ final class Words {
         "mac.print_next_add": ["en": "Add to Print next", "ar": "أضف إلى قائمة الطباعة"],
         "mac.print_next_remove": ["en": "Remove from Print next", "ar": "أزل من قائمة الطباعة"],
         "mac.duplicates": ["en": "Duplicates", "ar": "المكرّرة"],
+        // Putting a model aside by hand, and the Archived view it comes back
+        // from (`Shop.archive`). Never a delete: the file and the record stay.
+        "mac.archive_model": ["en": "Archive", "ar": "أرشفة"],
+        "mac.archive_n_models": ["en": "Archive {n} Models", "ar": "أرشفة {n} نماذج"],
+        "mac.unarchive_model": ["en": "Restore from Archive", "ar": "استعادة من الأرشيف"],
+        "mac.unarchive_n_models": ["en": "Restore {n} Models from Archive", "ar": "استعادة {n} نماذج من الأرشيف"],
+        "mac.lib_archived": ["en": "Archived", "ar": "المؤرشفة"],
+        // The search box's tokens (`LibraryQuery`), as their chips name them.
+        "mac.lib_token_tag": ["en": "Tag", "ar": "الوسم"],
+        "mac.lib_token_group": ["en": "Group", "ar": "المجموعة"],
+        "mac.lib_token_category": ["en": "Category", "ar": "التصنيف"],
+        "mac.lib_token_material": ["en": "Material", "ar": "الخامة"],
+        "mac.lib_token_creator": ["en": "Creator", "ar": "المصمم"],
+        "mac.lib_token_printer": ["en": "Ready on", "ar": "جاهز على"],
+        "mac.lib_token_remove": ["en": "Remove {name}", "ar": "إزالة {name}"],
+        // Where a model's bytes are (`LibrarySyncIndex`): the tile badge, the
+        // Show menu pair, and the inspector's Storage section.
+        "mac.lib_online_only": ["en": "Online only", "ar": "على الإنترنت فقط"],
+        "mac.lib_this_mac_only": ["en": "On this Mac only", "ar": "على هذا الماك فقط"],
+        "mac.storage_section": ["en": "Storage", "ar": "التخزين"],
+        "mac.storage_state_local": ["en": "On this Mac only", "ar": "على هذا الماك فقط"],
+        "mac.storage_state_backed_up": ["en": "On this Mac and backed up online", "ar": "على هذا الماك ومنسوخ على الإنترنت"],
+        "mac.storage_state_online": ["en": "Online only", "ar": "على الإنترنت فقط"],
+        "mac.storage_free_one": ["en": "Free Up Space", "ar": "توفير المساحة"],
+        "mac.storage_free_one_help": ["en": "Remove this Mac’s copy once the copy online has been checked. “Bring back from the cloud” fetches it again.",
+                                      "ar": "احذف نسخة هذا الماك بعد التحقق من النسخة على الإنترنت. يعيدها زر «أعده من السحابة» متى شئت."],
+        "mac.storage_freed_one": ["en": "Freed {size}. The model is Online only now.", "ar": "وُفّر {size}. النموذج الآن «على الإنترنت فقط»."],
+        "mac.storage_busy": ["en": "Another online storage task is running. Try again when it finishes.",
+                             "ar": "تجري مهمة تخزين أخرى على الإنترنت. حاول مجددًا عند انتهائها."],
+        "mac.storage_free_not_here": ["en": "This model’s file is not in the library folder on this Mac, so it was left alone.",
+                                      "ar": "ملف هذا النموذج ليس في مجلد المكتبة على هذا الماك، لذا تُرك كما هو."],
+        "mac.storage_free_in_use_q": ["en": "An open job uses this model", "ar": "عمل مفتوح يستخدم هذا النموذج"],
+        "mac.storage_free_in_use": ["en": "Free Up Space never moves a model an open job needs. Remove this Mac’s copy anyway? It is fetched again when the job opens it.",
+                                    "ar": "لا ينقل «توفير المساحة» أبدًا نموذجًا يحتاجه عمل مفتوح. هل تحذف نسخة هذا الماك رغم ذلك؟ ستُنزَّل مجددًا عندما يفتحه العمل."],
+        "mac.storage_free_anyway": ["en": "Free Up Space Anyway", "ar": "وفّر المساحة رغم ذلك"],
+        "mac.delete_kept_single": ["en": "One of these is set to Keep on This Mac. Remove from This Mac takes its copy here anyway and turns that off.",
+                                "ar": "أحدها مضبوط على «إبقاء على هذا الماك». «إزالة من هذا الجهاز» ستحذف نسخته هنا رغم ذلك وتوقف هذا الخيار."],
+        "mac.delete_kept_many": ["en": "{n} of these are set to Keep on This Mac. Remove from This Mac takes their copies here anyway and turns that off.",
+                              "ar": "{n} منها مضبوطة على «إبقاء على هذا الماك». «إزالة من هذا الجهاز» ستحذف نسخها هنا رغم ذلك وتوقف هذا الخيار."],
+        "mac.unarchive_both_one": ["en": "The converted copy stays in the library; you’ll have both.",
+                                   "ar": "تبقى النسخة المحوّلة في المكتبة، وسيكون لديك الاثنتان."],
+        "mac.unarchive_both_n": ["en": "{n} of these have a converted copy that stays in the library; you’ll have both of each.",
+                                 "ar": "لـ{n} منها نسخ محوّلة تبقى في المكتبة، وسيكون لديك الاثنتان من كل منها."],
+        "mac.storage_keep": ["en": "Keep on This Mac", "ar": "إبقاء على هذا الماك"],
+        "mac.storage_keep_help": ["en": "Free Up Space never moves this model off this Mac. If it is online only, it is brought back first.",
+                                  "ar": "لن ينقل «توفير المساحة» هذا النموذج من هذا الماك أبدًا. وإن كان على الإنترنت فقط فسيُعاد أولًا."],
+        // A model's title (`Shop.rename`); the file keeps its own name.
+        "mac.rename_model": ["en": "Rename", "ar": "إعادة تسمية"],
+        "mac.rename_model_undo": ["en": "Rename Model", "ar": "إعادة تسمية النموذج"],
+        "mac.archived_on": ["en": "Archived {date}", "ar": "أُرشف في {date}"],
+        "mac.archived_undated": ["en": "Archived", "ar": "مؤرشف"],
+        "mac.archive_help": ["en": "Take this model out of the library. Its file and its history stay, and Show ▸ Archived brings it back.",
+                             "ar": "أخرج هذا النموذج من المكتبة. يبقى ملفه وسجله، ويعيده «عرض ▸ المؤرشفة»."],
         "mac.by_creator": ["en": "by {name}", "ar": "من تصميم {name}"],
         "mac.creator_show_all": ["en": "Show everything by this creator", "ar": "اعرض كل أعمال هذا المصمم"],
         "mac.duplicate_of": ["en": "The same model as {n} other in the library:", "ar": "المجسّم نفسه موجود {n} مرة أخرى في المكتبة:"],

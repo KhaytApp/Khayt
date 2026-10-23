@@ -1292,23 +1292,102 @@ extension Shop {
         await load(source)
     }
 
-    /// Bring a model back into the library.
+    /// Put models aside by hand: out of the library's list, still in the book.
+    ///
+    /// The same field a conversion writes (`archivedAt`), without
+    /// `supersededBy` — nothing replaced these, the shop simply stopped
+    /// choosing them. NOTHING ON DISK IS TOUCHED: not the file, not its
+    /// folder, not a sidecar. A job printed from one of these months ago was
+    /// printed from those bytes, and the Archived view is where they come back
+    /// from. One write for the whole selection, and undoable, like every other
+    /// library edit (`editFiles`).
+    @discardableResult
+    func archive(_ ids: Set<LibraryFile.ID>) -> Bool {
+        let at = StoreWriter.iso(Date())
+        let named = ids.count > 1
+            ? words.callIt("mac.archive_n_models", ["n": .number(Double(ids.count))])
+            : words.callIt("mac.archive_model")
+        return editFiles(ids, named: named) { record in
+            // A model already put aside keeps the date it was put aside on.
+            if case .string(let was)? = record["archivedAt"], !was.isEmpty { return }
+            record["archivedAt"] = .string(at)
+        }
+    }
+
+    /// Bring models back into the library.
     ///
     /// The other half, because a one-way door is not a decision a shop should
-    /// have to be sure about before it makes it.
-    func unarchive(_ file: LibraryFile) async {
-        guard permitted("inventory", "edit") else { return }
-        guard let build = source.build else { return }
-        do {
-            try await StoreWriter.updateRecordOffMain(build, collection: "printFiles", id: file.id) { record in
-                record.removeValue(forKey: "archivedAt")
-                record.removeValue(forKey: "supersededBy")
-            }
-        } catch {
-            convertProblem = self.said(error)
-            return
+    /// have to be sure about before it makes it. Clears `supersededBy` too:
+    /// a converted original brought back is a model in its own right again.
+    @discardableResult
+    func unarchive(_ ids: Set<LibraryFile.ID>) -> Bool {
+        let named = ids.count > 1
+            ? words.callIt("mac.unarchive_n_models", ["n": .number(Double(ids.count))])
+            : words.callIt("mac.unarchive_model")
+        // An original a conversion replaced, whose conversion is still in
+        // the library: restoring it gives the shop two. Said once, counted.
+        let both = ids.count { id in
+            guard let file = libraryFile(id: id), let next = file.supersededBy, !next.isEmpty else { return false }
+            return libraryFile(id: next) != nil
         }
-        await load(source)
+        let wrote = editFiles(ids, named: named) { record in
+            record.removeValue(forKey: "archivedAt")
+            record.removeValue(forKey: "supersededBy")
+        }
+        if wrote, both > 0 {
+            importNote = both == 1
+                ? words.callIt("mac.unarchive_both_one")
+                : words.callIt("mac.unarchive_both_n", ["n": .number(Double(both))])
+        }
+        return wrote
+    }
+
+    /// Give a model a new title — its `name`, never its file.
+    ///
+    /// The FILE keeps the name it has: `originalName` and the folder are what
+    /// the vault, the sidecars and the other app find it by, and a past job
+    /// names the model by id. What a shop renames is what it reads on the tile
+    /// (`LibraryFile.title`). Through `editFiles`, so it is one write on the
+    /// store's chain and ⌘Z puts the old title back.
+    ///
+    /// Refused when the title is blank once trimmed — a blank `name` falls back
+    /// to the filename, which reads as the rename having been ignored — or
+    /// when nothing would change.
+    @discardableResult
+    func rename(_ id: LibraryFile.ID, to typed: String) -> Bool {
+        let title = Self.cleanTitle(typed)
+        guard !title.isEmpty, let file = libraryFile(id: id), file.name != title else { return false }
+        return editFiles([id], named: words.callIt("mac.rename_model_undo")) { record in
+            record["name"] = .string(title)
+        }
+    }
+
+    /// What a typed title is stored as: one line, trimmed. A newline pasted
+    /// into a title would break every one-line place it is drawn.
+    nonisolated static func cleanTitle(_ typed: String) -> String {
+        typed.components(separatedBy: .newlines).joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Start renaming a model: it becomes the selection, and the inspector
+    /// opens its title for editing.
+    func beginRename(_ file: LibraryFile) {
+        if fileSelection != [file.id] { select(file, modifiers: .replace) }
+        renamingFileId = file.id
+    }
+
+    /// The selected models that are (true) or are not (false) put aside.
+    func selectedArchiveIds(_ archived: Bool) -> Set<LibraryFile.ID> {
+        Set(selectedFiles.filter { $0.isArchived == archived }.map(\.id))
+    }
+
+    /// What Archive or Restore acts on from a model's menu: every model
+    /// selected when it is one of them, else that model alone — and only the
+    /// ones the action would change.
+    func archiveTargets(for file: LibraryFile, archiving: Bool) -> Set<LibraryFile.ID> {
+        let picked = selectedFiles
+        let pool = picked.contains(where: { $0.id == file.id }) && picked.count > 1 ? picked : [file]
+        return Set(pool.filter { $0.isArchived != archiving }.map(\.id))
     }
 
     /// `Falcon hood — Snapmaker U1.3mf`. The target in the name, because a
@@ -1672,6 +1751,12 @@ extension Shop {
         var creators: [CreatorCount] = []
         var printNext = 0
         var duplicates = 0
+        /// Models put aside (`LibraryFile.archivedAt`), for the Show menu's
+        /// Archived view — in the shelf, over what the other chips leave.
+        var archived = 0
+        /// Not on this Mac, and on this Mac with no copy online.
+        var onlineOnly = 0
+        var thisMacOnly = 0
         struct Ready: Equatable, Identifiable {
             let machineId: String
             let machineName: String
@@ -1680,15 +1765,28 @@ extension Shop {
         }
         var isEmpty: Bool {
             categories.isEmpty && tags.isEmpty && unfiled == 0 && neverPrinted == 0 && ready.isEmpty
-                && creators.isEmpty && printNext == 0 && duplicates == 0
+                && creators.isEmpty && printNext == 0 && duplicates == 0 && archived == 0
+                && onlineOnly == 0 && thisMacOnly == 0
         }
     }
 
-    enum LibraryAxis { case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates }
+    enum LibraryAxis { case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates, archived, storage }
 
     /// What one axis counts: the shelf, the search, and the other two chips.
-    private func libraryPool(skipping axis: LibraryAxis) -> [JSONValue] {
+    ///
+    /// `searched` is the ids the search box finds, worked out ONCE per
+    /// recount (`readLibraryFacets`) — it was run again inside every pool,
+    /// ten times a recount. Nil: no search.
+    private func libraryPool(skipping axis: LibraryAxis, searched: Set<String>?) -> [JSONValue] {
         var rows = libraryRows
+        // First: it is the narrowest, and every filter below is then over less.
+        if let searched { rows = rows.filter { searched.contains(Self.rowText($0, "id")) } }
+        // The chips count what the grid could draw: the put-aside models in
+        // the Archived view, the rest everywhere else. They counted the whole
+        // book, archived and all, so a chip could say 7 over a grid of 5.
+        if axis != .archived {
+            rows = rows.filter { Self.rowText($0, "archivedAt").isEmpty != libraryShowArchived }
+        }
         if case .library(let group) = shelf, let group {
             rows = rows.filter { Self.isUnder(Self.rowGroup($0), group) }
         }
@@ -1719,13 +1817,11 @@ extension Shop {
         if axis != .duplicates, libraryDuplicatesOnly {
             rows = rows.filter { duplicateOf[Self.rowText($0, "id")] != nil }
         }
-        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return rows }
-        return rows.filter { row in
-            Self.rowText(row, "title").lowercased().contains(q)
-                || Self.rowText(row, "material").lowercased().contains(q)
-                || Self.rowTags(row).contains { $0.lowercased().contains(q) }
+        if axis != .storage, let storage = libraryStorage {
+            let index = syncIndex
+            rows = rows.filter { storage.matches(index?.state(Self.rowText($0, "id"), remote: libraryRemoteId)) }
         }
+        return rows
     }
 
     /// How many times a record says it has been printed.
@@ -1763,11 +1859,37 @@ extension Shop {
         libraryRecount += 1
         let mine = libraryRecount
         guard let engine, !libraryRows.isEmpty else { libraryFacets = LibraryFacets(); return }
-        let categories = (try? await engine.categoryCounts(libraryPool(skipping: .category))) ?? []
-        let tags = (try? await engine.tagCounts(libraryPool(skipping: .tag))) ?? []
-        guard mine == libraryRecount else { return }
-        let unfiled = libraryPool(skipping: .unfiled).count { Self.rowGroup($0) == nil }
-        let never = libraryPool(skipping: .neverPrinted).count { Self.rowPrintCount($0) == 0 }
+        // The search the grid runs, tokens and all — it read `title`, which
+        // no record has, so a search narrowed the grid and not the counts.
+        // Once, here, for every pool below.
+        let query = LibraryQuery.parse(SearchText.fold(search.trimmingCharacters(in: .whitespaces)))
+        let searched: Set<String>? = query.isEmpty ? nil : {
+            let matches = searchMatcher(query)
+            libraryMemo.work.facetSearches += 1
+            return Set(files.lazy.filter(matches).map(\.id))
+        }()
+        guard !Task.isCancelled else { return }
+        // The engine is asked only when the rows it would count changed: the
+        // same pool, of the same book, has the same counts. Typing a search
+        // that leaves the pool as it was, or a recount the index started,
+        // crossed the bridge with the whole book twice for nothing.
+        func counted(_ axis: LibraryAxis, _ name: String,
+                     _ ask: ([JSONValue]) async throws -> [KhaytEngine.GroupCount]) async -> [KhaytEngine.GroupCount] {
+            let pool = libraryPool(skipping: axis, searched: searched)
+            var h = Hasher()
+            h.combine(libraryRowsRevision)
+            for row in pool { h.combine(Self.rowText(row, "id")) }
+            let key = h.finalize()
+            if let held = facetCountMemo[name], held.key == key { return held.rows }
+            let rows = (try? await ask(pool)) ?? []
+            facetCountMemo[name] = (key, rows)
+            return rows
+        }
+        let categories = await counted(.category, "category") { try await engine.categoryCounts($0) }
+        let tags = await counted(.tag, "tag") { try await engine.tagCounts($0) }
+        guard mine == libraryRecount, !Task.isCancelled else { return }
+        let unfiled = libraryPool(skipping: .unfiled, searched: searched).count { Self.rowGroup($0) == nil }
+        let never = libraryPool(skipping: .neverPrinted, searched: searched).count { Self.rowPrintCount($0) == 0 }
         // Across the whole book, once per machine that reports what it has
         // loaded; the chip's count is that set within what the other chips and
         // the search have left.
@@ -1776,9 +1898,20 @@ extension Shop {
         for machine in machinesInUse {
             let loaded = loadedSlots(for: machine.id)
             guard !loaded.isEmpty else { continue }
-            let ids = Set((try? await engine.readyToPrint(libraryRows, loaded: loaded)) ?? [])
+            // Asked of the engine only when the book or the machine's spools
+            // changed — never because a key was typed: it is the whole book
+            // across the bridge, per machine, and was most of a recount
+            // (240 ms of 300 at 6,600 models, Oct 2026).
+            let ids: Set<String>
+            let rowsAt = libraryRowsRevision
+            if let held = readyMemo[machine.id], held.revision == rowsAt, held.loaded == loaded {
+                ids = held.ids
+            } else {
+                ids = Set((try? await engine.readyToPrint(libraryRows, loaded: loaded)) ?? [])
+                readyMemo[machine.id] = (rowsAt, loaded, ids)
+            }
             byMachine[machine.id] = ids
-            let count = libraryPool(skipping: .ready).count { ids.contains(Self.rowText($0, "id")) }
+            let count = libraryPool(skipping: .ready, searched: searched).count { ids.contains(Self.rowText($0, "id")) }
             ready.append(.init(machineId: machine.id, machineName: machine.name, count: count))
         }
         guard mine == libraryRecount else { return }
@@ -1791,7 +1924,7 @@ extension Shop {
         let copies = Self.duplicateGroups(files)
         if copies != duplicateOf { duplicateOf = copies }
         func ids(_ axis: LibraryAxis) -> Set<String> {
-            Set(libraryPool(skipping: axis).map { Self.rowText($0, "id") })
+            Set(libraryPool(skipping: axis, searched: searched).map { Self.rowText($0, "id") })
         }
         let byId = Dictionary(files.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var creatorCounts: [String: (name: String, n: Int)] = [:]
@@ -1803,13 +1936,32 @@ extension Shop {
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.name < $1.name }
         let printNext = ids(.printNext).count { byId[$0]?.isPrintNext == true }
         let dupes = ids(.duplicates).count { duplicateOf[$0] != nil }
+        let archived = libraryPool(skipping: .archived, searched: searched).count { !Self.rowText($0, "archivedAt").isEmpty }
+        // Only once there is an index to read: before it, every model would
+        // count as "on this Mac only", which is a guess.
+        var onlineOnly = 0, thisMacOnly = 0
+        if let index = syncIndex {
+            for row in libraryPool(skipping: .storage, searched: searched) {
+                let state = index.state(Self.rowText(row, "id"), remote: libraryRemoteId)
+                if LibraryStorageFilter.onlineOnly.matches(state) { onlineOnly += 1 }
+                else if LibraryStorageFilter.thisMacOnly.matches(state) { thisMacOnly += 1 }
+            }
+            // "On this Mac only" says something only beside somewhere else.
+            if !libraryHasRemote && onlineOnly == 0 { thisMacOnly = 0 }
+        }
         let facets = LibraryFacets(categories: categories, tags: tags,
                                    unfiled: unfiled, neverPrinted: never, ready: ready,
-                                   creators: creators, printNext: printNext, duplicates: dupes)
+                                   creators: creators, printNext: printNext, duplicates: dupes,
+                                   archived: archived, onlineOnly: onlineOnly, thisMacOnly: thisMacOnly)
         if facets != libraryFacets { libraryFacets = facets }
     }
 
-    func recountLibrarySoon() { libraryRecountTask = Task { await readLibraryFacets() } }
+    /// A newer recount makes the one in flight pointless: it is cancelled,
+    /// and stops at its next step rather than finishing work nobody will see.
+    func recountLibrarySoon() {
+        libraryRecountTask?.cancel()
+        libraryRecountTask = Task { await readLibraryFacets() }
+    }
 
     /// Wait for the chips to catch up with what was last asked of them.
     ///
@@ -1873,6 +2025,7 @@ extension Shop {
         libraryCategory != nil || libraryTag != nil || libraryUnfiledOnly
             || libraryNeverPrintedOnly || libraryReadyOn != nil
             || libraryCreator != nil || libraryPrintNextOnly || libraryDuplicatesOnly
+            || libraryShowArchived || libraryStorage != nil
     }
 
     func clearLibraryFilter() {
@@ -1884,6 +2037,8 @@ extension Shop {
         libraryCreator = nil
         libraryPrintNextOnly = false
         libraryDuplicatesOnly = false
+        libraryShowArchived = false
+        libraryStorage = nil
     }
 
     /// ── DUPLICATES, in the library already there ─────────────────────────
@@ -1939,6 +2094,9 @@ extension Shop {
         // and still what a past job was printed from; it is simply not one of
         // the things the shop is choosing between today.
         if !libraryShowArchived { rows = rows.filter { !$0.isArchived } }
+        // The Archived view: ONLY what has been put aside, so a shop looking
+        // for something to restore is not looking through everything else.
+        if libraryShowArchived { rows = rows.filter(\.isArchived) }
         if case .library(let group) = shelf, let group {
             rows = rows.filter { Self.isUnder($0.groupName, group) }
         }
@@ -1960,10 +2118,15 @@ extension Shop {
         }
         if libraryPrintNextOnly { rows = rows.filter(\.isPrintNext) }
         if libraryDuplicatesOnly { rows = rows.filter { duplicateOf[$0.id] != nil } }
+        // Where the bytes are, from the index — one lookup a model.
+        if let storage = libraryStorage {
+            let index = syncIndex, remote = libraryRemoteId
+            rows = rows.filter { storage.matches(index?.state($0.id, remote: remote)) }
+        }
         if !q.isEmpty {
             // The file's name too, and folded — see `LibraryFile.matches`.
             libraryMemo.work.rowsSearched += rows.count
-            rows = rows.filter { matchesSearch($0, q) }
+            rows = rows.filter(searchMatcher(LibraryQuery.parse(q)))
         }
         // Side by side: the copies of one model together, oldest first.
         if libraryDuplicatesOnly {
