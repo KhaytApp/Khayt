@@ -20,10 +20,12 @@
  *   3. THE LANGUAGE. The customer's, not the shop's screen language. A shop
  *      working in English still writes to most of its customers in Arabic.
  *
- * NO ACCOUNT, NO API. This builds a `https://wa.me/<number>?text=<message>`
- * link; the host opens it and a person presses send in WhatsApp. Sending on
- * its own needs a WhatsApp Business provider and approved templates — see
- * docs/handoffs/whatsapp-business-api.md.
+ * TWO WAYS OUT. With no account, this builds a
+ * `https://wa.me/<number>?text=<message>` link; the host opens it and a person
+ * presses send in WhatsApp. A shop that connects its own WhatsApp Business
+ * account can have the update SENT instead, with a template Meta approved —
+ * `wouldSend` below decides when, and `lib/whatsapp-send.js` builds the
+ * request (docs/handoffs/whatsapp-business-api.md).
  *
  * PURE: no clock, no DOM, no network, no randomness. The host passes the
  * moment and the id when it wants a log line, and passes money and dates
@@ -330,24 +332,36 @@
     const c = ctx || {};
     const tpl = tplApi();
     if (!tpl) throw new Error('whatsapp-message: lib/wa-template.js is not loaded');
+    const lang = LANGS.indexOf(c.lang) !== -1 ? c.lang : 'ar';
+    const chosen = templateFor(c.templates, c.milestone, lang);
+    const values = valuesFor(Object.assign({}, c, { lang }));
+    const text = tpl.fillTemplate(dropEmptyLines(chosen.body, values), values);
+    return { text, templateId: chosen.id, isDefault: chosen.isDefault };
+  }
+
+  /**
+   * The named values an update is filled from — the customer's name and the
+   * shop's in the customer's language, the job id, the carrier and tracking
+   * number, the stage in the customer's words — with `ctx.values` laid over.
+   * ONE set, for the shop's own words above and for an approved template's
+   * parameters below, so the two kinds of message cannot name a customer two
+   * ways.
+   */
+  function valuesFor(ctx) {
+    const c = ctx || {};
     const o = c.order || {};
-    const client = c.client || {};
-    const settings = c.settings || {};
     const lang = LANGS.indexOf(c.lang) !== -1 ? c.lang : 'ar';
     const milestone = c.milestone;
-    const chosen = templateFor(c.templates, milestone, lang);
     const stage = milestone === 'shipped' || milestone === 'delivered' ? milestone : String(o.status || '');
     const carrierId = String(o.carrier || '').toLowerCase();
-    const values = Object.assign({
-      client: nameIn(client, 'name', lang) || String(o.client || ''),
+    return Object.assign({
+      client: nameIn(c.client || {}, 'name', lang) || String(o.client || ''),
       id: String(o.id || ''),
-      shop: nameIn(settings, 'biz', lang),
+      shop: nameIn(c.settings || {}, 'biz', lang),
       tracking: String(o.trackingNumber || ''),
       carrier: carrierId === 'manual' ? '' : (CARRIER_NAMES[carrierId] || String(o.carrier || '')),
       status: (STATUS_WORDS[lang] || STATUS_WORDS.en)[stage] || '',
     }, c.values || {});
-    const text = tpl.fillTemplate(dropEmptyLines(chosen.body, values), values);
-    return { text, templateId: chosen.id, isDefault: chosen.isDefault };
   }
 
   /**
@@ -383,6 +397,191 @@
     return Object.assign(base, { ok: true, e164: chat.e164, digits: chat.digits, link: chat.link });
   }
 
+  // ── SENT FOR THE SHOP: WHATSAPP BUSINESS ─────────────────────────────────
+  //
+  // Everything above opens WhatsApp and a person presses send. A shop that
+  // connects its own WhatsApp Business account (Meta's Cloud API) can have the
+  // update sent for it instead — with a TEMPLATE Meta has approved, because a
+  // business may not open a conversation with free text (`lib/whatsapp-send.js`
+  // says why). The template's words live in the shop's WhatsApp Manager; what
+  // Khayt sends is its name, its language and its parameters, in an order
+  // fixed here so a shop knows what {{1}}, {{2}}… will be when it writes one.
+  //
+  // `settings.smsConfig` is the account, the shape the other app's SMS settings
+  // already write (`provider: 'whatsapp_cloud'`, `phoneNumberId`, `token` —
+  // the token a registered secret in `store-secret-paths.js`, sealed on disk
+  // and masked before a book goes to a phone). `settings.whatsappTemplates` is
+  // which approved template each milestone sends:
+  //
+  //   { ready: { name: 'order_ready', langs: ['ar', 'en'] }, … }
+  //
+  // A milestone with no template is one the shop has not asked to have sent,
+  // which is how a shop sends "shipped" automatically and nothing else.
+
+  /** The body parameters each milestone's template is given, in order. */
+  const TEMPLATE_PARAMS = {
+    received: ['client', 'id', 'shop'],
+    ready: ['client', 'id', 'shop'],
+    shipped: ['client', 'id', 'carrier', 'tracking', 'shop'],
+    delivered: ['client', 'id', 'shop'],
+  };
+
+  /** The template names the settings suggest. A shop may call them anything. */
+  const SUGGESTED_TEMPLATES = {
+    received: 'order_received', ready: 'order_ready',
+    shipped: 'order_shipped', delivered: 'order_delivered',
+  };
+
+  /**
+   * A milestone's template parameters, in `TEMPLATE_PARAMS` order, from the
+   * values `valuesFor` works out. An empty value is sent as `-`: Meta refuses a
+   * message with an empty parameter, and a parcel handed over without a
+   * tracking number is still worth telling the customer about.
+   */
+  function templateParams(milestone, values) {
+    const keys = TEMPLATE_PARAMS[milestone] || [];
+    const v = values || {};
+    return keys.map((k) => {
+      const s = String(v[k] == null ? '' : v[k]).trim();
+      return s || '-';
+    });
+  }
+
+  const sendApi = () =>
+    global.KhaytWhatsappSend ||
+    (typeof require === 'function' ? require('./whatsapp-send.js') : null);
+
+  /**
+   * The shop's WhatsApp Business account as stored, or why there is none.
+   * `{ ok, phoneNumberId, token, reason }`, `reason` one of `not_set_up`,
+   * `no_phone_number_id`, `no_token`. The token is returned as STORED — the
+   * host opens a sealed one at the point of use, as it does every secret.
+   */
+  function cloudAccount(settings) {
+    const cfg = ((settings || {}).smsConfig) || {};
+    const out = { ok: false, phoneNumberId: '', token: '', reason: '' };
+    if (cfg.provider !== 'whatsapp_cloud') return Object.assign(out, { reason: 'not_set_up' });
+    const id = String(cfg.phoneNumberId || '').trim();
+    const token = String(cfg.token || '').trim();
+    if (!id) return Object.assign(out, { reason: 'no_phone_number_id' });
+    if (!token) return Object.assign(out, { reason: 'no_token' });
+    return { ok: true, phoneNumberId: id, token, reason: '' };
+  }
+
+  /**
+   * The approved template for this milestone, in the language nearest the
+   * customer's: `{ name, language }`, or null when the shop has not given the
+   * milestone one. `langs` are Meta's codes (`ar`, `en`, `en_US`) in the order
+   * the shop listed them; the first whose language is the customer's wins,
+   * else the first — a template approved only in Arabic still tells an
+   * English-speaking customer their parcel left.
+   */
+  function cloudTemplate(settings, milestone, lang) {
+    const map = ((settings || {}).whatsappTemplates) || {};
+    const t = map[milestone];
+    const S = sendApi();
+    if (!t || !S || !S.isTemplateName(String(t.name || '').trim())) return null;
+    const langs = (Array.isArray(t.langs) ? t.langs : [])
+      .map((x) => String(x || '').trim()).filter((x) => S.isLanguage(x));
+    if (!langs.length) return null;
+    const near = langs.find((x) => x.split('_')[0] === lang);
+    return { name: String(t.name).trim(), language: near || langs[0] };
+  }
+
+  /**
+   * Whether the customer agreed to order updates on WhatsApp.
+   *
+   * Its OWN field, apart from `marketingOptOut`: agreeing to hear that your
+   * order shipped is not agreeing to offers, and opting out of offers is not
+   * opting out of your order. `whatsappOptIn: { at, how }` — when, and how it
+   * was given (`asked`, `form`, `customer_wrote`, `other`) — so a shop asked
+   * by Meta can say. Removing the field is withdrawing it.
+   */
+  const OPT_IN_HOW = ['asked', 'form', 'customer_wrote', 'other'];
+  function optedIn(client) {
+    const o = client && client.whatsappOptIn;
+    return !!(o && typeof o === 'object' && String(o.at || '').trim());
+  }
+
+  function orderIndex(m) { return m ? MILESTONES.indexOf(m) : -1; }
+
+  /**
+   * Whether this change to a job is sent to its customer through the shop's
+   * WhatsApp Business account, and with what.
+   *
+   * `before`/`after` are the job as it was and as it now is — a status move,
+   * or a shipment or handover stamped on a finished job. Only a step FORWARD
+   * into a milestone sends: a job moved back from shipped to finished is not
+   * news, and a job edited without moving is not either.
+   *
+   * `ctx`: `{ settings, clients, shopLang }`.
+   *
+   * Returns `{ send, reason, milestone, lang, template, to, clientId }`.
+   * `send` false is ordinary and silent for every reason but the last few:
+   *   `no_change` `not_set_up` `no_phone_number_id` `no_token` `no_template`
+   *   `no_customer` `not_opted_in` `already_sent` — nothing owed, nobody missed;
+   *   `no_phone` or a `normalizePhone` reason — the customer agreed and cannot
+   *   be reached, which a host should SAY, so the shop can fix the number.
+   */
+  function wouldSend(before, after, ctx) {
+    const c = ctx || {};
+    const settings = c.settings || {};
+    const out = { send: false, reason: '', milestone: '', lang: '', template: null, to: '', clientId: '' };
+    const now = milestoneOf(after);
+    if (!now || orderIndex(now) <= orderIndex(milestoneOf(before))) return Object.assign(out, { reason: 'no_change' });
+    out.milestone = now;
+    const account = cloudAccount(settings);
+    if (!account.ok) return Object.assign(out, { reason: account.reason });
+    const o = after || {};
+    const clients = Array.isArray(c.clients) ? c.clients : [];
+    const client = o.clientId ? clients.find((x) => x && x.id === o.clientId) : null;
+    if (!client) return Object.assign(out, { reason: 'no_customer' });
+    out.clientId = String(client.id);
+    out.lang = customerLanguage(client, c.shopLang);
+    out.template = cloudTemplate(settings, now, out.lang);
+    if (!out.template) return Object.assign(out, { reason: 'no_template' });
+    if (!optedIn(client)) return Object.assign(out, { reason: 'not_opted_in' });
+    if (sentAt(client.commLog, String(o.id || ''), now)) return Object.assign(out, { reason: 'already_sent' });
+    if (!String(client.phone || '').trim()) return Object.assign(out, { reason: 'no_phone' });
+    const phone = normalizePhone(client.phone);
+    if (!phone.ok) return Object.assign(out, { reason: phone.reason });
+    return Object.assign(out, { send: true, to: phone.digits });
+  }
+
+  /** The reasons `wouldSend` gives that a host should tell the shop about. */
+  function isUnreachable(reason) {
+    return ['', 'no_change', 'not_set_up', 'no_phone_number_id', 'no_token', 'no_template',
+      'no_customer', 'not_opted_in', 'already_sent'].indexOf(String(reason || '')) === -1;
+  }
+
+  /**
+   * Whether a job's update for a milestone could be sent for the shop right
+   * now, asked by a button rather than a move: the same answer as
+   * `wouldSend`, with the job's own milestone and no step required.
+   */
+  function canSendNow(order, ctx) {
+    if (!milestoneOf(order)) return Object.assign(wouldSend(order, order, ctx), { reason: 'no_milestone' });
+    return wouldSend(null, order, ctx);
+  }
+
+  /**
+   * Everything the host sends: `wouldSend`'s answer plus `params`, worked
+   * out from the same values the shop's own words use. `ctx` is `wouldSend`'s
+   * plus `values` (what only the host formats) and `now: true` for a send a
+   * person asked for (`canSendNow`) rather than one a change owes. `params`
+   * is empty when `send` is false.
+   */
+  function cloudMessage(before, after, ctx) {
+    const c = ctx || {};
+    const ws = c.now ? canSendNow(after, c) : wouldSend(before, after, c);
+    if (!ws.send) return Object.assign({}, ws, { params: [] });
+    const client = (c.clients || []).find((x) => x && x.id === ws.clientId);
+    const values = valuesFor({
+      order: after, client, settings: c.settings, lang: ws.lang, milestone: ws.milestone, values: c.values,
+    });
+    return Object.assign({}, ws, { params: templateParams(ws.milestone, values) });
+  }
+
   // ── THE LOG ───────────────────────────────────────────────────────────────
 
   /**
@@ -393,7 +592,8 @@
    * feature reads back: which job and which milestone, so the job can stop
    * offering an update it has already sent.
    *
-   * `opts`: `{ id, at, text, orderId?, milestone?, lang? }`. The note is the
+   * `opts`: `{ id, at, text, orderId?, milestone?, lang?, messageId?,
+   * template? }`. The note is the
    * message itself — what the customer was sent is the useful thing to find
    * later.
    */
@@ -403,6 +603,16 @@
     if (o.orderId) out.orderId = String(o.orderId);
     if (MILESTONES.indexOf(o.milestone) !== -1) out.milestone = o.milestone;
     if (LANGS.indexOf(o.lang) !== -1) out.lang = o.lang;
+    // Sent for the shop rather than opened for a person: the id Meta's
+    // delivery reports name (`lib/whatsapp-status.js` matches on it), the
+    // first status, and the template that carried it.
+    const mid = String(o.messageId || '').trim();
+    if (mid) {
+      out.messageId = mid;
+      out.status = 'sent';
+      out.via = 'whatsapp_cloud';
+      if (o.template) out.template = String(o.template);
+    }
     return out;
   }
 
@@ -426,8 +636,10 @@
   const api = {
     MILESTONES, LANGS, DEFAULT_BODIES, STATUS_WORDS, CARRIER_NAMES,
     milestoneOf, westernDigits, normalizePhone, waLink, chatLink,
-    customerLanguage, defaultBody, templateFor, messageText, buildUpdate,
+    customerLanguage, defaultBody, templateFor, messageText, valuesFor, buildUpdate,
     commEntry, sentAt,
+    TEMPLATE_PARAMS, SUGGESTED_TEMPLATES, OPT_IN_HOW, templateParams, cloudAccount,
+    cloudTemplate, optedIn, wouldSend, isUnreachable, canSendNow, cloudMessage,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytWhatsappMessage = api;

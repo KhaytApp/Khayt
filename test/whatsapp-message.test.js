@@ -254,3 +254,123 @@ test('sentAt finds the newest matching WhatsApp line only', () => {
   assert.strictEqual(wa.sentAt(log, 'O1', 'shipped'), null);
   assert.strictEqual(wa.sentAt(undefined, 'O1', 'ready'), null);
 });
+
+// ── Sent for the shop: WhatsApp Business ────────────────────────────────────
+
+require('../lib/whatsapp-send.js');
+
+const TOKEN = 'EAAG' + 'b'.repeat(40);
+const cloudSettings = (over) => Object.assign({
+  bizEn: 'Athar', bizAr: 'أثر',
+  smsConfig: { provider: 'whatsapp_cloud', phoneNumberId: '106540352242922', token: TOKEN },
+  whatsappTemplates: {
+    ready: { name: 'order_ready', langs: ['ar', 'en'] },
+    shipped: { name: 'order_shipped', langs: ['en_US'] },
+  },
+}, over || {});
+const sara = (over) => Object.assign({
+  id: 'C1', nameAr: 'سارة', nameEn: 'Sara', phone: '055 123 4567',
+  whatsappOptIn: { at: '2026-10-23T09:00:00Z', how: 'asked' }, commLog: [],
+}, over || {});
+const printing = { id: 'J-101', status: 'printing', clientId: 'C1' };
+const finished = { id: 'J-101', status: 'completed', clientId: 'C1' };
+
+test('a step forward into a milestone is sent: template, language, number', () => {
+  const r = wa.wouldSend(printing, finished, { settings: cloudSettings(), clients: [sara()] });
+  assert.deepStrictEqual(r, {
+    send: true, reason: '', milestone: 'ready', lang: 'ar',
+    template: { name: 'order_ready', language: 'ar' }, to: '966551234567', clientId: 'C1',
+  });
+});
+
+test('nothing is sent for a move that is not a step forward', () => {
+  const ctx = { settings: cloudSettings(), clients: [sara()] };
+  assert.strictEqual(wa.wouldSend(finished, finished, ctx).reason, 'no_change');
+  assert.strictEqual(wa.wouldSend({ ...finished, shippedAt: '2026-10-23' }, finished, ctx).reason, 'no_change');
+  assert.strictEqual(wa.wouldSend(printing, { ...printing, status: 'post' }, ctx).reason, 'no_change');
+  assert.strictEqual(wa.wouldSend(printing, { ...printing, status: 'cancelled' }, ctx).reason, 'no_change');
+});
+
+test('shipped is stamped on a finished job and is a step of its own', () => {
+  const shipped = { ...finished, shippedAt: '2026-10-23T10:00:00Z', carrier: 'smsa', trackingNumber: '231' };
+  const r = wa.wouldSend(finished, shipped, { settings: cloudSettings(), clients: [sara()] });
+  assert.strictEqual(r.send, true);
+  assert.strictEqual(r.milestone, 'shipped');
+  // Approved only in en_US: the customer's Arabic is not a reason to say nothing.
+  assert.deepStrictEqual(r.template, { name: 'order_shipped', language: 'en_US' });
+});
+
+test('every quiet reason, in the order a shop would fix them', () => {
+  const run = (settings, client) => wa.wouldSend(printing, finished, { settings, clients: client ? [client] : [] }).reason;
+  assert.strictEqual(run({}, sara()), 'not_set_up');
+  assert.strictEqual(run(cloudSettings({ smsConfig: { provider: 'twilio' } }), sara()), 'not_set_up');
+  assert.strictEqual(run(cloudSettings({ smsConfig: { provider: 'whatsapp_cloud', token: TOKEN } }), sara()), 'no_phone_number_id');
+  assert.strictEqual(run(cloudSettings({ smsConfig: { provider: 'whatsapp_cloud', phoneNumberId: '106540352242922' } }), sara()), 'no_token');
+  assert.strictEqual(run(cloudSettings(), null), 'no_customer');
+  assert.strictEqual(run(cloudSettings({ whatsappTemplates: {} }), sara()), 'no_template');
+  assert.strictEqual(run(cloudSettings({ whatsappTemplates: { ready: { name: 'Order Ready', langs: ['ar'] } } }), sara()), 'no_template');
+  assert.strictEqual(run(cloudSettings({ whatsappTemplates: { ready: { name: 'order_ready', langs: [] } } }), sara()), 'no_template');
+  assert.strictEqual(run(cloudSettings(), sara({ whatsappOptIn: undefined })), 'not_opted_in');
+  assert.strictEqual(run(cloudSettings(), sara({ whatsappOptIn: { at: '' } })), 'not_opted_in');
+  for (const r of ['not_set_up', 'no_phone_number_id', 'no_token', 'no_customer', 'no_template', 'not_opted_in', 'no_change', 'already_sent']) {
+    assert.strictEqual(wa.isUnreachable(r), false, r);
+  }
+});
+
+test('opting out of offers is not opting out of an order update', () => {
+  const r = wa.wouldSend(printing, finished, { settings: cloudSettings(), clients: [sara({ marketingOptOut: true })] });
+  assert.strictEqual(r.send, true);
+});
+
+test('an update already sent or opened by hand is not sent again', () => {
+  const log = [{ id: 'L1', type: 'whatsapp', note: 'ready', at: '2026-10-23T08:00:00Z', orderId: 'J-101', milestone: 'ready' }];
+  const r = wa.wouldSend(printing, finished, { settings: cloudSettings(), clients: [sara({ commLog: log })] });
+  assert.strictEqual(r.reason, 'already_sent');
+});
+
+test('a customer who agreed and cannot be reached is a reason worth saying', () => {
+  const none = wa.wouldSend(printing, finished, { settings: cloudSettings(), clients: [sara({ phone: '' })] });
+  assert.strictEqual(none.reason, 'no_phone');
+  assert.strictEqual(wa.isUnreachable(none.reason), true);
+  const bad = wa.wouldSend(printing, finished, { settings: cloudSettings(), clients: [sara({ phone: '12345' })] });
+  assert.strictEqual(bad.send, false);
+  assert.strictEqual(wa.isUnreachable(bad.reason), true);
+});
+
+test('template parameters come in the fixed order, from the shop’s own values', () => {
+  assert.deepStrictEqual(wa.TEMPLATE_PARAMS.shipped, ['client', 'id', 'carrier', 'tracking', 'shop']);
+  const shipped = { ...finished, shippedAt: '2026-10-23T10:00:00Z', carrier: 'smsa', trackingNumber: 'SA231' };
+  const m = wa.cloudMessage(finished, shipped, { settings: cloudSettings(), clients: [sara()] });
+  assert.strictEqual(m.send, true);
+  // The customer's language, Arabic: her Arabic name and the shop's.
+  assert.deepStrictEqual(m.params, ['سارة', 'J-101', 'SMSA', 'SA231', 'أثر']);
+});
+
+test('an empty parameter goes as "-": a parcel with no tracking number is still news', () => {
+  assert.deepStrictEqual(wa.templateParams('shipped', { client: 'Sara', id: 'J-1', shop: 'Athar' }),
+    ['Sara', 'J-1', '-', '-', 'Athar']);
+  assert.deepStrictEqual(wa.templateParams('nope', { client: 'Sara' }), []);
+});
+
+test('a send asked for by a person needs no step, only a milestone', () => {
+  const m = wa.cloudMessage(null, finished, { settings: cloudSettings(), clients: [sara()], now: true });
+  assert.strictEqual(m.send, true);
+  assert.strictEqual(m.milestone, 'ready');
+  const quote = wa.cloudMessage(null, { ...finished, status: 'quote' }, { settings: cloudSettings(), clients: [sara()], now: true });
+  assert.strictEqual(quote.send, false);
+  assert.strictEqual(quote.reason, 'no_milestone');
+  assert.deepStrictEqual(quote.params, []);
+});
+
+test('a line sent for the shop carries the wamid and the first status', () => {
+  const e = wa.commEntry({ id: 'CMM1', at: '2026-10-23T10:00:00Z', text: 'order_ready: Sara · J-101', orderId: 'J-101',
+    milestone: 'ready', lang: 'ar', messageId: 'wamid.ABC', template: 'order_ready' });
+  assert.deepStrictEqual(e, {
+    id: 'CMM1', type: 'whatsapp', note: 'order_ready: Sara · J-101', at: '2026-10-23T10:00:00Z',
+    orderId: 'J-101', milestone: 'ready', lang: 'ar',
+    messageId: 'wamid.ABC', status: 'sent', via: 'whatsapp_cloud', template: 'order_ready',
+  });
+  // And one opened by hand has none of it.
+  assert.strictEqual(wa.commEntry({ id: 'x', text: 't' }).messageId, undefined);
+  assert.strictEqual(wa.commEntry({ id: 'x', text: 't' }).status, undefined);
+});

@@ -17,8 +17,9 @@ import KhaytCore
 /// button with the same words. This file is only what a Mac does with them:
 /// open a URL, and write the log.
 ///
-/// Automatic sending needs a WhatsApp Business provider and approved
-/// templates, and is not here: see docs/handoffs/whatsapp-business-api.md.
+/// Sending FOR the shop — through its own WhatsApp Business account, with a
+/// template Meta approved — is `WhatsAppCloud.swift`; this file is the
+/// account-free way, which every shop has.
 extension Shop {
 
     /// The customer record a job points at, raw and typed.
@@ -32,7 +33,7 @@ extension Shop {
     /// What only this app can format. The currency goes as its CODE, not
     /// `Money.mark`: the new riyal sign is a character a customer's phone may
     /// not have yet, and a box where the currency should be is worse than SAR.
-    private func whatsAppValues(for job: Order) -> [String: String] {
+    func whatsAppValues(for job: Order) -> [String: String] {
         ["price": Money.figure(job.price), "currency": currency, "due": job.dueDate ?? ""]
     }
 

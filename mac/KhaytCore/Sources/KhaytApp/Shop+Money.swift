@@ -1157,7 +1157,9 @@ extension Shop {
     /// `deliveredAt`. Setting a status here would take it out of the very
     /// column the action feeds — see `KhaytOrderStatus.stageOf`.
     func markDelivered(_ id: Order.ID) async {
-        await writeToOneOrder(id, named: words.callIt("queue.delivered"), as: .person("orders", "edit")) { order, engine, _ in
+        var before: JSONValue?
+        let wrote = await writeToOneOrder(id, named: words.callIt("queue.delivered"), as: .person("orders", "edit")) { order, engine, _ in
+            before = order
             let out = try await engine.markDelivered(order: order, now: Date())
             guard out.ok, let changed = out.order else {
                 throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
@@ -1165,6 +1167,8 @@ extension Shop {
             // The same line Khayt and Bed Ready write.
             return OneOrderEdit(order: changed, activity: "\(id) → delivered")
         }
+        // Not a status move, so the move's own WhatsApp send never sees it.
+        if wrote { await sendOwedWhatsApp(before: before, jobId: id) }
     }
 
     /// The parcel left the shop.
@@ -1175,7 +1179,9 @@ extension Shop {
     /// rule; this is the same call Khayt makes.
     func markShipped(_ id: Order.ID) async {
         var owed: [KhaytEngine.WebhookDelivery] = []
+        var before: JSONValue?
         let wrote = await writeToOneOrder(id, named: words.callIt("queue.shipped"), as: .person("orders", "edit")) { order, engine, root in
+            before = order
             let out = try await engine.markShipped(order: order, now: Date())
             guard out.ok, let changed = out.order else {
                 throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
@@ -1183,6 +1189,7 @@ extension Shop {
             owed = await Self.shippedDeliveries(before: order, after: changed, root: root, engine: engine)
             return OneOrderEdit(order: changed, activity: "\(id) → shipped")
         }
+        if wrote { await sendOwedWhatsApp(before: before, jobId: id) }
         if wrote, !owed.isEmpty { await fire(owed) }
     }
 
@@ -1216,7 +1223,9 @@ extension Shop {
     /// a parcel cannot leave before the thing in it is made.
     func ship(_ id: Order.ID, carrier: String, service: String?, trackingNumber: String) async {
         var owed: [KhaytEngine.WebhookDelivery] = []
+        var before: JSONValue?
         let wrote = await writeToOneOrder(id, named: words.callIt("ship.title"), as: .person("orders", "edit")) { order, engine, root in
+            before = order
             guard case .object(let o) = order, o["status"] == .string("completed"),
                   o["deliveredAt"] == nil || o["deliveredAt"] == .null else {
                 throw MoveRefused(sentence: self.words.callIt("mac.not_finished_yet"))
@@ -1226,6 +1235,7 @@ extension Shop {
             owed = await Self.shippedDeliveries(before: order, after: shipped, root: root, engine: engine)
             return OneOrderEdit(order: shipped, activity: "\(id) → shipped")
         }
+        if wrote { await sendOwedWhatsApp(before: before, jobId: id) }
         if wrote, !owed.isEmpty { await fire(owed) }
         // And the customer's page, which shows the parcel (order-flows.js
         // republishes after shipping, so the page shows the carrier and number).

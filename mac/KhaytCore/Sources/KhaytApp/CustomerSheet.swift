@@ -208,6 +208,40 @@ struct CustomerSheet: View {
                 .labelsHidden()
                 .fixedSize()
             }
+            // ── AGREED TO ORDER UPDATES ON WHATSAPP ───────────────────────
+            //
+            // What lets the shop's WhatsApp Business account write to them on
+            // its own (Settings › Integrations). Its own consent, apart from
+            // the marketing opt-out below, and it says when and how it was
+            // given, because Meta can ask a business to show it.
+            GridRow {
+                Color.clear.frame(height: 0)
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle(shop.words.callIt("mac.wab_opt_in"), isOn: Binding(
+                        get: { draft.whatsAppConsent != nil },
+                        set: { draft = draft.optedIntoWhatsApp($0, how: draft.whatsAppConsent?.how ?? "asked", at: Date()) }))
+                        .toggleStyle(.checkbox)
+                    if let consent = draft.whatsAppConsent {
+                        HStack(spacing: 6) {
+                            Picker("", selection: Binding(
+                                get: { consent.how },
+                                set: { draft = draft.optedIntoWhatsApp(true, how: $0, at: Date()) })) {
+                                ForEach(["asked", "form", "customer_wrote", "other"], id: \.self) { how in
+                                    Text(shop.words.callIt("mac.wab_how_" + how)).tag(how)
+                                }
+                                if !["asked", "form", "customer_wrote", "other", ""].contains(consent.how) {
+                                    Text(consent.how).tag(consent.how)
+                                }
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                            Text(shop.words.callIt("mac.wab_opt_in_since",
+                                                   ["day": .string(Calendar.localDay(ofInstant: consent.at))]))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
             GridRow {
                 Text(shop.words.callIt("ce.email")).gridColumnAlignment(.trailing)
                     .foregroundStyle(.secondary)

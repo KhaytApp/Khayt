@@ -62,10 +62,16 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
     /// reads the names and then the shop's language). A shop working in
     /// English still writes to most of its customers in Arabic.
     let messageLang: String
+    /// This customer agreed to order updates on WhatsApp — `{ at, how }`, or
+    /// nil. What lets the shop's WhatsApp Business account write to them
+    /// (`lib/whatsapp-message.js optedIn`). Its OWN consent, apart from
+    /// `marketingOptOut`: hearing that your order shipped is not hearing
+    /// offers, and the other way round.
+    let whatsappOptIn: [String: JSONValue]?
 
     private enum CodingKeys: String, CodingKey {
         case id, nameEn, nameAr, phone, email, cr, vat, notes, defaultDiscount, createdAt
-        case priceList, recurring, commLog, source, marketingOptOut, messageLang
+        case priceList, recurring, commLog, source, marketingOptOut, messageLang, whatsappOptIn
     }
 
     /// Is there anything under the heading?
@@ -118,6 +124,11 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         // — but note that it is NOT the safe default to WRITE. See `record`.
         marketingOptOut = ((try? c.decodeIfPresent(Bool.self, forKey: .marketingOptOut)) ?? nil) ?? false
         messageLang = ((try? c.decodeIfPresent(String.self, forKey: .messageLang)) ?? nil) ?? ""
+        if case .object(let o)? = (try? c.decodeIfPresent(JSONValue.self, forKey: .whatsappOptIn)) ?? nil {
+            whatsappOptIn = o
+        } else {
+            whatsappOptIn = nil
+        }
         let log = (try? c.decodeIfPresent([JSONValue].self, forKey: .commLog)) ?? nil
         commLog = (log ?? []).compactMap {
             if case .object(let o) = $0 { return CommEntry(raw: o) } else { return nil }
@@ -128,7 +139,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
          email: String = "", cr: String = "", vat: String = "", notes: String = "",
          source: String = "", defaultDiscount: Double = 0, createdAt: String? = nil,
          priceList: [PriceAgreement] = [], recurring: Recurring? = nil,
-         commLog: [CommEntry] = [], marketingOptOut: Bool = false, messageLang: String = "") {
+         commLog: [CommEntry] = [], marketingOptOut: Bool = false, messageLang: String = "",
+         whatsappOptIn: [String: JSONValue]? = nil) {
         self.id = id; self.nameEn = nameEn; self.nameAr = nameAr
         self.phone = phone; self.email = email; self.cr = cr; self.vat = vat
         self.notes = notes; self.source = source
@@ -136,6 +148,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         self.priceList = priceList; self.recurring = recurring; self.commLog = commLog
         self.marketingOptOut = marketingOptOut
         self.messageLang = messageLang
+        self.whatsappOptIn = whatsappOptIn
     }
 
     /// The record, as `clients` holds it — what the customer sheet saves.
@@ -168,6 +181,9 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             // Always written, for the same reason: going back to "automatic"
             // has to be able to clear a language chosen earlier.
             "messageLang": .string(messageLang),
+            // Always written, null when withdrawn: an omitted key is carried
+            // through from disk, so leaving it out could never take it back.
+            "whatsappOptIn": whatsappOptIn.map(JSONValue.object) ?? .null,
         ]
         if let recurring { out["recurring"] = .object(recurring.raw) }
         return out
@@ -208,7 +224,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             createdAt: createdAt,
             priceList: priceList, recurring: recurring, commLog: commLog,
             marketingOptOut: marketingOptOut,
-            messageLang: key == \Client.messageLang ? value : messageLang)
+            messageLang: key == \Client.messageLang ? value : messageLang,
+            whatsappOptIn: whatsappOptIn)
     }
 
     /// The same customer, marketed to or not.
@@ -217,7 +234,30 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                cr: cr, vat: vat, notes: notes, source: source,
                defaultDiscount: defaultDiscount, createdAt: createdAt,
                priceList: priceList, recurring: recurring, commLog: commLog,
-               marketingOptOut: !wanted, messageLang: messageLang)
+               marketingOptOut: !wanted, messageLang: messageLang, whatsappOptIn: whatsappOptIn)
+    }
+
+    /// The same customer, agreeing to WhatsApp updates or not. `at` and `how`
+    /// are kept when only `how` changes, so the date says when they agreed.
+    func optedIntoWhatsApp(_ agreed: Bool, how: String, at: Date) -> Client {
+        var next: [String: JSONValue]?
+        if agreed {
+            next = whatsappOptIn ?? ["at": .string(StoreWriter.iso(at))]
+            next?["how"] = .string(how)
+        }
+        return Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email,
+                      cr: cr, vat: vat, notes: notes, source: source,
+                      defaultDiscount: defaultDiscount, createdAt: createdAt,
+                      priceList: priceList, recurring: recurring, commLog: commLog,
+                      marketingOptOut: marketingOptOut, messageLang: messageLang,
+                      whatsappOptIn: next)
+    }
+
+    /// When they agreed to WhatsApp updates, and how — nil when they have not.
+    var whatsAppConsent: (at: String, how: String)? {
+        guard let o = whatsappOptIn, case .string(let at)? = o["at"], !at.isEmpty else { return nil }
+        if case .string(let how)? = o["how"] { return (at, how) }
+        return (at, "")
     }
 
     /// The same customer with a different price list.
@@ -231,7 +271,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                vat: vat, notes: notes, source: source,
                defaultDiscount: defaultDiscount, createdAt: createdAt,
                priceList: next, recurring: recurring, commLog: commLog,
-               marketingOptOut: marketingOptOut, messageLang: messageLang)
+               marketingOptOut: marketingOptOut, messageLang: messageLang,
+               whatsappOptIn: whatsappOptIn)
     }
 
     /// The same customer with a different standing order.
@@ -240,7 +281,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                vat: vat, notes: notes, source: source,
                defaultDiscount: defaultDiscount, createdAt: createdAt,
                priceList: priceList, recurring: next, commLog: commLog,
-               marketingOptOut: marketingOptOut, messageLang: messageLang)
+               marketingOptOut: marketingOptOut, messageLang: messageLang,
+               whatsappOptIn: whatsappOptIn)
     }
 }
 
