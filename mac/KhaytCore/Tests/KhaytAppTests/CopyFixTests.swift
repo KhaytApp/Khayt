@@ -206,7 +206,8 @@ struct CopyFixTests {
 
     @Test("a P&L quarter is named, not keyed")
     func quarterLabels() async throws {
-        #expect(MonthLabel.period("2026-Q3", words: Words()) == "Q3 " + Figure.isolated("2026"))
+        #expect(MonthLabel.period("2026-Q3", words: Words()) == "Q3\u{00A0}" + Figure.isolated("2026"),
+                "a no-break space, so a dialog never leaves Q3 at the end of one line and the year on the next")
         let ar = try await Self.arabic()
         #expect(MonthLabel.period("2026-Q3", words: ar) == "الربع الثالث " + Figure.isolated("2026"))
         #expect(MonthLabel.period("2026-08", words: ar) == "2026-08")
