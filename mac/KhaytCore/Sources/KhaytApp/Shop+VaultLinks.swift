@@ -48,6 +48,9 @@ extension Shop {
     enum LinkOutcome {
         case made(VaultLinks.Created)
         case refused(String)
+        /// Khayt turned off this shop's share links (403 links-disabled): the
+        /// sheet explains it and offers no second try.
+        case turnedOff(String)
     }
 
     /// Make the link. Every model must have a copy in the vault: a link that
@@ -62,6 +65,8 @@ extension Shop {
                 return .refused(Shop.say(words, "mac.vl_err_missing", missing.count))
             }
             return .made(try await engine.links.create(sources, options: options))
+        } catch VaultClient.Failure.linksDisabled {
+            return .turnedOff(linkProblem(VaultClient.Failure.linksDisabled))
         } catch {
             return .refused(linkProblem(error))
         }
@@ -91,9 +96,25 @@ extension Shop {
         case VaultClient.Failure.notAllowed: return words.callIt("mac.vl_err_not_allowed")
         case VaultClient.Failure.notAccepted: return words.callIt("mac.vl_err_signin")
         case VaultClient.Failure.rateLimited: return words.callIt("mac.vl_err_slow")
+        // Phase 2b: the email lock, and Khayt's takedowns.
+        case VaultLinks.Failure.noEmails: return words.callIt("mac.vl_lock_err_none")
+        case VaultLinks.Failure.tooManyEmails:
+            return words.callIt("mac.vl_lock_err_too_many", ["n": .number(Double(VaultLinks.maxEmails))])
+        case VaultLinks.Failure.notAnEmail(let typed):
+            return words.callIt("mac.vl_lock_err_bad", ["email": .string(Self.address(typed))])
+        case VaultClient.Failure.badEmailLock: return words.callIt("mac.vl_err_bad_lock")
+        case VaultClient.Failure.mailOff: return words.callIt("mac.vl_err_mail_off")
+        case VaultClient.Failure.disabled: return words.callIt("mac.vl_err_disabled")
+        case VaultClient.Failure.linksDisabled: return words.callIt("mac.vl_err_links_off")
         default: return words.callIt("mac.vl_err_generic")
         }
     }
+
+    /// An email address inside a sentence: isolated LEFT TO RIGHT (LRI…PDI),
+    /// with a left-to-right mark closing it, so one ending in a neutral
+    /// ("omar@", as typed) keeps its shape in an Arabic line instead of
+    /// reading "@omar" where the isolate alone is not honoured.
+    nonisolated static func address(_ s: String) -> String { "\u{2066}" + s + "\u{200E}\u{2069}" }
 
     /// The vault's own names for its files, for the Links screen: fileId →
     /// the name in the file's sealed record. Read from this Mac's sync state,

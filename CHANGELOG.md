@@ -53,6 +53,65 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - All of this shows only when the library is stored in Khayt Vault, which no
     shop can choose yet. In English and Arabic, light and dark.
 
+
+- **Mac: share links for only the people you name, and links Khayt has turned off (built, still dark).**
+  - The Share sheet has a new "Only these people" list. Type or paste email
+    addresses, up to 50. Each person then has to enter a code that is emailed
+    to them before they can see the files. The sheet says plainly that Khayt
+    Cloud can read these addresses (it sends the codes) and that everyone in
+    the shop can see them. The addresses are checked as you type, and a
+    mistyped one is named before anything is sent.
+  - Share Links shows who a link is limited to, and lets you change the list
+    or remove it (removing asks first, because anyone with the link can then
+    open it). Someone taken off the list can no longer open the link. The
+    activity list now names the address that opened or downloaded.
+  - If Khayt turns a link off, Share Links says "Turned off by Khayt", with
+    the reason when Khayt gave one. Revoke is the only thing it offers, and
+    Copy Link is hidden. This Mac keeps the link's key, so the link can be
+    copied again if Khayt turns it back on.
+  - If Khayt has turned off share links for the whole shop, the Share sheet
+    explains that instead of offering to try again.
+  - The password and the part of the link after `#` still never leave this
+    Mac, and the WhatsApp message still never carries the password. In English
+    and Arabic, light and dark.
+
+- **Desktop: the machine card shows the printer's full reading, and part prep/post time follow the shop's defaults.**
+  - Under the live badge, the card now shows heater targets, the chamber, the
+    current layer, the part fan, speed and flow, and the printer's own message.
+    A figure the printer did not give is left out, never shown as 0. The job
+    figures show only while a job is running or paused.
+  - A Klipper printer's chamber and per-head fans are now discovered with its
+    filament sensors. A failed discovery is retried after a minute. Before, it
+    counted as "no sensors" until the app restarted.
+  - The pause/resume/cancel buttons now ask the shared `supports()` table which
+    commands a printer can take.
+  - Product editor: a part's prep and post time that were never typed show the
+    shop's default as a grey hint, and a blank field saves as "use the default".
+    Before, opening and saving a product wrote 0 h into both, which costed the
+    part with no labour. A new part no longer starts at a fixed 0.1 h / 0.2 h;
+    it follows the shop's defaults.
+
+
+- **beta.5 review fixes: filed VAT, portal sync, Bambu sessions, runout, PIN lockouts.**
+  - A cancel, void or credit after a filed period is now dated by that event,
+    not by the job's last save. A job cancelled on 20 December and saved again
+    on 3 January for a payment or a note used to put its VAT reversal in Q1,
+    so the Q4 return left it out. The reversal now stays in Q4. The sync stamp
+    `updatedAt` is only used for an edit that has no event date. The Mac's copy
+    of the rule is the same file.
+  - Mac: publishing or taking down a customer's portal page now always stamps
+    the job. Before, a job that already showed the same value was not stamped,
+    and another Mac's older copy could win the sync merge.
+  - Mac: changing a Bambu's access code, host or port keeps the printer's
+    last-known state. The new connection used to start empty while the
+    five-minute full-state limit was still running. Two quick reconnects at the
+    same time can no longer leave a second MQTT connection open.
+  - The runout alert now fires when a job starts on a head that was already
+    empty.
+  - Mac: wrong-PIN lockouts on the LAN server now use the same clock as the
+    pairing window, a clock that only moves forward. Changing the Mac's date
+    no longer lifts or extends a lockout.
+
 - **Mac: archive models by hand, and bring them back.** Right-click a model (or several), use the Model menu, or press Archive in the model's panel to take it out of the library. Nothing is deleted: the file and its history stay. Show ▸ Archived lists everything put aside, including originals a conversion replaced, and Restore from Archive brings a model back. Undo works for both. The library's filter counts no longer include archived models.
 
 - **Mac: rename a model.** Press the pencil beside a model's title, right-click it, or use Model ▸ Rename… to change the name the library shows. The file keeps its own name, and Undo puts the old title back.

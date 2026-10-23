@@ -77,6 +77,61 @@ struct VaultLinksUITests {
         #expect(shop.linkProblem(VaultClient.Failure.notYet) == shop.words.callIt("mac.vl_err_not_yet"))
     }
 
+    @Test("Vault links UI: the email lock's and Khayt's refusals each read as their own message, in both languages")
+    func phase2bProblems() {
+        let shop = Shop()
+        let w = shop.words
+        #expect(shop.linkProblem(VaultClient.Failure.mailOff) == w.callIt("mac.vl_err_mail_off"))
+        #expect(shop.linkProblem(VaultClient.Failure.badEmailLock) == w.callIt("mac.vl_err_bad_lock"))
+        #expect(shop.linkProblem(VaultClient.Failure.disabled) == w.callIt("mac.vl_err_disabled"))
+        #expect(shop.linkProblem(VaultClient.Failure.linksDisabled) == w.callIt("mac.vl_err_links_off"))
+        #expect(shop.linkProblem(VaultLinks.Failure.noEmails) == w.callIt("mac.vl_lock_err_none"))
+        let tooMany = shop.linkProblem(VaultLinks.Failure.tooManyEmails(60))
+        #expect(tooMany.contains("50") && !tooMany.contains("60"))
+        // The address typed is named, isolated so it keeps its shape in Arabic.
+        #expect(shop.linkProblem(VaultLinks.Failure.notAnEmail("omar@")).contains(Shop.address("omar@")))
+        // None of them falls through to the generic line.
+        let all: [any Error] = [VaultClient.Failure.mailOff, VaultClient.Failure.badEmailLock,
+                                VaultClient.Failure.disabled, VaultClient.Failure.linksDisabled,
+                                VaultLinks.Failure.noEmails, VaultLinks.Failure.tooManyEmails(51),
+                                VaultLinks.Failure.notAnEmail("x")]
+        for e in all {
+            #expect(shop.linkProblem(e) != w.callIt("mac.vl_err_generic"))
+        }
+    }
+
+    /// Copy Link only on a live link (`state == .ok`, so never a disabled
+    /// one), and a disabled link's menu holds Revoke alone.
+    @Test("Vault links UI: a link Khayt turned off shows no Copy Link, and Revoke is its only action")
+    func disabledOnlyRevokes() throws {
+        let s = try Self.source("VaultLinksSheet.swift")
+        #expect(s.contains("private var live: Bool { grant.state == .ok }"))
+        #expect(s.contains("if live && local == .copyable {"))
+        // Everything but Revoke sits inside the live-and-whole block.
+        let menu = try #require(s.range(of: "if live || disabled {"))
+        let whole = try #require(s.range(of: "if live && !incomplete {", range: menu.upperBound..<s.endIndex))
+        let revoke = try #require(s.range(of: "\"mac.vl_revoke\") + \"\\u{2026}\"", range: whole.upperBound..<s.endIndex))
+        for key in ["mac.vl_add_downloads", "mac.vl_extend_days", "mac.vl_remove_end", "mac.vl_lock_set",
+                    "mac.vl_lock_change", "mac.vl_lock_remove"] {
+            let at = try #require(s.range(of: "\"\(key)\"", range: whole.upperBound..<revoke.lowerBound), "\(key)")
+            #expect(at.lowerBound > whole.upperBound)
+        }
+        // And the core forgets nothing of a disabled link: Khayt can turn it back on.
+        let grant = try JSONDecoder().decode(VaultClient.Grant.self, from: Data(
+            #"{"grantId":"AAAAAAAAAAAAAAAAAAAAAA","state":"disabled","disabledReason":"x"}"#.utf8))
+        #expect(grant.isDisabled && grant.state != .ok)
+    }
+
+    @Test("Vault links UI: the share sheet says who can read the addresses, and that each person gets a code")
+    func lockExplained() {
+        for lang in ["en", "ar"] {
+            let en = Words.own["mac.vl_lock_explain"]?[lang] ?? ""
+            #expect(!en.isEmpty)
+        }
+        let en = Words.own["mac.vl_lock_explain"]?["en"] ?? ""
+        #expect(en.contains("code") && en.contains("Khayt Cloud") && en.contains("everyone in your shop"))
+    }
+
     @Test("Vault links UI: a copied link is marked concealed and transient, for clipboard managers")
     func pasteboardMarkers() throws {
         #expect(Set(Shop.secretPasteboardMarkers.map(\.rawValue))
