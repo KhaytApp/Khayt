@@ -428,12 +428,164 @@ function addAMSMaterialRow() {
   if (typeof renderExtraMaterials === 'function') renderExtraMaterials();
 }
 
+/* ── FILED VAT RETURNS ──────────────────────────────────────────
+ * The owner's rule (2026-10-22, lib/vat-periods.js): a return the shop marks
+ * FILED keeps the figures it was filed with, and a later cancel, void, credit,
+ * edit or backdated invoice is adjusted in the first open period — the next
+ * quarter, or the next month for a monthly filer (Settings → VAT). The P&L,
+ * the tax summary and the return export already read the marks
+ * (KhaytPnl.vatCorrections); this is where the shop makes them. ONLY THIS
+ * MARK makes a period filed: a deadline passing marks nothing. The Mac's
+ * VAT returns card (PnlControls.swift) is the model, word for word.
+ *
+ * The marks live in this book's settings, which Khayt Cloud sync does not
+ * carry: a period marked on the Mac is not marked here. */
+
+/** `2026-Q3` → "Q3 2026"; `2026-09` → the month in the app's language. */
+function vatPeriodLabel(key) {
+  const m = /^(\d{4})-(?:Q([1-4])|(\d{2}))$/.exec(String(key || ''));
+  if (!m) return String(key || '');
+  if (m[2]) return t('pnl.vat_quarter_label', { q: m[2], year: m[1] });
+  try {
+    return new Date(Date.UTC(+m[1], +m[3] - 1, 1)).toLocaleDateString(localeTag(), { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  } catch { return key; }
+}
+
+/** A manager may read Settings but not change them (lib/rbac.js settings: R,
+ *  as settings.js settingsReadOnly) — and filing a return is a settings write. */
+function _vatReadOnly() {
+  return typeof operatorCan === 'function' && !operatorCan('settings', 'edit');
+}
+
+function _vatToday() {
+  return KhaytVatPeriods.localDay(new Date().toISOString());
+}
+
+function _vatCtx() {
+  return { clients: (typeof clients !== 'undefined' ? clients : []),
+           currencies: (typeof CURRENCIES !== 'undefined') ? CURRENCIES : undefined };
+}
+
+/** Write a vat-periods result back into the live settings and save. */
+function _vatApply(next) {
+  settings.vatFiledPeriods = next.vatFiledPeriods || [];
+  if ('vatUnfiledPeriods' in next) settings.vatUnfiledPeriods = next.vatUnfiledPeriods;
+  saveAll();
+  renderVatFiling();
+}
+
+function setVatPeriodFiled(key, filed, fresh) {
+  if (_vatReadOnly()) { toast(t('set.readonly_note'), 'error'); return; }
+  const V = KhaytVatPeriods;
+  if (filed) {
+    const other = V.overlapOf(settings, key);
+    if (other) { toast(t('pnl.vat_filed_overlap', { period: vatPeriodLabel(key), other: vatPeriodLabel(other) }), 'error'); return; }
+    _vatApply(V.markFiled(settings, key, printLog, new Date(), _vatCtx(), { fresh: !!fresh }));
+  } else {
+    const later = V.laterFiledOf(settings, key);
+    if (later) { toast(t('pnl.vat_filed_later', { later: vatPeriodLabel(later), period: vatPeriodLabel(key) }), 'error'); return; }
+    _vatApply(V.unmarkFiled(settings, key));
+  }
+}
+
+function askVatPeriodFiled(key, filed, archived) {
+  const label = vatPeriodLabel(key);
+  if (!filed) {
+    // Un-filing forgets what was filed in the screen's eyes: asked first.
+    openFormModal({
+      title: t('pnl.vat_unfile_title', { period: label }),
+      bodyHtml: `<p style="margin:0;">${escapeHtml(t('pnl.vat_unfile_message', { period: label }))}</p>`,
+      saveLabel: t('pnl.vat_unfile_confirm'),
+      sizeLg: false,
+      onSave: () => { setVatPeriodFiled(key, false); return true; },
+    });
+    return;
+  }
+  if (!archived) { setVatPeriodFiled(key, true); return; }
+  // Filed before, un-filed, and filed again: restore what was sent (the
+  // default), or record the book as it is now for an amended return.
+  openFormModal({
+    title: t('pnl.vat_refile_title', { period: label }),
+    bodyHtml: `<p style="margin:0 0 10px;">${escapeHtml(t('pnl.vat_refile_message'))}</p>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:normal;"><input type="radio" name="vatRefile" value="restore" checked style="width:auto;margin:0;">${escapeHtml(t('pnl.vat_refile_restore'))}</label>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:normal;margin-top:6px;"><input type="radio" name="vatRefile" value="fresh" style="width:auto;margin:0;">${escapeHtml(t('pnl.vat_refile_fresh'))}</label>`,
+    saveLabel: t('pnl.vat_mark_filed'),
+    sizeLg: false,
+    onSave: (modal) => {
+      const pick = modal.querySelector('input[name="vatRefile"]:checked');
+      setVatPeriodFiled(key, true, !!(pick && pick.value === 'fresh'));
+      return true;
+    },
+  });
+}
+
+/** The VAT return card: the export picker in the shop's frequency, and the
+ *  ended return periods, each markable filed. */
+function renderVatFiling() {
+  if (typeof KhaytVatPeriods === 'undefined') return;
+  const V = KhaytVatPeriods;
+  const today = _vatToday();
+  const freq = V.frequencyOf(settings);
+
+  const sel = document.getElementById('vatReturnPeriod');
+  if (sel) {
+    const was = sel.value;
+    const keys = V.periodsBetween(`${today.slice(0, 4)}-01-01`, today, freq).reverse();
+    sel.innerHTML = `<option value="year">${escapeHtml(t('analytics.this_year'))}</option>`
+      + keys.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(vatPeriodLabel(k))}</option>`).join('');
+    // The last ENDED period first: that is the return about to be filed.
+    const ended = keys.find((k) => V.periodBounds(k).to < today);
+    sel.value = [...sel.options].some((o) => o.value === was) && was !== 'year' ? was : (ended || keys[0] || 'year');
+  }
+
+  const box = document.getElementById('vatFilingSection');
+  if (!box) return;
+  const profile = KhaytTax.profileFromSettings(settings);
+  if (!profile.rates.reduce((sum, r) => sum + r.percent, 0)) { box.innerHTML = ''; return; }
+  const ro = _vatReadOnly();
+  const rows = V.filingPeriods(settings, { today, count: 8 });
+  const rowHtml = (r) => {
+    const label = escapeHtml(vatPeriodLabel(r.period));
+    let state = '', btn = '';
+    if (r.partOf) {
+      state = `<span style="color:var(--text-muted);">${escapeHtml(t('pnl.vat_filed_part_of', { period: vatPeriodLabel(r.partOf) }))}</span>`;
+    } else if (r.filed) {
+      state = `<span style="color:var(--success);">${escapeHtml(t('pnl.vat_filed'))}</span>`;
+      btn = `<button class="btn small ghost" data-act="vat-unfile" data-period="${escapeHtml(r.period)}"${ro ? ' disabled' : ''}>${escapeHtml(t('pnl.vat_unfile_confirm'))}</button>`;
+    } else {
+      btn = `<button class="btn small" data-act="vat-file" data-period="${escapeHtml(r.period)}" data-archived="${r.archived ? '1' : ''}"${ro ? ' disabled' : ''}>${escapeHtml(t('pnl.vat_mark_filed'))}</button>`;
+    }
+    return `<div class="vat-filing-row" data-period="${escapeHtml(r.period)}" style="display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border);">
+      <span style="flex:1;">${label}</span>${state}${btn}</div>`;
+  };
+  box.innerHTML = `<div class="card" style="margin-top:8px;">
+      <h4 style="margin:0 0 6px;font-size:13px;">${escapeHtml(t('pnl.vat_returns'))}</h4>
+      ${rows.length ? rows.map(rowHtml).join('') : `<p style="margin:0;color:var(--text-muted);font-size:12px;">${escapeHtml(t('pnl.vat_returns_none'))}</p>`}
+      <p style="margin:8px 0 0;color:var(--text-muted);font-size:11.5px;">${escapeHtml(t('pnl.vat_filed_hint'))}</p>
+    </div>`;
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-act]');
+      if (!b || b.disabled) return;
+      if (b.dataset.act === 'vat-file') askVatPeriodFiled(b.dataset.period, true, b.dataset.archived === '1');
+      else if (b.dataset.act === 'vat-unfile') askVatPeriodFiled(b.dataset.period, false);
+    });
+  }
+}
+
 /* ── Feature 7: GAZT VAT Return Export ─────────────────────── */
 function exportGaztVatReturn(period) {
   period = period || 'year';
   const now = new Date();
   let fromDate, toDate;
-  if (period === 'year') {
+  // A return period key from the picker (`2026-Q3`, or `2026-09` for a
+  // monthly filer — lib/vat-periods.js), or the older this-year shorthands.
+  const bounds = (typeof KhaytVatPeriods !== 'undefined') ? KhaytVatPeriods.periodBounds(period) : null;
+  if (bounds) {
+    fromDate = bounds.from;
+    toDate = bounds.to;
+  } else if (period === 'year') {
     fromDate = `${now.getFullYear()}-01-01`;
     toDate   = `${now.getFullYear()}-12-31`;
   } else if (period === 'q1') { fromDate = `${now.getFullYear()}-01-01`; toDate = `${now.getFullYear()}-03-31`; }
@@ -545,8 +697,9 @@ function exportGaztVatReturn(period) {
   const box7Known = periodExp.some(e => +e.vatAmount > 0);
   const netVat = box3 - box7;
 
+  const periodTitle = bounds ? vatPeriodLabel(period) : `${period.toUpperCase()} ${now.getFullYear()}`;
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>${escapeHtml(taxName)} summary — ${escapeHtml(period)} ${now.getFullYear()}</title>
+    <title>${escapeHtml(taxName)} summary — ${escapeHtml(periodTitle)}</title>
     <style>body{font-family:sans-serif;max-width:700px;margin:auto;padding:24px;}
       h1{font-size:18px;} table{width:100%;border-collapse:collapse;margin-top:16px;}
       th{background:#f3f4f6;text-align:left;padding:8px;border:1px solid #ddd;font-size:13px;}
@@ -554,7 +707,7 @@ function exportGaztVatReturn(period) {
       .net{font-weight:700;background:#fef3c7;}
       .warn{margin-top:16px;padding:10px 12px;border:1px solid #f59e0b;background:#fffbeb;font-size:12px;}</style></head>
     <body>
-      <h1>${escapeHtml(taxName)} summary — ${escapeHtml(shopName() || '')} (${escapeHtml(period.toUpperCase())} ${now.getFullYear()})</h1>
+      <h1>${escapeHtml(taxName)} summary — ${escapeHtml(shopName() || '')} (${escapeHtml(periodTitle)})</h1>
       <p style="font-size:12px;color:#666;">Period: ${escapeHtml(fromDate)} to ${escapeHtml(toDate)}</p>
       <table>
         <thead><tr><th>Box</th><th>Description</th><th>Amount (${escapeHtml(currencySymbol())})</th></tr></thead>
@@ -813,6 +966,9 @@ function openLogEnvModal() {
     applyGiftCard,
     addAMSMaterialRow,
     exportGaztVatReturn,
+    renderVatFiling,
+    vatPeriodLabel,
+    setVatPeriodFiled,
     renderSlicerProfiles,
     openSlicerProfileModal,
     deleteSlicerProfile,

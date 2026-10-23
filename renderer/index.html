@@ -1076,14 +1076,15 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <h3 class="card-head" style="margin:0;" data-i18n="vatReturn">VAT Return</h3>
           <div style="display:flex;gap:8px;align-items:center;">
+            <!-- Filled by renderVatFiling: this year, then each period in the
+                 shop's filing frequency (quarters or months). -->
             <select id="vatReturnPeriod" class="form-select" style="font-size:12px;padding:4px 8px;">
               <option value="year" data-i18n="analytics.this_year">This Year</option>
-              <option value="q1">Q1</option><option value="q2">Q2</option>
-              <option value="q3">Q3</option><option value="q4">Q4</option>
             </select>
             <button id="btnExportVatReturn" class="btn btn-sm btn-secondary" data-i18n="exportVatReturn">Export VAT Return</button>
           </div>
         </div>
+        <div id="vatFilingSection"></div>
       </div>
 
       <!-- Acquisition Sources -->
@@ -1781,6 +1782,16 @@
                 <option value="exclusive" data-i18n="set.tax_mode_exclusive">Exclude tax (added at checkout)</option>
               </select>
               <p id="taxModeHint" style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;"></p>
+            </div>
+            <!-- How often the VAT return is filed: it decides the period a later
+                 change to a FILED return lands in (lib/vat-periods.js). -->
+            <div style="margin-top:12px;">
+              <label data-i18n="pnl.vat_filing" for="set_vatFilingFrequency">VAT returns are filed</label>
+              <select id="set_vatFilingFrequency" style="max-width:240px;">
+                <option value="quarterly" data-i18n="pnl.vat_filing_quarterly">Quarterly</option>
+                <option value="monthly" data-i18n="pnl.vat_filing_monthly">Monthly</option>
+              </select>
+              <p style="font-size:11.5px; color:var(--text-muted); margin:4px 0 0;" data-i18n="pnl.vat_filing_hint"></p>
             </div>
           </div>
           <div>

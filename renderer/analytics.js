@@ -596,6 +596,8 @@ function renderAnalytics() {
   renderMaintenanceCostChart();
   // Feature K: Time tracking analytics
   renderTimeAnalytics();
+  // The VAT return card's picker and filed returns (operations-extras.js).
+  if (typeof renderVatFiling === 'function') renderVatFiling();
 }
 
 function renderClientSourceChart() {
