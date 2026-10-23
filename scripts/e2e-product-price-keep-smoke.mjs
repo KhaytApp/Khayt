@@ -6,7 +6,8 @@
  * through an edit that does not touch its pricing, and the editor says what
  * today's costs would give. An edit that does re-price it says "was → now"
  * before Save, and Save stores the new price. The Mac keeps the stored price
- * on an untouched save the same way.
+ * on an untouched save the same way. A part's unset prep/post time stays
+ * unset through the editor (the shop's default, as a hint).
  *
  * Run: npm run test:e2e:pricekeep
  */
@@ -58,6 +59,24 @@ try {
   await window.waitForTimeout(400);
   const repriced = await window.evaluate(() => products.find((x) => x.id === 'PROD-keep').price);
   ok(repriced > seeded.stored, `and Save stores the new price (${repriced})`);
+
+  // A part that never said its prep/post time shows the shop's default as a
+  // hint, not a typed 0, and saving leaves it unset (costed at the default).
+  await window.evaluate(() => openProductEditor('PROD-keep'));
+  await window.waitForSelector('.modal .part-row [data-f="prepTime"]');
+  const prep = await window.evaluate(() => {
+    const el = document.querySelector('.modal .part-row [data-f="prepTime"]');
+    return { value: el.value, ph: el.placeholder, want: String(KhaytPrintRates.ratesFor({ settings }).prepTime) };
+  });
+  ok(prep.value === '' && prep.ph === prep.want, `an unset prep time is drawn empty with the default as its hint (${JSON.stringify(prep)})`);
+  await window.fill('.modal .part-row [data-f="postTime"]', '2');
+  await window.dispatchEvent('.modal .part-row [data-f="postTime"]', 'input');
+  await window.fill('.modal .part-row [data-f="postTime"]', '');
+  await window.dispatchEvent('.modal .part-row [data-f="postTime"]', 'input');
+  await window.click('.modal [data-act="save"]');
+  await window.waitForTimeout(400);
+  const part = await window.evaluate(() => products.find((x) => x.id === 'PROD-keep').parts[0]);
+  ok(!('prepTime' in part) && !('postTime' in part), `a blank prep/post time saves as unset, not 0 (${JSON.stringify({ prepTime: part.prepTime, postTime: part.postTime })})`);
 
   // A new product is priced as before.
   const fresh = await window.evaluate(() => {

@@ -3576,6 +3576,17 @@ function openProductEditor(productId = null) {
     ? `<div class="empty-state" style="padding:18px;">${escapeHtml(t('pe.no_parts'))}</div>`
     : draft.parts.map((part, i) => renderPartRow(part, i)).join(''));
 
+  /* Prep and post time a part does not say are costed at the shop's default
+   * rates (lib/print-rates.js withRates: only a finite number, 0 included,
+   * overrides). So an unset field is drawn EMPTY with the default as its
+   * placeholder, not as a typed 0 — a 0 written back on save would turn "the
+   * shop's default" into "no labour" without anyone choosing it. */
+  const partDefaults = (typeof KhaytPrintRates !== 'undefined')
+    ? KhaytPrintRates.ratesFor({ settings: typeof settings !== 'undefined' ? settings : {} })
+    : {};
+  const RATE_FIELDS = new Set(['prepTime', 'postTime']);
+  const rateValue = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? '' : String(v));
+
   function renderPartRow(part, i) {
     const filamentOptions = inventory.map(it =>
       `<option value="${it.id}" ${part.filamentId === it.id ? 'selected' : ''}>${escapeHtml(it.material)}</option>`
@@ -3621,11 +3632,11 @@ function openProductEditor(productId = null) {
           </div>
           <div>
             <label>${escapeHtml(t('calc.labor.prep'))} (${escapeHtml(t('common.hours'))})</label>
-            <input type="number" min="0" step="0.1" data-f="prepTime" value="${part.prepTime ?? 0}">
+            <input type="number" min="0" step="0.1" data-f="prepTime" value="${rateValue(part.prepTime)}" placeholder="${escapeHtml(String(partDefaults.prepTime ?? ''))}">
           </div>
           <div>
             <label>${escapeHtml(t('calc.labor.post'))} (${escapeHtml(t('common.hours'))})</label>
-            <input type="number" min="0" step="0.1" data-f="postTime" value="${part.postTime ?? 0}">
+            <input type="number" min="0" step="0.1" data-f="postTime" value="${rateValue(part.postTime)}" placeholder="${escapeHtml(String(partDefaults.postTime ?? ''))}">
           </div>
         </div>
       </div>`;
@@ -3894,7 +3905,8 @@ function openProductEditor(productId = null) {
         const pi = +row.dataset.pi;
         const f = input.dataset.f;
         if (!draft.parts[pi]) return;
-        draft.parts[pi][f] = input.type === 'number' ? num(input.value, 0) : input.value;
+        if (RATE_FIELDS.has(f) && String(input.value).trim() === '') delete draft.parts[pi][f];
+        else draft.parts[pi][f] = input.type === 'number' ? num(input.value, 0) : input.value;
         refreshPricing();
       });
 
@@ -3919,8 +3931,8 @@ function openProductEditor(productId = null) {
           wearRate:    num($('#wearRate').value, 0.75),
           powerDraw:   num($('#powerDraw').value, 150),
           elecRate:    num($('#elecRate').value, (typeof shopRateDefaults === 'function' ? shopRateDefaults() : { elecRate: 0.18 }).elecRate),
-          prepTime: 0.1,
-          postTime: 0.2,
+          // No prep or post time: unset, they cost at the shop's defaults
+          // (withRates) — the fixed 0.1/0.2 seeded here overrode them.
           laborRate:   num($('#laborRate').value, 90),
           failureRate: num($('#failureRate').value, 10),
         });
