@@ -147,6 +147,15 @@ extension Snapshot {
         try? await Task.sleep(for: .milliseconds(900))
         capture(named: "b5-2a-camera-paused" + tag, into: dir)
         scrollMain(to: 0)
+        // The tile on its own, drawn by the renderer: the window shot cannot
+        // show the label, which sits on a material the offscreen draw skips.
+        captureView(named: "b5-2e-camera-tile-paused" + tag,
+                    CameraTile(frame: .paused(placeholderStill()), webcam: nil, words: shop.words)
+                        .frame(width: 380).padding(16)
+                        .background(Khayt.ground)
+                        .environment(\.colorScheme, tag.isEmpty ? .light : .dark)
+                        .environment(\.layoutDirection, shop.words.isRTL ? .rightToLeft : .leftToRight),
+                    into: dir)
         shop.cameras.setFrameForTesting("MACH-u1", .none)
 
         // The sheet's camera section with the offer a look would have made.
