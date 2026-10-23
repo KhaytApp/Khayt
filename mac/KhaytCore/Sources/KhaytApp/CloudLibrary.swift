@@ -208,6 +208,7 @@ enum CloudLibrary {
         switch remote {
         case .bucket(let c): return bucketIdentity(endpoint: c.endpoint, bucket: c.bucket, prefix: c.prefix)
         case .drive(let d): return driveIdentity(d.config, folder: driveFolder(settings))
+        case .vault(let v): return "vault:" + v.sync.client.connection.shopId
         }
     }
 

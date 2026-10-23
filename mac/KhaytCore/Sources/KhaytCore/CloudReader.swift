@@ -100,7 +100,7 @@ public enum CloudReader {
     /// The claim is true and that is what earns it — `store(_:dek:engine:)`
     /// folds `base + deltas` through `KhaytSync.applyDeltas`, the same rule the
     /// desktop folds with. It comes off again if that ever stops being so.
-    public static func request(_ connection: Connection, token: String,
+    nonisolated public static func request(_ connection: Connection, token: String,
                         method: String, tail: String) throws -> URLRequest {
         guard let base = URL(string: connection.url), base.scheme == "https" else {
             // Not a preference: the token goes in a header, and http would put
