@@ -47,6 +47,10 @@ final class VaultStub: @unchecked Sendable {
     /// Refuse every revoke (a cleanup that cannot reach the cloud).
     var failRevoke = false
     var maxActiveLinks = 100
+    /// Phase 2b: a cloud that cannot send email (422 mail-off on a lock), and
+    /// a shop whose links Khayt turned off (403 links-disabled on a POST).
+    var mailOff = false
+    var linksDisabled = false
     struct Logged { let method: String; let url: String; let body: Data; let headers: [String: String] }
 
     struct File { var fileId: String; var nextVersion = 1; var head: Int?; var meta: String?; var metaRev = 0
@@ -76,7 +80,7 @@ final class VaultStub: @unchecked Sendable {
                                  headers: r.allHTTPHeaderFields ?? [:]))
         if url.host == "store.test" { return try object(r) }
         // The public link route: no shop token, as a browser calls it.
-        if url.path.hasPrefix("/v1/s/") { return publicGrant(url) }
+        if url.path.hasPrefix("/v1/s/") { return publicGrant(url, cookie: r.value(forHTTPHeaderField: "Cookie")) }
         guard r.value(forHTTPHeaderField: "Authorization") == "Bearer " + Self.token else { return reply(url, 401, ["error": "no"]) }
         guard r.value(forHTTPHeaderField: "x-delta-capable") == "1" else { return reply(url, 400, ["error": "header"]) }
         let prefix = "/v1/shops/\(Self.shopId)/vault/"

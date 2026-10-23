@@ -305,7 +305,9 @@ extension VaultClient {
                 remaining = try c.decodeIfPresent(Int.self, forKey: .remaining)
             }
         }
-        public enum State: String, Sendable { case ok, revoked, expired, usedUp = "used-up", unknown }
+        /// `disabled` is a takedown by Khayt, and outranks the rest: such a
+        /// link can only be revoked (any other PATCH is 409 `disabled`).
+        public enum State: String, Sendable { case ok, disabled, revoked, expired, usedUp = "used-up", unknown }
 
         public let grantId: String
         public let state: State
@@ -320,12 +322,19 @@ extension VaultClient {
         public let ownerNote: String?
         public let used: Int
         public let devices: Int
+        /// The addresses the link is locked to (each proves itself by an
+        /// emailed code), or nil for no lock. Stored by the cloud in plaintext.
+        public let emailLock: [String]?
+        /// When Khayt turned the link off, and why (when it said), on a
+        /// `disabled` link. The reason is Khayt's own text, shown as written.
+        public let disabledAt: String?
+        public let disabledReason: String?
         public let items: [Item]
         public var id: String { grantId }
 
         enum CodingKeys: String, CodingKey {
             case grantId, state, createdAt, revokedAt, firstOpenAt, expiresAt, limits, password, ownerNote, used,
-                 devices, items
+                 devices, emailLock, disabledAt, disabledReason, items
         }
         public init(from d: Decoder) throws {
             let c = try d.container(keyedBy: CodingKeys.self)
@@ -340,11 +349,18 @@ extension VaultClient {
             ownerNote = try c.decodeIfPresent(String.self, forKey: .ownerNote)
             used = try c.decodeIfPresent(Int.self, forKey: .used) ?? 0
             devices = try c.decodeIfPresent(Int.self, forKey: .devices) ?? 0
+            emailLock = try c.decodeIfPresent([String].self, forKey: .emailLock).flatMap { $0.isEmpty ? nil : $0 }
+            disabledAt = try c.decodeIfPresent(String.self, forKey: .disabledAt)
+            disabledReason = try c.decodeIfPresent(String.self, forKey: .disabledReason)
+                .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
             items = try c.decodeIfPresent([Item].self, forKey: .items) ?? []
         }
 
         /// Downloads left on the whole link, or nil when it has no limit.
         /// For a per-file limit, the sum of what each file has left.
+        /// Turned off by Khayt: Revoke is the only thing it takes.
+        public var isDisabled: Bool { state == .disabled }
+
         public var remaining: Int? {
             guard let max = limits.maxDownloads else { return nil }
             if limits.perFile == true { return items.reduce(0) { $0 + ($1.remaining ?? 0) } }
@@ -360,21 +376,26 @@ extension VaultClient {
         public let country: String?
         /// `phone`, `tablet`, `computer` or `other`. No IP, no user agent.
         public let deviceClass: String?
-        public var id: String { at + "|" + kind + "|" + (fileId ?? "") }
+        /// The address that proved itself on an email-locked link, else nil.
+        public let recipient: String?
+        public var id: String { at + "|" + kind + "|" + (fileId ?? "") + "|" + (recipient ?? "") }
     }
 
     /// What a PATCH changes. Any of these, together.
     public struct GrantPatch: Sendable, Equatable {
         public enum Expiry: Sendable, Equatable { case keep, at(String), never }
+        /// `set` sends the (already checked) list, `remove` sends null.
+        public enum EmailLockChange: Sendable, Equatable { case keep, set([String]), remove }
         public var addDownloads: Int?
         public var expiresAt: Expiry = .keep
         public var revoke = false
         public var items: [GrantItem] = []
         public var removeItems: [String] = []
+        public var emailLock: EmailLockChange = .keep
         public init(addDownloads: Int? = nil, expiresAt: Expiry = .keep, revoke: Bool = false,
-                    items: [GrantItem] = [], removeItems: [String] = []) {
+                    items: [GrantItem] = [], removeItems: [String] = [], emailLock: EmailLockChange = .keep) {
             self.addDownloads = addDownloads; self.expiresAt = expiresAt; self.revoke = revoke
-            self.items = items; self.removeItems = removeItems
+            self.items = items; self.removeItems = removeItems; self.emailLock = emailLock
         }
         var json: [String: Any] {
             var o: [String: Any] = [:]
@@ -387,28 +408,36 @@ extension VaultClient {
             if revoke { o["revoke"] = true }
             if !items.isEmpty { o["items"] = items.map(\.json) }
             if !removeItems.isEmpty { o["removeItems"] = removeItems }
+            switch emailLock {
+            case .keep: break
+            case .set(let list): o["emailLock"] = list
+            case .remove: o["emailLock"] = NSNull()
+            }
             return o
         }
     }
 
     static func createBody(grantId: String, items: [GrantItem], limits: GrantLimits?, password: Bool,
-                           ownerNote: Data?) -> [String: Any] {
+                           ownerNote: Data?, emailLock: [String]? = nil) -> [String: Any] {
         var body: [String: Any] = ["grantId": grantId, "items": items.map(\.json)]
         if let limits, !limits.json.isEmpty { body["limits"] = limits.json }
         if password { body["password"] = true }
         if let ownerNote { body["ownerNote"] = ownerNote.base64EncodedString() }
+        if let emailLock { body["emailLock"] = emailLock }
         return body
     }
 
     /// POST /vault/grants. A taken id throws `.grantExists`. Returns createdAt.
+    /// `emailLock` is sent as given: check it first (`VaultLinks.emailLock`).
     @discardableResult
     public func createGrant(grantId: String, items: [GrantItem], limits: GrantLimits?, password: Bool,
-                            ownerNote: Data?) async throws -> String {
+                            ownerNote: Data?, emailLock: [String]? = nil) async throws -> String {
         guard grantId.count >= 22 else { throw VaultCrypto.Failure.badInput("grantId must be at least 22 characters") }
         _ = try VaultCrypto.id(grantId, "grantId")
         let o = try await call("POST", "/vault/grants",
                                body: Self.createBody(grantId: grantId, items: items, limits: limits,
-                                                     password: password, ownerNote: ownerNote),
+                                                     password: password, ownerNote: ownerNote,
+                                                     emailLock: emailLock),
                                expect: [201])
         return (o["createdAt"] as? String) ?? ""
     }
@@ -487,6 +516,8 @@ public struct VaultLinks: Sendable {
     public static let maxBodyBytes = 16 * 1024 * 1024
     public static let maxLinkMetaBytes = 256 * 1024
     public static let maxNoteBytes = 16 * 1024
+    /// An email lock holds 1 to 50 addresses.
+    public static let maxEmails = 50
     /// Grant ids are random; three in a row taken means something else is wrong.
     static let idAttempts = 3
 
@@ -522,6 +553,13 @@ public struct VaultLinks: Sendable {
         case incomplete(grantId: String, sent: Int, total: Int, revoked: Bool, why: String)
         /// This device does not hold the link's secret (another Mac made it).
         case secretNotHere
+        /// An email lock with no address in it.
+        case noEmails
+        /// An email lock over `VaultLinks.maxEmails` addresses (after
+        /// de-duplicating): how many there were.
+        case tooManyEmails(Int)
+        /// Text in an email lock that is not an address, as it was typed.
+        case notAnEmail(String)
 
         public var description: String {
             switch self {
@@ -533,6 +571,9 @@ public struct VaultLinks: Sendable {
             case .incomplete(let id, let sent, let total, let revoked, let why):
                 return "The link \(id) got \(sent) of \(total) files (\(why))\(revoked ? "; it was revoked" : "")."
             case .secretNotHere: return "This link was made on another device."
+            case .noEmails: return "Add at least one email address."
+            case .tooManyEmails(let n): return "\(n) email addresses; a link takes at most \(VaultLinks.maxEmails)."
+            case .notAnEmail: return "One of the email addresses is not an email address."
             }
         }
     }
@@ -566,17 +607,23 @@ public struct VaultLinks: Sendable {
         public var password: String?
         /// Sealed under the vault key; only this shop's devices read it.
         public var note: String?
+        /// Nil for no lock. Otherwise the addresses as typed: `create` checks
+        /// and tidies them (`VaultLinks.emailLock`) before anything is sent.
+        public var emailLock: [String]?
         public init(maxDownloads: Int? = nil, perFile: Bool = false, expiresAt: Date? = nil, validForSec: Int? = nil,
-                    maxDevices: Int? = nil, password: String? = nil, note: String? = nil) {
+                    maxDevices: Int? = nil, password: String? = nil, note: String? = nil, emailLock: [String]? = nil) {
             self.maxDownloads = maxDownloads; self.perFile = perFile; self.expiresAt = expiresAt
             self.validForSec = validForSec; self.maxDevices = maxDevices; self.password = password; self.note = note
+            self.emailLock = emailLock
         }
-        /// The password and the note never print.
+        /// The password and the note never print; the addresses print as a count.
         public var customMirror: Mirror {
             Mirror(self, children: ["maxDownloads": maxDownloads as Any, "perFile": perFile,
                                     "expiresAt": expiresAt as Any, "validForSec": validForSec as Any,
                                     "maxDevices": maxDevices as Any, "password": password == nil ? "none" : "withheld",
-                                    "note": note == nil ? "none" : "withheld"], displayStyle: .struct)
+                                    "note": note == nil ? "none" : "withheld",
+                                    "emailLock": emailLock.map { "\($0.count) address(es)" } ?? "none"],
+                   displayStyle: .struct)
         }
         var limits: VaultClient.GrantLimits {
             VaultClient.GrantLimits(maxDownloads: maxDownloads, perFile: perFile && maxDownloads != nil ? true : nil,
@@ -689,6 +736,8 @@ public struct VaultLinks: Sendable {
         let password = options.password.flatMap { $0.isEmpty ? nil : $0 }
         if let password, !VaultCrypto.linkPasswordOk(password) { throw Failure.weakPassword }
         let note = options.note.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        // Checked before anything is sent, as the password is.
+        let lock = try options.emailLock.map(Self.emailLock)
         let prepared = try sources.map(prepare)
         let limits = options.limits
 
@@ -703,14 +752,16 @@ public struct VaultLinks: Sendable {
             }
             let items = try Self.seal(prepared, grantId: grantId, linkKey: linkKey)
             let first = Self.jsonBytes(VaultClient.createBody(grantId: grantId, items: [], limits: limits,
-                                                              password: password != nil, ownerNote: sealedNote))
+                                                              password: password != nil, ownerNote: sealedNote,
+                                                              emailLock: lock))
             let rest = Self.patchEnvelope
             let batches = try Self.batches(items, firstEnvelope: first, restEnvelope: rest,
                                            maxItems: maxItems, maxBytes: maxBodyBytes)
             let createdAt: String
             do {
                 createdAt = try await client.createGrant(grantId: grantId, items: batches[0], limits: limits,
-                                                         password: password != nil, ownerNote: sealedNote)
+                                                         password: password != nil, ownerNote: sealedNote,
+                                                         emailLock: lock)
             } catch VaultClient.Failure.grantExists {
                 continue   // someone, somewhere, has this id: a new id, a new secret, everything sealed again
             }
@@ -742,6 +793,67 @@ public struct VaultLinks: Sendable {
         throw Failure.noFreeGrantId
     }
 
+    // MARK: The email lock
+
+    /// An email lock as the cloud takes it, or why not: each address trimmed
+    /// and lower-cased, repeats dropped (first one kept, order kept), then 1 to
+    /// `maxEmails` of them. The syntax is the cloud's own, kept simple on
+    /// purpose: something, one `@`, something with a dot in it, no spaces, at
+    /// most 254 characters. Blank entries are skipped, not refused.
+    ///
+    /// ── WHO SEES THE ADDRESSES ─────────────────────────────────────────────
+    ///
+    /// Unlike the note, these are NOT sealed: Khayt Cloud has to read them to
+    /// send each person their code, so it stores them in plaintext, and every
+    /// device of the shop sees them in the Links screen. The share sheet says
+    /// so before the link is made.
+    public static func emailLock(_ raw: [String]) throws -> [String] {
+        var out: [String] = [], seen: Set<String> = []
+        for entry in raw {
+            let e = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+            if e.isEmpty { continue }
+            let n = e.lowercased()
+            guard isEmail(n) else { throw Failure.notAnEmail(e) }
+            if seen.insert(n).inserted { out.append(n) }
+        }
+        guard !out.isEmpty else { throw Failure.noEmails }
+        guard out.count <= maxEmails else { throw Failure.tooManyEmails(out.count) }
+        return out
+    }
+
+    /// The cloud's test (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`, at most 254).
+    static func isEmail(_ s: String) -> Bool {
+        guard s.count <= 254, !s.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.contains($0) })
+        else { return false }
+        let halves = s.split(separator: "@", omittingEmptySubsequences: false)
+        guard halves.count == 2, !halves[0].isEmpty else { return false }
+        // Something, a dot, something: a dot with text on both sides somewhere.
+        return halves[1].dropFirst().dropLast().contains(".")
+    }
+
+    /// The addresses in what a person typed or pasted: split on commas
+    /// (Latin and Arabic), semicolons, spaces and new lines. Not checked: pass
+    /// the result to `emailLock`.
+    public static func emails(in text: String) -> [String] {
+        text.split(whereSeparator: { ",;،\u{061B}".contains($0) || $0.isWhitespace || $0.isNewline })
+            .map(String.init)
+    }
+
+    /// Lock the link to these addresses, or change who it is locked to. An
+    /// address taken off loses its codes and sessions at once (the cloud's
+    /// doing). Checked here first; nothing is sent when it fails.
+    @discardableResult
+    public func setEmailLock(_ grantId: String, _ emails: [String]) async throws -> VaultClient.Grant {
+        let lock = try Self.emailLock(emails)
+        return try await client.patchGrant(grantId, VaultClient.GrantPatch(emailLock: .set(lock)))
+    }
+
+    /// Take the lock off: anyone with the link (and its password) opens it.
+    @discardableResult
+    public func removeEmailLock(_ grantId: String) async throws -> VaultClient.Grant {
+        try await client.patchGrant(grantId, VaultClient.GrantPatch(emailLock: .remove))
+    }
+
     // MARK: Keeping
 
     public func list() async throws -> [VaultClient.Grant] { try await client.grants() }
@@ -768,6 +880,8 @@ public struct VaultLinks: Sendable {
     /// what each link is here (for the Links sheet, on every load):
     /// * a link the cloud no longer calls `ok` (revoked elsewhere, expired,
     ///   used up) has its secret forgotten: a dead link is never copied;
+    /// * a link Khayt turned off (`disabled`) keeps its secret, because Khayt
+    ///   can turn it back on, but is not copyable while it is off;
     /// * a link still pending after `pendingGrace` is revoked (the app died
     ///   mid-way, or a cleanup revoke failed) and forgotten.
     /// Returns the grants as they now stand, and each one's local state.
@@ -775,7 +889,19 @@ public struct VaultLinks: Sendable {
         var out: [VaultClient.Grant] = [], local: [String: Local] = [:]
         for var g in grants {
             let kept = await secrets.load(shopId: shopId, grantId: g.grantId)
-            if g.state != .ok {
+            if g.state == .disabled {
+                // Turned off by Khayt, which can turn it back on (a shop-wide
+                // switch restores the links it turned off). So the secret is
+                // KEPT, and only Copy Link is withheld while it is off. A
+                // half-made one past its grace is still revoked: revoking is
+                // the one change a disabled link takes.
+                if let since = kept?.pendingSince, now().timeIntervalSince(since) > Self.pendingGrace,
+                   let revoked = try? await client.patchGrant(g.grantId, VaultClient.GrantPatch(revoke: true)) {
+                    await secrets.forget(shopId: shopId, grantId: g.grantId)
+                    g = revoked
+                }
+                local[g.grantId] = Local.none
+            } else if g.state != .ok {
                 if kept != nil { await secrets.forget(shopId: shopId, grantId: g.grantId) }
                 local[g.grantId] = Local.none
             } else if let kept, let since = kept.pendingSince {

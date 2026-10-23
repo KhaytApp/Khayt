@@ -7,6 +7,11 @@ import Foundation
 /// at most 256 KB, padded base64 blobs, a client-chosen id of 22–64 id
 /// characters, an id used anywhere is 409). Plus the public `GET /v1/s/{id}`
 /// a recipient's page calls, with no shop token.
+///
+/// Phase 2b too: the email lock on POST and PATCH (`bad-email-lock`,
+/// `mail-off`), a takedown (`takedown`: the grant reads `disabled` and takes
+/// only a revoke, 409 `disabled` otherwise), a shop whose links are off (403
+/// `links-disabled`), and `recipient` on the events of a locked link.
 extension VaultStub {
 
     struct Grant {
@@ -20,9 +25,27 @@ extension VaultStub {
         var used = 0
         var events: [[String: Any]] = []
         var createdAt = "2026-10-23T09:00:00Z"
+        /// Phase 2b: the addresses it is locked to, and a takedown.
+        var emailLock: [String]?
+        var disabledAt: String?
+        var disabledReason: String?
     }
 
     static let maxGrantBody = 16 * 1024 * 1024
+
+    /// The cloud's `cleanEmailLock` (`src/vault.js`): 1 to 50 entries as SENT
+    /// (before de-duplicating), each trimmed, lower-cased and matching
+    /// `^[^\s@]+@[^\s@]+\.[^\s@]+$` within 254 characters. Nil if it fails.
+    static func cleanEmailLock(_ v: Any?) -> [String]? {
+        guard let list = v as? [Any], (1...50).contains(list.count) else { return nil }
+        var out: [String] = []
+        for e in list {
+            guard let s = (e as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), s.count <= 254,
+                  s.wholeMatch(of: /[^\s@]+@[^\s@]+\.[^\s@]+/) != nil else { return nil }
+            if !out.contains(s) { out.append(s) }
+        }
+        return out
+    }
 
     static func isGrantId(_ s: String) -> Bool {
         (22...64).contains(s.utf8.count) && s.utf8.allSatisfy(VaultCrypto.isIdByte)
@@ -72,13 +95,20 @@ extension VaultStub {
         }
         guard let list = b["items"] as? [[String: Any]], !list.isEmpty else { return reply(url, 422, ["error": "items"]) }
         if let bad = checkItems(url, list) { return bad }
-        if b["emailLock"] != nil { return reply(url, 422, ["reason": "not-yet"]) }
+        var lock: [String]?
+        if b.keys.contains("emailLock") {
+            guard let l = Self.cleanEmailLock(b["emailLock"]) else { return reply(url, 422, ["reason": "bad-email-lock"]) }
+            lock = l
+        }
         if let note = b["ownerNote"] {
             guard let n = note as? String, Self.paddedBase64(n), n.utf8.count <= 16 * 1024 else {
                 return reply(url, 422, ["error": "ownerNote"])
             }
         }
         if let p = b["password"], !(p is Bool) { return reply(url, 422, ["error": "password is a boolean"]) }
+        // The server's order: mail-off before the store is asked, then the ban.
+        if lock != nil, mailOff { return reply(url, 422, ["reason": "mail-off"]) }
+        if linksDisabled { return reply(url, 403, ["reason": "links-disabled"]) }
         let active = grants.values.filter { !$0.revoked }.count
         if active >= maxActiveLinks { return reply(url, 402, ["reason": "links-full", "limit": maxActiveLinks]) }
         var g = Grant(grantId: gid)
@@ -86,6 +116,7 @@ extension VaultStub {
         g.limits = (b["limits"] as? [String: Any]) ?? [:]
         g.password = (b["password"] as? Bool) ?? false
         g.ownerNote = b["ownerNote"] as? String
+        g.emailLock = lock
         grants[gid] = g
         return reply(url, 201, ["grantId": gid, "createdAt": g.createdAt])
     }
@@ -102,7 +133,18 @@ extension VaultStub {
         if failPatchNumber == grantPatches { return reply(url, 500, ["error": "boom"]) }
         if failRevoke, b["revoke"] as? Bool == true { return reply(url, 503, ["error": "down"]) }
         guard raw.count <= Self.maxGrantBody else { return reply(url, 413, ["error": "body over 16 MB"]) }
+        var lock: [String]?
+        if let v = b["emailLock"], !(v is NSNull) {
+            guard let l = Self.cleanEmailLock(v) else { return reply(url, 422, ["reason": "bad-email-lock"]) }
+            guard !mailOff else { return reply(url, 422, ["reason": "mail-off"]) }
+            lock = l
+        }
         guard var g = grants[gid] else { return reply(url, 404, ["reason": "unknown-grant"]) }
+        // A link Khayt turned off takes a revoke and nothing else.
+        if g.disabledAt != nil, b.keys.contains(where: { $0 != "revoke" }) {
+            return reply(url, 409, ["error": "Khayt turned this link off; it can only be revoked", "reason": "disabled"])
+        }
+        if b.keys.contains("emailLock") { g.emailLock = lock }
         if let list = b["items"] as? [[String: Any]] {
             if let bad = checkItems(url, list) { return bad }
             for it in list { add(it, to: &g) }
@@ -121,7 +163,11 @@ extension VaultStub {
 
     func grantJSON(_ g: Grant) -> [String: Any] {
         let max = g.limits["maxDownloads"] as? Int
-        return ["grantId": g.grantId, "state": g.revoked ? "revoked" : "ok", "createdAt": g.createdAt,
+        // `disabled` outranks the rest.
+        let state = g.disabledAt != nil ? "disabled" : g.revoked ? "revoked" : "ok"
+        return ["grantId": g.grantId, "state": state, "createdAt": g.createdAt,
+                "emailLock": g.emailLock ?? NSNull(), "disabledAt": g.disabledAt ?? NSNull(),
+                "disabledReason": g.disabledReason ?? NSNull(),
                 "revokedAt": g.revoked ? "2026-10-23T10:00:00Z" : NSNull(), "firstOpenAt": NSNull(),
                 "expiresAt": g.limits["expiresAt"] ?? NSNull(), "limits": g.limits, "password": g.password,
                 "ownerNote": g.ownerNote ?? NSNull(), "used": g.used, "devices": 0,
@@ -132,12 +178,25 @@ extension VaultStub {
     }
 
     /// `GET /v1/s/{grantId}`: what the share page reads, without a token.
-    func publicGrant(_ url: URL) -> (Data, URLResponse) {
+    ///
+    /// An email-locked link wants the `kvs` cookie that `email-verify` sets.
+    /// The stub's cookie is simply `kvs=<address>` (the cloud's is a token it
+    /// keeps the hash of); an address not on the lock proves nothing.
+    func publicGrant(_ url: URL, cookie: String? = nil) -> (Data, URLResponse) {
         let gid = String(url.path.dropFirst("/v1/s/".count))
         guard var g = grants[gid] else { return reply(url, 404, ["error": "Not found"]) }
+        if g.disabledAt != nil { return reply(url, 410, ["reason": "disabled"]) }
         if g.revoked { return reply(url, 410, ["reason": "revoked"]) }
+        var recipient: String?
+        if let lock = g.emailLock {
+            let proven = cookie.flatMap { $0.hasPrefix("kvs=") ? String($0.dropFirst(4)).lowercased() : nil }
+            guard let proven, lock.contains(proven) else {
+                return reply(url, 403, ["reason": "email-required", "emailLock": true])
+            }
+            recipient = proven
+        }
         g.events.append(["at": "2026-10-23T09:3\(g.events.count % 10):00Z", "kind": "open", "country": "SA",
-                         "deviceClass": "phone"])
+                         "deviceClass": "phone", "recipient": recipient ?? NSNull()])
         grants[gid] = g
         let items: [[String: Any]] = g.order.map { f in
             let it = g.items[f]!
@@ -147,6 +206,7 @@ extension VaultStub {
                     "wrappedKey": it.wrappedKey, "linkMeta": it.linkMeta, "remaining": NSNull()]
         }
         return reply(url, 200, ["grantId": gid, "items": items, "password": g.password, "limits": g.limits,
+                                "emailLock": g.emailLock != nil, "recipient": recipient ?? NSNull(),
                                 "remaining": NSNull(), "expiresAt": g.limits["expiresAt"] ?? NSNull()])
     }
 
@@ -181,6 +241,12 @@ extension VaultStub {
 
     func grant(_ id: String) -> Grant? { lock.lock(); defer { lock.unlock() }; return grants[id] }
     func revokeElsewhere(_ id: String) { lock.lock(); defer { lock.unlock() }; grants[id]?.revoked = true }
+    /// The admin takedown (`POST /v1/admin/vault/grants/{id}`), on or off.
+    func takedown(_ id: String, reason: String?, on: Bool = true) {
+        lock.lock(); defer { lock.unlock() }
+        grants[id]?.disabledAt = on ? "2026-10-23T11:00:00Z" : nil
+        grants[id]?.disabledReason = on ? reason : nil
+    }
     var log: [Logged] { lock.lock(); defer { lock.unlock() }; return requestLog }
     func objectBytes(_ fileId: String, _ version: Int, _ i: Int) -> Data? {
         lock.lock(); defer { lock.unlock() }; return objects[key(fileId, version, i)]

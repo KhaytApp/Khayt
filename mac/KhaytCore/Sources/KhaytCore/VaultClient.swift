@@ -81,8 +81,18 @@ public struct VaultClient: Sendable {
         case unknownItems([String])
         /// 422 downloads-cap: this plan caps a link's downloads at `limit`.
         case downloadsCap(limit: Int)
-        /// 422 not-yet: a feature the cloud has not built (the email lock).
+        /// 422 not-yet: a feature this cloud has not built.
         case notYet
+        /// 422 bad-email-lock: the cloud refused the email lock's addresses.
+        case badEmailLock
+        /// 422 mail-off: this cloud cannot send email, so it cannot lock a
+        /// link to addresses.
+        case mailOff
+        /// 409 disabled: Khayt turned this link off; it can only be revoked.
+        case disabled
+        /// 403 links-disabled: Khayt turned off this shop's share links, so no
+        /// new one can be made.
+        case linksDisabled
 
         public var description: String {
             switch self {
@@ -110,6 +120,10 @@ public struct VaultClient: Sendable {
             case .unknownItems(let ids): return "\(ids.count) file(s) are no longer in the vault."
             case .downloadsCap(let limit): return "This plan allows at most \(limit) downloads per link."
             case .notYet: return "Khayt Cloud does not offer that yet."
+            case .badEmailLock: return "Khayt Cloud did not accept the link's email addresses."
+            case .mailOff: return "Khayt Cloud cannot send email, so it cannot lock a link to email addresses."
+            case .disabled: return "Khayt turned this link off; it can only be revoked."
+            case .linksDisabled: return "Khayt has turned off share links for this shop."
             }
         }
     }
@@ -414,6 +428,10 @@ public struct VaultClient: Sendable {
         case (422, "unknown-items"): return .unknownItems((o["fileIds"] as? [String]) ?? [])
         case (422, "downloads-cap"): return .downloadsCap(limit: n("limit"))
         case (422, "not-yet"): return .notYet
+        case (422, "bad-email-lock"): return .badEmailLock
+        case (422, "mail-off"): return .mailOff
+        case (409, "disabled"): return .disabled
+        case (403, "links-disabled"): return .linksDisabled
         case (413, _): return .fileTooLarge(limit: n("limit"))
         case (409, "duplicate"):
             return .duplicate(fileId: (o["fileId"] as? String) ?? "", version: n("version"))
