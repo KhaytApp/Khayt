@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the client for selling vault files (built, nothing on screen yet).** KhaytCore's `VaultProducts` covers listings (products, previews, the makerrun connection), the release, buyers delivered by hand or from a sale, and the sales webhook settings. A release sends a fresh product key and every file wrapped under it, so Khayt Cloud can deliver to a buyer while the Mac is asleep. Only the files in the release become readable by the cloud, and the Mac keeps no product key. Tested against a stand-in cloud that opens every released file with that key, as Khayt Cloud does.
+
 - **Mac: the Khayt Vault can hold the library's online copy (built, hidden until Khayt Cloud switches the vault on).**
   - Settings › Online storage offers "Use the Khayt Vault" once Khayt Cloud says the vault is available for this shop. Each model is encrypted on this Mac before it is uploaded, with a key Khayt Cloud never holds.
   - In use, the pane shows how full the vault is, and Stop Using the Vault asks first. Stopping deletes nothing.
