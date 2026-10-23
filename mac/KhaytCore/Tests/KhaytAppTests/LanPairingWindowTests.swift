@@ -73,7 +73,9 @@ struct LanPairingWindowTests {
 
     @Test("closed by the owner, by a pairing, or by many wrong PINs from many addresses, and said which")
     func windowCloses() {
-        let window = LanPairingWindow()
+        // A clock that stands still: on a loaded runner a real one ran out mid-test
+        // and the window read .timedOut (Oct 23, PR #2034).
+        let window = LanPairingWindow(clock: { 0 })
         window.open(); window.close()
         #expect(!window.isOpen() && window.lastClosed == .byOwner)
         window.open(); window.paired(name: "Turki's iPhone")
@@ -225,7 +227,9 @@ struct LanPairingWindowTests {
 
     @Test("one address guessing five times and more does not stop a second address pairing in the same window")
     func guesserDoesNotBlockAnotherAddress() async throws {
-        let window = LanPairingWindow()
+        // A clock that stands still: on a loaded runner a real one ran out mid-test
+        // and the window read .timedOut (Oct 23, PR #2034).
+        let window = LanPairingWindow(clock: { 0 })
         let (server, devices) = try await Self.server(window)
         window.open()
         for i in 0..<(LanPairingWindow.perAddress + 3) {
@@ -242,7 +246,9 @@ struct LanPairingWindowTests {
 
     @Test("only fifty wrong PINs from ten addresses close the window for everyone")
     func manyAddressesClose() async throws {
-        let window = LanPairingWindow()
+        // A clock that stands still: on a loaded runner a real one ran out mid-test
+        // and the window read .timedOut (Oct 23, PR #2034).
+        let window = LanPairingWindow(clock: { 0 })
         let (server, devices) = try await Self.server(window)
         window.open()
         for i in 0..<(LanPairingWindow.maxWrong - 1) {
