@@ -16,6 +16,14 @@ import KhaytCore
 /// "Copy link" is offered only on the Mac that made the link, because only
 /// that Mac's Keychain holds its secret (`VaultLinkSecret`). Everything else
 /// works from any device of the shop.
+///
+/// ── PHASE 2B ─────────────────────────────────────────────────────────────
+///
+/// A link locked to email addresses lists them, and the overflow changes or
+/// removes the list (removing asks first: it opens the link to anyone holding
+/// it). A link Khayt turned off says so, with Khayt's reason when it gave one;
+/// Revoke is its only action and Copy Link is not shown. An event on a locked
+/// link names the address that proved itself.
 struct VaultLinksSheet: View {
     let shop: Shop
 
@@ -28,13 +36,18 @@ struct VaultLinksSheet: View {
 
     private var words: Words { shop.words }
 
-    /// `preloaded` draws these grants without asking the cloud: for a
-    /// photograph, where no `.task` runs.
-    init(shop: Shop, preloaded: [VaultClient.Grant]? = nil, names: [String: String] = [:]) {
+    /// Activity already open on these grants: for a photograph only.
+    @State private var shownEvents: [String: [VaultClient.GrantEvent]] = [:]
+
+    /// `preloaded` draws these grants without asking the cloud, and `events`
+    /// opens their activity: for a photograph, where no `.task` runs.
+    init(shop: Shop, preloaded: [VaultClient.Grant]? = nil, names: [String: String] = [:],
+         events: [String: [VaultClient.GrantEvent]] = [:]) {
         self.shop = shop
         _grants = State(initialValue: preloaded ?? [])
         _names = State(initialValue: names)
         _loading = State(initialValue: preloaded == nil)
+        _shownEvents = State(initialValue: events)
     }
 
     var body: some View {
@@ -53,7 +66,7 @@ struct VaultLinksSheet: View {
             }
             ForEach(grants) { g in
                 VaultGrantRow(shop: shop, grant: g, names: names, note: notes[g.grantId],
-                              local: local[g.grantId] ?? .none) { updated in
+                              local: local[g.grantId] ?? .none, shownEvents: shownEvents[g.grantId]) { updated in
                     if let i = grants.firstIndex(where: { $0.grantId == updated.grantId }) { grants[i] = updated }
                     if updated.state != .ok { local[updated.grantId] = VaultLinks.Local.none }
                 }
@@ -113,13 +126,43 @@ struct VaultGrantRow: View {
     @State private var showingActivity = false
     @State private var events: [VaultClient.GrantEvent]?
     @State private var askingRevoke = false
+    @State private var askingUnlock = false
+    @State private var editingLock = false
+    @State private var lockText = ""
     @State private var working = false
     @State private var problem: String?
     @State private var told: String?
 
+    init(shop: Shop, grant: VaultClient.Grant, names: [String: String], note: String?, local: VaultLinks.Local,
+         shownEvents: [VaultClient.GrantEvent]? = nil, changed: @escaping (VaultClient.Grant) -> Void) {
+        self.shop = shop; self.grant = grant; self.names = names; self.note = note; self.local = local
+        self.changed = changed
+        _events = State(initialValue: shownEvents)
+        _showingActivity = State(initialValue: shownEvents != nil)
+    }
+
     private var words: Words { shop.words }
     private var live: Bool { grant.state == .ok }
     private var incomplete: Bool { live && local == .incomplete }
+    /// Turned off by Khayt: Revoke only, no Copy Link.
+    private var disabled: Bool { grant.isDisabled }
+
+    /// Khayt's own text ISOLATED (first strong), so it keeps its shape in either language.
+    private func isolated(_ s: String) -> String { "\u{2068}" + s + "\u{2069}" }
+
+    /// "Only for a@x.sa, b@x.sa and 3 more".
+    private var lockLine: String? {
+        guard let lock = grant.emailLock, !lock.isEmpty else { return nil }
+        let shown = lock.prefix(2).map(Shop.address).joined(separator: words.language == "ar" ? "\u{060C} " : ", ")
+        let emails = lock.count > 2
+            ? words.callIt("mac.vl_locked_more", ["emails": .string(shown), "n": .number(Double(lock.count - 2))])
+            : shown
+        return words.callIt("mac.vl_locked_to", ["emails": .string(emails)])
+    }
+
+    private var lockCheck: Result<[String], Error> {
+        Result { try VaultLinks.emailLock(VaultLinks.emails(in: lockText)) }
+    }
 
     /// The note the shop wrote, else the first files' names.
     private var title: String {
@@ -137,6 +180,7 @@ struct VaultGrantRow: View {
         if incomplete { return words.callIt("mac.vl_state_incomplete") }
         switch grant.state {
         case .ok: return words.callIt("mac.vl_state_ok")
+        case .disabled: return words.callIt("mac.vl_state_disabled")
         case .revoked: return words.callIt("mac.vl_state_revoked")
         case .expired: return words.callIt("mac.vl_state_expired")
         case .usedUp: return words.callIt("mac.vl_state_used_up")
@@ -156,6 +200,7 @@ struct VaultGrantRow: View {
     }
 
     private var endLine: String {
+        if disabled, let off = date(grant.disabledAt) { return words.callIt("mac.vl_disabled_on", ["date": .string(off)]) }
         if let revoked = date(grant.revokedAt) { return words.callIt("mac.vl_revoked_on", ["date": .string(revoked)]) }
         if let end = date(grant.expiresAt) { return words.callIt("mac.vl_ends_on", ["date": .string(end)]) }
         if grant.limits.validForSec != nil, grant.firstOpenAt == nil { return words.callIt("mac.vl_ends_after_open") }
@@ -174,17 +219,37 @@ struct VaultGrantRow: View {
                 Text(stateWord)
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Capsule().fill(incomplete ? Khayt.attention.opacity(0.15)
+                    .background(Capsule().fill(incomplete || disabled ? Khayt.attention.opacity(0.15)
                                                : live ? Khayt.done.opacity(0.15) : Color.secondary.opacity(0.15)))
-                    .foregroundStyle(incomplete ? Khayt.attention : live ? Khayt.done : .secondary)
+                    .foregroundStyle(incomplete || disabled ? Khayt.attention : live ? Khayt.done : .secondary)
             }
             Text([Shop.say(words, "mac.vl_n_files", grant.items.count), downloadsLine, endLine].joined(separator: " · "))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
 
+            if let lockLine {
+                Label {
+                    Text(lockLine).lineLimit(2)
+                } icon: {
+                    Image(systemName: "envelope").accessibilityHidden(true)
+                }
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             if incomplete {
                 Text(words.callIt("mac.vl_incomplete_explain"))
                     .font(.caption).foregroundStyle(Khayt.attention).fixedSize(horizontal: false, vertical: true)
             }
+            if disabled {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let reason = grant.disabledReason {
+                        Text(words.callIt("mac.vl_disabled_reason", ["reason": .string(isolated(reason))]))
+                            .font(.caption.weight(.medium))
+                    }
+                    Text(words.callIt("mac.vl_disabled_explain"))
+                        .font(.caption)
+                }
+                .foregroundStyle(Khayt.attention).fixedSize(horizontal: false, vertical: true)
+            }
+            if editingLock { lockEditor }
             // The row's actions: one primary, then one overflow.
             HStack(spacing: 8) {
                 if live && local == .copyable {
@@ -196,16 +261,23 @@ struct VaultGrantRow: View {
                 }
                 if working { ProgressView().controlSize(.small) }
                 Spacer()
-                if live {
+                if live || disabled {
                     Menu {
-                        // A half-made link is only for revoking.
-                        if !incomplete {
+                        // A half-made link, and one Khayt turned off, are only for revoking.
+                        if live && !incomplete {
                             Button(Shop.say(words, "mac.vl_add_downloads", 5)) { Task { await addDownloads(5) } }
                             Button(Shop.say(words, "mac.vl_add_downloads", 25)) { Task { await addDownloads(25) } }
                             Divider()
                             Button(Shop.say(words, "mac.vl_extend_days", 7)) { Task { await extend(days: 7) } }
                             Button(Shop.say(words, "mac.vl_extend_days", 30)) { Task { await extend(days: 30) } }
                             Button(words.callIt("mac.vl_remove_end")) { Task { await extend(days: nil) } }
+                            Divider()
+                            if grant.emailLock != nil {
+                                Button(words.callIt("mac.vl_lock_change") + "\u{2026}") { startEditingLock() }
+                                Button(words.callIt("mac.vl_lock_remove") + "\u{2026}") { askingUnlock = true }
+                            } else {
+                                Button(words.callIt("mac.vl_lock_set") + "\u{2026}") { startEditingLock() }
+                            }
                             Divider()
                         }
                         Button(words.callIt("mac.vl_revoke") + "\u{2026}", role: .destructive) { askingRevoke = true }
@@ -235,6 +307,49 @@ struct VaultGrantRow: View {
         } message: {
             Text(words.callIt("mac.vl_revoke_explain"))
         }
+        .background {
+            // Its own anchor: two dialogs on one view can shadow each other.
+            Color.clear.confirmationDialog(words.callIt("mac.vl_lock_remove_title"), isPresented: $askingUnlock) {
+                Button(words.callIt("mac.vl_lock_remove"), role: .destructive) { Task { await removeLock() } }
+                Button(words.callIt("common.cancel"), role: .cancel) {}
+            } message: {
+                Text(words.callIt("mac.vl_lock_remove_explain"))
+            }
+        }
+    }
+
+    /// Who may open the link: the list, checked as it is typed, saved with one PATCH.
+    @ViewBuilder private var lockEditor: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(words.callIt("mac.vl_lock_edit_title")).font(.caption.weight(.semibold))
+            TextField(words.callIt("mac.vl_lock_ph"), text: $lockText, axis: .vertical)
+                .textFieldStyle(.roundedBorder).lineLimit(1...4)
+                .autocorrectionDisabled()
+            switch lockCheck {
+            case .success(let list):
+                Text(Shop.say(words, "mac.vl_lock_count", list.count)).font(.caption).foregroundStyle(.secondary)
+            case .failure(let e):
+                if !lockText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(shop.linkProblem(e)).font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Text(words.callIt("mac.vl_lock_explain") + " " + words.callIt("mac.vl_lock_edit_explain"))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button(words.callIt("common.cancel")) { editingLock = false }
+                Button(words.callIt("common.save")) { Task { await applyEmailLock() } }
+                    .disabled(working || (try? lockCheck.get()) == nil)
+            }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.5)))
+    }
+
+    private func startEditingLock() {
+        lockText = (grant.emailLock ?? []).joined(separator: ", ")
+        editingLock = true
     }
 
     @ViewBuilder private var activity: some View {
@@ -261,6 +376,8 @@ struct VaultGrantRow: View {
         if let d = e.deviceClass {
             parts.append(words.callIt("mac.vl_device_" + (["phone", "tablet", "computer"].contains(d) ? d : "other")))
         }
+        // The address that proved itself on an email-locked link.
+        if let r = e.recipient, !r.isEmpty { parts.append(Shop.address(r)) }
         if let c = e.country, c.count == 2 {
             parts.append(words.locale.localizedString(forRegionCode: c) ?? c)
         }
@@ -310,6 +427,16 @@ struct VaultGrantRow: View {
 
     private func revoke() async {
         await run { try await $0.revoke(grant.grantId) }
+    }
+
+    private func applyEmailLock() async {
+        let list = VaultLinks.emails(in: lockText)
+        await run { try await $0.setEmailLock(grant.grantId, list) }
+        if problem == nil { editingLock = false }
+    }
+
+    private func removeLock() async {
+        await run { try await $0.removeEmailLock(grant.grantId) }
     }
 
     private func loadEvents() async {

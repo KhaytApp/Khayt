@@ -17,6 +17,19 @@ import KhaytCore
 /// Shown once made, with Copy link and Send on WhatsApp. It is written LEFT TO
 /// RIGHT in Arabic as well: it is an address, and a mirrored one cannot be
 /// read back over the phone. The password is never put into the message.
+///
+/// ── ONLY THESE PEOPLE ─────────────────────────────────────────────────────
+///
+/// An optional email list (phase 2b): each person proves their address with
+/// a code the cloud emails them before the page shows anything. Unlike the
+/// note, the addresses are not sealed — the cloud must read them to send the
+/// codes, and every device of the shop lists them — and the sheet says so
+/// next to the field. The list is checked as it is typed (`VaultLinks.emailLock`).
+///
+/// ── WHEN KHAYT HAS TURNED THE SHOP'S LINKS OFF ───────────────────────────
+///
+/// A create answered 403 `links-disabled` replaces the form with a plain
+/// explanation and takes Create away: trying again cannot work.
 struct VaultShareSheet: View {
     let shop: Shop
     let request: VaultShareRequest
@@ -35,16 +48,27 @@ struct VaultShareSheet: View {
     @State private var madePassword = false
     @State private var secretKept = true
     @State private var told: String?
+    @State private var useLock = false
+    @State private var lockText = ""
+    @State private var madeLocked = false
+    /// Set when the cloud said Khayt turned this shop's links off.
+    @State private var turnedOff: String?
 
     private var words: Words { shop.words }
 
-    /// `shown` opens the sheet on a link already made: for a photograph of
-    /// that state, which the app itself reaches only through Create.
-    init(shop: Shop, request: VaultShareRequest, shown: VaultLink? = nil, withPassword: Bool = false) {
+    /// `shown` opens the sheet on a link already made, `emails` with the email
+    /// list on and filled, `linksOff` on the turned-off explanation: each for a
+    /// photograph of that state, which the app itself reaches only through Create.
+    init(shop: Shop, request: VaultShareRequest, shown: VaultLink? = nil, withPassword: Bool = false,
+         emails: String? = nil, linksOff: Bool = false) {
         self.shop = shop; self.request = request
         _made = State(initialValue: shown)
         _madePassword = State(initialValue: withPassword)
         _usePassword = State(initialValue: withPassword && shown == nil)
+        _useLock = State(initialValue: emails != nil && shown == nil)
+        _lockText = State(initialValue: emails ?? "")
+        _madeLocked = State(initialValue: emails != nil && shown != nil)
+        _turnedOff = State(initialValue: linksOff ? shop.linkProblem(VaultClient.Failure.linksDisabled) : nil)
     }
 
     static let dayChoices = [1, 7, 30, 90, 0]
@@ -54,6 +78,27 @@ struct VaultShareSheet: View {
     }
 
     private var passwordOk: Bool { !usePassword || VaultCrypto.linkPasswordOk(password) }
+
+    /// The email list as the cloud will get it, or why it cannot be sent.
+    private var lockCheck: Result<[String], Error> {
+        Result { try VaultLinks.emailLock(VaultLinks.emails(in: lockText)) }
+    }
+
+    private var lockOk: Bool {
+        guard useLock else { return true }
+        if case .success = lockCheck { return true }
+        return false
+    }
+
+    /// Under the field: how many addresses, or what is wrong. Nothing while
+    /// it is still empty (the explanation says what to do).
+    private var lockStatus: (text: String, ok: Bool)? {
+        guard useLock, !lockText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        switch lockCheck {
+        case .success(let list): return (Shop.say(words, "mac.vl_lock_count", list.count), true)
+        case .failure(let e): return (shop.linkProblem(e), false)
+        }
+    }
 
     private var heading: String {
         request.titles.count == 1 ? (request.titles.first ?? "")
@@ -68,6 +113,16 @@ struct VaultShareSheet: View {
             }
             if let made {
                 result(made)
+            } else if let turnedOff {
+                Label {
+                    Text(turnedOff).fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "nosign").foregroundStyle(Khayt.attention)
+                }
+                .font(.callout)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Khayt.attention.opacity(0.1)))
             } else {
                 form
             }
@@ -79,12 +134,14 @@ struct VaultShareSheet: View {
             HStack {
                 if working { ProgressView().controlSize(.small) }
                 Spacer()
-                Button(words.callIt(made == nil ? "common.cancel" : "common.close")) { shop.sharingByLink = nil }
+                Button(words.callIt(made == nil && turnedOff == nil ? "common.cancel" : "common.close")) {
+                    shop.sharingByLink = nil
+                }
                     .keyboardShortcut(.cancelAction)
-                if made == nil {
+                if made == nil && turnedOff == nil {
                     Button(words.callIt("mac.vl_create")) { Task { await create() } }
                         .keyboardShortcut(.defaultAction)
-                        .disabled(working || !passwordOk)
+                        .disabled(working || !passwordOk || !lockOk)
                 }
             }
         }
@@ -134,6 +191,23 @@ struct VaultShareSheet: View {
         }
 
         VStack(alignment: .leading, spacing: 6) {
+            Toggle(words.callIt("mac.vl_lock_toggle"), isOn: $useLock)
+            if useLock {
+                TextField(words.callIt("mac.vl_lock_ph"), text: $lockText, axis: .vertical)
+                    .textFieldStyle(.roundedBorder).lineLimit(1...4)
+                    .autocorrectionDisabled()
+                if let lockStatus {
+                    Text(lockStatus.text)
+                        .font(.caption)
+                        .foregroundStyle(lockStatus.ok ? Color.secondary : Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(words.callIt("mac.vl_lock_explain"))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+
+        VStack(alignment: .leading, spacing: 6) {
             TextField(words.callIt("mac.vl_note_ph"), text: $note, axis: .vertical)
                 .textFieldStyle(.roundedBorder).lineLimit(1...3)
             Text(words.callIt("mac.vl_note_explain"))
@@ -171,6 +245,10 @@ struct VaultShareSheet: View {
             Text(words.callIt("mac.vl_password_separately"))
                 .font(.callout).fixedSize(horizontal: false, vertical: true)
         }
+        if madeLocked {
+            Text(words.callIt("mac.vl_lock_made"))
+                .font(.callout).fixedSize(horizontal: false, vertical: true)
+        }
         if !secretKept {
             Text(words.callIt("mac.vl_not_kept"))
                 .font(.callout).foregroundStyle(Khayt.attention).fixedSize(horizontal: false, vertical: true)
@@ -187,16 +265,20 @@ struct VaultShareSheet: View {
                                          perFile: limitDownloads && perFile,
                                          expiresAt: endDate,
                                          password: usePassword ? password : nil,
-                                         note: note)
+                                         note: note,
+                                         emailLock: useLock ? VaultLinks.emails(in: lockText) : nil)
         switch await shop.makeShareLink(request, options: options) {
         case .made(let created):
             made = created.link
             secretKept = created.secretKept
             madePassword = usePassword
+            madeLocked = useLock
             // The password has done its work; it is not kept, here or anywhere.
             password = ""
         case .refused(let why):
             problem = why
+        case .turnedOff(let why):
+            turnedOff = why
         }
     }
 }

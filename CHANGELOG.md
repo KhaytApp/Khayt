@@ -4,6 +4,27 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: share links for only the people you name, and links Khayt has turned off (built, still dark).**
+  - The Share sheet has a new "Only these people" list. Type or paste email
+    addresses, up to 50. Each person then has to enter a code that is emailed
+    to them before they can see the files. The sheet says plainly that Khayt
+    Cloud can read these addresses (it sends the codes) and that everyone in
+    the shop can see them. The addresses are checked as you type, and a
+    mistyped one is named before anything is sent.
+  - Share Links shows who a link is limited to, and lets you change the list
+    or remove it (removing asks first, because anyone with the link can then
+    open it). Someone taken off the list can no longer open the link. The
+    activity list now names the address that opened or downloaded.
+  - If Khayt turns a link off, Share Links says "Turned off by Khayt", with
+    the reason when Khayt gave one. Revoke is the only thing it offers, and
+    Copy Link is hidden. This Mac keeps the link's key, so the link can be
+    copied again if Khayt turns it back on.
+  - If Khayt has turned off share links for the whole shop, the Share sheet
+    explains that instead of offering to try again.
+  - The password and the part of the link after `#` still never leave this
+    Mac, and the WhatsApp message still never carries the password. In English
+    and Arabic, light and dark.
+
 - **The repository's `privacy.html` now points to khaytapp.com/privacy.** The old page had fallen behind the published policy and contradicted it (it said nothing syncs to a Khayt cloud and that updates come only from GitHub). No app ships the file. It is now a short English and Arabic note naming khaytapp.com/privacy as the only current version.
 
 - **iPhone: the catalogue.** Home has a Catalogue row (also in the + menu)
