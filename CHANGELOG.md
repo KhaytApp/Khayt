@@ -4,6 +4,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: the machine card shows the printer's full reading, and part prep/post time follow the shop's defaults.**
+  - Under the live badge, the card now shows heater targets, the chamber, the
+    current layer, the part fan, speed and flow, and the printer's own message.
+    A figure the printer did not give is left out, never shown as 0. The job
+    figures show only while a job is running or paused.
+  - A Klipper printer's chamber and per-head fans are now discovered with its
+    filament sensors. A failed discovery is retried after a minute. Before, it
+    counted as "no sensors" until the app restarted.
+  - The pause/resume/cancel buttons now ask the shared `supports()` table which
+    commands a printer can take.
+  - Product editor: a part's prep and post time that were never typed show the
+    shop's default as a grey hint, and a blank field saves as "use the default".
+    Before, opening and saving a product wrote 0 h into both, which costed the
+    part with no labour. A new part no longer starts at a fixed 0.1 h / 0.2 h;
+    it follows the shop's defaults.
+
 
 - **beta.5 review fixes: filed VAT, portal sync, Bambu sessions, runout, PIN lockouts.**
   - A cancel, void or credit after a filed period is now dated by that event,

@@ -6,7 +6,8 @@
  * dismissing the question sends nothing, confirming it sends the command. The
  * printer here is an unreachable LAN address, so a command that reaches the
  * printer path comes back as "did not take it" — which is how the test knows it
- * was sent. The Mac's card is the model.
+ * was sent. The Mac's card is the model. Under the badge, the printer's
+ * richer reading (targets, chamber, layer, fan, speed, flow, message).
  *
  * Run: npm run test:e2e:printerctl
  */
@@ -48,6 +49,26 @@ try {
   ok((await acts(window, 'm-k')).length === 0, 'nor does one whose reading is stale');
   await window.evaluate(() => { machineStatusCache['m-k'].lastUpdated = Date.now(); updateMachinesLiveStatus(); });
 
+  // The richer reading under the badge: targets, chamber, layer, fan, speed,
+  // flow and the printer's message; a figure the printer did not give is left out.
+  const detail = (id) => window.evaluate((id) => document.querySelector(`[data-machine-detail="${id}"]`).innerText, id);
+  await window.evaluate(() => {
+    Object.assign(machineStatusCache['m-k'], { tempNozzle: 214.6, targetNozzle: 215, tempBed: 60.2, targetBed: 60, tempChamber: 37.4, targetChamber: null,
+      layer: 12, totalLayers: 240, fanPart: 100, speedFactor: 100, flowFactor: 95, message: 'Filament runout on e1' });
+    machineStatusCache['m-r'].tempNozzle = 200;
+    updateMachinesLiveStatus();
+  });
+  const d = await detail('m-k');
+  ok(/Nozzle 215\/215°/.test(d) && /Bed 60\/60°/.test(d) && /Chamber 37°/.test(d) && /Layer 12\/240/.test(d)
+    && /Fan 100%/.test(d) && /Speed 100%/.test(d) && /Flow 95%/.test(d) && /Filament runout on e1/.test(d),
+    `the card shows targets, chamber, layer, fan, speed, flow and the message (${d})`);
+  const r = await detail('m-r');
+  ok(r === 'Nozzle 200°', `a printer that gives only a nozzle reading shows only that, never a 0 (${r})`);
+  await window.evaluate(() => { machineStatusCache['m-k'].state = 'standby'; updateMachinesLiveStatus(); });
+  const idle = await detail('m-k');
+  ok(/Nozzle/.test(idle) && !/Layer|Fan|Speed|Flow/.test(idle), `idle, the job figures go and the temperatures stay (${idle})`);
+  await window.evaluate(() => { machineStatusCache['m-k'].state = 'printing'; updateMachinesLiveStatus(); });
+
   // Every toast, recorded: they fade on their own, so reading the page races.
   await window.evaluate(() => { window.__toasts = []; const orig = window.toast; window.toast = (...a) => { window.__toasts.push(String(a[0])); return orig(...a); }; });
   const sent = (n) => window.waitForFunction((n) => window.__toasts.filter((x) => /did not take it|Sent to the printer/.test(x)).length > n, n, { timeout: 30000 }).then(() => true, () => false);
@@ -79,6 +100,8 @@ try {
   await window.evaluate(() => { settings.lang = 'ar'; i18n.set('ar'); renderMachines(); });
   const ar = await window.evaluate(() => document.querySelector('[data-machine-ctl="m-k"]').innerText);
   ok(/إيقاف مؤقت/.test(ar) && /إلغاء الطباعة/.test(ar) && !/mach\./.test(ar), 'the controls are translated');
+  const dar = await window.evaluate(() => document.querySelector('[data-machine-detail="m-k"]').innerText);
+  ok(/الفوهة/.test(dar) && /الطبقة 12\/240/.test(dar) && !/mach\./.test(dar), `the readings are translated (${dar})`);
 
   console.log('e2e-printer-controls: ok (shown while running/paused, only verbs the protocol has, Cancel asks, Pause does not, en + ar)');
 } catch (err) {

@@ -94,6 +94,48 @@ function machineLiveBadge(m) {
   return badge('var(--surface-2)', 'var(--text-muted)', t('mach.live_idle') || 'Idle');
 }
 
+/**
+ * The rest of what the printer says, under the badge: heater targets, the
+ * chamber, the layer, the part fan, speed and flow overrides and the
+ * printer's own message. The poller has read all of it since the richer status
+ * landed in lib/ (moonraker.readStatus and the other adapters); only the Mac
+ * drew it. Every figure is null when the machine did not say, and a null is
+ * left out rather than drawn as 0 — "Fan 0%" about a fan nobody measured is a
+ * reading a shop would act on. The job figures (layer, fan, speed, flow) only
+ * while a job is on, where they mean something.
+ */
+function machineLiveDetailHtml(m) {
+  if (!m || !m.printerApi || !m.printerApi.type || m.printerApi.type === 'none') return '';
+  const cache = (typeof machineStatusCache !== 'undefined' && machineStatusCache) || {};
+  const s = cache[m.id];
+  if (!s || s.error) return '';
+  const age = s.lastUpdated ? Date.now() - s.lastUpdated : null;
+  if (age !== null && age > MACHINE_LIVE_STALE_MS) return '';
+  const fin = (v) => typeof v === 'number' && Number.isFinite(v);
+  const deg = (cur, target) => {
+    if (!fin(cur)) return null;
+    return fin(target) && target > 0 ? `${Math.round(cur)}/${Math.round(target)}°` : `${Math.round(cur)}°`;
+  };
+  const bits = [];
+  const add = (label, fig) => { if (fig != null) bits.push(`${escapeHtml(label)} <bdi>${escapeHtml(fig)}</bdi>`); };
+  add(t('mach.live_nozzle'), deg(s.tempNozzle, s.targetNozzle));
+  add(t('mach.live_bed'), deg(s.tempBed, s.targetBed));
+  add(t('mach.live_chamber'), deg(s.tempChamber, s.targetChamber));
+  const raw = String(s.state || '').toLowerCase();
+  const onJob = /paus/.test(raw) || (/print/.test(raw) && !/error/.test(raw));
+  if (onJob) {
+    if (fin(s.layer) && fin(s.totalLayers)) {
+      bits.push(`<bdi>${escapeHtml(t('mach.live_layer', { layer: String(s.layer), total: String(s.totalLayers) }))}</bdi>`);
+    }
+    add(t('mach.live_fan'), fin(s.fanPart) ? `${s.fanPart}%` : null);
+    add(t('mach.live_speed'), fin(s.speedFactor) ? `${s.speedFactor}%` : null);
+    add(t('mach.live_flow'), fin(s.flowFactor) ? `${s.flowFactor}%` : null);
+  }
+  const msg = typeof s.message === 'string' ? s.message.trim().slice(0, 140) : '';
+  if (!bits.length && !msg) return '';
+  return `<div style="font-size:11px;color:var(--text-muted);">${bits.join(' · ')}${msg ? `${bits.length ? ' · ' : ''}<span style="font-style:italic;">${escapeHtml(msg)}</span>` : ''}</div>`;
+}
+
 /* ── JOB CONTROL on the machine card ──────────────────────────────────────────
  * main.js has carried pause / resume / cancel and "drop one object" since the
  * Mac got them, and preload exposed all three — but nothing on this screen
@@ -107,8 +149,9 @@ function _printerVerbOk(m, cmd) {
   const PC = (typeof KhaytPrinterCommands !== 'undefined') ? KhaytPrinterCommands : null;
   const api = (m && m.printerApi) || {};
   if (!PC) return false;
-  const d = PC.buildCommand(api.type, cmd, 'job', { duetFlavour: api.duetFlavour, printerSlug: api.printerSlug || 'printer' });
-  return !!d && !d.unsupported;
+  // The shared answer (supports): one table of what each protocol can do, and
+  // HTTP is the only transport this app performs.
+  return PC.supports(api.type, cmd, { duetFlavour: api.duetFlavour, printerSlug: api.printerSlug || 'printer', transports: ['http'] });
 }
 
 function machineControlsHtml(m) {
@@ -207,6 +250,10 @@ function updateMachinesLiveStatus() {
   document.querySelectorAll('#machinesList [data-machine-live]').forEach((el) => {
     const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === el.dataset.machineLive);
     if (m) el.innerHTML = machineLiveBadge(m);
+  });
+  document.querySelectorAll('#machinesList [data-machine-detail]').forEach((el) => {
+    const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === el.dataset.machineDetail);
+    if (m) el.innerHTML = machineLiveDetailHtml(m);
   });
   document.querySelectorAll('#machinesList [data-machine-ctl]').forEach((el) => {
     const m = (typeof machines !== 'undefined' ? machines : []).find((x) => x.id === el.dataset.machineCtl);
@@ -316,6 +363,7 @@ function renderMachines() {
         ${retired
           ? `<button class="btn small" data-act="unretire-mach" data-id="${m.id}">${escapeHtml(t('mach.unretire'))}</button>`
           : `<button class="btn danger small" data-act="del-mach" data-id="${m.id}">${escapeHtml(t('common.delete'))}</button>`}
+        <div data-machine-detail="${escapeHtml(m.id)}" style="flex-basis:100%;">${retired ? '' : machineLiveDetailHtml(m)}</div>
         ${nozzleHtml}
         ${specsHtml}
         ${(typeof KhaytWebcam !== 'undefined' && KhaytWebcam.hasCamera(m)) ? `

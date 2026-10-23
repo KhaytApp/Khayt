@@ -87,16 +87,18 @@ const moonrakerHistory = require('./lib/moonraker-history');
 // same machines. Two readings of the same JSON would be two opinions about
 // whether a shop's print is nearly done.
 const moonraker = require('./lib/moonraker');
-const filamentSensors = require('./lib/filament-sensors');
 /**
  * Which filament sensors each Klipper machine publishes, by machine id.
  *
  * Discovered once per machine per run: Klipper's object list changes only
  * across a firmware restart, and asking on every poll would add a request to
- * the slowest link in the app. An empty array means "asked, has none" and is
- * not the same as `undefined`, which means "have not asked yet".
+ * the slowest link in the app. Each entry is `{ watched }`, a
+ * `moonraker.discover` answer (sensors, chamber, per-head fans), or
+ * `{ watched: null, retryAt }` after a failed ask — retried, never kept as
+ * "has none". No entry means "have not asked yet".
  */
 const moonrakerSensors = new Map();
+const MOONRAKER_DISCOVER_RETRY_MS = 60 * 1000;
 /**
  * The slicer's estimate for the file each Moonraker machine is printing.
  *
@@ -5343,18 +5345,21 @@ async function fetchPrinterStatus(machine) {
     };
   }
   if (type === 'moonraker') {
-    // The filament sensors are DISCOVERED, once per machine per run, because a
-    // hardcoded object name finds nothing on the printer this was written
-    // against — see `lib/filament-sensors.js`. Klipper's object list changes
-    // only across a firmware restart, and a failed discovery simply means no
-    // runout reporting rather than a failed poll.
-    let sensorNames = moonrakerSensors.get(machine.id);
-    if (sensorNames === undefined) {
+    // The filament sensors, the chamber and the per-head fans are DISCOVERED
+    // (`moonraker.discover`), once per machine per run, because a hardcoded
+    // object name finds nothing on the printer this was written against — see
+    // `lib/filament-sensors.js`. Klipper's object list changes only across a
+    // firmware restart. A FAILED discovery is not an answer: it is asked again
+    // after a minute rather than kept as "no sensors" until the app restarts,
+    // and meanwhile the poll goes on without them.
+    let found = moonrakerSensors.get(machine.id);
+    if (!found || (!found.watched && Date.now() >= found.retryAt)) {
       try {
-        sensorNames = filamentSensors.sensorNames(await get('/printer/objects/list'));
-      } catch (e) { sensorNames = []; }
-      moonrakerSensors.set(machine.id, sensorNames);
+        found = { watched: moonraker.discover(await get('/printer/objects/list')) };
+      } catch (e) { found = { watched: null, retryAt: Date.now() + MOONRAKER_DISCOVER_RETRY_MS }; }
+      moonrakerSensors.set(machine.id, found);
     }
+    const sensorNames = found.watched || [];
     const data = await get(`/printer/objects/query?${moonraker.queryWith(sensorNames)}`);
     // On a toolchanger the live head is not toolhead zero, and only the machines
     // that need it pay for the second request. A failure there keeps toolhead
