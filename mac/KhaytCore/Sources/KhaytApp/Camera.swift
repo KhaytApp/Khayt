@@ -65,6 +65,11 @@ final class Camera {
     /// a nozzle move.
     static let every: Duration = .seconds(5)
 
+    /// Put a frame in place, for the snapshot runner: a paused still needs a
+    /// camera that is not there. In memory only; the sample never starts the
+    /// poller, so nothing replaces it.
+    func setFrameForTesting(_ id: String, _ frame: Frame) { frames[id] = frame }
+
     func start(shop: Shop) {
         stop()
         task = Task { [weak self] in

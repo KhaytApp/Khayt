@@ -26,6 +26,9 @@ import KhaytCore
 /// camera rules as every still (`timelapseLink`).
 @MainActor
 enum Timelapse {
+    /// Links the snapshot runner puts in place, by job id. Empty outside it.
+    static var pretend: [String: KhaytEngine.TimelapseLink] = [:]
+
 
     /// When to look after a print finishes. The first is past the 35 s the
     /// bench took; the later two are for a long print's longer encode.
@@ -107,6 +110,7 @@ extension Shop {
     /// Where to watch a job's timelapse, or nil when it has none or its
     /// machine has gone.
     func timelapseLink(_ jobId: String) async -> KhaytEngine.TimelapseLink? {
+        if let pretend = Timelapse.pretend[jobId] { return pretend }
         guard let engine, case .object(let row)? = orderRows.first(where: { Self.recordId($0) == jobId }),
               case .object(let t)? = row["printerTimelapse"], case .string(let mid)? = t["machineId"],
               let machine = machineRows.first(where: { Self.recordId($0) == mid }) else { return nil }

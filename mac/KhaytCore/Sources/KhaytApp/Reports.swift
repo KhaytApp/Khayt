@@ -578,7 +578,7 @@ struct Reports: View {
     private func recomputePnl() async {
         let statement = await shop.pnlStatement()
         rows = statement?.rows ?? []
-        vat = statement?.vat
+        vat = VatSummaryCard.pretendSummary ?? statement?.vat
         await recomputeSpending()
     }
 

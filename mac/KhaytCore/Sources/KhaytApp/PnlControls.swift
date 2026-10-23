@@ -95,6 +95,9 @@ struct VatSummaryCard: View {
     let shop: Shop
     let vat: VatSummary
     let period: String
+    /// A summary the snapshot runner puts in place when the sample cannot
+    /// produce one (a filed period with a reversal). Nil outside it.
+    static var pretendSummary: VatSummary?
 
     /// The return periods in the chosen span that can be marked filed.
     @State private var returns: [KhaytEngine.VatFilingPeriod] = []
@@ -109,6 +112,15 @@ struct VatSummaryCard: View {
     private struct ReturnsKey: Equatable {
         let range: PnlRange
         let settings: JSONValue
+    }
+
+    /// The snapshot runner's dialog, opened on the newest filed return.
+    private func askForSnapshot() {
+        switch shop.pretendVatDialog {
+        case "unfile": unfiling = returns.first(where: { $0.filed && ($0.partOf ?? "").isEmpty })
+        case "refile": refiling = returns.first(where: { $0.filed && ($0.partOf ?? "").isEmpty })
+        default: unfiling = nil; refiling = nil
+        }
     }
 
     var body: some View {
@@ -210,7 +222,9 @@ struct VatSummaryCard: View {
         }
         .task(id: ReturnsKey(range: shop.pnlRange, settings: shop.settingsValue)) {
             returns = await shop.vatFilingPeriods()
+            askForSnapshot()
         }
+        .onChange(of: shop.pretendVatDialog) { _, _ in askForSnapshot() }
         .confirmationDialog(
             words.callIt("mac.vat_unfile_title",
                          ["period": .string(MonthLabel.period(unfiling?.period ?? "", words: words))]),

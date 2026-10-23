@@ -75,6 +75,20 @@ struct MachineTileTests {
                 "an idle machine was drawn as a print at 0%")
     }
 
+    /// A print HELD part-way is not an idle machine. The front-door tile read
+    /// "Idle" for a printer paused on a runout, halfway through a part.
+    @Test("a paused print is not idle on the tile")
+    func pausedIsNotIdle() async throws {
+        let shop = await Self.book()
+        let machine = try #require(shop.machines.first)
+        shop.printers.setReadingForTesting(machine.id, Self.printing(48, state: "paused"))
+        let tile = shop.tileReading(for: machine)
+        #expect(tile.state == .machineCheck)
+        #expect(tile.line != shop.words.callIt("mac.idle"))
+        #expect(tile.line.contains("48"))
+        #expect(tile.percent == nil, "a paused print was drawn as one running")
+    }
+
     /// A KIND with no protocol in this repo. Permanent, and not a fault: the
     /// sample shop has a UV flatbed and a laser cutter for exactly this.
     @Test("a machine Khayt has no protocol for says so, and says it differently")

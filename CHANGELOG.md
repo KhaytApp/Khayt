@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+
 - **beta.5 review fixes: filed VAT, portal sync, Bambu sessions, runout, PIN lockouts.**
   - A cancel, void or credit after a filed period is now dated by that event,
     not by the job's last save. A job cancelled on 20 December and saved again
@@ -8428,6 +8429,34 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.5] - 2026-10-23
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Before you update
+
+- **A product part with no rates of its own is now costed at your default rates.** A part with no labour, wear, power, electricity or failure rate saved on it is costed at your shop's defaults everywhere. Before, the catalogue counted those rates as zero. A rate the part does have, including 0, still wins. Saved product prices do not change by themselves. A product may show "Saved price kept; today's costs give …" and a different margin until you edit and save it.
+- **You can mark a VAT return period as filed, and its figures stay as filed.** Choose quarterly or monthly filing in the tax settings, then mark a period filed under Reports. After that, a cancel, void, credit note or edit dated in a filed period shows as "Adjustment for a filed period" in the first open period on or after the day it happened, instead of changing what you filed. Nothing changes until you mark a period filed. The marks live in this Mac's book and do not sync.
+
+### Added
+
+- **Library: archive and restore models, rename a model, search by field** (`tag:`, `group:`, `category:`, `material:`, `creator:`, `printer:`), and a badge on each tile showing where it is stored, with Free Up Space and Keep on This Mac for one model.
+- **Printers:** out-of-filament alerts for Klipper printers, including on the home screen; layer, target temperatures and chamber on the card; Bambu speed and chamber light, and Bambu's own words for a pause or failure; pause, resume and cancel for Bambu (Developer Mode) and Elegoo resin printers.
+- **Snapmaker U1 camera:** found automatically, a paused camera says so, and a finished job links to its timelapse.
+- **Pair a phone:** a phone can pair only during a two-minute window you open on the Mac.
+
+### Changed
+
+- **Bambu printers stay on one connection**, and their certificate is checked against Bambu Lab's own authorities.
+- **A printer card shows only the buttons its printer can use.**
+
+### Fixed
+
+- A printer paused because it ran out of filament read "Idle" on its home tile.
+- Free Up Space could ignore Keep on This Mac when used right after launch.
+- A store page's published state could be overwritten by another Mac's older copy.
 
 ## [4.0.0-beta.4] - 2026-10-21
 

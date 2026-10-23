@@ -345,6 +345,16 @@ extension Shop {
                                      ?? words.callIt("mac.printing"),
                                filename: status.filename)
         }
+        // A print HELD part-way — a runout, a fault, somebody pressed Pause —
+        // is not an idle machine. It read "Idle" here, on the front door, for a
+        // printer sitting on a half-made part waiting for a person.
+        if let status = printers.heard(machine.id),
+           ["paused", "pausing"].contains(status.state.lowercased()) {
+            return TileReading(percent: nil, state: .machineCheck,
+                               line: PrinterWatch.stateWord("paused", words) + " \u{00B7} "
+                                     + words.numeral(status.progress) + "%",
+                               filename: status.filename)
+        }
         let why = quiet(machine)
         return TileReading(percent: nil, state: why.state, line: words.callIt(why.wordKey),
                            filename: "")
