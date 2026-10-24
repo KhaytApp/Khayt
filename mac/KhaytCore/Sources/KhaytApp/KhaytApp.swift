@@ -731,6 +731,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only the model page and the multi-select pane (library
+            // inspector redesign), on the sample, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBINSP"] == "1", let shop = subject {
+                await captureLibraryInspector(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             // Only the beta.5 scenes (live printer cards, the camera, Pair a
             // phone, filed VAT periods), on the sample, in memory.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_B5"] == "1", let shop = subject {

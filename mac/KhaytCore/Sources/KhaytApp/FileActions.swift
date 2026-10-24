@@ -85,52 +85,35 @@ enum FileActions {
 
 /// The menu on a model, in the grid and in the inspector alike.
 ///
-/// The two entries that need the file are absent — not disabled — when it is not
-/// on this Mac. A greyed-out "Reveal in Finder" invites a shop to keep clicking
-/// it; the reason is said once, in the inspector, where there is room for it.
+/// ── TWENTY-ONE ITEMS IN A ROW WAS A LIST, NOT A MENU ──────────────────────
+///
+/// It had grown one item at a time to twenty-one, in no order a shop could
+/// learn. Now: getting at the file first (Quick Look, Open, the slicers,
+/// Reveal), then the three things a shop opens a model to DO (quote, job,
+/// catalogue), then three submenus — Organise, Share & Sell, Storage — and
+/// Archive and Delete last, alone.
+///
+/// The two entries that need the file are absent — not disabled — when it is
+/// not on this Mac. The reason is said once, in the inspector.
 struct ModelActions: View {
     let file: LibraryFile
     let shop: Shop
 
     var body: some View {
+        // "Every one selected" is every one selected AND ON SCREEN — never a
+        // model inside a folder tile or behind a filter (`Shop.selectedIds`).
+        let picked = shop.selectedIds
+        let chosen = picked.contains(file.id) ? shop.selectedFiles : []
         if let url = shop.modelFile(for: file) {
             Button(shop.words.callIt("mac.quick_look")) { shop.quickLook(url) }
-            Divider()
-            Button(shop.words.callIt("mac.reveal_in_finder")) { FileActions.reveal(url) }
             Button(shop.words.callIt("mac.open")) { FileActions.open(url) }
-            // The shop's OWN slicer, above the system's idea of one. A .3mf
-            // opens in a viewer as readily as in the thing the shop prints
-            // from, and this shop has four slicers installed and has already
-            // said which it means.
-            // CONVERT, beside the slicers rather than under Edit: a maker
-            // converts a file in order to open it in one of them, and this is
-            // where they already are.
-            //
-            // Only for a 3MF. An STL carries no printer settings to rewrite, so
-            // offering it would be offering to do nothing.
-            if (file.sourceFile?.ext ?? "").lowercased() == "3mf", !shop.printerProfiles.isEmpty {
-                Menu(shop.words.callIt("mac.convert_for")) {
-                    ForEach(shop.printerProfiles) { profile in
-                        Button(profile.name) {
-                            Task { await shop.convertModel(file, targetId: profile.id) }
-                        }
-                    }
-                    Divider()
-                    // The vendor's settings stripped rather than replaced — a
-                    // clean 3MF any slicer opens, which is the answer when the
-                    // printer is not on the list.
-                    Button(shop.words.callIt("mac.standard_3mf")) {
-                        Task { await shop.convertModel(file, targetId: nil) }
-                    }
-                }
-                .disabled(shop.converting)
-            }
+            // The shop's OWN slicer, above the system's idea of one.
             if let first = shop.defaultSlicer {
                 Button(shop.words.callIt("mac.open_in", ["name": .string(first.name)])) {
                     Task { await shop.openInSlicer(url, slicer: first) }
                 }
-                // The rest behind one item rather than four in the top level:
-                // a shop reaches for its default nearly every time.
+                // The rest behind one item: a shop reaches for its default
+                // nearly every time.
                 let rest = shop.slicers.filter { $0.id != first.id }
                 if !rest.isEmpty {
                     Menu(shop.words.callIt("mac.open_in_other")) {
@@ -142,85 +125,50 @@ struct ModelActions: View {
                     }
                 }
             }
-            Divider()
+            // CONVERT, beside the slicers: a maker converts a file in order to
+            // open it in one of them. Only for a 3MF — an STL carries no
+            // printer settings to rewrite.
+            if (file.sourceFile?.ext ?? "").lowercased() == "3mf", !shop.printerProfiles.isEmpty {
+                Menu(shop.words.callIt("mac.convert_for")) {
+                    ForEach(shop.printerProfiles) { profile in
+                        Button(profile.name) {
+                            Task { await shop.convertModel(file, targetId: profile.id) }
+                        }
+                    }
+                    Divider()
+                    // The vendor's settings stripped rather than replaced.
+                    Button(shop.words.callIt("mac.standard_3mf")) {
+                        Task { await shop.convertModel(file, targetId: nil) }
+                    }
+                }
+                .disabled(shop.converting)
+            }
+            Button(shop.words.callIt("mac.reveal_in_finder")) { FileActions.reveal(url) }
         } else if shop.isInCloudOnly(file) {
-            // Moved to the cloud to free space: the one thing to do with it is
-            // bring it back, and then everything above is offered again.
+            // Moved to the cloud to free space: the one thing to do with the
+            // FILE is bring it back. Quoting does not need it (below).
             Button(shop.words.callIt(file.isLinked ? "mac.linked_download" : "mac.cloudlib_bring_back")) { Task { await shop.bringBack(file) } }
                 .disabled(shop.cloudLibraryBusy)
-            Divider()
         } else if let dir = shop.directory(for: file) {
             Button(shop.words.callIt("mac.reveal_folder")) { FileActions.reveal(dir) }
-            Divider()
         }
-        // On or off the Print next list — this model, or every one selected.
-        //
-        // "Every one selected" is every one selected AND ON SCREEN — never a
-        // model inside a folder tile or behind a filter (`Shop.selectedIds`).
-        let picked = shop.selectedIds
-        let marked = picked.contains(file.id) && picked.count > 1 ? picked : [file.id]
-        let allOn = shop.files.filter { marked.contains($0.id) }.allSatisfy(\.isPrintNext)
-        Button(shop.words.callIt(allOn ? "mac.print_next_remove" : "mac.print_next_add")) {
-            shop.setPrintNext(marked, on: !allOn)
-        }
-        // The title, never the file: `Shop.rename`. This model alone — a
-        // title is one model's.
-        Button(shop.words.callIt("mac.rename_model") + "\u{2026}") { shop.beginRename(file) }
-            .disabled(!shop.canWrite)
-        // Put aside, or brought back — the selection when this model is one
-        // of it, as Print next above. Never a delete: `Shop.archive`.
-        let restoring = file.isArchived
-        let aside = shop.archiveTargets(for: file, archiving: !restoring)
-        Button(Self.archiveTitle(restoring: restoring, count: aside.count, words: shop.words)) {
-            if restoring { shop.unarchive(aside) } else { shop.archive(aside) }
-        }
-        .disabled(!shop.canWrite || aside.isEmpty)
-        // Into a group: the same choices as the toolbar's Group menu, here
-        // because right-clicking the models is where a shop looks for it. A
-        // model right-clicked outside the selection becomes the selection
-        // first, so the item acts on what was clicked.
-        Menu(shop.words.callIt(picked.contains(file.id) && picked.count > 1
-                               ? "mac.group_n_models" : "mac.group",
-                               ["n": .number(Double(picked.count))])) {
-            ForEach(shop.groups, id: \.self) { group in
-                Button(group) { fileUnder(group) }
-            }
-            if !shop.groups.isEmpty { Divider() }
-            Button(shop.words.callIt("mac.new_group")) {
-                adoptSelection()
-                shop.namingGroup = true
-            }
-            if (picked.contains(file.id) ? shop.selectedFiles : [file]).contains(where: { $0.groupName != nil }) {
-                Button(shop.words.callIt("mac.remove_from_group")) { fileUnder("") }
-            }
-        }
-        .disabled(!shop.canWrite)
-        // This model's picture as its group's, from the model itself — where
-        // a shop looking at the picture it wants already is.
-        if let group = file.groupName, shop.thumbnail(for: file) != nil {
-            Button(shop.words.callIt("mac.group_picture_choose")) {
-                Task { await shop.useModelPicture(group, model: file.id) }
-            }
-            .disabled(!shop.canWrite || shop.groupCover(group) == .model(file.id))
-        }
-        // A photograph of the print, here because this is where a shop looked
-        // for it — the model's page had it only as its last section. The
-        // CLICKED model, never the selection: a photo is of one print, and the
-        // same picture on twelve models would make them harder to tell apart,
-        // which is the opposite of what it is for. Gated as the page's own
-        // buttons are.
-        let hasPhoto = LibraryPhoto.has(file)
-        Button(shop.words.callIt(hasPhoto ? "mac.lp_replace" : "mac.lp_add") + "\u{2026}") {
-            shop.chooseLibraryPhoto(for: file.id)
+        Divider()
+
+        // ── PRINT: what a shop opens a model to do ───────────────────────
+        // A quote or a job on the model's own figures — or, from several
+        // selected, one job with a line for each.
+        let forJob = chosen.count > 1 ? chosen : [file]
+        let many: [String: JSONValue] = ["n": .number(Double(forJob.count))]
+        Button(shop.words.callIt(forJob.count > 1 ? "mac.quote_n_models" : "mac.quote_model", many) + "\u{2026}") {
+            Task { await shop.startJob(fromModels: forJob, asQuote: true) }
         }
         .disabled(!shop.canMoveJobs)
-        if hasPhoto {
-            Button(shop.words.callIt("mac.lp_remove")) { shop.clearLibraryPhoto(file.id) }
-                .disabled(!shop.canMoveJobs)
+        Button(shop.words.callIt(forJob.count > 1 ? "mac.job_from_n_models" : "mac.job_from_model", many) + "\u{2026}") {
+            Task { await shop.startJob(fromModels: forJob, asQuote: false) }
         }
-        // To the catalogue: this model — or, when it is one of several
-        // selected, all of them, as one product or one each.
-        let chosen = picked.contains(file.id) ? shop.selectedFiles : []
+        .disabled(!shop.canMoveJobs)
+        // To the catalogue: this model — or all of those selected, as one
+        // product or one each.
         if chosen.count > 1 {
             let n: [String: JSONValue] = ["n": .number(Double(chosen.count))]
             Button(shop.words.callIt("mac.catalogue_add_as_one", n) + "\u{2026}") {
@@ -234,39 +182,131 @@ struct ModelActions: View {
                 Task { await shop.editingProduct = shop.productFromFile(file) }
             }
         }
-        // A quote or a job on the model's own figures — or, from several
-        // selected, one job with a line for each. The job sheet holds many
-        // parts, so a selection is one job, not one each.
-        let forJob = chosen.count > 1 ? chosen : [file]
-        let many: [String: JSONValue] = ["n": .number(Double(forJob.count))]
-        Button(shop.words.callIt(forJob.count > 1 ? "mac.quote_n_models" : "mac.quote_model", many) + "\u{2026}") {
-            Task { await shop.startJob(fromModels: forJob, asQuote: true) }
+        // On or off the Print next list — this model, or every one selected.
+        let marked = picked.contains(file.id) && picked.count > 1 ? picked : [file.id]
+        let allOn = shop.files.filter { marked.contains($0.id) }.allSatisfy(\.isPrintNext)
+        Button(shop.words.callIt(allOn ? "mac.print_next_remove" : "mac.print_next_add")) {
+            shop.setPrintNext(marked, on: !allOn)
         }
-        .disabled(!shop.canMoveJobs)
-        Button(shop.words.callIt(forJob.count > 1 ? "mac.job_from_n_models" : "mac.job_from_model", many) + "\u{2026}") {
-            Task { await shop.startJob(fromModels: forJob, asQuote: false) }
-        }
-        .disabled(!shop.canMoveJobs)
-        // A PRIVATE LINK to this model, or to the selection it is part of.
-        // Absent unless the library's remote is the vault: there is nothing
-        // a link could share from a bucket or a Drive (`Shop.libraryOnVault`).
-        if shop.libraryOnVault {
+        Divider()
+
+        // ── ORGANISE ─────────────────────────────────────────────────────
+        Menu(shop.words.callIt("mac.li_group_organise")) {
+            // The title, never the file: `Shop.rename`. This model alone.
+            Button(shop.words.callIt("mac.rename_model") + "\u{2026}") { shop.beginRename(file) }
+                .disabled(!shop.canWrite)
+            if shop.canWrite {
+                Button(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite")) {
+                    shop.toggleFavourite(file)
+                }
+            }
             Divider()
-            Button(shop.words.callIt("mac.vl_share") + "\u{2026}") { shop.shareByLink(file) }
+            // Into a group (a folder): the toolbar's Group menu, here because
+            // right-clicking the models is where a shop looks for it. A model
+            // right-clicked outside the selection becomes the selection first.
+            Menu(shop.words.callIt(picked.contains(file.id) && picked.count > 1
+                                   ? "mac.group_n_models" : "mac.group",
+                                   ["n": .number(Double(picked.count))])) {
+                ForEach(shop.groups, id: \.self) { group in
+                    Button(group) { fileUnder(group) }
+                }
+                if !shop.groups.isEmpty { Divider() }
+                Button(shop.words.callIt("mac.new_group")) {
+                    adoptSelection()
+                    shop.namingGroup = true
+                }
+                if (picked.contains(file.id) ? shop.selectedFiles : [file]).contains(where: { $0.groupName != nil }) {
+                    Button(shop.words.callIt("mac.remove_from_group")) { fileUnder("") }
+                }
+            }
+            .disabled(!shop.canWrite)
+            // What it IS — the categories already in use, as the toolbar's.
+            Menu(shop.words.callIt("mac.category")) {
+                ForEach(shop.categoriesInUse, id: \.self) { category in
+                    Button(category) { fileUnder(category: category) }
+                }
+                if (picked.contains(file.id) ? shop.selectedFiles : [file]).contains(where: { !($0.category ?? "").isEmpty }) {
+                    if !shop.categoriesInUse.isEmpty { Divider() }
+                    Button(shop.words.callIt("mac.remove_from_category")) { fileUnder(category: "") }
+                }
+            }
+            .disabled(!shop.canWrite || shop.categoriesInUse.isEmpty && (file.category ?? "").isEmpty)
+            // A tag the shop already uses, ADDED to what each carries.
+            if !shop.tagsInUse.isEmpty {
+                Menu(shop.words.callIt("mac.li_add_tag_menu")) {
+                    ForEach(shop.tagsInUse.prefix(30), id: \.self) { tag in
+                        Button(tag) { addTag(tag) }
+                    }
+                }
                 .disabled(!shop.canWrite)
-            Button(shop.words.callIt("mac.vp_sell") + "\u{2026}") { Task { await shop.sellAsProduct(file) } }
-                .disabled(!shop.canWrite)
+            }
+            Divider()
+            // This model's picture as its group's, from the model itself.
+            if let group = file.groupName, shop.thumbnail(for: file) != nil {
+                Button(shop.words.callIt("mac.group_picture_choose")) {
+                    Task { await shop.useModelPicture(group, model: file.id) }
+                }
+                .disabled(!shop.canWrite || shop.groupCover(group) == .model(file.id))
+            }
+            // A photograph of the print — the CLICKED model, never the
+            // selection: a photo is of one print. Gated as the page's own.
+            let hasPhoto = LibraryPhoto.has(file)
+            Button(shop.words.callIt(hasPhoto ? "mac.lp_replace" : "mac.lp_add") + "\u{2026}") {
+                shop.chooseLibraryPhoto(for: file.id)
+            }
+            .disabled(!shop.canMoveJobs)
+            if hasPhoto {
+                Button(shop.words.callIt("mac.lp_remove")) { shop.clearLibraryPhoto(file.id) }
+                    .disabled(!shop.canMoveJobs)
+            }
+            Divider()
+            Button(shop.words.callIt("mac.copy_name")) { FileActions.copy(file.title) }
+            if let original = file.sourceFile?.originalName ?? file.originalName {
+                Button(shop.words.callIt("mac.copy_file_name")) { FileActions.copy(original) }
+            }
+        }
+
+        // ── SHARE & SELL ─────────────────────────────────────────────────
+        // A PRIVATE LINK, or a product, from this model or the selection it
+        // is part of. Absent unless the library's remote is the vault: there
+        // is nothing a link could share from a bucket or a Drive.
+        if shop.libraryOnVault {
+            Menu(shop.words.callIt("mac.li_group_share")) {
+                Button(shop.words.callIt("mac.vl_share") + "\u{2026}") { shop.shareByLink(file) }
+                    .disabled(!shop.canWrite)
+                Button(shop.words.callIt("mac.vp_sell") + "\u{2026}") { Task { await shop.sellAsProduct(file) } }
+                    .disabled(!shop.canWrite)
+            }
+        }
+
+        // ── STORAGE ──────────────────────────────────────────────────────
+        // This model alone, as the inspector's Storage section does it.
+        if shop.libraryHasRemote {
+            let kept = shop.isKeptOnThisMac(file)
+            Menu(shop.words.callIt("mac.li_group_storage")) {
+                if !file.isLinked, !shop.isInCloudOnly(file) {
+                    Button(shop.words.callIt("mac.storage_free_one")) { Task { await shop.freeUpSpace(model: file) } }
+                        .disabled(kept || shop.cloudLibraryBusy || !shop.canWrite)
+                }
+                Button(shop.words.callIt(kept ? "mac.li_unkeep" : "mac.storage_keep")) {
+                    Task { await shop.keepOnThisMac(file, !kept) }
+                }
+                .disabled(shop.cloudLibraryBusy || shop.syncIndex == nil)
+            }
         }
         Divider()
-        Button(shop.words.callIt("mac.copy_name")) { FileActions.copy(file.title) }
-        if let original = file.sourceFile?.originalName ?? file.originalName {
-            Button(shop.words.callIt("mac.copy_file_name")) { FileActions.copy(original) }
+
+        // ── PUT ASIDE, OR GONE ───────────────────────────────────────────
+        // Put aside, or brought back — the selection when this model is one
+        // of it. Never a delete: `Shop.archive`.
+        let restoring = file.isArchived
+        let aside = shop.archiveTargets(for: file, archiving: !restoring)
+        Button(Self.archiveTitle(restoring: restoring, count: aside.count, words: shop.words)) {
+            if restoring { shop.unarchive(aside) } else { shop.archive(aside) }
         }
-        Divider()
+        .disabled(!shop.canWrite || aside.isEmpty)
         // Last, alone, and marked: the one item here that cannot be undone.
         // The ellipsis is the promise that it asks first — see `WindowSheets`.
-        // Every selected model when this one is part of a selection, as the
-        // group, tag and catalogue items above already do.
         // Asked through `askToDeleteFromLibrary`, which refuses any model not
         // on screen rather than trusting the selection to hold none.
         let chosenForDelete = picked.contains(file.id) ? shop.selectedFiles : []
@@ -302,5 +342,15 @@ extension ModelActions {
     @MainActor fileprivate func fileUnder(_ group: String) {
         adoptSelection()
         Task { await shop.fileSelection(under: group) }
+    }
+
+    @MainActor fileprivate func fileUnder(category: String) {
+        adoptSelection()
+        Task { await shop.fileSelection(underCategory: category) }
+    }
+
+    @MainActor fileprivate func addTag(_ tag: String) {
+        adoptSelection()
+        Task { await shop.addTagToSelection(tag) }
     }
 }

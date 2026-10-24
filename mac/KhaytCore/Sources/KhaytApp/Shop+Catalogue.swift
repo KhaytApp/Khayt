@@ -229,6 +229,31 @@ extension Shop {
     /// not answer for leaves fields at zero, and a zero that looks typed is
     /// worse than a blank somebody was told about.
     func productFromFile(_ file: LibraryFile) async -> Product? {
+        guard let draft = await modelPartsDraft(file) else { return nil }
+        var product = newProduct()
+        // The model's name in every language the catalogue carries — the same
+        // name, because a model has one and a shop can correct it on the sheet.
+        for key in await allLanguageKeys() {
+            product.names[key.language] = file.title
+        }
+        product.rest["parts"] = .array(draft.parts)
+        productNote = draft.note
+        return product
+    }
+
+    /// The parts a product made from this model starts with — and the parts
+    /// the library inspector costs it at, so "cost to make" on the model and
+    /// the cost of the product made from it are ONE figure (`modelSummary`).
+    ///
+    /// Sets nothing on the shop but what `modelPart` already does.
+    struct ModelPartsDraft {
+        var parts: [JSONValue]
+        var note: String?
+        /// A weight or a time came from the mesh rather than a slice.
+        var estimated: Bool
+    }
+
+    func modelPartsDraft(_ file: LibraryFile) async -> ModelPartsDraft? {
         // A MULTI-PLATE FILE is a part per plate, every plate to start with —
         // the sheet's Plates row takes any of them off. "If it's a 3MF with
         // multiple plates I should be able to pick which plate to price, all
@@ -236,23 +261,20 @@ extension Shop {
         let plateList = plates(of: file)
         var parts: [JSONValue] = []
         var note: String?
+        var estimated = false
         if plateList.isEmpty {
-            guard let filled = await partFields(from: file) else { return nil }
+            guard let filled = await modelPart(from: file) else { return nil }
             parts = [.object(filled.part)]
             note = filled.note
+            estimated = !filled.estimated.isEmpty
         } else {
             for p in plateList {
-                guard let filled = await partFields(from: file, plate: p.index) else { continue }
+                guard let filled = await modelPart(from: file, plate: p.index) else { continue }
                 parts.append(.object(filled.part))
                 if note == nil { note = filled.note }
+                if !filled.estimated.isEmpty { estimated = true }
             }
             guard !parts.isEmpty else { return nil }
-        }
-        var product = newProduct()
-        // The model's name in every language the catalogue carries — the same
-        // name, because a model has one and a shop can correct it on the sheet.
-        for key in await allLanguageKeys() {
-            product.names[key.language] = file.title
         }
         // What one print of the model uses — magnets, inserts — rides on the
         // first part, so the product counts them once per copy and a job
@@ -263,9 +285,7 @@ extension Shop {
             first["consumables"] = .array(uses)
             parts[0] = .object(first)
         }
-        product.rest["parts"] = .array(parts)
-        productNote = note
-        return product
+        return ModelPartsDraft(parts: parts, note: note, estimated: estimated)
     }
 
     /// A library model, as one part of a product — the figures and the note

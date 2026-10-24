@@ -1894,7 +1894,12 @@ extension Shop {
         // loaded; the chip's count is that set within what the other chips and
         // the search have left.
         var byMachine: [String: Set<String>] = [:]
+        var spoolsByMachine: [String: Set<String>] = [:]
         var ready: [LibraryFacets.Ready] = []
+        // The beds, once: a model loaded for a machine it does not fit on is
+        // not ready there (`ModelReadiness`).
+        let meshes = Dictionary(files.compactMap { f in f.mesh.map { (f.id, $0) } },
+                                uniquingKeysWith: { a, _ in a })
         for machine in machinesInUse {
             let loaded = loadedSlots(for: machine.id)
             guard !loaded.isEmpty else { continue }
@@ -1910,8 +1915,15 @@ extension Shop {
                 ids = Set((try? await engine.readyToPrint(libraryRows, loaded: loaded)) ?? [])
                 readyMemo[machine.id] = (rowsAt, loaded, ids)
             }
-            byMachine[machine.id] = ids
-            let count = libraryPool(skipping: .ready, searched: searched).count { ids.contains(Self.rowText($0, "id")) }
+            spoolsByMachine[machine.id] = ids
+            let bed = bed(of: machine.id)
+            let onBed = bed == nil ? ids : ids.filter { id in
+                guard let m = meshes[id] else { return true }
+                return ModelReadiness.canStart(ModelReadiness.state(
+                    bounds: ModelReadiness.bounds(x: m.x, y: m.y, z: m.z), bed: bed, spoolsReady: true))
+            }
+            byMachine[machine.id] = onBed
+            let count = libraryPool(skipping: .ready, searched: searched).count { onBed.contains(Self.rowText($0, "id")) }
             ready.append(.init(machineId: machine.id, machineName: machine.name, count: count))
         }
         guard mine == libraryRecount else { return }
@@ -1919,6 +1931,7 @@ extension Shop {
         // key, so writing the same answer back redrew the grid and rebuilt
         // its lists after every key typed.
         if byMachine != readyByMachine { readyByMachine = byMachine }
+        if spoolsByMachine != spoolReadyByMachine { spoolReadyByMachine = spoolsByMachine }
         // The three counted in Swift, over the same pool: the ids the other
         // axes leave, each skipping its own.
         let copies = Self.duplicateGroups(files)
