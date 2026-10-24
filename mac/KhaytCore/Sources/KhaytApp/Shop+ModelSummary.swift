@@ -262,3 +262,30 @@ extension Shop {
         return fileSelection.count { !shown.contains($0) }
     }
 }
+
+/// One way to say a print's time and weight on the model page and the
+/// multi-select pane — the same "6h 52m" the machine cards use
+/// (`PrinterWatch.spell`), and whole grams or kilos past a thousand. The page
+/// said "6.9 h" on the card and "6.9 hrs" under it, beside a grid saying
+/// "6h 52m" for the same print.
+enum PrintFigures {
+
+    @MainActor
+    static func duration(minutes: Double, _ words: Words) -> String {
+        PrinterWatch.spell(max(0, minutes) * 60, words)
+    }
+
+    @MainActor
+    static func duration(hours: Double, _ words: Words) -> String {
+        duration(minutes: hours * 60, words)
+    }
+
+    /// "146 g", "2.1 kg".
+    @MainActor
+    static func weight(_ grams: Double, _ words: Words) -> String {
+        if grams >= 1000 {
+            return Money.quantity(grams / 1000, decimals: 1) + " " + words.callIt("mac.unit_kg")
+        }
+        return Money.quantity(max(0, grams).rounded(), decimals: 0) + " " + words.callIt("mac.unit_g")
+    }
+}

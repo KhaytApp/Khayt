@@ -358,11 +358,9 @@ struct ManyModels: View {
             Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 6) {
                 GridRow {
                     tile(w.callIt("mac.li_print_time"),
-                         t.hours > 0 ? Money.quantity(t.hours, decimals: 1) : none,
-                         unit: t.hours > 0 ? w.callIt("common.hours_short") : nil)
+                         t.hours > 0 ? PrintFigures.duration(hours: t.hours, w) : none, unit: nil)
                     tile(w.callIt("mac.li_filament"),
-                         t.grams > 0 ? Money.grams(t.grams) : none,
-                         unit: t.grams > 0 ? w.callIt("common.grams") : nil)
+                         t.grams > 0 ? PrintFigures.weight(t.grams, w) : none, unit: nil)
                 }
                 GridRow {
                     tile(w.callIt("mac.on_disk"), Format.bytes(t.bytes), unit: nil)

@@ -143,6 +143,31 @@ struct LibraryInspectorRedesignTests {
         #expect(t.bytes == (vase.size ?? 0) + (king.size ?? 0))
     }
 
+    // MARK: One format for time and weight
+
+    @Test("time reads as the machine cards say it, weight as whole grams or kilos")
+    func figures() {
+        let w = Words()
+        #expect(PrintFigures.duration(minutes: 412, w) == PrinterWatch.spell(412 * 60, w))
+        #expect(PrintFigures.duration(minutes: 412, w) == "6h 52m")
+        #expect(PrintFigures.duration(hours: 0.5, w) == "30m")
+        #expect(PrintFigures.weight(146.3, w) == "146 g")
+        #expect(PrintFigures.weight(2140, w) == "2.1 kg")
+    }
+
+    @Test("the shape's guess is shown only where nothing measured exists")
+    func estimateOnlyWithoutSlicer() async throws {
+        let shop = await Self.sample()
+        let dallah = try #require(shop.files.first { $0.id == "PF-sample-dallah" })
+        #expect(LibraryInspector.slicerSaidAnything(dallah), "the dallah's slicer gave a time")
+        let king = try #require(shop.files.first { $0.id == "PF-sample-king-1" })
+        #expect(!LibraryInspector.slicerSaidAnything(king))
+        let src = try String(contentsOf: GroupFromRightClickTests.source("LibraryInspector.swift"), encoding: .utf8)
+        #expect(src.contains("!Self.slicerSaidAnything(file) { priced(estimate) }"))
+        #expect(!src.contains("common.hours_short") && !src.contains("Money.grams("),
+                "a second time or weight format is back on the model page")
+    }
+
     // MARK: Words and wiring
 
     @Test("every new word has English and Arabic, in Arabic script")

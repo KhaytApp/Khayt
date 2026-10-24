@@ -84,7 +84,7 @@ struct LibraryInspector: View {
                 // Only for something with a mesh to walk, and only while the
                 // slicer has not answered both: beside a slice's own time and
                 // weight a guess from the shape is a second, different number.
-                if let estimate = shop.estimates[file.id], !Self.fullySliced(file) { priced(estimate) }
+                if let estimate = shop.estimates[file.id], !Self.slicerSaidAnything(file) { priced(estimate) }
                 if file.sourceFile?.kind == "model" { risk(file) }
                 if let how = howItPrints(file) { how }
             }
@@ -139,6 +139,16 @@ struct LibraryInspector: View {
     /// The slicer recorded both a time and a weight.
     static func fullySliced(_ file: LibraryFile) -> Bool {
         (file.parsed?.printTimeMins ?? 0) > 0 && (file.parsed?.filamentGrams ?? 0) > 0
+    }
+
+    /// The slicer — or the file's own per-colour weights — said a time or a
+    /// weight. Then the summary card shows THOSE, and a guess from the shape
+    /// beside them is a second, different answer for the same print (190.8 g
+    /// · 5.34 hrs under a card saying 146 g · 6h 54m, review of #2056). The
+    /// guess is shown only where nothing measured exists, and marked ≈.
+    static func slicerSaidAnything(_ file: LibraryFile) -> Bool {
+        (file.parsed?.printTimeMins ?? 0) > 0 || (file.parsed?.filamentGrams ?? 0) > 0
+            || file.palette.contains { ($0.grams ?? 0) > 0 }
     }
 
     /// Provenance or guides to show. The section is absent otherwise — see
@@ -225,10 +235,8 @@ struct LibraryInspector: View {
         guard mins > 0 || grams > 0 else { return nil }
         let plates = shop.plates(of: file)
         let w = shop.words
-        func hours(_ m: Double) -> String {
-            Money.quantity((m / 60 * 100).rounded() / 100) + " " + w.callIt("common.hours")
-        }
-        func g(_ n: Double) -> String { Money.grams(n) + " " + w.callIt("common.grams") }
+        func hours(_ m: Double) -> String { PrintFigures.duration(minutes: m, w) }
+        func g(_ n: Double) -> String { PrintFigures.weight(n, w) }
         return AnyView(DetailSection(w.callIt(plates.isEmpty ? "mac.sliced_title" : "mac.sliced_project",
                                               ["plates": .string(w.counting(plates.count, "mac.n_plates"))])) {
             if mins > 0 { DetailLine(w.callIt("mac.est_time"), hours(mins), strong: true) }
@@ -288,7 +296,7 @@ struct LibraryInspector: View {
                         .font(.callout)
                     Spacer(minLength: 8)
                     if let g = colour.grams {
-                        Text(verbatim: "\(Format.mm(g)) \(shop.words.callIt("common.grams"))")
+                        Text(PrintFigures.weight(g, shop.words))
                             .font(.callout)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
@@ -432,9 +440,9 @@ struct LibraryInspector: View {
     @ViewBuilder private func priced(_ e: KhaytEngine.MeshEstimate) -> some View {
         DetailSection(shop.words.callIt("mac.est_title")) {
             DetailLine(shop.words.callIt("mac.est_filament"),
-                       Money.figure(e.grams) + " " + shop.words.callIt("common.grams"))
+                       "\u{2248}\u{2009}" + PrintFigures.weight(e.grams, shop.words))
             DetailLine(shop.words.callIt("mac.est_time"),
-                       Money.figure(e.hours) + " " + shop.words.callIt("common.hours"))
+                       "\u{2248}\u{2009}" + PrintFigures.duration(hours: e.hours, shop.words))
             if e.isCalibrated, let n = e.jobs, let rate = e.gramsPerHour {
                 Text(shop.words.callIt("mac.est_learned",
                                        ["jobs": .number(Double(n)),
@@ -796,16 +804,15 @@ struct ModelSummaryCard: View {
 
     private var facts: some View {
         let none = "\u{2014}"
-        let approx = estimated ? "\u{2248}\u{2009}" : ""
         return VStack(alignment: .leading, spacing: 6) {
             Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 0) {
                 GridRow {
                     fact(w.callIt("mac.li_print_time"),
-                         hours.map { approx + Money.quantity($0, decimals: 1) } ?? none,
-                         unit: hours == nil ? nil : w.callIt("common.hours_short"))
+                         hours.map { PrintFigures.duration(hours: $0, w) } ?? none,
+                         unit: nil, approximate: estimated && hours != nil)
                     fact(w.callIt("mac.li_filament"),
-                         grams.map { approx + Money.grams($0) } ?? none,
-                         unit: grams == nil ? nil : w.callIt("common.grams"))
+                         grams.map { PrintFigures.weight($0, w) } ?? none,
+                         unit: nil, approximate: estimated && grams != nil)
                     fact(w.callIt("mac.li_cost"),
                          summary?.cost.map { Money.figure($0) } ?? none,
                          unit: summary?.cost == nil ? nil : Money.mark(shop.currency))
@@ -823,16 +830,21 @@ struct ModelSummaryCard: View {
         }
     }
 
-    private func fact(_ label: String, _ value: String, unit: String?) -> some View {
+    /// `approximate` draws ≈ as its own leading mark — beside the number in
+    /// both directions, never stranded after it in Arabic.
+    private func fact(_ label: String, _ value: String, unit: String?, approximate: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                if approximate {
+                    Text(verbatim: "\u{2248}").font(.callout).foregroundStyle(.secondary)
+                }
                 Text(value)
-                    .font(.title3.weight(.semibold))
+                    .font(.headline)
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -1143,12 +1155,9 @@ struct VersionsSection: View {
 
     private func size(_ v: KhaytEngine.PrintVersions.Version) -> String? {
         var bits: [String] = []
-        if let g = v.grams {
-            bits.append("\(g.formatted(.number.precision(.fractionLength(0)).locale(shop.words.locale))) \(shop.words.callIt("common.grams"))")
-        }
-        if let h = v.hours {
-            bits.append("\(h.formatted(.number.precision(.fractionLength(1)).locale(shop.words.locale))) \(shop.words.callIt("common.hours_short"))")
-        }
+        // The page's one format for both (`PrintFigures`).
+        if let g = v.grams { bits.append(PrintFigures.weight(g, shop.words)) }
+        if let h = v.hours { bits.append(PrintFigures.duration(hours: h, shop.words)) }
         return bits.isEmpty ? nil : bits.joined(separator: " · ")
     }
 }
