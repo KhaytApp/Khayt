@@ -216,29 +216,27 @@ struct CustomerSheet: View {
             // given, because Meta can ask a business to show it.
             GridRow {
                 Color.clear.frame(height: 0)
+                consentRow("mac.wab_opt_in", draft.whatsAppConsent) { agreed, how in
+                    draft = draft.optedIntoWhatsApp(agreed, how: how, at: Date())
+                }
+            }
+            // ── AGREED TO OFFERS ON WHATSAPP ──────────────────────────────
+            //
+            // A third consent, which the desktop's WhatsApp campaigns send to
+            // (`lib/campaigns.js whatsappOffersOptedIn`). Order updates are not
+            // offers, so the box above never stands in for this one. The word
+            // is the other app's (`ce.wab_offers`).
+            GridRow {
+                Color.clear.frame(height: 0)
                 VStack(alignment: .leading, spacing: 4) {
-                    Toggle(shop.words.callIt("mac.wab_opt_in"), isOn: Binding(
-                        get: { draft.whatsAppConsent != nil },
-                        set: { draft = draft.optedIntoWhatsApp($0, how: draft.whatsAppConsent?.how ?? "asked", at: Date()) }))
-                        .toggleStyle(.checkbox)
-                    if let consent = draft.whatsAppConsent {
-                        HStack(spacing: 6) {
-                            Picker("", selection: Binding(
-                                get: { consent.how },
-                                set: { draft = draft.optedIntoWhatsApp(true, how: $0, at: Date()) })) {
-                                ForEach(["asked", "form", "customer_wrote", "other"], id: \.self) { how in
-                                    Text(shop.words.callIt("mac.wab_how_" + how)).tag(how)
-                                }
-                                if !["asked", "form", "customer_wrote", "other", ""].contains(consent.how) {
-                                    Text(consent.how).tag(consent.how)
-                                }
-                            }
-                            .labelsHidden()
-                            .fixedSize()
-                            Text(shop.words.callIt("mac.wab_opt_in_since",
-                                                   ["day": .string(Calendar.localDay(ofInstant: consent.at))]))
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
+                    consentRow("ce.wab_offers", draft.whatsAppOffersConsent) { agreed, how in
+                        draft = draft.optedIntoWhatsAppOffers(agreed, how: how, at: Date())
+                    }
+                    // The opt-out below wins, as it does in the campaigns.
+                    if draft.whatsAppOffersConsent != nil && draft.marketingOptOut {
+                        Text(shop.words.callIt("mac.wab_offers_opted_out"))
+                            .font(.caption).foregroundStyle(Khayt.attention)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -439,6 +437,38 @@ struct CustomerSheet: View {
     /// `Client` is a value with `let` fields — it is a record, not a form — so
     /// editing rebuilds it. That keeps the record's shape in one place rather
     /// than growing a second mutable copy of it.
+    /// One WhatsApp consent: the box, and once ticked, how it was given and
+    /// since when — because Meta can ask a business to show it.
+    @ViewBuilder
+    private func consentRow(_ label: String, _ consent: (at: String, how: String)?,
+                            set: @escaping (Bool, String) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle(shop.words.callIt(label), isOn: Binding(
+                get: { consent != nil },
+                set: { set($0, consent?.how ?? "asked") }))
+                .toggleStyle(.checkbox)
+            if let consent {
+                HStack(spacing: 6) {
+                    Picker("", selection: Binding(
+                        get: { consent.how },
+                        set: { set(true, $0) })) {
+                        ForEach(["asked", "form", "customer_wrote", "other"], id: \.self) { how in
+                            Text(shop.words.callIt("mac.wab_how_" + how)).tag(how)
+                        }
+                        if !["asked", "form", "customer_wrote", "other", ""].contains(consent.how) {
+                            Text(consent.how).tag(consent.how)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    Text(shop.words.callIt("mac.wab_opt_in_since",
+                                           ["day": .string(Calendar.localDay(ofInstant: consent.at))]))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
     private func binding(_ key: KeyPath<Client, String>) -> Binding<String> {
         Binding(
             get: { draft[keyPath: key] },
