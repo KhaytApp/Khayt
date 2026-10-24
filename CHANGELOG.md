@@ -4,6 +4,11 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: Team, signed-in devices, and a safer import-key swap.**
+  - Settings ▸ Online ▸ Team lists who is on the shop's Khayt Cloud account. The owner or a manager can invite by email as a manager, operator or viewer (the code lasts 7 days), and can remove a member, which signs out every device on that account.
+  - Signed-in devices lists every key that can reach the shop, with when it was made and last used, so a leaked key that is still in use shows. Any device but this Mac can be signed out.
+  - Replacing the import key now keeps the old key working for 2 hours by default, so a web store can switch with no refused orders. "Stop the Old Key" ends that early. "Replace and Stop the Old Key Now" is there for a key in the wrong hands.
+
 - **Mac: "Agreed to offers on WhatsApp" on the customer sheet.** It is a separate consent from "Agreed to order updates on WhatsApp", and it records how and when the customer agreed. The desktop's WhatsApp campaigns send only to customers with it (`whatsappMarketingOptIn`). Withdrawing it is saved, and a Mac edit keeps a consent the desktop recorded. A note shows when the customer has also opted out of marketing, because the opt-out wins.
 
 - **Mac/iPhone: the seller fields an invoice prints are one shared rule.** `ShopFields.document` (name, address, tagline, footer) moved into KhaytCore, so the iPhone's invoice prints the same seller block as the Mac's.

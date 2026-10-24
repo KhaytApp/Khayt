@@ -31,13 +31,20 @@ enum ImportKeyClient {
     struct Status: Equatable, Sendable {
         let set: Bool
         let createdAt: Date?
+        /// Until when the key just replaced still works (`keepPrevious`), or nil.
+        var previousUntil: Date? = nil
     }
 
     /// A new key, the only time it is ever shown.
     struct Created: Equatable, Sendable {
         let key: String
         let createdAt: Date?
+        var previousUntil: Date? = nil
     }
+
+    /// How long a replaced key keeps working by default: two hours, so a store
+    /// can be redeployed with the new key and no order is refused meanwhile.
+    static let overlapMinutes = 120
 
     enum Failure: Error, Equatable, CustomStringConvertible {
         /// 401: the shop's sign-in was not accepted.
@@ -67,16 +74,20 @@ enum ImportKeyClient {
         let data = try await send(connection, token: token, method: "GET", fetch: fetch)
         guard let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let set = body["set"] as? Bool else { throw Failure.malformed }
-        return Status(set: set, createdAt: (body["createdAt"] as? String).flatMap(date))
+        return Status(set: set, createdAt: (body["createdAt"] as? String).flatMap(date),
+                      previousUntil: (body["previousUntil"] as? String).flatMap(date))
     }
 
-    /// Make a key, replacing any old one. Links carrying the old one stop at once.
-    static func create(_ connection: CloudReader.Connection, token: String,
+    /// Make a key, replacing any old one. With `keepPrevious` the old one keeps
+    /// working for that many minutes (1–1440); without, it stops at once.
+    static func create(_ connection: CloudReader.Connection, token: String, keepPrevious: Int? = nil,
                        fetch: Fetch) async throws -> Created {
-        let data = try await send(connection, token: token, method: "POST", fetch: fetch)
+        let query = keepPrevious.map { "?keepPrevious=\(min(1440, max(1, $0)))" } ?? ""
+        let data = try await send(connection, token: token, method: "POST", query: query, fetch: fetch)
         guard let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let key = body["key"] as? String, !key.isEmpty else { throw Failure.malformed }
-        return Created(key: key, createdAt: (body["createdAt"] as? String).flatMap(date))
+        return Created(key: key, createdAt: (body["createdAt"] as? String).flatMap(date),
+                       previousUntil: (body["previousUntil"] as? String).flatMap(date))
     }
 
     /// No key: the import link accepts orders from anyone again.
@@ -85,12 +96,18 @@ enum ImportKeyClient {
         _ = try await send(connection, token: token, method: "DELETE", fetch: fetch)
     }
 
+    /// End the overlap now: the replaced key stops; the current one is untouched.
+    static func endOverlap(_ connection: CloudReader.Connection, token: String,
+                           fetch: Fetch) async throws {
+        _ = try await send(connection, token: token, method: "DELETE", query: "?previous=1", fetch: fetch)
+    }
+
     private static func send(_ connection: CloudReader.Connection, token: String, method: String,
-                             fetch: Fetch) async throws -> Data {
+                             query: String = "", fetch: Fetch) async throws -> Data {
         // Built by CloudReader.request like every other cloud call, for the
         // Bearer token and the x-delta-capable header — a call that forgot the
         // header would close the shop's delta gate.
-        var request = try CloudReader.request(connection, token: token, method: method, tail: tail)
+        var request = try CloudReader.request(connection, token: token, method: method, tail: tail + query)
         if method == "POST" {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = Data("{}".utf8)
@@ -157,7 +174,7 @@ struct ImportKeySection: View {
     @State private var confirming: Confirm?
     @State private var copied = false
 
-    enum Confirm: Identifiable { case create, replace, remove; var id: Self { self } }
+    enum Confirm: Identifiable { case create, replace, remove, endOverlap; var id: Self { self } }
 
     var body: some View {
         Section(shop.words.callIt("mac.ik_title")) {
@@ -176,6 +193,16 @@ struct ImportKeySection: View {
                     } else {
                         Button(shop.words.callIt("mac.ik_create")) { confirming = .create }
                     }
+                }
+            }
+
+            if let until = status?.previousUntil, until > Date(), !busy {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(shop.words.callIt("mac.ik_overlap_until",
+                                           ["time": .string(shop.words.say(until, .dateTime.hour().minute()))]))
+                        .font(.callout).fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    Button(shop.words.callIt("mac.ik_end_overlap"), role: .destructive) { confirming = .endOverlap }
                 }
             }
 
@@ -213,8 +240,15 @@ struct ImportKeySection: View {
         .confirmationDialog(confirmTitle,
                             isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
                             presenting: confirming) { which in
-            Button(confirmButton(which), role: which == .create ? nil : .destructive) {
+            Button(confirmButton(which), role: which == .create || which == .replace ? nil : .destructive) {
                 Task { await act(which) }
+            }
+            // Replacing keeps the old key two hours by default; stopping it at
+            // once is the second choice, for a key known to be in the wrong hands.
+            if which == .replace {
+                Button(shop.words.callIt("mac.ik_replace_now"), role: .destructive) {
+                    Task { await act(.replace, keepOld: false) }
+                }
             }
             Button(shop.words.callIt("common.cancel"), role: .cancel) { confirming = nil }
         } message: { which in
@@ -233,6 +267,7 @@ struct ImportKeySection: View {
     private var confirmTitle: String {
         switch confirming {
         case .remove: shop.words.callIt("mac.ik_remove_title")
+        case .endOverlap: shop.words.callIt("mac.ik_end_overlap_title")
         case .replace: shop.words.callIt("mac.ik_replace_title")
         default: shop.words.callIt("mac.ik_create_title")
         }
@@ -243,6 +278,7 @@ struct ImportKeySection: View {
         case .create: shop.words.callIt("mac.ik_create")
         case .replace: shop.words.callIt("mac.ik_replace")
         case .remove: shop.words.callIt("mac.ik_remove")
+        case .endOverlap: shop.words.callIt("mac.ik_end_overlap")
         }
     }
 
@@ -251,6 +287,7 @@ struct ImportKeySection: View {
         case .create: shop.words.callIt("mac.ik_create_body")
         case .replace: shop.words.callIt("mac.ik_replace_body")
         case .remove: shop.words.callIt("mac.ik_remove_body")
+        case .endOverlap: shop.words.callIt("mac.ik_end_overlap_body")
         }
     }
 
@@ -267,7 +304,7 @@ struct ImportKeySection: View {
         }
     }
 
-    private func act(_ which: Confirm) async {
+    private func act(_ which: Confirm, keepOld: Bool = true) async {
         confirming = nil
         busy = true; defer { busy = false }
         do {
@@ -276,10 +313,16 @@ struct ImportKeySection: View {
             let fetch: ImportKeyClient.Fetch = { try await session.data(for: $0) }
             switch which {
             case .create, .replace:
-                let made = try await ImportKeyClient.create(connection, token: token, fetch: fetch)
+                let keep = which == .replace && keepOld ? ImportKeyClient.overlapMinutes : nil
+                let made = try await ImportKeyClient.create(connection, token: token, keepPrevious: keep, fetch: fetch)
                 fresh = made
                 copied = false
-                status = .init(set: true, createdAt: made.createdAt ?? Date())
+                status = .init(set: true, createdAt: made.createdAt ?? Date(),
+                               previousUntil: made.previousUntil
+                                   ?? keep.map { Date().addingTimeInterval(Double($0) * 60) })
+            case .endOverlap:
+                try await ImportKeyClient.endOverlap(connection, token: token, fetch: fetch)
+                status = status.map { .init(set: $0.set, createdAt: $0.createdAt, previousUntil: nil) }
             case .remove:
                 try await ImportKeyClient.remove(connection, token: token, fetch: fetch)
                 fresh = nil
