@@ -2849,6 +2849,27 @@ final class Shop {
     var libraryPrintNextOnly = false { didSet { libraryViewChanged() } }
     /// Models that are the same file, or the same mesh, as another.
     var libraryDuplicatesOnly = false { didSet { libraryViewChanged() } }
+    /// Ready on ANY machine that says what it has loaded — the "Ready to
+    /// print" smart folder. See `LibraryQuery.readyAnywhere`.
+    var libraryReadyAnywhere = false { didSet { if libraryReadyAnywhere != oldValue { libraryViewChanged() } } }
+    /// Models with neither a print time nor a weight known.
+    var libraryNoFiguresOnly = false { didSet { if libraryNoFiguresOnly != oldValue { libraryViewChanged() } } }
+    /// Models a catalogue product is made from.
+    var libraryInCatalogueOnly = false { didSet { if libraryInCatalogueOnly != oldValue { libraryViewChanged() } } }
+    /// Print time, filament, price, times printed and the day added. Part of
+    /// `libraryQuery`, the one value the bar and the saved searches share.
+    var libraryRanges = LibraryQuery.Ranges() { didSet { if libraryRanges != oldValue { libraryViewChanged() } } }
+    /// The saved search loaded with Edit Search, so the bar offers to
+    /// update it rather than only to save a new one.
+    var libraryEditingSearchId: String?
+    /// The bar's two popovers, here rather than in the view so a snapshot
+    /// scene can open them.
+    var libraryRangesShown = false
+    var librarySaveSearchShown = false
+    /// The saved search whose name is being edited in the sidebar.
+    var libraryRenamingSearchId: String?
+    /// The saved search Delete is asking about.
+    var libraryDeletingSearchId: String?
     /// Which models are ready on which machine, from the last recount —
     /// loaded AND on the bed (`ModelReadiness`), so the Ready chip never
     /// counts a model the inspector calls too big for that machine.

@@ -40,6 +40,13 @@ final class LibraryMemo {
         var printNext: Bool
         var duplicates: Bool
         var storage: LibraryStorageFilter?
+        /// The axes and ranges added with the saved searches.
+        var readyAnywhere = false
+        var noFigures = false
+        var inCatalogue = false
+        var ranges = LibraryQuery.Ranges()
+        /// Today, while a "last N days" range is on — tomorrow it finds less.
+        var day = ""
         /// `librarySyncRevision`: a model moved out or brought back.
         var sync: Int
         var sort: LibrarySort
@@ -84,6 +91,11 @@ final class LibraryMemo {
         var facetSearches = 0
         /// Models whose tile facts were worked out (`Shop.libraryFacts`).
         var factBuilds = 0
+        /// Facet recounts that ran, and those the memo answered.
+        var facetRecounts = 0
+        var facetMemoHits = 0
+        /// Saved-search counts worked out (`Shop.libraryCount`).
+        var queryCounts = 0
     }
 
     var work = Work()
@@ -101,7 +113,7 @@ final class LibraryMemo {
     var folded: [LibraryFile.ID: Folded] = [:]
 
     /// One model's text, folded once: what the free search reads, and what
-    /// each kind of token (`LibraryQuery.Field`) reads.
+    /// each kind of token (`LibrarySearch.Field`) reads.
     ///
     /// Held as UTF-8 bytes, folded and composed, and matched with `memmem`:
     /// a recount runs the search over every model, and the Foundation
@@ -162,6 +174,15 @@ final class LibraryMemo {
     var factLinesLanguage = ""
     var factLines: [LibraryFile.ID: String] = [:]
 
+    /// The last facet recount's inputs, hashed (`Shop.facetMemoKey`).
+    var facetKey: Int?
+    /// Each smart folder's count, for the revisions it was counted at.
+    var countsRevision: [Int] = []
+    var counts: [LibraryQuery: Int] = [:]
+    /// The models a catalogue product is made from, per book revision.
+    var catalogueKey = -1
+    var catalogueIds: Set<String>?
+
     /// The list view's rows, for the entries and facts they were made from.
     var rowsKey: LibraryRow.Key?
     var rows: [LibraryRow] = []
@@ -191,9 +212,16 @@ extension Shop {
                      neverPrinted: libraryNeverPrintedOnly, readyOn: libraryReadyOn,
                      category: libraryCategory, tag: libraryTag, creator: libraryCreator,
                      printNext: libraryPrintNextOnly, duplicates: libraryDuplicatesOnly,
-                     storage: libraryStorage, sync: libraryStorage == nil ? 0 : librarySyncRevision,
+                     storage: libraryStorage,
+                     readyAnywhere: libraryReadyAnywhere, noFigures: libraryNoFiguresOnly,
+                     inCatalogue: libraryInCatalogueOnly, ranges: libraryRanges,
+                     day: libraryRanges.added.lastDays == nil ? "" : Calendar.book.dayString(Date()),
+                     sync: libraryStorage == nil ? 0 : librarySyncRevision,
                      sort: librarySort,
-                     facts: librarySort.readsFacts ? libraryFactsKey() : [],
+                     // The facts too when a filter READS them (a range, No
+                     // print figures, the catalogue's files), not only the order.
+                     facts: librarySort.readsFacts || libraryRanges.isActive || libraryNoFiguresOnly
+                        || libraryInCatalogueOnly ? libraryFactsKey() : [],
                      query: SearchText.fold(search.trimmingCharacters(in: .whitespaces)))
     }
 
@@ -204,14 +232,14 @@ extension Shop {
         if memo.shownKey == key { return memo.shown }
         let rows: [LibraryFile]
         if let old = memo.shownKey, old.sameView(as: key), !old.query.isEmpty,
-           LibraryQuery.parse(key.query).narrows(from: LibraryQuery.parse(old.query)) {
+           LibrarySearch.parse(key.query).narrows(from: LibrarySearch.parse(old.query)) {
             // Typed one more letter: everything the longer search finds, the
             // shorter one found too, already filtered and in order. Asked of
             // the PARSED search, not the string: `tag` → `tag:` is longer and
-            // not narrower (`LibraryQuery.narrows`).
+            // not narrower (`LibrarySearch.narrows`).
             memo.work.narrowed += 1
             memo.work.rowsSearched += memo.shown.count
-            let matches = searchMatcher(LibraryQuery.parse(key.query))
+            let matches = searchMatcher(LibrarySearch.parse(key.query))
             rows = memo.shown.filter(matches)
         } else {
             memo.work.builds += 1
@@ -225,7 +253,7 @@ extension Shop {
     /// Does this model's search text hold `q` (already folded)? The same
     /// answer as `LibraryFile.matches(folded:)`, from text folded once.
     func matchesSearch(_ file: LibraryFile, _ q: String) -> Bool {
-        searchMatcher(LibraryQuery.parse(q))(file)
+        searchMatcher(LibrarySearch.parse(q))(file)
     }
 
     /// One model's folded text, from the memo.
@@ -250,7 +278,7 @@ extension Shop {
     /// loaded on a machine whose name holds the value, in a material that
     /// fits — so, like that menu, it finds nothing on a machine that does not
     /// say what it has loaded.
-    func searchMatcher(_ query: LibraryQuery) -> (LibraryFile) -> Bool {
+    func searchMatcher(_ query: LibrarySearch) -> (LibraryFile) -> Bool {
         let readyFor: [[String: Bool]] = query.tokens.filter { $0.field == .printer }.map { token in
             var ids: [String: Bool] = [:]
             for machine in machines where SearchText.fold(machine.name).localizedStandardContains(token.folded) {

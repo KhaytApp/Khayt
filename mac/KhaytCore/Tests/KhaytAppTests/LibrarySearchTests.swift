@@ -6,54 +6,54 @@ import KhaytCore
 /// The library's search: tokens, quoted values, Arabic, a wider default scope,
 /// and the memo's narrowing kept only where it still gives the same answer.
 @MainActor
-struct LibraryQueryTests {
+struct LibrarySearchTests {
 
     @Test("tokens, quotes of every kind, free text left over")
     func parses() {
-        let q = LibraryQuery.parse(#"dragon tag:PLA group:"Saudi Kings" category:“Wall art” bust"#)
+        let q = LibrarySearch.parse(#"dragon tag:PLA group:"Saudi Kings" category:“Wall art” bust"#)
         #expect(q.text == "dragon bust")
         #expect(q.tokens.map(\.field) == [.tag, .group, .category])
         #expect(q.tokens.map(\.value) == ["PLA", "Saudi Kings", "Wall art"])
         #expect(q.tokens[0].folded == "pla")
         #expect(q.tokens[1].source == #"group:"Saudi Kings""#)
         // An unclosed quote runs to the end: the shop is still typing it.
-        #expect(LibraryQuery.parse(#"group:"Saudi K"#).tokens.first?.value == "Saudi K")
+        #expect(LibrarySearch.parse(#"group:"Saudi K"#).tokens.first?.value == "Saudi K")
         // `tag:` alone asks for nothing and is not the word "tag".
-        let bare = LibraryQuery.parse("tag:")
+        let bare = LibrarySearch.parse("tag:")
         #expect(bare.isEmpty)
         // A colon in something that is not a field is just text.
-        #expect(LibraryQuery.parse("https://printables.com").tokens.isEmpty)
-        #expect(LibraryQuery.parse("Printer:U1").tokens.first?.field == .printer, "field names fold")
+        #expect(LibrarySearch.parse("https://printables.com").tokens.isEmpty)
+        #expect(LibrarySearch.parse("Printer:U1").tokens.first?.field == .printer, "field names fold")
     }
 
     @Test("Arabic field names and Arabic values")
     func arabic() {
-        let q = LibraryQuery.parse("وسم:تنين مجموعة:«ملوك السعودية» فئه:تماثيل دلة")
+        let q = LibrarySearch.parse("وسم:تنين مجموعة:«ملوك السعودية» فئه:تماثيل دلة")
         #expect(q.tokens.map(\.field) == [.tag, .group, .category], "ة and ه are one letter to the search")
         #expect(q.tokens[1].value == "ملوك السعودية")
         #expect(q.text == SearchText.fold("دلة"))
         // A full-width colon, as an Arabic keyboard may give.
-        #expect(LibraryQuery.parse("خامة\u{FF1A}PLA").tokens.first?.field == .material)
+        #expect(LibrarySearch.parse("خامة\u{FF1A}PLA").tokens.first?.field == .material)
     }
 
     @Test("removing a chip takes out exactly its text")
     func removing() throws {
         let raw = #"dragon  group:"Saudi Kings" tag:pla"#
-        let q = LibraryQuery.parse(raw)
+        let q = LibrarySearch.parse(raw)
         let group = try #require(q.tokens.first { $0.field == .group })
-        #expect(LibraryQuery.removing(group, from: raw) == "dragon tag:pla")
+        #expect(LibrarySearch.removing(group, from: raw) == "dragon tag:pla")
         // The SECOND of two identical tokens is the second one, and a value's
         // own spaces are left as typed.
         let twice = #"tag:pla  group:"A  B" tag:pla"#
-        let tokens = LibraryQuery.parse(twice).tokens
-        #expect(LibraryQuery.removing(tokens[2], from: twice) == #"tag:pla  group:"A  B""#)
-        #expect(LibraryQuery.removing(tokens[0], from: twice) == #"group:"A  B" tag:pla"#)
+        let tokens = LibrarySearch.parse(twice).tokens
+        #expect(LibrarySearch.removing(tokens[2], from: twice) == #"tag:pla  group:"A  B""#)
+        #expect(LibrarySearch.removing(tokens[0], from: twice) == #"group:"A  B" tag:pla"#)
     }
 
     @Test("narrowing is allowed only when the new search is inside the old one")
     func narrows() {
         func n(_ new: String, _ old: String) -> Bool {
-            LibraryQuery.parse(SearchText.fold(new)).narrows(from: LibraryQuery.parse(SearchText.fold(old)))
+            LibrarySearch.parse(SearchText.fold(new)).narrows(from: LibrarySearch.parse(SearchText.fold(old)))
         }
         #expect(n("model 12", "model 1"))
         #expect(n("tag:dra", "tag:dr"))

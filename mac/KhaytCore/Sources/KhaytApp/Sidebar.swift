@@ -154,6 +154,7 @@ struct Sidebar: View {
                 Row(title: shop.words.callIt("mac.all_models"), mark: .library, count: shop.files.count,
                     selected: shop.shelf == .library(nil))
                     .tag(Shop.Shelf.library(nil))
+                ClassicSmartFolderRows(shop: shop)  // saved searches
                 ForEach(shop.groups, id: \.self) { group in
                     Row(title: group, symbol: "square.stack", count: shop.count(group: group),
                         selected: shop.shelf == .library(group))
