@@ -23,22 +23,6 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 - **Mac: Khayt Cloud plan in Settings ▸ Online.** It shows the shop's plan and every plan Khayt Cloud offers: price (VAT included), vault size, share links, selling and team size. All of it is read from the cloud's catalogue, so the Mac holds no price list of its own. The owner can change plans. Moving up is free during the beta, and before anything changes the app says what the published terms say: when the beta ends there are 30 days to start paying, or the shop moves back to Free, and nothing is deleted. Moving down says what stops over the new limits. A move that loses selling also says products leave makerrun.com, while sales already released still deliver and paid buyers keep their links. A manager sees the plan but can't change it. While the cloud has upgrades closed, the buttons stay off and the pane says "Upgrades open soon".
 
-- **Desktop: choose your Khayt Cloud plan in Settings.**
-  - Settings → Online → Khayt Cloud now lists the plans from the cloud server, with their real prices in SAR and what each includes.
-  - The shop owner can move to another plan, and upgrading is free during the beta. Before the switch, a warning says that when the beta ends you have 30 days to start paying, or the shop moves back to Free. Nothing is deleted, and the vault becomes read-only beyond Free's limits.
-  - Nothing is charged.
-  - Until the server opens upgrades, the button reads "Opens soon".
-  - Going back to Free is always possible. A team member sees the plans but can't change them.
-- **Desktop: a library kept in the Khayt Vault stays there.** When the Mac keeps the library's online copy in the Khayt Vault, the desktop's object storage and Google Drive switches are turned off, with a line saying the library is in the Khayt Vault and that only the Mac app can change that. The desktop also stops copying new files to a bucket or Drive beside the vault, so the library can't split between the two. Files that were already in a bucket or on Drive still come back as before.
-- **Desktop: campaigns through your WhatsApp Business account send an approved template.**
-  - Before, a campaign sent free text, and Meta refuses free text to anyone who hasn't messaged you in the last 24 hours. So it failed for nearly every customer.
-  - Choose WhatsApp Business (approved template) and enter the template's name and language. Then write one value per line: line 1 fills {{1}}, line 2 fills {{2}}. Merge fields such as {{name}} work on every line.
-  - It goes only to customers marked "Agreed to offers on WhatsApp", a new checkbox on the customer with the date it was given and how. Agreeing to order updates on WhatsApp is not agreeing to offers, so those customers aren't included. Customers excluded from marketing are still skipped.
-  - If sends fail, the result names Meta's most common reason, such as a template that doesn't exist or a token that was refused.
-  - With WhatsApp Business chosen in Settings, Send test now checks the account and shows its number and business name. Nothing is sent.
-- **Desktop: a library file the Mac moved to the Khayt Vault says so.** Bringing it back used to ask your bucket and fail with a missing-file error. It now says the file is in the Khayt Vault, which only the Mac app opens.
-- **Khayt Cloud plans: Free, Maker, Creator and Studio.** They replace Cloud and Branches. Maker is 25 SAR ($7) a month, Creator 65 SAR ($18) and Studio 180 SAR ($48), VAT included; a year costs ten months. Every paid plan is still free during the beta. Branches is gone, and so are the history and device lines, because Khayt Cloud keeps the last 20 snapshots for every shop and limits no devices. The prices and wording match khaytapp.com and Khayt Cloud's own plan list.
-
 - **Mac: selling vault files on makerrun.com (built, hidden until Khayt Cloud switches the vault and selling on).**
   - With the library in the Khayt Vault, the library strip gains Products, and a model's menu gains Sell as a Product.
   - A product is its listing:
@@ -6416,6 +6400,35 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   saw the second hop. Redirects are now refused outright rather than followed
   and questioned afterwards, which is what the Windows and Linux app has always
   done. A camera that redirects now reads as a camera that refused.
+
+## [3.11.28] - 2026-10-24
+
+### Before you update
+
+- **WhatsApp Business campaigns now send a template Meta has approved, and only to customers who agreed to offers on WhatsApp.** A campaign through your own WhatsApp Business account used to send the text you typed, which Meta refuses for anyone who hasn't written to you in the last 24 hours, so it reached almost nobody. Now you enter the name and language of a template you've had approved, and the campaign goes only to customers ticked "Agreed to offers on WhatsApp" on their customer record. Until you tick it for someone, a WhatsApp Business campaign doesn't reach them. Email, SMS, Twilio and Unifonic campaigns haven't changed.
+
+### Changed
+
+WhatsApp Business campaigns send an approved template to customers who agreed to offers, since 3.11.27.
+Individual entries are kept below; this is what changed for you.
+
+You can also choose your Khayt Cloud plan in Settings (free during the beta, and nothing is charged), and a library the Mac keeps in the Khayt Vault stays there.
+
+- **Desktop: choose your Khayt Cloud plan in Settings.**
+  - Settings → Online → Khayt Cloud now lists the plans from the cloud server, with their real prices in SAR and what each includes.
+  - The shop owner can move to another plan, and upgrading is free during the beta. Before the switch, a warning says that when the beta ends you have 30 days to start paying, or the shop moves back to Free. Nothing is deleted, and the vault becomes read-only beyond Free's limits.
+  - Nothing is charged.
+  - Until the server opens upgrades, the button reads "Opens soon".
+  - Going back to Free is always possible. A team member sees the plans but can't change them.
+- **Desktop: a library kept in the Khayt Vault stays there.** When the Mac keeps the library's online copy in the Khayt Vault, the desktop's object storage and Google Drive switches are turned off, with a line saying the library is in the Khayt Vault and that only the Mac app can change that. The desktop also stops copying new files to a bucket or Drive beside the vault, so the library can't split between the two. Files that were already in a bucket or on Drive still come back as before.
+- **Desktop: campaigns through your WhatsApp Business account send an approved template.**
+  - Before, a campaign sent free text, and Meta refuses free text to anyone who hasn't messaged you in the last 24 hours. So it failed for nearly every customer.
+  - Choose WhatsApp Business (approved template) and enter the template's name and language. Then write one value per line: line 1 fills {{1}}, line 2 fills {{2}}. Merge fields such as {{name}} work on every line.
+  - It goes only to customers marked "Agreed to offers on WhatsApp", a new checkbox on the customer with the date it was given and how. Agreeing to order updates on WhatsApp is not agreeing to offers, so those customers aren't included. Customers excluded from marketing are still skipped.
+  - If sends fail, the result names Meta's most common reason, such as a template that doesn't exist or a token that was refused.
+  - With WhatsApp Business chosen in Settings, Send test now checks the account and shows its number and business name. Nothing is sent.
+- **Desktop: a library file the Mac moved to the Khayt Vault says so.** Bringing it back used to ask your bucket and fail with a missing-file error. It now says the file is in the Khayt Vault, which only the Mac app opens.
+- **Khayt Cloud plans: Free, Maker, Creator and Studio.** They replace Cloud and Branches. Maker is 25 SAR ($7) a month, Creator 65 SAR ($18) and Studio 180 SAR ($48), VAT included; a year costs ten months. Every paid plan is still free during the beta. Branches is gone, and so are the history and device lines, because Khayt Cloud keeps the last 20 snapshots for every shop and limits no devices. The prices and wording match khaytapp.com and Khayt Cloud's own plan list.
 
 ## [3.11.27] - 2026-10-23
 
