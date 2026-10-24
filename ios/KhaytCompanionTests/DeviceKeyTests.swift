@@ -126,7 +126,7 @@ final class DeviceKeyTests: XCTestCase {
 
     func testThePhoneEnrolsOnceThenSignsInsteadOfSendingThePin() async throws {
         let s = pairedSettings()
-        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
         XCTAssertTrue(api.wantsEnrolment())
         let result = await api.enrolDevice(name: "Test iPhone")
         XCTAssertEqual(result, .enrolled)
@@ -144,7 +144,7 @@ final class DeviceKeyTests: XCTestCase {
 
     func testAMacWithNoPairingWindowIsNotAskedAgainWithinTheHourAndKeepsNothing() async throws {
         let s = pairedSettings()
-        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
         StubMac.pairingClosed = true
         let now = Date()
         let result = await api.enrolDevice(name: "Test iPhone", now: now)
@@ -163,7 +163,7 @@ final class DeviceKeyTests: XCTestCase {
 
     func testAPhoneLockedOutOfTheWindowWaitsForTheNextOne() async throws {
         let s = pairedSettings()
-        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
         StubMac.pairingLocked = true
         let now = Date()
         let result = await api.enrolDevice(name: "Test iPhone", now: now)
@@ -178,7 +178,7 @@ final class DeviceKeyTests: XCTestCase {
 
     func testAMacThatForgotThePhoneGetsThePinAndAFreshEnrolment() async throws {
         let s = pairedSettings()
-        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
         _ = await api.enrolDevice(name: "Test iPhone")
         StubMac.knowsDevice = false
         let fetched = await api.fetchIdentityKey()
@@ -190,7 +190,7 @@ final class DeviceKeyTests: XCTestCase {
 
     func testAPhoneSignedOutOnTheMacForgetsThePinAndDoesNotComeBackByItself() async throws {
         let s = pairedSettings()
-        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
         _ = await api.enrolDevice(name: "Test iPhone")
         StubMac.revoked = true
         let before = StubMac.seen.count
@@ -211,7 +211,7 @@ final class DeviceKeyTests: XCTestCase {
 
     func testAMacWithAnotherClockIsBelievedOnce() async throws {
         let s = pairedSettings()
-        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
         _ = await api.enrolDevice(name: "Test iPhone")
         StubMac.clockAhead = 600
         let fetched = await api.fetchIdentityKey()
@@ -223,7 +223,7 @@ final class DeviceKeyTests: XCTestCase {
 
     func testAComputerWithoutTheRouteKeepsThePinAndIsAskedADayLater() async {
         let s = pairedSettings()
-        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
         StubMac.hasRoute = false
         let now = Date()
         let result = await api.enrolDevice(name: "Test iPhone", now: now)
@@ -238,7 +238,7 @@ final class DeviceKeyTests: XCTestCase {
 
     func testANewPinOrIdentityDropsTheEnrolment() async {
         let s = pairedSettings()
-        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self])
+        let api = KhaytAPIClient(settings: s, protocols: [StubMac.self], withBook: false)
         _ = await api.enrolDevice(name: "Test iPhone")
         XCTAssertNotNil(s.device)
         s.macIdentityKey = Curve25519.Signing.PrivateKey().publicKey.rawRepresentation.base64EncodedString()

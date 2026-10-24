@@ -98,7 +98,9 @@ final class KhaytAPIClient: ObservableObject {
     }
 
     /// `protocols` is for tests: URL protocols that answer in place of the Mac.
-    init(settings: ConnectionSettings, protocols: [AnyClass] = []) {
+    /// `withBook: false` is for tests too: a client that holds no book always
+    /// asks the Mac, whatever the simulator's shared container holds.
+    init(settings: ConnectionSettings, protocols: [AnyClass] = [], withBook: Bool = true) {
         self.settings = settings
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
@@ -107,7 +109,7 @@ final class KhaytAPIClient: ObservableObject {
         // Every request to the Mac carries the PIN or this phone's signature,
         // so none may follow a redirect to another host — see `NoRedirects`.
         self.session = URLSession(configuration: config, delegate: NoRedirects(), delegateQueue: nil)
-        let opened = try? CompanionBook.inSharedContainer()
+        let opened = withBook ? try? CompanionBook.inSharedContainer() : nil
         self.book = opened
         self.reader = opened.map(BookReader.init(book:))
     }
@@ -936,6 +938,15 @@ final class KhaytAPIClient: ObservableObject {
     func fetchCatalogue() async throws -> CataloguePage {
         guard let reader, holdsBook else { throw KhaytAPIError.server(L10n.tr("catalogue.no_book")) }
         return try await reader.catalogue(language: L10n.usesArabicLayout ? "ar" : "en")
+    }
+
+    // MARK: - Invoices
+
+    /// A job's invoice, built from the book this phone keeps — or why not.
+    func invoice(orderId: String) async -> InvoiceBuild {
+        guard let reader, holdsBook else { return .refused(.missing) }
+        return (try? await reader.invoice(orderId: orderId, language: L10n.usesArabicLayout ? "ar" : "en"))
+            ?? .refused(.failed)
     }
 
     // MARK: - The shop's library
