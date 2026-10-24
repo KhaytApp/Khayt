@@ -387,6 +387,12 @@ private struct LibraryViewCommands: View {
         Button(Words.upfront("mac.lg_default_size")) { display.resetSize() }
             .keyboardShortcut("0", modifiers: [.command, .option])
             .disabled(!shop.showingLibrary || display.layout != .grid || display.tileSize == .medium)
+        Divider()
+        // LIBRARY HEALTH: what is wrong with the library, and the fixes
+        // (`LibraryHealthView`). From any screen — it opens the library.
+        // No shortcut: it is looked at now and then, not every day.
+        Button(Words.upfront("mac.lh_title")) { shop.openLibraryHealth() }
+            .disabled(shop.files.isEmpty)
     }
 }
 
@@ -701,6 +707,13 @@ private struct ModelMenu: View {
         // File ▸ Duplicate has it now.
         Button(Words.upfront("mac.favourite")) { shop.toggleFavouriteOnSelection() }
             .keyboardShortcut("d", modifiers: [.command, .shift])
+            .disabled(!canEdit)
+        // ⌘B — "bookmark", the badge it puts on the tile. Free across the
+        // whole app (checked against every `keyboardShortcut`, not guessed:
+        // SwiftUI drops a clashing one silently). Toggles, for the reason
+        // Favourite above does: a menu title cannot change.
+        Button(Words.upfront("mac.print_next")) { shop.togglePrintNextOnSelection() }
+            .keyboardShortcut("b")
             .disabled(!canEdit)
         // The inspector's title field, opened on the one selected model.
         Button(Words.upfront("mac.rename_model") + "\u{2026}") {

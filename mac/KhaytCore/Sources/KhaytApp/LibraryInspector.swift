@@ -158,9 +158,11 @@ struct LibraryInspector: View {
         return !shop.guides(for: file).isEmpty
     }
 
-    /// The file, reachable — Finder, the system's opener, the Print next list.
-    /// The buttons that DECIDE something (quote, job, catalogue) are on the
-    /// summary card; these are about the file itself.
+    /// The file, reachable — Finder and the system's opener. The buttons that
+    /// DECIDE something (quote, job, catalogue, Print next) are on the
+    /// summary card; these are about the file itself. Print next was here
+    /// too, as "Add to Print next", and moved up to the card: one mark, one
+    /// place on the page.
     @ViewBuilder private func fileButtons(_ file: LibraryFile) -> some View {
         let url = shop.modelFile(for: file)
         FlowLayout(spacing: 8) {
@@ -171,10 +173,6 @@ struct LibraryInspector: View {
                 Button { FileActions.open(url) } label: {
                     Label(shop.words.callIt("mac.open"), systemImage: "arrow.up.forward.app")
                 }
-            }
-            Button { shop.setPrintNext([file.id], on: !file.isPrintNext) } label: {
-                Label(shop.words.callIt(file.isPrintNext ? "mac.print_next_remove" : "mac.print_next_add"),
-                      systemImage: file.isPrintNext ? "bookmark.fill" : "bookmark")
             }
         }
         .controlSize(.small)
@@ -615,6 +613,7 @@ struct ModelSummaryCard: View {
             whereItPrints
             availability
             actions
+            PrintNextRow(shop: shop, file: file)
         }
     }
 
@@ -1334,5 +1333,56 @@ private struct StorageSection: View {
         } message: {
             Text(shop.words.callIt("mac.storage_free_in_use"))
         }
+    }
+}
+
+/// ── PRINT NEXT, ON THE CARD ──────────────────────────────────────────────
+///
+/// The mark that says "I mean to print this" — Printventory's Want, which is
+/// the one state of theirs Khayt did not already know (a job is Queued and
+/// Printing, `timesPrinted` is Printed). Toggled here, from the right-click
+/// menu, the multi-select pane and Model ▸ Print Next (⌘B); a note says who
+/// or what it is for. Starting a JOB from the model takes it off the list
+/// (`Shop.clearPrintNext`); a quote leaves it.
+struct PrintNextRow: View {
+    let shop: Shop
+    let file: LibraryFile
+    @State private var typed = ""
+    @FocusState private var editing: Bool
+
+    private var w: Words { shop.words }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button { shop.setPrintNext([file.id], on: !file.isPrintNext) } label: {
+                Label(w.callIt(file.isPrintNext ? "mac.print_next_remove" : "mac.print_next_add"),
+                      systemImage: file.isPrintNext ? "bookmark.fill" : "bookmark")
+            }
+            .controlSize(.small)
+            .disabled(!shop.canWrite)
+            .help(w.callIt("mac.print_next_help"))
+            if file.isPrintNext {
+                HStack(spacing: 6) {
+                    Text(w.callIt("mac.print_next_for")).font(.caption).foregroundStyle(.secondary)
+                    TextField(w.callIt("mac.print_next_for_hint"), text: $typed)
+                        .textFieldStyle(.roundedBorder)
+                        .controlSize(.small)
+                        .focused($editing)
+                        .onSubmit(save)
+                        .disabled(!shop.canWrite)
+                }
+            }
+        }
+        .onAppear { typed = file.printNextFor ?? "" }
+        .onChange(of: file.id) { _, _ in typed = file.printNextFor ?? "" }
+        .onChange(of: file.printNextFor) { _, now in if !editing { typed = now ?? "" } }
+        // Kept when the field is left as well as on Return.
+        .onChange(of: editing) { _, now in if !now { save() } }
+    }
+
+    private func save() {
+        let now = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard now != (file.printNextFor ?? "").trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+        shop.setPrintNextNote(file.id, now)
     }
 }

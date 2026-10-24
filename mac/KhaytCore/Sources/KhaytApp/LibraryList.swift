@@ -173,6 +173,10 @@ struct LibraryList: View {
                     if row.file?.isFavourite == true {
                         Image(systemName: "star.fill").font(.caption2).foregroundStyle(Khayt.marked)
                     }
+                    if let file = row.file, file.isPrintNext {
+                        Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(Khayt.brand)
+                            .help(Cell.printNextSaid(file, words: shop.words))
+                    }
                     Text(row.name).lineLimit(1).truncationMode(.middle)
                 }
                 .help(row.name)

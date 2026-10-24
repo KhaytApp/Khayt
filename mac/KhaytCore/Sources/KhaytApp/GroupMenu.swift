@@ -250,6 +250,14 @@ struct ManyModels: View {
                         Label(w.callIt("mac.li_catalogue_each"), systemImage: "tag.circle")
                     }
                     .disabled(!shop.canWrite)
+                    // On or off Print next, all of them — off only when
+                    // every one is on already (as ⌘B and the right-click menu).
+                    let allOn = chosen.allSatisfy(\.isPrintNext)
+                    Button { shop.setPrintNext(Set(chosen.map(\.id)), on: !allOn) } label: {
+                        Label(w.callIt(allOn ? "mac.print_next_remove" : "mac.print_next_add"),
+                              systemImage: allOn ? "bookmark.fill" : "bookmark")
+                    }
+                    .disabled(!shop.canWrite)
                 }
                 group(w.callIt("mac.li_group_organise")) {
                     Button { typedTag = ""; tagging = true } label: {

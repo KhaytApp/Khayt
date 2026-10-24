@@ -83,8 +83,15 @@ extension Shop {
     ///
     /// Everything that is the same for every model (the ready set, the
     /// catalogue's files, today) is worked out once here, not per model.
+    ///
+    /// `focus` is a Library Health group put on the grid by its Show button
+    /// (`libraryHealthFocus`): ids, not a query, so it is never saved with a
+    /// search and never narrows a smart folder's count — only the grid and
+    /// the chips, which pass it. Never skipped: it is the frame the chips
+    /// count inside.
     func libraryMatcher(_ q: LibraryQuery, group: String?,
-                        skipping axis: LibraryAxis? = nil) -> (LibraryFile) -> Bool {
+                        skipping axis: LibraryAxis? = nil,
+                        focus: Set<String>? = nil) -> (LibraryFile) -> Bool {
         let ready: Set<String>? = {
             guard axis != .ready else { return nil }
             if let machine = q.readyOn { return readyByMachine[machine] ?? [] }
@@ -111,6 +118,7 @@ extension Shop {
             // ONLY those, so a shop looking for something to restore is not
             // looking through everything else.
             if axis != .archived, f.isArchived != q.archived { return false }
+            if let focus, !focus.contains(f.id) { return false }
             if let group, !Self.isUnder(f.groupName, group) { return false }
             if axis != .unfiled, q.unfiled, !(f.groupName ?? "").isEmpty { return false }
             if axis != .neverPrinted, q.neverPrinted, f.printCount != 0 { return false }

@@ -81,6 +81,9 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// When the shop put this model on its Print next list; absent when it is
     /// not on it. A date rather than a flag, so the list reads oldest first.
     let printNextAt: String?
+    /// Who or what it is on the list for — "Noura's order", "the stand at the
+    /// fair". Optional, the shop's own words, and taken off with the mark.
+    let printNextFor: String?
     /// For a LINKED model — indexed where it sits, never copied — the file's
     /// own path. Absent for a model that lives in the vault.
     let externalPath: String?
@@ -160,6 +163,12 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     var title: String { name.isEmpty ? (originalName ?? id) : name }
     var isFavourite: Bool { favorite == true }
     var isPrintNext: Bool { !(printNextAt ?? "").isEmpty }
+    /// The note, while the model is on the list; nil otherwise.
+    var printNextNote: String? {
+        guard isPrintNext else { return nil }
+        let note = (printNextFor ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return note.isEmpty ? nil : note
+    }
 
     /// Who made it, as the library groups by: the designer the file or the
     /// shop named, or — for a link — the site it came from. Nil when unsaid.

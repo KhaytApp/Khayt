@@ -672,6 +672,10 @@ extension Shop {
                 // Newest first, the way every screen reads the book.
                 root["printLog"] = .array([out.order] + orders)
                 root["settings"] = .object(out.settings)
+                // A model on Print next that this JOB prints comes off the
+                // list in this same write — never asked, never for a quote
+                // (`clearPrintNext`).
+                Self.clearPrintNext(&root, forJob: record)
                 Self.appendActivity(&root,
                                     text: "\(id)" + (record["project"].flatMap(Self.plainString).map { $0.isEmpty ? "" : " · \($0)" } ?? ""),
                                     ref: id, settings: out.settings, root: root,

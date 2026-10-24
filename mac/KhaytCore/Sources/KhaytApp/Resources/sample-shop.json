@@ -3750,6 +3750,8 @@
   },
   {
    "id": "PF-sample-lantern",
+   "printNextAt": "2026-09-18T09:00:00.000Z",
+   "printNextFor": "The Ramadan stall",
    "name": "Ramadan lantern",
    "originalName": "ramadan-lantern.3mf",
    "updatedAt": "2026-08-22T14:00:00.000Z",
@@ -4099,6 +4101,7 @@
   },
   {
    "id": "PF-sample-gripper",
+   "printNextAt": "2026-09-19T15:30:00.000Z",
    "name": "Robot gripper fingers",
    "originalName": "gripper-fingers.3mf",
    "updatedAt": "2026-08-22T14:00:00.000Z",
