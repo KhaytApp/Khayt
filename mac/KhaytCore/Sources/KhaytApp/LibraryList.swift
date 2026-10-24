@@ -212,10 +212,9 @@ struct LibraryList: View {
                 }
                 .width(min: 36, ideal: 44)
                 TableColumn(shop.words.callIt("mac.last_run"), value: \LibraryRow.last) { row in
-                    figure(row.last < 0 ? "" : shop.words.say(Date(timeIntervalSince1970: row.last),
-                                                              .dateTime.day().month(.abbreviated).year()))
+                    figure(row.last < 0 ? "" : Self.day(Date(timeIntervalSince1970: row.last), words: shop.words))
                 }
-                .width(min: 64, ideal: 80)
+                .width(min: 72, ideal: 88)
                 TableColumn(shop.words.callIt("mac.lg_col_storage")) { row in
                     storage(row)
                 }
@@ -266,6 +265,15 @@ struct LibraryList: View {
         guard let first = order.first, let sort = Self.sort(for: order),
               first.order != Self.natural(sort) else { return rows }
         return rows.reversed()
+    }
+
+    /// A last-printed date as short as it can be read: "Sep 15" this year,
+    /// "Sep 15, 2025" before it — the year said only when it is news. In the
+    /// book's calendar, like every date a person reads in this app.
+    static func day(_ date: Date, now: Date = Date(), words: Words) -> String {
+        let sameYear = Calendar.book.component(.year, from: date) == Calendar.book.component(.year, from: now)
+        return sameYear ? words.say(date, .dateTime.day().month(.abbreviated))
+                        : words.say(date, .dateTime.day().month(.abbreviated).year())
     }
 
     // MARK: Columns ↔ the library's order

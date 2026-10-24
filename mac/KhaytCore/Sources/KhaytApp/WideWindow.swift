@@ -58,6 +58,18 @@ enum Wide {
               count: columns(across: available, tile: tile))
     }
 
+    /// The library's grid: as many columns of at least `minimum` as fit, and
+    /// the tile WIDENED to share out the rest, so the last column ends at the
+    /// edge rather than leaving a band of nothing before the inspector.
+    ///
+    /// The library alone, because it has three densities: a fixed tile at the
+    /// Small step left up to a whole column of empty space at most widths.
+    static func fill(across available: CGFloat, minimum: CGFloat) -> (columns: Int, tile: CGFloat) {
+        let n = max(1, Int(((available + tileGap) / (minimum + tileGap)).rounded(.down)))
+        let tile = ((available - tileGap * CGFloat(n - 1)) / CGFloat(n)).rounded(.down)
+        return (n, max(minimum, tile))
+    }
+
     // MARK: Sentences
 
     /// Explanatory copy stops growing at 68 characters.

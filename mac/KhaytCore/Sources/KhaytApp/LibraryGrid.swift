@@ -61,14 +61,18 @@ struct LibraryGrid: View {
             // Fixed columns rather than `.adaptive`, because the arrow keys have
             // to know how many there are: moving down is moving forward by one
             // row, and `.adaptive` decides the count privately.
-            // §10: columns = floor(available ÷ 165). Tiles multiply; a tile
-            // never inflates, because a 300-point thumbnail is not a better
-            // thumbnail — it is the same picture with the row half as useful.
-            let tile = display.tileSize.points
-            let count = Wide.columns(across: geometry.size.width - Metric.screen * 2, tile: tile)
+            // Tiles multiply: as many columns of the density's minimum as fit,
+            // each widened by its share of what is left (`Wide.fill`), so no
+            // dead band sits beside the last column at any density.
+            let fill = Wide.fill(across: geometry.size.width - Metric.screen * 2,
+                                 minimum: display.tileSize.points)
+            let tile = fill.tile
+            let count = fill.columns
+            let pixels = LibraryTileSize.pixels(width: tile, scale: scale)
             ScrollViewReader { scroller in
                 ScrollView {
-                    LazyVGrid(columns: Wide.grid(across: geometry.size.width - Metric.screen * 2, tile: tile),
+                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: Wide.tileGap,
+                                                                 alignment: .topLeading), count: count),
                               alignment: .leading,
                               spacing: Wide.tileGap) {
                         ForEach(shop.shownEntries) { entry in
@@ -83,7 +87,7 @@ struct LibraryGrid: View {
                                            parent: FolderCell.parent(of: path, open: shop.shelf),
                                            selected: shop.groupSelection.contains(path),
                                            size: display.tileSize,
-                                           pixels: display.tileSize.pixels(scale: scale))
+                                           pixels: pixels)
                                     .id(entry.id)
                                     // A folder OPENS. The shelf already filters
                                     // by group, so entering one is setting it —
@@ -128,7 +132,7 @@ struct LibraryGrid: View {
                                         }
                                     }
                             case .file(let file):
-                                cell(for: file).id(file.id)
+                                cell(for: file, pixels: pixels).id(file.id)
                             }
                         }
                     }
@@ -243,7 +247,7 @@ struct LibraryGrid: View {
 
     /// Broken out of the grid body: the type-checker gave up on the whole
     /// expression once the modifiers went on.
-    @ViewBuilder private func cell(for file: LibraryFile) -> some View {
+    @ViewBuilder private func cell(for file: LibraryFile, pixels: Int) -> some View {
         // ONCE per cell: the tile and its right-click preview drew the same
         // picture from two separate asks.
         let thumbnail = shop.thumbnail(for: file)
@@ -257,7 +261,7 @@ struct LibraryGrid: View {
              kept: shop.isKeptOnThisMac(file),
              facts: shop.libraryFactsLine(file),
              size: display.tileSize,
-             pixels: display.tileSize.pixels(scale: scale))
+             pixels: pixels)
             .onTapGesture {
                 // SwiftUI's tap gesture does not report modifiers, so they are
                 // read from the event that is arriving. Without this, ⌘-click
@@ -465,7 +469,7 @@ struct FolderCell: View {
                 Text(Self.caption(kind: kind, count: count, words: words))
                     .font(.caption2)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Cell.secondaryInk(selected: selected))
                     .lineLimit(1)
             }
             .padding(.top, 6)
@@ -617,6 +621,18 @@ struct Cell: View {
     /// What the picture is decoded to (`LibraryTileSize.pixels`).
     var pixels: Int = ThumbnailStore.maxPixels
 
+    /// ── ON A CHOSEN TILE, NOTHING IN THE BRAND'S BLUE ────────────────────
+    ///
+    /// The folder link was drawn in `Khayt.brand` on the accent-blue
+    /// selection, so a chosen King read its group as a smudge. On a chosen
+    /// tile the link is white and the facts a slightly dimmer white, in both
+    /// appearances — the selection fill is the accent colour either way.
+    static func groupInk(selected: Bool) -> Color { selected ? .white : Khayt.brand }
+
+    static func secondaryInk(selected: Bool) -> AnyShapeStyle {
+        selected ? AnyShapeStyle(Color.white.opacity(0.85)) : AnyShapeStyle(.secondary)
+    }
+
     /// The extensions a shop prints from every day. Their badge said
     /// nothing a shop did not already assume, on every tile, so only the
     /// others — the `.step` a customer sent, an `.obj`, a `.gcode` — wear one.
@@ -726,7 +742,8 @@ struct Cell: View {
                     let line = facts.isEmpty ? subtitle : shown
                     if group == nil || size.isCompact || !line.isEmpty {
                         Text(((group == nil || size.isCompact || !facts.isEmpty) ? "" : "\u{00B7} ") + line)
-                            .foregroundStyle(facts.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary.opacity(0.78)))
+                            .foregroundStyle(selected ? Self.secondaryInk(selected: true)
+                                             : facts.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary.opacity(0.78)))
                             .layoutPriority(facts.isEmpty ? 0 : 1)
                             .help(facts.isEmpty ? line : facts)
                     }
@@ -756,7 +773,7 @@ struct Cell: View {
                 Image(systemName: "folder.fill")
                 if named { Text(leaf).truncationMode(.tail) }
             }
-            .foregroundStyle(Khayt.brand)
+            .foregroundStyle(Self.groupInk(selected: selected))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

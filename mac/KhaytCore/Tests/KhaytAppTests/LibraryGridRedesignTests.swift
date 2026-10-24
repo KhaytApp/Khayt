@@ -27,14 +27,13 @@ struct LibraryGridRedesignTests {
     func tileSteps() {
         let display = LibraryDisplay(defaults: Self.defaults())
         #expect(display.tileSize == .medium, "a new Mac opens on the size it always had")
-        #expect(LibraryTileSize.medium.points == Wide.tile)
         #expect(display.larger() && display.tileSize == .large)
         #expect(!display.larger() && display.tileSize == .large)
         #expect(display.smaller() && display.smaller() && display.tileSize == .small)
         #expect(!display.smaller() && display.tileSize == .small)
         display.resetSize()
         #expect(display.tileSize == .medium)
-        #expect(LibraryTileSize.allCases.map(\.points) == [112, 152, 220])
+        #expect(LibraryTileSize.allCases.map(\.points) == [94, 140, 200])
     }
 
     @Test("tile size and grid-or-list survive a relaunch, per Mac")
@@ -53,11 +52,61 @@ struct LibraryGridRedesignTests {
 
     @Test("a thumbnail is decoded at twice the tile, not 640 for every size")
     func decodeSize() {
-        #expect(LibraryTileSize.small.pixels(scale: 2) == 200)
-        #expect(LibraryTileSize.large.pixels(scale: 2) == 416)
+        #expect(LibraryTileSize.pixels(width: 112, scale: 2) == 200)
+        #expect(LibraryTileSize.pixels(width: 220, scale: 3) == 416, "decoded past 2×")
         #expect(ThumbnailStore.bucket(200) == 256)
         #expect(ThumbnailStore.bucket(9_000) == ThumbnailStore.maxPixels)
         #expect(Wide.columns(across: 800, tile: 112) > Wide.columns(across: 800, tile: 220))
+    }
+
+    @Test("the grid fills its width: no dead band, Small is eight across a 1320-point window")
+    func fillsWidth() {
+        // 1320 − sidebar − inspector − the grid's padding, as the shots measure it.
+        for available: CGFloat in [600, 852, 860, 1000, 1400] {
+            for size in LibraryTileSize.allCases {
+                let fill = Wide.fill(across: available, minimum: size.points)
+                let used = fill.tile * CGFloat(fill.columns) + Wide.tileGap * CGFloat(fill.columns - 1)
+                #expect(used <= available + 0.5, "\(size) at \(available) overflows")
+                #expect(available - used < CGFloat(fill.columns) + 1, "\(size) at \(available) leaves \(available - used)pt")
+                #expect(fill.tile >= size.points)
+            }
+        }
+        #expect(Wide.fill(across: 852, minimum: LibraryTileSize.small.points).columns >= 8)
+        #expect(Wide.fill(across: 10, minimum: 94).columns == 1)
+    }
+
+    @Test("a last-printed date says its year only when it is not this year")
+    func listDates() throws {
+        let words = Words()
+        let now = try #require(Calendar.book.date(from: DateComponents(year: 2026, month: 10, day: 24)))
+        let thisYear = try #require(Calendar.book.date(from: DateComponents(year: 2026, month: 9, day: 15)))
+        let lastYear = try #require(Calendar.book.date(from: DateComponents(year: 2025, month: 9, day: 15)))
+        let short = LibraryList.day(thisYear, now: now, words: words)
+        let long = LibraryList.day(lastYear, now: now, words: words)
+        #expect(!short.contains("2026") && short.contains("15"), "\(short)")
+        #expect(long.contains("2025"), "\(long)")
+    }
+
+    @Test("no estimate on a tile when the mesh fits no printer the shop has")
+    func estimateNeedsAPrinter() throws {
+        let estimate = try JSONDecoder().decode(KhaytEngine.MeshEstimate.self, from: Data(
+            #"{"grams":2100,"hours":59.9,"shellUnreliable":false}"#.utf8))
+        func fit(_ verdict: String, _ checked: Int) throws -> KhaytEngine.Fit {
+            try JSONDecoder().decode(KhaytEngine.Fit.self, from: Data(#"{"verdict":"\#(verdict)","checked":\#(checked)}"#.utf8))
+        }
+        #expect(LibraryFacts.usable(estimate, fit: try fit("none", 3)) == nil)
+        #expect(LibraryFacts.usable(estimate, fit: try fit("fits", 3)) != nil)
+        #expect(LibraryFacts.usable(estimate, fit: try fit("none", 0)) != nil, "no bed known is not a refusal")
+        #expect(LibraryFacts.usable(estimate, fit: nil) != nil)
+    }
+
+    @Test("a chosen tile draws its folder link and facts in white, not brand blue on accent blue")
+    func selectedInk() throws {
+        #expect(Cell.groupInk(selected: true) == .white)
+        #expect(Cell.groupInk(selected: false) == Khayt.brand)
+        let grid = try QuoteSheetStatusTests.source("LibraryGrid.swift")
+        #expect(grid.contains(".foregroundStyle(Self.groupInk(selected: selected))"))
+        #expect(grid.contains(".foregroundStyle(Cell.secondaryInk(selected: selected))"), "a chosen group tile's caption")
     }
 
     @Test("Small hides the format badge, and STL/3MF never wear one")
@@ -169,6 +218,9 @@ struct LibraryGridRedesignTests {
         #expect(bar.contains(".disabled(true)"))
         #expect(bar.contains("LibraryViewControls(shop: shop)"), "sort, view and size left the row")
         #expect(LibraryFilterBar.axes.count == 5)
+        #expect(bar.contains("ViewThatFits(in: .horizontal)") && bar.contains("more(all,"),
+                "axes that do not fit are cut instead of folded into More")
+        #expect(!bar.contains("ScrollView(.horizontal"), "the row scrolls a chip half out of sight again")
         for key in ["mac.lg_filter_empty", "mac.lg_view_grid", "mac.lg_view_list", "mac.lg_tile_size"] {
             #expect(Words.own[key]?["en"]?.isEmpty == false && Words.own[key]?["ar"]?.isEmpty == false, "\(key)")
         }

@@ -2961,7 +2961,10 @@ final class Shop {
     /// Which machine each model fits, keyed by the model's id. Worked out once
     /// when the book loads rather than per row: a grid of four hundred models
     /// asking the runtime on every redraw is four hundred context hops.
-    internal(set) var fits: [String: KhaytEngine.Fit] = [:]
+    internal(set) var fits: [String: KhaytEngine.Fit] = [:] {
+        // A model no printer can hold shows no estimate on its tile.
+        didSet { libraryDerivedRevision &+= 1 }
+    }
     /// The cards the shop has issued, and what each one is today.
     private(set) var giftCards: [GiftCard] = []
     private(set) var giftCardRows: [JSONValue] = []

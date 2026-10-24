@@ -59,13 +59,16 @@ enum LibraryTileSize: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    /// The tile's width in points. Medium is §10's `Wide.tile`, so the grid a
-    /// shop has always had is the middle step.
+    /// The NARROWEST a tile may be, in points. The grid fits as many columns
+    /// of at least this as the width allows and then shares out what is left
+    /// (`Wide.fill`), so there is never a dead band beside the last column.
+    /// Small is a contact sheet — eight across a 1320-point window with the
+    /// inspector open; Medium is about §10's tile; Large about twice Small.
     var points: CGFloat {
         switch self {
-        case .small: 112
-        case .medium: Wide.tile
-        case .large: 220
+        case .small: 94
+        case .medium: 140
+        case .large: 200
         }
     }
 
@@ -105,11 +108,11 @@ enum LibraryTileSize: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// The longest side a thumbnail is decoded to for this tile: twice the
-    /// picture's width in points (a Retina screen), and no more. A 112-point
-    /// tile was decoded to 640 pixels like every other.
-    func pixels(scale: CGFloat) -> Int {
-        Int(((points - 12) * max(1, min(scale, 2))).rounded(.up))
+    /// The longest side a thumbnail is decoded to for a tile `width` wide:
+    /// twice the picture's width in points (a Retina screen), and no more. A
+    /// small tile was decoded to 640 pixels like every other.
+    static func pixels(width: CGFloat, scale: CGFloat) -> Int {
+        Int(((width - 12) * max(1, min(scale, 2))).rounded(.up))
     }
 }
 
@@ -147,6 +150,16 @@ struct LibraryFacts: Equatable, Sendable {
     var price: Double?
 
     var isEmpty: Bool { minutes == nil && grams == nil && price == nil }
+
+    /// The mesh estimate, unless the mesh is bigger than every printer the
+    /// shop has a bed for. A model that fits no machine is either measured
+    /// at the wrong scale or not printable as it is, and either way "≈59h ·
+    /// ≈2.1 kg" on its tile is a confident number about a print that will not
+    /// happen. Nothing known about the beds (`checked == 0`) is not a refusal.
+    static func usable(_ estimate: KhaytEngine.MeshEstimate?, fit: KhaytEngine.Fit?) -> KhaytEngine.MeshEstimate? {
+        if let fit, fit.checked > 0, fit.verdict == "none" { return nil }
+        return estimate
+    }
 
     /// From the file alone: what its slicer recorded. No estimate, no price.
     static func sliced(_ file: LibraryFile) -> LibraryFacts {
@@ -251,7 +264,7 @@ extension Shop {
         let memo = libraryMemo
         refreshFactsMemo()
         if let known = memo.facts[file.id] { return known }
-        let e = estimates[file.id]
+        let e = LibraryFacts.usable(estimates[file.id], fit: fits[file.id])
         let made = LibraryFacts.of(file, estimate: e.map { ($0.grams, $0.hours) },
                                    price: memo.prices[file.id])
         memo.facts[file.id] = made
@@ -278,6 +291,7 @@ extension Shop {
     /// What the facts were made from. Read here so SwiftUI follows them.
     func libraryFactsKey() -> [Int] {
         _ = estimates.count
+        _ = fits.count
         _ = catalogueRows.count
         return [filesRevision, libraryDerivedRevision, bookRevision]
     }

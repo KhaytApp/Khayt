@@ -424,6 +424,7 @@ final class Words {
                                       "ar": "امسح المرشحات لترى المكتبة كاملة مرة أخرى."],
         "mac.lg_empty_hint": ["en": "Import a folder of models with the button below, or drop files anywhere on this screen.",
                               "ar": "استورد مجلدًا من النماذج بالزر أدناه، أو أفلت الملفات في أي مكان على هذه الشاشة."],
+        "mac.lg_more_filters": ["en": "More", "ar": "المزيد"],
         // ── end of Library grid redesign ──────────────────────────────────
 
         // Shelves
