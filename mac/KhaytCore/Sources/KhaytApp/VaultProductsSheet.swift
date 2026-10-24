@@ -81,19 +81,19 @@ struct VaultProductsSheet: View {
             }
         }
         .task { if !preloaded { await load() } }
-        .sheet(item: $editing) { target in
+        .shopSheet(item: $editing) { target in
             VaultProductEditor(shop: shop, target: target, names: names) { saved in
                 editing = nil
                 if let saved { upsert(saved) }
             }
         }
-        .sheet(item: $releasing) { p in
+        .shopSheet(item: $releasing) { p in
             VaultReleaseSheet(shop: shop, product: p, names: names) { state in
                 releasing = nil
                 if let state { released[p.productId] = state }
             }
         }
-        .sheet(item: $buyersOf) { p in VaultBuyersSheet(shop: shop, product: p) { buyersOf = nil } }
+        .shopSheet(item: $buyersOf) { p in VaultBuyersSheet(shop: shop, product: p) { buyersOf = nil } }
         .confirmationDialog(words.callIt("mac.vp_remove_title"),
                             isPresented: Binding(get: { askingRemove != nil }, set: { if !$0 { askingRemove = nil } }),
                             presenting: askingRemove) { p in
