@@ -33,6 +33,12 @@ struct LibraryFilterBar: View {
 
     private var chips: [FilterChipModel] {
         var out: [FilterChipModel] = []
+        // A LIBRARY HEALTH GROUP, put on the grid by its Show button: on the
+        // Show menu while it is on, and off from there (`libraryHealthFocus`).
+        if let focus = shop.libraryHealthFocus {
+            out.append(FilterChipModel(id: "health", label: shop.words.callIt(LibraryHealthView.look(focus.kind).title),
+                                       count: focus.ids.count, on: true) { shop.libraryHealthFocus = nil })
+        }
         // THE LIST THE SHOP KEEPS of what to print next — first, because it is
         // the one opened on purpose rather than found by narrowing.
         if facets.printNext > 0 || shop.libraryPrintNextOnly {
@@ -297,7 +303,7 @@ struct LibraryFilterBar: View {
 
     /// The axes the row draws, in order — every one of them, always.
     static let axes: [Axis] = [
-        Axis(key: "mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed", "archived",
+        Axis(key: "mac.lib_show", ids: ["health", "print-next", "duplicates", "unfiled", "never-printed", "archived",
                                         "no-figures", "in-catalogue", "online-only", "this-mac-only"]),
         Axis(key: "mac.lib_printer", prefix: "ready:"),
         Axis(key: "mac.lib_creator", prefix: "creator:"),
@@ -348,6 +354,11 @@ struct LibraryFilterBar: View {
             let on = rows.filter(\.on)
             Menu {
                 items(rows)
+                // The way into Library Health, under what the grid can show.
+                if axis.key == "mac.lib_show" {
+                    Divider()
+                    Button(shop.words.callIt("mac.lh_title")) { shop.openLibraryHealth() }
+                }
             } label: {
                 // ONE Text. A macOS button-style menu draws its label as a
                 // single title, and of an HStack of two it kept only the

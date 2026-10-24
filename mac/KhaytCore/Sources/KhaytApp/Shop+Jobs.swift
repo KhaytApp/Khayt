@@ -2000,6 +2000,10 @@ extension Shop {
                     to: &root, id: id, stage: stage, engine: engine, words: self.words,
                     holdReason: holdReason, qcNotes: qcNotes, actuals: actuals)
                 undoSnapshot = out.undo; said = out.notices
+                // A quote accepted into a job takes its models off Print
+                // next, in this same write (`clearPrintNext(acceptedFrom:)`).
+                Self.clearPrintNext(&root, acceptedFrom: wasOrder,
+                                    now: Self.rows(root, "printLog").first(where: { Self.recordId($0) == id }))
                 telegram = out.telegram; owed = out.webhooks
                 mail = out.email; portal = out.portal
             }

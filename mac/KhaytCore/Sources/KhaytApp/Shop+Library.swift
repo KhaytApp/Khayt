@@ -1795,7 +1795,8 @@ extension Shop {
     private func libraryPool(skipping axis: LibraryAxis, searched: Set<String>?) -> [JSONValue] {
         var group: String?
         if case .library(let g) = shelf { group = g }
-        let match = libraryMatcher(libraryQuery, group: group, skipping: axis)
+        let match = libraryMatcher(libraryQuery, group: group, skipping: axis,
+                                  focus: libraryHealthFocus.map { Set($0.ids) })
         var ids: Set<String> = []
         ids.reserveCapacity(files.count)
         for f in files where (searched?.contains(f.id) ?? true) && match(f) { ids.insert(f.id) }
@@ -2037,7 +2038,7 @@ extension Shop {
             || libraryNeverPrintedOnly || libraryReadyOn != nil
             || libraryCreator != nil || libraryPrintNextOnly || libraryDuplicatesOnly
             || libraryShowArchived || libraryStorage != nil
-            || libraryReadyAnywhere || libraryNoFiguresOnly || libraryInCatalogueOnly || libraryRanges.isActive
+            || libraryReadyAnywhere || libraryNoFiguresOnly || libraryInCatalogueOnly || libraryRanges.isActive || libraryHealthFocus != nil
     }
 
     func clearLibraryFilter() {
@@ -2055,6 +2056,7 @@ extension Shop {
         libraryNoFiguresOnly = false
         libraryInCatalogueOnly = false
         libraryRanges = LibraryQuery.Ranges()
+        libraryHealthFocus = nil
     }
 
     /// ── DUPLICATES, in the library already there ─────────────────────────
@@ -2090,12 +2092,100 @@ extension Shop {
     struct CreatorCount: Equatable, Identifiable { let name: String; let count: Int; var id: String { name } }
 
     /// Put these models on the Print next list, or take them off.
-    func setPrintNext(_ ids: Set<LibraryFile.ID>, on: Bool) {
+    ///
+    /// The ONE mark for "I mean to print this": Printventory's Want/Queued,
+    /// which Khayt does not need the rest of — a job is the queue, and
+    /// `timesPrinted` is Printed. On the record (`printNextAt`, and its
+    /// optional `printNextFor`), so it syncs with the model, through
+    /// `editFiles` — on the write chain, gated by `permitted`, undoable.
+    /// Taking a model off takes its note with it. False when refused.
+    @discardableResult
+    func setPrintNext(_ ids: Set<LibraryFile.ID>, on: Bool) -> Bool {
         let at = StoreWriter.iso(Date())
-        editFiles(ids, named: words.callIt(on ? "mac.print_next_add" : "mac.print_next_remove")) { record in
-            if on { if record["printNextAt"] == nil { record["printNextAt"] = .string(at) } }
-            else { record.removeValue(forKey: "printNextAt") }
+        return editFiles(ids, named: words.callIt(on ? "mac.print_next_add" : "mac.print_next_remove")) { record in
+            Self.markPrintNext(&record, on: on, at: at)
         }
+    }
+
+    /// The mark itself, on one record. An existing date is kept: the list
+    /// reads oldest first, and marking twice must not move a model to the end.
+    nonisolated static func markPrintNext(_ record: inout [String: JSONValue], on: Bool, at: String) {
+        if on {
+            if record["printNextAt"] == nil { record["printNextAt"] = .string(at) }
+        } else {
+            record.removeValue(forKey: "printNextAt")
+            record.removeValue(forKey: "printNextFor")
+        }
+    }
+
+    /// Who or what a model on the list is for. Empty clears it. Only on a
+    /// model that is on the list — a note with no mark would be a note
+    /// nobody sees. False when refused.
+    @discardableResult
+    func setPrintNextNote(_ id: LibraryFile.ID, _ typed: String) -> Bool {
+        guard files.first(where: { $0.id == id })?.isPrintNext == true else { return false }
+        let note = String(typed.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
+        return editFiles([id], named: words.callIt("mac.print_next_for")) { record in
+            guard record["printNextAt"] != nil else { return }
+            if note.isEmpty { record.removeValue(forKey: "printNextFor") }
+            else { record["printNextFor"] = .string(note) }
+        }
+    }
+
+    /// Model ▸ Print Next (⌘B): every selected model on, unless every one
+    /// is on already — then off. The VISIBLE selection only (`selectedFiles`).
+    func togglePrintNextOnSelection() {
+        let chosen = selectedFiles
+        guard !chosen.isEmpty else { return }
+        setPrintNext(Set(chosen.map(\.id)), on: !chosen.allSatisfy(\.isPrintNext))
+    }
+
+    /// ── STARTING THE JOB TAKES IT OFF THE LIST ──────────────────────────
+    ///
+    /// A model on Print next that becomes a JOB has been dealt with: the
+    /// mark is cleared in the same write that saves the job, without asking.
+    /// A QUOTE leaves it — nothing will be printed until the customer says
+    /// yes. Which models: the ones the job's parts print from
+    /// (`printFileId`, `lib/order-file-link.js`). Returns the ids cleared.
+    @discardableResult
+    nonisolated static func clearPrintNext(_ root: inout [String: JSONValue],
+                                           forJob order: [String: JSONValue]) -> Set<String> {
+        guard plainString(order["status"]) != "quote",
+              case .array(let parts)? = order["parts"] else { return [] }
+        let printed = Set(parts.compactMap { part -> String? in
+            guard case .object(let p) = part, case .string(let id)? = p["printFileId"], !id.isEmpty else { return nil }
+            return id
+        })
+        guard !printed.isEmpty, case .array(var rows)? = root["printFiles"] else { return [] }
+        var cleared: Set<String> = []
+        for i in rows.indices {
+            guard case .object(var record) = rows[i], case .string(let id)? = record["id"],
+                  printed.contains(id), record["printNextAt"] != nil else { continue }
+            markPrintNext(&record, on: false, at: "")
+            StoreWriter.stamp(&record)
+            rows[i] = .object(record)
+            cleared.insert(id)
+        }
+        if !cleared.isEmpty { root["printFiles"] = .array(rows) }
+        return cleared
+    }
+
+    /// The same, for a QUOTE that has just become a job: accepted on the Mac
+    /// (a move out of Quote — the board, the Job menu, a portal approval that
+    /// advances it), or approved by the customer on the LAN quote page
+    /// (`lib/lan-quote-page.js`, run by `approveQuote`). `before` is the job as
+    /// the write found it, `after` as the write leaves it. A quote on hold
+    /// (`hasQuote`) is still a quote; a cancelled one prints nothing.
+    @discardableResult
+    nonisolated static func clearPrintNext(_ root: inout [String: JSONValue],
+                                           acceptedFrom before: JSONValue?, now after: JSONValue?) -> Set<String> {
+        guard case .object(let was)? = before, case .object(let job)? = after else { return [] }
+        let wasStatus = plainString(was["status"]) ?? ""
+        let wasQuote = wasStatus == "quote" || (wasStatus == "on_hold" && was["hasQuote"] == .bool(true))
+        let status = plainString(job["status"]) ?? ""
+        let stillQuote = status == "quote" || (status == "on_hold" && job["hasQuote"] == .bool(true))
+        guard wasQuote, !stillQuote, status != "cancelled" else { return [] }
+        return clearPrintNext(&root, forJob: job)
     }
 
     /// Kept between draws; see `Shop+LibraryMemo.swift`.
@@ -2111,11 +2201,18 @@ extension Shop {
         // and the saved searches' counts are worked out by too.
         var group: String?
         if case .library(let g) = shelf { group = g }
-        var rows = files.filter(libraryMatcher(libraryQuery, group: group))
+        var rows = files.filter(libraryMatcher(libraryQuery, group: group,
+                                               focus: libraryHealthFocus.map { Set($0.ids) }))
         if !q.isEmpty {
             // The file's name too, and folded — see `LibraryFile.matches`.
             libraryMemo.work.rowsSearched += rows.count
             rows = rows.filter(searchMatcher(LibrarySearch.parse(q)))
+        }
+        // A Library Health group, in the group's own order: the copies of one
+        // model side by side, as the health page listed them.
+        if let focus = libraryHealthFocus {
+            let at = Dictionary(focus.ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+            return rows.sorted { (at[$0.id] ?? .max) < (at[$1.id] ?? .max) }
         }
         // Side by side: the copies of one model together, oldest first.
         if libraryDuplicatesOnly {

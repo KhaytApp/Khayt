@@ -29,6 +29,17 @@ struct LibraryGrid: View {
     @Environment(\.displayScale) private var scale
 
     var body: some View {
+        // LIBRARY HEALTH, in place of the grid and its filter row — on this
+        // screen rather than a sheet, so the inspector beside it still works
+        // and Back to Library is the grid exactly as it was.
+        if shop.libraryHealthOpen {
+            LibraryHealthView(shop: shop)
+        } else {
+            gridScreen
+        }
+    }
+
+    private var gridScreen: some View {
         VStack(spacing: 0) {
             // THE WAY BACK OUT OF A GROUP.
             //
@@ -638,6 +649,12 @@ struct Cell: View {
     /// others — the `.step` a customer sent, an `.obj`, a `.gcode` — wear one.
     static let everydayFormats: Set<String> = ["stl", "3mf"]
 
+    /// What the Print next badge says: the list, and the note when there is one.
+    static func printNextSaid(_ file: LibraryFile, words: Words) -> String {
+        guard let note = file.printNextNote else { return words.callIt("mac.print_next") }
+        return words.callIt("mac.print_next_for_said", ["name": .string(note)])
+    }
+
     /// The badge a tile wears for its format, or nil.
     static func formatBadge(_ ext: String?, size: LibraryTileSize) -> String? {
         guard !size.isCompact, let ext = ext?.lowercased(), !ext.isEmpty,
@@ -664,14 +681,27 @@ struct Cell: View {
                 .aspectRatio(1, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(alignment: .topTrailing) {
-                    if file.isFavourite {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Khayt.marked)
-                            .shadow(radius: 2)
-                            .padding(6)
-                            .help(words.callIt("mac.is_favourite"))
+                    HStack(spacing: 4) {
+                        // ON THE PRINT NEXT LIST, with who it is for on hover.
+                        if file.isPrintNext {
+                            let said = Self.printNextSaid(file, words: words)
+                            Image(systemName: "bookmark.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Khayt.brand)
+                                .padding(.horizontal, 5).padding(.vertical, 4)
+                                .background(.regularMaterial, in: Capsule())
+                                .help(said)
+                                .accessibilityLabel(said)
+                        }
+                        if file.isFavourite {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Khayt.marked)
+                                .shadow(radius: 2)
+                                .help(words.callIt("mac.is_favourite"))
+                        }
                     }
+                    .padding(6)
                 }
                 // The palette, on the image where the eye already is. Four
                 // filaments and three swaps is the difference between a print

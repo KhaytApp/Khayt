@@ -342,6 +342,12 @@ final class Shop {
         settingsValue = .object(held)
     }
 
+    /// Give the shop a catalogue, for a test or a snapshot. The book on disk
+    /// is not touched.
+    func pretendProducts(_ rows: [JSONValue]) {
+        productRows = rows
+    }
+
     /// Give the shop a library, for a test. The book on disk is not touched.
     func pretendLibrary(_ rows: [JSONValue]) {
         files = Self.decodeFiles(["printFiles": .array(rows)]).items
@@ -2847,6 +2853,22 @@ final class Shop {
 
     /// The shop's Print next list.
     var libraryPrintNextOnly = false { didSet { libraryViewChanged() } }
+
+    // ── LIBRARY HEALTH (`Shop+LibraryHealth.swift`) ──────────────────────
+    /// The library screen is showing Library Health instead of the grid.
+    var libraryHealthOpen = false
+    /// The groups as last worked out; nil before the first check.
+    var libraryHealthGroups: [LibraryHealth.Group]?
+    /// A check or a fix is running.
+    var libraryHealthBusy = false
+    /// What the last fix had to say.
+    var libraryHealthNote: String?
+    /// The grid narrowed to one group's models, from its Show button — a
+    /// filter like the others, on the Show menu, cleared with them.
+    var libraryHealthFocus: LibraryHealthFocus? { didSet { libraryViewChanged() } }
+    /// For a snapshot or a test: where each model's bytes are, instead of
+    /// asking the disk. The sample book has no library folder to ask.
+    @ObservationIgnored var pretendHealthPresence: [String: LibraryHealth.Presence]?
     /// Models that are the same file, or the same mesh, as another.
     var libraryDuplicatesOnly = false { didSet { libraryViewChanged() } }
     /// Ready on ANY machine that says what it has loaded — the "Ready to

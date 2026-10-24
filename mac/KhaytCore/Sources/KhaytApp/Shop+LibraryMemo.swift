@@ -39,6 +39,8 @@ final class LibraryMemo {
         var creator: String?
         var printNext: Bool
         var duplicates: Bool
+        /// A Library Health group's models, from its Show button.
+        var healthFocus: LibraryHealthFocus?
         var storage: LibraryStorageFilter?
         /// The axes and ranges added with the saved searches.
         var readyAnywhere = false
@@ -212,6 +214,7 @@ extension Shop {
                      neverPrinted: libraryNeverPrintedOnly, readyOn: libraryReadyOn,
                      category: libraryCategory, tag: libraryTag, creator: libraryCreator,
                      printNext: libraryPrintNextOnly, duplicates: libraryDuplicatesOnly,
+                     healthFocus: libraryHealthFocus,
                      storage: libraryStorage,
                      readyAnywhere: libraryReadyAnywhere, noFigures: libraryNoFiguresOnly,
                      inCatalogue: libraryInCatalogueOnly, ranges: libraryRanges,
