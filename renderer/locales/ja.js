@@ -4606,6 +4606,7 @@
   "plib.identify": "識別",
   "set.plib_loc_section": "プリントライブラリの保存先",
   "set.plib_s3_on": "オブジェクトストレージにもバックアップする（S3、Cloudflare R2、Backblaze B2 ほか）",
+  "set.plib_vault_lock": "このライブラリはKhayt Vaultに保存されています。保存先を変更するには、Mac版Khaytアプリを使ってください。",
   "set.plib_s3_hint": "すべてのファイルの二つめの控えを、別の場所に保存します。これはバックアップにすぎず、このコンピュータの空き容量は増えません。容量を空けるには、下のクラウドストレージを有効にしてください。",
   "set.plib_s3_endpoint": "エンドポイント",
   "set.plib_s3_bucket": "バケット",

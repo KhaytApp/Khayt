@@ -2287,6 +2287,7 @@ async function renderPrintLibLocation() {
   const s3 = cfg.s3 || {};
   const setV = (id, v) => { const el = $(id); if (el) el.value = v || ''; };
   if ($('#set_plibS3On')) $('#set_plibS3On').checked = !!s3.enabled;
+  plibVaultLock();
   setV('#set_plibS3Endpoint', s3.endpoint);
   setV('#set_plibS3Bucket', s3.bucket);
   setV('#set_plibS3Region', s3.region);
@@ -2549,7 +2550,7 @@ async function savePrintLibS3() {
   settings.printLibrary = Object.assign({}, settings.printLibrary, {
     s3: {
       ...cur,
-      enabled: !!$('#set_plibS3On')?.checked,
+      enabled: !plibVaultIsOn() && !!$('#set_plibS3On')?.checked,
       provider,
       endpoint,
       bucket: v('#set_plibS3Bucket'),
@@ -2597,11 +2598,33 @@ function plibBytes(n) {
   return `${i === 0 ? v : v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
 }
 
+/**
+ * The Mac can make the Khayt Vault this library's remote (Mac #2041), and only
+ * the Mac can move it out again. While it is there, the bucket and Drive
+ * switches stay off here: turning one on would either make the Mac fall back
+ * to it — the whole vault library gone from its view — or split new files
+ * between the two. Refused, not resolved: the line says where to change it.
+ */
+function plibVaultIsOn() {
+  const v = ((settings && settings.printLibrary) || {}).vault;
+  return !!(v && v.enabled === true);
+}
+function plibVaultLock() {
+  const on = plibVaultIsOn();
+  const note = $('#plibVaultNote');
+  if (note) note.style.display = on ? '' : 'none';
+  for (const id of ['#set_plibS3On', '#set_plibGDriveOn']) {
+    const el = $(id);
+    if (el) { el.disabled = on; if (on) el.checked = false; }
+  }
+}
+
 /** Paint the Drive fields, and say who is actually connected. */
 async function renderPrintLibGDrive() {
   const cfg = ((settings && settings.printLibrary) || {}).gdrive || {};
   const status = $('#plibGDStatus');
   if ($('#set_plibGDriveOn')) $('#set_plibGDriveOn').checked = !!cfg.enabled;
+  plibVaultLock();
   if ($('#set_plibGDClientId')) $('#set_plibGDClientId').value = cfg.clientId || '';
   if ($('#set_plibGDFolder')) $('#set_plibGDFolder').value = cfg.folderName || '';
   // Same rule as the bucket secret: the renderer holds a mask, never the value,
@@ -2630,7 +2653,7 @@ function savePrintLibGDrive(extra) {
   const cur = ((settings.printLibrary || {}).gdrive) || {};
   settings.printLibrary = Object.assign({}, settings.printLibrary, {
     gdrive: Object.assign({}, cur, {
-      enabled: !!$('#set_plibGDriveOn')?.checked,
+      enabled: !plibVaultIsOn() && !!$('#set_plibGDriveOn')?.checked,
       clientId: v('#set_plibGDClientId'),
       clientSecret: secretInputSave(cur.clientSecret, v('#set_plibGDSecret')),
       folderName: v('#set_plibGDFolder') || 'Khayt print library',

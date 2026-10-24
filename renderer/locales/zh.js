@@ -4606,6 +4606,7 @@
   "plib.identify": "识别",
   "set.plib_loc_section": "打印库位置",
   "set.plib_s3_on": "同时备份到对象存储（S3、Cloudflare R2、Backblaze B2 等）",
+  "set.plib_vault_lock": "此资料库保存在 Khayt Vault 中。要更改保存位置，请使用 Mac 版 Khayt 应用。",
   "set.plib_s3_hint": "每个文件的第二份副本，存放在异地。这只是备份，并不会释放本机空间。要释放空间，请启用下方的云存储。",
   "set.plib_s3_endpoint": "端点",
   "set.plib_s3_bucket": "存储桶",

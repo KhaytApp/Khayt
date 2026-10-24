@@ -4607,6 +4607,7 @@
   "plib.identify": "Identify",
   "set.plib_loc_section": "Print library location",
   "set.plib_s3_on": "Also back up to object storage (S3, Cloudflare R2, Backblaze B2, and more)",
+  "set.plib_vault_lock": "This library lives in the Khayt Vault. To change where it is kept, use the Khayt Mac app.",
   "set.plib_s3_hint": "A second copy of every file, off-site. On its own this is only a backup — it does not free up any space here. To do that, switch on cloud storage below.",
   "set.plib_s3_endpoint": "Endpoint",
   "set.plib_s3_bucket": "Bucket",

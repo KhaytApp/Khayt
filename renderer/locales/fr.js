@@ -4606,6 +4606,7 @@
   "plib.identify": "Identifier",
   "set.plib_loc_section": "Emplacement de la bibliothèque d’impression",
   "set.plib_s3_on": "Sauvegarder aussi vers un stockage objet (S3, Cloudflare R2, Backblaze B2 et autres)",
+  "set.plib_vault_lock": "Cette bibliothèque se trouve dans le Khayt Vault. Pour changer l'endroit où elle est conservée, utilisez l'app Khayt pour Mac.",
   "set.plib_s3_hint": "Une seconde copie de chaque fichier, hors site. En soi ce n'est qu'une sauvegarde : cela ne libère aucun espace ici. Pour cela, activez le stockage cloud ci-dessous.",
   "set.plib_s3_endpoint": "Point de terminaison",
   "set.plib_s3_bucket": "Bucket",
