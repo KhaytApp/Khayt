@@ -76,7 +76,9 @@ struct ConverterTests {
     @Test("a put-aside model leaves the library list but not the book")
     func archivedIsHiddenNotGone() {
         let shop = MenuCoverageTests.source("Shop.swift")
-        #expect(shop.contains("if !libraryShowArchived { rows = rows.filter { !$0.isArchived } }"),
+        // One matcher now (`Shop.libraryMatcher`): off the Archived view a
+        // put-aside model fails it; in that view only those pass.
+        #expect(shop.contains("if axis != .archived, f.isArchived != q.archived { return false }"),
                 "the library still offers a model that has been replaced")
         // `files` itself keeps them: the import dedupe, the product links and
         // the job records all read it, and a model vanishing from there would

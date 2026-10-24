@@ -2868,6 +2868,8 @@ final class Shop {
     var librarySaveSearchShown = false
     /// The saved search whose name is being edited in the sidebar.
     var libraryRenamingSearchId: String?
+    /// The saved search Delete is asking about.
+    var libraryDeletingSearchId: String?
     /// Which models are ready on which machine, from the last recount —
     /// loaded AND on the bed (`ModelReadiness`), so the Ready chip never
     /// counts a model the inspector calls too big for that machine.

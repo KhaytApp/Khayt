@@ -734,6 +734,7 @@ struct RoundTripTests {
     static let exempt: [String: String] = [
         "saveBucket": "writes six strings the pane shows verbatim and selects the bucket; nothing is parsed or defaulted except an empty region, which the other app also writes as auto",
         "saveCloudLibrary": "the caller of saveBucket, above; it adds only a secret that is sealed when typed",
+        "saveLibrarySearch": "writes only settings.librarySavedSearches, inside the write chain, as LibrarySavedSearch.encode of the list read back leniently; every other settings key goes back as read, and LibraryEditPerfTests.savedSearchWritePath proves bizEn survives",
         "editFiles": "a library edit hands one closure per field the shop changed; it never re-encodes a record",
         "saveSeen": "the LAN server's replay list, a file of its own; not a record in the book",
         "saveInstead": "Send Feedback's fallback: writes a zip to Downloads; reads the book, never writes it",

@@ -25,7 +25,7 @@ struct LibraryRangesButton: View {
         }
         .fixedSize()
         .help(shop.words.callIt("mac.ls_ranges_help") + "\n" + shop.words.callIt("mac.ls_unknown_rule"))
-        .popover(isPresented: $shop.libraryRangesShown, arrowEdge: .bottom) {
+        .shopPopover(isPresented: $shop.libraryRangesShown, arrowEdge: .bottom) {
             LibraryRangesPopover(shop: shop)
         }
     }
@@ -312,7 +312,7 @@ struct LibrarySaveSearchButton: View {
                 }
             }
         }
-        .popover(isPresented: $shop.librarySaveSearchShown, arrowEdge: .bottom) {
+        .shopPopover(isPresented: $shop.librarySaveSearchShown, arrowEdge: .bottom) {
             SearchNamePopover(shop: shop, original: nil, initial: editing?.name ?? "")
         }
     }
@@ -426,11 +426,42 @@ private struct SavedSearchMenu: View {
             Button(shop.words.callIt("mac.ls_edit")) { shop.openSmartRow(row, editing: true) }
             Button(shop.words.callIt("mac.ls_duplicate")) { Task { await shop.duplicateLibrarySearch(saved.id) } }
             Divider()
+            // Asks first (`DeleteSearchQuestion`), like every removal.
             Button(shop.words.callIt("mac.ls_delete"), role: .destructive) {
-                if shop.libraryEditingSearchId == saved.id { shop.libraryEditingSearchId = nil }
-                Task { await shop.deleteLibrarySearch(saved.id) }
+                shop.libraryDeletingSearchId = saved.id
             }
         }
+    }
+}
+
+/// "Delete the saved search …?" — once, on the rows' container.
+private struct DeleteSearchQuestion: ViewModifier {
+    @Bindable var shop: Shop
+
+    func body(content: Content) -> some View {
+        let target = shop.librarySavedSearches.first { $0.id == shop.libraryDeletingSearchId }
+        content.confirmationDialog(
+            shop.words.callIt("mac.ls_delete_title", ["name": .string(target?.name ?? "")]),
+            isPresented: Binding(get: { target != nil }, set: { if !$0 { shop.libraryDeletingSearchId = nil } }),
+            presenting: target) { saved in
+            Button(shop.words.callIt("mac.ls_delete"), role: .destructive) {
+                if shop.libraryEditingSearchId == saved.id { shop.libraryEditingSearchId = nil }
+                shop.libraryDeletingSearchId = nil
+                Task { await shop.deleteLibrarySearch(saved.id) }
+            }
+            Button(shop.words.callIt("mac.ls_cancel"), role: .cancel) { shop.libraryDeletingSearchId = nil }
+        } message: { _ in
+            Text(shop.words.callIt("mac.ls_delete_note"))
+        }
+    }
+}
+
+private struct OnFirst: ViewModifier {
+    let isFirst: Bool
+    let shop: Shop
+
+    func body(content: Content) -> some View {
+        if isFirst { content.modifier(DeleteSearchQuestion(shop: shop)) } else { content }
     }
 }
 
@@ -441,7 +472,7 @@ private struct RenamePopover: ViewModifier {
 
     func body(content: Content) -> some View {
         if let saved = row.saved {
-            content.popover(isPresented: Binding(get: { shop.libraryRenamingSearchId == saved.id },
+            content.shopPopover(isPresented: Binding(get: { shop.libraryRenamingSearchId == saved.id },
                                                  set: { if !$0 { shop.libraryRenamingSearchId = nil } }),
                             arrowEdge: .trailing) {
                 SearchNamePopover(shop: shop, original: saved, initial: saved.name)
@@ -460,9 +491,12 @@ struct ShellSmartFolderRows: View {
     @Bindable var shop: Shop
 
     var body: some View {
-        ForEach(shop.librarySmartRows) { row in
-            ShellSmartRow(shop: shop, row: row)
+        VStack(spacing: 0) {
+            ForEach(shop.librarySmartRows) { row in
+                ShellSmartRow(shop: shop, row: row)
+            }
         }
+        .modifier(DeleteSearchQuestion(shop: shop))
     }
 }
 
@@ -531,6 +565,9 @@ struct ClassicSmartFolderRows: View {
             .contextMenu { SavedSearchMenu(shop: shop, row: row) }
             .modifier(RenamePopover(shop: shop, row: row))
             .help(row.saved == nil ? shop.words.callIt("mac.ls_builtin_help") : row.title)
+            // The question hangs on ONE row — the first built-in, always
+            // there — or a List would hold one dialog per row.
+            .modifier(OnFirst(isFirst: row.id == shop.librarySmartRows.first?.id, shop: shop))
         }
     }
 }
