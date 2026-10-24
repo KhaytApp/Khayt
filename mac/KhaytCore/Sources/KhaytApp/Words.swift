@@ -1268,6 +1268,8 @@ final class Words {
           "ar": "وافق على تلقي تحديثات الطلب عبر واتساب"],
         "mac.wab_opt_in_since": ["en": "since {day}",
           "ar": "منذ {day}"],
+        "mac.wab_offers_opted_out": ["en": "Opted out of marketing below, so no offers go to them.",
+          "ar": "ألغى الاشتراك في التسويق أدناه، فلن تصله أي عروض."],
         "mac.wab_how_asked": ["en": "Asked in person or by phone",
           "ar": "سُئل شخصياً أو هاتفياً"],
         "mac.wab_how_form": ["en": "On an order form",
@@ -5330,6 +5332,7 @@ final class Words {
         // editors call one thing by one name.
         "ce.price_list", "ce.price_list_empty", "ce.price_list_hint", "ce.pl_product",
         "ce.pl_price", "ce.pl_note", "ce.pl_autofill",
+        "ce.wab_offers",
         "rec.enable", "rec.interval", "rec.interval.weekly", "rec.interval.biweekly",
         "rec.interval.monthly", "rec.interval.quarterly", "rec.next_due", "rec.paused",
         "rec.end_date", "rec.skip_next", "rec.hint", "rec.created",

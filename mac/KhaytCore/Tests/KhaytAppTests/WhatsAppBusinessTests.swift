@@ -153,6 +153,44 @@ struct WhatsAppBusinessTests {
         #expect(Client.decoding(withdrawn.record)?.whatsAppConsent == nil)
     }
 
+    @Test("offers consent is its own field: separate, kept by every copy, withdrawable")
+    func offersConsentIsSeparate() throws {
+        let at = Date(timeIntervalSince1970: 1_792_000_000)
+        let updates = Client(id: "C1", nameEn: "Sara").optedIntoWhatsApp(true, how: "form", at: at)
+        // Agreeing to order updates is not agreeing to offers, and the other way round.
+        #expect(updates.whatsAppOffersConsent == nil)
+        let both = updates.optedIntoWhatsAppOffers(true, how: "customer_wrote", at: at)
+        #expect(both.whatsAppOffersConsent?.how == "customer_wrote")
+        #expect(both.whatsAppConsent?.how == "form")
+        #expect(both.optedIntoWhatsApp(false, how: "", at: at).whatsAppOffersConsent != nil)
+        #expect(both.optedIntoWhatsAppOffers(false, how: "", at: at).whatsAppConsent != nil)
+        // Every copy the sheet makes keeps it.
+        #expect(both.with(\.phone, "0551234567").whatsAppOffersConsent != nil)
+        #expect(both.marketed(false).whatsAppOffersConsent != nil)
+        #expect(both.replacing(priceList: []).whatsAppOffersConsent != nil)
+        #expect(both.replacing(recurring: nil).whatsAppOffersConsent != nil)
+        // The desktop's shape, read back.
+        #expect(both.record["whatsappMarketingOptIn"]
+                == .object(["at": .string(StoreWriter.iso(at)), "how": .string("customer_wrote")]))
+        let read = try #require(Client.decoding(both.record))
+        #expect(read.whatsAppOffersConsent?.how == "customer_wrote")
+        // Withdrawn is written as null, so it cannot be carried back from disk.
+        let withdrawn = both.optedIntoWhatsAppOffers(false, how: "", at: at)
+        #expect(withdrawn.record["whatsappMarketingOptIn"] == .null)
+        let saved = Shop.customerRecord(saving: withdrawn, over: both.record)
+        #expect(Client.decoding(saved)?.whatsAppOffersConsent == nil)
+    }
+
+    @Test("a Mac save keeps the desktop's offers consent it did not touch")
+    func macSaveKeepsDesktopOffersConsent() throws {
+        let consent: JSONValue = .object(["at": .string("2026-10-24T09:00:00Z"), "how": .string("form")])
+        let raw: [String: JSONValue] = ["id": .string("C1"), "nameEn": .string("Sara"),
+                                        "whatsappMarketingOptIn": consent]
+        let opened = try #require(Client.decoding(raw))
+        let saved = Shop.customerRecord(saving: opened.with(\.phone, "0551234567"), over: raw, opened: opened)
+        #expect(saved["whatsappMarketingOptIn"] == consent)
+    }
+
     @Test("the account and templates reach the book; the token is kept unless changed")
     func settingsSave() async throws {
         let engine = try KhaytEngine()

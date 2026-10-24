@@ -68,10 +68,17 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
     /// `marketingOptOut`: hearing that your order shipped is not hearing
     /// offers, and the other way round.
     let whatsappOptIn: [String: JSONValue]?
+    /// This customer agreed to OFFERS on WhatsApp — `{ at, how }`, or nil.
+    /// A third consent, apart from both of the above: agreeing to hear that
+    /// an order shipped is not agreeing to campaigns. The desktop's campaigns
+    /// send to it (`lib/campaigns.js whatsappOffersOptedIn`, which also needs
+    /// no `marketingOptOut`); this app only records it.
+    let whatsappMarketingOptIn: [String: JSONValue]?
 
     private enum CodingKeys: String, CodingKey {
         case id, nameEn, nameAr, phone, email, cr, vat, notes, defaultDiscount, createdAt
         case priceList, recurring, commLog, source, marketingOptOut, messageLang, whatsappOptIn
+        case whatsappMarketingOptIn
     }
 
     /// Is there anything under the heading?
@@ -129,6 +136,11 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         } else {
             whatsappOptIn = nil
         }
+        if case .object(let o)? = (try? c.decodeIfPresent(JSONValue.self, forKey: .whatsappMarketingOptIn)) ?? nil {
+            whatsappMarketingOptIn = o
+        } else {
+            whatsappMarketingOptIn = nil
+        }
         let log = (try? c.decodeIfPresent([JSONValue].self, forKey: .commLog)) ?? nil
         commLog = (log ?? []).compactMap {
             if case .object(let o) = $0 { return CommEntry(raw: o) } else { return nil }
@@ -140,7 +152,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
          source: String = "", defaultDiscount: Double = 0, createdAt: String? = nil,
          priceList: [PriceAgreement] = [], recurring: Recurring? = nil,
          commLog: [CommEntry] = [], marketingOptOut: Bool = false, messageLang: String = "",
-         whatsappOptIn: [String: JSONValue]? = nil) {
+         whatsappOptIn: [String: JSONValue]? = nil,
+         whatsappMarketingOptIn: [String: JSONValue]? = nil) {
         self.id = id; self.nameEn = nameEn; self.nameAr = nameAr
         self.phone = phone; self.email = email; self.cr = cr; self.vat = vat
         self.notes = notes; self.source = source
@@ -149,6 +162,7 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
         self.marketingOptOut = marketingOptOut
         self.messageLang = messageLang
         self.whatsappOptIn = whatsappOptIn
+        self.whatsappMarketingOptIn = whatsappMarketingOptIn
     }
 
     /// The record, as `clients` holds it — what the customer sheet saves.
@@ -184,6 +198,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             // Always written, null when withdrawn: an omitted key is carried
             // through from disk, so leaving it out could never take it back.
             "whatsappOptIn": whatsappOptIn.map(JSONValue.object) ?? .null,
+            // The same, for the same reason.
+            "whatsappMarketingOptIn": whatsappMarketingOptIn.map(JSONValue.object) ?? .null,
         ]
         if let recurring { out["recurring"] = .object(recurring.raw) }
         return out
@@ -225,7 +241,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
             priceList: priceList, recurring: recurring, commLog: commLog,
             marketingOptOut: marketingOptOut,
             messageLang: key == \Client.messageLang ? value : messageLang,
-            whatsappOptIn: whatsappOptIn)
+            whatsappOptIn: whatsappOptIn,
+               whatsappMarketingOptIn: whatsappMarketingOptIn)
     }
 
     /// The same customer, marketed to or not.
@@ -234,28 +251,50 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                cr: cr, vat: vat, notes: notes, source: source,
                defaultDiscount: defaultDiscount, createdAt: createdAt,
                priceList: priceList, recurring: recurring, commLog: commLog,
-               marketingOptOut: !wanted, messageLang: messageLang, whatsappOptIn: whatsappOptIn)
+               marketingOptOut: !wanted, messageLang: messageLang, whatsappOptIn: whatsappOptIn,
+               whatsappMarketingOptIn: whatsappMarketingOptIn)
     }
 
     /// The same customer, agreeing to WhatsApp updates or not. `at` and `how`
     /// are kept when only `how` changes, so the date says when they agreed.
     func optedIntoWhatsApp(_ agreed: Bool, how: String, at: Date) -> Client {
-        var next: [String: JSONValue]?
-        if agreed {
-            next = whatsappOptIn ?? ["at": .string(StoreWriter.iso(at))]
-            next?["how"] = .string(how)
-        }
+        let next = Self.consent(whatsappOptIn, agreed, how: how, at: at)
         return Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email,
                       cr: cr, vat: vat, notes: notes, source: source,
                       defaultDiscount: defaultDiscount, createdAt: createdAt,
                       priceList: priceList, recurring: recurring, commLog: commLog,
                       marketingOptOut: marketingOptOut, messageLang: messageLang,
-                      whatsappOptIn: next)
+                      whatsappOptIn: next, whatsappMarketingOptIn: whatsappMarketingOptIn)
+    }
+
+    /// The same customer, agreeing to offers on WhatsApp or not — kept the
+    /// same way as `optedIntoWhatsApp`.
+    func optedIntoWhatsAppOffers(_ agreed: Bool, how: String, at: Date) -> Client {
+        let next = Self.consent(whatsappMarketingOptIn, agreed, how: how, at: at)
+        return Client(id: id, nameEn: nameEn, nameAr: nameAr, phone: phone, email: email,
+                      cr: cr, vat: vat, notes: notes, source: source,
+                      defaultDiscount: defaultDiscount, createdAt: createdAt,
+                      priceList: priceList, recurring: recurring, commLog: commLog,
+                      marketingOptOut: marketingOptOut, messageLang: messageLang,
+                      whatsappOptIn: whatsappOptIn, whatsappMarketingOptIn: next)
     }
 
     /// When they agreed to WhatsApp updates, and how — nil when they have not.
-    var whatsAppConsent: (at: String, how: String)? {
-        guard let o = whatsappOptIn, case .string(let at)? = o["at"], !at.isEmpty else { return nil }
+    var whatsAppConsent: (at: String, how: String)? { Self.reading(whatsappOptIn) }
+
+    /// When they agreed to offers on WhatsApp, and how — nil when they have not.
+    var whatsAppOffersConsent: (at: String, how: String)? { Self.reading(whatsappMarketingOptIn) }
+
+    private static func consent(_ was: [String: JSONValue]?, _ agreed: Bool, how: String,
+                                at: Date) -> [String: JSONValue]? {
+        guard agreed else { return nil }
+        var next = was ?? ["at": .string(StoreWriter.iso(at))]
+        next["how"] = .string(how)
+        return next
+    }
+
+    private static func reading(_ o: [String: JSONValue]?) -> (at: String, how: String)? {
+        guard let o, case .string(let at)? = o["at"], !at.isEmpty else { return nil }
         if case .string(let how)? = o["how"] { return (at, how) }
         return (at, "")
     }
@@ -272,7 +311,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                defaultDiscount: defaultDiscount, createdAt: createdAt,
                priceList: next, recurring: recurring, commLog: commLog,
                marketingOptOut: marketingOptOut, messageLang: messageLang,
-               whatsappOptIn: whatsappOptIn)
+               whatsappOptIn: whatsappOptIn,
+               whatsappMarketingOptIn: whatsappMarketingOptIn)
     }
 
     /// The same customer with a different standing order.
@@ -282,7 +322,8 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
                defaultDiscount: defaultDiscount, createdAt: createdAt,
                priceList: priceList, recurring: next, commLog: commLog,
                marketingOptOut: marketingOptOut, messageLang: messageLang,
-               whatsappOptIn: whatsappOptIn)
+               whatsappOptIn: whatsappOptIn,
+               whatsappMarketingOptIn: whatsappMarketingOptIn)
     }
 }
 
