@@ -4606,6 +4606,7 @@
   "plib.identify": "Tanımla",
   "set.plib_loc_section": "Baskı kitaplığı konumu",
   "set.plib_s3_on": "Nesne depolamaya da yedekle (S3, Cloudflare R2, Backblaze B2 ve diğerleri)",
+  "set.plib_vault_lock": "Bu kitaplık Khayt Vault'ta duruyor. Nerede tutulacağını değiştirmek için Mac'teki Khayt uygulamasını kullanın.",
   "set.plib_s3_hint": "Her dosyanın ikinci bir kopyası, dışarıda. Tek başına bu yalnızca bir yedektir — burada yer açmaz. Yer açmak için aşağıdaki bulut depolamayı açın.",
   "set.plib_s3_endpoint": "Uç nokta",
   "set.plib_s3_bucket": "Kova",

@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: a library kept in the Khayt Vault stays there.** When the Mac keeps the library's online copy in the Khayt Vault, the desktop's object storage and Google Drive switches are turned off, with a line saying the library is in the Khayt Vault and that only the Mac app can change that. The desktop also stops copying new files to a bucket or Drive beside the vault, so the library can't split between the two. Files that were already in a bucket or on Drive still come back as before.
 - **Desktop: campaigns through your WhatsApp Business account send an approved template.**
   - Before, a campaign sent free text, and Meta refuses free text to anyone who hasn't messaged you in the last 24 hours. So it failed for nearly every customer.
   - Choose WhatsApp Business (approved template) and enter the template's name and language. Then write one value per line: line 1 fills {{1}}, line 2 fills {{2}}. Merge fields such as {{name}} work on every line.

@@ -153,6 +153,33 @@ try {
   // TypeError is a page that is one interaction from breaking.
   ok(errors.length === 0, `no page errors (${errors.length})${errors.length ? ': ' + errors.join(' | ') : ''}`);
 
+  // A library the Mac keeps in the Khayt Vault (Mac #2041): only the Mac can
+  // move it, so the bucket and Drive switches are off here, with the reason,
+  // and a save cannot turn one on.
+  const vault = await page.evaluate(async () => {
+    settings.printLibrary = Object.assign({}, settings.printLibrary, {
+      vault: { enabled: true }, s3: { ...(settings.printLibrary || {}).s3, enabled: false },
+      gdrive: { ...(settings.printLibrary || {}).gdrive, enabled: false } });
+    await window.KhaytSettings.renderPrintLibLocation();
+    const s3 = document.getElementById('set_plibS3On');
+    const gd = document.getElementById('set_plibGDriveOn');
+    const note = document.getElementById('plibVaultNote');
+    const shown = { s3Off: s3.disabled, gdOff: gd ? gd.disabled : true,
+      note: getComputedStyle(note).display !== 'none' ? note.innerText : '' };
+    s3.disabled = false; s3.checked = true;           // as if forced on
+    await window.KhaytSettings.savePrintLibS3();
+    shown.saved = settings.printLibrary.s3.enabled;
+    settings.printLibrary.vault = { enabled: false };
+    await window.KhaytSettings.renderPrintLibLocation();
+    shown.after = { s3Off: document.getElementById('set_plibS3On').disabled,
+      note: getComputedStyle(note).display };
+    return shown;
+  });
+  ok(vault.s3Off && vault.gdOff, 'with the library in the Khayt Vault, the bucket and Drive switches are off');
+  ok(/Khayt Vault/.test(vault.note) && /Mac/.test(vault.note), `and the panel says why (${vault.note})`);
+  ok(vault.saved === false, 'a save cannot switch the bucket on beside the vault');
+  ok(!vault.after.s3Off && vault.after.note === 'none', 'with the vault off, the switches come back');
+
   const shot = path.join(root, 'build', 'cloud-storage-settings.png');
   fs.mkdirSync(path.dirname(shot), { recursive: true });
   await page.locator('#set_plibS3Provider').scrollIntoViewIfNeeded();

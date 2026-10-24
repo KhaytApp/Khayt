@@ -2356,7 +2356,19 @@ function printLibDrive(opts) {
  * to have sized for the whole library.
  */
 function printLibRemote() {
+  // A library the Mac keeps in the Khayt Vault has no remote here: this app
+  // has no vault client, and copying to a bucket or Drive beside it would
+  // split the library in two (the Mac's choose() turns them off; this is the
+  // same rule, read rather than written). Bringing back older files from a
+  // bucket or Drive still works — printLibRemotesFor asks them even when off.
+  if (printLibVaultOn()) return null;
   return printLibS3() || printLibDrive();
+}
+
+/** Whether the Mac has made the Khayt Vault this library's remote. */
+function printLibVaultOn() {
+  const v = (printLibSettings() || {}).vault;
+  return !!(v && v.enabled === true);
 }
 
 /**

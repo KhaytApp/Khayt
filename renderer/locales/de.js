@@ -4606,6 +4606,7 @@
   "plib.identify": "Erkennen",
   "set.plib_loc_section": "Speicherort der Druckbibliothek",
   "set.plib_s3_on": "Auch in Objektspeicher sichern (S3, Cloudflare R2, Backblaze B2 und weitere)",
+  "set.plib_vault_lock": "Diese Bibliothek liegt im Khayt Vault. Um zu ändern, wo sie gespeichert wird, verwende die Khayt-App für Mac.",
   "set.plib_s3_hint": "Eine zweite Kopie jeder Datei, extern. Für sich genommen ist das nur ein Backup — es gibt hier keinen Speicherplatz frei. Dafür schalten Sie unten die Cloud-Speicherung ein.",
   "set.plib_s3_endpoint": "Endpunkt",
   "set.plib_s3_bucket": "Bucket",
