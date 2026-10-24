@@ -46,12 +46,24 @@ final class PrinterNotice {
 
     private var asked = false
 
+    /// What has been said about each machine's current print, so a finish, a
+    /// failure or a pause is told once (`PrintNoticeLedger`). Ignored by
+    /// observation: it changes on every sweep and nothing draws it.
+    @ObservationIgnored var ledger = PrintNoticeLedger()
+
     /// Raise one. Recorded always; delivered when it can be.
     func raise(_ notice: Notice) {
         raised.insert(notice, at: 0)
         // Twenty is a session's worth of "what happened while I was out"
         // without becoming a log nobody reads.
         if raised.count > 20 { raised.removeLast(raised.count - 20) }
+        guard Self.canDeliver else { return }
+        Task { await deliver(notice) }
+    }
+
+    /// Deliver a notice without keeping it in `raised`. For good news — a
+    /// print that finished — which has no place in "Printer trouble".
+    func announce(_ notice: PrinterNotice.Notice) {
         guard Self.canDeliver else { return }
         Task { await deliver(notice) }
     }

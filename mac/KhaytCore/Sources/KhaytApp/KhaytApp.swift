@@ -758,6 +758,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only the menu bar item's label states and its fleet panel, on
+            // the sample, in memory (`SnapshotMenuBar.swift`).
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_MENUBAR"] == "1", let shop = subject {
+                await captureMenuBar(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             // Only the beta.5 scenes (live printer cards, the camera, Pair a
             // phone, filed VAT periods), on the sample, in memory.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_B5"] == "1", let shop = subject {

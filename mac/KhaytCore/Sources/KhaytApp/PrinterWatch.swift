@@ -437,6 +437,8 @@ final class PrinterWatch {
         if asked {
             await shop.printersAnswered()
             await raiseAlerts(shop: shop)
+            // A print just paused, told once (`PrintNoticeLedger`).
+            raisePrintNotices(shop: shop)
         } else if forgot {
             // Nothing was asked, but a machine's last reading went: the
             // dashboard and the widget still count it until they are told.
@@ -473,6 +475,7 @@ final class PrinterWatch {
             // starts with an offline count or a stall clock from before.
             previous[id] = nil
             if case .object(var o) = alertState, o[id] != nil { o[id] = nil; alertState = .object(o) }
+            notices.ledger.forget(id)
             shop.printerUnwatched(id)
         }
         return forgot
@@ -502,6 +505,9 @@ final class PrinterWatch {
         alertState = found.state
         for alert in found.alerts {
             let name = shop.machineName(forId: alert.machineId)
+            // A failed print the fault alert has told about is not told again
+            // by the finish seam.
+            if alert.type == "error" { notices.ledger.faultTold(alert.machineId) }
             let title = Self.title(alert.type, machine: name, shop: shop)
             let body = Self.body(alert, machine: name, shop: shop)
             notices.raise(PrinterNotice.Notice(
