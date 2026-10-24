@@ -123,6 +123,7 @@ struct OnlinePane: View {
                 // Drive here, under Online. It saves itself as it changes, so
                 // the Save bar below is not its business.
                 CloudLibrarySettings(shop: shop)
+                CloudPlanSettings(shop: shop)
                 Section(shop.words.callIt("mac.online_title")) {
                     Text(shop.words.callIt("mac.online_desc"))
                         .font(.callout).foregroundStyle(.secondary)
