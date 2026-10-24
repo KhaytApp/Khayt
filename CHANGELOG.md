@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: a job's invoice, on the phone.** A job's page now has an Invoice card. It
+  opens the same invoice the Mac and PC print, in English or Arabic with the ZATCA
+  QR, and Share sends it as an A4 PDF. The phone never gives out an invoice number:
+  an accepted quote that hasn't been numbered yet says to open it once on the Mac
+  or PC. Quotes still waiting for the customer and cancelled jobs have no invoice.
+  When the phone holds only the newest jobs, the customer's loyalty badge is left
+  off rather than worked out from part of their history.
+
 - **Mac: Team, signed-in devices, and a safer import-key swap.**
   - Settings ▸ Online ▸ Team lists who is on the shop's Khayt Cloud account. The owner or a manager can invite by email as a manager, operator or viewer (the code lasts 7 days), and can remove a member, which signs out every device on that account.
   - Signed-in devices lists every key that can reach the shop, with when it was made and last used, so a leaked key that is still in use shows. Any device but this Mac can be signed out.

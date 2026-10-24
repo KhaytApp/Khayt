@@ -833,3 +833,14 @@
 "catalogue.price.rounded" = "Rounded from the calculated price";
 "catalogue.price.calculated" = "Calculated";
 "home.catalogue.sub" = "What you sell, with prices and stock";
+
+/* Invoices */
+"invoice.title" = "Invoice";
+"invoice.open" = "Invoice";
+"invoice.open.sub" = "See it and send it as a PDF";
+"invoice.share" = "Share";
+"invoice.refused.missing" = "This job isn't in the phone's copy of the book. Pull the book again on the shop's Wi-Fi.";
+"invoice.refused.quote" = "This is still a quote. It gets an invoice once the customer accepts it.";
+"invoice.refused.cancelled" = "A cancelled job has no invoice.";
+"invoice.refused.not_numbered" = "This invoice needs its number first. Open it once on the Mac or PC, which numbers it, then it shows here.";
+"invoice.refused.failed" = "The invoice couldn't be made. Try again, or open it on the Mac or PC.";

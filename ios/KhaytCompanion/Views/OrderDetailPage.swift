@@ -25,6 +25,7 @@ struct OrderDetailPage: View {
     @State private var whatsApp: KhaytAPIClient.WhatsAppOffer?
     @State private var writingWhatsApp = false
     @State private var photoAccess: KhaytAPIClient.PhotoAccess?
+    @State private var showingInvoice = false
 
     init(order: QueueOrder, facts: OrderFacts?, onChanged: @escaping () async -> Void) {
         _order = State(initialValue: order)
@@ -43,6 +44,13 @@ struct OrderDetailPage: View {
                                onAssignMachine: { id in Task { await assignMachine(id) } })
             if let payment {
                 PaymentCard(state: payment, currency: currency) { recordingPayment = true }
+                    .padding(.horizontal, 16).padding(.bottom, 16)
+            }
+            // A quote or a cancelled job has no invoice; the page says why for
+            // the rarer cases (waiting for approval, not numbered yet).
+            if order.status != "quote", order.status != "cancelled" {
+                Button { showingInvoice = true } label: { InvoiceCard() }
+                    .buttonStyle(.plain)
                     .padding(.horizontal, 16).padding(.bottom, 16)
             }
             if let whatsApp {
@@ -66,6 +74,7 @@ struct OrderDetailPage: View {
         .sheet(isPresented: $writingWhatsApp, onDismiss: { Task { whatsApp = await api.whatsAppOffer(orderId: order.id) } }) {
             WhatsAppSheet(orderId: order.id)
         }
+        .navigationDestination(isPresented: $showingInvoice) { InvoicePage(orderId: order.id) }
         .background(KhaytDesign.ground.ignoresSafeArea())
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
@@ -92,6 +101,8 @@ struct OrderDetailPage: View {
             #if DEBUG
             // `-KhaytWASheet YES` with `-KhaytOpen order:<id>`: the sheet, for screenshots.
             if whatsApp != nil, UserDefaults.standard.bool(forKey: "KhaytWASheet") { writingWhatsApp = true }
+            // `-KhaytInvoice YES` with `-KhaytOpen order:<id>`: the invoice, for screenshots.
+            if UserDefaults.standard.bool(forKey: "KhaytInvoice") { showingInvoice = true }
             #endif
         }
         .watchesPrinters(when: order.status == "printing" && order.machineId != nil)
@@ -153,6 +164,28 @@ struct OrderDetailPage: View {
                                machine: machine, machineId: machineId, dueDate: order.dueDate,
                                priority: order.priority)
         }
+    }
+}
+
+/// The way into a job's invoice.
+struct InvoiceCard: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "doc.text.fill").foregroundStyle(KhaytDesign.brandV2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L10n.tr("invoice.open"))
+                    .font(.khayt(14.5, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(KhaytDesign.ink)
+                Text(L10n.tr("invoice.open.sub"))
+                    .font(.khayt(12, relativeTo: .caption))
+                    .foregroundStyle(KhaytDesign.note)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.forward").flipsForRightToLeftLayoutDirection(true)
+                .font(.caption).foregroundStyle(KhaytDesign.note)
+        }
+        .padding(14)
+        .card()
     }
 }
 

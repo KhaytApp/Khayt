@@ -938,6 +938,15 @@ final class KhaytAPIClient: ObservableObject {
         return try await reader.catalogue(language: L10n.usesArabicLayout ? "ar" : "en")
     }
 
+    // MARK: - Invoices
+
+    /// A job's invoice, built from the book this phone keeps — or why not.
+    func invoice(orderId: String) async -> InvoiceBuild {
+        guard let reader, holdsBook else { return .refused(.missing) }
+        return (try? await reader.invoice(orderId: orderId, language: L10n.usesArabicLayout ? "ar" : "en"))
+            ?? .refused(.failed)
+    }
+
     // MARK: - The shop's library
 
     /// The built-in sample shop is open: nothing here talks to a Mac.

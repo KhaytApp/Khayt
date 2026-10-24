@@ -1,0 +1,502 @@
+/* -----------------------------------------------------------
+   The document a customer is handed.
+   ============================================================
+   Extracted from styles.css so the native Mac app can print the
+   SAME invoice: the html is lib/invoice-document.js and this is
+   what it looks like. Two stylesheets would be two documents
+   that agree until one of them is edited.
+
+   Loaded by renderer/index.html and renderer/bedready.html, and
+   bundled into mac/KhaytCore as a resource.
+   ----------------------------------------------------------- */
+
+/* -----------------------------------------------------------
+   Print — invoice
+   ============================================================
+   We render the invoice into #invoice-print-area, which is
+   hidden on screen and only visible in the print stream.
+   ----------------------------------------------------------- */
+#invoice-print-area { display: none; }
+#label-print-area { display: none; }
+
+/* Label sheet (orders / spools) — grid of QR labels. Hidden on screen; the
+   .printing-labels class on <html> reveals only this area for window.print(). */
+html.printing-labels body * { visibility: hidden !important; }
+html.printing-labels #label-print-area,
+html.printing-labels #label-print-area * { visibility: visible !important; }
+html.printing-labels #label-print-area {
+  display: block !important; position: absolute; inset-inline-start: 0; top: 0; width: 100%;
+  background: #fff; color: #111;
+}
+#label-print-area .label-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8mm; }
+#label-print-area .lbl-card { display: flex; gap: 10px; align-items: center; border: 1px solid #bbb; border-radius: 6px; padding: 10px; break-inside: avoid; }
+#label-print-area .lbl-qr { width: 90px; height: 90px; flex-shrink: 0; }
+#label-print-area .lbl-title { font-weight: 700; font-size: 14px; margin-bottom: 3px; }
+#label-print-area .lbl-line { font-size: 11px; color: #333; }
+#label-print-area .lbl-sub { font-size: 10px; color: #777; margin-top: 4px; }
+#label-print-area .lbl-heading { font-size: 13px; font-weight: 600; margin: 0 0 6mm; }
+@media print { html.printing-labels { background: #fff; } html.printing-labels @page { size: A4; margin: 12mm; } }
+
+@media print {
+  @page { size: A4; margin: 18mm; }
+  body, html { background: #fff !important; color: #000 !important; overflow: visible !important; }
+  body * { visibility: hidden; }
+  #invoice-print-area, #invoice-print-area * { visibility: visible; }
+  #invoice-print-area {
+    display: block;
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    background: #fff;
+    color: #1a1a1a;
+    font-family: "SF Pro Text", "Segoe UI", "Tajawal", "Cairo", Arial, sans-serif;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+}
+
+/* ============================================================
+   INVOICE — print template
+   Refined layout, brand mark, accent palette, single-language
+   primary labels with secondary language as muted subtext.
+   ============================================================ */
+.inv {
+  --ink:       #1a1410;
+  --ink-soft:  #4a4540;
+  --ink-mute:  #8a857f;
+  --line:      #e2dcd2;
+  --line-soft: #f0ead8;
+  --cream:     #faf5ee;
+  --brand:     #5E2E14;
+  --accent:    #B8723D;
+  --highlight: #fcefdc;
+
+  max-width: 760px;
+  margin: 0 auto;
+  color: var(--ink);
+  font-family: "SF Pro Text", "Segoe UI", "Helvetica Neue", "Tajawal", "Cairo", Arial, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+}
+
+/* ---------- Document templates (branding presets; structure-safe) ----------
+   classic = default. modern = accent header band + thicker bar. minimal =
+   no color bar, lighter borders, restrained accent. Applied on .inv-wrap. */
+.inv-tmpl-modern .inv-top-bar { height: 10px; }
+.inv-tmpl-modern .inv .inv-header {
+  background: var(--brand);
+  margin: -28px -28px 26px;
+  padding: 26px 28px;
+  border-bottom: 0;
+  border-radius: 0 0 10px 10px;
+}
+.inv-tmpl-modern .inv .inv-header,
+.inv-tmpl-modern .inv .inv-header h1,
+.inv-tmpl-modern .inv .inv-header .biz-tagline,
+.inv-tmpl-modern .inv .inv-header .biz-meta p { color: #fff; }
+.inv-tmpl-modern .inv .inv-header .biz-meta { opacity: 0.92; }
+.inv-tmpl-modern .inv .inv-header .mark { background: #fff; border-radius: 8px; padding: 4px; }
+
+.inv-tmpl-minimal .inv-top-bar { display: none; }
+.inv-tmpl-minimal .inv { --line: #eee; --line-soft: #f5f5f5; --highlight: #f6f6f6; }
+.inv-tmpl-minimal .inv .inv-header { border-bottom-width: 2px; padding-bottom: 18px; margin-bottom: 22px; }
+
+.inv .ar  { font-family: "SF Arabic", "Geeza Pro", "Tajawal", "Cairo", Arial, sans-serif; direction: rtl; }
+.inv .ltr { direction: ltr; unicode-bidi: isolate; }
+.inv .sub { font-weight: 500; color: var(--ink-mute); margin-inline-start: 4px; }
+
+/* When the invoice itself is RTL, the secondary English labels need to
+   render as LTR isolates so they don't run into the Arabic text. */
+.inv[dir="rtl"] .sub.ltr { direction: ltr; unicode-bidi: isolate; }
+.inv[dir="ltr"] .sub.ar  { direction: rtl; unicode-bidi: isolate; }
+
+/* ---------- Header ---------- */
+.inv .inv-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 30px;
+  padding-bottom: 26px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid var(--line);
+}
+.inv .inv-header .biz {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+.inv .inv-header .mark svg { width: 100%; height: 100%; display: block; }
+.inv .inv-header .biz-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+.inv .inv-header .biz-name h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--brand);
+}
+.inv .inv-header .biz-name .biz-ar {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  direction: rtl;
+}
+.inv .inv-header .biz-name .biz-meta {
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--ink-mute);
+  line-height: 1.55;
+}
+.inv .inv-header .biz-name .biz-meta p { margin: 0; }
+.inv .inv-header .biz-name .biz-meta .ar-line { direction: rtl; }
+
+.inv .inv-header .doc {
+  text-align: end;
+  flex-shrink: 0;
+  min-width: 200px;
+}
+.inv .inv-header .doc .title {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0;
+  color: var(--ink);
+  line-height: 1;
+}
+.inv .inv-header .doc .title-ar {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink-mute);
+  margin: 2px 0 0;
+  direction: rtl;
+}
+.inv .inv-header .doc .meta {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+.inv .inv-header .doc .meta-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 10px;
+}
+.inv .inv-header .doc .meta-row .k {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-mute);
+}
+.inv .inv-header .doc .meta-row .v {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* ---------- Bill To strip ---------- */
+.inv .bill-to {
+  background: var(--cream);
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.inv .bill-to .label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-mute);
+  font-weight: 600;
+  min-width: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.inv .bill-to .label .sub {
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-soft);
+  font-weight: 500;
+  margin: 0;
+}
+.inv .bill-to .name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--brand);
+}
+.inv .bill-to .name-sub {
+  font-size: 11.5px;
+  color: var(--ink-mute);
+  margin-top: 2px;
+}
+
+/* ---------- Lines table ---------- */
+.inv table.lines {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+}
+.inv table.lines thead th {
+  text-align: start;
+  padding: 10px 8px;
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-mute);
+  background: transparent;
+  border-bottom: 1.5px solid var(--ink);
+  vertical-align: bottom;
+}
+.inv table.lines thead th .sub {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-mute);
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 1px 0 0;
+}
+/* Right-side amount column header — text-anchor end so the "Amount" label
+   aligns with the column's numeric content in both directions */
+.inv table.lines thead th.th-amount { text-align: end; }
+.inv table.lines thead th.th-amount .sub { text-align: end; }
+.inv table.lines td {
+  padding: 14px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  font-size: 12px;
+}
+/* The drawn Saudi Riyal mark — see RIYAL_SVG in lib/invoice-document.js for
+   why this is geometry rather than U+20C1.
+
+   Sized in `em` so it tracks whatever text it lands in: it appears at three
+   different sizes on one document (line amounts, the totals block, the
+   instalment table) and a fixed pixel height would be wrong in two of them.
+   The width is the viewBox's own ratio, 1124.14 / 1256.39 = 0.895, so the
+   mark cannot squash however the box around it is sized. `-0.075em` drops it
+   off the text baseline to sit with the digits: the glyph has no descender
+   and would otherwise float above them.
+
+   `print-color-adjust` because it inherits `currentColor` from a muted span
+   in the line rows, and a print pipeline that decides to "help" by forcing
+   graphics to black would make the mark darker than the figure beside it. */
+.inv .riyal {
+  height: .72em;
+  width: .645em;          /* .72em x 0.895 — the viewBox ratio */
+  vertical-align: -0.075em;
+  display: inline-block;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.inv table.lines td.num { text-align: end; font-variant-numeric: tabular-nums; }
+.inv table.lines td.center { text-align: center; font-variant-numeric: tabular-nums; }
+.inv table.lines td.amount {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink);
+}
+.inv table.lines td .desc-en {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 12.5px;
+}
+.inv table.lines td .meta {
+  font-size: 10.5px;
+  color: var(--ink-mute);
+  margin-top: 3px;
+  letter-spacing: -0.003em;
+}
+
+/* ---------- Totals block ---------- */
+.inv .totals {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 30px;
+  margin: 28px 0 16px;
+  align-items: start;
+}
+.inv .totals .qr-box {
+  text-align: start;
+}
+.inv .totals .qr-box .qr-svg {
+  display: inline-block;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.inv .totals .qr-box .qr-svg svg {
+  width: 110px;
+  height: 110px;
+  display: block;
+}
+.inv .totals .qr-box .qr-label {
+  font-size: 9.5px;
+  color: var(--ink-mute);
+  margin-top: 8px;
+  letter-spacing: 0.02em;
+  max-width: 200px;
+  line-height: 1.4;
+}
+.inv .totals .qr-box .qr-label .sub {
+  display: block;
+  margin: 2px 0 0;
+}
+
+.inv .totals .summary { padding-top: 4px; }
+.inv .totals .summary .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 0;
+  font-size: 12px;
+}
+.inv .totals .summary .row .label-en {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.inv .totals .summary .row .v {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--ink);
+}
+.inv .totals .summary .row.grand {
+  margin-top: 10px;
+  padding: 14px 16px;
+  background: var(--highlight);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 4px;
+}
+.inv .totals .summary .row.grand .label-en {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand);
+}
+.inv .totals .summary .row.grand .label-ar {
+  display: block;
+  font-size: 10.5px;
+  color: var(--ink-mute);
+  font-weight: 500;
+  margin-top: 1px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.inv .totals .summary .row.grand .v {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--brand);
+  letter-spacing: -0.02em;
+}
+.inv .totals .summary .row.grand .v .unit {
+  font-size: 12px;
+  color: var(--ink-mute);
+  margin-inline-start: 4px;
+  font-weight: 500;
+}
+
+/* ---------- Footer ---------- */
+.inv .footer {
+  margin-top: 36px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.inv .footer .thanks {
+  font-size: 13px;
+  color: var(--brand);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.inv .footer .thanks-ar {
+  font-size: 12.5px;
+  direction: rtl;
+  color: var(--ink-soft);
+  margin-top: 4px;
+  font-weight: 500;
+}
+.inv .footer .legal {
+  margin-top: 14px;
+  font-size: 9.5px;
+  color: var(--ink-mute);
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+}
+
+/* ---------- Top accent bar (brand colour stripe at the top) ---------- */
+.inv-top-bar {
+  height: 5px;
+  border-radius: 3px 3px 0 0;
+  margin-bottom: -1px;
+}
+
+/* ---------- Larger mark / logo area ---------- */
+.inv .inv-header .mark {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+}
+
+/* ---------- Tagline under business name ---------- */
+.inv .inv-header .biz-name .biz-tagline {
+  font-size: 11px;
+  color: var(--ink-mute);
+  font-style: italic;
+  margin: 1px 0 2px;
+  letter-spacing: 0.01em;
+}
+.inv .inv-header .biz-name .biz-tagline.sec {
+  font-size: 10.5px;
+  direction: rtl;
+}
+
+/* ---------- Terms & conditions section ---------- */
+.inv .inv-terms {
+  margin: 18px 0 10px;
+  padding: 14px 18px;
+  background: var(--cream);
+  border-radius: 6px;
+  border-inline-start: 3px solid var(--line);
+}
+.inv .inv-terms .label-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-mute);
+}
+.inv .inv-terms .inv-terms-body {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  line-height: 1.65;
+  margin: 0;
+  white-space: pre-wrap;
+}
+.inv .inv-terms .inv-terms-body.sec {
+  margin-top: 6px;
+  direction: rtl;
+  color: var(--ink-mute);
+}
+

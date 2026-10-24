@@ -833,3 +833,14 @@
 "catalogue.price.rounded" = "مقرّب من السعر المحسوب";
 "catalogue.price.calculated" = "محسوب";
 "home.catalogue.sub" = "ما تبيعه، بأسعاره ومخزونه";
+
+/* Invoices */
+"invoice.title" = "الفاتورة";
+"invoice.open" = "الفاتورة";
+"invoice.open.sub" = "اعرضها وأرسلها ملف PDF";
+"invoice.share" = "مشاركة";
+"invoice.refused.missing" = "هذا الطلب غير موجود في نسخة الجوال من الدفتر. اسحب الدفتر من جديد على شبكة المتجر.";
+"invoice.refused.quote" = "هذا ما زال عرض سعر، وتصدر فاتورته بعد موافقة العميل.";
+"invoice.refused.cancelled" = "الطلب الملغى ليس له فاتورة.";
+"invoice.refused.not_numbered" = "تحتاج هذه الفاتورة إلى رقمها أولًا. افتحها مرة على الماك أو الكمبيوتر ليعطيها رقمًا، ثم تظهر هنا.";
+"invoice.refused.failed" = "تعذّر إنشاء الفاتورة. حاول مرة أخرى، أو افتحها على الماك أو الكمبيوتر.";
