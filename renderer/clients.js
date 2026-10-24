@@ -763,6 +763,25 @@ function openClientEditor(clientId = null) {
         <input type="checkbox" id="ceMarketingOptOut" style="width:auto;margin:0;" ${draft.marketingOptOut ? 'checked' : ''}>
         <span>${escapeHtml(t('camp.opt_out') || 'Exclude from marketing campaigns')}</span>
       </label>
+      ${(() => {
+        // Consent to OFFERS on WhatsApp, kept apart from consent to order
+        // updates (whatsappOptIn): the shop's WhatsApp Business account sends a
+        // campaign only to a customer ticked here. The date it was first given
+        // stays when only "how" changes.
+        const o = KhaytCampaigns.whatsappOffersOptedIn(draft) ? draft.whatsappMarketingOptIn : null;
+        const how = (o && o.how) || 'asked';
+        const hows = KhaytCampaigns.OFFERS_HOW.includes(how) ? KhaytCampaigns.OFFERS_HOW : [...KhaytCampaigns.OFFERS_HOW, how];
+        return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+            <input type="checkbox" id="ceWabOffers" style="width:auto;margin:0;" ${o ? 'checked' : ''}>
+            <span>${escapeHtml(t('ce.wab_offers'))}</span>
+          </label>
+          <select id="ceWabOffersHow" style="width:auto;font-size:12px;${o ? '' : 'display:none;'}">
+            ${hows.map((h) => `<option value="${escapeHtml(h)}" ${h === how ? 'selected' : ''}>${escapeHtml(KhaytCampaigns.OFFERS_HOW.includes(h) ? t('ce.wab_how_' + h) : h)}</option>`).join('')}
+          </select>
+          ${o ? `<span style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(t('ce.wab_since', { day: localDateStr(new Date(o.at)) }))}</span>` : ''}
+        </div>`;
+      })()}
     </div>
 
     <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border-soft);">
@@ -806,6 +825,10 @@ function openClientEditor(clientId = null) {
     sizeLg: false,
     bodyHtml,
     onMount(modal) {
+      modal.querySelector('#ceWabOffers')?.addEventListener('change', (e) => {
+        const how = modal.querySelector('#ceWabOffersHow');
+        if (how) how.style.display = e.target.checked ? '' : 'none';
+      });
       modal.querySelectorAll('[data-f]').forEach(input => {
         input.addEventListener('input', () => { draft[input.dataset.f] = input.value; });
       });
@@ -986,6 +1009,11 @@ function openClientEditor(clientId = null) {
         endDate:  modal.querySelector('#recEndDate')?.value || null,
       };
       draft.marketingOptOut = modal.querySelector('#ceMarketingOptOut')?.checked || false;
+      if (modal.querySelector('#ceWabOffers')?.checked) {
+        const was = KhaytCampaigns.whatsappOffersOptedIn(draft) ? draft.whatsappMarketingOptIn : null;
+        draft.whatsappMarketingOptIn = { ...(was || {}), at: was ? was.at : new Date().toISOString(),
+          how: modal.querySelector('#ceWabOffersHow')?.value || 'asked' };
+      } else delete draft.whatsappMarketingOptIn;
       draft.currency = modal.querySelector('#ceCurrency')?.value || null;
       draft.creditLimit = Math.max(0, num(modal.querySelector('#ceCreditLimit')?.value, 0)) || 0;
       draft.source = modal.querySelector('[data-f="source"]')?.value || 'other';
@@ -1481,6 +1509,11 @@ function openCampaignModal() {
   const fmtMoney = (n) => (typeof fmtPrice === 'function' ? fmtPrice(n) : String(n));
   const emailReady = (settings.emailConfig?.provider || 'none') !== 'none';
   const smsReady = (settings.smsConfig?.provider || 'none') !== 'none';
+  // The shop's own WhatsApp Business account sends approved templates only —
+  // free text is refused for anyone who has not written in the last 24 hours —
+  // so it is its own channel, with a template in place of a message.
+  const wabReady = settings.smsConfig?.provider === 'whatsapp_cloud';
+  const wabTpl = settings.campaignWaTemplate || {};
 
   const criteriaFrom = (modal) => {
     const c = {};
@@ -1506,7 +1539,8 @@ function openCampaignModal() {
         <div><label style="margin-top:0;">${escapeHtml(t('camp.channel') || 'Channel')}</label>
           <select id="campChannel">
             ${emailReady ? `<option value="email">${escapeHtml(t('camp.ch_email') || 'Email')}</option>` : ''}
-            ${smsReady ? `<option value="whatsapp">WhatsApp</option><option value="sms">SMS</option>` : ''}
+            ${wabReady ? `<option value="whatsapp_business">${escapeHtml(t('camp.ch_wab'))}</option>`
+              : smsReady ? `<option value="whatsapp">WhatsApp</option><option value="sms">SMS</option>` : ''}
             ${!emailReady && !smsReady ? `<option value="">${escapeHtml(t('camp.no_channel') || 'Configure email or SMS in Settings first')}</option>` : ''}
           </select>
         </div>
@@ -1525,9 +1559,16 @@ function openCampaignModal() {
         <select id="campTier"><option value="">${escapeHtml(t('camp.any') || 'any')}</option>${tierNames.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}</select>` : ''}
       <label style="margin-top:10px;" id="campSubjLabel">${escapeHtml(t('camp.subject') || 'Subject (email)')}</label>
       <input id="campSubject" maxlength="160" placeholder="${escapeHtml(t('camp.subject_ph') || 'A note from {{name}}…')}">
-      <label style="margin-top:8px;">${escapeHtml(t('camp.message') || 'Message')}</label>
+      <div class="inline-pair" id="campWabFields" style="margin-top:8px;display:none;">
+        <div><label style="margin-top:0;">${escapeHtml(t('camp.wab_template'))}</label>
+          <input id="campWabName" maxlength="512" placeholder="spring_offer" value="${escapeHtml(wabTpl.name || '')}" dir="ltr"></div>
+        <div><label style="margin-top:0;">${escapeHtml(t('camp.wab_language'))}</label>
+          <input id="campWabLang" maxlength="6" placeholder="ar, en, en_US" value="${escapeHtml(wabTpl.language || (settings.lang === 'ar' ? 'ar' : 'en'))}" dir="ltr"></div>
+      </div>
+      <label style="margin-top:8px;" id="campBodyLabel">${escapeHtml(t('camp.message') || 'Message')}</label>
       <textarea id="campBody" rows="4" placeholder="${escapeHtml(t('camp.body_ph') || 'Hi {{name}}, …')}"></textarea>
-      <p style="font-size:11px;color:var(--text-muted);margin:4px 0 0;">${escapeHtml(t('camp.merge_hint') || 'Merge fields: {{name}} {{orders}} {{spend}} {{last_order}} · opted-out customers are skipped.')}</p>
+      <p style="font-size:11px;color:var(--text-muted);margin:4px 0 0;" id="campMergeHint">${escapeHtml(t('camp.merge_hint') || 'Merge fields: {{name}} {{orders}} {{spend}} {{last_order}} · opted-out customers are skipped.')}</p>
+      <p style="font-size:11px;color:var(--text-muted);margin:4px 0 0;display:none;" id="campWabHint">${escapeHtml(t('camp.wab_hint'))}</p>
       <div style="margin-top:8px;font-size:12.5px;"><strong id="campCount">0</strong> ${escapeHtml(t('camp.recipients') || 'recipients')}</div>
       <div id="campPreview" style="margin-top:6px;font-size:12px;color:var(--text-muted);white-space:pre-wrap;"></div>
       <span id="campResult" style="font-size:12px;display:block;margin-top:6px;"></span>`,
@@ -1536,11 +1577,19 @@ function openCampaignModal() {
         const ch = channelOf(modal);
         modal.querySelector('#campSubjLabel').style.display = ch === 'email' ? '' : 'none';
         modal.querySelector('#campSubject').style.display = ch === 'email' ? '' : 'none';
+        const wab = ch === 'whatsapp_business';
+        modal.querySelector('#campWabFields').style.display = wab ? '' : 'none';
+        modal.querySelector('#campWabHint').style.display = wab ? '' : 'none';
+        modal.querySelector('#campMergeHint').style.display = wab ? 'none' : '';
+        modal.querySelector('#campBodyLabel').textContent = wab ? t('camp.wab_values') : (t('camp.message') || 'Message');
         const recips = ch ? recipientsOf(modal) : [];
         modal.querySelector('#campCount').textContent = recips.length;
         const sample = recips[0];
+        const body = modal.querySelector('#campBody').value;
         modal.querySelector('#campPreview').textContent = sample
-          ? (t('camp.preview') || 'Preview') + ' → ' + sample.contact + ':\n' + KhaytCampaigns.fillTemplate(modal.querySelector('#campBody').value, sample, fmtMoney, settings)
+          ? (t('camp.preview') || 'Preview') + ' → ' + sample.contact + ':\n' + (wab
+            ? KhaytCampaigns.templateValues(body, sample, fmtMoney, settings).map((v, i) => `{{${i + 1}}} ${v}`).join('\n')
+            : KhaytCampaigns.fillTemplate(body, sample, fmtMoney, settings))
           : '';
       };
       // Debounce: segmentation is O(clients × orders), so don't recompute per keystroke.
@@ -1558,10 +1607,17 @@ function openCampaignModal() {
       const body = modal.querySelector('#campBody').value.trim();
       if (!body) { res.textContent = '✗ ' + (t('camp.need_body') || 'Write a message first'); res.style.color = 'var(--danger)'; return false; }
       const subject = modal.querySelector('#campSubject').value.trim();
+      const wab = ch === 'whatsapp_business';
+      const template = wab ? { name: modal.querySelector('#campWabName').value.trim(), language: modal.querySelector('#campWabLang').value.trim() } : null;
+      if (wab && !(/^[a-z0-9_]{1,512}$/.test(template.name) && /^[a-z]{2,3}(_[A-Z]{2})?$/.test(template.language))) {
+        res.textContent = '✗ ' + t('camp.wab_need_template'); res.style.color = 'var(--danger)'; return false;
+      }
       const recips = recipientsOf(modal);
       if (!recips.length) { res.textContent = '✗ ' + (t('camp.none') || 'No recipients match'); res.style.color = 'var(--danger)'; return false; }
       if (!(await confirmModal((t('camp.confirm', { n: recips.length }) || `Send to ${recips.length} customers?`)))) return false;
       let sent = 0, failed = 0;
+      const reasons = {};
+      if (wab) settings.campaignWaTemplate = template;
       const btn = modal.querySelector('.modal-save'); if (btn) btn.disabled = true;
       for (let i = 0; i < recips.length; i++) {
         const r = recips[i];
@@ -1576,6 +1632,11 @@ function openCampaignModal() {
             const html = KhaytCampaigns.fillTemplate(body, r, fmtMoney, settings, { html: true });
             ok = await window.hubAPI.sendEmail({ to: r.contact, subject: KhaytCampaigns.fillTemplate(subject || 'Khayt', r, fmtMoney, settings), body: html.replace(/\n/g, '<br>'), smtpConfig: settings.emailConfig });
           }
+          else if (wab) {
+            ok = await window.hubAPI.sendWhatsappTemplate({ to: r.contact, template,
+              params: KhaytCampaigns.templateValues(body, r, fmtMoney, settings), smsConfig: settings.smsConfig });
+            if (ok && !ok.ok) reasons[ok.reason || 'failed'] = (reasons[ok.reason || 'failed'] || 0) + 1;
+          }
           else ok = await window.hubAPI.sendSms({ to: r.contact, message: msg, channel: ch, smsConfig: settings.smsConfig });
           (ok && ok.ok) ? sent++ : failed++;
         } catch (e) { failed++; }
@@ -1585,7 +1646,13 @@ function openCampaignModal() {
       settings.campaignLog = (settings.campaignLog || []).slice(-49);
       settings.campaignLog.push({ at: new Date().toISOString(), channel: ch, recipients: recips.length, sent, failed });
       saveAll();
-      res.textContent = `✓ ${t('camp.done') || 'Sent'}: ${sent}${failed ? ` · ${failed} ${t('camp.failed') || 'failed'}` : ''}`;
+      // Meta's commonest refusal, in words the shop can act on: a template
+      // name typed wrong fails every customer for the same reason.
+      const known = ['bad_token', 'bad_phone_number_id', 'template_missing', 'template_paused', 'not_on_whatsapp', 'rate_limited'];
+      let top = Object.keys(reasons).sort((a, b) => reasons[b] - reasons[a])[0];
+      if (top === 'template_disabled') top = 'template_paused';
+      const why = top ? ` (${t(known.includes(top) ? 'wab.reason.' + top : 'wab.reason.other')})` : '';
+      res.textContent = `✓ ${t('camp.done') || 'Sent'}: ${sent}${failed ? ` · ${failed} ${t('camp.failed') || 'failed'}${why}` : ''}`;
       res.style.color = failed ? 'var(--warning)' : 'var(--success)';
       if (btn) btn.disabled = false;
       return false; // keep open to show the result

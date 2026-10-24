@@ -58,10 +58,47 @@ function matchesSegment(client, stats, criteria, now, opts) {
   return true;
 }
 
-/** The contact value for a channel, or '' if the client can't be reached there. */
+/**
+ * The phone rule WhatsApp sends by, however this file was loaded (the same
+ * script-tag-or-require resolution as `CL` below). Looked up when asked,
+ * not at load, so the order of the script tags does not decide it.
+ */
+const waApi = () => (typeof KhaytWhatsappMessage !== 'undefined') ? KhaytWhatsappMessage
+  : (typeof require === 'function' ? require('./whatsapp-message.js') : null);
+
+/**
+ * Whether the customer agreed to OFFERS on WhatsApp.
+ *
+ * Its own field, apart from `whatsappOptIn`: that one is agreeing to hear
+ * about your order, and an offer is not your order. `whatsappMarketingOptIn:
+ * { at, how }` — when, and how it was given (`asked`, `form`,
+ * `customer_wrote`, `other`), the same shape — and removing the field is
+ * withdrawing it. A shop's WhatsApp Business account writes first, so Meta
+ * holds it to having asked; this is the record that it did.
+ */
+const OFFERS_HOW = ['asked', 'form', 'customer_wrote', 'other'];
+function whatsappOffersOptedIn(client) {
+  const o = client && client.whatsappMarketingOptIn;
+  return !!(o && typeof o === 'object' && String(o.at || '').trim());
+}
+
+/**
+ * The contact value for a channel, or '' if the client can't be reached there.
+ *
+ * `whatsapp_business` is the shop's own WhatsApp Business account: an
+ * approved template to a customer who agreed to offers there, at a number
+ * WhatsApp can dial (digits, country code first). A number that can't be
+ * made into one is not guessed at — an offer to a stranger is worse than none.
+ */
 function channelContact(client, channel) {
   if (!client || client.marketingOptOut) return '';
   if (channel === 'email') return String(client.email || '').trim();
+  if (channel === 'whatsapp_business') {
+    const WA = waApi();
+    if (!whatsappOffersOptedIn(client) || !WA) return '';
+    const n = WA.normalizePhone(client.phone);
+    return n.ok ? n.digits : '';
+  }
   return String(client.phone || '').trim(); // sms / whatsapp
 }
 
@@ -134,7 +171,20 @@ function fillTemplate(text, recipient, fmtMoney, settings, opts) {
     .replace(/\{\{\s*last_order\s*\}\}/gi, () => out(s.lastOrderDate || ''));
 }
 
-const api = { clientStats, daysSinceLastOrder, matchesSegment, channelContact, segmentRecipients, fillTemplate };
+/**
+ * The values for an approved template's numbered slots, one per line of what
+ * the shop wrote: line 1 fills {{1}}, line 2 fills {{2}}. Each line takes the
+ * same merge fields as a message, so `{{name}}` on line 1 is the customer's
+ * name in slot 1. Blank lines are dropped — a template has no empty slot.
+ */
+function templateValues(text, recipient, fmtMoney, settings) {
+  return String(text == null ? '' : text).split(/\r?\n/)
+    .map((line) => fillTemplate(line, recipient, fmtMoney, settings).trim())
+    .filter(Boolean);
+}
+
+const api = { clientStats, daysSinceLastOrder, matchesSegment, channelContact, segmentRecipients, fillTemplate,
+  OFFERS_HOW, whatsappOffersOptedIn, templateValues };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof globalThis !== 'undefined') globalThis.KhaytCampaigns = api;
 

@@ -389,6 +389,7 @@ function renderSmsNotificationSettings() {
           <div><label style="margin-top:0;">Phone Number ID</label><input id="smsWaId" value="${v(cfg.phoneNumberId)}" placeholder="1234567890" style="font-size:12.5px;"></div>
           <div><label style="margin-top:0;">Access Token</label><input id="smsWaToken" type="password" value="${v(cfg.token)}" placeholder="EAA…" style="font-size:12.5px;"></div>
         </div>
+        <p style="font-size:11.5px;color:var(--text-muted);margin:6px 0 0;">${escapeHtml(t('wab.hint'))}</p>
       </div>
       <div data-prov="unifonic" style="${prov === 'unifonic' ? '' : 'display:none;'}">
         <div class="inline-pair">
@@ -439,9 +440,22 @@ function renderSmsNotificationSettings() {
   el.querySelector('#btnTestSms')?.addEventListener('click', async () => {
     const res = el.querySelector('#smsTestResult');
     const to = (settings.phone || '').trim();
-    if (!to) { res.textContent = t('sms.need_phone') || 'Set your shop phone in Settings to test.'; res.style.color = 'var(--danger)'; return; }
+    if (!to && el.querySelector('#smsProvider').value !== 'whatsapp_cloud') { res.textContent = t('sms.need_phone') || 'Set your shop phone in Settings to test.'; res.style.color = 'var(--danger)'; return; }
     res.textContent = '…';
     settings.smsConfig = collect(); saveAll();
+    if (settings.smsConfig.provider === 'whatsapp_cloud') {
+      // The WhatsApp Business account writes first only with an approved
+      // template, so a test text would be refused. Ask Meta about the account
+      // instead: it names the number and business, and messages nobody.
+      const c = await window.hubAPI?.checkWhatsapp?.({ smsConfig: settings.smsConfig });
+      if (c?.ok) { res.textContent = '✓ ' + t('wab.test_ok', { number: c.number, name: c.name }); res.style.color = 'var(--success)'; }
+      else {
+        const k = ['bad_token', 'bad_phone_number_id', 'rate_limited'].includes(c?.reason) ? 'wab.reason.' + c.reason : 'wab.reason.other';
+        res.textContent = '✗ ' + t(k) + (k === 'wab.reason.other' && c?.title ? ': ' + c.title : '');
+        res.style.color = 'var(--danger)';
+      }
+      return;
+    }
     const r = await window.hubAPI?.sendSms?.({ to, message: 'Khayt test message — notifications are working.', channel: settings.smsConfig.channel, smsConfig: settings.smsConfig });
     if (r?.ok) { res.textContent = '✓ ' + (t('sms.test_sent') || 'Sent'); res.style.color = 'var(--success)'; }
     else { res.textContent = '✗ ' + (r?.error || r?.status || 'failed'); res.style.color = 'var(--danger)'; }

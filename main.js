@@ -121,7 +121,7 @@ const bambu = require('./lib/bambu');
 const { bambuFtpUpload } = require('./lib/bambu-ftp');
 const { resolvePrinterTarget } = require('./lib/main/printer-target');
 const printerUpload = require('./lib/printer-upload');
-const { sendSms } = require('./lib/sms');
+const { sendSms, sendWhatsappTemplate, checkWhatsapp } = require('./lib/sms');
 const cloudClient = require('./lib/cloud-client');
 const { summarizeBranch, totalBranches } = require('./lib/branch-summary');
 const aiTools = require('./lib/ai-tools');
@@ -2588,6 +2588,12 @@ async function printLibRehydrate(fullPath) {
     catch (_) { side = null; }
     if (!side) return { ok: false, error: 'The record of this file in the cloud is unreadable.' };
 
+    // The Mac can move a model to the Khayt Vault, and only the Mac has a
+    // vault client. Asked of the bucket instead (as any other provider would
+    // be), it failed with a missing-key error that named the wrong place.
+    if (String(side.provider || '').trim() === 'vault') {
+      return { ok: false, error: 'This file is in the Khayt Vault, which only the Khayt Mac app can open. Bring it back on the Mac.' };
+    }
     const remotes = printLibRemotesFor(side.provider);
     if (!remotes.length) return { ok: false, error: 'This file is in cloud storage, but no bucket or Google Drive is connected. Add the credentials in Settings.' };
 
@@ -5618,6 +5624,26 @@ ipcMain.handle('hub:send-sms', async (_e, { to, message, channel, smsConfig } = 
     cfg.secret    = smsSecret(cfg.secret,    d => d?.settings?.smsConfig?.secret);
   } catch (e) { return { ok: false, error: e.message }; }
   return sendSms(provider, cfg, { to, message, channel });
+});
+
+// The shop's WhatsApp Business account: an approved template to one customer,
+// and the settings check that messages nobody. The number id travels from the
+// window; the token resolves from the encrypted store like every SMS secret
+// above (the host is fixed, Meta's, so it is not bound to a URL).
+const waAccount = (smsConfig) => {
+  const cfg = smsConfig ? { ...smsConfig } : {};
+  return { phoneNumberId: String(cfg.phoneNumberId || '').trim(),
+    token: resolveStoreSecret(cfg.token, d => d?.settings?.smsConfig?.token) };
+};
+ipcMain.handle('hub:send-whatsapp-template', async (_e, { to, template, params, smsConfig } = {}) => {
+  let acct;
+  try { acct = waAccount(smsConfig); } catch (e) { return { ok: false, reason: 'bad_token', title: e.message }; }
+  return sendWhatsappTemplate(acct, { to, template, params });
+});
+ipcMain.handle('hub:check-whatsapp', async (_e, { smsConfig } = {}) => {
+  let acct;
+  try { acct = waAccount(smsConfig); } catch (e) { return { ok: false, reason: 'bad_token', title: e.message }; }
+  return checkWhatsapp(acct);
 });
 
 // One-way accounting sync: POST a canonical invoice/expense payload to the
