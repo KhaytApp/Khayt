@@ -1126,6 +1126,10 @@ struct PreferencesPane: View {
     @State private var original = Draft()
     @AppStorage("mac.menuBar") private var menuBar = true
     @AppStorage(Spotlight.defaultsKey) private var spotlight = true
+    @AppStorage(MenuBarStyle.defaultsKey) private var menuBarStyle = MenuBarStyle.ringAndFigures.rawValue
+    @AppStorage(PrintNoticeKind.finished.defaultsKey) private var notifyFinished = true
+    @AppStorage(PrintNoticeKind.failed.defaultsKey) private var notifyFailed = true
+    @AppStorage(PrintNoticeKind.paused.defaultsKey) private var notifyPaused = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1173,6 +1177,25 @@ struct PreferencesPane: View {
                             if on { FloorStatus.shared.install(shop: shop) }
                             else { FloorStatus.shared.remove() }
                         }
+                    // What the item draws: the ring and "64% · 1h 02m", the ring
+                    // alone, or the nozzle as it always was. Mac-local, beside
+                    // the switch above (`MenuBarStyle`).
+                    Picker(shop.words.callIt("mac.mbp_style"), selection: $menuBarStyle) {
+                        ForEach(MenuBarStyle.allCases, id: \.rawValue) { style in
+                            Text(shop.words.callIt(style.wordKey)).tag(style.rawValue)
+                        }
+                    }
+                    .disabled(!menuBar)
+                    .onChange(of: menuBarStyle) { _, _ in FloorStatus.shared.restyle() }
+                    // The print notices this Mac did not send before
+                    // (`PrintNotices.swift`). Faults, runouts and silent
+                    // printers were already notified and have no switch here.
+                    Toggle(shop.words.callIt(PrintNoticeKind.finished.toggleKey), isOn: $notifyFinished)
+                    Toggle(shop.words.callIt(PrintNoticeKind.failed.toggleKey), isOn: $notifyFailed)
+                    Toggle(shop.words.callIt(PrintNoticeKind.paused.toggleKey), isOn: $notifyPaused)
+                    Text(shop.words.callIt("mac.mbp_notify_note"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     // SWITCHING THIS OFF HAS TO UNDO IT.
                     //
                     // A toggle that stops adding to an index but leaves what is

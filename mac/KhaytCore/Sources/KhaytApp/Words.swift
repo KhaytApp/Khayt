@@ -5408,6 +5408,37 @@ final class Words {
                               "ar": "أحد الأجزاء ليست له أسعار خاصة، فتُحتسب العمالة والكهرباء والاستهلاك فيه بأسعارك الافتراضية. لتحديد أسعاره، عدّل الجزء واملأ الحقول أعلاه."],
         "mac.tracking_link_copied": ["en": "Tracking link copied. The customer sees the stage, the shipping and, once done, a short survey.",
                                      "ar": "نُسخ رابط المتابعة. يرى العميل المرحلة والشحن، وبعد الإنجاز استبياناً قصيراً."],
+        // ── Menu bar progress ─────────────────────────────────────────────
+        // The status item's ring and figures, the fleet popover, the menu bar
+        // style picker and the print notifications on this Mac
+        // (`MenuBar.swift`, `MenuBarProgress.swift`, `PrintNotices.swift`).
+        // Every figure, and every machine name inside an Arabic sentence, is
+        // isolated (U+2068/U+2069) so it never drags the line's direction.
+        "mac.mbp_figures": ["en": "{pct}% · {left}", "ar": "\u{2068}{pct}٪\u{2069} · \u{2068}{left}\u{2069}"],
+        "mac.mbp_pct": ["en": "{pct}%", "ar": "\u{2068}{pct}٪\u{2069}"],
+        "mac.mbp_hm": ["en": "{h}h {m}m", "ar": "\u{2068}{h} س {m} د\u{2069}"],
+        "mac.mbp_m": ["en": "{m}m", "ar": "\u{2068}{m} د\u{2069}"],
+        "mac.mbp_more": ["en": "+{n}", "ar": "\u{2068}+{n}\u{2069}"],
+        "mac.mbp_left": ["en": "{left} left", "ar": "المتبقي \u{2068}{left}\u{2069}"],
+        "mac.mbp_done_at": ["en": "done {time}", "ar": "ينتهي \u{2068}{time}\u{2069}"],
+        "mac.mbp_attn_fault": ["en": "Fault", "ar": "عطل"],
+        "mac.mbp_attn_paused": ["en": "Paused", "ar": "متوقفة مؤقتًا"],
+        "mac.mbp_attn_runout": ["en": "Out of filament", "ar": "نفد الخيط"],
+        "mac.mbp_attn_bed": ["en": "Finished · clear the bed", "ar": "انتهت · أفرغ السرير"],
+        "mac.mbp_open_machine": ["en": "Open {machine} in the main window", "ar": "افتح \u{2068}{machine}\u{2069} في النافذة الرئيسية"],
+        "mac.mbp_style": ["en": "Menu bar shows", "ar": "يعرض شريط القوائم"],
+        "mac.mbp_style_ring_figures": ["en": "Progress ring and figures", "ar": "حلقة التقدم والأرقام"],
+        "mac.mbp_style_ring": ["en": "Progress ring only", "ar": "حلقة التقدم فقط"],
+        "mac.mbp_style_glyph": ["en": "Icon only", "ar": "الأيقونة فقط"],
+        "mac.mbp_notify_finished": ["en": "Notify me when a print finishes", "ar": "نبّهني عند انتهاء طباعة"],
+        "mac.mbp_notify_failed": ["en": "Notify me when a print fails", "ar": "نبّهني عند فشل طباعة"],
+        "mac.mbp_notify_paused": ["en": "Notify me when a print is paused", "ar": "نبّهني عند إيقاف طباعة مؤقتًا"],
+        "mac.mbp_notify_note": ["en": "Faults, filament runouts and printers that stop answering are always notified.",
+                                "ar": "تصل دائمًا تنبيهات الأعطال ونفاد الخيط والطابعات التي تتوقف عن الرد."],
+        "mac.mbp_notice_finished": ["en": "{machine} finished printing", "ar": "انتهت \u{2068}{machine}\u{2069} من الطباعة"],
+        "mac.mbp_notice_failed": ["en": "The print on {machine} failed", "ar": "فشلت الطباعة على \u{2068}{machine}\u{2069}"],
+        "mac.mbp_notice_paused": ["en": "{machine} is paused", "ar": "\u{2068}{machine}\u{2069} متوقفة مؤقتًا"],
+
         // ── A printer's working life: under service, retired, deleted ─────
         // (`Shop+MachineLife.swift`, `lib/machine-status.js`).
         "mac.life_badge_service": ["en": "Under service", "ar": "تحت الصيانة"],

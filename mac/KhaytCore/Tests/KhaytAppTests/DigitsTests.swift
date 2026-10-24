@@ -351,7 +351,8 @@ struct DigitsLeftoversTests {
         #expect(grid.contains("Text(verbatim: shop.words.numeral(shop.shownFiles.count))"))
         let menu = try QuoteSheetStatusTests.source("MenuBar.swift")
         #expect(!menu.contains("Text(verbatim: \"\\(status.progress)%\")"))
-        #expect(menu.contains("shop.words.numeral(status.progress) + \"%\""))
+        // The fleet rows (Menu bar progress) say it through `mac.mbp_pct`.
+        #expect(menu.contains("shop.words.numeral(line.progress)"))
         // The live print's figure on the dashboard's floor strip, counted bare.
         let dash = try QuoteSheetStatusTests.source("Dashboard.swift")
         #expect(!dash.contains("Text(\"\\(status?.progress ?? 0)\")"))

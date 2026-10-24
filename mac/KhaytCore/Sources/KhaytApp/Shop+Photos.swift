@@ -174,6 +174,8 @@ extension Shop {
     /// that disagrees with this one about what "finished" means.
     func printFinished(_ ended: FinishCamera.Ended) async {
         lastPrintEnded[ended.machineId] = ended
+        // The notification on this Mac: finished or failed, once per print.
+        noticePrintEnded(ended)
         await settleEnergy(ended)
         await sendPrintFinishedEvent(ended)
     }

@@ -60,9 +60,10 @@ final class FloorStatus {
         guard item == nil else { return }
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = Self.glyph()
-        item.button?.image?.isTemplate = true
+        item.button?.image = StatusGlyph.image(ring: nil, attention: false)
         item.button?.imagePosition = .imageLeading
+        // Monospaced digits, so the item does not jitter as the figures move.
+        item.button?.font = StatusGlyph.font
         item.button?.target = self
         item.button?.action = #selector(toggle)
         self.item = item
@@ -108,15 +109,39 @@ final class FloorStatus {
         popover?.performClose(nil); popover = nil
         if let item { NSStatusBar.system.removeStatusItem(item) }
         item = nil
+        shown = nil
     }
 
     @objc private func tickFired() { refresh() }
 
-    /// The count beside the glyph, or nothing when nothing is running.
+    /// What the item last drew, so a tick that changes nothing redraws nothing.
+    private(set) var shown: FloorRead.Label?
+
+    /// The style picker changed: draw the new one now rather than in five
+    /// seconds.
+    func restyle() { shown = nil; refresh() }
+
+    /// The ring and figures for the print that finishes soonest, "+N" for the
+    /// others, or the nozzle alone — with a dot when a machine wants somebody
+    /// (`FloorRead`). Read off what the shop holds; no printer is asked.
     private func refresh() {
         guard let shop, let button = item?.button else { return }
-        let n = shop.printingNow
-        button.title = n > 0 ? " \(n)" : ""
+        let lines = FloorRead.lines(shop)
+        let label = FloorRead.label(lines, style: MenuBarStyle.current, words: shop.words)
+        guard label != shown else { return }
+        shown = label
+        button.image = StatusGlyph.image(ring: label.ring, attention: label.attention)
+        button.title = label.text.isEmpty ? "" : " " + label.text
+        button.setAccessibilityLabel(FloorPanel.summary(shop))
+    }
+
+    /// A row of the panel, clicked: the machine in the main window, by the
+    /// same road a khayt://machine/<id> link takes (`Activator.application(_:open:)`
+    /// → `Shop.openedLinks` → `follow`), with its permission gate.
+    func open(machine id: String) {
+        popover?.performClose(nil); popover = nil
+        ShopWindowOpener.raise()
+        Shop.openedLinks += [.machine(id)]
     }
 
     @objc private func toggle() {
@@ -126,53 +151,54 @@ final class FloorStatus {
         // while it is not on screen.
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 300, height: 1)
+        popover.contentSize = NSSize(width: 320, height: 1)
         popover.contentViewController = NSHostingController(rootView: FloorPanel(shop: shop).modifier(ShopsLocale(words: shop.words)))
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
         self.popover = popover
     }
-
-    /// The app's own nozzle, drawn once into a template image.
-    private static func glyph() -> NSImage? {
-        let renderer = ImageRenderer(content:
-            NozzleShape().stroke(lineWidth: 1.5).frame(width: 12, height: 15).padding(1))
-        renderer.scale = 2
-        return renderer.nsImage
-    }
 }
 
-/// What the strip shows when it is pulled down.
+/// What the strip shows when it is pulled down: the fleet, problems first.
 ///
 /// Not private: the snapshot runner renders it through `ImageRenderer`, because
 /// a menu bar extra is not a window and the window shot cannot see it. A panel
 /// nobody photographs is a panel that ships however it looks.
+///
+/// READ-ONLY. A row opens its machine in the main window; pausing or
+/// cancelling a print is the machine card's, where the shop can see what it is
+/// about to stop.
 struct FloorPanel: View {
     let shop: Shop
+    /// The job each print belongs to. Looked up when the panel opens (`.task`);
+    /// handed in by the snapshot runner, which cannot wait for a task.
+    @State var jobs: [String: Order] = [:]
+    /// The clock the finish times are read against — fixed by the snapshot.
+    var now: Date? = nil
     @Environment(\.openWindow) private var openWindow
 
+    /// More rows than this scroll, so a farm's panel still fits the screen.
+    static let rowsBeforeScrolling = 7
+
     var body: some View {
+        let lines = FloorRead.lines(shop)
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(shop.shopName).font(.headline)
-                Text(summary).font(.caption).foregroundStyle(.secondary)
+                Text(Self.summary(shop)).font(.caption).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 10)
 
             Divider()
 
             // Retired printers are not on the floor any more (`machinesInUse`).
-            if shop.machinesInUse.isEmpty {
+            if lines.isEmpty {
                 Text(shop.words.callIt("mac.no_machines"))
                     .font(.callout).foregroundStyle(.secondary)
                     .padding(14)
+            } else if lines.count > Self.rowsBeforeScrolling {
+                ScrollView { rows(lines) }.frame(height: 430)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(shop.machinesInUse) { machine in
-                        MachineLine(machine: machine, shop: shop)
-                        if machine.id != shop.machinesInUse.last?.id { Divider().padding(.leading, 14) }
-                    }
-                }
-                .padding(.vertical, 4)
+                rows(lines)
             }
 
             Divider()
@@ -199,11 +225,27 @@ struct FloorPanel: View {
             }
             .padding(.vertical, 5)
         }
-        .frame(width: 300)
+        .frame(width: 320)
+        .task {
+            guard jobs.isEmpty else { return }
+            jobs = await FloorRead.jobs(shop, lines: FloorRead.lines(shop))
+        }
+    }
+
+    @ViewBuilder private func rows(_ lines: [FloorLine]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(lines) { line in
+                FleetRow(line: line, shop: shop, job: jobs[line.id], now: now ?? Date()) {
+                    FloorStatus.shared.open(machine: line.id)
+                }
+                if line.id != lines.last?.id { Divider().padding(.leading, 14) }
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     /// One line saying where the shop stands, chosen so it is never a zero.
-    private var summary: String {
+    static func summary(_ shop: Shop) -> String {
         let printing = shop.printingNow
         if printing == 0 { return shop.words.callIt("mac.nothing_printing") }
         guard let soonest = shop.soonestFinish else {
@@ -214,66 +256,100 @@ struct FloorPanel: View {
     }
 }
 
-/// One machine: what it is doing, how far in, and when it is free.
-private struct MachineLine: View {
-    let machine: Machine
+/// One machine: what it is doing, how far in, when it is free, and which job.
+private struct FleetRow: View {
+    let line: FloorLine
     let shop: Shop
+    let job: Order?
+    let now: Date
+    let open: () -> Void
+    @State private var hovered = false
 
     var body: some View {
-        let status = shop.printers.readings[machine.id]?.status
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 7) {
-                Circle().fill(dot(status)).frame(width: 7, height: 7)
-                Text(machine.name).font(.callout.weight(.medium)).lineLimit(1)
-                Spacer(minLength: 6)
-                if let status, status.progress > 0 {
-                    // In the shop's digits, as the window's own figures are.
-                    Text(verbatim: shop.words.numeral(status.progress) + "%")
-                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+        Button(action: open) {
+            HStack(alignment: .top, spacing: 9) {
+                mark.frame(width: 18, height: 18)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(line.name).font(.callout.weight(.medium)).lineLimit(1)
+                        Spacer(minLength: 6)
+                        trailing
+                    }
+                    if line.printing, let left = line.left {
+                        Text(verbatim: shop.words.callIt("mac.mbp_left",
+                                                         ["left": .string(FloorRead.duration(left, shop.words))])
+                             + " · " + FloorRead.finishes(left, now: now, words: shop.words))
+                            .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    if !line.filename.isEmpty, line.printing || line.attention != nil {
+                        Text(verbatim: line.filename)
+                            .font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.middle)
+                    }
+                    if let job {
+                        Text(verbatim: FloorRead.jobLine(job, shop: shop))
+                            .font(.caption).foregroundStyle(.tertiary)
+                            .lineLimit(1).truncationMode(.tail)
+                    }
+                    if line.rank == .idle || line.rank == .offline {
+                        Text(verbatim: quiet).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+                    }
                 }
             }
-            if let status {
-                if !status.filename.isEmpty {
-                    Text(status.filename).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-                if status.progress > 0 {
-                    ProgressView(value: Double(status.progress) / 100).controlSize(.small)
-                }
-                if let left = status.timeRemaining, left > 0 {
-                    Text(shop.words.callIt("mac.eta") + " " + PrinterWatch.spell(left, shop.words))
-                        .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
-                }
-            } else {
-                // Why there is no reading, rather than a blank that reads as
-                // broken. A machine nobody configured is not a machine that is
-                // failing.
-                Text(quiet).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
-            }
+            .contentShape(Rectangle())
+            .padding(.horizontal, 14).padding(.vertical, 7)
+            .background(hovered ? Color.accentColor.opacity(0.12) : .clear)
         }
-        .padding(.horizontal, 14).padding(.vertical, 7)
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(shop.words.callIt("mac.mbp_open_machine", ["machine": .string(line.name)]))
     }
 
+    @ViewBuilder private var mark: some View {
+        if line.printing {
+            ProgressRing(value: Double(line.progress) / 100,
+                         tint: line.attention == nil ? Khayt.hot : Khayt.attention)
+        } else {
+            Circle().fill(dot).frame(width: 8, height: 8)
+        }
+    }
+
+    @ViewBuilder private var trailing: some View {
+        if let attention = line.attention {
+            HStack(spacing: 4) {
+                Image(systemName: attention == .fault ? "exclamationmark.octagon.fill"
+                                                      : "exclamationmark.triangle.fill")
+                Text(verbatim: shop.words.callIt(attention.wordKey))
+                if line.progress > 0, line.printing || attention == .paused || attention == .runout {
+                    Text(verbatim: shop.words.callIt("mac.mbp_pct", ["pct": .string(shop.words.numeral(line.progress))]))
+                        .monospacedDigit()
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(attention == .fault ? Khayt.late : Khayt.attention)
+        } else if line.printing {
+            Text(verbatim: shop.words.callIt("mac.mbp_pct", ["pct": .string(shop.words.numeral(line.progress))]))
+                .font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(Khayt.hot)
+        }
+    }
+
+    private var dot: Color {
+        switch line.rank {
+        case .attention: line.attention == .fault ? Khayt.late : Khayt.attention
+        case .printing: Khayt.hot
+        case .idle: line.quiet == nil ? Khayt.done : Color(nsColor: .tertiaryLabelColor)
+        case .offline: Color(nsColor: .quaternaryLabelColor)
+        }
+    }
+
+    /// Why there is no print, rather than a blank that reads as broken. A
+    /// machine nobody configured is not a machine that is failing — the same
+    /// sentences the front door's tiles use (`Shop.quiet`).
     private var quiet: String {
-        switch PrinterWatch.notWatched(machine) {
-        case .noConnection: return shop.words.callIt("mac.not_connected")
-        case .otherProtocol(let name):
-            return shop.words.callIt("mac.not_polled", ["protocol": .string(name)])
-        case .underService: return shop.words.callIt("mac.life_not_polled_service")
-        case .retired: return shop.words.callIt("mac.life_not_polled_retired")
-        case nil:
-            return shop.printers.readings[machine.id]?.problem
-                ?? shop.words.callIt("mac.asking")
-        }
-    }
-
-    private func dot(_ status: KhaytEngine.PrinterStatus?) -> Color {
-        guard let status else { return Color(nsColor: .quaternaryLabelColor) }
-        switch status.state {
-        case "printing": return Khayt.hot
-        case "error":    return Khayt.late
-        case "paused":   return Khayt.attention
-        default:         return Khayt.done
-        }
+        guard let quiet = line.quiet else { return shop.words.callIt("mac.idle") }
+        if quiet == .notAnswering, let problem = shop.printers.readings[line.id]?.problem { return problem }
+        return shop.words.callIt(quiet == .noProtocol ? "mac.cannot_ask" : quiet.wordKey)
     }
 }
 
