@@ -52,6 +52,30 @@ struct ImportKeyTests {
         #expect(none == .init(set: false, createdAt: nil))
     }
 
+    @Test("replacing keeps the old key working when asked, reads until when, and can end it early")
+    func overlap() async throws {
+        var seen: [URLRequest] = []
+        let made = try await ImportKeyClient.create(Self.connection, token: "tok", keepPrevious: ImportKeyClient.overlapMinutes) { r in
+            seen.append(r)
+            return try await Self.answer(200, #"{"key":"ik_new","createdAt":"2026-10-24T08:00:00Z","previousUntil":"2026-10-24T10:00:00Z"}"#)(r)
+        }
+        #expect(seen[0].httpMethod == "POST")
+        #expect(seen[0].url?.absoluteString == "https://cloud.khaytapp.com/v1/shops/shop_abc_123/import-key?keepPrevious=120")
+        #expect(made.previousUntil == ISO8601DateFormatter().date(from: "2026-10-24T10:00:00Z"))
+        let st = try await ImportKeyClient.status(Self.connection, token: "tok",
+                                                  fetch: Self.answer(200, #"{"set":true,"createdAt":null,"previousUntil":"2026-10-24T10:00:00Z"}"#))
+        #expect(st.previousUntil != nil)
+        try await ImportKeyClient.endOverlap(Self.connection, token: "tok") { r in
+            seen.append(r)
+            return try await Self.answer(200, #"{"ok":true,"previousUntil":null}"#)(r)
+        }
+        #expect(seen[1].httpMethod == "DELETE")
+        #expect(seen[1].url?.absoluteString == "https://cloud.khaytapp.com/v1/shops/shop_abc_123/import-key?previous=1")
+        // The default replace in the pane keeps the old key; only the second choice stops it.
+        let pane = try Self.source("ImportKey.swift")
+        #expect(pane.contains("which == .replace && keepOld ? ImportKeyClient.overlapMinutes : nil"))
+    }
+
     @Test("the PHP backend's MySQL timestamp is read as UTC")
     func sqlDate() {
         #expect(ImportKeyClient.date("2026-09-26 08:30:00")
