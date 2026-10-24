@@ -2214,7 +2214,100 @@ async function showCloudPlan(c) {
     if (mb) parts.push((t('cloud.plan_storage') || 'up to') + ' ' + mb + ' MB');
     elx.textContent = parts.join(' · ');
     elx.style.color = r.active ? 'var(--text-muted)' : 'var(--danger)';
+    await showCloudPlanPicker(c, r);
   } catch (e) { /* billing is optional — stay silent */ }
+}
+
+/**
+ * The plan cards, with what each one offers this shop's owner: the server's
+ * catalogue (GET /v1/plans) and this shop's plan, read through
+ * lib/cloud-plan-picker.js. Replaces the static cards below once both have
+ * answered; until then (or offline) the static ladder stays as it was.
+ *
+ * Upgrading is free during the beta and charges nothing. Before the server
+ * opens upgrades, the buttons read "Opens soon" and do nothing.
+ */
+async function showCloudPlanPicker(c, billing) {
+  const row = document.getElementById('cloudPlanCards');
+  if (!row || typeof KhaytCloudPlanPicker === 'undefined' || !window.hubAPI?.cloudPlans) return;
+  let cat;
+  try { cat = await window.hubAPI.cloudPlans({ url: c.url }); } catch (_) { cat = null; }
+  if (!cat || !cat.ok || !Array.isArray(cat.plans) || !cat.plans.length) return;
+  const owner = (c.role || 'owner') === 'owner';
+  const actions = KhaytCloudPlanPicker.planActions(cat, billing, { owner });
+  const lang = (typeof i18n !== 'undefined' && i18n.current) || 'en';
+  const local = (name) => (typeof KhaytCloudPlans !== 'undefined' && KhaytCloudPlans.planById(name)) || null;
+  const words = (o) => (o && (o[lang] || o.en)) || '';
+  const betaFree = typeof KhaytCloudPlans !== 'undefined' ? KhaytCloudPlans.isBetaFree() : true;
+
+  const card = (p, a) => {
+    const lp = local(p.name);
+    const label = words(lp && lp.label) || p.label || p.name;
+    const sar = Number(p.priceSar) || 0;
+    const per = p.period === 'year' ? t('cplan.per_year') : t('plans.per_month');
+    const usd = Number(p.priceUsd) || (lp && lp.price && Number(lp.price.USD)) || 0;
+    const price = sar
+      ? `<span style="font-weight:700;">${escapeHtml(`${sar} SAR`)}</span><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(per)}${usd ? ` · $${usd}` : ''}</span>`
+      : `<span style="font-weight:700;">${escapeHtml(t('plans.price_free'))}</span>`;
+    // The catalogue's own words when this app knows the plan; otherwise the
+    // server's limits, so a plan added on the server is still described.
+    const L = p.limits || {};
+    const lines = lp ? lp.features.map((f) => words(f.label)) : [
+      L.maxVaultBytes ? t('cplan.vault', { size: KhaytCloudPlanPicker.sizeText(L.maxVaultBytes) }) : '',
+      L.maxActiveLinks ? t('cplan.links', { n: L.maxActiveLinks }) : (L.maxVaultBytes ? t('cplan.no_links') : ''),
+      L.publishing ? t('cplan.selling') : '',
+    ].filter(Boolean);
+    const chip = (text, tint) => `<div style="display:inline-block;font-size:11.5px;font-weight:700;margin-top:3px;padding:1px 7px;border-radius:999px;background:color-mix(in srgb, ${tint} 18%, transparent);">${escapeHtml(text)}</div>`;
+    const btn = {
+      current: chip(t('cplan.current'), 'var(--accent,#3b82f6)'),
+      upgrade: `<button type="button" class="btn small primary" data-plan-pick="${escapeHtml(p.name)}">${escapeHtml(t('cplan.upgrade_free'))}</button>`,
+      downgrade: `<button type="button" class="btn small" data-plan-pick="${escapeHtml(p.name)}">${escapeHtml(t('cplan.switch_to', { plan: label }))}</button>`,
+      soon: `<button type="button" class="btn small" disabled>${escapeHtml(t('cplan.opens_soon'))}</button>`,
+      paid: `<span style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(t('cplan.paid_elsewhere'))}</span>`,
+      none: '',
+    }[a.action] || '';
+    return `
+      <div data-plan-card="${escapeHtml(p.name)}" style="flex:1 1 180px;min-width:170px;border:1px solid ${a.action === 'current' ? 'var(--accent,#3b82f6)' : 'var(--border,#3a3a3a)'};border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;">
+        <div style="font-weight:600;font-size:13px;">${escapeHtml(label)}</div>
+        <div style="display:flex;align-items:baseline;gap:3px;flex-wrap:wrap;">${price}</div>
+        ${sar && betaFree ? chip(t('plans.free_during_beta'), 'var(--success,#16a34a)') : ''}
+        <ul style="margin:6px 0 8px;padding-inline-start:16px;font-size:11.5px;line-height:1.55;flex:1;">
+          ${lines.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}
+        </ul>
+        <div>${btn}</div>
+      </div>`;
+  };
+
+  const byName = new Map(cat.plans.map((p) => [p.name, p]));
+  row.innerHTML = actions.map((a) => card(byName.get(a.name), a)).join('');
+  const note = document.getElementById('cloudPlanPickNote');
+  if (note) {
+    note.textContent = !owner ? t('cplan.owner_only') : (cat.beta && cat.beta.freeUpgrades ? t('cplan.beta_warning', { days: cat.beta.graceDays || 30 }) : '');
+    note.style.display = note.textContent ? '' : 'none';
+  }
+  row.querySelectorAll('[data-plan-pick]').forEach((b) => b.addEventListener('click', () => pickCloudPlan(c, b.dataset.planPick, cat)));
+}
+
+/** Ask, then ask the server; the answer re-draws the cards from what it says. */
+async function pickCloudPlan(c, name, cat) {
+  const p = (cat.plans || []).find((x) => x.name === name);
+  if (!p) return;
+  const lp = typeof KhaytCloudPlans !== 'undefined' ? KhaytCloudPlans.planById(name) : null;
+  const lang = (typeof i18n !== 'undefined' && i18n.current) || 'en';
+  const label = (lp && lp.label && (lp.label[lang] || lp.label.en)) || p.label || name;
+  const down = name === (cat.defaultPlan || 'free');
+  const msg = down
+    ? t('cplan.confirm_down', { plan: label })
+    : t('cplan.confirm_up', { plan: label }) + '\n\n' + t('cplan.beta_warning', { days: (cat.beta && cat.beta.graceDays) || 30 });
+  if (!(await confirmModal(msg, { okText: down ? t('cplan.switch_to', { plan: label }) : t('cplan.upgrade_free') }))) return;
+  const r = await window.hubAPI.cloudSetPlan({ url: c.url, shopId: c.shopId, token: c.token, plan: name });
+  if (!r || !r.ok) {
+    const key = KhaytCloudPlanPicker.refusalKey(r && r.reason);
+    toast(t(key) + (key === 'cplan.refused.other' && r && r.error ? ': ' + r.error : ''), 'error', 6000);
+  } else {
+    toast(t('cplan.now_on', { plan: label }), 'success');
+  }
+  showCloudPlan(c);
 }
 
 function cloudSyncStatusLabel(s) {
@@ -3053,7 +3146,8 @@ function cloudPlansHtml() {
       <p style="font-size:12.5px;font-weight:600;margin:0 0 2px;">${escapeHtml(t('plans.title') || 'What Khayt Cloud costs')}</p>
       <p style="font-size:11.5px;color:var(--text-muted);margin:0 0 10px;">${escapeHtml(t('plans.intro') || 'The desktop app is free forever and works with no account. These prices are only for the hosted service.')}</p>
       ${betaFree ? `<p style="font-size:11.5px;margin:0 0 10px;padding:6px 9px;border-radius:6px;background:color-mix(in srgb, var(--success,#16a34a) 12%, transparent);border:1px solid color-mix(in srgb, var(--success,#16a34a) 55%, transparent);">${escapeHtml(t('plans.beta_note') || 'Khayt Cloud is in beta, so every plan is free right now. The prices below are what they will cost, shown early so nothing comes as a surprise later.')}</p>` : ''}
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">${rows.map(card).join('')}</div>
+      <p id="cloudPlanPickNote" style="display:none;font-size:11.5px;margin:0 0 10px;padding:6px 9px;border-radius:6px;background:color-mix(in srgb, var(--warning,#d97706) 12%, transparent);border:1px solid color-mix(in srgb, var(--warning,#d97706) 55%, transparent);"></p>
+      <div id="cloudPlanCards" style="display:flex;gap:8px;flex-wrap:wrap;">${rows.map(card).join('')}</div>
     </div>`;
 }
 

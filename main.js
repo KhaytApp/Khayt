@@ -6346,6 +6346,19 @@ ipcMain.handle('hub:cloud-portal-reply', async (_e, { url, shopId, token, authTo
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
+ipcMain.handle('hub:cloud-plans', async (_e, { url } = {}) => {
+  try { return { ok: true, ...(await cloudClient.plans(url)) }; }
+  catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
+ipcMain.handle('hub:cloud-set-plan', async (_e, { url, shopId, token, plan } = {}) => {
+  try {
+    token = cloudToken(token, url);
+    const r = await cloudClient.setPlan(url, shopId, token, String(plan || ''));
+    return r.refused ? { ok: false, reason: r.reason, error: r.error } : { ok: true, ...r };
+  } catch (e) { return { ok: false, reason: '', error: String(e && e.message || e) }; }
+});
+
 ipcMain.handle('hub:cloud-billing-me', async (_e, { url, shopId, token } = {}) => {
   try {
     token = cloudToken(token, url);

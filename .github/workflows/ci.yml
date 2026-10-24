@@ -309,6 +309,9 @@ jobs:
       - name: E2E smoke (a WhatsApp Business campaign sends an approved template to consenting customers)
         run: xvfb-run -a npm run test:e2e:wabcampaign
 
+      - name: E2E smoke (the owner picks a Khayt Cloud plan, free during the beta)
+        run: xvfb-run -a npm run test:e2e:planpicker
+
       - name: E2E smoke (full erase takes tracking pages down)
         run: xvfb-run -a npm run test:e2e:takedown
 
