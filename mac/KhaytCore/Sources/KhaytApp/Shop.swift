@@ -1762,7 +1762,10 @@ final class Shop {
     /// Not per redraw: the calibration reads the whole print log, and a grid of
     /// four hundred models asking for that on every frame is four hundred trips
     /// through the runtime for one number that cannot have changed.
-    internal(set) var estimates: [String: KhaytEngine.MeshEstimate] = [:]
+    internal(set) var estimates: [String: KhaytEngine.MeshEstimate] = [:] {
+        // The library's tile facts and its time/weight sorts read these.
+        didSet { libraryDerivedRevision &+= 1 }
+    }
 
     // Stored for "A printer that changed address" (Shop+Printers.swift).
     /// Machines whose address appears to have moved, and where to.

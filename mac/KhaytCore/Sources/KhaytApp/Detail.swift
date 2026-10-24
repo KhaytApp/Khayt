@@ -130,6 +130,15 @@ struct DetailLine: View {
 /// fine, the bytes are simply elsewhere.
 struct Thumbnail: View {
     let source: ThumbnailSource?
+    /// The longest side to decode to, in pixels. A library tile asks for
+    /// twice its own width (`LibraryTileSize.pixels`); everything else keeps
+    /// the old 640, which the right-click preview needs.
+    var pixels: Int = ThumbnailStore.maxPixels
+    /// The model's first filament, for the drawn placeholder.
+    var tint: Color? = nil
+    /// The surface under the picture. Nil keeps the old translucent grey; the
+    /// library passes its own well (`LibraryTile.well`).
+    var well: Color? = nil
     @State private var image: NSImage?
     /// A photograph of the screen (`SnapshotTests`) cannot wait for `.task`,
     /// so there the picture is read on the spot. Never in the running app.
@@ -142,23 +151,29 @@ struct Thumbnail: View {
         // tile wider than its column and drew over the next print (Oct 13
         // 2026). The picture is an overlay on a shape that takes the size it is
         // offered, and is clipped to it — the rule ProductCell already keeps.
-        Rectangle().fill(.quaternary)
+        Rectangle().fill(well.map(AnyShapeStyle.init) ?? AnyShapeStyle(.quaternary))
             .overlay {
-                if let image = image ?? (photographing ? source.flatMap(ThumbnailStore.decode) : nil) {
+                if let image = image
+                    ?? (photographing ? source.flatMap { ThumbnailStore.decode($0, maxPixels: ThumbnailStore.bucket(pixels)) } : nil) {
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 } else {
-                    Image(systemName: "cube.transparent")
-                        .font(.system(size: 22, weight: .light))
-                        .foregroundStyle(.tertiary)
+                    // A build plate with a print on it, not the system's
+                    // generic cube — see `ModelPlaceholder`.
+                    ModelPlaceholder(tint: tint)
                 }
             }
             .clipped()
-        .task(id: source) {
+        .task(id: TaskKey(source: source, pixels: ThumbnailStore.bucket(pixels))) {
             guard let source else { image = nil; return }
-            image = await ThumbnailStore.shared.image(for: source)
+            image = await ThumbnailStore.shared.image(for: source, maxPixels: pixels)
         }
+    }
+
+    private struct TaskKey: Hashable {
+        let source: ThumbnailSource?
+        let pixels: Int
     }
 }
 
@@ -173,36 +188,59 @@ enum ThumbnailSource: Hashable, Sendable {
 actor ThumbnailStore {
     static let shared = ThumbnailStore()
 
-    /// How many pictures are kept. A tile draws at most ~330 px and the
-    /// right-click preview 640, so each is decoded to fit 640 — about 1.6 MB
-    /// as a bitmap — and 400 of them cover several screens of scrolling back
-    /// without a 5,000-model library holding every picture it ever showed.
+    /// How many pictures are kept, at most.
     static let limit = 400
-    /// The longest side a picture is decoded to.
+    /// And how many BYTES of decoded bitmap. Counting pictures alone treated a
+    /// 104-pixel small tile and a 640-pixel preview as the same weight; a
+    /// budget in bytes keeps several screens of a dense grid while a few
+    /// large previews cannot crowd it out.
+    static let byteLimit = 128 * 1024 * 1024
+    /// The longest side a picture is decoded to, at most.
     static let maxPixels = 640
 
-    private var cache: [ThumbnailSource: (image: NSImage, used: Int)] = [:]
+    private struct Key: Hashable {
+        let source: ThumbnailSource
+        let pixels: Int
+    }
+
+    private var cache: [Key: (image: NSImage, used: Int, bytes: Int)] = [:]
+    private var bytes = 0
     private var clock = 0
     /// Decodes, counted — for the test that proves a second ask is a hit.
     private(set) var decodes = 0
 
-    func image(for source: ThumbnailSource) async -> NSImage? {
+    /// Sizes round UP to a step of 64 pixels (and never past `maxPixels`), so
+    /// a window being resized does not decode a picture per point.
+    nonisolated static func bucket(_ pixels: Int) -> Int {
+        min(maxPixels, max(64, ((pixels + 63) / 64) * 64))
+    }
+
+    func image(for source: ThumbnailSource, maxPixels wanted: Int = ThumbnailStore.maxPixels) async -> NSImage? {
+        let size = Self.bucket(wanted)
+        let key = Key(source: source, pixels: size)
         clock &+= 1
-        if let hit = cache[source] {
-            cache[source] = (hit.image, clock)
+        if let hit = cache[key] {
+            cache[key] = (hit.image, clock, hit.bytes)
             return hit.image
+        }
+        // A bigger copy already decoded serves a smaller tile as it is.
+        if let bigger = cache.first(where: { $0.key.source == source && $0.key.pixels > size }) {
+            cache[bigger.key] = (bigger.value.image, clock, bigger.value.bytes)
+            return bigger.value.image
         }
         decodes += 1
         // Decoded on a global queue, never on the actor's thread or the
         // main one: a JPEG is real work, and blocking work inside a Swift
         // task starves the cooperative pool (memory: swift-pool-starvation).
         let made = await withCheckedContinuation { (done: CheckedContinuation<NSImage?, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async { done.resume(returning: Self.decode(source)) }
+            DispatchQueue.global(qos: .userInitiated).async { done.resume(returning: Self.decode(source, maxPixels: size)) }
         }
         if let made {
             clock &+= 1
-            cache[source] = (made, clock)
-            if cache.count > Self.limit { evict() }
+            let cost = Self.cost(made)
+            cache[key] = (made, clock, cost)
+            bytes += cost
+            if cache.count > Self.limit || bytes > Self.byteLimit { evict() }
         }
         return made
     }
@@ -210,17 +248,34 @@ actor ThumbnailStore {
     /// Drop the least recently used quarter, so eviction is not paid on
     /// every picture once the cache is full.
     private func evict() {
-        let keep = Self.limit * 3 / 4
-        let order = cache.sorted { $0.value.used > $1.value.used }
-        cache = Dictionary(uniqueKeysWithValues: order.prefix(keep).map { ($0.key, $0.value) })
+        let keepCount = Self.limit * 3 / 4, keepBytes = Self.byteLimit * 3 / 4
+        var kept: [Key: (image: NSImage, used: Int, bytes: Int)] = [:]
+        var total = 0
+        for (key, value) in cache.sorted(by: { $0.value.used > $1.value.used }) {
+            guard kept.count < keepCount, total + value.bytes <= keepBytes else { break }
+            kept[key] = value
+            total += value.bytes
+        }
+        cache = kept
+        bytes = total
     }
 
     var count: Int { cache.count }
+    var byteCount: Int { bytes }
+
+    private static func cost(_ image: NSImage) -> Int {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return 0 }
+        return cg.bytesPerRow * cg.height
+    }
+
+    nonisolated static func decode(_ source: ThumbnailSource) -> NSImage? {
+        decode(source, maxPixels: maxPixels)
+    }
 
     /// Read and decode, scaled to fit `maxPixels`. ImageIO decodes at that
     /// size directly, rather than holding a full-size camera photo for a
     /// 150-point tile.
-    nonisolated static func decode(_ source: ThumbnailSource) -> NSImage? {
+    nonisolated static func decode(_ source: ThumbnailSource, maxPixels: Int) -> NSImage? {
         let image: CGImageSource?
         switch source {
         case .file(let url):
@@ -241,7 +296,124 @@ actor ThumbnailStore {
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceThumbnailMaxPixelSize: maxPixels,
         ]
-        guard let cg = CGImageSourceCreateThumbnailAtIndex(image, 0, options as CFDictionary) else { return nil }
+        guard let decoded = CGImageSourceCreateThumbnailAtIndex(image, 0, options as CFDictionary) else { return nil }
+        let cg = matte(decoded) ?? decoded
         return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+    }
+
+    // MARK: - The white square
+
+    /// ── A RENDER ON WHITE, MADE INTO A RENDER ON NOTHING ──────────────────
+    ///
+    /// A slicer's or a website's preview is often an opaque picture of the
+    /// model on a white-to-grey studio backdrop. On the light window that is
+    /// a slightly brighter square; in dark mode it was a wall of white tiles
+    /// glaring out of a dark grid (Oct 2026 audit). `MeshPreview` already
+    /// draws on transparent for exactly this reason — this does the same for
+    /// pictures that arrive already flattened.
+    ///
+    /// Only a picture with no transparency of its own whose EDGE is almost
+    /// all near-white and colourless: that is a backdrop, not a photograph of
+    /// a desk. From the edge inwards, the backdrop is followed while it stays
+    /// colourless and changes smoothly from one pixel to the next — never
+    /// brighter by more than a few levels, so a white model on a white
+    /// backdrop keeps its own faces, and darker only in a shadow's bands. What
+    /// was followed becomes black at the opacity of its darkness against the
+    /// backdrop at that height: white goes, a shadow stays a shadow, and both
+    /// sit on whatever the tile's own surface is in either appearance.
+    ///
+    /// Nil when the picture is not one of these, so the caller keeps it.
+    nonisolated static func matte(_ image: CGImage) -> CGImage? {
+        let w = image.width, h = image.height
+        guard w >= 16, h >= 16, w * h <= 1_200_000 else { return nil }
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        let space = CGColorSpaceCreateDeviceRGB()
+        let drawn: Bool = px.withUnsafeMutableBytes { buf in
+            guard let ctx = CGContext(data: buf.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                                      bytesPerRow: w * 4, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+            return true
+        }
+        guard drawn else { return nil }
+
+        @inline(__always) func at(_ x: Int, _ y: Int) -> Int { (y * w + x) * 4 }
+        @inline(__always) func light(_ i: Int) -> Int { (Int(px[i]) * 3 + Int(px[i + 1]) * 6 + Int(px[i + 2])) / 10 }
+        @inline(__always) func chroma(_ i: Int) -> Int {
+            let r = Int(px[i]), g = Int(px[i + 1]), b = Int(px[i + 2])
+            return max(r, g, b) - min(r, g, b)
+        }
+        @inline(__always) func backdrop(_ i: Int) -> Bool { px[i + 3] == 255 && chroma(i) <= 10 }
+
+        // The edge: opaque, and nine in ten of its pixels near-white.
+        var edge: [Int] = []
+        edge.reserveCapacity(2 * (w + h))
+        for x in 0..<w { edge.append(at(x, 0)); edge.append(at(x, h - 1)) }
+        for y in 1..<(h - 1) { edge.append(at(0, y)); edge.append(at(w - 1, y)) }
+        if edge.contains(where: { px[$0 + 3] < 250 }) { return nil }
+        let white = edge.filter { backdrop($0) && light($0) >= 222 }.count
+        guard white * 10 >= edge.count * 9 else { return nil }
+
+        // The backdrop's own brightness at each row: the brighter of the two
+        // side edges, which is what a vertical studio gradient varies by.
+        var rowLight = [Int](repeating: 255, count: h)
+        for y in 0..<h { rowLight[y] = max(light(at(0, y)), light(at(w - 1, y)), 1) }
+
+        // Flood in from the edge.
+        var seen = [Bool](repeating: false, count: w * h)
+        var stack: [Int] = []
+        stack.reserveCapacity(w * 4)
+        for i in edge where backdrop(i) && light(i) >= 200 {
+            let p = i / 4
+            if !seen[p] { seen[p] = true; stack.append(p) }
+        }
+        while let p = stack.popLast() {
+            let x = p % w, y = p / w
+            let l = light(p * 4)
+            for (nx, ny) in [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)] {
+                guard nx >= 0, ny >= 0, nx < w, ny < h else { continue }
+                let q = ny * w + nx
+                guard !seen[q] else { continue }
+                let j = q * 4
+                // Up by a few levels at most (a white model's face is
+                // BRIGHTER than the backdrop and is never entered); down by
+                // more, because a rendered shadow is drawn in bands.
+                let step = light(j) - l
+                guard backdrop(j), step <= 3, step >= -12, light(j) >= 180 else { continue }
+                seen[q] = true
+                stack.append(q)
+            }
+        }
+
+        // The anti-aliased rim the flood stops at — a pixel or two of light
+        // grey round the model, and the bright sliver a renderer draws where
+        // the model meets its floor — read as a white outline on a dark tile.
+        // Two pixels' grace for anything colourless and light beside the
+        // backdrop.
+        for _ in 0..<2 {
+            var rim: [Int] = []
+            for p in 0..<(w * h) where !seen[p] {
+                let i = p * 4
+                guard backdrop(i), light(i) >= 200 else { continue }
+                let x = p % w, y = p / w
+                if (x > 0 && seen[p - 1]) || (x < w - 1 && seen[p + 1])
+                    || (y > 0 && seen[p - w]) || (y < h - 1 && seen[p + w]) { rim.append(p) }
+            }
+            for p in rim { seen[p] = true }
+        }
+
+        // Followed pixels become black at the opacity of their shade.
+        for p in 0..<(w * h) where seen[p] {
+            let i = p * 4
+            let ref = Double(rowLight[p / w])
+            let dark = max(0, ref - Double(light(i))) / ref
+            let alpha = UInt8(min(255, (dark * 2.2 * 255).rounded()))
+            px[i] = 0; px[i + 1] = 0; px[i + 2] = 0; px[i + 3] = alpha
+        }
+        return px.withUnsafeMutableBytes { buf -> CGImage? in
+            CGContext(data: buf.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                      bytesPerRow: w * 4, space: space,
+                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)?.makeImage()
+        }
     }
 }

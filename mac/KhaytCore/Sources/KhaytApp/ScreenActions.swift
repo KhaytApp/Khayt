@@ -85,38 +85,19 @@ struct ScreenActions: View {
                 // toolbar grew this item. It exists in the Book menu as well,
                 // and a shop with a folder of models that has not read the
                 // menus has no way in that it can see.
-                // THE ORDER, WHERE IT CAN BE SEEN. It was only in the View
-                // menu, so a shop asked for a way to sort that already existed.
-                Menu {
-                    Picker(shop.words.callIt("mac.sort_by"), selection: $shop.librarySort) {
-                        ForEach(LibrarySort.allCases) { sort in
-                            Text(shop.words.callIt(sort.key)).tag(sort)
-                        }
-                    }
-                    .pickerStyle(.inline)
-                } label: {
-                    Label(shop.words.callIt(shop.librarySort.key), systemImage: "arrow.up.arrow.down")
-                        .font(TypeScale.body(11.5))
-                        .foregroundStyle(Role.onNavy2)
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .navyMenu()
-                .help(shop.words.callIt("mac.sort_by"))
-                // GROUP, CATEGORY, WHERE IT CAME FROM. The old shell put these
-                // in the window's toolbar and this shell has none, so a shop on
-                // the default layout had no way to group prints at all — and
-                // asked for one. Same menus, drawn on the strip.
-                Group {
-                    GroupMenu(shop: shop)
-                    CategoryMenu(shop: shop)
-                    ProvenanceMenu(shop: shop)
-                }
-                .font(TypeScale.body(11.5))
-                .foregroundStyle(Role.onNavy2)
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .navyMenu()
+                // THE ORDER moved to the library's own filter row, beside
+                // grid-or-list and the tile size (`LibraryViewControls`).
+                //
+                // GROUP, CATEGORY, WHERE IT CAME FROM — the three menus that
+                // CHANGE the selection — are one "Edit" menu now
+                // (`EditSelectionMenu`): side by side with the sort they read
+                // as three more filters.
+                EditSelectionMenu(shop: shop)
+                    .font(TypeScale.body(11.5))
+                    .foregroundStyle(Role.onNavy2)
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .navyMenu()
                 NavyAction(label: shop.words.callIt("mac.import_models"),
                            symbol: "square.and.arrow.down",
                            enabled: shop.canMoveJobs && !shop.importing, titled: true) {

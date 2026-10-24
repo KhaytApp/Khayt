@@ -43,6 +43,10 @@ final class LibraryMemo {
         /// `librarySyncRevision`: a model moved out or brought back.
         var sync: Int
         var sort: LibrarySort
+        /// What the tile facts were made from — only when the order READS
+        /// them (print time, weight, price), so an ordinary sort is not
+        /// rebuilt by every change to the catalogue.
+        var facts: [Int] = []
         /// Trimmed and folded.
         var query: String
 
@@ -78,6 +82,8 @@ final class LibraryMemo {
         /// Searches a recount of the chips ran over the book — one per
         /// recount, however many pools it counts.
         var facetSearches = 0
+        /// Models whose tile facts were worked out (`Shop.libraryFacts`).
+        var factBuilds = 0
     }
 
     var work = Work()
@@ -146,6 +152,19 @@ final class LibraryMemo {
     /// a record that changed (a new `thumbFile`) is asked again.
     var thumbRoots: [String]?
     var thumbs: [LibraryFile.ID: (file: LibraryFile, source: ThumbnailSource?)] = [:]
+
+    /// The tile facts (`LibraryDisplay.swift`): the numbers per model, the
+    /// line each one is said in, and the catalogue prices they read — all
+    /// for the revisions in `factsKey`.
+    var factsKey: [Int]?
+    var facts: [LibraryFile.ID: LibraryFacts] = [:]
+    var prices: [LibraryFile.ID: Double] = [:]
+    var factLinesLanguage = ""
+    var factLines: [LibraryFile.ID: String] = [:]
+
+    /// The list view's rows, for the entries and facts they were made from.
+    var rowsKey: LibraryRow.Key?
+    var rows: [LibraryRow] = []
 }
 
 extension Shop.Shelf {
@@ -174,6 +193,7 @@ extension Shop {
                      printNext: libraryPrintNextOnly, duplicates: libraryDuplicatesOnly,
                      storage: libraryStorage, sync: libraryStorage == nil ? 0 : librarySyncRevision,
                      sort: librarySort,
+                     facts: librarySort.readsFacts ? libraryFactsKey() : [],
                      query: SearchText.fold(search.trimmingCharacters(in: .whitespaces)))
     }
 
@@ -279,7 +299,7 @@ extension Shop {
         } else {
             entries = Self.libraryEntries(shown, under: shownKey.group, flat: libraryFlat,
                                           showingMatches: libraryShowsMatches, kinds: libraryGroupKinds,
-                                          order: librarySort.order)
+                                          order: librarySort.ordering(libraryFacts))
         }
         let visible = Self.modelTiles(entries)
         var position: [LibraryFile.ID: Int] = [:]

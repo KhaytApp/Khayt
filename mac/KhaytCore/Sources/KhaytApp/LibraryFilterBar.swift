@@ -168,6 +168,40 @@ struct LibraryFilterBar: View {
     // are built from, so the two cannot disagree.
     var body: some View {
         HStack(spacing: 8) {
+            // The filters scroll sideways when the window is too narrow for
+            // all of them, rather than pushing the row wider than the window
+            // — which shoved the whole split view, sidebar and all, sideways.
+            ScrollView(.horizontal, showsIndicators: false) {
+                filters
+            }
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            // A soft trailing edge, so a menu cut by the window reads as
+            // "more this way" rather than as a broken label.
+            .mask {
+                HStack(spacing: 0) {
+                    Rectangle()
+                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: 18)
+                }
+            }
+            // ── HOW IT IS SHOWN, ON THE TRAILING SIDE OF THE SAME ROW ──────
+            //
+            // The order was a menu in the title strip, beside three menus
+            // that EDITED the selection and looked exactly like filters; the
+            // density and the list did not exist. What narrows the grid is on
+            // the leading side and how it is laid out on the trailing side,
+            // with the count of what is left between them — one row, read
+            // left to right (right to left in Arabic) as one sentence.
+            LibraryViewControls(shop: shop)
+                .fixedSize()
+        }
+        .controlSize(.small)
+        .padding(.horizontal, Metric.screen)
+        .padding(.vertical, 8)
+    }
+
+    private var filters: some View {
+        HStack(spacing: 8) {
             // Only at the top. Inside an open group both choices draw that
             // group's own levels (`Shop.libraryEntries`), so the switch was
             // on screen and did nothing — a control that changes nothing
@@ -197,15 +231,13 @@ struct LibraryFilterBar: View {
             menu("mac.category", prefix: "category:")
             menu("mac.lib_tag", prefix: "tag:")
 
-            Spacer(minLength: 0)
             if shop.libraryFilterOn {
                 Button(shop.words.callIt("log.clear_filters")) { shop.clearLibraryFilter() }
                     .buttonStyle(.link)
+                    .fixedSize()
             }
         }
-        .controlSize(.small)
-        .padding(.horizontal, Metric.screen)
-        .padding(.vertical, 8)
+        .padding(.vertical, 1)
     }
 
     /// Is the All models / Groups switch drawn? Only with no group open.
@@ -214,14 +246,40 @@ struct LibraryFilterBar: View {
         return true
     }
 
-    /// One axis as a menu. Hidden when it has nothing to offer.
+    /// The axes the row draws, in order — every one of them, always.
+    static let axes: [(key: String, prefix: String?)] = [
+        ("mac.lib_show", nil), ("mac.lib_printer", "ready:"), ("mac.lib_creator", "creator:"),
+        ("mac.category", "category:"), ("mac.lib_tag", "tag:"),
+    ]
+
+    /// ── A MENU WITH NOTHING IN IT IS GREYED, NOT GONE ─────────────────────
+    ///
+    /// Each axis vanished when its count reached zero, so the row changed
+    /// shape as the shop typed: "Ready on" disappeared on a library with no
+    /// printer reporting its spools, Creator on one nobody had attributed,
+    /// and a shop could not learn the axes existed until its book happened
+    /// to fill them. Now every axis is always drawn, disabled when it has
+    /// nothing to offer, with the reason on hover.
+    static func menuEnabled(rows: Int) -> Bool { rows > 0 }
+
+    /// One axis as a menu. Disabled — never hidden — when it has nothing to offer.
     @ViewBuilder
     private func menu(_ key: String, prefix: String? = nil, ids: [String] = []) -> some View {
         let rows = chips.filter { chip in
             if let prefix { return chip.id.hasPrefix(prefix) }
             return ids.contains(chip.id)
         }
-        if !rows.isEmpty {
+        if !Self.menuEnabled(rows: rows.count) {
+            Menu {
+                EmptyView()
+            } label: {
+                Text(shop.words.callIt(key)).lineLimit(1)
+            }
+            .menuStyle(.button)
+            .fixedSize()
+            .disabled(true)
+            .help(shop.words.callIt("mac.lg_filter_empty", ["name": .string(shop.words.callIt(key))]))
+        } else {
             let on = rows.filter(\.on)
             Menu {
                 ForEach(rows) { chip in

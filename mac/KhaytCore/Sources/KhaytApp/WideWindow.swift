@@ -40,7 +40,7 @@ enum Wide {
     /// with at least one, because a window can always be narrower than the
     /// thing inside it and a grid of zero columns is a crash rather than a
     /// layout.
-    static func columns(across available: CGFloat) -> Int {
+    static func columns(across available: CGFloat, tile: CGFloat = Wide.tile) -> Int {
         max(1, Int((available / (tile + tileGap)).rounded(.down)))
     }
 
@@ -50,9 +50,12 @@ enum Wide {
     /// NEVER centred. A grid whose leading edge moves as the window resizes is
     /// worse than a ragged trailing edge — the eye loses the column it was
     /// reading down, which is the one thing a grid is for.
-    static func grid(across available: CGFloat) -> [GridItem] {
+    ///
+    /// `tile` is the library's chosen density (`LibraryTileSize`); every other
+    /// grid keeps §10's one size.
+    static func grid(across available: CGFloat, tile: CGFloat = Wide.tile) -> [GridItem] {
         Array(repeating: GridItem(.fixed(tile), spacing: tileGap, alignment: .topLeading),
-              count: columns(across: available))
+              count: columns(across: available, tile: tile))
     }
 
     // MARK: Sentences
