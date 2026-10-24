@@ -2282,22 +2282,33 @@ async function showCloudPlanPicker(c, billing) {
   row.innerHTML = actions.map((a) => card(byName.get(a.name), a)).join('');
   const note = document.getElementById('cloudPlanPickNote');
   if (note) {
-    note.textContent = !owner ? t('cplan.owner_only') : (cat.beta && cat.beta.freeUpgrades ? t('cplan.beta_warning', { days: cat.beta.graceDays || 30 }) : '');
+    // A beta upgrade after the beta's end runs on its grace: say until when,
+    // in the Mac pane's words (mac.plan_grace_until).
+    const bb = (billing && billing.beta) || {};
+    const ended = bb.upgrade && bb.endsAt && Date.parse(bb.endsAt) <= Date.now() && bb.graceEndsAt;
+    note.textContent = ended ? t('cplan.grace_until', { day: localDateStr(new Date(bb.graceEndsAt)) })
+      : !owner ? t('cplan.owner_only')
+      : (cat.beta && cat.beta.freeUpgrades ? t('cplan.beta_warning', { days: cat.beta.graceDays || 30 }) : '');
     note.style.display = note.textContent ? '' : 'none';
   }
-  row.querySelectorAll('[data-plan-pick]').forEach((b) => b.addEventListener('click', () => pickCloudPlan(c, b.dataset.planPick, cat)));
+  row.querySelectorAll('[data-plan-pick]').forEach((b) => b.addEventListener('click', () => pickCloudPlan(c, b.dataset.planPick, cat, billing)));
 }
 
 /** Ask, then ask the server; the answer re-draws the cards from what it says. */
-async function pickCloudPlan(c, name, cat) {
+async function pickCloudPlan(c, name, cat, billing) {
   const p = (cat.plans || []).find((x) => x.name === name);
   if (!p) return;
   const lp = typeof KhaytCloudPlans !== 'undefined' ? KhaytCloudPlans.planById(name) : null;
   const lang = (typeof i18n !== 'undefined' && i18n.current) || 'en';
   const label = (lp && lp.label && (lp.label[lang] || lp.label.en)) || p.label || name;
   const down = name === (cat.defaultPlan || 'free');
+  // Going down says what stops (the Mac pane's words): limits stop new
+  // uploads and links, nothing is deleted; leaving selling takes products off
+  // makerrun.com, while sales already made still deliver.
+  const cur = (cat.plans || []).find((x) => billing && x.name === billing.plan);
+  const losesSelling = !!(cur && cur.limits && cur.limits.publishing) && !(p.limits && p.limits.publishing);
   const msg = down
-    ? t('cplan.confirm_down', { plan: label })
+    ? t('cplan.confirm_down', { plan: label }) + '\n\n' + t('cplan.down_note') + (losesSelling ? '\n\n' + t('cplan.down_selling') : '')
     : t('cplan.confirm_up', { plan: label }) + '\n\n' + t('cplan.beta_warning', { days: (cat.beta && cat.beta.graceDays) || 30 });
   if (!(await confirmModal(msg, { okText: down ? t('cplan.switch_to', { plan: label }) : t('cplan.upgrade_free') }))) return;
   const r = await window.hubAPI.cloudSetPlan({ url: c.url, shopId: c.shopId, token: c.token, plan: name });

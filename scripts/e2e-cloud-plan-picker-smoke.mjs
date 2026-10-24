@@ -72,7 +72,7 @@ try {
   c = await cards();
   ok(c.maker.pick && /free during the beta/i.test(c.maker.btn), `with upgrades open, Maker offers "${c.maker.btn}"`);
   const note = await window.evaluate(() => document.getElementById('cloudPlanPickNote').innerText);
-  ok(/30 days to start paying/.test(note) && /Nothing is deleted/.test(note), 'the beta warning is on the card');
+  ok(/30 days to start paying/.test(note) && /Nothing is deleted/.test(note) && /read-only/.test(note), 'the beta warning is on the card, in the Mac pane\'s words');
   await window.click('#cloudPlanCards [data-plan-pick="maker"]');
   await window.waitForSelector('.confirm-modal-overlay [data-act="ok"]');
   const ask = await window.evaluate(() => document.querySelector('.confirm-modal-overlay .modal').innerText);
@@ -86,7 +86,8 @@ try {
   // Back to Free.
   await window.click('#cloudPlanCards [data-plan-pick="free"]');
   await window.waitForSelector('.confirm-modal-overlay [data-act="ok"]');
-  ok(/Nothing is deleted/.test(await window.evaluate(() => document.querySelector('.confirm-modal-overlay .modal').innerText)), 'going back to Free asks, and says nothing is deleted');
+  const downAsk = await window.evaluate(() => document.querySelector('.confirm-modal-overlay .modal').innerText);
+  ok(/Nothing is deleted/.test(downAsk) && /Existing links keep working/.test(downAsk) && !/makerrun/.test(downAsk), 'going back to Free asks, and says what stops (nothing deleted; no selling note from Maker)');
   await window.click('.confirm-modal-overlay [data-act="ok"]');
   await window.waitForFunction(() => /Your plan/.test(document.querySelector('#cloudPlanCards [data-plan-card="free"]')?.innerText || ''), null, { timeout: 10000 });
   ok(true, 'back on Free');
