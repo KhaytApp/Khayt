@@ -120,6 +120,9 @@ struct LibraryHealthAppTests {
         #expect(!shop.libraryHealthOpen)
         #expect(shop.visibleFiles.map(\.id) == copies.modelIds, "the copies are not side by side, in order")
         #expect(shop.libraryFilterOn)
+        // Through the one matcher, but never into a saved search or its count.
+        #expect(shop.libraryQuery == LibraryQuery() || !shop.libraryQuery.filtersOn)
+        #expect(shop.libraryCount(LibraryQuery()) > copies.count, "the focus narrowed a smart folder's count")
         shop.clearLibraryFilter()
         #expect(shop.libraryHealthFocus == nil)
         let unorganised = try #require(shop.libraryHealthGroups?.first { $0.kind == .unorganised })
