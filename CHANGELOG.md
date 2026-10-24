@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: Khayt Cloud plan in Settings ▸ Online.** It shows the shop's plan and every plan Khayt Cloud offers: price (VAT included), vault size, share links, selling and team size. All of it is read from the cloud's catalogue, so the Mac holds no price list of its own. The owner can change plans. Moving up is free during the beta, and before anything changes the app says what the published terms say: when the beta ends there are 30 days to start paying, or the shop moves back to Free, and nothing is deleted. Moving down says what stops over the new limits. A move that loses selling also says products leave makerrun.com, while sales already released still deliver and paid buyers keep their links. A manager sees the plan but can't change it. While the cloud has upgrades closed, the buttons stay off and the pane says "Upgrades open soon".
+
 - **Desktop: choose your Khayt Cloud plan in Settings.**
   - Settings → Online → Khayt Cloud now lists the plans from the cloud server, with their real prices in SAR and what each includes.
   - The shop owner can move to another plan, and upgrading is free during the beta. Before the switch, a warning says that when the beta ends you have 30 days to start paying, or the shop moves back to Free. Nothing is deleted, and the vault becomes read-only beyond Free's limits.
