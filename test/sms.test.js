@@ -32,15 +32,11 @@ test('twilio WhatsApp: From/To get the whatsapp: prefix', () => {
   assert.equal(p.get('To'), 'whatsapp:+966500000000');
 });
 
-test('whatsapp_cloud: graph URL, Bearer token, JSON text body, digits-only to', () => {
-  const r = buildSmsRequest('whatsapp_cloud', { phoneNumberId: '12345', token: 'EAA' },
-    { to: '+966500000000', message: 'Ready!', channel: 'whatsapp' });
-  assert.match(r.url, /graph\.facebook\.com\/v\d+\.\d+\/12345\/messages$/);
-  assert.equal(r.headers.Authorization, 'Bearer EAA');
-  const j = JSON.parse(r.body);
-  assert.equal(j.messaging_product, 'whatsapp');
-  assert.equal(j.to, '966500000000'); // no +
-  assert.equal(j.text.body, 'Ready!');
+test('whatsapp_cloud: no free text — Meta refuses it outside the 24 h window (131047)', () => {
+  // A configured account still refuses: the shop's WhatsApp Business number
+  // sends approved templates through lib/whatsapp-send.js, never a text body.
+  assert.throws(() => buildSmsRequest('whatsapp_cloud', { phoneNumberId: '12345', token: 'EAA' },
+    { to: '+966500000000', message: 'Ready!', channel: 'whatsapp' }), /approved templates only/);
 });
 
 test('unifonic: REST URL, AppSid + SenderID + Recipient form', () => {
@@ -66,7 +62,6 @@ test('webhook: posts JSON {to,message,channel} + optional secret header', () => 
 
 test('misconfiguration + unknown provider throw', () => {
   assert.throws(() => buildSmsRequest('twilio', {}, { to: '+1', message: 'x' }), /Account SID/);
-  assert.throws(() => buildSmsRequest('whatsapp_cloud', { token: 'x' }, { to: '+1', message: 'x' }), /Phone Number ID/);
   assert.throws(() => buildSmsRequest('webhook', { url: 'ftp://x' }, { to: '+1', message: 'x' }), /http/);
   assert.throws(() => buildSmsRequest('nope', {}, { to: '+1', message: 'x' }), /Unknown SMS provider/);
   assert.throws(() => buildSmsRequest('twilio', { accountSid: 'AC', authToken: 't' }, { to: '', message: 'x' }), /recipient/);

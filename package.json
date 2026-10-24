@@ -40,6 +40,7 @@
     "test:e2e:pricekeep": "node scripts/e2e-product-price-keep-smoke.mjs",
     "test:e2e:settingsro": "node scripts/e2e-settings-readonly-smoke.mjs",
     "test:e2e:vatfiled": "node scripts/e2e-vat-filed-smoke.mjs",
+    "test:e2e:wabcampaign": "node scripts/e2e-whatsapp-business-campaign-smoke.mjs",
     "test:e2e:takedown": "node scripts/e2e-erase-takedown-smoke.mjs",
     "test:e2e:activecount": "node scripts/e2e-active-count-smoke.mjs",
     "test:e2e:telemetry-ask": "node scripts/e2e-telemetry-ask-smoke.mjs",

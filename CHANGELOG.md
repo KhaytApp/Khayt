@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: campaigns through your WhatsApp Business account send an approved template.**
+  - Before, a campaign sent free text, and Meta refuses free text to anyone who hasn't messaged you in the last 24 hours. So it failed for nearly every customer.
+  - Choose WhatsApp Business (approved template) and enter the template's name and language. Then write one value per line: line 1 fills {{1}}, line 2 fills {{2}}. Merge fields such as {{name}} work on every line.
+  - It goes only to customers marked "Agreed to offers on WhatsApp", a new checkbox on the customer with the date it was given and how. Agreeing to order updates on WhatsApp is not agreeing to offers, so those customers aren't included. Customers excluded from marketing are still skipped.
+  - If sends fail, the result names Meta's most common reason, such as a template that doesn't exist or a token that was refused.
+  - With WhatsApp Business chosen in Settings, Send test now checks the account and shows its number and business name. Nothing is sent.
+- **Desktop: a library file the Mac moved to the Khayt Vault says so.** Bringing it back used to ask your bucket and fail with a missing-file error. It now says the file is in the Khayt Vault, which only the Mac app opens.
 - **Khayt Cloud plans: Free, Maker, Creator and Studio.** They replace Cloud and Branches. Maker is 25 SAR ($7) a month, Creator 65 SAR ($18) and Studio 180 SAR ($48), VAT included; a year costs ten months. Every paid plan is still free during the beta. Branches is gone, and so are the history and device lines, because Khayt Cloud keeps the last 20 snapshots for every shop and limits no devices. The prices and wording match khaytapp.com and Khayt Cloud's own plan list.
 
 - **Mac: selling vault files on makerrun.com (built, hidden until Khayt Cloud switches the vault and selling on).**
