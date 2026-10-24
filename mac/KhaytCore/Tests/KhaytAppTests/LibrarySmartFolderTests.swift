@@ -283,6 +283,10 @@ struct LibrarySmartFolderTests {
     /// 660 ms — time spent queued behind them, not counting. So the bound is
     /// generous, and the WORK is counted as well, which does not depend on
     /// the machine or on what else is running.
+    ///
+    /// CI's shared runner, in the full 2,161-test run, took 1,664 ms (PR
+    /// #2059, Oct 25), so the clock bounds below only catch a runaway (a
+    /// recount per model, say); the work counts are the real guard.
     @Test("facet counts and smart-folder counts stay quick on 600 models, and a repeat is free")
     func facetSpeed() async {
         let shop = await Self.scaled()
@@ -296,7 +300,7 @@ struct LibrarySmartFolderTests {
             await shop.settleLibraryFacets()
             worst = Swift.max(worst, clock.now - t)
         }
-        #expect(ms(worst) < 1_500, "a facet recount took \(ms(worst)) ms")
+        #expect(ms(worst) < 10_000, "a facet recount took \(ms(worst)) ms")
 
         // The same question again: the memo answers, nothing is counted.
         let ran = shop.libraryMemo.work.facetRecounts
@@ -310,7 +314,7 @@ struct LibrarySmartFolderTests {
         let t = clock.now
         let counts = rows.map { shop.libraryCount($0.query) }
         let took = clock.now - t
-        #expect(ms(took) < 500, "\(rows.count) smart-folder counts took \(ms(took)) ms")
+        #expect(ms(took) < 5_000, "\(rows.count) smart-folder counts took \(ms(took)) ms")
         #expect(counts.allSatisfy { $0 >= 0 && $0 <= 600 })
         // A redraw of the sidebar asks again and does no work.
         let before = shop.libraryMemo.work.queryCounts
