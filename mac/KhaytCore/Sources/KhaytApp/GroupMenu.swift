@@ -188,63 +188,291 @@ struct NameAGroup: View {
     }
 }
 
-/// What several selected models have in common, and what can be done to them.
+/// What several selected models come to together, and what can be done to
+/// all of them at once.
+///
+/// It offered totals, two catalogue buttons and Archive — and everything else
+/// a shop does to a shelf of models (tag them, file them, quote them, share
+/// them, free their space, delete them) only inside a 21-item right-click
+/// menu. Each button here is the same Shop function that menu calls.
+///
+/// ── THE COUNT IS THE WHOLE TRUTH ──────────────────────────────────────────
+///
+/// Every action acts on `selectedFiles` — the models drawn as tiles — and
+/// says how many in its own title. Anything selected but hidden (inside a
+/// folder tile, behind a filter) is counted on its own line and touched by
+/// nothing here: a shop said yes to "Delete 34 Models" on 27 Sep 2026 without
+/// seeing it was a whole group.
 struct ManyModels: View {
     let shop: Shop
+    @State private var tagging = false
+    @State private var typedTag = ""
+    @State private var namingCategory = false
+    @State private var typedCategory = ""
+    @State private var settingMaterial = false
+    @State private var typedMaterial = ""
+
+    private var w: Words { shop.words }
 
     var body: some View {
         let chosen = shop.selectedFiles
-        VStack(alignment: .leading, spacing: 16) {
-            Text(shop.words.counting(chosen.count, "mac.n_models"))
-                .font(.title3.weight(.semibold))
-            DetailSection(shop.words.callIt("mac.together")) {
-                DetailLine(shop.words.callIt("mac.on_disk"), Format.bytes(chosen.compactMap(\.size).reduce(0, +)))
-                DetailLine(shop.words.callIt("mac.printed"), "\(chosen.reduce(0) { $0 + $1.printCount })×", dim: true)
-                let groups = Set(chosen.compactMap(\.groupName))
-                DetailLine(shop.words.callIt("mac.group"),
-                           groups.isEmpty ? shop.words.callIt("mac.none")
-                           : groups.count == 1 ? groups.first!
-                           : shop.words.callIt("mac.n_different",
-                                               ["n": .number(Double(groups.count))]),
-                           dim: groups.isEmpty)
-                let missing = chosen.filter { !shop.fileIsPresent($0) }.count
-                if missing > 0 { DetailLine(shop.words.callIt("mac.not_on_this_mac"), "\(missing)", warn: true) }
-            }
-            Text(shop.words.callIt("mac.group_hint"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            // To the catalogue, together or one each.
-            VStack(alignment: .leading, spacing: 6) {
-                let n: [String: JSONValue] = ["n": .number(Double(chosen.count))]
-                Button { Task { await shop.editingProduct = shop.productFromFiles(chosen, name: nil) } } label: {
-                    Label(shop.words.callIt("mac.catalogue_add_as_one", n), systemImage: "tag")
-                }
-                Button { Task { await shop.addEachToCatalogue(chosen) } } label: {
-                    Label(shop.words.callIt("mac.catalogue_add_each", n), systemImage: "tag.circle")
-                }
-                // Put aside, or back — only the ones it would change, so a
-                // mixed selection says how many it really moves.
-                let aside = Set(chosen.filter { !$0.isArchived }.map(\.id))
-                let back = Set(chosen.filter(\.isArchived).map(\.id))
-                if !aside.isEmpty {
-                    Button { shop.archive(aside) } label: {
-                        Label(ModelActions.archiveTitle(restoring: false, count: aside.count, words: shop.words),
-                              systemImage: "archivebox")
+        let totals = shop.selectedFiles.isEmpty ? SelectionTotals() : shop.selectionTotals(chosen)
+        let n: [String: JSONValue] = ["n": .number(Double(chosen.count))]
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(w.counting(chosen.count, "mac.n_models"))
+                        .font(.title3.weight(.semibold))
+                    let hidden = shop.selectedButHidden
+                    if hidden > 0 {
+                        Label(w.callIt("mac.li_hidden_selected", ["n": .number(Double(hidden))]),
+                              systemImage: "eye.slash")
+                            .font(.caption).foregroundStyle(Khayt.attention)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                if !back.isEmpty {
-                    Button { shop.unarchive(back) } label: {
-                        Label(ModelActions.archiveTitle(restoring: true, count: back.count, words: shop.words),
-                              systemImage: "arrow.uturn.backward")
+                totalsCard(totals)
+                group(w.callIt("mac.li_group_print")) {
+                    Button { Task { await shop.startJob(fromModels: chosen, asQuote: true) } } label: {
+                        Label(w.callIt("mac.li_quote_these", n), systemImage: "doc.text")
+                    }
+                    .disabled(!shop.canMoveJobs)
+                    Button { Task { await shop.startJob(fromModels: chosen, asQuote: false) } } label: {
+                        Label(w.callIt("mac.job_from_n_models", n) + "\u{2026}", systemImage: "hammer")
+                    }
+                    .disabled(!shop.canMoveJobs)
+                    // To the catalogue, together or one each.
+                    Button { Task { await shop.editingProduct = shop.productFromFiles(chosen, name: nil) } } label: {
+                        Label(w.callIt("mac.li_catalogue_single"), systemImage: "tag")
+                    }
+                    .disabled(!shop.canWrite)
+                    Button { Task { await shop.addEachToCatalogue(chosen) } } label: {
+                        Label(w.callIt("mac.li_catalogue_each"), systemImage: "tag.circle")
+                    }
+                    .disabled(!shop.canWrite)
+                }
+                group(w.callIt("mac.li_group_organise")) {
+                    Button { typedTag = ""; tagging = true } label: {
+                        Label(w.callIt("mac.li_add_tag"), systemImage: "number")
+                    }
+                    .shopPopover(isPresented: $tagging, arrowEdge: .bottom) {
+                        NameIt(words: w, typed: $typedTag, title: w.callIt("mac.li_add_tag_title"),
+                               example: w.callIt("mac.tag_example"),
+                               note: w.callIt("mac.li_add_tag_note"),
+                               confirm: w.callIt("mac.li_add")) { line in
+                            tagging = false
+                            Task { await shop.addTagToSelection(line) }
+                        }
+                    }
+                    categoryMenu
+                        .shopPopover(isPresented: $namingCategory, arrowEdge: .bottom) {
+                            NameIt(words: w, typed: $typedCategory,
+                                   title: w.callIt("mac.name_this_category"),
+                                   example: w.callIt("mac.category_example"),
+                                   note: w.callIt("mac.group_name_kept"),
+                                   confirm: w.callIt("mac.file_it")) { name in
+                                namingCategory = false
+                                let wanted = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !wanted.isEmpty else { return }
+                                Task { await shop.fileSelection(underCategory: wanted) }
+                            }
+                        }
+                    folderMenu
+                    Button { typedMaterial = Self.common(chosen.map { $0.material ?? "" }); settingMaterial = true } label: {
+                        Label(w.callIt("mac.li_set_material"), systemImage: "circle.hexagongrid")
+                    }
+                    .shopPopover(isPresented: $settingMaterial, arrowEdge: .bottom) {
+                        NameIt(words: w, typed: $typedMaterial, title: w.callIt("mac.li_set_material_title"),
+                               example: w.callIt("mac.li_material_example"),
+                               note: w.callIt("mac.li_material_note"),
+                               confirm: w.callIt("mac.li_set")) { line in
+                            settingMaterial = false
+                            shop.setMaterialOnSelection(line)
+                        }
                     }
                 }
+                .disabled(!shop.canWrite)
+                // A PRIVATE LINK, or a product sold through the vault. Absent
+                // unless the library's remote IS the vault (`libraryOnVault`).
+                if shop.libraryOnVault, let first = chosen.first {
+                    group(w.callIt("mac.li_group_share")) {
+                        Button { shop.shareByLink(first) } label: {
+                            Label(w.callIt("mac.vl_share") + "\u{2026}", systemImage: "link")
+                        }
+                        Button { Task { await shop.sellAsProduct(first) } } label: {
+                            Label(w.callIt("mac.vp_sell") + "\u{2026}", systemImage: "cart")
+                        }
+                    }
+                    .disabled(!shop.canWrite)
+                }
+                if shop.libraryHasRemote { storage(chosen) }
+                group(w.callIt("mac.li_group_remove")) {
+                    // Put aside, or back — only the ones it would change, so a
+                    // mixed selection says how many it really moves.
+                    let aside = Set(chosen.filter { !$0.isArchived }.map(\.id))
+                    let back = Set(chosen.filter(\.isArchived).map(\.id))
+                    if !aside.isEmpty {
+                        Button { shop.archive(aside) } label: {
+                            Label(ModelActions.archiveTitle(restoring: false, count: aside.count, words: w),
+                                  systemImage: "archivebox")
+                        }
+                        .disabled(!shop.canWrite)
+                    }
+                    if !back.isEmpty {
+                        Button { shop.unarchive(back) } label: {
+                            Label(ModelActions.archiveTitle(restoring: true, count: back.count, words: w),
+                                  systemImage: "arrow.uturn.backward")
+                        }
+                        .disabled(!shop.canWrite)
+                    }
+                    // The count in the title is the count asked about and the
+                    // count deleted: `askToDeleteFromLibrary` takes exactly
+                    // these, refuses any not on screen, and its question names
+                    // them and the groups they are in.
+                    Button(role: .destructive) { shop.askToDeleteFromLibrary(chosen) } label: {
+                        Label(Self.deleteTitle(count: chosen.count, words: w), systemImage: "trash")
+                            .foregroundStyle(Khayt.late)
+                    }
+                    .disabled(!shop.canWrite || chosen.isEmpty)
+                }
             }
-            .controlSize(.small)
-            .disabled(!shop.canWrite)
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
         }
+    }
+
+    /// "Delete 5 Models…" — the number is the list handed to the question.
+    static func deleteTitle(count: Int, words: Words) -> String {
+        words.callIt("mac.delete_n_models", ["n": .number(Double(count))]) + "\u{2026}"
+    }
+
+    /// What every one of them shares, or empty.
+    static func common(_ values: [String]) -> String {
+        guard let first = values.first, values.allSatisfy({ $0 == first }) else { return "" }
+        return first
+    }
+
+    private func totalsCard(_ t: SelectionTotals) -> some View {
+        let none = "\u{2014}"
+        return VStack(alignment: .leading, spacing: 8) {
+            Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 6) {
+                GridRow {
+                    tile(w.callIt("mac.li_print_time"),
+                         t.hours > 0 ? PrintFigures.duration(hours: t.hours, w) : none, unit: nil)
+                    tile(w.callIt("mac.li_filament"),
+                         t.grams > 0 ? PrintFigures.weight(t.grams, w) : none, unit: nil)
+                }
+                GridRow {
+                    tile(w.callIt("mac.on_disk"), Format.bytes(t.bytes), unit: nil)
+                    tile(w.callIt("mac.li_online_only_label"), "\(t.onlineOnly)", unit: nil,
+                         dim: t.onlineOnly == 0)
+                }
+            }
+            if t.withFigures < t.count {
+                Text(w.callIt("mac.li_totals_partial", ["n": .number(Double(t.withFigures)),
+                                                        "total": .number(Double(t.count))]))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if t.notHere > 0 {
+                Text(w.callIt("mac.li_not_here_n", ["n": .number(Double(t.notHere))]))
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func tile(_ label: String, _ value: String, unit: String?, dim: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value).font(.title3.weight(.semibold)).monospacedDigit()
+                    .foregroundStyle(dim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                    .lineLimit(1).minimumScaleFactor(0.6)
+                if let unit { Text(unit).font(.caption).foregroundStyle(.secondary) }
+            }
+        }
+        .padding(.horizontal, 9).padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
+        .background(Khayt.recessed, in: RoundedRectangle(cornerRadius: Radius.control))
+    }
+
+    /// A captioned run of buttons that wraps in the inspector's width.
+    private func group<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .textCase(.uppercase)
+                .tracking(0.6)
+                .foregroundStyle(.tertiary)
+            FlowLayout(spacing: 6) { content() }
+                .controlSize(.small)
+        }
+    }
+
+    /// The categories the shop already uses, then a new one — the toolbar's
+    /// Categorise menu, here because this is where the selection is.
+    private var categoryMenu: some View {
+        Menu {
+            ForEach(shop.categoriesInUse, id: \.self) { category in
+                Button(category) { Task { await shop.fileSelection(underCategory: category) } }
+            }
+            if !shop.categoriesInUse.isEmpty { Divider() }
+            Button(w.callIt("mac.new_category")) { typedCategory = ""; namingCategory = true }
+            if shop.selectedFiles.contains(where: { !($0.category ?? "").isEmpty }) {
+                Button(w.callIt("mac.remove_from_category")) {
+                    Task { await shop.fileSelection(underCategory: "") }
+                }
+            }
+        } label: {
+            Label(w.callIt("mac.li_set_category"), systemImage: "tag")
+        }
+        .fixedSize()
+    }
+
+    /// The shop's folders, then a new one — the toolbar's Group menu.
+    private var folderMenu: some View {
+        Menu {
+            ForEach(shop.groups, id: \.self) { group in
+                Button(group) { Task { await shop.fileSelection(under: group) } }
+            }
+            if !shop.groups.isEmpty { Divider() }
+            Button(w.callIt("mac.new_group")) { shop.namingGroup = true }
+            if shop.selectedFiles.contains(where: { $0.groupName != nil }) {
+                Button(w.callIt("mac.remove_from_group")) { Task { await shop.fileSelection(under: "") } }
+            }
+        } label: {
+            Label(w.callIt("mac.li_move_folder"), systemImage: "folder")
+        }
+        .fixedSize()
+    }
+
+    /// Free their space, or keep them here — through the one-model paths.
+    @ViewBuilder private func storage(_ chosen: [LibraryFile]) -> some View {
+        let movable = chosen.filter {
+            !$0.isLinked && !shop.isInCloudOnly($0) && shop.fileIsPresent($0) && !shop.isKeptOnThisMac($0)
+        }
+        let allKept = !chosen.isEmpty && chosen.allSatisfy { shop.isKeptOnThisMac($0) }
+        group(w.callIt("mac.li_group_storage")) {
+            Button { Task { await shop.freeUpSpace(models: movable) } } label: {
+                Label(w.callIt("mac.li_free_up_n", ["n": .number(Double(movable.count))]),
+                      systemImage: "icloud.and.arrow.up")
+            }
+            .disabled(movable.isEmpty || shop.cloudLibraryBusy || !shop.canWrite)
+            Button { Task { await shop.keepOnThisMac(models: chosen, !allKept) } } label: {
+                Label(w.callIt(allKept ? "mac.li_unkeep" : "mac.storage_keep"),
+                      systemImage: allKept ? "pin.slash" : "pin")
+            }
+            .disabled(shop.cloudLibraryBusy || shop.syncIndex == nil)
+            if shop.cloudLibraryBusy { ProgressView().controlSize(.small) }
+        }
+        if let note = shop.cloudLibraryNote {
+            Text(note).font(.caption).foregroundStyle(.secondary)
+        }
+        if let problem = shop.cloudLibraryProblem {
+            Text(problem).font(.caption).foregroundStyle(Khayt.attention)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

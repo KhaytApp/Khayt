@@ -4,6 +4,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: the model page opens on a summary, and several models get real buttons.**
+  - A model's page starts with a summary card: the picture (drop a photo on it to set it; the separate empty "Drop a photo here" box is gone), the title, and the facts that decide a print: print time, filament, cost to make, the catalogue product it sells as with its price and margin (red when under the shop's minimum margin), and which printers it fits and is ready on. Quote, New Job and Add to Catalogue sit right there and stay visible when the file is online only or missing; a line says what the file itself is still needed for.
+  - Cost to make is the catalogue's own cost for the model, so it matches the product made from it.
+  - The rest of the page is in sections that fold away and stay folded: Print, File & Storage, Shape, Parts/Versions/Setups, Origin, Notes, Archive.
+  - "Ready" now accounts for the bed: a model too big for a printer is never "Ready to start" on it, on the page or in the Ready on chip. Laser and UV flatbed machines are no longer offered as somewhere a model fits.
+  - "Before you quote: not found" now says the file isn't on this Mac and what to do.
+  - Selecting several models shows their total print time, filament, size on disk and how many are online only, with buttons for Quote, New Job, Add to Catalogue (one product or one each), Add Tag, Set Category, Move to Folder, Set Material, Share by Link and Sell as a Product (vault libraries), Free Up Space / Keep on This Mac, Archive and Delete. Delete states exactly how many it deletes, and the pane says how many selected models are hidden in folders and left alone.
+  - A model's right-click menu is grouped: open and slicers, then Quote / Job / Catalogue, then Organise, Share & Sell and Storage submenus, with Archive and Delete last.
+  - The sample shop's King reliefs measured 1142 mm wide because they carried another model's geometry; they now measure 200 × 200 mm like the real files.
+
 - **iPhone: a job's invoice, on the phone.** A job's page now has an Invoice card. It
   opens the same invoice the Mac and PC print, in English or Arabic with the ZATCA
   QR, and Share sends it as an A4 PDF. The phone never gives out an invoice number:

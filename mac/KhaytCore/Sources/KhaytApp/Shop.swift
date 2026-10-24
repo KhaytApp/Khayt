@@ -2841,8 +2841,14 @@ final class Shop {
     var libraryPrintNextOnly = false { didSet { libraryViewChanged() } }
     /// Models that are the same file, or the same mesh, as another.
     var libraryDuplicatesOnly = false { didSet { libraryViewChanged() } }
-    /// Which models are ready on which machine, from the last recount.
+    /// Which models are ready on which machine, from the last recount —
+    /// loaded AND on the bed (`ModelReadiness`), so the Ready chip never
+    /// counts a model the inspector calls too big for that machine.
     var readyByMachine: [String: Set<String>] = [:] { didSet { libraryDerivedRevision &+= 1 } }
+    /// The spools half of that answer alone: what `readyToPrint` said before
+    /// the bed was asked. The inspector reads it to tell "needs a swap" from
+    /// "too big"; nothing filters on it.
+    var spoolReadyByMachine: [String: Set<String>] = [:]
 
     /// Recomputed with the facets; the grid's filter and the inspector read it.
     var duplicateOf: [String: String] = [:] { didSet { libraryDerivedRevision &+= 1 } }

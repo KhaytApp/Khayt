@@ -3,15 +3,40 @@ import KhaytCore
 
 /// The selected model, in detail.
 ///
-/// What a shop asks before putting a file back on a printer: how big is it, how
-/// many colours, how many swaps, when did it last run, and where is the file.
+/// ── ONE GLANCE, THEN THE DETAIL ───────────────────────────────────────────
+///
+/// It was one long undifferentiated scroll, about 1,600 points of it: the
+/// header, an empty "Drop a photo here" box second from the top, the file,
+/// the filament, the mesh, an estimate in grams and hours with no money in it,
+/// and the Quote and Job buttons near the BOTTOM — hidden entirely when the
+/// file was online only (library audit, Oct 2026). A shop opens a model to
+/// decide whether to print it, quote it or sell it, and the answer was spread
+/// over the whole column.
+///
+/// So the page opens on a SUMMARY CARD (`ModelSummaryCard`): the picture
+/// (drop a photo on it to set it), the title, and the decision facts — time,
+/// grams, cost to make, the catalogue price and margin, and which machines it
+/// fits and is ready on — with Quote, New Job and Add to Catalogue right
+/// there. Everything else follows in sections ordered by the task, each one
+/// folding away and remembered (`InspectorSection`).
 struct LibraryInspector: View {
     let shop: Shop
     @State private var setups: KhaytEngine.PrintSetups?
     @State private var versions: KhaytEngine.PrintVersions?
     @State private var parts: KhaytEngine.PrintParts?
+    @State private var summary: ModelSummary?
     /// The model whose bought-licence proof is being edited.
     @State private var proofFor: LibraryFile?
+
+    /// What the summary depends on: the record, and the catalogue it is
+    /// priced against. A product saved or a rate changed moves the rows.
+    private struct SummaryKey: Equatable {
+        let file: LibraryFile
+        let products: [KhaytEngine.CatalogueRow]
+        let shelf: Int
+        /// The shop's minimum margin, which colours the margin.
+        let floor: Double?
+    }
 
     var body: some View {
         if shop.selectedFiles.count > 1 {
@@ -33,6 +58,13 @@ struct LibraryInspector: View {
                 versions = await shop.versions(for: file.id)
                 parts = await shop.parts(for: file.id)
             }
+            .task(id: SummaryKey(file: file, products: shop.catalogueRows, shelf: shop.consumableRows.count,
+                                     floor: Shop.plainNumber(shop.settingsDict["minMarginPct"]))) {
+                summary = await shop.modelSummary(for: file)
+            }
+            // The previous model's figures never stand under this one's title
+            // while its own are worked out.
+            .onChange(of: file.id) { _, _ in summary = nil }
         } else {
             EmptyHere(title: shop.words.callIt("mac.no_model"), message: shop.words.callIt("mac.no_model_hint"), mark: .library)
         }
@@ -40,279 +72,128 @@ struct LibraryInspector: View {
 
     /// The page itself, outside its scroll view so a snapshot can draw it:
     /// `ImageRenderer` draws nothing inside a `ScrollView`.
-    @ViewBuilder func page(_ file: LibraryFile) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            header(file)
-            creatorAndCopies(file)
-            // The photo straight under the picture it replaces, and
-            // above everything technical: it is what identifies the
-            // print. It was the LAST section — below parts, versions,
-            // setups and consumables — and a shop reported it missing.
-            LayerRule()
-            PhotoSection(shop: shop, file: file)
-            LayerRule()
-            theFile(file)
-            if shop.libraryHasRemote || shop.storageState(for: file) == .online {
-                LayerRule()
-                StorageSection(shop: shop, file: file)
-                    .id("model-storage")
+    @ViewBuilder func page(_ file: LibraryFile, summary given: ModelSummary? = nil) -> some View {
+        let w = shop.words
+        VStack(alignment: .leading, spacing: 18) {
+            ModelSummaryCard(shop: shop, file: file, summary: given ?? summary)
+                .id("model-title")
+            // ── PRINT: what it takes and what can go wrong ───────────────
+            InspectorSection(id: "print", title: w.callIt("mac.li_sec_print"), symbol: "printer") {
+                if let sliced = slicedSection(file) { sliced }
+                if !file.palette.isEmpty { filament(file) }
+                // Only for something with a mesh to walk, and only while the
+                // slicer has not answered both: beside a slice's own time and
+                // weight a guess from the shape is a second, different number.
+                if let estimate = shop.estimates[file.id], !Self.slicerSaidAnything(file) { priced(estimate) }
+                if file.sourceFile?.kind == "model" { risk(file) }
+                if let how = howItPrints(file) { how }
             }
-            if let sliced = slicedSection(file) {
-                LayerRule()
-                sliced
+            // ── THE FILE, AND WHERE ITS BYTES ARE ────────────────────────
+            InspectorSection(id: "file", title: w.callIt("mac.li_sec_file"), symbol: "doc") {
+                theFile(file)
+                fileButtons(file)
+                if shop.libraryHasRemote || shop.storageState(for: file) == .online {
+                    StorageSection(shop: shop, file: file)
+                        .id("model-storage")
+                }
             }
-            if !file.palette.isEmpty {
-                LayerRule()
-                filament(file)
-            }
+            // ── THE SHAPE, AND WHICH BEDS IT GOES ON ─────────────────────
             if let mesh = file.mesh {
-                LayerRule()
-                geometry(mesh, file.id)
+                InspectorSection(id: "shape", title: w.callIt("mac.li_sec_shape"), symbol: "cube") {
+                    geometry(mesh, file)
+                }
             }
-            // Only for something with a mesh to walk. A gcode is a list
-            // of moves and there is no geometry in it to judge.
-            if let estimate = shop.estimates[file.id] {
-                LayerRule()
-                priced(estimate)
+            // ── WHAT IT IS MADE OF, AND HOW IT HAS BEEN MADE ─────────────
+            // Parts only for a print that IS several files, versions only
+            // where there is more than one: a heading over a list of one says
+            // nothing.
+            InspectorSection(id: "build", title: w.callIt("mac.li_sec_build"), symbol: "square.stack.3d.up") {
+                if let parts, parts.multi { PartsSection(parts: parts, shop: shop) }
+                if let versions, versions.many { VersionsSection(versions: versions, shop: shop) }
+                if let setups, setups.total > 0 { SetupsSection(setups: setups, shop: shop) }
+                ModelConsumablesSection(shop: shop, file: file)
             }
-            if file.sourceFile?.kind == "model" {
-                LayerRule()
-                risk(file)
+            // ── WHERE IT CAME FROM ───────────────────────────────────────
+            if hasOrigin(file) {
+                InspectorSection(id: "origin", title: w.callIt("mac.li_sec_origin"), symbol: "signature") {
+                    provenance(file)
+                    guides(file)
+                }
             }
-            if let how = howItPrints(file) {
-                LayerRule()
-                how
-            }
-            // Only where there is more than one. A print always HAS a
-            // version; almost every file has exactly one, and a section
-            // headed "versions" over a list of one is a heading that
-            // says nothing.
-            // Only for a print that IS several files. One file is
-            // the ordinary case and a "parts" heading over a list of
-            // one says nothing.
-            if let parts, parts.multi {
-                LayerRule()
-                PartsSection(parts: parts, shop: shop)
-            }
-            if let versions, versions.many {
-                LayerRule()
-                VersionsSection(versions: versions, shop: shop)
-            }
-            if let setups, setups.total > 0 {
-                LayerRule()
-                SetupsSection(setups: setups, shop: shop)
-            }
-            LayerRule()
-            ModelConsumablesSection(shop: shop, file: file)
-            provenance(file)
-            guides(file)
-            actions(file)
-            if !file.isArchived { archiveButton(file) }
             if let notes = file.testedNotes, !notes.isEmpty {
-                LayerRule()
-                DetailSection(shop.words.callIt("doc.notes")) { Text(notes).textSelection(.enabled) }
+                InspectorSection(id: "notes", title: w.callIt("mac.li_sec_notes"), symbol: "note.text") {
+                    Text(notes).font(.callout).textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if !file.isArchived {
+                InspectorSection(id: "archive", title: w.callIt("mac.li_sec_archive"), symbol: "archivebox",
+                                 openByDefault: false) {
+                    archiveButton(file)
+                }
             }
         }
         .padding(16)
     }
 
-    /// The file, reachable. Buttons rather than only a context menu: a menu you
-    /// have to know is there is a feature for the person who wrote it.
-    @ViewBuilder private func actions(_ file: LibraryFile) -> some View {
-        if shop.isInCloudOnly(file) {
-            // Said where the missing buttons would be, so a model moved to
-            // the cloud does not read as a model that was lost.
-            HStack(spacing: 8) {
-                Label(shop.words.callIt("mac.cloudlib_in_cloud"), systemImage: "icloud")
-                    .foregroundStyle(.secondary)
-                Button { Task { await shop.bringBack(file) } } label: {
-                    Label(shop.words.callIt(file.isLinked ? "mac.linked_download" : "mac.cloudlib_bring_back"), systemImage: "icloud.and.arrow.down")
-                }
-                .disabled(shop.cloudLibraryBusy)
-                if shop.cloudLibraryBusy { ProgressView().controlSize(.small) }
-            }
-            .controlSize(.small)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if let problem = shop.cloudLibraryProblem {
-                Text(problem).font(.caption).foregroundStyle(Khayt.attention)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        } else if let url = shop.modelFile(for: file) {
-            HStack(spacing: 8) {
+    /// The slicer recorded both a time and a weight.
+    static func fullySliced(_ file: LibraryFile) -> Bool {
+        (file.parsed?.printTimeMins ?? 0) > 0 && (file.parsed?.filamentGrams ?? 0) > 0
+    }
+
+    /// The slicer — or the file's own per-colour weights — said a time or a
+    /// weight. Then the summary card shows THOSE, and a guess from the shape
+    /// beside them is a second, different answer for the same print (190.8 g
+    /// · 5.34 hrs under a card saying 146 g · 6h 54m, review of #2056). The
+    /// guess is shown only where nothing measured exists, and marked ≈.
+    static func slicerSaidAnything(_ file: LibraryFile) -> Bool {
+        (file.parsed?.printTimeMins ?? 0) > 0 || (file.parsed?.filamentGrams ?? 0) > 0
+            || file.palette.contains { ($0.grams ?? 0) > 0 }
+    }
+
+    /// Provenance or guides to show. The section is absent otherwise — see
+    /// `provenance` for why "not recorded" on four hundred models is worse.
+    private func hasOrigin(_ file: LibraryFile) -> Bool {
+        if let s = shop.licences[file.id], s.known || !s.source.isEmpty { return true }
+        return !shop.guides(for: file).isEmpty
+    }
+
+    /// The file, reachable — Finder, the system's opener, the Print next list.
+    /// The buttons that DECIDE something (quote, job, catalogue) are on the
+    /// summary card; these are about the file itself.
+    @ViewBuilder private func fileButtons(_ file: LibraryFile) -> some View {
+        let url = shop.modelFile(for: file)
+        FlowLayout(spacing: 8) {
+            if let url {
                 Button { FileActions.reveal(url) } label: {
                     Label(shop.words.callIt("mac.reveal"), systemImage: "folder")
                 }
                 Button { FileActions.open(url) } label: {
                     Label(shop.words.callIt("mac.open"), systemImage: "arrow.up.forward.app")
                 }
-                Button { shop.setPrintNext([file.id], on: !file.isPrintNext) } label: {
-                    Label(shop.words.callIt(file.isPrintNext ? "mac.print_next_remove" : "mac.print_next_add"),
-                          systemImage: file.isPrintNext ? "bookmark.fill" : "bookmark")
-                }
-                // The door to the catalogue, where it can be seen — it lived
-                // only in a right-click menu, and a shop went looking for it.
-                Button { Task { await shop.editingProduct = shop.productFromFile(file) } } label: {
-                    Label(shop.words.callIt("mac.product_from_model"), systemImage: "tag")
-                }
             }
-            .controlSize(.small)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            quoteOrJob(file)
+            Button { shop.setPrintNext([file.id], on: !file.isPrintNext) } label: {
+                Label(shop.words.callIt(file.isPrintNext ? "mac.print_next_remove" : "mac.print_next_add"),
+                      systemImage: file.isPrintNext ? "bookmark.fill" : "bookmark")
+            }
         }
+        .controlSize(.small)
     }
 
-    /// "Archived 12 Oct 2026", and Restore beside it.
-    /// The note on a line of its own and Restore under it: side by side in
-    /// the inspector's width, the date broke over two lines.
-    private func archivedNote(_ file: LibraryFile) -> some View {
+    /// "Archive", on its own: it changes what the library offers, and does
+    /// nothing to the file.
+    private func archiveButton(_ file: LibraryFile) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(archivedSentence(file), systemImage: "archivebox")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Text(shop.words.callIt("mac.archive_help"))
+                .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button { shop.unarchive([file.id]) } label: {
-                Label(shop.words.callIt("mac.unarchive_model"), systemImage: "arrow.uturn.backward")
+            Button { shop.archive([file.id]) } label: {
+                Label(shop.words.callIt("mac.archive_model"), systemImage: "archivebox")
             }
             .controlSize(.small)
             .disabled(!shop.canWrite)
         }
-    }
-
-    private func archivedSentence(_ file: LibraryFile) -> String {
-        // In the book's calendar (`Words.say`), never `Calendar.current`.
-        guard let when = Calendar.instant(file.archivedAt ?? "") else {
-            return shop.words.callIt("mac.archived_undated")
-        }
-        let day = shop.words.say(when, .dateTime.day().month(.abbreviated).year())
-        return shop.words.callIt("mac.archived_on", ["date": .string(day)])
-    }
-
-    /// Archive, on its own line under the rest: it changes what the library
-    /// offers, and does nothing to the file — so it is not with the buttons
-    /// that open the file.
-    private func archiveButton(_ file: LibraryFile) -> some View {
-        Button { shop.archive([file.id]) } label: {
-            Label(shop.words.callIt("mac.archive_model"), systemImage: "archivebox")
-        }
-        .controlSize(.small)
-        .disabled(!shop.canWrite)
-        .help(shop.words.callIt("mac.archive_help"))
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// Quote this model — or take the job — on its own figures, without
-    /// retyping them. ONE control: the click is the quote, the arrow holds
-    /// the job, so the row above does not grow a sixth button. On its own row
-    /// because that one is already as wide as the inspector.
-    private func quoteOrJob(_ file: LibraryFile) -> some View {
-        Menu {
-            Button(shop.words.callIt("mac.job_from_model") + "\u{2026}") {
-                Task { await shop.startJob(fromModels: [file], asQuote: false) }
-            }
-        } label: {
-            Label(shop.words.callIt("mac.quote_model") + "\u{2026}", systemImage: "doc.text")
-        } primaryAction: {
-            Task { await shop.startJob(fromModels: [file], asQuote: true) }
-        }
-        .fixedSize()
-        .controlSize(.small)
-        .disabled(!shop.canMoveJobs)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// Who made it, as a way to the rest of their models; and the copies of
-    /// it the library holds, each a way to it.
-    @ViewBuilder private func creatorAndCopies(_ file: LibraryFile) -> some View {
-        if file.isLinked, let path = file.externalPath {
-            Label(shop.words.callIt("mac.linked_where",
-                                    ["path": .string(((path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)]),
-                  systemImage: "link")
-                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-        }
-        if let creator = file.creator {
-            Button {
-                shop.libraryCreator = creator
-                shop.shelf = .library(nil)
-            } label: {
-                Label(shop.words.callIt("mac.by_creator", ["name": .string(creator)]), systemImage: "person")
-            }
-            .buttonStyle(.link)
-            .help(shop.words.callIt("mac.creator_show_all"))
-        }
-        let copies = shop.duplicates(of: file)
-        if !copies.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                Label(shop.words.callIt("mac.duplicate_of", ["n": .number(Double(copies.count))]),
-                      systemImage: "square.on.square")
-                    .font(.callout.weight(.medium)).foregroundStyle(Khayt.attention)
-                ForEach(copies) { copy in
-                    Button(copy.title) { shop.select(copy, modifiers: .replace) }
-                        .buttonStyle(.link).lineLimit(1)
-                }
-            }
-        }
-    }
-
-    private func header(_ file: LibraryFile) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // A fixed height, not an aspect ratio. `Thumbnail` is a ZStack over
-            // a Rectangle and has no size of its own, and asking for a 1:1 fit
-            // inside a vertical ScrollView leaves the height unresolved — the
-            // whole inspector drew as an empty column.
-            Thumbnail(source: shop.thumbnail(for: file))
-                .frame(maxWidth: .infinity)
-                .frame(height: 210)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            HStack(spacing: 6) {
-                // A control only when it would do something. While the Electron
-                // app has the book this is a star that reports, not a button
-                // that lies — a disabled toggle invites people to keep pressing.
-                if shop.canWrite {
-                    Button {
-                        shop.toggleFavourite(file)
-                    } label: {
-                        Image(systemName: file.isFavourite ? "star.fill" : "star")
-                            .foregroundStyle(file.isFavourite ? AnyShapeStyle(.yellow)
-                                                             : AnyShapeStyle(.tertiary))
-                    }
-                    .buttonStyle(.plain)
-                    .help(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite"))
-                    .accessibilityLabel(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite"))
-                } else if file.isFavourite {
-                    Image(systemName: "star.fill").foregroundStyle(Khayt.marked)
-                }
-                ModelTitle(shop: shop, file: file)
-            }
-            .id("model-title")
-            // PUT ASIDE, and said so where the eye is, with the way back. A
-            // model found through Spotlight or a job opens here even while it
-            // is archived, and should not read as one still on offer.
-            if file.isArchived { archivedNote(file) }
-            if let problem = shop.writeProblem {
-                Label(problem, systemImage: "exclamationmark.triangle")
-                    .font(.caption)
-                    .foregroundStyle(Khayt.attention)
-                    .textSelection(.enabled)
-            }
-            if let group = file.groupName {
-                Label(group, systemImage: "square.stack")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            // What it IS, beside the set it is in. Both are filterable now and
-            // both are settable now, so a model that carries one and not the
-            // other should say so rather than look the same either way.
-            if let category = file.category, !category.isEmpty {
-                Label(category, systemImage: "tag")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            if let tags = file.tags, !tags.isEmpty {
-                Text(tags.joined(separator: " · "))
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-        }
     }
 
     private func theFile(_ file: LibraryFile) -> some View {
@@ -332,16 +213,13 @@ struct LibraryInspector: View {
             // Where the bytes are is worth stating plainly. "On this Mac" and
             // "in the records but not here" look identical in a grid, and only
             // one of them can be put on a printer this afternoon.
-            // The FILE, not its folder: a model online only (moved off, or put
-            // in the bucket by hand) has a folder holding just its sidecar or
-            // marker, and was ticked "On this Mac" right above "In the cloud"
-            // (alpha.65 review, snapshot 42).
+            // The FILE, not its folder (alpha.65 review, snapshot 42).
             if shop.isInCloudOnly(file) {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.cloudlib_in_cloud"), dim: true)
             } else if shop.fileIsPresent(file) {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), "✓", dim: true)
             } else {
-                DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.not_found"), warn: true)
+                DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.li_not_here"), warn: true)
             }
         }
     }
@@ -351,18 +229,14 @@ struct LibraryInspector: View {
     /// each spool.
     ///
     /// A tester (Oct 2026): "I uploaded a multi plate 3mf and it only shows the
-    /// filament data and time for one". This screen showed no slicer figures at
-    /// all — only a per-colour list that carried plate 1's grams — so a
-    /// two-plate project read as one plate's worth of plastic.
+    /// filament data and time for one".
     func slicedSection(_ file: LibraryFile) -> AnyView? {
         let mins = file.parsed?.printTimeMins ?? 0, grams = file.parsed?.filamentGrams ?? 0
         guard mins > 0 || grams > 0 else { return nil }
         let plates = shop.plates(of: file)
         let w = shop.words
-        func hours(_ m: Double) -> String {
-            Money.quantity((m / 60 * 100).rounded() / 100) + " " + w.callIt("common.hours")
-        }
-        func g(_ n: Double) -> String { Money.grams(n) + " " + w.callIt("common.grams") }
+        func hours(_ m: Double) -> String { PrintFigures.duration(minutes: m, w) }
+        func g(_ n: Double) -> String { PrintFigures.weight(n, w) }
         return AnyView(DetailSection(w.callIt(plates.isEmpty ? "mac.sliced_title" : "mac.sliced_project",
                                               ["plates": .string(w.counting(plates.count, "mac.n_plates"))])) {
             if mins > 0 { DetailLine(w.callIt("mac.est_time"), hours(mins), strong: true) }
@@ -393,10 +267,7 @@ struct LibraryInspector: View {
         })
     }
 
-    /// "Filament 2 · PLA": which spool slot it is AND what is in it. The
-    /// material alone read "PLA, PLA" for a two-colour plate, and the slot
-    /// alone said nothing about what to load. The number goes through the
-    /// shop's numerals (`.number`), not the file's text.
+    /// "Filament 2 · PLA": which spool slot it is AND what is in it.
     static func slotLabel(_ f: Shop.PlateFilament, words: Words) -> String {
         let slot: String = {
             if let n = Double(f.slot), n.isFinite, n >= 0, n < 1_000_000, n == n.rounded() {
@@ -412,6 +283,10 @@ struct LibraryInspector: View {
         }
     }
 
+    /// The colours it needs and how many swaps. WHICH MACHINE it can start on
+    /// is the summary card's line, from the one fit-aware rule — the per-
+    /// machine "Ready to start" here sat under "Too big for every machine you
+    /// have" and contradicted it.
     private func filament(_ file: LibraryFile) -> some View {
         DetailSection(shop.words.callIt("mac.filament")) {
             ForEach(Array(file.palette.enumerated()), id: \.offset) { i, colour in
@@ -421,7 +296,7 @@ struct LibraryInspector: View {
                         .font(.callout)
                     Spacer(minLength: 8)
                     if let g = colour.grams {
-                        Text(verbatim: "\(Format.mm(g)) \(shop.words.callIt("common.grams"))")
+                        Text(PrintFigures.weight(g, shop.words))
                             .font(.callout)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
@@ -431,32 +306,11 @@ struct LibraryInspector: View {
             if file.swaps > 0 {
                 DetailLine(shop.words.callIt("mac.swaps"), "\(file.swaps)", dim: true)
             }
-            // Can it start now, on each machine that says what it has loaded?
-            // The same answer the Ready chip counts, so the two cannot disagree.
-            ForEach(shop.libraryFacets.ready) { row in
-                if shop.isReady(file, on: row.machineId) {
-                    DetailLine(row.machineName, shop.words.callIt("mac.ready_now"), tint: Khayt.done)
-                } else if !(file.colors ?? []).isEmpty {
-                    DetailLine(row.machineName, shop.words.callIt("mac.needs_swap"), dim: true)
-                }
-            }
         }
     }
 
-    /// What the slicer was told to do with this model.
-    ///
-    /// The question a shop asks second, after "which model is this": a folder
-    /// holds the same shape sliced for a U1 and for an X1 Carbon, at three layer
-    /// heights, one with support and one without, and the pictures are
-    /// identical.
-    ///
-    /// NO PRINT TIME AND NO FILAMENT WEIGHT. Those exist only in a SLICED 3MF
-    /// and not one of the 43 files in this shop's library carries them; a row
-    /// that is empty on every real file teaches people the panel is broken.
-    ///
-    /// Absent entirely for a model whose file says nothing — an STL, a 3MF a CAD
-    /// program wrote — for the same reason `provenance` is absent when nobody
-    /// recorded a licence.
+    /// What the slicer was told to do with this model. Absent entirely for a
+    /// model whose file says nothing — an STL, a 3MF a CAD program wrote.
     @ViewBuilder
     private func howItPrints(_ file: LibraryFile) -> (some View)? {
         let lines = Self.lines(from: shop.printFacts(for: file), words: shop.words)
@@ -470,8 +324,7 @@ struct LibraryInspector: View {
     }
 
     /// One line per thing the file actually said — the rule is in `KhaytCore`,
-    /// because the Quick Look preview is a separate bundle that shows the same
-    /// facts and cannot import this app. See `PrintFactLines`.
+    /// because the Quick Look preview shows the same facts. See `PrintFactLines`.
     @MainActor
     static func lines(from facts: KhaytEngine.PrintFacts?,
                       words: Words) -> [PrintFactLines.Line] {
@@ -482,21 +335,8 @@ struct LibraryInspector: View {
 
     static func number(_ v: Double) -> String { PrintFactLines.number(v) }
 
-    /// Where it came from, and what may be done with it.
-    ///
-    /// The papers that came with it.
-    ///
-    /// ── THEY USED TO BE EXTRACTED AND DELETED ─────────────────────────────
-    ///
-    /// A creator pack's assembly instructions and its colour guide are the two
-    /// pieces of paper a shop actually needs beside the print, and
-    /// `ArchiveImport` kept only files whose extension names a model — so every
-    /// PDF in every pack was unzipped into a scratch folder, ignored, and
-    /// thrown out with it. Silently, on every import.
-    ///
-    /// Absent when there are none, like `provenance` above and for the same
-    /// reason: a heading reading "no guides" on four hundred models teaches
-    /// people to stop reading headings.
+    /// The papers that came with it — a creator pack's assembly instructions
+    /// and colour guide. Absent when there are none.
     @ViewBuilder
     private func guides(_ file: LibraryFile) -> some View {
         let papers = shop.guides(for: file)
@@ -522,11 +362,9 @@ struct LibraryInspector: View {
         }
     }
 
-    /// Absent entirely for a model nobody has recorded a licence for. That is
-    /// deliberate: a library that has just been imported has recorded none, and
-    /// a panel that said "not recorded" on four hundred models would teach
-    /// people to stop reading it. What it must never do is imply a refusal —
-    /// unknown is not "you may not sell this".
+    /// Where it came from, and what may be done with it. Absent entirely for
+    /// a model nobody has recorded a licence for: unknown is not "you may not
+    /// sell this".
     @ViewBuilder
     private func provenance(_ file: LibraryFile) -> some View {
         if let standing = shop.licences[file.id], standing.known || !standing.source.isEmpty {
@@ -535,12 +373,8 @@ struct LibraryInspector: View {
                     DetailLine(shop.words.callIt("plib.source"), standing.source)
                 }
                 if standing.known {
-                    // ONE ROW, and the words are in the licence's own name:
-                    // every language spells the NonCommercial ones "… — not for
-                    // sale". A separate warning line said the same thing twice
-                    // and had to borrow "Status" as a label, so the panel showed
-                    // two rows both called Status. Amber for the eye, the
-                    // sentence for the reader, one line for both.
+                    // ONE ROW, in the licence's own name: every language spells
+                    // the NonCommercial ones "… — not for sale".
                     DetailLine(shop.words.callIt("plib.licence"),
                                shop.words.callIt("plib.licence_"
                                                  + standing.licence.replacingOccurrences(of: "-", with: "_")),
@@ -548,11 +382,8 @@ struct LibraryInspector: View {
                 }
                 // ── A BOUGHT LICENCE, AND THE PROOF OF IT ─────────────────
                 //
-                // "Commercial" is only as good as the receipt: a designer's
-                // merchant tier is usually a subscription, and a print sold the
-                // week after it lapsed is sold without a licence. The last day
-                // it covers turns amber once it has passed, and every sale of
-                // the model says so (`Shop.saleProblems`).
+                // "Commercial" is only as good as the receipt; the last day it
+                // covers turns amber once it has passed (`Shop.saleProblems`).
                 if standing.licence == "commercial" {
                     if let until = file.licenceExpires, !until.isEmpty {
                         let lapsed = ModelLicence.expired(
@@ -577,45 +408,41 @@ struct LibraryInspector: View {
         }
     }
 
-    private func geometry(_ mesh: LibraryFile.Mesh, _ id: String) -> some View {
-        DetailSection(shop.words.callIt("mac.mesh")) {
-            DetailLine(shop.words.callIt("set.store_size"), "\(Format.mm(mesh.x)) × \(Format.mm(mesh.y)) × \(Format.mm(mesh.z)) mm")
-            DetailLine(shop.words.callIt("mac.triangles"), Format.count(mesh.triangles), dim: true)
-            // WHETHER IT GOES ON A BED THE SHOP OWNS, which is the question a
-            // maker asks before any other and which this app could not answer:
-            // the rule lived inside the converter. Silent when nothing is
-            // known — a machine with no bed recorded is not a machine that
-            // refuses the model, and saying so would be a warning about a fact
-            // nobody has.
-            if let fit = shop.fits[id], fit.checked > 0 {
-                DetailLine(shop.words.callIt("fit.title"), fitWords(fit),
-                           warn: fit.verdict == "none")
+    /// The box, the volume, and — machine by machine — whether it goes on
+    /// the bed. The same rule as the summary card (`ModelReadiness`), so the
+    /// two can never disagree; "Fits" used to name only the first machine it
+    /// fitted, which could be the laser cutter.
+    private func geometry(_ mesh: LibraryFile.Mesh, _ file: LibraryFile) -> some View {
+        let w = shop.words
+        let machines = shop.machineFits(for: file)
+        return DetailSection(w.callIt("mac.mesh")) {
+            DetailLine(w.callIt("set.store_size"), "\(Format.mm(mesh.x)) × \(Format.mm(mesh.y)) × \(Format.mm(mesh.z)) mm")
+            if mesh.volumeMm3 > 0 {
+                DetailLine(w.callIt("mac.li_volume"),
+                           Money.quantity(mesh.volumeMm3 / 1000, decimals: 1) + " cm³", dim: true)
+            }
+            DetailLine(w.callIt("mac.triangles"), Format.count(mesh.triangles), dim: true)
+            // Silent when nothing is known — a machine with no bed recorded
+            // is not a machine that refuses the model.
+            ForEach(machines) { m in
+                let tooBig = m.state == .tooBig
+                let turned = m.state == .readyTurned || m.state == .fitsTurned
+                DetailLine(m.name,
+                           w.callIt(tooBig ? "mac.li_state_too_big" : turned ? "mac.li_state_fits_turned" : "mac.li_state_fits"),
+                           warn: tooBig)
             }
         }
     }
 
-    /// What this model would take, before anybody slices it.
-    ///
-    /// The Mac could measure a mesh from the day it could read one and could
-    /// never price one, so a shop looking at a model it had not printed got a
-    /// size and a triangle count and no answer to the question it had.
-    ///
-    /// WHERE THE RATE CAME FROM IS PART OF THE ANSWER. The estimator's hardest
-    /// constant is effective volumetric throughput, which nobody knows about
-    /// their own printer and which was 8 mm³/s for everyone. Density and
-    /// throughput only appear multiplied together, and that product is grams
-    /// per hour — measured by every job that reported both. So the figure is
-    /// either learned from this shop's own jobs, and says how many, or it is
-    /// Khayt's own default, and says that instead. A number a shop cannot
-    /// attribute is a number it cannot check.
+    /// What this model would take, before anybody slices it. WHERE THE RATE
+    /// CAME FROM IS PART OF THE ANSWER: learned from this shop's own jobs and
+    /// says how many, or Khayt's default and says so.
     @ViewBuilder private func priced(_ e: KhaytEngine.MeshEstimate) -> some View {
         DetailSection(shop.words.callIt("mac.est_title")) {
-            // `common.grams` is the UNIT, not a label — using it for both read
-            // "g   765.20 g" on screen.
             DetailLine(shop.words.callIt("mac.est_filament"),
-                       Money.figure(e.grams) + " " + shop.words.callIt("common.grams"))
+                       "\u{2248}\u{2009}" + PrintFigures.weight(e.grams, shop.words))
             DetailLine(shop.words.callIt("mac.est_time"),
-                       Money.figure(e.hours) + " " + shop.words.callIt("common.hours"))
+                       "\u{2248}\u{2009}" + PrintFigures.duration(hours: e.hours, shop.words))
             if e.isCalibrated, let n = e.jobs, let rate = e.gramsPerHour {
                 Text(shop.words.callIt("mac.est_learned",
                                        ["jobs": .number(Double(n)),
@@ -639,13 +466,14 @@ struct LibraryInspector: View {
 
     /// What is likely to go wrong with this print.
     ///
-    /// THREE STATES, and the third one is the reason this is not just a list.
-    /// A shop on the default setting has not walked this mesh, so there is
-    /// nothing to show and a button to ask — and an empty section headed
-    /// "before you quote this" would read as "nothing to worry about", which is
-    /// a different and much worse answer than "not looked yet".
+    /// THREE STATES, and the third one is the reason this is not just a list:
+    /// "not looked yet" is a different answer from "nothing to worry about".
+    ///
+    /// It read "Before you quote: not found" for a model whose file is not on
+    /// this Mac — two cryptic words for "I cannot look, and here is why". It
+    /// now says what is missing and what to do about it.
     @ViewBuilder private func risk(_ file: LibraryFile) -> some View {
-        DetailSection(shop.words.callIt("risk.title")) {
+        DetailSection(shop.words.callIt("mac.li_risk_title")) {
             if shop.riskRunning.contains(file.id) {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
@@ -653,23 +481,13 @@ struct LibraryInspector: View {
                 }
             } else if let report = shop.risks[file.id] {
                 if report.note.isEmpty {
-                    // The answer for most functional parts, and worth saying
-                    // out loud: a section that only ever speaks up when
-                    // something is wrong leaves the shop unable to tell
-                    // "checked, fine" from "not checked".
-                    //
-                    // Quiet, though. It read louder than the warnings in the
-                    // first photograph of it, which is the wrong way round.
                     Text(shop.words.callIt("risk.clear"))
                         .font(.callout).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
-                        // `risk.head` IS the section's own title — "Before you
-                        // quote this:" — written for the other app's quote
-                        // screen, which has no heading above these lines. Here
-                        // it printed the same sentence twice, once in small
-                        // caps and once in prose.
+                        // `risk.head` is the other app's own heading for these
+                        // lines; this section has one already.
                         ForEach(Array(report.note.enumerated()), id: \.offset) { _, line in
                             if line.key != "risk.head" {
                                 Text(shop.words.callIt(line.key, line.vars ?? [:]))
@@ -681,12 +499,12 @@ struct LibraryInspector: View {
                     }
                 }
             } else if shop.modelFile(for: file) == nil {
-                // The record is here and the file is not — an external library
-                // that is not mounted, or a model moved to the cloud. Nothing
-                // to walk, and offering a button that cannot work is worse
-                // than saying so.
-                Text(shop.words.callIt(shop.isInCloudOnly(file) ? "mac.cloudlib_in_cloud" : "mac.not_found"))
-                    .foregroundStyle(.secondary)
+                // The record is here and the file is not. Nothing to walk,
+                // and a button that cannot work is worse than saying so —
+                // but say WHAT is missing and what to do.
+                Text(shop.words.callIt(shop.isInCloudOnly(file) ? "mac.li_risk_online" : "mac.li_risk_no_file"))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(shop.words.callIt("risk.not_looked"))
@@ -705,17 +523,483 @@ struct LibraryInspector: View {
             }
         }
     }
+}
 
-    private func fitWords(_ fit: KhaytEngine.Fit) -> String {
-        let machine = fit.machine.flatMap { row -> String? in
-            guard case .object(let o) = row, case .string(let name)? = o["name"] else { return nil }
-            return name
-        } ?? ""
-        switch fit.verdict {
-        case "fits": return shop.words.callIt("fit.yes", ["machine": .string(machine)])
-        case "rotate": return shop.words.callIt("fit.rotate", ["machine": .string(machine)])
-        default: return shop.words.callIt("fit.no")
+/// One section of the model page: a heading that folds it away, and the
+/// detail under it.
+///
+/// Folded or open is remembered PER SECTION in the user defaults, not per
+/// model: a shop that never reads provenance folds it once, and it stays
+/// folded on every model after.
+struct InspectorSection<Content: View>: View {
+    let id: String
+    let title: String
+    let symbol: String
+    @AppStorage private var open: Bool
+    @ViewBuilder let content: Content
+
+    nonisolated static func defaultsKey(_ id: String) -> String { "libraryInspector.open." + id }
+
+    init(id: String, title: String, symbol: String, openByDefault: Bool = true,
+         @ViewBuilder content: () -> Content) {
+        self.id = id; self.title = title; self.symbol = symbol
+        _open = AppStorage(wrappedValue: openByDefault, Self.defaultsKey(id))
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button { open.toggle() } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: symbol)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18)
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: 8)
+                    // Forward when folded — mirrors itself in Arabic — and
+                    // down when open, in both.
+                    Image(systemName: open ? "chevron.down" : "chevron.forward")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.vertical, 2)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isHeader)
+            if open {
+                VStack(alignment: .leading, spacing: 16) { content }
+                    .padding(.leading, 26)
+            }
         }
+        .padding(.top, 12)
+        .overlay(alignment: .top) { LayerRule() }
+    }
+}
+
+/// The top of the model page: what it is, and whether to print, quote or sell
+/// it — in one glance, with the buttons that act on the answer.
+///
+/// ── THE PHOTO IS DROPPED ON THE PICTURE ───────────────────────────────────
+///
+/// A separate "Drop a photo here" box sat second from the top, empty on
+/// nearly every model, pushing the facts down by a third of the column. The
+/// picture IS the place a photo goes (`Shop.thumbnail(for:)` already prefers
+/// one), so a picture dropped on it sets it, and the small menu on its corner
+/// chooses, replaces or removes one.
+///
+/// ── THE BUTTONS ARE ALWAYS THERE ──────────────────────────────────────────
+///
+/// Quote and Job were hidden entirely when the file was online only, so a
+/// model moved off to save space read as one that could not be quoted. A
+/// quote, a job and a product are priced from the record's figures, not the
+/// file — they work either way, and the line above them says what the file
+/// itself is needed for and offers to fetch it.
+struct ModelSummaryCard: View {
+    let shop: Shop
+    let file: LibraryFile
+    let summary: ModelSummary?
+    @State private var dropTarget = false
+
+    private var w: Words { shop.words }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            picture
+            titleBlock
+            facts
+            catalogueLine
+            whereItPrints
+            availability
+            actions
+        }
+    }
+
+    // MARK: Picture
+
+    private var picture: some View {
+        // A fixed height, not an aspect ratio: `Thumbnail` has no size of its
+        // own, and a 1:1 fit inside a vertical ScrollView drew nothing.
+        Thumbnail(source: shop.thumbnail(for: file))
+            .frame(maxWidth: .infinity)
+            .frame(height: 190)
+            .clipShape(RoundedRectangle(cornerRadius: Radius.card))
+            .overlay {
+                RoundedRectangle(cornerRadius: Radius.card)
+                    .strokeBorder(dropTarget ? Khayt.brand : .clear,
+                                  style: StrokeStyle(lineWidth: 2, dash: [5, 3]))
+            }
+            .overlay(alignment: .bottom) {
+                if dropTarget {
+                    Text(w.callIt("mac.li_drop_photo"))
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(10)
+                }
+            }
+            .overlay(alignment: .topTrailing) { photoMenu.padding(8) }
+            .dropDestination(for: URL.self) { urls, _ in
+                guard shop.canMoveJobs, let url = urls.first else { return false }
+                shop.setLibraryPhoto(file.id, from: url)
+                return true
+            } isTargeted: { dropTarget = $0 }
+            .help(w.callIt("mac.li_photo_help"))
+    }
+
+    private var photoMenu: some View {
+        let has = LibraryPhoto.has(file)
+        return Menu {
+            Button(w.callIt(has ? "mac.lp_replace" : "mac.lp_add") + "\u{2026}") {
+                shop.chooseLibraryPhoto(for: file.id)
+            }
+            if has {
+                Button(w.callIt("mac.lp_remove")) { shop.clearLibraryPhoto(file.id) }
+            }
+        } label: {
+            Image(systemName: has ? "photo.fill" : "camera")
+                .font(.callout)
+                .padding(6)
+                .background(.regularMaterial, in: Circle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .disabled(!shop.canMoveJobs)
+        .help(w.callIt(has ? "mac.lp_replace" : "mac.lp_add"))
+        .accessibilityLabel(w.callIt(has ? "mac.lp_replace" : "mac.lp_add"))
+    }
+
+    // MARK: Title
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                // A control only when it would do something.
+                if shop.canWrite {
+                    Button {
+                        shop.toggleFavourite(file)
+                    } label: {
+                        Image(systemName: file.isFavourite ? "star.fill" : "star")
+                            .foregroundStyle(file.isFavourite ? AnyShapeStyle(Khayt.marked)
+                                                             : AnyShapeStyle(.tertiary))
+                    }
+                    .buttonStyle(.plain)
+                    .help(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite"))
+                    .accessibilityLabel(shop.words.callIt(file.isFavourite ? "mac.unmake_favourite" : "mac.make_favourite"))
+                } else if file.isFavourite {
+                    Image(systemName: "star.fill").foregroundStyle(Khayt.marked)
+                }
+                ModelTitle(shop: shop, file: file)
+            }
+            // What it is filed as, on one quiet line: the set, what it IS,
+            // and its tags.
+            if let meta = metaLine {
+                Text(meta)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            // PUT ASIDE, and said so where the eye is, with the way back.
+            if file.isArchived { archivedNote }
+            if let problem = shop.writeProblem {
+                Label(problem, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(Khayt.attention)
+                    .textSelection(.enabled)
+            }
+            creatorAndCopies(file)
+        }
+    }
+
+    private var metaLine: String? {
+        var bits: [String] = []
+        if let group = file.groupName, !group.isEmpty { bits.append(Shop.groupLeaf(group)) }
+        if let category = file.category, !category.isEmpty { bits.append(category) }
+        if let tags = file.tags, !tags.isEmpty { bits.append(tags.prefix(4).map { "#" + $0 }.joined(separator: " ")) }
+        return bits.isEmpty ? nil : bits.map(Figure.isolated).joined(separator: " · ")
+    }
+
+    private var archivedNote: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(archivedSentence, systemImage: "archivebox")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { shop.unarchive([file.id]) } label: {
+                Label(shop.words.callIt("mac.unarchive_model"), systemImage: "arrow.uturn.backward")
+            }
+            .controlSize(.small)
+            .disabled(!shop.canWrite)
+        }
+    }
+
+    private var archivedSentence: String {
+        // In the book's calendar (`Words.say`), never `Calendar.current`.
+        guard let when = Calendar.instant(file.archivedAt ?? "") else {
+            return shop.words.callIt("mac.archived_undated")
+        }
+        let day = shop.words.say(when, .dateTime.day().month(.abbreviated).year())
+        return shop.words.callIt("mac.archived_on", ["date": .string(day)])
+    }
+
+    /// Who made it, as a way to the rest of their models; and the copies of
+    /// it the library holds, each a way to it.
+    @ViewBuilder private func creatorAndCopies(_ file: LibraryFile) -> some View {
+        if file.isLinked, let path = file.externalPath {
+            Label(shop.words.callIt("mac.linked_where",
+                                    ["path": .string(((path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)]),
+                  systemImage: "link")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        }
+        if let creator = file.creator {
+            Button {
+                shop.libraryCreator = creator
+                shop.shelf = .library(nil)
+            } label: {
+                Label(shop.words.callIt("mac.by_creator", ["name": .string(creator)]), systemImage: "person")
+            }
+            .buttonStyle(.link)
+            .font(.callout)
+            .help(shop.words.callIt("mac.creator_show_all"))
+        }
+        let copies = shop.duplicates(of: file)
+        if !copies.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(shop.words.callIt("mac.duplicate_of", ["n": .number(Double(copies.count))]),
+                      systemImage: "square.on.square")
+                    .font(.callout.weight(.medium)).foregroundStyle(Khayt.attention)
+                ForEach(copies) { copy in
+                    Button(copy.title) { shop.select(copy, modifiers: .replace) }
+                        .buttonStyle(.link).lineLimit(1)
+                }
+            }
+        }
+    }
+
+    // MARK: The decision facts
+
+    /// Time and grams: the summary's (the catalogue's own figures), else what
+    /// the record says on its own while that is worked out.
+    private var hours: Double? {
+        if let h = summary?.hours { return h }
+        if let m = file.parsed?.printTimeMins, m > 0 { return m / 60 }
+        return shop.estimates[file.id].map(\.hours).flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    private var grams: Double? {
+        if let g = summary?.grams { return g }
+        if let g = file.parsed?.filamentGrams, g > 0 { return g }
+        return shop.estimates[file.id].map(\.grams).flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    private var estimated: Bool {
+        if let summary { return summary.estimated }
+        return (file.parsed?.printTimeMins ?? 0) <= 0 || (file.parsed?.filamentGrams ?? 0) <= 0
+    }
+
+    private var facts: some View {
+        let none = "\u{2014}"
+        return VStack(alignment: .leading, spacing: 6) {
+            Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 0) {
+                GridRow {
+                    fact(w.callIt("mac.li_print_time"),
+                         hours.map { PrintFigures.duration(hours: $0, w) } ?? none,
+                         unit: nil, approximate: estimated && hours != nil)
+                    fact(w.callIt("mac.li_filament"),
+                         grams.map { PrintFigures.weight($0, w) } ?? none,
+                         unit: nil, approximate: estimated && grams != nil)
+                    fact(w.callIt("mac.li_cost"),
+                         summary?.cost.map { Money.figure($0) } ?? none,
+                         unit: summary?.cost == nil ? nil : Money.mark(shop.currency))
+                }
+            }
+            if hours == nil && grams == nil {
+                Text(w.callIt("mac.li_no_figures"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if estimated {
+                Text(w.callIt("mac.li_estimated_note"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// `approximate` draws ≈ as its own leading mark — beside the number in
+    /// both directions, never stranded after it in Arabic.
+    private func fact(_ label: String, _ value: String, unit: String?, approximate: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                if approximate {
+                    Text(verbatim: "\u{2248}").font(.callout).foregroundStyle(.secondary)
+                }
+                Text(value)
+                    .font(.headline)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                if let unit {
+                    Text(unit).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+        }
+        .padding(.horizontal, 9).padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Khayt.recessed, in: RoundedRectangle(cornerRadius: Radius.control))
+    }
+
+    /// The catalogue product this model is sold as, its price and margin — the
+    /// margin coloured only when it is under the floor the shop set.
+    @ViewBuilder private var catalogueLine: some View {
+        if let product = summary?.product {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "tag").foregroundStyle(.secondary).font(.callout)
+                VStack(alignment: .leading, spacing: 2) {
+                    Button {
+                        Task { shop.editingProduct = await shop.productForEditing(product.id) }
+                    } label: {
+                        Text(w.callIt("mac.li_sells_as", ["name": .string(product.name)]))
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.link)
+                    .font(.callout)
+                    .help(w.callIt("mac.li_open_product"))
+                    HStack(spacing: 6) {
+                        Text(Money.text(product.price, shop.currency))
+                            .font(.callout.weight(.semibold)).monospacedDigit()
+                        if let margin = product.margin {
+                            Text(verbatim: "·").foregroundStyle(.tertiary)
+                            Text(w.callIt("mac.li_margin_pct", ["pct": .string(Money.quantity(margin * 100, decimals: 0))]))
+                                .font(.callout).monospacedDigit()
+                                .foregroundStyle(product.belowFloor || margin < 0 ? AnyShapeStyle(Khayt.late)
+                                                                                  : AnyShapeStyle(.secondary))
+                        }
+                    }
+                    if product.belowFloor, let floor = Shop.plainNumber(shop.settingsDict["minMarginPct"]) {
+                        Text(w.callIt("mac.li_margin_below", ["min": .string(Money.quantity(floor, decimals: 0))]))
+                            .font(.caption).foregroundStyle(Khayt.late)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        } else if summary != nil {
+            Label(w.callIt("mac.li_not_in_catalogue"), systemImage: "tag")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    /// Which machines it goes on and can start on now — fit AND spools, the
+    /// one rule (`ModelReadiness`), so this line and the Shape section never
+    /// disagree the way "Too big for every machine" over "Ready to start" did.
+    @ViewBuilder private var whereItPrints: some View {
+        let machines = shop.machineFits(for: file)
+        if !machines.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(w.callIt("mac.li_where"))
+                    .font(.caption).foregroundStyle(.secondary)
+                if machines.allSatisfy({ $0.state == .tooBig }) {
+                    Label(w.callIt("mac.li_too_big_all"), systemImage: "arrow.up.left.and.arrow.down.right")
+                        .font(.callout).foregroundStyle(Khayt.late)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    FlowLayout(spacing: 6) {
+                        ForEach(machines) { m in machineChip(m) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func machineChip(_ m: ModelSummary.MachineFit) -> some View {
+        let (word, colour, mark) = Self.chip(m.state)
+        return HStack(spacing: 4) {
+            Image(systemName: mark).font(.caption2.weight(.bold)).foregroundStyle(colour)
+            Text(Figure.isolated(m.name)).font(.caption.weight(.medium))
+            Text(w.callIt(word)).font(.caption).foregroundStyle(colour == .secondary ? AnyShapeStyle(.secondary) : AnyShapeStyle(colour))
+        }
+        .padding(.horizontal, 7).padding(.vertical, 4)
+        .background(Khayt.recessed, in: RoundedRectangle(cornerRadius: Radius.chip))
+        .accessibilityElement(children: .combine)
+    }
+
+    static func chip(_ state: ModelReadiness.State) -> (String, Color, String) {
+        switch state {
+        case .ready: ("mac.li_state_ready", Khayt.done, "checkmark")
+        case .readyTurned: ("mac.li_state_ready_turned", Khayt.done, "checkmark")
+        case .needsSwap: ("mac.li_state_needs_swap", .secondary, "arrow.triangle.2.circlepath")
+        case .fits: ("mac.li_state_fits", .secondary, "checkmark")
+        case .fitsTurned: ("mac.li_state_fits_turned", .secondary, "rotate.right")
+        case .tooBig: ("mac.li_state_too_big", Khayt.late, "xmark")
+        }
+    }
+
+    /// Where the file is, when it is not here — said once, with the way to
+    /// get it, beside the buttons that do not need it.
+    @ViewBuilder private var availability: some View {
+        if shop.isInCloudOnly(file) {
+            VStack(alignment: .leading, spacing: 6) {
+                Label(w.callIt("mac.li_online_only"), systemImage: "icloud")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button { Task { await shop.bringBack(file) } } label: {
+                        Label(shop.words.callIt(file.isLinked ? "mac.linked_download" : "mac.cloudlib_bring_back"),
+                              systemImage: "icloud.and.arrow.down")
+                    }
+                    .disabled(shop.cloudLibraryBusy)
+                    if shop.cloudLibraryBusy { ProgressView().controlSize(.small) }
+                }
+                .controlSize(.small)
+                if let problem = shop.cloudLibraryProblem {
+                    Text(problem).font(.caption).foregroundStyle(Khayt.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        } else if !shop.fileIsPresent(file) {
+            Label(w.callIt("mac.li_missing_file"), systemImage: "questionmark.folder")
+                .font(.caption).foregroundStyle(Khayt.attention)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: Actions
+
+    /// Quote, New Job, Add to Catalogue — always, whatever the file's state.
+    /// Side by side when they fit; Add to Catalogue under the other two in a
+    /// narrow column or in Arabic.
+    private var actions: some View {
+        let quote = Button { Task { await shop.startJob(fromModels: [file], asQuote: true) } } label: {
+            Label(w.callIt("mac.li_quote"), systemImage: "doc.text")
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(!shop.canMoveJobs)
+        let job = Button { Task { await shop.startJob(fromModels: [file], asQuote: false) } } label: {
+            Label(w.callIt("mac.li_new_job"), systemImage: "hammer")
+        }
+        .disabled(!shop.canMoveJobs)
+        // The door to the catalogue, where it can be seen — it lived only in
+        // a right-click menu, and a shop went looking for it.
+        let catalogue = Button { Task { await shop.editingProduct = shop.productFromFile(file) } } label: {
+            Label(w.callIt("mac.li_add_catalogue"), systemImage: "tag")
+        }
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) { quote; job; catalogue }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) { quote; job }
+                catalogue
+            }
+        }
+        .controlSize(.regular)
     }
 }
 
@@ -871,12 +1155,9 @@ struct VersionsSection: View {
 
     private func size(_ v: KhaytEngine.PrintVersions.Version) -> String? {
         var bits: [String] = []
-        if let g = v.grams {
-            bits.append("\(g.formatted(.number.precision(.fractionLength(0)).locale(shop.words.locale))) \(shop.words.callIt("common.grams"))")
-        }
-        if let h = v.hours {
-            bits.append("\(h.formatted(.number.precision(.fractionLength(1)).locale(shop.words.locale))) \(shop.words.callIt("common.hours_short"))")
-        }
+        // The page's one format for both (`PrintFigures`).
+        if let g = v.grams { bits.append(PrintFigures.weight(g, shop.words)) }
+        if let h = v.hours { bits.append(PrintFigures.duration(hours: h, shop.words)) }
         return bits.isEmpty ? nil : bits.joined(separator: " · ")
     }
 }

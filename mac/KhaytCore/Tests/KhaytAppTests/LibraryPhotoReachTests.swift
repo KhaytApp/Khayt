@@ -91,14 +91,16 @@ struct LibraryPhotoReachTests {
         #expect(grid.contains("await shop.addModelsToLibrary(urls)"))
     }
 
-    @Test("the photo is the section under the header, above the file's details")
+    @Test("the photo is dropped on the summary card's picture, and there is no separate empty box")
     func placement() throws {
         let src = try Self.source("LibraryInspector.swift")
-        let photo = try #require(src.range(of: "PhotoSection(shop: shop, file: file)"))
-        let header = try #require(src.range(of: "creatorAndCopies(file)\n"))
-        let theFile = try #require(src.range(of: "theFile(file)\n"))
-        #expect(header.upperBound < photo.lowerBound && photo.upperBound < theFile.lowerBound)
-        #expect(src.components(separatedBy: "PhotoSection(").count == 2, "the section is drawn once")
+        // The card comes first on the page, and the picture is its drop target.
+        let card = try #require(src.range(of: "ModelSummaryCard(shop: shop, file: file"))
+        let print = try #require(src.range(of: "InspectorSection(id: \"print\""))
+        #expect(card.upperBound < print.lowerBound)
+        #expect(src.contains(".dropDestination(for: URL.self)"))
+        #expect(src.contains("shop.setLibraryPhoto(file.id, from: url)"))
+        #expect(!src.contains("PhotoSection("), "the empty drop box second from the top is back")
     }
 
     @Test("pictures for review: the model page and a tile taking a photo, EN and AR")
