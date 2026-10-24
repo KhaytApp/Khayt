@@ -254,6 +254,8 @@ struct ModelActions: View {
             Divider()
             Button(shop.words.callIt("mac.vl_share") + "\u{2026}") { shop.shareByLink(file) }
                 .disabled(!shop.canWrite)
+            Button(shop.words.callIt("mac.vp_sell") + "\u{2026}") { Task { await shop.sellAsProduct(file) } }
+                .disabled(!shop.canWrite)
         }
         Divider()
         Button(shop.words.callIt("mac.copy_name")) { FileActions.copy(file.title) }

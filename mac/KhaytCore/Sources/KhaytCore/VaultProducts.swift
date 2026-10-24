@@ -41,6 +41,9 @@ public struct VaultProducts: Sendable {
         /// `release-drops-file`, `bad-release`).
         public let fileIds: [String]
         public let limit: Int?
+        public init(status: Int, reason: String, error: String, fileIds: [String], limit: Int?) {
+            self.status = status; self.reason = reason; self.error = error; self.fileIds = fileIds; self.limit = limit
+        }
         public var description: String {
             "Khayt Cloud refused (\(status) \(reason.isEmpty ? error : reason))"
                 + (fileIds.isEmpty ? "" : " for \(fileIds.count) file(s)")
@@ -295,9 +298,14 @@ public struct VaultProducts: Sendable {
     // MARK: - Release (phase 3b)
 
     public struct ReleaseState: Decodable, Sendable, Equatable {
-        public struct Item: Decodable, Sendable, Equatable { public let fileId: String; public let version: Int }
+        public struct Item: Decodable, Sendable, Equatable {
+            public let fileId: String
+            public let version: Int
+            public init(fileId: String, version: Int) { self.fileId = fileId; self.version = version }
+        }
         public let releasedAt: String?
         public let items: [Item]
+        public init(releasedAt: String?, items: [Item]) { self.releasedAt = releasedAt; self.items = items }
     }
 
     public func releaseState(_ productId: String) async throws -> ReleaseState {

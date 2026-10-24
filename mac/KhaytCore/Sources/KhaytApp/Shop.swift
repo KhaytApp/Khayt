@@ -1895,6 +1895,10 @@ final class Shop {
     var sharingByLink: VaultShareRequest?
     /// The Links sheet: every share link, its downloads and its events.
     var showingVaultLinks = false
+    /// Selling vault files: the products list, and a new product begun from
+    /// the library's selection (`Shop+VaultProducts.swift`).
+    var showingVaultProducts = false
+    var makingProduct: VaultProductRequest?
 
     /// The shop's own saved messages, in the order it keeps them.
     private(set) var messageTemplates: [MessageTemplate] = []

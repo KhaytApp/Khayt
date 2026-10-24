@@ -873,6 +873,7 @@ struct WindowSheets: ViewModifier {
             }
             .shopSheet(item: $shop.sharingByLink) { VaultShareSheet(shop: shop, request: $0) }
             .shopSheet(isPresented: $shop.showingVaultLinks) { VaultLinksSheet(shop: shop) }
+            .shopSheet(isPresented: $shop.showingVaultProducts) { VaultProductsSheet(shop: shop) }
             .shopSheet(isPresented: $shop.askingTheBook) {
                 VStack(spacing: 0) {
                     AskTheBook(shop: shop)

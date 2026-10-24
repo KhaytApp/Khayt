@@ -4,6 +4,22 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: selling vault files on makerrun.com (built, hidden until Khayt Cloud switches the vault and selling on).**
+  - With the library in the Khayt Vault, the library strip gains Products, and a model's menu gains Sell as a Product.
+  - A product is its listing:
+    - title and description in English and Arabic;
+    - one-time purchase or members;
+    - your checkout (Stripe, Gumroad, Lemon Squeezy, Payhip, StreamPay, Salla, Zid, Ko-fi, Etsy and others);
+    - the price shown, the licence and up to 8 pictures;
+    - the vault files it holds;
+    - what each buyer's link allows (downloads, per file, days).
+  - Everything but the files is public, and the editor says so.
+  - Release lists exactly which files and versions Khayt Cloud will then be able to read, says what that means in the privacy policy's own words, and sends nothing until you confirm.
+  - Buyers shows who has a link and how much they have used. Deliver by hand sends a buyer their link for a sale your provider cannot report, and Revoke stops a link.
+  - Sales that deliver themselves takes your Stripe, Lemon Squeezy or Gumroad signing secret and shows the address to give the provider.
+  - Khayt and makerrun never take the payment or a fee.
+  - In English and Arabic, light and dark.
+
 - **Mac: the client for selling vault files (built, nothing on screen yet).** KhaytCore's `VaultProducts` covers listings (products, previews, the makerrun connection), the release, buyers delivered by hand or from a sale, and the sales webhook settings. A release sends a fresh product key and every file wrapped under it, so Khayt Cloud can deliver to a buyer while the Mac is asleep. Only the files in the release become readable by the cloud, and the Mac keeps no product key. Tested against a stand-in cloud that opens every released file with that key, as Khayt Cloud does.
 
 - **Mac: the Khayt Vault can hold the library's online copy (built, hidden until Khayt Cloud switches the vault on).**
