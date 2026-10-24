@@ -2938,7 +2938,12 @@ extension Shop {
         ) { root in
             let result = try await engine.lanQuoteApply(store: .object(root), orderId: jobId, nowIso: nowIso)
             guard result.found, result.error == nil, let printLog = result.printLog else { return }
+            let before = Shop.rows(root, "printLog").first(where: { Shop.recordId($0) == jobId })
             root["printLog"] = printLog
+            // The customer said yes: the job's models come off Print next in
+            // this same write, as they do for a quote accepted on the Mac.
+            Shop.clearPrintNext(&root, acceptedFrom: before,
+                                now: Shop.rows(root, "printLog").first(where: { Shop.recordId($0) == jobId }))
             // The invoice counter, advanced when the approval gave the job its
             // number. Same write as the job, so the number on the job and the
             // counter that issued it cannot land apart.

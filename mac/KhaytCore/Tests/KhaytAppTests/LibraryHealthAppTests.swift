@@ -192,6 +192,42 @@ struct LibraryHealthAppTests {
             "parts": .array([.object(["printFileId": .string("PF-1")])])]).isEmpty)
     }
 
+    @Test("a quote that becomes a job clears the mark; one that stays a quote, or is cancelled, does not")
+    func clearedWhenAccepted() {
+        let parts: JSONValue = .array([.object(["printFileId": .string("PF-2")])])
+        func job(_ status: String, hasQuote: Bool = false) -> JSONValue {
+            var o: [String: JSONValue] = ["id": .string("J1"), "status": .string(status), "parts": parts]
+            if hasQuote { o["hasQuote"] = .bool(true) }
+            return .object(o)
+        }
+        func cleared(_ before: JSONValue, _ after: JSONValue) -> Set<String> {
+            var root = Self.book()
+            return Shop.clearPrintNext(&root, acceptedFrom: before, now: after)
+        }
+        #expect(cleared(job("quote"), job("pending")) == ["PF-2"])
+        #expect(cleared(job("on_hold", hasQuote: true), job("pending")) == ["PF-2"], "a quote on hold is a quote")
+        #expect(cleared(job("quote"), job("quote")).isEmpty)
+        #expect(cleared(job("quote"), job("on_hold", hasQuote: true)).isEmpty)
+        #expect(cleared(job("quote"), job("cancelled")).isEmpty)
+        #expect(cleared(job("pending"), job("printing")).isEmpty, "not a quote being accepted")
+        #expect(cleared(job("quote"), .null).isEmpty)
+    }
+
+    @Test("every path from quote to job clears it in its own write")
+    func everyAcceptPathIsWired() throws {
+        func read(_ name: String) throws -> String {
+            try String(contentsOf: GroupFromRightClickTests.source(name), encoding: .utf8)
+        }
+        let jobs = try read("Shop+Jobs.swift")
+        let move = try #require(jobs.range(of: "func moveJob(_ id: Order.ID"))
+        #expect(String(jobs[move.upperBound...].prefix(3000)).contains("Self.clearPrintNext(&root, acceptedFrom: wasOrder"),
+                "a move out of Quote (board, Job menu, portal approval) no longer clears Print next")
+        let lan = try read("LanServer.swift")
+        let approve = try #require(lan.range(of: "func approveQuote(_ jobId: String"))
+        #expect(String(lan[approve.upperBound...].prefix(1500)).contains("Shop.clearPrintNext(&root, acceptedFrom: before"),
+                "the LAN quote page's approval no longer clears Print next")
+    }
+
     @Test("the sample book has two models on Print next, one with a note")
     func sampleMarked() async {
         let shop = Shop()
@@ -295,4 +331,40 @@ extension LibraryEditPerfTests {
         #expect(source.contains("Self.clearPrintNext(&root, forJob: record)"), "createJob no longer clears it in its write")
     }
 
+
+    @Test("a quote accepted on the Mac, or approved on the LAN page, takes its model off Print next")
+    func acceptedQuotesClear() async throws {
+        var book = LibraryHealthAppTests.book()
+        if case .array(var rows)? = book["printFiles"] {
+            rows.append(.object(["id": .string("PF-3"), "name": .string("Bowl"),
+                                 "printNextAt": .string("2026-09-03T00:00:00.000Z")]))
+            book["printFiles"] = .array(rows)
+        }
+        try await withPerfBook(book) { shop, url in
+            @MainActor func quote(_ file: String) async throws -> String {
+                await shop.createJob([
+                    "parts": .array([.object(["name": .string(file), "printFileId": .string(file),
+                                              "printWeight": .number(40), "printTime": .number(2), "qty": .number(1)])]),
+                    "project": .string(file), "margin": .number(30), "discountPct": .number(0),
+                    "shippingCost": .number(0), "depositAmount": .number(0), "rushEnabled": .bool(false),
+                    "asQuote": .bool(true),
+                ])
+                return try #require(shop.lastCreated, "no quote was created: \(shop.moveProblem ?? "")")
+            }
+            // A quote leaves the mark.
+            let first = try await quote("PF-2")
+            #expect(try LibraryHealthAppTests.record(url, "PF-2")?["printNextAt"] != nil, "a quote cleared the mark")
+            // Accepted on the Mac: a move out of Quote.
+            await shop.moveJob(first, to: .pending)
+            #expect(shop.moveProblem == nil, "\(shop.moveProblem ?? "")")
+            #expect(try LibraryHealthAppTests.record(url, "PF-2")?["printNextAt"] == nil,
+                    "a quote accepted on the Mac left its model on Print next")
+            // Approved by the customer on the LAN quote page.
+            let second = try await quote("PF-3")
+            let approved = try await shop.approveQuote(second, nowIso: StoreWriter.iso(Date()))
+            #expect(approved != nil, "the LAN approval was refused")
+            #expect(try LibraryHealthAppTests.record(url, "PF-3")?["printNextAt"] == nil,
+                    "a quote approved on the LAN page left its model on Print next")
+        }
+    }
 }

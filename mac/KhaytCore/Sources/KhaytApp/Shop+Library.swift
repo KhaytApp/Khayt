@@ -2170,6 +2170,24 @@ extension Shop {
         return cleared
     }
 
+    /// The same, for a QUOTE that has just become a job: accepted on the Mac
+    /// (a move out of Quote — the board, the Job menu, a portal approval that
+    /// advances it), or approved by the customer on the LAN quote page
+    /// (`lib/lan-quote-page.js`, run by `approveQuote`). `before` is the job as
+    /// the write found it, `after` as the write leaves it. A quote on hold
+    /// (`hasQuote`) is still a quote; a cancelled one prints nothing.
+    @discardableResult
+    nonisolated static func clearPrintNext(_ root: inout [String: JSONValue],
+                                           acceptedFrom before: JSONValue?, now after: JSONValue?) -> Set<String> {
+        guard case .object(let was)? = before, case .object(let job)? = after else { return [] }
+        let wasStatus = plainString(was["status"]) ?? ""
+        let wasQuote = wasStatus == "quote" || (wasStatus == "on_hold" && was["hasQuote"] == .bool(true))
+        let status = plainString(job["status"]) ?? ""
+        let stillQuote = status == "quote" || (status == "on_hold" && job["hasQuote"] == .bool(true))
+        guard wasQuote, !stillQuote, status != "cancelled" else { return [] }
+        return clearPrintNext(&root, forJob: job)
+    }
+
     /// Kept between draws; see `Shop+LibraryMemo.swift`.
     var shownFiles: [LibraryFile] { memoShownFiles() }
 
