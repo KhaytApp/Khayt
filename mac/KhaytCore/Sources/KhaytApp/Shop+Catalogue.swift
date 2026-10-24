@@ -1089,30 +1089,11 @@ extension Shop {
     }
 
     /// The shop's address, resolved the way its name already is.
-    var shopAddress: String { shopFieldValue("addr") }
+    var shopAddress: String { ShopFields.value("addr", settingsDict) }
 
-    /// Every field an invoice asks the shop for, resolved the way the renderer
-    /// resolves them.
-    ///
-    /// The document wants `biz`, `addr`, `tagline` and `footer`. It used to be
-    /// handed the name and the address and nothing else, and its `shopField`
-    /// answered the shop's NAME for the other two — so every invoice printed
-    /// the name twice at the top and again in the footer, and the tagline the
-    /// shop had typed into Settings appeared nowhere.
-    var shopDocumentFields: [String: JSONValue] {
-        var out: [String: JSONValue] = [:]
-        for base in ["biz", "addr", "tagline", "footer"] {
-            out[base] = .string(shopFieldValue(base))
-        }
-        return out
-    }
-
-    private func shopFieldValue(_ base: String) -> String {
-        for key in ["\(base)En", "\(base)Ar"] {
-            if case .string(let v)? = settingsDict[key], !v.isEmpty { return v }
-        }
-        return ""
-    }
+    /// Every field an invoice asks the shop for (`ShopFields.document`, which
+    /// the iPhone prints from too).
+    var shopDocumentFields: [String: JSONValue] { ShopFields.document(settingsDict) }
 
     /// Whether this shop can reclaim the tax it pays on a purchase.
     ///
