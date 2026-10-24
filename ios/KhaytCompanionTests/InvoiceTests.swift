@@ -119,7 +119,7 @@ final class InvoiceTests: XCTestCase {
     }
 
     func testTheShopsFieldsAreEnglishFirst() {
-        let fields = BookReader.documentFields([
+        let fields = ShopFields.document([
             "bizAr": .string("ورشة"), "addrAr": .string("الرياض"), "addrEn": .string(""), "taglineEn": .string("Made here"),
         ])
         XCTAssertEqual(fields["biz"], .string("ورشة"))

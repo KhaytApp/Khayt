@@ -82,7 +82,7 @@ extension BookReader {
         if let ts = Self.text(order["timestamp"]), !ts.isEmpty { stamp = ts }
 
         let sellerName = await Self.shopName(settings, engine: engine, language: language)
-        let fields = Self.documentFields(settings)
+        let fields = ShopFields.document(settings)
 
         // The loyalty badge is worked out from what the customer has spent,
         // and a phone holding the newest 200 jobs would understate it. No
@@ -165,21 +165,7 @@ extension BookReader {
         if let name = try? await engine.shopText("biz", settings: settings, language: language), !name.isEmpty {
             return name
         }
-        for key in ["bizEn", "bizAr"] {
-            if let v = text(settings[key]), !v.isEmpty { return v }
-        }
-        return ""
-    }
-
-    /// Every field the document asks the shop for, as the Mac's
-    /// `shopDocumentFields` resolves them: English first, then Arabic.
-    nonisolated static func documentFields(_ settings: [String: JSONValue]) -> [String: JSONValue] {
-        var out: [String: JSONValue] = [:]
-        for base in ["biz", "addr", "tagline", "footer"] {
-            let value = ["\(base)En", "\(base)Ar"].lazy.compactMap { text(settings[$0]) }.first { !$0.isEmpty }
-            out[base] = .string(value ?? "")
-        }
-        return out
+        return ShopFields.value("biz", settings)
     }
 
     /// Named as the Mac's invoice sheet names it — the name is what the
