@@ -2149,7 +2149,7 @@ extension Shop {
         if libraryPrintNextOnly {
             return rows.sorted { ($0.printNextAt ?? "") < ($1.printNextAt ?? "") }
         }
-        return librarySort.sorted(rows)
+        return librarySort.sorted(rows, facts: libraryFacts)
     }
 
     /// The inspector shows one model. More than one selected is a different

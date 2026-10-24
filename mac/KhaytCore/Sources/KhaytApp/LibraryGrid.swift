@@ -24,8 +24,9 @@ struct LibraryGrid: View {
     /// number `Motion.hover` holds — so it kept moving under Reduce Motion.
     @Environment(\.accessibilityReduceMotion) private var reduced
 
-    private static let cellWidth: CGFloat = 176
-    private static let spacing: CGFloat = 16
+    /// Tile size and grid-or-list, per Mac (`LibraryDisplay`).
+    private var display: LibraryDisplay { LibraryDisplay.shared }
+    @Environment(\.displayScale) private var scale
 
     var body: some View {
         VStack(spacing: 0) {
@@ -47,7 +48,11 @@ struct LibraryGrid: View {
             // and a control that narrows a grid from another column is a
             // control a shop has to remember it set.
             LibraryFilterBar(shop: shop)
-            grid
+            if display.layout == .list {
+                LibraryList(shop: shop)
+            } else {
+                grid
+            }
         }
     }
 
@@ -56,13 +61,18 @@ struct LibraryGrid: View {
             // Fixed columns rather than `.adaptive`, because the arrow keys have
             // to know how many there are: moving down is moving forward by one
             // row, and `.adaptive` decides the count privately.
-            // §10: columns = floor(available ÷ 165). Tiles multiply; a tile
-            // never inflates, because a 300-point thumbnail is not a better
-            // thumbnail — it is the same picture with the row half as useful.
-            let count = Wide.columns(across: geometry.size.width - Metric.screen * 2)
+            // Tiles multiply: as many columns of the density's minimum as fit,
+            // each widened by its share of what is left (`Wide.fill`), so no
+            // dead band sits beside the last column at any density.
+            let fill = Wide.fill(across: geometry.size.width - Metric.screen * 2,
+                                 minimum: display.tileSize.points)
+            let tile = fill.tile
+            let count = fill.columns
+            let pixels = LibraryTileSize.pixels(width: tile, scale: scale)
             ScrollViewReader { scroller in
                 ScrollView {
-                    LazyVGrid(columns: Wide.grid(across: geometry.size.width - Metric.screen * 2),
+                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: Wide.tileGap,
+                                                                 alignment: .topLeading), count: count),
                               alignment: .leading,
                               spacing: Wide.tileGap) {
                         ForEach(shop.shownEntries) { entry in
@@ -75,7 +85,9 @@ struct LibraryGrid: View {
                                            words: shop.words,
                                            kind: shop.groupKind(path),
                                            parent: FolderCell.parent(of: path, open: shop.shelf),
-                                           selected: shop.groupSelection.contains(path))
+                                           selected: shop.groupSelection.contains(path),
+                                           size: display.tileSize,
+                                           pixels: pixels)
                                     .id(entry.id)
                                     // A folder OPENS. The shelf already filters
                                     // by group, so entering one is setting it —
@@ -120,7 +132,7 @@ struct LibraryGrid: View {
                                         }
                                     }
                             case .file(let file):
-                                cell(for: file).id(file.id)
+                                cell(for: file, pixels: pixels).id(file.id)
                             }
                         }
                     }
@@ -235,15 +247,21 @@ struct LibraryGrid: View {
 
     /// Broken out of the grid body: the type-checker gave up on the whole
     /// expression once the modifiers went on.
-    @ViewBuilder private func cell(for file: LibraryFile) -> some View {
+    @ViewBuilder private func cell(for file: LibraryFile, pixels: Int) -> some View {
+        // ONCE per cell: the tile and its right-click preview drew the same
+        // picture from two separate asks.
+        let thumbnail = shop.thumbnail(for: file)
         Cell(file: file,
-             thumbnail: shop.thumbnail(for: file),
+             thumbnail: thumbnail,
              selected: shop.fileSelection.contains(file.id),
              words: shop.words,
              group: Cell.groupShown(for: file, shelf: shop.shelf),
              openGroup: { shop.showGroup($0) },
              storage: shop.storageBadge(for: file),
-             kept: shop.isKeptOnThisMac(file))
+             kept: shop.isKeptOnThisMac(file),
+             facts: shop.libraryFactsLine(file),
+             size: display.tileSize,
+             pixels: pixels)
             .onTapGesture {
                 // SwiftUI's tap gesture does not report modifiers, so they are
                 // read from the event that is arriving. Without this, ⌘-click
@@ -272,7 +290,7 @@ struct LibraryGrid: View {
             } preview: {
                 // Right-click gives the picture at a size worth looking at. It
                 // is the fastest way to tell two versions of a model apart.
-                Thumbnail(source: shop.thumbnail(for: file))
+                Thumbnail(source: thumbnail, tint: file.firstColour, well: LibraryTile.well)
                     .frame(width: 320, height: 320)
             }
     }
@@ -419,6 +437,10 @@ struct FolderCell: View {
     var parent: String? = nil
     /// Chosen with ⌘/⇧-click, drawn the way a chosen model is.
     var selected: Bool = false
+    /// The grid's density: Small draws one line of title.
+    var size: LibraryTileSize = .medium
+    /// What the picture is decoded to (`LibraryTileSize.pixels`).
+    var pixels: Int = ThumbnailStore.maxPixels
 
     /// How far each card behind the picture shows above it.
     static let peek: CGFloat = 4
@@ -436,8 +458,8 @@ struct FolderCell: View {
                 // screen. On the name's own two lines, so the tile is the
                 // height of every other tile.
                 title
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(2, reservesSpace: true)
+                    .font(.system(size: size.isCompact ? 11 : 12, weight: .medium))
+                    .lineLimit(size.isCompact ? 1 : 2, reservesSpace: true)
                     .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
                     .help(parent.map { name + " \u{00B7} " + words.callIt("mac.group_in_parent", ["name": .string($0)]) } ?? name)
@@ -447,7 +469,7 @@ struct FolderCell: View {
                 Text(Self.caption(kind: kind, count: count, words: words))
                     .font(.caption2)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Cell.secondaryInk(selected: selected))
                     .lineLimit(1)
             }
             .padding(.top, 6)
@@ -520,7 +542,7 @@ struct FolderCell: View {
             // `Color.clear` takes the size it is offered and nothing else, so
             // the picture cannot widen it.
             Color.clear
-                .overlay { Thumbnail(source: thumbnail) }
+                .overlay { Thumbnail(source: thumbnail, pixels: pixels, well: LibraryTile.well) }
                 // On the window's own ground: the thumbnail's grey is
                 // translucent, and without this the cards behind showed
                 // through it and the tile came out a different colour from a
@@ -591,6 +613,37 @@ struct Cell: View {
     var storage: LibrarySyncIndex.State? = nil
     /// Set to Keep on this Mac: a pin beside the storage badge.
     var kept = false
+    /// "4h 32m · 57 g · 85 ⃁" — `Shop.libraryFactsLine`, from the memo. Empty
+    /// when the app knows none of them, and then the old line is drawn.
+    var facts: String = ""
+    /// The grid's density.
+    var size: LibraryTileSize = .medium
+    /// What the picture is decoded to (`LibraryTileSize.pixels`).
+    var pixels: Int = ThumbnailStore.maxPixels
+
+    /// ── ON A CHOSEN TILE, NOTHING IN THE BRAND'S BLUE ────────────────────
+    ///
+    /// The folder link was drawn in `Khayt.brand` on the accent-blue
+    /// selection, so a chosen King read its group as a smudge. On a chosen
+    /// tile the link is white and the facts a slightly dimmer white, in both
+    /// appearances — the selection fill is the accent colour either way.
+    static func groupInk(selected: Bool) -> Color { selected ? .white : Khayt.brand }
+
+    static func secondaryInk(selected: Bool) -> AnyShapeStyle {
+        selected ? AnyShapeStyle(Color.white.opacity(0.85)) : AnyShapeStyle(.secondary)
+    }
+
+    /// The extensions a shop prints from every day. Their badge said
+    /// nothing a shop did not already assume, on every tile, so only the
+    /// others — the `.step` a customer sent, an `.obj`, a `.gcode` — wear one.
+    static let everydayFormats: Set<String> = ["stl", "3mf"]
+
+    /// The badge a tile wears for its format, or nil.
+    static func formatBadge(_ ext: String?, size: LibraryTileSize) -> String? {
+        guard !size.isCompact, let ext = ext?.lowercased(), !ext.isEmpty,
+              !everydayFormats.contains(ext) else { return nil }
+        return ext.uppercased()
+    }
 
     /// Which group a tile names: the model's own, unless the grid is already
     /// INSIDE it.
@@ -607,7 +660,7 @@ struct Cell: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Thumbnail(source: thumbnail)
+            Thumbnail(source: thumbnail, pixels: pixels, tint: file.firstColour, well: LibraryTile.well)
                 .aspectRatio(1, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(alignment: .topTrailing) {
@@ -649,9 +702,12 @@ struct Cell: View {
                 // at — a `.step` a customer sent and a `.3mf` ready for the
                 // bed are the same card. Top-leading, because the favourite
                 // star has the other corner and the palette has the floor.
+                //
+                // QUIETER NOW: only for a format other than STL and 3MF, and
+                // never on a Small tile (`formatBadge`).
                 .overlay(alignment: .topLeading) {
-                    if let ext = file.sourceFile?.ext, !ext.isEmpty {
-                        Text(ext.uppercased())
+                    if let badge = Self.formatBadge(file.sourceFile?.ext, size: size) {
+                        Text(badge)
                             .font(.system(size: 8, weight: .semibold))
                             .tracking(0.4)
                             .padding(.horizontal, 4).padding(.vertical, 1)
@@ -663,8 +719,8 @@ struct Cell: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(TitleBreaks.soften(file.title))
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(2, reservesSpace: true)
+                    .font(.system(size: size.isCompact ? 11 : 12, weight: .medium))
+                    .lineLimit(size.isCompact ? 1 : 2, reservesSpace: true)
                     .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
                     .help(file.title)
@@ -672,11 +728,24 @@ struct Cell: View {
                 // ONE line either way, so a row of grouped and ungrouped
                 // models stays level: the group goes at the head of the line
                 // the tile already had, and the rest of it gives way first.
+                //
+                // THE FACTS FIRST (`LibraryFacts`): how long, how much
+                // plastic, what it sells for — the three a shop decides by.
+                // They hold their width and the group's name gives way;
+                // a Small tile has no room for the group at all.
                 HStack(spacing: 4) {
-                    if let group { groupLabel(group) }
-                    if group == nil || !subtitle.isEmpty {
-                        Text((group == nil ? "" : "\u{00B7} ") + subtitle)
-                            .foregroundStyle(.secondary)
+                    if let group, !size.isCompact { groupLabel(group, named: facts.isEmpty).layoutPriority(facts.isEmpty ? 1 : 0) }
+                    // Small has room for one figure: the print time, which
+                    // is the one a shop plans the day around.
+                    let shown = size.isCompact
+                        ? (facts.components(separatedBy: " \u{00B7} ").first ?? facts) : facts
+                    let line = facts.isEmpty ? subtitle : shown
+                    if group == nil || size.isCompact || !line.isEmpty {
+                        Text(((group == nil || size.isCompact || !facts.isEmpty) ? "" : "\u{00B7} ") + line)
+                            .foregroundStyle(selected ? Self.secondaryInk(selected: true)
+                                             : facts.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary.opacity(0.78)))
+                            .layoutPriority(facts.isEmpty ? 0 : 1)
+                            .help(facts.isEmpty ? line : facts)
                     }
                 }
                 .font(.caption2)
@@ -694,18 +763,20 @@ struct Cell: View {
 
     /// The group, as a link to it: the folder mark and the group's own name
     /// (its last level), with the whole path on hover.
-    private func groupLabel(_ path: String) -> some View {
+    ///
+    /// Beside the facts it is the folder mark alone — the name truncated to
+    /// "…" said nothing, and the whole path is on hover either way.
+    private func groupLabel(_ path: String, named: Bool = true) -> some View {
         let leaf = Shop.groupLeaf(path)
         return Button { openGroup(path) } label: {
             HStack(spacing: 2) {
                 Image(systemName: "folder.fill")
-                Text(leaf).truncationMode(.tail)
+                if named { Text(leaf).truncationMode(.tail) }
             }
-            .foregroundStyle(Khayt.brand)
+            .foregroundStyle(Self.groupInk(selected: selected))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .layoutPriority(1)
         .help(words.callIt("mac.open_group", ["name": .string(path)]))
         .accessibilityLabel(words.callIt("mac.open_group", ["name": .string(leaf)]))
     }
@@ -773,7 +844,7 @@ private struct Palette: View {
     }
 }
 
-private struct EmptyShelf: View {
+struct EmptyShelf: View {
     let shop: Shop
 
     var body: some View {
@@ -787,8 +858,28 @@ private struct EmptyShelf: View {
             } description: { Text(problem) }
         } else if !shop.search.isEmpty {
             NothingMatched(shop: shop, mark: .library)
+        } else if shop.libraryFilterOn {
+            // Filters narrowed it to nothing: the way back is clearing them,
+            // not importing more.
+            EmptyHere(title: shop.words.callIt("mac.lg_none_filtered"),
+                      message: shop.words.callIt("mac.lg_none_filtered_hint"), mark: .library) {
+                Button(shop.words.callIt("log.clear_filters")) { shop.clearLibraryFilter() }
+            }
         } else {
-            EmptyHere(title: shop.words.callIt("mac.no_models"), message: shop.words.callIt("mac.no_models_hint"), mark: .library)
+            // THE BUTTON THE SENTENCE NAMES, right under it. The hint said
+            // "use the Import button" while the only one was an unlabelled
+            // arrow in the title strip.
+            EmptyHere(title: shop.words.callIt("mac.no_models"),
+                      message: shop.words.callIt("mac.lg_empty_hint"), mark: .library) {
+                Button {
+                    Task { await shop.addModelToLibrary() }
+                } label: {
+                    Label(shop.words.callIt("mac.import_models") + "\u{2026}", systemImage: "square.and.arrow.down")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(!shop.canMoveJobs || shop.importing)
+            }
         }
     }
 }

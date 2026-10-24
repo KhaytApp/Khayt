@@ -79,6 +79,8 @@ struct KhaytCommands: Commands {
             DetailsCommand()
             Divider()
             SortMenu().environment(shop).disabled(shop.needsSignIn)
+            // Grid or list, and the tile size — `LibraryDisplay`.
+            LibraryViewCommands().environment(shop).disabled(shop.needsSignIn)
             Divider()
             KioskCommand().disabled(shop.needsSignIn)
         }
@@ -357,6 +359,34 @@ private struct GoMenu: View {
             Button(Words.upfront("mac.pnl_title")) { shop.shelf = .reports }
                 .keyboardShortcut("0", modifiers: .command)
         }
+    }
+}
+
+/// View ▸ as Grid / as List, and the tile size with ⌘+ and ⌘−.
+///
+/// ⌥⌘0 for the middle size rather than ⌘0, which Go ▸ Reports has held since
+/// long before the library had sizes.
+private struct LibraryViewCommands: View {
+    @Environment(Shop.self) private var shop
+    private var display: LibraryDisplay { LibraryDisplay.shared }
+
+    var body: some View {
+        Picker(Words.upfront("mac.lg_view"), selection: Binding(
+            get: { display.layout }, set: { display.layout = $0 })) {
+            ForEach(LibraryLayout.allCases) { layout in
+                Text(Words.upfront(layout.wordKey)).tag(layout)
+            }
+        }
+        .disabled(!shop.showingLibrary)
+        Button(Words.upfront("mac.lg_larger")) { display.larger() }
+            .keyboardShortcut("+", modifiers: .command)
+            .disabled(!shop.showingLibrary || display.layout != .grid || display.tileSize.larger == nil)
+        Button(Words.upfront("mac.lg_smaller")) { display.smaller() }
+            .keyboardShortcut("-", modifiers: .command)
+            .disabled(!shop.showingLibrary || display.layout != .grid || display.tileSize.smaller == nil)
+        Button(Words.upfront("mac.lg_default_size")) { display.resetSize() }
+            .keyboardShortcut("0", modifiers: [.command, .option])
+            .disabled(!shop.showingLibrary || display.layout != .grid || display.tileSize == .medium)
     }
 }
 

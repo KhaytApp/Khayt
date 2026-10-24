@@ -37,12 +37,17 @@ struct GroupFromRightClickTests {
         #expect(src.contains("$shop.namingGroup"))
     }
 
-    @Test("the default layout shows Group, Category and Source above the library")
+    @Test("the default layout offers Group, Category and Source above the library, in one Edit menu")
     func defaultShellHasTheMenus() throws {
-        // The new shell has no window toolbar; these lived only in it.
+        // The new shell has no window toolbar; these lived only in it. Since
+        // the library grid redesign they are submenus of one Edit menu
+        // (`EditSelectionMenu`) rather than three menus that read as filters.
         let src = try String(contentsOf: Self.source("ScreenActions.swift"), encoding: .utf8)
-        for menu in ["GroupMenu(shop: shop)", "CategoryMenu(shop: shop)", "ProvenanceMenu(shop: shop)"] {
-            #expect(src.contains(menu), "\(menu) is missing from the new shell's strip")
+        #expect(src.contains("EditSelectionMenu(shop: shop)"), "the Edit menu is missing from the new shell's strip")
+        let menu = try String(contentsOf: Self.source("EditSelectionMenu.swift"), encoding: .utf8)
+        for part in ["private var groupMenu", "private var categoryMenu", "private var provenanceMenu",
+                     "$shop.namingGroup"] {
+            #expect(menu.contains(part), "\(part) is missing from the Edit menu")
         }
     }
 

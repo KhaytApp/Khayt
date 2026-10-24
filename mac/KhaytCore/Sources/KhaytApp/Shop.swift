@@ -1074,9 +1074,20 @@ final class Shop {
             // is still the newest load. Re-judged on every load rather than
             // cached with the verdict, because the nozzle and the plate come
             // from the machines and those change.
+            // What kind each machine is, resolved once per book — BEFORE the
+            // fits, which ask only the machines that print in three
+            // dimensions (`Shop.modelMachines`): a laser bed or a UV flatbed
+            // holds a footprint and says nothing about printing a model, and
+            // the fit badge could name the laser cutter. Read in view bodies
+            // too, so a hop into JavaScript per machine per redraw would be a
+            // hop for a constant.
+            let kinds = (try? await engine?.machineKinds(machineRows)) ?? [:]
+            if overtaken() { return }
+            machineKinds = kinds
             let figured = files
             let worked = await LoadFigures.work(
-                .init(files: figured, machines: machineRowsInUse, settings: Self.settings(root),
+                .init(files: figured, machines: Self.modelMachineRows(machineRowsInUse, kinds: kinds),
+                      settings: Self.settings(root),
                       orders: orderRows, nozzle: nozzleForRisk),
                 engine: engine, wanted: { generation == self.loadGeneration })
             if let hook = Self.whileFiguringForTests { await hook() }
@@ -1119,12 +1130,6 @@ final class Shop {
             let profiles = (try? await engine?.printerProfiles()) ?? []
             if overtaken() { return }
             printerProfiles = profiles
-            // What kind each machine is, resolved once per book. Read in view
-            // bodies, so a hop into JavaScript per machine per redraw would be
-            // a hop for a constant.
-            let kinds = (try? await engine?.machineKinds(machineRows)) ?? [:]
-            if overtaken() { return }
-            machineKinds = kinds
             // And what each shelf row is counted in. Same reason: read in view
             // bodies, and a constant per item per redraw is a hop for nothing.
             let units = (try? await engine?.inventoryUnits(
@@ -1762,7 +1767,10 @@ final class Shop {
     /// Not per redraw: the calibration reads the whole print log, and a grid of
     /// four hundred models asking for that on every frame is four hundred trips
     /// through the runtime for one number that cannot have changed.
-    internal(set) var estimates: [String: KhaytEngine.MeshEstimate] = [:]
+    internal(set) var estimates: [String: KhaytEngine.MeshEstimate] = [:] {
+        // The library's tile facts and its time/weight sorts read these.
+        didSet { libraryDerivedRevision &+= 1 }
+    }
 
     // Stored for "A printer that changed address" (Shop+Printers.swift).
     /// Machines whose address appears to have moved, and where to.
@@ -2958,7 +2966,10 @@ final class Shop {
     /// Which machine each model fits, keyed by the model's id. Worked out once
     /// when the book loads rather than per row: a grid of four hundred models
     /// asking the runtime on every redraw is four hundred context hops.
-    internal(set) var fits: [String: KhaytEngine.Fit] = [:]
+    internal(set) var fits: [String: KhaytEngine.Fit] = [:] {
+        // A model no printer can hold shows no estimate on its tile.
+        didSet { libraryDerivedRevision &+= 1 }
+    }
     /// The cards the shop has issued, and what each one is today.
     private(set) var giftCards: [GiftCard] = []
     private(set) var giftCardRows: [JSONValue] = []

@@ -382,6 +382,46 @@ final class Words {
             .merging(TelemetryWords.table) { mine, _ in mine }
 
     private nonisolated static let base: [String: [String: String]] = [
+        // ── Library grid redesign ─────────────────────────────────────────
+        //
+        // Tile size, grid or list, the facts line on a tile, the three new
+        // orders, the list's columns, the one Edit menu and the empty states
+        // (`LibraryDisplay.swift`, `LibraryList.swift`, `EditSelectionMenu`).
+        // Numerals in the Arabic are isolated (U+2068/U+2069) so a figure
+        // never drags the line's direction with it.
+        "mac.lg_size_small": ["en": "Small tiles", "ar": "مربعات صغيرة"],
+        "mac.lg_size_medium": ["en": "Medium tiles", "ar": "مربعات متوسطة"],
+        "mac.lg_size_large": ["en": "Large tiles", "ar": "مربعات كبيرة"],
+        "mac.lg_tile_size": ["en": "Tile size", "ar": "حجم المربعات"],
+        "mac.lg_tile_size_help": ["en": "Tile size — Small, Medium or Large (⌘− and ⌘+)",
+                                  "ar": "حجم المربعات — صغير أو متوسط أو كبير (⌘− و⌘+)"],
+        "mac.lg_view": ["en": "View", "ar": "العرض"],
+        "mac.lg_view_grid": ["en": "As Grid", "ar": "كشبكة"],
+        "mac.lg_view_list": ["en": "As List", "ar": "كقائمة"],
+        "mac.lg_larger": ["en": "Larger Tiles", "ar": "مربعات أكبر"],
+        "mac.lg_smaller": ["en": "Smaller Tiles", "ar": "مربعات أصغر"],
+        "mac.lg_default_size": ["en": "Default Tile Size", "ar": "حجم المربعات الافتراضي"],
+        "mac.lg_sort_time": ["en": "Print time", "ar": "مدة الطباعة"],
+        "mac.lg_sort_grams": ["en": "Filament weight", "ar": "وزن الخيط"],
+        "mac.lg_sort_price": ["en": "Price", "ar": "السعر"],
+        "mac.lg_col_folder": ["en": "Folder", "ar": "المجلد"],
+        "mac.lg_col_material": ["en": "Material", "ar": "الخامة"],
+        "mac.lg_col_grams": ["en": "Weight", "ar": "الوزن"],
+        "mac.lg_col_storage": ["en": "Storage", "ar": "التخزين"],
+        "mac.lg_filter_empty": ["en": "{name}: nothing in this library to choose from yet",
+                                "ar": "{name}: لا شيء في هذه المكتبة للاختيار منه بعد"],
+        "mac.lg_edit": ["en": "Edit", "ar": "تعديل"],
+        "mac.lg_edit_n": ["en": "Edit {what}", "ar": "تعديل {what}"],
+        "mac.lg_edit_help": ["en": "Change the selected models: their group, category, tags and where they came from",
+                             "ar": "غيّر النماذج المحددة: مجموعتها وتصنيفها ووسومها ومصدرها"],
+        "mac.lg_none_filtered": ["en": "No models match these filters", "ar": "لا نماذج تطابق هذه المرشحات"],
+        "mac.lg_none_filtered_hint": ["en": "Clear the filters to see the whole library again.",
+                                      "ar": "امسح المرشحات لترى المكتبة كاملة مرة أخرى."],
+        "mac.lg_empty_hint": ["en": "Import a folder of models with the button below, or drop files anywhere on this screen.",
+                              "ar": "استورد مجلدًا من النماذج بالزر أدناه، أو أفلت الملفات في أي مكان على هذه الشاشة."],
+        "mac.lg_more_filters": ["en": "More", "ar": "المزيد"],
+        // ── end of Library grid redesign ──────────────────────────────────
+
         // Shelves
         "mac.all_jobs":      ["en": "Jobs",          "ar": "الأعمال"],
         "mac.pipeline":      ["en": "Pipeline",      "ar": "المسار"],

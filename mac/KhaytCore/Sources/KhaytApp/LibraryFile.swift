@@ -325,8 +325,16 @@ enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
     /// file it had just added.
     case added
     case khayt, name, size, lastPrinted, timesPrinted
+    /// The facts a tile now says (`LibraryFacts`): the quickest print first,
+    /// the lightest first, the dearest first. A model the app knows nothing
+    /// about goes last in every one, never first.
+    case printTime, grams, price
 
     var id: String { rawValue }
+
+    /// Does this order read the tile facts — estimates and the catalogue as
+    /// well as the file?
+    var readsFacts: Bool { self == .printTime || self == .grams || self == .price }
 
     /// The key each one is named by, so the menu speaks the shop's language.
     var key: String {
@@ -337,7 +345,47 @@ enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
         case .size: "set.store_size"
         case .lastPrinted: "mac.last_run"
         case .timesPrinted: "mac.printed"
+        case .printTime: "mac.lg_sort_time"
+        case .grams: "mac.lg_sort_grams"
+        case .price: "mac.lg_sort_price"
         }
+    }
+
+    /// `sorted`, with each model's facts from the shop (estimates and the
+    /// catalogue too). Each model's facts are read once, not per comparison.
+    func sorted(_ files: [LibraryFile], facts: (LibraryFile) -> LibraryFacts) -> [LibraryFile] {
+        guard readsFacts else { return sorted(files) }
+        let keyed = files.map { ($0, Self.figure(self, facts($0))) }
+        return keyed.sorted { a, b in Self.before(self, a.1, b.1, a.0, b.0) }.map(\.0)
+    }
+
+    /// `order`, with the facts from the shop.
+    func ordering(_ facts: @escaping (LibraryFile) -> LibraryFacts) -> (LibraryFile, LibraryFile) -> Bool {
+        guard readsFacts else { return order }
+        return { a, b in Self.before(self, Self.figure(self, facts(a)), Self.figure(self, facts(b)), a, b) }
+    }
+
+    private static func figure(_ sort: LibrarySort, _ f: LibraryFacts) -> Double? {
+        switch sort {
+        case .printTime: f.minutes
+        case .grams: f.grams
+        case .price: f.price
+        default: nil
+        }
+    }
+
+    /// Unknown last; then by the figure (price dearest first, the others
+    /// smallest first); then by name, so equal figures do not shuffle.
+    private static func before(_ sort: LibrarySort, _ x: Double?, _ y: Double?,
+                               _ a: LibraryFile, _ b: LibraryFile) -> Bool {
+        switch (x, y) {
+        case (nil, nil): break
+        case (nil, _): return false
+        case (_, nil): return true
+        case (let x?, let y?) where x != y: return sort == .price ? x > y : x < y
+        default: break
+        }
+        return a.title.localizedStandardCompare(b.title) == .orderedAscending
     }
 
     /// The files in this order, each one's dates read ONCE rather than on
@@ -377,6 +425,9 @@ enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
         case .timesPrinted:
             if a.printCount != b.printCount { return a.printCount > b.printCount }
             return a.title.localizedStandardCompare(b.title) == .orderedAscending
+        case .printTime, .grams, .price:
+            // Without the shop: what the file's own slicer said.
+            return Self.before(self, Self.figure(self, .sliced(a)), Self.figure(self, .sliced(b)), a, b)
         }
     }
 }

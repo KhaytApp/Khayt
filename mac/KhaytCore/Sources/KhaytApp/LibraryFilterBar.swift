@@ -167,6 +167,40 @@ struct LibraryFilterBar: View {
     // value kept even at zero) are unchanged: `chips` above is what the menus
     // are built from, so the two cannot disagree.
     var body: some View {
+        let all = chips
+        HStack(spacing: 8) {
+            // ── NEVER A CHIP CUT IN HALF ────────────────────────────────────
+            //
+            // The row first scrolled sideways under a fade, and at 1320
+            // points the Tag menu sat half-hidden behind the model count as
+            // "Ta" — a label cut mid-word reads as broken. Now the row is
+            // drawn with as many axis menus as fit WHOLE, and the rest go
+            // into one More menu: every axis, all five, five to none inline.
+            ViewThatFits(in: .horizontal) {
+                ForEach((0...Self.axes.count).reversed(), id: \.self) { inline in
+                    filters(all, inline: inline)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // ── HOW IT IS SHOWN, ON THE TRAILING SIDE OF THE SAME ROW ──────
+            //
+            // The order was a menu in the title strip, beside three menus
+            // that EDITED the selection and looked exactly like filters; the
+            // density and the list did not exist. What narrows the grid is on
+            // the leading side and how it is laid out on the trailing side,
+            // with the count of what is left between them — one row, read
+            // left to right (right to left in Arabic) as one sentence.
+            LibraryViewControls(shop: shop)
+                .fixedSize()
+        }
+        .controlSize(.small)
+        .padding(.horizontal, Metric.screen)
+        .padding(.vertical, 8)
+    }
+
+    /// The leading half of the row with the first `inline` axes drawn as
+    /// menus and any others folded into More.
+    private func filters(_ all: [FilterChipModel], inline: Int) -> some View {
         HStack(spacing: 8) {
             // Only at the top. Inside an open group both choices draw that
             // group's own levels (`Shop.libraryEntries`), so the switch was
@@ -190,22 +224,21 @@ struct LibraryFilterBar: View {
                 }
             }
 
-            menu("mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed", "archived",
-                                        "online-only", "this-mac-only"])
-            menu("mac.lib_printer", prefix: "ready:")
-            menu("mac.lib_creator", prefix: "creator:")
-            menu("mac.category", prefix: "category:")
-            menu("mac.lib_tag", prefix: "tag:")
+            ForEach(Array(Self.axes.prefix(inline).enumerated()), id: \.offset) { _, axis in
+                menu(all, axis)
+            }
+            if inline < Self.axes.count {
+                more(all, Array(Self.axes.dropFirst(inline)))
+            }
 
-            Spacer(minLength: 0)
             if shop.libraryFilterOn {
                 Button(shop.words.callIt("log.clear_filters")) { shop.clearLibraryFilter() }
                     .buttonStyle(.link)
+                    .fixedSize()
             }
         }
-        .controlSize(.small)
-        .padding(.horizontal, Metric.screen)
-        .padding(.vertical, 8)
+        .fixedSize()
+        .padding(.vertical, 1)
     }
 
     /// Is the All models / Groups switch drawn? Only with no group open.
@@ -214,37 +247,105 @@ struct LibraryFilterBar: View {
         return true
     }
 
-    /// One axis as a menu. Hidden when it has nothing to offer.
-    @ViewBuilder
-    private func menu(_ key: String, prefix: String? = nil, ids: [String] = []) -> some View {
-        let rows = chips.filter { chip in
+    /// One filter axis: its name, and which chips belong to it.
+    struct Axis {
+        let key: String
+        var prefix: String? = nil
+        var ids: [String] = []
+
+        func holds(_ chip: FilterChipModel) -> Bool {
             if let prefix { return chip.id.hasPrefix(prefix) }
             return ids.contains(chip.id)
         }
-        if !rows.isEmpty {
+    }
+
+    /// The axes the row draws, in order — every one of them, always.
+    static let axes: [Axis] = [
+        Axis(key: "mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed", "archived",
+                                        "online-only", "this-mac-only"]),
+        Axis(key: "mac.lib_printer", prefix: "ready:"),
+        Axis(key: "mac.lib_creator", prefix: "creator:"),
+        Axis(key: "mac.category", prefix: "category:"),
+        Axis(key: "mac.lib_tag", prefix: "tag:"),
+    ]
+
+    /// ── A MENU WITH NOTHING IN IT IS GREYED, NOT GONE ─────────────────────
+    ///
+    /// Each axis vanished when its count reached zero, so the row changed
+    /// shape as the shop typed: "Ready on" disappeared on a library with no
+    /// printer reporting its spools, Creator on one nobody had attributed,
+    /// and a shop could not learn the axes existed until its book happened
+    /// to fill them. Now every axis is always drawn, disabled when it has
+    /// nothing to offer, with the reason on hover.
+    static func menuEnabled(rows: Int) -> Bool { rows > 0 }
+
+    /// The title an axis wears: its name, and what it is set to.
+    private func title(_ axis: Axis, on: [FilterChipModel]) -> String {
+        on.isEmpty ? shop.words.callIt(axis.key)
+            : shop.words.callIt(axis.key) + ": " + (on.count == 1 ? on[0].label : shop.words.numeral(on.count))
+    }
+
+    @ViewBuilder private func items(_ rows: [FilterChipModel]) -> some View {
+        ForEach(rows) { chip in
+            Button { chip.press() } label: {
+                if chip.on { Label(chip.label + "  (\(chip.count))", systemImage: "checkmark") }
+                else { Text(chip.label + "  (\(chip.count))") }
+            }
+        }
+    }
+
+    /// One axis as a menu. Disabled — never hidden — when it has nothing to offer.
+    @ViewBuilder
+    private func menu(_ all: [FilterChipModel], _ axis: Axis) -> some View {
+        let rows = all.filter(axis.holds)
+        if !Self.menuEnabled(rows: rows.count) {
+            Menu {
+                EmptyView()
+            } label: {
+                Text(shop.words.callIt(axis.key)).lineLimit(1)
+            }
+            .menuStyle(.button)
+            .fixedSize()
+            .disabled(true)
+            .help(shop.words.callIt("mac.lg_filter_empty", ["name": .string(shop.words.callIt(axis.key))]))
+        } else {
             let on = rows.filter(\.on)
             Menu {
-                ForEach(rows) { chip in
-                    Button { chip.press() } label: {
-                        if chip.on { Label(chip.label + "  (\(chip.count))", systemImage: "checkmark") }
-                        else { Text(chip.label + "  (\(chip.count))") }
-                    }
-                }
+                items(rows)
             } label: {
                 // ONE Text. A macOS button-style menu draws its label as a
                 // single title, and of an HStack of two it kept only the
                 // first: "Show" with Archived on read "Show" (Oct 2026
                 // capture), and every axis lost what it was set to.
-                Text(on.isEmpty ? shop.words.callIt(key)
-                     : shop.words.callIt(key) + ": " + (on.count == 1 ? on[0].label : shop.words.numeral(on.count)))
-                    .lineLimit(1)
+                Text(title(axis, on: on)).lineLimit(1)
             }
             .menuStyle(.button)
             .fixedSize()
             // Rebuilt when what it is set to changes, so the button behind
             // it takes the new title rather than keeping the first one.
-            .id(key + "|" + on.map(\.id).joined(separator: ","))
+            .id(axis.key + "|" + on.map(\.id).joined(separator: ","))
         }
+    }
+
+    /// The axes that did not fit, as submenus of one More menu — each still
+    /// there, greyed when empty, and the More title says how many of them
+    /// are narrowing the grid.
+    private func more(_ all: [FilterChipModel], _ hidden: [Axis]) -> some View {
+        let active = hidden.reduce(0) { $0 + all.filter($1.holds).filter(\.on).count }
+        return Menu {
+            ForEach(Array(hidden.enumerated()), id: \.offset) { _, axis in
+                let rows = all.filter(axis.holds)
+                Menu(title(axis, on: rows.filter(\.on))) { items(rows) }
+                    .disabled(!Self.menuEnabled(rows: rows.count))
+            }
+        } label: {
+            Text(active == 0 ? shop.words.callIt("mac.lg_more_filters")
+                 : shop.words.callIt("mac.lg_more_filters") + ": " + shop.words.numeral(active))
+                .lineLimit(1)
+        }
+        .menuStyle(.button)
+        .fixedSize()
+        .id("more|\(hidden.count)|\(active)")
     }
 }
 

@@ -738,6 +738,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only the library grid's scenes — sizes, the list, a selection,
+            // the empty states, and a 600-model library — on the sample.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBGRID"] == "1", let shop = subject {
+                await captureLibraryGrid(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             // Only the beta.5 scenes (live printer cards, the camera, Pair a
             // phone, filed VAT periods), on the sample, in memory.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_B5"] == "1", let shop = subject {

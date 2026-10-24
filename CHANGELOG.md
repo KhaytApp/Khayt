@@ -14,6 +14,16 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - A model's right-click menu is grouped: open and slicers, then Quote / Job / Catalogue, then Organise, Share & Sell and Storage submenus, with Archive and Delete last.
   - The sample shop's King reliefs measured 1142 mm wide because they carried another model's geometry; they now measure 200 × 200 mm like the real files.
 
+- **Mac: the print library, redesigned for choosing what to print.**
+  - Tile size: Small, Medium or Large, from the filter row or View ▸ Larger/Smaller Tiles (⌘+ / ⌘−, ⌥⌘0 for the default). Small is a contact sheet with a one-line title. Remembered per Mac.
+  - A list view (Grid | List): name, folder, material, print time, weight, price, file size, times printed, last printed and storage, sortable and resizable, with the grid's selection, keys (Return, Space, ⌫) and right-click menu.
+  - Each tile now says how long it prints, how much filament it takes and what it sells for (when a catalogue product is made from that file). Figures the app estimated from the mesh carry ≈. The format badge is shown only for files other than STL and 3MF.
+  - New orders: print time, filament weight and price, in the grid and the list.
+  - Sort, Grid | List and tile size sit on the filter row with the number of models shown. Filter menus with nothing to offer are greyed instead of disappearing.
+  - Group, Category and Where it came from, which change the selected models, are one Edit menu in the title strip ("Edit 3 models"), so they no longer look like filters.
+  - Rendered previews on a white backdrop have the backdrop removed, so dark mode no longer shows white squares. Models with no picture show a drawn build plate tinted with the first filament colour. Pictures are decoded at twice the tile size, and the cache is limited by memory used.
+  - An empty library has an Import Models button under its message.
+
 - **iPhone: a job's invoice, on the phone.** A job's page now has an Invoice card. It
   opens the same invoice the Mac and PC print, in English or Arabic with the ZATCA
   QR, and Share sends it as an A4 PDF. The phone never gives out an invoice number:

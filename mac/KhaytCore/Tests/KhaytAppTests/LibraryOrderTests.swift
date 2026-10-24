@@ -24,7 +24,8 @@ struct LibraryOrderTests {
     @Test("date added is the default, and the Library screen offers the choice")
     func defaultAndVisible() throws {
         #expect(LibrarySort.allCases.first == .added)
-        let strip = try QuoteSheetStatusTests.source("ScreenActions.swift")
+        // On the library's own filter row since the grid redesign.
+        let strip = try QuoteSheetStatusTests.source("LibraryList.swift")
         #expect(strip.contains("selection: $shop.librarySort"))
         let shop = try QuoteSheetStatusTests.source("Shop.swift")
         #expect(shop.contains("var librarySort: LibrarySort = .added"))

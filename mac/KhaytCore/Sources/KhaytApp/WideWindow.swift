@@ -40,7 +40,7 @@ enum Wide {
     /// with at least one, because a window can always be narrower than the
     /// thing inside it and a grid of zero columns is a crash rather than a
     /// layout.
-    static func columns(across available: CGFloat) -> Int {
+    static func columns(across available: CGFloat, tile: CGFloat = Wide.tile) -> Int {
         max(1, Int((available / (tile + tileGap)).rounded(.down)))
     }
 
@@ -50,9 +50,24 @@ enum Wide {
     /// NEVER centred. A grid whose leading edge moves as the window resizes is
     /// worse than a ragged trailing edge — the eye loses the column it was
     /// reading down, which is the one thing a grid is for.
-    static func grid(across available: CGFloat) -> [GridItem] {
+    ///
+    /// `tile` is the library's chosen density (`LibraryTileSize`); every other
+    /// grid keeps §10's one size.
+    static func grid(across available: CGFloat, tile: CGFloat = Wide.tile) -> [GridItem] {
         Array(repeating: GridItem(.fixed(tile), spacing: tileGap, alignment: .topLeading),
-              count: columns(across: available))
+              count: columns(across: available, tile: tile))
+    }
+
+    /// The library's grid: as many columns of at least `minimum` as fit, and
+    /// the tile WIDENED to share out the rest, so the last column ends at the
+    /// edge rather than leaving a band of nothing before the inspector.
+    ///
+    /// The library alone, because it has three densities: a fixed tile at the
+    /// Small step left up to a whole column of empty space at most widths.
+    static func fill(across available: CGFloat, minimum: CGFloat) -> (columns: Int, tile: CGFloat) {
+        let n = max(1, Int(((available + tileGap) / (minimum + tileGap)).rounded(.down)))
+        let tile = ((available - tileGap * CGFloat(n - 1)) / CGFloat(n)).rounded(.down)
+        return (n, max(minimum, tile))
     }
 
     // MARK: Sentences
