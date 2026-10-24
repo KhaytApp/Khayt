@@ -135,12 +135,13 @@ struct LibraryGridRedesignTests {
 
     // MARK: Facts
 
-    @Test("the facts line: hours and minutes, grams or kilos, price, ≈ for estimates")
+    @Test("the facts line speaks PrintFigures: the inspector's time and weight, price, ≈ for estimates")
     func factsLine() throws {
         let words = Words()
-        #expect(LibraryFacts.duration(45, words: words) == "45m")
+        #expect(LibraryFacts.duration(45, words: words) == PrintFigures.duration(minutes: 45, words))
         #expect(LibraryFacts.duration(272, words: words) == "4h 32m")
-        #expect(LibraryFacts.duration(120, words: words) == "2h")
+        #expect(LibraryFacts.duration(120, words: words) == PrintFigures.duration(minutes: 120, words),
+                "a whole hour reads differently on a tile and on the model page")
         #expect(LibraryFacts.weight(57.18, words: words) == "57 g")
         #expect(LibraryFacts.weight(2_140, words: words) == "2.1 kg")
         #expect(LibraryFacts.weight(62, words: words, approximate: true) == "\u{2248}62 g")
@@ -151,15 +152,6 @@ struct LibraryGridRedesignTests {
         #expect(LibraryFacts.line(guessed, words: words, currency: "SAR") == "\u{2248}1h 44m \u{00B7} \u{2248}62 g")
         #expect(LibraryFacts.line(LibraryFacts(), words: words, currency: "SAR").isEmpty)
         #expect(LibraryFacts.price(85.5, currency: "USD").hasPrefix("85.50"))
-    }
-
-    @Test("Arabic facts keep their numerals isolated, with ≈ inside the figure")
-    func factsArabic() throws {
-        for key in ["mac.lg_hours_minutes", "mac.lg_grams", "mac.lg_kilos", "mac.lg_minutes", "mac.lg_hours"] {
-            let ar = try #require(Words.own[key]?["ar"], "\(key)")
-            #expect(ar.contains("\u{2068}") && ar.contains("\u{2069}"), "\(key) is not isolated")
-            #expect(Words.own[key]?["en"]?.isEmpty == false)
-        }
     }
 
     @Test("facts come from the slicer, then the colours, then the estimate")

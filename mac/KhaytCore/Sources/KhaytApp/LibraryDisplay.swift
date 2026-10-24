@@ -200,32 +200,24 @@ struct LibraryFacts: Equatable, Sendable {
         return bits.joined(separator: " \u{00B7} ")
     }
 
-    /// Hours and minutes, rounded to the minute: "45m", "4h 32m", "12h".
-    /// A shop reads this to see whether a print fits before closing, and a
-    /// tenth of an hour is not a unit anybody plans in.
-    @MainActor
+    /// The print time as every other screen says it — `PrintFigures`, the
+    /// inspector's and the machine cards' own (`PrinterWatch.spell`): "45m",
+    /// "4h 32m", "6h 0m". One formatter, so a tile, the list and the model
+    /// page never disagree about the same print.
     ///
-    /// `approximate` puts ≈ INSIDE the first number, not before the phrase:
-    /// in Arabic the phrase runs right to left and a ≈ in front of it landed
-    /// after the figure ("59≈ س"), where it reads as a different symbol.
+    /// `approximate` puts ≈ in front, as the inspector does: in Arabic the
+    /// mark takes the line's direction and sits beside the number on its
+    /// leading side.
+    @MainActor
     static func duration(_ minutes: Double, words: Words, approximate: Bool = false) -> String {
-        let total = max(1, Int(minutes.rounded()))
-        let h = total / 60, m = total % 60
-        let mark = approximate ? "\u{2248}" : ""
-        let hs = (h > 0 ? mark : "") + Format.count(h), ms = (h > 0 ? "" : mark) + Format.count(m)
-        if h == 0 { return words.callIt("mac.lg_minutes", ["m": .string(ms)]) }
-        if m == 0 { return words.callIt("mac.lg_hours", ["h": .string(hs)]) }
-        return words.callIt("mac.lg_hours_minutes", ["h": .string(hs), "m": .string(ms)])
+        (approximate ? "\u{2248}" : "") + PrintFigures.duration(minutes: max(1, minutes), words)
     }
 
-    /// Whole grams, or kilos past a thousand: "57 g", "1.2 kg".
+    /// The weight as every other screen says it (`PrintFigures`): "57 g",
+    /// "2.1 kg".
     @MainActor
     static func weight(_ grams: Double, words: Words, approximate: Bool = false) -> String {
-        let mark = approximate ? "\u{2248}" : ""
-        if grams >= 1000 {
-            return words.callIt("mac.lg_kilos", ["n": .string(mark + Money.quantity(grams / 1000, decimals: 1))])
-        }
-        return words.callIt("mac.lg_grams", ["n": .string(mark + Money.quantity(max(1, grams.rounded()), decimals: 0))])
+        (approximate ? "\u{2248}" : "") + PrintFigures.weight(max(1, grams), words)
     }
 
     /// Whole when it is whole: a tile has no room for ".00".
