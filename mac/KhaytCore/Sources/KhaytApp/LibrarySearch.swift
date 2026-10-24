@@ -20,7 +20,7 @@ import KhaytCore
 /// case, width, Latin accents, harakat, alef forms and Arabic-Indic digits do
 /// not decide what is found. A value matches when the model's property
 /// CONTAINS it, so a token half-typed already narrows.
-struct LibraryQuery: Equatable, Sendable {
+struct LibrarySearch: Equatable, Sendable {
 
     enum Field: String, CaseIterable, Sendable {
         case tag, group, category, material, creator, printer
@@ -72,7 +72,7 @@ struct LibraryQuery: Equatable, Sendable {
     /// A colon, ASCII or full-width.
     private static func isColon(_ c: Character) -> Bool { c == ":" || c == "\u{FF1A}" }
 
-    static func parse(_ raw: String) -> LibraryQuery {
+    static func parse(_ raw: String) -> LibrarySearch {
         let chars = Array(raw)
         var i = 0
         var free: [String] = []
@@ -111,7 +111,7 @@ struct LibraryQuery: Equatable, Sendable {
             free.append(String(chars[start..<j]))
             i = j
         }
-        return LibraryQuery(text: SearchText.fold(free.joined(separator: " ")), tokens: tokens)
+        return LibrarySearch(text: SearchText.fold(free.joined(separator: " ")), tokens: tokens)
     }
 
     /// Can the answer to this query be found among the answer to `older`?
@@ -121,7 +121,7 @@ struct LibraryQuery: Equatable, Sendable {
     /// the value it held. `LibraryMemo` narrows the last list instead of
     /// searching the book again only then. Typing the colon of `tag:` turns
     /// the free word "tag" into a token, which is NOT narrower, and starts over.
-    func narrows(from older: LibraryQuery) -> Bool {
+    func narrows(from older: LibrarySearch) -> Bool {
         guard older.text.isEmpty || text.contains(older.text) else { return false }
         guard older.tokens.count <= tokens.count else { return false }
         for (was, now) in zip(older.tokens, tokens) {

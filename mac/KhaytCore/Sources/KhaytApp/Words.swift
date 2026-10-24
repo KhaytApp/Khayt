@@ -422,6 +422,65 @@ final class Words {
         "mac.lg_more_filters": ["en": "More", "ar": "المزيد"],
         // ── end of Library grid redesign ──────────────────────────────────
 
+        // ── Library smart folders ─────────────────────────────────────────
+        //
+        // Saved searches in the sidebar, the five built in, Save Search…, the
+        // Ranges popover and the axes they added (`Shop+LibraryQuery.swift`,
+        // `LibrarySmartFolders.swift`). Numerals and placeholders in the
+        // Arabic are isolated (U+2068/U+2069) so a figure or a shop's own
+        // name never drags the line's direction with it.
+        "mac.ls_ready": ["en": "Ready to print", "ar": "جاهز للطباعة"],
+        "mac.ls_no_figures": ["en": "No print figures", "ar": "بلا أرقام طباعة"],
+        "mac.ls_in_catalogue": ["en": "Sells in catalogue", "ar": "يُباع في الكتالوج"],
+        "mac.ls_ready_any": ["en": "Any printer", "ar": "أي طابعة"],
+        "mac.ls_builtin_help": ["en": "Built in: always here, worked out from the library",
+                                "ar": "مدمج: موجود دائمًا ويُحسب من المكتبة"],
+        "mac.ls_save": ["en": "Save Search…", "ar": "حفظ البحث…"],
+        "mac.ls_save_help": ["en": "Keep this search in the sidebar, under Library",
+                             "ar": "احتفظ بهذا البحث في الشريط الجانبي، تحت المكتبة"],
+        "mac.ls_update": ["en": "Update Search", "ar": "تحديث البحث"],
+        "mac.ls_update_help": ["en": "Keep the search on screen as “{name}”",
+                               "ar": "احفظ البحث المعروض باسم «\u{2068}{name}\u{2069}»"],
+        "mac.ls_save_menu": ["en": "Save", "ar": "حفظ"],
+        "mac.ls_name": ["en": "Name", "ar": "الاسم"],
+        "mac.ls_name_prompt": ["en": "Ready for the market", "ar": "جاهز للسوق"],
+        "mac.ls_save_button": ["en": "Save", "ar": "حفظ"],
+        "mac.ls_cancel": ["en": "Cancel", "ar": "إلغاء"],
+        "mac.ls_replaces": ["en": "Replaces the saved search with this name.",
+                            "ar": "يستبدل البحث المحفوظ الذي يحمل هذا الاسم."],
+        "mac.ls_rename": ["en": "Rename…", "ar": "إعادة تسمية…"],
+        "mac.ls_rename_taken": ["en": "Another saved search has this name.",
+                                "ar": "بحث محفوظ آخر يحمل هذا الاسم."],
+        "mac.ls_edit": ["en": "Edit Search", "ar": "تعديل البحث"],
+        "mac.ls_duplicate": ["en": "Duplicate", "ar": "تكرار"],
+        "mac.ls_delete": ["en": "Delete", "ar": "حذف"],
+        "mac.ls_copy_name": ["en": "{name} {n}", "ar": "\u{2068}{name}\u{2069} \u{2068}{n}\u{2069}"],
+        "mac.ls_sample": ["en": "The sample shop cannot keep a saved search.",
+                          "ar": "لا يحفظ المتجر التجريبي أي بحث."],
+        "mac.ls_ranges": ["en": "Ranges", "ar": "النطاقات"],
+        "mac.ls_ranges_on": ["en": "Ranges: {n}", "ar": "النطاقات: \u{2068}{n}\u{2069}"],
+        "mac.ls_ranges_help": ["en": "Narrow by print time, filament, price, times printed and date added",
+                               "ar": "ضيّق حسب مدة الطباعة والخيط والسعر ومرات الطباعة وتاريخ الإضافة"],
+        "mac.ls_range_time": ["en": "Print time (h)", "ar": "مدة الطباعة (س)"],
+        "mac.ls_range_grams": ["en": "Filament (g)", "ar": "الخيط (غ)"],
+        "mac.ls_range_price": ["en": "Price ({currency})", "ar": "السعر (\u{2068}{currency}\u{2069})"],
+        "mac.ls_range_printed": ["en": "Times printed", "ar": "مرات الطباعة"],
+        "mac.ls_range_added": ["en": "Date added", "ar": "تاريخ الإضافة"],
+        "mac.ls_min": ["en": "Min", "ar": "الأدنى"],
+        "mac.ls_max": ["en": "Max", "ar": "الأعلى"],
+        "mac.ls_any_time": ["en": "Any time", "ar": "أي وقت"],
+        "mac.ls_last_7": ["en": "Last 7 days", "ar": "آخر \u{2068}7\u{2069} أيام"],
+        "mac.ls_last_30": ["en": "Last 30 days", "ar": "آخر \u{2068}30\u{2069} يومًا"],
+        "mac.ls_last_90": ["en": "Last 90 days", "ar": "آخر \u{2068}90\u{2069} يومًا"],
+        "mac.ls_between": ["en": "Between dates", "ar": "بين تاريخين"],
+        "mac.ls_from": ["en": "From", "ar": "من"],
+        "mac.ls_to": ["en": "To", "ar": "إلى"],
+        "mac.ls_unknown_rule": ["en": "A model with no figure never matches a range.",
+                                "ar": "النموذج الذي لا رقم له لا يطابق أي نطاق."],
+        "mac.ls_unknown_n": ["en": "{n} with no figure left out", "ar": "استُبعد \u{2068}{n}\u{2069} بلا رقم"],
+        "mac.ls_clear_ranges": ["en": "Clear Ranges", "ar": "مسح النطاقات"],
+        // ── end of Library smart folders ──────────────────────────────────
+
         // Shelves
         "mac.all_jobs":      ["en": "Jobs",          "ar": "الأعمال"],
         "mac.pipeline":      ["en": "Pipeline",      "ar": "المسار"],
@@ -3392,7 +3451,7 @@ final class Words {
         "mac.unarchive_model": ["en": "Restore from Archive", "ar": "استعادة من الأرشيف"],
         "mac.unarchive_n_models": ["en": "Restore {n} Models from Archive", "ar": "استعادة {n} نماذج من الأرشيف"],
         "mac.lib_archived": ["en": "Archived", "ar": "المؤرشفة"],
-        // The search box's tokens (`LibraryQuery`), as their chips name them.
+        // The search box's tokens (`LibrarySearch`), as their chips name them.
         "mac.lib_token_tag": ["en": "Tag", "ar": "الوسم"],
         "mac.lib_token_group": ["en": "Group", "ar": "المجموعة"],
         "mac.lib_token_category": ["en": "Category", "ar": "التصنيف"],

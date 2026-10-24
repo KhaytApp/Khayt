@@ -745,6 +745,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only the smart folders, saved searches and ranges, on the
+            // sample and a 600-model library in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBSMART"] == "1", let shop = subject {
+                await captureLibrarySmart(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             // Only the beta.5 scenes (live printer cards, the camera, Pair a
             // phone, filed VAT periods), on the sample, in memory.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_B5"] == "1", let shop = subject {

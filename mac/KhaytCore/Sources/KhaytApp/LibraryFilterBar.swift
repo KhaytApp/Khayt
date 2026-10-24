@@ -96,6 +96,31 @@ struct LibraryFilterBar: View {
                 shop.libraryNeverPrintedOnly.toggle()
             })
         }
+        // NOTHING TO PRICE FROM, and WHAT THE SHOP SELLS — the two questions
+        // the smart folders added (`LibrarySmartFolder`). Counted like the
+        // rest, over what the other axes leave.
+        if facets.noFigures > 0 || shop.libraryNoFiguresOnly {
+            out.append(FilterChipModel(id: "no-figures", label: shop.words.callIt("mac.ls_no_figures"),
+                                       count: facets.noFigures, on: shop.libraryNoFiguresOnly) {
+                shop.libraryNoFiguresOnly.toggle()
+            })
+        }
+        if facets.inCatalogue > 0 || shop.libraryInCatalogueOnly {
+            out.append(FilterChipModel(id: "in-catalogue", label: shop.words.callIt("mac.ls_in_catalogue"),
+                                       count: facets.inCatalogue, on: shop.libraryInCatalogueOnly) {
+                shop.libraryInCatalogueOnly.toggle()
+            })
+        }
+        // Any machine at all — the "Ready to print" smart folder, typed into
+        // the Ready on menu as its first item. One or the other: choosing a
+        // machine takes "any" off, and the other way round.
+        if facets.readyAnywhere > 0 || shop.libraryReadyAnywhere {
+            out.append(FilterChipModel(id: "ready:*", label: shop.words.callIt("mac.ls_ready_any"),
+                                       count: facets.readyAnywhere, on: shop.libraryReadyAnywhere) {
+                shop.libraryReadyAnywhere.toggle()
+                if shop.libraryReadyAnywhere { shop.libraryReadyOn = nil }
+            })
+        }
         // WHAT CAN START NOW, on each machine that says what it has loaded:
         // every colour the model needs is in a head, in a material that fits.
         // Beside the other facts, because it is the question asked before every
@@ -107,6 +132,7 @@ struct LibraryFilterBar: View {
                                        count: row.count,
                                        on: shop.libraryReadyOn == row.machineId) {
                 shop.libraryReadyOn = shop.libraryReadyOn == row.machineId ? nil : row.machineId
+                if shop.libraryReadyOn != nil { shop.libraryReadyAnywhere = false }
             })
         }
         // WHO MADE IT — the busiest eight, and the one chosen whatever its count.
@@ -217,10 +243,10 @@ struct LibraryFilterBar: View {
 
             // WHAT THE SEARCH BOX IS FILTERING ON, one chip per token, each
             // with the way to take it off. Read from the box itself
-            // (`LibraryQuery`), so a chip and the text cannot disagree.
-            ForEach(Array(LibraryQuery.parse(shop.search).tokens.enumerated()), id: \.offset) { _, token in
+            // (`LibrarySearch`), so a chip and the text cannot disagree.
+            ForEach(Array(LibrarySearch.parse(shop.search).tokens.enumerated()), id: \.offset) { _, token in
                 TokenChip(token: token, words: shop.words) {
-                    shop.search = LibraryQuery.removing(token, from: shop.search)
+                    shop.search = LibrarySearch.removing(token, from: shop.search)
                 }
             }
 
@@ -231,10 +257,20 @@ struct LibraryFilterBar: View {
                 more(all, Array(Self.axes.dropFirst(inline)))
             }
 
+            // The ranges: one button, always there, with a popover — five
+            // figures do not fit in a menu, and a range typed into a menu
+            // item is not a thing a Mac does.
+            LibraryRangesButton(shop: shop)
+
             if shop.libraryFilterOn {
                 Button(shop.words.callIt("log.clear_filters")) { shop.clearLibraryFilter() }
                     .buttonStyle(.link)
                     .fixedSize()
+            }
+            // Keep what is on screen as a smart folder in the sidebar. Only
+            // while something narrows: an empty search is the library itself.
+            if shop.libraryQueryActive {
+                LibrarySaveSearchButton(shop: shop, compact: inline == 0)
             }
         }
         .fixedSize()
@@ -262,7 +298,7 @@ struct LibraryFilterBar: View {
     /// The axes the row draws, in order — every one of them, always.
     static let axes: [Axis] = [
         Axis(key: "mac.lib_show", ids: ["print-next", "duplicates", "unfiled", "never-printed", "archived",
-                                        "online-only", "this-mac-only"]),
+                                        "no-figures", "in-catalogue", "online-only", "this-mac-only"]),
         Axis(key: "mac.lib_printer", prefix: "ready:"),
         Axis(key: "mac.lib_creator", prefix: "creator:"),
         Axis(key: "mac.category", prefix: "category:"),
@@ -352,7 +388,7 @@ struct LibraryFilterBar: View {
 /// One search token as a chip: "Tag: dragon ⓧ". The whole chip removes it —
 /// a target the size of a word rather than of the cross.
 private struct TokenChip: View {
-    let token: LibraryQuery.Token
+    let token: LibrarySearch.Token
     let words: Words
     let remove: () -> Void
 

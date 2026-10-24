@@ -4,6 +4,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: saved searches, smart folders and ranges in the print library.**
+  - Under Library in the sidebar: five smart folders that are always there (Ready to print, Never printed, Online only, No print figures, Sells in catalogue) and the shop's own saved searches, each with a live count. Clicking one fills the filter row with its search.
+  - "Save Search…" appears in the filter row when anything narrows the library. Saving under a name that is already used replaces that search. Right-click a saved search to Rename, Edit (load it into the row, then Update Search), Duplicate or Delete it. Saved searches are kept in the book's settings (`librarySavedSearches`), so they travel with it.
+  - A Ranges popover filters by print time, filament, price, times printed and date added (any time, the last 7/30/90 days, or between two dates). A model whose figure is not known never matches a range, and the popover says how many each range leaves out for that reason.
+  - The Show menu gains No print figures and Sells in catalogue, and Ready on gains Any printer. Every menu item's count is worked out under the current search, filters and ranges.
+  - The filter row, the saved searches and the counts all use one query model (`LibraryQuery`, in the shared core so the iPhone can read the same saved searches later). The sample shop has one saved search.
+
 - **Mac: the model page opens on a summary, and several models get real buttons.**
   - A model's page starts with a summary card: the picture (drop a photo on it to set it; the separate empty "Drop a photo here" box is gone), the title, and the facts that decide a print: print time, filament, cost to make, the catalogue product it sells as with its price and margin (red when under the shop's minimum margin), and which printers it fits and is ready on. Quote, New Job and Add to Catalogue sit right there and stay visible when the file is online only or missing; a line says what the file itself is still needed for.
   - Cost to make is the catalogue's own cost for the model, so it matches the product made from it.

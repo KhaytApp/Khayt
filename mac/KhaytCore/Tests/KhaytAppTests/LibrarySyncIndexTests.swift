@@ -194,7 +194,13 @@ struct LibrarySyncIndexTests {
         shop.search = "model"
         await shop.settleLibraryFacets()
         let before = shop.libraryMemo.work.facetSearches
+        // A recount with nothing moved is answered by the facet memo and
+        // searches nothing (`facetMemoKey`); a new search recounts, and
+        // searches the book ONCE for all its pools.
         shop.recountLibrarySoon()
+        await shop.settleLibraryFacets()
+        #expect(shop.libraryMemo.work.facetSearches == before, "a recount with nothing changed searched again")
+        shop.search = "mode"
         await shop.settleLibraryFacets()
         #expect(shop.libraryMemo.work.facetSearches == before + 1, "the search ran once per pool again")
         #expect(shop.libraryFacets.onlineOnly == 2)

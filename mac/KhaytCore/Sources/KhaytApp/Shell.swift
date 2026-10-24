@@ -433,6 +433,7 @@ struct ShellSidebar: View {
             // gate rather than by somebody remembering to write one.
             ForEach(items.filter { shop.canShow($0.shelf) }) { item in
                 NavRow(item: item, shop: shop)
+                if item.shelf == .library(nil) { ShellSmartFolderRows(shop: shop) }  // saved searches
             }
         }
     }

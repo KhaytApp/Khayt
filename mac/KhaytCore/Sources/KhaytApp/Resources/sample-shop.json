@@ -2501,6 +2501,14 @@
      "Saudi Kings" : { "kind" : "collection" },
      "Dental" : { "kind" : "parts" }
    },
+   "librarySavedSearches" : [
+     {
+       "id" : "LSS-sample-quick",
+       "name" : "Quick prints under 3 h",
+       "query" : { "ranges" : { "minutes" : { "max" : 180 } }, "sort" : "printTime" },
+       "createdAt" : "2026-09-30T10:00:00.000Z"
+     }
+   ],
    "storefront" : {
      "stockQty" : {
        "PRD-0522F9" : 12,
