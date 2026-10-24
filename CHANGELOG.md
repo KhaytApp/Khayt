@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Khayt Cloud plans: Free, Maker, Creator and Studio.** They replace Cloud and Branches. Maker is 25 SAR ($7) a month, Creator 65 SAR ($18) and Studio 180 SAR ($48), VAT included; a year costs ten months. Every paid plan is still free during the beta. Branches is gone, and so are the history and device lines, because Khayt Cloud keeps the last 20 snapshots for every shop and limits no devices. The prices and wording match khaytapp.com and Khayt Cloud's own plan list.
+
 - **Mac: selling vault files on makerrun.com (built, hidden until Khayt Cloud switches the vault and selling on).**
   - With the library in the Khayt Vault, the library strip gains Products, and a model's menu gains Sell as a Product.
   - A product is its listing:
