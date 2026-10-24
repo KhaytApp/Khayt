@@ -263,6 +263,8 @@ contextBridge.exposeInMainWorld('hubAPI', {
   cloudPortalReply: (opts) => ipcRenderer.invoke('hub:cloud-portal-reply', opts),
   webhookPost: (opts) => ipcRenderer.invoke('hub:webhook-post', opts),
   cloudBillingMe: (opts) => ipcRenderer.invoke('hub:cloud-billing-me', opts),
+  cloudPlans: (opts) => ipcRenderer.invoke('hub:cloud-plans', opts),
+  cloudSetPlan: (opts) => ipcRenderer.invoke('hub:cloud-set-plan', opts),
   cloudPutKeyset: (opts) => ipcRenderer.invoke('hub:cloud-put-keyset', opts),
   cloudUnlock: (opts) => ipcRenderer.invoke('hub:cloud-unlock', opts),
 

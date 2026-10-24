@@ -44,6 +44,7 @@ const OTHERS = Object.keys(L).filter((k) => k !== 'en').sort();
  */
 const SAME_ON_PURPOSE = new Set([
   'calc.elec_preview',  // "≈ {rate} {base}/kWh" — no words, only units
+  'cplan.vault',        // "Khayt Vault — {size}" — the product's name and a size; Arabic writes its own name
   'set.iban_ph',        // "SAxx xxxx xxxx xxxx xxxx xxxx" — a Saudi IBAN mask
   'set.supplier_ph',    // "+966 5x xxx xxxx" — a Saudi phone mask
   'zatca2.egs_cn',      // "EGS Common Name" — the X.509 term German PKI keeps

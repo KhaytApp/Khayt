@@ -4,6 +4,12 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: choose your Khayt Cloud plan in Settings.**
+  - Settings → Online → Khayt Cloud now lists the plans from the cloud server, with their real prices in SAR and what each includes.
+  - The shop owner can move to another plan, and upgrading is free during the beta. Before the switch, a warning says that when the beta ends you have 30 days to start paying, or the shop moves back to Free. Nothing is deleted, and the vault becomes read-only beyond Free's limits.
+  - Nothing is charged.
+  - Until the server opens upgrades, the button reads "Opens soon".
+  - Going back to Free is always possible. A team member sees the plans but can't change them.
 - **Desktop: a library kept in the Khayt Vault stays there.** When the Mac keeps the library's online copy in the Khayt Vault, the desktop's object storage and Google Drive switches are turned off, with a line saying the library is in the Khayt Vault and that only the Mac app can change that. The desktop also stops copying new files to a bucket or Drive beside the vault, so the library can't split between the two. Files that were already in a bucket or on Drive still come back as before.
 - **Desktop: campaigns through your WhatsApp Business account send an approved template.**
   - Before, a campaign sent free text, and Meta refuses free text to anyone who hasn't messaged you in the last 24 hours. So it failed for nearly every customer.
