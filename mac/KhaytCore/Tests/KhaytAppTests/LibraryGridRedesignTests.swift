@@ -87,17 +87,33 @@ struct LibraryGridRedesignTests {
         #expect(long.contains("2025"), "\(long)")
     }
 
-    @Test("no estimate on a tile when the mesh fits no printer the shop has")
+    @Test("no estimate on a tile when the mesh fits no 3D printer the shop has")
     func estimateNeedsAPrinter() throws {
         let estimate = try JSONDecoder().decode(KhaytEngine.MeshEstimate.self, from: Data(
             #"{"grams":2100,"hours":59.9,"shellUnreliable":false}"#.utf8))
-        func fit(_ verdict: String, _ checked: Int) throws -> KhaytEngine.Fit {
-            try JSONDecoder().decode(KhaytEngine.Fit.self, from: Data(#"{"verdict":"\#(verdict)","checked":\#(checked)}"#.utf8))
+        #expect(LibraryFacts.usable(estimate, tooBigEverywhere: true) == nil)
+        #expect(LibraryFacts.usable(estimate, tooBigEverywhere: false) != nil)
+        // The laser and the UV flatbed are not asked.
+        func kind(_ k: String) throws -> KhaytEngine.MachineKind {
+            try JSONDecoder().decode(KhaytEngine.MachineKind.self, from: Data(
+                #"{"kind":"\#(k)","nameKey":"x","consumable":"filament","unit":"g","consumableKey":"x","unitKey":"x","layered":true,"polled":true,"specs":[],"wear":[]}"#.utf8))
         }
-        #expect(LibraryFacts.usable(estimate, fit: try fit("none", 3)) == nil)
-        #expect(LibraryFacts.usable(estimate, fit: try fit("fits", 3)) != nil)
-        #expect(LibraryFacts.usable(estimate, fit: try fit("none", 0)) != nil, "no bed known is not a refusal")
-        #expect(LibraryFacts.usable(estimate, fit: nil) != nil)
+        let rows: [JSONValue] = ["m-fdm", "m-laser", "m-uv", "m-resin", "m-new"].map { .object(["id": .string($0)]) }
+        let kinds = ["m-fdm": try kind("fdm"), "m-laser": try kind("laser"), "m-uv": try kind("uv"),
+                     "m-resin": try kind("resin")]
+        #expect(Shop.modelMachineRows(rows, kinds: kinds).compactMap(Shop.recordId)
+                == ["m-fdm", "m-resin", "m-new"])
+    }
+
+    @Test("the sample's tiles show prices, and its King reliefs an estimate that fits a printer")
+    func sampleSpansTheFacts() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        #expect(shop.files.contains { shop.libraryFacts($0).price != nil },
+                "no sample product is made of one library file, so no tile shows a price")
+        for king in shop.files where king.id.hasPrefix("PF-sample-king") {
+            #expect(!shop.tooBigForEveryModelMachine(king), "\(king.id) fits no printer in the sample")
+        }
     }
 
     @Test("a chosen tile draws its folder link and facts in white, not brand blue on accent blue")

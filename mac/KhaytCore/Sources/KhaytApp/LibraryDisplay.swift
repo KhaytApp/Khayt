@@ -155,10 +155,9 @@ struct LibraryFacts: Equatable, Sendable {
     /// shop has a bed for. A model that fits no machine is either measured
     /// at the wrong scale or not printable as it is, and either way "≈59h ·
     /// ≈2.1 kg" on its tile is a confident number about a print that will not
-    /// happen. Nothing known about the beds (`checked == 0`) is not a refusal.
-    static func usable(_ estimate: KhaytEngine.MeshEstimate?, fit: KhaytEngine.Fit?) -> KhaytEngine.MeshEstimate? {
-        if let fit, fit.checked > 0, fit.verdict == "none" { return nil }
-        return estimate
+    /// happen. See `Shop.tooBigForEveryModelMachine`.
+    static func usable(_ estimate: KhaytEngine.MeshEstimate?, tooBigEverywhere: Bool) -> KhaytEngine.MeshEstimate? {
+        tooBigEverywhere ? nil : estimate
     }
 
     /// From the file alone: what its slicer recorded. No estimate, no price.
@@ -264,7 +263,7 @@ extension Shop {
         let memo = libraryMemo
         refreshFactsMemo()
         if let known = memo.facts[file.id] { return known }
-        let e = LibraryFacts.usable(estimates[file.id], fit: fits[file.id])
+        let e = LibraryFacts.usable(estimates[file.id], tooBigEverywhere: tooBigForEveryModelMachine(file))
         let made = LibraryFacts.of(file, estimate: e.map { ($0.grams, $0.hours) },
                                    price: memo.prices[file.id])
         memo.facts[file.id] = made
@@ -288,10 +287,38 @@ extension Shop {
         return said
     }
 
+    /// Is this model bigger than every 3D printer the shop has a bed for?
+    ///
+    /// The shared rule (`ModelReadiness`, the inspector's own), over the
+    /// machines that print in three dimensions (`modelMachines` — not the
+    /// laser or the UV flatbed). False when no bed is known or there is no
+    /// mesh: unknown is not a refusal.
+    func tooBigForEveryModelMachine(_ file: LibraryFile) -> Bool {
+        guard let mesh = file.mesh else { return false }
+        let bounds = ModelReadiness.bounds(x: mesh.x, y: mesh.y, z: mesh.z)
+        let states = modelMachines.compactMap { machine -> ModelReadiness.State? in
+            guard let bed = bed(of: machine.id) else { return nil }
+            return ModelReadiness.state(bounds: bounds, bed: bed, spoolsReady: nil)
+        }
+        return !states.isEmpty && states.allSatisfy { $0 == .tooBig }
+    }
+
+    /// The machine rows a model's fit is asked of: those that build in three
+    /// dimensions, by the same rule as `modelMachines`. A machine whose kind
+    /// is not known yet counts as a printer, as it does there.
+    nonisolated static func modelMachineRows(_ rows: [JSONValue],
+                                             kinds: [String: KhaytEngine.MachineKind]) -> [JSONValue] {
+        rows.filter { row in
+            guard let id = recordId(row) else { return true }
+            return ["fdm", "resin"].contains(kinds[id]?.kind ?? "fdm")
+        }
+    }
+
     /// What the facts were made from. Read here so SwiftUI follows them.
     func libraryFactsKey() -> [Int] {
         _ = estimates.count
         _ = fits.count
+        _ = machineKinds.count
         _ = catalogueRows.count
         return [filesRevision, libraryDerivedRevision, bookRevision]
     }

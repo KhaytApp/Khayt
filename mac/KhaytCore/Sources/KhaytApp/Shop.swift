@@ -1074,9 +1074,20 @@ final class Shop {
             // is still the newest load. Re-judged on every load rather than
             // cached with the verdict, because the nozzle and the plate come
             // from the machines and those change.
+            // What kind each machine is, resolved once per book — BEFORE the
+            // fits, which ask only the machines that print in three
+            // dimensions (`Shop.modelMachines`): a laser bed or a UV flatbed
+            // holds a footprint and says nothing about printing a model, and
+            // the fit badge could name the laser cutter. Read in view bodies
+            // too, so a hop into JavaScript per machine per redraw would be a
+            // hop for a constant.
+            let kinds = (try? await engine?.machineKinds(machineRows)) ?? [:]
+            if overtaken() { return }
+            machineKinds = kinds
             let figured = files
             let worked = await LoadFigures.work(
-                .init(files: figured, machines: machineRowsInUse, settings: Self.settings(root),
+                .init(files: figured, machines: Self.modelMachineRows(machineRowsInUse, kinds: kinds),
+                      settings: Self.settings(root),
                       orders: orderRows, nozzle: nozzleForRisk),
                 engine: engine, wanted: { generation == self.loadGeneration })
             if let hook = Self.whileFiguringForTests { await hook() }
@@ -1119,12 +1130,6 @@ final class Shop {
             let profiles = (try? await engine?.printerProfiles()) ?? []
             if overtaken() { return }
             printerProfiles = profiles
-            // What kind each machine is, resolved once per book. Read in view
-            // bodies, so a hop into JavaScript per machine per redraw would be
-            // a hop for a constant.
-            let kinds = (try? await engine?.machineKinds(machineRows)) ?? [:]
-            if overtaken() { return }
-            machineKinds = kinds
             // And what each shelf row is counted in. Same reason: read in view
             // bodies, and a constant per item per redraw is a hop for nothing.
             let units = (try? await engine?.inventoryUnits(
