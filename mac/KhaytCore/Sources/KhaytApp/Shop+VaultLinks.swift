@@ -30,7 +30,7 @@ extension Shop {
     /// Share this model, or the selection when it is part of one (as the
     /// other model actions do).
     func shareByLink(_ file: LibraryFile) {
-        guard libraryOnVault else { return }
+        guard libraryOnVault, permitted("cloud", "edit") else { return }
         let picked = selectedIds
         let files = picked.contains(file.id) && picked.count > 1 ? selectedFiles : [file]
         sharingByLink = VaultShareRequest(recordIds: files.map(\.id), titles: files.map(\.title))
@@ -55,7 +55,7 @@ extension Shop {
     /// Make the link. Every model must have a copy in the vault: a link that
     /// quietly left some out would be worse than one that says so.
     func makeShareLink(_ request: VaultShareRequest, options: VaultLinks.Options) async -> LinkOutcome {
-        guard canWrite else { return .refused(words.callIt("mac.vl_err_not_allowed")) }
+        guard canWrite, permitted("cloud", "edit") else { return .refused(words.callIt("mac.vl_err_not_allowed")) }
         guard let engine = await vaultLinkEngine() else { return .refused(words.callIt("mac.vl_err_vault_off")) }
         do {
             try await engine.remote.sync.pull()
@@ -145,6 +145,8 @@ extension Shop {
     /// clipboard managers and history tools that honour the markers neither
     /// show nor keep it. The link is a key to the files.
     func copyLink(_ link: VaultLink) {
+        // The link is the key to the files: copying it is sharing them.
+        guard permitted("cloud", "edit") else { return }
         let item = NSPasteboardItem()
         item.setString(link.url, forType: .string)
         for marker in Self.secretPasteboardMarkers { item.setData(Data(), forType: marker) }

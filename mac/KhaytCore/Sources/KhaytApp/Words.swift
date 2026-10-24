@@ -1278,6 +1278,7 @@ final class Words {
           "ar": "راسلنا عبر واتساب"],
         "mac.wab_how_other": ["en": "Another way",
           "ar": "بطريقة أخرى"],
+        "mac.wab_sent_not_logged": ["en": "WhatsApp took the message (id {id}), but it could not be written to the customer’s log. Don’t send it again; add a note by hand if you need the record.", "ar": "استلم واتساب الرسالة (المعرّف {id})، لكن تعذّر تسجيلها في سجل العميل. لا ترسلها مجدداً؛ وأضف ملاحظة يدوياً إن احتجت إلى السجل."],
         "mac.wab_note": ["en": "WhatsApp Business template {name}: {params}",
           "ar": "قالب واتساب للأعمال {name}: {params}"],
         "mac.wab_sent": ["en": "“{m}” update sent to the customer on WhatsApp.",
@@ -1357,6 +1358,7 @@ final class Words {
         // Settings › Online › Khayt Cloud plan (`CloudPlanSettings`). The beta
         // sentences restate khaytapp.com/terms §4 "Plans during the beta":
         // tell the website lane before changing them.
+        "mac.vp_release_changed": ["en": "The files changed while this was open: another device uploaded a version or restored a file. Check the list again, then confirm.", "ar": "تغيّرت الملفات أثناء فتح هذه النافذة: رفع جهاز آخر نسخة أو استعاد ملفاً. راجع القائمة مجدداً ثم أكّد."],
         "mac.plan_title": ["en": "Khayt Cloud plan", "ar": "خطة سحابة خيط"],
         "mac.plan_current": ["en": "Current plan", "ar": "الخطة الحالية"],
         "mac.plan_free_price": ["en": "Free", "ar": "مجاناً"],
@@ -1563,7 +1565,7 @@ final class Words {
         "mac.vp_clear_previews": ["en": "Remove All",
           "ar": "إزالة الكل"],
         "mac.vp_previews_hint": ["en": "JPEG or PNG, up to 2 MB, at most 8. Khayt Cloud removes location and camera details before anyone sees them.",
-          "ar": "JPEG أو PNG، حتى 2 ميغابايت، وثماني صور كحد أقصى. تزيل سحابة خيط بيانات الموقع والكاميرا قبل أن يراها أحد."],
+          "ar": "صور بصيغة JPEG أو PNG، حتى 2 ميغابايت، وثماني صور كحد أقصى. تزيل سحابة خيط بيانات الموقع والكاميرا قبل أن يراها أحد."],
         "mac.vp_hide": ["en": "Hide from makerrun for now",
           "ar": "إخفاؤه عن makerrun مؤقتاً"],
         "mac.vp_need_title": ["en": "Give it a title in English or Arabic.",
@@ -1605,7 +1607,7 @@ final class Words {
         "mac.vp_no_buyers": ["en": "No buyers yet.",
           "ar": "لا يوجد مشترون بعد."],
         "mac.vp_buyer_line": ["en": "{provider} · order {order} · {used} downloads",
-          "ar": "{provider} · الطلب {order} · {used} تنزيلات"],
+          "ar": "الطلب {order} · {used} تنزيلات · {provider}"],
         "mac.vp_status_paid": ["en": "Paid",
           "ar": "مدفوع"],
         "mac.vp_status_refunded": ["en": "Refunded",

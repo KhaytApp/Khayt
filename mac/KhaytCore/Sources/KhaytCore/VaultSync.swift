@@ -15,8 +15,9 @@ import Foundation
 ///   device wrote is the very thing a rolled-back server could also serve.
 /// * Not in or beside the library root: a root, or its parent, can be iCloud,
 ///   a NAS or a shared folder (`LibraryLocation`), which would carry the file
-///   to other devices. A file written beside the root by an earlier build is
-///   moved here once (`migrateLegacyState`).
+///   to other devices. Nothing is ever read from beside the root either: a
+///   file there could be planted by anyone who can write that folder, and no
+///   released build wrote one (an unreleased branch did; beta.6 review).
 /// * The root's path is hashed into the name, so two libraries on one Mac
 ///   keep two states.
 ///
@@ -79,11 +80,9 @@ public struct VaultSync: Sendable {
     }
 
     /// The state for the library at `libraryRoot`, kept in `appFolder` (on
-    /// the Mac, the book's folder: `StoreReader.Build.vaultStateFolder()`). A
-    /// state an earlier build wrote beside the root is moved there first.
+    /// the Mac, the book's folder: `StoreReader.Build.vaultStateFolder()`).
     public init(client: VaultClient, keys: VaultKeys, appFolder: URL, libraryRoot: URL, deviceId: String) {
         let url = Self.stateURL(appFolder: appFolder, libraryRoot: libraryRoot, shopId: client.connection.shopId)
-        Self.migrateLegacyState(to: url, libraryRoot: libraryRoot, shopId: client.connection.shopId, deviceId: deviceId)
         self.init(client: client, keys: keys, stateURL: url, deviceId: deviceId)
     }
 
@@ -101,32 +100,6 @@ public struct VaultSync: Sendable {
         let path = libraryRoot.standardizedFileURL.path
         let h = VaultCrypto.hex(VaultCrypto.sha256(Data(path.utf8))).prefix(16)
         return appFolder.appending(path: "vault-state.\(safe(shopId)).\(h).json")
-    }
-
-    /// Where an earlier build kept it: beside the root, one file per device.
-    static func legacyStateURL(libraryRoot: URL, shopId: String, deviceId: String) -> URL {
-        let root = libraryRoot.standardizedFileURL
-        return root.deletingLastPathComponent()
-            .appending(path: ".\(root.lastPathComponent).khayt-vault.\(safe(shopId)).\(safe(deviceId)).json")
-    }
-
-    /// Move THIS device's state from beside the root to `url`, once. Another
-    /// device's file beside the root (a synced parent carried it here) is
-    /// left alone: it is not this device's memory. Nothing happens when `url`
-    /// already exists. Returns whether a file was moved.
-    @discardableResult
-    public static func migrateLegacyState(to url: URL, libraryRoot: URL, shopId: String, deviceId: String) -> Bool {
-        let fm = FileManager.default
-        let old = legacyStateURL(libraryRoot: libraryRoot, shopId: shopId, deviceId: deviceId)
-        guard !fm.fileExists(atPath: url.path), let d = try? Data(contentsOf: old),
-              let s = try? JSONDecoder().decode(VaultSyncState.self, from: d),
-              s.shopId == shopId, s.deviceId == deviceId else { return false }
-        do {
-            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try d.write(to: url, options: .atomic)
-            try fm.removeItem(at: old)
-            return true
-        } catch { return false }
     }
 
     public enum Change: Equatable, Sendable {

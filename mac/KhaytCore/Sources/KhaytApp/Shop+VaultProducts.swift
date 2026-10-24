@@ -38,7 +38,7 @@ extension Shop {
     /// Models with no vault copy are left out and said; none at all is said
     /// instead of opening an empty product.
     func sellAsProduct(_ file: LibraryFile) async {
-        guard libraryOnVault, canWrite else { return }
+        guard libraryOnVault, canWrite, permitted("cloud", "edit") else { return }
         let picked = selectedIds
         let files = picked.contains(file.id) && picked.count > 1 ? selectedFiles : [file]
         guard let engine = await vaultProductsEngine() else {
@@ -91,5 +91,13 @@ extension Shop {
                       "streampay": "StreamPay", "kofi": "Ko-fi", "etsy": "Etsy", "patreon": "Patreon"]
         if let b = brands[p] { return b }
         return words.callIt("mac.vp_prov_" + p, fallback: p)
+    }
+}
+
+extension Shop {
+    /// Whether the files and versions about to be released are exactly the
+    /// ones the release sheet showed.
+    nonisolated static func releaseMatches(shown: [String: Int], now: [String: Int]) -> Bool {
+        !shown.isEmpty && shown == now
     }
 }

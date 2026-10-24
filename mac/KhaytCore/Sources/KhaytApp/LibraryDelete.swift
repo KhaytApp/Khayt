@@ -254,11 +254,17 @@ extension Shop {
                 break
             }
             for tagged in problem == nil ? tags : [] {
-                // `drive:` is Drive, which is only ever the remote in use;
-                // `bucket:` is the library's bucket, in use or not.
+                // `drive:` is Drive and `vault:` the Khayt Vault, each only ever
+                // the remote in use; `bucket:` is the library's bucket, in use
+                // or not. The vault had no tag of its own and went to the
+                // bucket, so a shop that moved from a bucket to the vault had
+                // its "Delete completely" sent to the OLD bucket (204 for a key
+                // that is not there) and the vault file kept (beta.6 review).
                 let target: LibraryRemote?, key: String
                 if tagged.hasPrefix("drive:") {
                     target = remoteTag == "drive:" ? remote : nil; key = String(tagged.dropFirst("drive:".count))
+                } else if tagged.hasPrefix("vault:") {
+                    target = remoteTag == "vault:" ? remote : nil; key = String(tagged.dropFirst("vault:".count))
                 } else {
                     target = bucket ?? (remoteTag == "bucket:" ? remote : nil)
                     key = String(tagged.dropFirst("bucket:".count))
@@ -326,7 +332,7 @@ extension Shop {
                                            prefix: String, provider: String) {
         let config = await cloudConfig()
         let bucket = await CloudLibrary.libraryBucket(settings: settingsDict, build: source.build).map(LibraryRemote.bucket)
-        let tag = config?.isDrive == true ? "drive:" : "bucket:"
+        let tag = config?.isDrive == true ? "drive:" : config?.isVault == true ? "vault:" : "bucket:"
         return (config?.remote, bucket, tag, config?.prefix ?? "", config?.provider ?? "")
     }
 

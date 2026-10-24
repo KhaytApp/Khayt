@@ -113,6 +113,13 @@ extension Shop {
             return whatsAppBusinessReason(message.reason)
         }
         guard let account = whatsAppBusinessAccount() else { return whatsAppBusinessReason("not_set_up") }
+        let sending = jobId + "|" + message.milestone
+        guard !whatsAppSending.contains(sending) else { return whatsAppBusinessReason("already_sent") }
+        whatsAppSending.insert(sending)
+        // Kept for the run once Meta has taken it, so it is never offered twice;
+        // released on any failure, so the job goes on offering it.
+        var accepted = false
+        defer { if !accepted { whatsAppSending.remove(sending) } }
         let token: String
         do { token = try await Secrets.open(account.sealedToken, for: source) }
         catch { return whatsAppBusinessReason("token_locked") }
@@ -140,15 +147,20 @@ extension Shop {
             if let code = answer.code { said += " (#\(code))" }
             return said
         }
+        accepted = true
         let note = words.callIt("mac.wab_note", [
             "name": .string(template.name),
             "params": .string(message.params.joined(separator: " · ")),
         ])
-        if case .object(let raw)? = try? await engine.whatsAppCommEntry(
+        // Meta has it. A log line that cannot be written is SAID: without it
+        // nothing records that this went, and after a relaunch it would be
+        // offered again (beta.6 review).
+        guard case .object(let raw)? = try? await engine.whatsAppCommEntry(
             id: Self.uid("CMM"), at: Date(), text: note, orderId: jobId,
             milestone: message.milestone, lang: message.lang,
-            messageId: messageId, template: template.name) {
-            await addCommunication(CommEntry(raw: raw), to: message.clientId, gate: ("orders", "edit"))
+            messageId: messageId, template: template.name),
+            await addCommunication(CommEntry(raw: raw), to: message.clientId, gate: ("orders", "edit")) else {
+            return words.callIt("mac.wab_sent_not_logged", ["id": .string(messageId)])
         }
         return nil
     }

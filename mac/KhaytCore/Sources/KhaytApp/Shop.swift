@@ -2674,6 +2674,11 @@ final class Shop {
 
     /// What stopped a move, when something did. Cleared by the next attempt.
     var moveProblem: String?
+    /// WhatsApp Business updates being sent or sent this run, as "job|milestone".
+    /// A send waits up to 15 s on Meta before its log line is written, and a
+    /// second click in that time sent the template twice; one that Meta took
+    /// but whose log line could not be written would be offered again.
+    var whatsAppSending: Set<String> = []
     /// What the last move had to say — the due date it pushed out, the spools
     /// it emptied, the ones that are now low.
     var moveNotices: [String] = []

@@ -647,7 +647,10 @@
         const langs = (Array.isArray(t.langs) ? t.langs : [])
           .map((x) => String(x || '').trim())
           .filter((x, i, all) => x && all.indexOf(x) === i);
-        map[m] = { name, langs };
+        // Merged over what is held, so a field another app keeps per template
+        // survives a save from one that does not show it.
+        const held = (s.whatsappTemplates && s.whatsappTemplates[m]) || {};
+        map[m] = { ...held, name, langs };
       }
       out.whatsappTemplates = map;
     }

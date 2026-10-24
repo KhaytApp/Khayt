@@ -181,6 +181,24 @@ struct WhatsAppBusinessTests {
         #expect(Client.decoding(saved)?.whatsAppOffersConsent == nil)
     }
 
+    @Test("a stored consent with no date can be ticked, and gets one")
+    func undatedConsentCanBeTicked() throws {
+        let raw: [String: JSONValue] = ["id": .string("C1"), "nameEn": .string("Sara"),
+                                        "whatsappOptIn": .object(["how": .string("form")])]
+        let c = try #require(Client.decoding(raw))
+        #expect(c.whatsAppConsent == nil)
+        let ticked = c.optedIntoWhatsApp(true, how: "form", at: Date(timeIntervalSince1970: 1_792_000_000))
+        #expect(ticked.whatsAppConsent?.at == StoreWriter.iso(Date(timeIntervalSince1970: 1_792_000_000)))
+    }
+
+    @Test("a send already in flight, or taken, for a job and milestone is not sent again")
+    func noSecondSend() throws {
+        let src = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appending(path: "../../Sources/KhaytApp/WhatsAppCloud.swift").standardizedFileURL, encoding: .utf8)
+        #expect(src.contains("guard !whatsAppSending.contains(sending)"))
+        #expect(src.contains("mac.wab_sent_not_logged"))
+    }
+
     @Test("a Mac save keeps the desktop's offers consent it did not touch")
     func macSaveKeepsDesktopOffersConsent() throws {
         let consent: JSONValue = .object(["at": .string("2026-10-24T09:00:00Z"), "how": .string("form")])

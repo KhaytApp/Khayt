@@ -258,6 +258,7 @@ struct VaultShareSheet: View {
     }
 
     private func create() async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         working = true
         problem = nil
         defer { working = false }

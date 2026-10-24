@@ -8673,6 +8673,31 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.6] - 2026-10-24
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Khayt Vault:** keep the print library in Khayt Cloud, encrypted on your Mac before it leaves. Share files by private link (password, download limit, expiry, locked to email addresses), and sell them: make a product, list it on makerrun.com, release the files to Khayt Cloud for delivery, and see and deliver to your buyers. Payments go to your own checkout. Choose it under Settings ▸ Online.
+- **Khayt Cloud plan** under Settings ▸ Online: every plan with its price, and the owner moves between them. Moving up is free during the beta.
+- **Team and signed-in devices** under Settings ▸ Online: invite people as a manager, operator or viewer, remove them, and see every device signed in to the shop, with when each was last used, and sign any of them out.
+- **WhatsApp Business:** order updates can go out on their own through the shop's own WhatsApp Business account, using its approved templates, only to customers who agreed to order updates on WhatsApp. It stays off until you add the account under Settings ▸ Integrations.
+- **Customers:** "Agreed to offers on WhatsApp", a consent of its own beside the one for order updates.
+
+### Changed
+
+- **Replacing the import key keeps the old key working for 2 hours**, so your web store can switch over with no refused orders. "Stop the Old Key" ends that early, and "Replace and Stop the Old Key Now" is there for a key in the wrong hands.
+- **With the staff lock on, only someone allowed to manage Khayt Cloud** can make or copy a share link, sell files, release them or deliver them to a buyer.
+
+### Fixed
+
+- Delete Completely on a model kept in the vault could miss the vault copy when an older storage bucket was still set up.
+- A release could include a newer version, or a restored file, that arrived after the confirmation was shown. It now releases exactly what was shown, or asks again.
+- A WhatsApp update Meta accepted but that could not be written to the customer's log could be offered again; a second click while one was sending could send it twice.
+- The customer sheet's "since" date under a WhatsApp consent was squeezed to a letter a line, and an older consent with no date could not be ticked.
+
 ## [4.0.0-beta.5] - 2026-10-23
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see

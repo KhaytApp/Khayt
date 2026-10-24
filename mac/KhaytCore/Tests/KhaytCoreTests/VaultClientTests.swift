@@ -342,26 +342,16 @@ struct VaultClientTests {
         #expect(!FileManager.default.fileExists(atPath: out.path))
     }
 
-    @Test("Vault: the state file moves from beside the root to the app folder, this device's only")
-    func stateMigrates() async throws {
+    @Test("Vault: a state file planted beside the library root is never read")
+    func plantedStateIgnored() async throws {
         let b = Bench()
         try FileManager.default.createDirectory(at: b.library, withIntermediateDirectories: true)
-        var mine = VaultSyncState(shopId: VaultStub.shopId, deviceId: "mac-a"); mine.rev = 41
-        let theirs = VaultSyncState(shopId: VaultStub.shopId, deviceId: "mac-b")
-        let oldMine = VaultSync.legacyStateURL(libraryRoot: b.library, shopId: VaultStub.shopId, deviceId: "mac-a")
-        let oldTheirs = VaultSync.legacyStateURL(libraryRoot: b.library, shopId: VaultStub.shopId, deviceId: "mac-b")
-        #expect(oldMine.lastPathComponent == ".Library.khayt-vault.shop_test.mac-a.json")
-        try JSONEncoder().encode(mine).write(to: oldMine)
-        try JSONEncoder().encode(theirs).write(to: oldTheirs)
-        let s = b.sync("mac-a")
-        #expect(s.load().rev == 41)
-        #expect(!FileManager.default.fileExists(atPath: oldMine.path))
-        #expect(FileManager.default.fileExists(atPath: oldTheirs.path), "another device's file is not ours to move")
-        // Once moved, a stray old file never overwrites the new one.
-        try JSONEncoder().encode(VaultSyncState(shopId: VaultStub.shopId, deviceId: "mac-a")).write(to: oldMine)
-        #expect(!VaultSync.migrateLegacyState(to: s.stateURL, libraryRoot: b.library, shopId: VaultStub.shopId,
-                                              deviceId: "mac-a"))
-        #expect(b.sync("mac-a").load().rev == 41)
+        var planted = VaultSyncState(shopId: VaultStub.shopId, deviceId: "mac-a"); planted.rev = 999_999
+        let beside = b.library.deletingLastPathComponent()
+            .appending(path: ".\(b.library.lastPathComponent).khayt-vault.\(VaultStub.shopId).mac-a.json")
+        try JSONEncoder().encode(planted).write(to: beside)
+        #expect(b.sync("mac-a").load().rev != 999_999)
+        #expect(FileManager.default.fileExists(atPath: beside.path), "left alone, not adopted")
     }
 
     /// A raw /complete, so the stub's refusals can be seen for bodies this

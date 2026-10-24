@@ -155,7 +155,7 @@ struct VaultGrantRow: View {
         guard let lock = grant.emailLock, !lock.isEmpty else { return nil }
         let shown = lock.prefix(2).map(Shop.address).joined(separator: words.language == "ar" ? "\u{060C} " : ", ")
         let emails = lock.count > 2
-            ? words.callIt("mac.vl_locked_more", ["emails": .string(shown), "n": .number(Double(lock.count - 2))])
+            ? words.callIt("mac.vl_locked_more", ["emails": .string(isolated(shown)), "n": .number(Double(lock.count - 2))])
             : shown
         return words.callIt("mac.vl_locked_to", ["emails": .string(emails)])
     }
@@ -388,6 +388,7 @@ struct VaultGrantRow: View {
     // MARK: - Acting
 
     private func run(_ body: (VaultLinks) async throws -> VaultClient.Grant?) async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         working = true; problem = nil; told = nil
         defer { working = false }
         guard let engine = await shop.vaultLinkEngine() else {
@@ -399,6 +400,7 @@ struct VaultGrantRow: View {
     }
 
     private func copy() async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         await run { links in
             if let link = await links.link(grant.grantId) {
                 shop.copyLink(link)

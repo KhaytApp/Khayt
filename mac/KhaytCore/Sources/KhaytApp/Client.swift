@@ -288,7 +288,10 @@ struct Client: Identifiable, Hashable, Sendable, Decodable {
     private static func consent(_ was: [String: JSONValue]?, _ agreed: Bool, how: String,
                                 at: Date) -> [String: JSONValue]? {
         guard agreed else { return nil }
-        var next = was ?? ["at": .string(StoreWriter.iso(at))]
+        var next = was ?? [:]
+        // A stored consent with no date reads as none, so ticking the box must
+        // date it — or it could never be ticked at all.
+        if case .string(let had)? = next["at"], !had.isEmpty {} else { next["at"] = .string(StoreWriter.iso(at)) }
         next["how"] = .string(how)
         return next
     }

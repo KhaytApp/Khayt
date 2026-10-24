@@ -101,6 +101,25 @@ struct LibraryA65ReviewTests {
         #expect(ok.done == ["PF-d"] && bucket.object("/lib/Mine/d.stl") == nil)
     }
 
+    @Test("with the vault in use, Delete Completely goes to the vault, never to an old bucket still set up")
+    func vaultDeleteNotSentToOldBucket() async throws {
+        let bucket = FakeBucket()
+        // The vault stands in as a second bucket; the routing is by TAG, not type.
+        var vault = config; vault.bucket = "vlt"
+        bucket.seed("/lib/print-files/PF-d/d.stl", Data([1]))
+        bucket.seed("/vlt/print-files/PF-d/d.stl", Data([2]))
+        let p = plan(online: ["PF-d": ["vault:print-files/PF-d/d.stl"]])
+        let r = await Shop.deleteOnlineCopies(p, ids: p.ids, remote: .bucket(vault), bucket: .bucket(config),
+                                              remoteTag: "vault:", fetch: bucket.fetch)
+        #expect(r.done == ["PF-d"])
+        #expect(bucket.object("/vlt/print-files/PF-d/d.stl") == nil, "deleted from the remote in use")
+        #expect(bucket.object("/lib/print-files/PF-d/d.stl") != nil, "the old bucket is not touched")
+        // And a vault tag with the vault no longer in use is refused, not sent anywhere.
+        let gone = await Shop.deleteOnlineCopies(p, ids: p.ids, remote: .bucket(config), bucket: .bucket(config),
+                                                 remoteTag: "bucket:", fetch: bucket.fetch)
+        #expect(gone.failed.keys.sorted() == ["PF-d"])
+    }
+
     @Test("an object another model still names is kept; a key with an empty segment is refused")
     func sharedAndOddKeys() async throws {
         let bucket = FakeBucket()

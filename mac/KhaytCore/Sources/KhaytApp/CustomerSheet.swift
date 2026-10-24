@@ -443,12 +443,18 @@ struct CustomerSheet: View {
     private func consentRow(_ label: String, _ consent: (at: String, how: String)?,
                             set: @escaping (Bool, String) -> Void) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Toggle(shop.words.callIt(label), isOn: Binding(
+            Toggle(isOn: Binding(
                 get: { consent != nil },
-                set: { set($0, consent?.how ?? "asked") }))
-                .toggleStyle(.checkbox)
+                set: { set($0, consent?.how ?? "asked") })) {
+                // Wraps rather than truncating: "Agreed to order updates on
+                // WhatsApp" is longer than the column (beta.6 UI review).
+                Text(shop.words.callIt(label)).fixedSize(horizontal: false, vertical: true)
+            }
+            .toggleStyle(.checkbox)
             if let consent {
-                HStack(spacing: 6) {
+                // The date on its own line, under the picker: beside it, the
+                // picker took the width and the date was drawn a letter a line.
+                VStack(alignment: .leading, spacing: 2) {
                     Picker("", selection: Binding(
                         get: { consent.how },
                         set: { set(true, $0) })) {
@@ -463,7 +469,7 @@ struct CustomerSheet: View {
                     .fixedSize()
                     Text(shop.words.callIt("mac.wab_opt_in_since",
                                            ["day": .string(Calendar.localDay(ofInstant: consent.at))]))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.secondary).fixedSize()
                 }
             }
         }

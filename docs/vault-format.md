@@ -320,9 +320,8 @@ KhaytCore. Another client may do these things differently and still read the sam
     it is this device's own memory.
   - It is kept out of the library root and its parent because either can be iCloud, a NAS
     or a shared folder.
-  - Earlier builds of this branch wrote it beside the root, as
-    `.<root name>.khayt-vault.<shopId>.<deviceId>.json`. That file is moved into the app
-    folder once. Only this device's file is moved.
+  - Nothing is read from beside the root. An unreleased build wrote the state there, and a
+    file in that place can be planted by anyone who can write the folder, so it is ignored.
 - **Uploads spool.** Sealed chunks are written to disk before any part is sent. A resumed
   upload re-sends those exact bytes. A spool that was never fully sealed is abandoned
   (`DELETE /uploads/{id}`) and the upload starts again. The raw DK is never written to disk.

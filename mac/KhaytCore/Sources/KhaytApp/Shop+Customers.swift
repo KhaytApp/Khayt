@@ -64,12 +64,14 @@ extension Shop {
     /// customer is order work, which staff may do; its log line is part of
     /// that send, not an edit of the customer, so it is written under the
     /// send's own permission rather than refused after WhatsApp has opened.
+    /// Answers whether the line was written.
+    @discardableResult
     func addCommunication(_ entry: CommEntry, to clientId: String,
-                          gate: (area: String, action: String) = ("clients", "edit")) async {
+                          gate: (area: String, action: String) = ("clients", "edit")) async -> Bool {
         moveProblem = nil
-        guard permitted(gate.area, gate.action) else { return }
+        guard permitted(gate.area, gate.action) else { return false }
         guard let build = source.build else {
-            moveProblem = words.callIt("mac.move_sample"); return
+            moveProblem = words.callIt("mac.move_sample"); return false
         }
         do {
             let raw = entry.raw
@@ -84,8 +86,10 @@ extension Shop {
                 record["commLog"] = .array(log)
             }
             await load(source)
+            return true
         } catch {
             moveProblem = self.said(error)
+            return false
         }
     }
 
