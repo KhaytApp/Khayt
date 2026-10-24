@@ -1,8 +1,7 @@
 'use strict';
 
-// Khayt Cloud plan definitions. The figures come from
-// docs/KHAYT-CLOUD-FEATURES-AND-PRICING.md §4 and are costed in
-// docs/KHAYT-CLOUD-COST-PER-SHOP.md; these tests pin the properties that a
+// Khayt Cloud plan definitions. The figures are the cloud's GET /v1/plans
+// (Turki, 2026-10-24); these tests pin the properties that a
 // careless edit would break quietly — a price that stops being struck through
 // while nothing can collect it, or an annual figure that stops matching its
 // own monthly.
@@ -12,16 +11,24 @@ const assert = require('node:assert/strict');
 
 const Plans = require('../lib/cloud-plans.js');
 
-test('the ladder is free → cloud → branches', () => {
-  assert.deepEqual(Plans.allPlans().map((p) => p.id), ['free', 'cloud', 'branches']);
+test('the ladder is free → maker → creator → studio', () => {
+  assert.deepEqual(Plans.allPlans().map((p) => p.id), ['free', 'maker', 'creator', 'studio']);
 });
 
 test('prices are the ones the pricing doc sets', () => {
   assert.equal(Plans.planPrice('free', 'USD').amount, 0);
-  assert.equal(Plans.planPrice('cloud', 'USD').amount, 9);
-  assert.equal(Plans.planPrice('branches', 'USD').amount, 29);
-  assert.equal(Plans.planPrice('cloud', 'SAR').amount, 35);
-  assert.equal(Plans.planPrice('branches', 'SAR').amount, 109);
+  assert.equal(Plans.planPrice('maker', 'SAR').amount, 25);
+  assert.equal(Plans.planPrice('creator', 'SAR').amount, 65);
+  assert.equal(Plans.planPrice('studio', 'SAR').amount, 180);
+  assert.equal(Plans.planPrice('maker', 'USD').amount, 7);
+  assert.equal(Plans.planPrice('creator', 'USD').amount, 18);
+  assert.equal(Plans.planPrice('studio', 'USD').amount, 48);
+});
+
+test('USD is SAR ÷ 3.75 rounded UP — never the cheaper of the two', () => {
+  for (const p of Plans.allPlans()) {
+    assert.equal(p.price.USD, Math.ceil(p.price.SAR / 3.75), `${p.id}: USD ${p.price.USD} for SAR ${p.price.SAR}`);
+  }
 });
 
 test('the ladder never goes down, in either currency', () => {
@@ -46,7 +53,7 @@ test('annual is ten months of the monthly price — in its OWN currency', () => 
 
 test('an unpriced currency falls back to USD rather than inventing a rate', () => {
   for (const cur of ['EUR', 'GBP', 'JPY', '', null, undefined, 'sar']) {
-    const got = Plans.planPrice('cloud', cur);
+    const got = Plans.planPrice('maker', cur);
     const expected = String(cur).toUpperCase() === 'SAR' ? 'SAR' : 'USD';
     assert.equal(got.currency, expected, `${cur} should price in ${expected}`);
   }
@@ -54,10 +61,10 @@ test('an unpriced currency falls back to USD rather than inventing a rate', () =
 
 test('during beta, paid tiers are struck through and nothing is charged', () => {
   const beta = { betaFree: true };
-  const cloud = Plans.planPrice('cloud', 'USD', beta);
-  assert.equal(cloud.strike, true, 'a paid tier renders struck through during beta');
-  assert.equal(cloud.charged, false, 'nothing is collected during beta');
-  assert.equal(cloud.amount, 9, 'the price is still shown — beta does not zero it');
+  const maker = Plans.planPrice('maker', 'USD', beta);
+  assert.equal(maker.strike, true, 'a paid tier renders struck through during beta');
+  assert.equal(maker.charged, false, 'nothing is collected during beta');
+  assert.equal(maker.amount, 7, 'the price is still shown — beta does not zero it');
 });
 
 test('free is free forever, which is NOT the same as "not charged yet"', () => {
@@ -71,7 +78,7 @@ test('free is free forever, which is NOT the same as "not charged yet"', () => {
 
 test('after beta, paid tiers stop being struck through and start being charged', () => {
   const live = { betaFree: false };
-  for (const id of ['cloud', 'branches']) {
+  for (const id of ['maker', 'creator', 'studio']) {
     const p = Plans.planPrice(id, 'USD', live);
     assert.equal(p.strike, false);
     assert.equal(p.charged, true);
@@ -84,14 +91,19 @@ test('BETA_FREE is still on — flipping it is a deliberate act, not a drive-by'
   // failing because you flipped it, confirm billing can actually charge, then
   // update this test in the same commit so the two facts stay together.
   assert.equal(Plans.isBetaFree(), true);
-  assert.equal(Plans.planPrice('cloud', 'USD').strike, true);
+  assert.equal(Plans.planPrice('maker', 'USD').strike, true);
 });
 
-test('branches is marked unbuilt, because Phase 3 is', () => {
-  // docs/KHAYT-3.0-CLOUD-STATUS.md: multi-shop tenancy is Not started. Listing a
-  // price without saying so would be selling something that does not exist.
-  assert.equal(Plans.planById('branches').soon, true);
-  assert.equal(Plans.planById('cloud').soon, undefined);
+test('no tier is marked unbuilt: every one is live on the cloud', () => {
+  for (const p of Plans.allPlans()) assert.equal(p.soon, undefined, `${p.id}`);
+});
+
+test('no plan promises a history or device limit the server does not enforce', () => {
+  // The server keeps the last 20 book snapshots for every shop, whatever the
+  // plan, and limits no devices. "7 / 90 days of history" was listed once.
+  for (const p of Plans.allPlans()) {
+    for (const f of p.features) assert.doesNotMatch(f.label.en, /history|1 device/i, `${p.id}.${f.key}`);
+  }
 });
 
 test('every plan carries a label, tagline and features in en and ar', () => {
@@ -107,10 +119,10 @@ test('every plan carries a label, tagline and features in en and ar', () => {
 
 test('planComparison renders a complete table and falls back per key', () => {
   const rows = Plans.planComparison('ar', 'SAR');
-  assert.equal(rows.length, 3);
-  assert.equal(rows[1].label, 'السحابة');
+  assert.equal(rows.length, 4);
+  assert.equal(rows[1].label, 'الصانع');
   assert.equal(rows[1].price.currency, 'SAR');
-  assert.equal(rows[1].price.amount, 35);
+  assert.equal(rows[1].price.amount, 25);
 
   // A language with no translations at all still gets a full English table
   // rather than a grid of blanks.

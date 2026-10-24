@@ -66,25 +66,25 @@ async function testLadderRenders(window) {
   const loaded = await window.evaluate(() => typeof KhaytCloudPlans !== 'undefined');
   if (!loaded) throw new Error('KhaytCloudPlans is not loaded in index.html — the section renders empty');
 
-  for (const tier of ['Free', 'Cloud', 'Branches']) {
+  for (const tier of ['Free', 'Maker', 'Creator', 'Studio']) {
     if (!text.includes(tier)) throw new Error(`the "${tier}" tier is not on screen`);
   }
   if (!text.includes('Free during beta')) {
     throw new Error('"Free during beta" is missing — a shop cannot tell it is not being charged');
   }
-  if (!text.includes('Not built yet')) {
-    throw new Error('the Branches tier does not say it is unbuilt, so it reads as purchasable');
+  if (text.includes('Not built yet')) {
+    throw new Error('a tier says it is unbuilt, but every tier is live on the cloud');
   }
   return struck;
 }
 
 /** The prices shown must be the real ones, struck through — not hidden, not live. */
 async function testPricesAreStruckThroughAndReal(window, struck) {
-  if (struck.length !== 2) {
-    throw new Error(`expected exactly 2 struck-through prices (cloud + branches), got ${struck.length}: ${struck.join(', ')}`);
+  if (struck.length !== 3) {
+    throw new Error(`expected exactly 3 struck-through prices (maker + creator + studio), got ${struck.length}: ${struck.join(', ')}`);
   }
   const expected = await window.evaluate(() =>
-    ['cloud', 'branches'].map((id) => {
+    ['maker', 'creator', 'studio'].map((id) => {
       const p = KhaytCloudPlans.planPrice(id, settings.currency);
       return p.currency === 'USD' ? `$${p.amount}` : `${p.amount} ${p.currency}`;
     }));
@@ -100,15 +100,15 @@ async function testPricesAreStruckThroughAndReal(window, struck) {
 }
 
 /**
- * The prices must follow the shop's currency, because a Saudi shop reading "$9"
+ * The prices must follow the shop's currency, because a Saudi shop reading "$7"
  * has to do arithmetic to know what it will pay.
  */
 async function testCurrencyFollowsTheShop(window) {
-  for (const [currency, want] of [['SAR', '35 SAR'], ['USD', '$9']]) {
+  for (const [currency, want] of [['SAR', '25 SAR'], ['USD', '$7']]) {
     await window.evaluate((cur) => { settings.currency = cur; renderCloudSettings(); }, currency);
     const { struck } = await readLadder(window);
     if (!struck.includes(want)) {
-      throw new Error(`with currency=${currency} the Cloud tier should read "${want}"; struck = ${struck.join(', ')}`);
+      throw new Error(`with currency=${currency} the Maker tier should read "${want}"; struck = ${struck.join(', ')}`);
     }
   }
 }
