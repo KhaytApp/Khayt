@@ -796,3 +796,9 @@ test('the template map keeps the four milestones, named, and nothing else', () =
   // A save that does not carry it leaves it alone.
   assert.deepEqual(apply(out, { bizEn: 'x' }, CTX).whatsappTemplates, out.whatsappTemplates);
 });
+
+test('a template field another app keeps survives a save that only sends the name and languages', () => {
+  const held = { whatsappTemplates: { ready: { name: 'old', langs: ['ar'], category: 'UTILITY' } } };
+  const out = apply(held, { whatsappTemplates: { ready: { name: 'order_ready', langs: ['en'] } } }, CTX);
+  assert.deepEqual(out.whatsappTemplates.ready, { name: 'order_ready', langs: ['en'], category: 'UTILITY' });
+});

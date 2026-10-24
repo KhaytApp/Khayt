@@ -18,6 +18,8 @@ struct TeamSettings: View {
     @State private var members: [CloudTeam.Member] = []
     @State private var devices: [CloudTeam.Device] = []
     @State private var loaded = false
+    /// Signed in to Khayt Cloud: without it, inviting can only fail.
+    @State private var connected = false
     @State private var problem: String?
     @State private var note: String?
     @State private var busy = false
@@ -70,7 +72,7 @@ struct TeamSettings: View {
                     }
                 }
             }
-            if manages {
+            if manages && connected {
                 HStack {
                     TextField(shop.words.callIt("mac.team_email"), text: $email)
                         .textFieldStyle(.roundedBorder)
@@ -138,8 +140,10 @@ struct TeamSettings: View {
 
     private func session() async -> (CloudReader.Connection, String)? {
         guard let s = await shop.vaultSession() else {
+            connected = false
             problem = shop.words.callIt("mac.team_sign_in"); return nil
         }
+        connected = true
         return s
     }
 
@@ -151,6 +155,9 @@ struct TeamSettings: View {
             devices = manages ? try await CloudTeam.devices(c, token: t, fetch: Shop.plansFetch) : []
             problem = nil
         } catch {
+            // Cleared, not kept: a list from before a removal or a sign-out
+            // would show someone as still there.
+            members = []; devices = []
             problem = said(error)
         }
     }

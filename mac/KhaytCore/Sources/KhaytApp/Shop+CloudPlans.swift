@@ -42,8 +42,10 @@ extension Shop {
     }
 
     /// Move the shop to `plan`. Answers the new state, or the cloud's reason.
-    func chooseCloudPlan(_ plan: String) async -> CloudPlanState {
-        var state = await cloudPlanState()
+    /// Starts from what the pane already shows, so a refusal (or a reading
+    /// that failed) never blanks the list or puts the shop on Free.
+    func chooseCloudPlan(_ plan: String, from shown: CloudPlanState) async -> CloudPlanState {
+        var state = shown
         guard let (connection, token) = await vaultSession() else { return state }
         do {
             state.mine = try await CloudPlans.choose(plan, connection, token: token, fetch: Self.plansFetch)

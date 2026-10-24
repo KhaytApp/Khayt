@@ -98,7 +98,8 @@ struct CloudPlanSettings: View {
     private func priceText(_ plan: CloudPlans.Plan) -> String {
         guard let (amount, currency) = CloudPlans.price(plan, currency: shop.currency) else { return "" }
         if amount == 0 { return shop.words.callIt("mac.plan_free_price") }
-        let money = Money.text(amount, currency)
+        // Isolated: an Arabic line that starts with a Latin price reads backwards.
+        let money = "\u{2068}" + Money.text(amount, currency) + "\u{2069}"
         return shop.words.callIt(plan.period == "year" ? "mac.plan_per_year" : "mac.plan_per_month",
                                  ["price": .string(money)])
     }
@@ -151,7 +152,7 @@ struct CloudPlanSettings: View {
 
     private func choose(_ plan: CloudPlans.Plan) async {
         busy = true
-        state = await shop.chooseCloudPlan(plan.name)
+        state = await shop.chooseCloudPlan(plan.name, from: state)
         busy = false
     }
 }

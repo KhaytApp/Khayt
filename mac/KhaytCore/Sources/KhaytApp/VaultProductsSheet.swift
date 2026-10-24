@@ -194,12 +194,14 @@ struct VaultProductsSheet: View {
     }
 
     private func remove(_ p: VaultProducts.Product) async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         guard let engine = await shop.vaultProductsEngine() else { return }
         do { try await engine.products.remove(p.productId); await load() }
         catch { problem = shop.productProblem(error) }
     }
 
     private func disconnect() async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         guard let engine = await shop.vaultProductsEngine() else { return }
         do { try await engine.products.disconnect("makerrun"); connections.removeAll { $0.client == "makerrun" } }
         catch { problem = shop.productProblem(error) }
@@ -443,6 +445,7 @@ struct VaultProductEditor: View {
     }
 
     private func save() async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         working = true; problem = nil
         defer { working = false }
         guard let engine = await shop.vaultProductsEngine() else { problem = words.callIt("mac.vl_err_vault_off"); return }
@@ -455,6 +458,7 @@ struct VaultProductEditor: View {
     }
 
     private func addPreview() async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         guard let productId else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.jpeg, .png]
@@ -471,6 +475,7 @@ struct VaultProductEditor: View {
     }
 
     private func clearPreviews() async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         guard let productId else { return }
         working = true; defer { working = false }
         guard let engine = await shop.vaultProductsEngine() else { return }
@@ -588,11 +593,24 @@ struct VaultReleaseSheet: View {
     }
 
     private func release() async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         working = true; problem = nil
         defer { working = false }
         guard let engine = await shop.vaultProductsEngine() else { problem = words.callIt("mac.vl_err_vault_off"); return }
         try? await engine.remote.sync.pull()
         let (sources, _) = Shop.releaseSources(product.files, state: engine.remote.sync.load())
+        // Exactly what the sheet showed, or nothing. The feed is read again
+        // here, and in between another device can upload a new version or
+        // restore a file shown as missing — releasing either would make the
+        // cloud able to read something the shop never confirmed (beta.6 review).
+        let shown = Dictionary(uniqueKeysWithValues: lines.map { ($0.fileId, $0.version) })
+        let now = Dictionary(uniqueKeysWithValues: sources.compactMap { s in
+            s.row.headVersion.map { (s.row.fileId, $0.version) } })
+        guard Shop.releaseMatches(shown: shown, now: now) else {
+            await prepare()
+            problem = words.callIt("mac.vp_release_changed")
+            return
+        }
         do {
             result = try await engine.products.release(product.productId, files: sources, unrelease: dropping)
         } catch {
@@ -639,8 +657,10 @@ struct VaultBuyersSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: b.buyerEmail).environment(\.layoutDirection, .leftToRight)
                         Text(words.callIt("mac.vp_buyer_line", [
-                            "provider": .string(shop.providerName(b.provider)),
-                            "order": .string(b.orderId), "used": .number(Double(b.used)),
+                            // Isolated, so a Latin name or order number does not
+                            // turn an Arabic line around (beta.6 UI review).
+                            "provider": .string("\u{2068}" + shop.providerName(b.provider) + "\u{2069}"),
+                            "order": .string("\u{2068}" + b.orderId + "\u{2069}"), "used": .number(Double(b.used)),
                         ]))
                         .font(.caption).foregroundStyle(.secondary)
                     }
@@ -691,6 +711,7 @@ struct VaultBuyersSheet: View {
     }
 
     private func add() async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         working = true; problem = nil; told = nil
         defer { working = false }
         guard let engine = await shop.vaultProductsEngine() else { return }
@@ -707,6 +728,7 @@ struct VaultBuyersSheet: View {
     }
 
     private func revoke(_ b: VaultProducts.Buyer) async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         guard let engine = await shop.vaultProductsEngine() else { return }
         do { try await engine.products.revokeBuyer(product.productId, grantId: b.grantId); await load() }
         catch { problem = shop.productProblem(error) }
@@ -778,6 +800,7 @@ struct VaultSalesHooksBlock: View {
     }
 
     private func save() async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         working = true; problem = nil; defer { working = false }
         guard let engine = await shop.vaultProductsEngine() else { return }
         do {
@@ -788,6 +811,7 @@ struct VaultSalesHooksBlock: View {
     }
 
     private func remove(_ p: String) async {
+        guard shop.permitted("cloud", "edit") else { problem = shop.moveProblem; return }
         working = true; defer { working = false }
         guard let engine = await shop.vaultProductsEngine() else { return }
         do { try await engine.products.removeSalesHook(p); hooks.removeAll { $0.provider == p } }

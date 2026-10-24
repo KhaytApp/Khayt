@@ -78,7 +78,9 @@ struct WhatsAppBusinessSettings: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 LabeledContent(shop.words.callIt("mac.wab_token")) {
-                    SecureField(storedToken ? "••••••••" : "EAAG…", text: $draft.token)
+                    // The placeholder as a PROMPT: as a title, a grouped form
+                    // drew it as a stray label beside an empty box.
+                    SecureField("", text: $draft.token, prompt: Text(verbatim: storedToken ? "••••••••" : "EAAG…"))
                         .textFieldStyle(.roundedBorder).frame(width: 240)
                 }
                 Text(shop.words.callIt("mac.wab_token_hint"))
@@ -94,10 +96,11 @@ struct WhatsAppBusinessSettings: View {
                     Text(shop.words.callIt("mac.wab_templates_hint"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    // Not monospaced: a fixed-width font pulls Arabic letters apart.
                     Text(shop.words.callIt("mac.wab_params_basic"))
-                        .font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                     Text(shop.words.callIt("mac.wa_m_shipped") + ": " + shop.words.callIt("mac.wab_params_shipped"))
-                        .font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                     Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
                         GridRow {
