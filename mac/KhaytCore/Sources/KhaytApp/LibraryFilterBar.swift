@@ -120,7 +120,7 @@ struct LibraryFilterBar: View {
         // SAVED FROM A WEB PAGE with the browser extension — its own smart
         // folder, and a chip so the bar can say it is on and take it off.
         if facets.fromWeb > 0 || shop.libraryFromWebOnly {
-            out.append(FilterChipModel(id: "from-web", label: shop.words.callIt("mac.ws_saved_from_web"),
+            out.append(FilterChipModel(id: "from-web", label: shop.words.callIt("mac.sfw_saved_from_web"),
                                        count: facets.fromWeb, on: shop.libraryFromWebOnly) {
                 shop.libraryFromWebOnly.toggle()
             })

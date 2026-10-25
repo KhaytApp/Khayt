@@ -39,6 +39,16 @@ struct WebSaveAppTests {
         #expect(locked.moveProblem == nil, "nobody at the Mac pressed anything: no alert")
     }
 
+    @Test("every word of Save to Khayt is its own: no key shared with another screen's")
+    func ownWords() {
+        // `Words.own` keeps the FIRST table's value for a repeated key, so a
+        // key that collides shows another screen's sentence (it happened:
+        // `mac.ws_settings` was already the web store's).
+        for (key, value) in WebSaveWords.table {
+            #expect(Words.own[key] == value, "\(key) is taken by another table")
+        }
+    }
+
     @Test("Saved from web is a built-in smart folder, and its query keeps the axis through the book")
     func smartFolder() async {
         let shop = Shop()

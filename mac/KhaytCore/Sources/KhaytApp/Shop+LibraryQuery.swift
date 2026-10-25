@@ -283,7 +283,7 @@ enum LibrarySmartFolder: String, CaseIterable, Identifiable, Sendable {
         case .onlineOnly: "mac.lib_online_only"
         case .noFigures: "mac.ls_no_figures"
         case .inCatalogue: "mac.ls_in_catalogue"
-        case .fromWeb: "mac.ws_saved_from_web"
+        case .fromWeb: "mac.sfw_saved_from_web"
         }
     }
 

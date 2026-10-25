@@ -79,7 +79,7 @@ struct LibraryInspector: View {
                 .id("model-title")
             // ── SAVED FROM A WEB PAGE ────────────────────────────────────
             if file.isFromWeb {
-                InspectorSection(id: "web", title: w.callIt("mac.ws_sec_web"), symbol: "safari") {
+                InspectorSection(id: "web", title: w.callIt("mac.sfw_sec_web"), symbol: "safari") {
                     WebSourceSection(shop: shop, file: file)
                 }
             }
@@ -220,7 +220,7 @@ struct LibraryInspector: View {
             // The FILE, not its folder (alpha.65 review, snapshot 42).
             if file.isWebOnly {
                 // Saved from a page and not downloaded: nothing is missing.
-                DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.ws_not_downloaded"), dim: true)
+                DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.sfw_not_downloaded"), dim: true)
             } else if shop.isInCloudOnly(file) {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.cloudlib_in_cloud"), dim: true)
             } else if shop.fileIsPresent(file) {
@@ -973,6 +973,11 @@ struct ModelSummaryCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+        } else if file.isWebOnly {
+            // Saved from a page, not downloaded yet: nothing is lost.
+            Label(w.callIt("mac.sfw_download_hint"), systemImage: "safari")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         } else if !shop.fileIsPresent(file) {
             Label(w.callIt("mac.li_missing_file"), systemImage: "questionmark.folder")
                 .font(.caption).foregroundStyle(Khayt.attention)

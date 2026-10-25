@@ -57,7 +57,8 @@ extension Snapshot {
         WebSaveInbox.shared.pretendLastSaved(title: saved[0].0.title)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 460),
                               styleMask: [.titled], backing: .buffered, defer: false)
-        window.title = shop.words.callIt("mac.ws_settings")
+        window.isReleasedWhenClosed = false
+        window.title = shop.words.callIt("mac.sfw_settings")
         window.contentView = NSHostingView(rootView:
             Form { BrowserExtensionSettings(shop: shop) }
                 .formStyle(.grouped)

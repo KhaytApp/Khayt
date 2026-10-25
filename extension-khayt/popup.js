@@ -38,7 +38,9 @@ function render(page) {
   $('site').textContent = SITE_NAMES[page.site] || host;
   $('creator').textContent = page.creator ? say('popupBy', [page.creator]) : '';
   $('creatorSep').hidden = !page.creator;
-  $('licence').textContent = page.licence;
+  // Khayt's id, shown the way a licence is written: `cc-by-nc` → CC BY-NC.
+  $('licence').textContent = /^cc(0|-)/.test(page.licence)
+    ? page.licence.replace(/^cc-?/, 'CC ').replace('CC 0', 'CC0').toUpperCase() : page.licence;
   $('licence').hidden = !page.licence;
   const n = page.files.length;
   $('files').textContent = n === 1 ? say('popupOneFile') : say('popupFiles', [String(n)]);
