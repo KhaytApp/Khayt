@@ -63,6 +63,10 @@ struct WebSaveAppTests {
         // Locked, nobody signed in: the old save waits for a sign-in; the
         // fresh one's popup is still open, so it hears why.
         let locked = await OperatorLockTests.shop()
+        // "Fresh" is judged by the file's age, and loading two books on a
+        // busy runner can take longer than a popup waits: date it now.
+        try FileManager.default.setAttributes([.creationDate: Date()],
+                                              ofItemAtPath: dir.appending(path: "\(fresh.id).json").path)
         inbox.start(shop: locked)
         await inbox.drain()
         #expect(WebInbox.pending(in: dir).map(\.lastPathComponent) == ["\(old.id).json"])

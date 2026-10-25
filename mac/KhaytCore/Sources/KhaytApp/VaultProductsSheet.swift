@@ -53,7 +53,8 @@ struct VaultProductsSheet: View {
                 Spacer()
                 Button(words.callIt("mac.vl_refresh")) { Task { await load() } }.disabled(loading)
                 Button(words.callIt("mac.vp_new") + "\u{2026}") { editing = .new([]) }
-                    .disabled(!shop.canWrite || loading)
+                    // Paused while the vault is over its plan (the banner below).
+                    .disabled(!shop.canWrite || loading || shop.vaultLapseDisplay.isOver)
             }
             Text(words.callIt("mac.vp_explain"))
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

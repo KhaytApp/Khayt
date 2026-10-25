@@ -20,6 +20,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - A page's canonical address or `og:url` counts only when it is on the same site as the tab; otherwise the tab's own address is saved. Checked in the extension and again by the app, so a mirror cannot overwrite a saved Printables or MakerWorld record.
   - The waiting-saves folder is read without following links or opening anything but a plain file; a download is offered only when its real path is inside your home folder, under its real file name; a model taken out of a quarantined download keeps the quarantine; Safari's download questions are capped at 10 waiting.
   - Firefox's Install waits for the store listing, as Chrome's does, until Save to Khayt is listed on addons.mozilla.org under its id.
+- **Mac: fixes from the beta.7 UI review.**
+  - Opening Settings ▸ Preferences no longer crashes. Safari answered the browser-extension check on its own queue, into a closure that expected the main thread, and the app stopped. The dark snapshot pass now photographs Preferences too.
+  - Arabic: the Cloud plan lines keep each figure with its own words ("50 GB" no longer swallows the next number), Free is translated, and the library count reads correctly for 0, 11 and over (it said "18 نماذج"). "Model" is one word throughout (نموذج; مجسّم only for the mesh itself and objects on a plate). Print next is «التالي للطباعة», upgrading is «ترقية الخطة», "this Mac" is «هذا الماك», material is «الخامة» and category «التصنيف» everywhere. "Fits" reads «يناسب». Counts in the compressed-file and printer-chip lines use the dual and the 3–10 forms.
+  - Library list: the columns fit beside the inspector. Folder steps aside while the inspector is open, Fits is narrower, and Name gets the room, so Last run and Storage are on screen again.
+  - The vault's Create Link and New Product… are switched off while the vault is read-only, as its banner says.
+  - Model page: a slicer's default "Filament 1" names are said in the shop's language. A model inside a compressed file is no longer called missing. Cost to make shows "—" when there is no time or weight, and ≈ when it is estimated. File size, dimensions and volume have their own Arabic words. A model that already sells has Open in Catalogue in place of Add to Catalogue. A page saved from the web and not downloaded has no empty Print section or blank Name row.
+  - Multi-select: the totals carry ≈ when estimated, the size tile is called Size (it counts files not on this Mac too), and Delete is no longer bright red when it is disabled.
+  - Small tiles give the name two lines, so similar names can be told apart. Healthy prints in the menu bar popover are no longer drawn in the warning colour. The attach prompt offers only Show in Finder when the download has nothing Khayt can read.
 
 - **Mac: printer chips on library tiles, a Fits filter, and ⌘J to jump in the library.**
   - Medium and Large tiles show a row of printer chips: where the model goes on the bed, with the printers it can start on now (spools loaded) first and marked with a tick, then the ones that need a spool change, then the ones it only fits. A printer it is too big for is left off; too big for every printer is one red chip. Past the tile's width the rest fold into "+N", and every printer is on the hover. Laser and UV beds are never listed. Small tiles show no chips.
@@ -8779,6 +8787,34 @@ missing its dot. And a Prusa can be sent binary G-code.
   test; it is now, over real HTTP, and the same tests pass against the handler
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
+
+## [4.0.0-beta.7] - 2026-10-25
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **A new library.** Small, medium and large tiles (⌘+ / ⌘−) and a list view, with each model's print time, filament and price on the tile. A model's page opens with a summary: time, filament, cost, catalogue price and margin, which printers it fits, and Quote, New Job and Add to Catalogue always in reach.
+- **Saved searches and ranges:** Ready to print, Never printed, Online only, No print figures, Sells in catalogue and Saved from web in the sidebar with live counts, your own saved searches, and ranges for time, weight, price, times printed and date added.
+- **Library Health** (View ▸ Library Health): missing files, models never measured, duplicates, look-alikes, models too big for every printer, and catalogue products whose file is gone, each with a fix. Models on a drive that is not connected are listed as such, never offered for removal.
+- **Print next:** mark a model with a note (⌘B); the mark clears when a job starts or a quote is accepted.
+- **Which printers it fits** on medium and large tiles, a Fits column in the list, and a Fits filter.
+- **⌘J Jump to in Library:** any model, folder, compressed file, tag or saved search. ⌘↩ quotes it, ⌥↩ starts a job.
+- **Compressed files as folders:** ZIP, RAR, 7-Zip and tar files in a linked folder show their models as tiles, extracted only when used. The compressed file is never changed, and a locked one never asks for a password.
+- **Save to Khayt**, a browser extension for Safari (inside Khayt.app), Chrome, Edge, Brave, Vivaldi and Firefox: save a model's page from Printables, MakerWorld, Thingiverse, Thangs, Cults3D, MyMiniFactory or any page with its link, creator, licence and cover, and add the file you then download, after Khayt asks. Chrome, Edge and Firefox connect once their store listings are live.
+- **Menu bar:** a progress ring with the time left and a dot when a printer needs you; the panel lists printers that need attention first. Notifications when a print finishes, fails or pauses, each with its own switch.
+- **Khayt Cloud plan:** when a vault holds more than a smaller plan allows, Settings shows how much over, since when, and the date files will be deleted once Khayt Cloud sets one.
+
+### Changed
+
+- Moving to a smaller plan: a vault over its limit becomes read-only, and files still over it 90 days after a dated email are deleted. Share links and product changes say why they are paused.
+- Arabic: one word for a model (نموذج), «التالي للطباعة» for Print next, and counts that read correctly.
+
+### Fixed
+
+- Opening Settings ▸ Preferences could quit the app.
+- Arabic plan lines no longer scramble their figures; the library list's columns fit.
 
 ## [4.0.0-beta.6] - 2026-10-24
 

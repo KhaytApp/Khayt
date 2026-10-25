@@ -234,7 +234,7 @@ struct ManyModels: View {
                 totalsCard(totals)
                 group(w.callIt("mac.li_group_print")) {
                     Button { Task { await shop.startJob(fromModels: chosen, asQuote: true) } } label: {
-                        Label(w.callIt("mac.li_quote_these", n), systemImage: "doc.text")
+                        Label(w.counting(chosen.count, "mac.li_quote_these"), systemImage: "doc.text")
                     }
                     .disabled(!shop.canMoveJobs)
                     Button { Task { await shop.startJob(fromModels: chosen, asQuote: false) } } label: {
@@ -338,8 +338,11 @@ struct ManyModels: View {
                     // these, refuses any not on screen, and its question names
                     // them and the groups they are in.
                     Button(role: .destructive) { shop.askToDeleteFromLibrary(chosen) } label: {
+                        // Red only when it can be pressed: an explicit colour
+                        // overrides the disabled dimming, and a greyed pane
+                        // with one bright red button reads as the way out.
                         Label(Self.deleteTitle(count: chosen.count, words: w), systemImage: "trash")
-                            .foregroundStyle(Khayt.late)
+                            .foregroundStyle(shop.canWrite && !chosen.isEmpty ? AnyShapeStyle(Khayt.late) : AnyShapeStyle(.secondary))
                     }
                     .disabled(!shop.canWrite || chosen.isEmpty)
                 }
@@ -366,12 +369,16 @@ struct ManyModels: View {
             Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 6) {
                 GridRow {
                     tile(w.callIt("mac.li_print_time"),
-                         t.hours > 0 ? PrintFigures.duration(hours: t.hours, w) : none, unit: nil)
+                         t.hours > 0 ? PrintFigures.duration(hours: t.hours, w) : none, unit: nil,
+                         approximate: t.anyEstimated && t.hours > 0)
                     tile(w.callIt("mac.li_filament"),
-                         t.grams > 0 ? PrintFigures.weight(t.grams, w) : none, unit: nil)
+                         t.grams > 0 ? PrintFigures.weight(t.grams, w) : none, unit: nil,
+                         approximate: t.anyEstimated && t.grams > 0)
                 }
                 GridRow {
-                    tile(w.callIt("mac.on_disk"), Format.bytes(t.bytes), unit: nil)
+                    // "Size", not "On disk": the sum counts every file's size,
+                    // including the ones not on this Mac (said below it).
+                    tile(w.callIt("set.store_size"), Format.bytes(t.bytes), unit: nil)
                     tile(w.callIt("mac.li_online_only_label"), "\(t.onlineOnly)", unit: nil,
                          dim: t.onlineOnly == 0)
                 }
@@ -390,10 +397,14 @@ struct ManyModels: View {
         }
     }
 
-    private func tile(_ label: String, _ value: String, unit: String?, dim: Bool = false) -> some View {
+    private func tile(_ label: String, _ value: String, unit: String?, dim: Bool = false,
+                      approximate: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
+                if approximate {
+                    Text(verbatim: "\u{2248}").font(.callout).foregroundStyle(.secondary)
+                }
                 Text(value).font(.title3.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(dim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
                     .lineLimit(1).minimumScaleFactor(0.6)

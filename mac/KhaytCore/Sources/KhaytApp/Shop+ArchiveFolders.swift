@@ -392,9 +392,9 @@ extension Shop {
     /// The scan's sentence about archives, or nil when there were none.
     func archiveScanLines(_ scan: ArchiveScan) -> [String] {
         var lines: [String] = []
-        if scan.added > 0 { lines.append(words.callIt("mac.arc_scanned", ["n": .number(Double(scan.added))])) }
+        if scan.added > 0 { lines.append(words.counting(scan.added, "mac.arc_scanned")) }
         if scan.locked > 0 { lines.append(words.callIt("mac.arc_locked_n", ["n": .number(Double(scan.locked))])) }
-        if scan.online > 0 { lines.append(words.callIt("mac.arc_online_n", ["n": .number(Double(scan.online))])) }
+        if scan.online > 0 { lines.append(words.counting(scan.online, "mac.arc_online_n")) }
         if !scan.refused.isEmpty {
             lines.append(words.callIt("mac.arc_refused_n", ["n": .number(Double(scan.refused.count))]))
         }

@@ -147,7 +147,9 @@ struct VaultShareSheet: View {
                 if made == nil && turnedOff == nil {
                     Button(words.callIt("mac.vl_create")) { Task { await create() } }
                         .keyboardShortcut(.defaultAction)
-                        .disabled(working || !passwordOk || !lockOk)
+                        // Read-only while the vault is over its plan, as the banner
+                        // above says: no new links. Not a form filled in for an error.
+                        .disabled(working || !passwordOk || !lockOk || shop.vaultLapseDisplay.isOver)
                 }
             }
         }

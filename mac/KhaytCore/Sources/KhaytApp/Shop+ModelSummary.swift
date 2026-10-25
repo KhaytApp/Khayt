@@ -288,6 +288,9 @@ struct SelectionTotals: Equatable, Sendable {
     var withFigures = 0
     var onlineOnly = 0
     var notHere = 0
+    /// Any time or weight in the sum came from the mesh estimate, so the
+    /// total is drawn with ≈ like each of the tiles it adds up.
+    var anyEstimated = false
 }
 
 extension Shop {
@@ -307,6 +310,7 @@ extension Shop {
             let h = mins > 0 ? mins / 60 : (e?.hours ?? 0)
             let g = (f.parsed?.filamentGrams ?? 0) > 0 ? (f.parsed?.filamentGrams ?? 0) : (e?.grams ?? 0)
             if h > 0 || g > 0 { t.withFigures += 1 }
+            if (mins <= 0 && h > 0) || ((f.parsed?.filamentGrams ?? 0) <= 0 && g > 0) { t.anyEstimated = true }
             t.hours += max(0, h)
             t.grams += max(0, g)
             if onlineOnly(f) { t.onlineOnly += 1 } else if !present(f) { t.notHere += 1 }

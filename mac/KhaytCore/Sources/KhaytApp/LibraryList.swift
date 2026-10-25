@@ -166,6 +166,9 @@ struct LibraryList: View {
     @Bindable var shop: Shop
     @State private var order: [KeyPathComparator<LibraryRow>] = []
     @State private var dropping = false
+    /// The window's own Hide/Show Details, read here so the table can give
+    /// up its least-needed column when the inspector takes 280 pt of it.
+    @SceneStorage("inspector.showing") private var inspectorShowing = true
 
     var body: some View {
         let rows = shown(shop.libraryListRows())
@@ -188,11 +191,20 @@ struct LibraryList: View {
                 }
                 .help(row.name)
             }
-            .width(min: 120, ideal: 170)
-            TableColumn(shop.words.callIt("mac.lg_col_folder")) { row in
-                Text(row.folder).lineLimit(1).truncationMode(.head).foregroundStyle(.secondary)
+            // THE COLUMNS FIT THE PANE AT 1440 PT WITH THE INSPECTOR OPEN.
+            // beta.7: the ideal widths added up to more than the content
+            // column, so "Last run" was cut to "Sep"/"O", Storage was never
+            // on screen, and names were middle-truncated beside a wide
+            // Folder. Folder goes while the inspector is open (the model's
+            // page says where it is), Fits is narrower (its chips fold into
+            // "+N" on their own), and Name is the one that grows.
+            .width(min: 120, ideal: 190)
+            if !inspectorShowing {
+                TableColumn(shop.words.callIt("mac.lg_col_folder")) { row in
+                    Text(row.folder).lineLimit(1).truncationMode(.head).foregroundStyle(.secondary)
+                }
+                .width(min: 48, ideal: 72)
             }
-            .width(min: 56, ideal: 80)
             TableColumn(shop.words.callIt("mac.lg_col_material")) { row in
                 Text(row.material).lineLimit(1)
             }
@@ -207,7 +219,7 @@ struct LibraryList: View {
                                words: shop.words)
                 }
             }
-            .width(min: 70, ideal: 130)
+            .width(min: 60, ideal: 96)
             Group {
                 TableColumn(shop.words.callIt("mac.lg_sort_time"), value: \LibraryRow.minutes) { row in
                     figure(row.minutes < 0 ? ""
@@ -232,15 +244,15 @@ struct LibraryList: View {
                 TableColumn(shop.words.callIt("mac.printed"), value: \LibraryRow.times) { row in
                     figure(row.isFolder ? "" : (row.times > 0 ? Format.count(row.times) : "\u{2013}"))
                 }
-                .width(min: 36, ideal: 44)
+                .width(min: 36, ideal: 40)
                 TableColumn(shop.words.callIt("mac.last_run"), value: \LibraryRow.last) { row in
                     figure(row.last < 0 ? "" : Self.day(Date(timeIntervalSince1970: row.last), words: shop.words))
                 }
-                .width(min: 72, ideal: 88)
+                .width(min: 56, ideal: 68)
                 TableColumn(shop.words.callIt("mac.lg_col_storage")) { row in
                     storage(row)
                 }
-                .width(min: 50, ideal: 70)
+                .width(min: 44, ideal: 60)
             }
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))

@@ -186,7 +186,7 @@ struct LibrarySmartFolderTests {
         let rows = shop.librarySmartRows
         #expect(rows.prefix(6).map(\.saved) == [nil, nil, nil, nil, nil, nil])
         #expect(rows.count == 6 + shop.librarySavedSearches.count)
-        #expect(shop.librarySavedSearches.map(\.name) == ["Quick prints under 3 h"],
+        #expect(shop.librarySavedSearches.map(\.name) == ["Quick prints"],
                 "the sample book carries one saved search, so the sidebar shows one")
     }
 

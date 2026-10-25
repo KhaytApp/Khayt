@@ -216,7 +216,7 @@ struct FloorPanel: View {
             // What a person would go to the app FOR, rather than a list of
             // everything the app can do.
             VStack(spacing: 1) {
-                MenuLine(text: shop.words.callIt("mac.open_book"), key: "⌘0") {
+                MenuLine(text: shop.words.callIt("mac.mb_open_khayt"), key: "⌘0") {
                     openWindow(id: "shop")
                     NSApp.activate(ignoringOtherApps: true)
                 }
@@ -319,7 +319,7 @@ private struct FleetRow: View {
     @ViewBuilder private var mark: some View {
         if line.printing {
             ProgressRing(value: Double(line.progress) / 100,
-                         tint: line.attention == nil ? Khayt.hot : Khayt.attention)
+                         tint: line.attention == nil ? Color.accentColor : Khayt.attention)
         } else {
             Circle().fill(dot).frame(width: 8, height: 8)
         }
@@ -339,15 +339,17 @@ private struct FleetRow: View {
             .font(.caption.weight(.semibold))
             .foregroundStyle(attention == .fault ? Khayt.late : Khayt.attention)
         } else if line.printing {
+            // A print going well is not an alarm: ordinary ink, so the warm
+            // colours above are kept for the lines that need a look.
             Text(verbatim: shop.words.callIt("mac.mbp_pct", ["pct": .string(shop.words.numeral(line.progress))]))
-                .font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(Khayt.hot)
+                .font(.callout.weight(.semibold)).monospacedDigit().foregroundStyle(.primary)
         }
     }
 
     private var dot: Color {
         switch line.rank {
         case .attention: line.attention == .fault ? Khayt.late : Khayt.attention
-        case .printing: Khayt.hot
+        case .printing: Color.accentColor
         case .idle: line.quiet == nil ? Khayt.done : Color(nsColor: .tertiaryLabelColor)
         case .offline: Color(nsColor: .quaternaryLabelColor)
         }

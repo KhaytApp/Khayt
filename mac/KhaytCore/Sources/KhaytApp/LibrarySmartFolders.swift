@@ -102,7 +102,7 @@ struct LibraryRangesPopover: View {
                 if shop.libraryRanges.added.isActive, case let n = shop.libraryUnknownAddedCount(), n > 0 {
                     GridRow {
                         Text("")
-                        unknownNote(n).gridCellColumns(2)
+                        unknownNote(n, date: true).gridCellColumns(2)
                     }
                 }
             }
@@ -121,9 +121,10 @@ struct LibraryRangesPopover: View {
         .frame(width: 380)
     }
 
-    @ViewBuilder private func unknownNote(_ n: Int) -> some View {
+    /// `date`: the Date added row, where what is missing is a date, not a figure.
+    @ViewBuilder private func unknownNote(_ n: Int, date: Bool = false) -> some View {
         if n > 0 {
-            Label(shop.words.callIt("mac.ls_unknown_n", ["n": .string(shop.words.numeral(n))]),
+            Label(shop.words.callIt(date ? "mac.ls_unknown_date_n" : "mac.ls_unknown_n", ["n": .string(shop.words.numeral(n))]),
                   systemImage: "questionmark.circle")
                 .font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }

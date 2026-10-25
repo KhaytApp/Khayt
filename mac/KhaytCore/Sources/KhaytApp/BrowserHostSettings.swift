@@ -86,7 +86,9 @@ struct BrowserHostRows: View {
                 Text(problem).font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text(w.callIt("mac.sfw_downloads_note"))
+            // The minutes as a figure in this Mac's digits, not a literal "10"
+            // inside Arabic text that ignored the Arabic-Indic setting.
+            Text(w.callIt("mac.sfw_downloads_note", ["min": .string(w.numeral(10))]))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -163,13 +165,13 @@ enum BrowserHostWords {
         "mac.sfw_host_update": ["en": "Update", "ar": "تحديث"],
         "mac.sfw_host_remove": ["en": "Remove", "ar": "إزالة"],
         "mac.sfw_host_none": ["en": "No Chrome, Edge, Brave, Vivaldi or Firefox on this Mac.",
-                              "ar": "لا يوجد Chrome أو Edge أو Brave أو Vivaldi أو Firefox على هذا الجهاز."],
+                              "ar": "لا يوجد Chrome أو Edge أو Brave أو Vivaldi أو Firefox على هذا الماك."],
         "mac.sfw_host_note": ["en": "Install puts one small file in that browser's folder so Save to Khayt in it can reach Khayt. Remove deletes only that file.",
                               "ar": "يضع «تثبيت» ملفًا صغيرًا في مجلد ذلك المتصفح ليتمكن «احفظ في خيط» فيه من الوصول إلى خيط. ولا يحذف «إزالة» إلا ذلك الملف."],
         "mac.sfw_host_no_program": ["en": "This copy of Khayt has no browser host (a development build). Use a build from khaytapp.com.",
                                     "ar": "هذه النسخة من خيط لا تحتوي على برنامج الاتصال بالمتصفح (نسخة تطوير). استخدم نسخة من khaytapp.com."],
         "mac.sfw_host_failed": ["en": "Could not change {browser}: {why}", "ar": "تعذّر تغيير {browser}: {why}"],
-        "mac.sfw_downloads_note": ["en": "After you save a page, a model you download from it within 10 minutes is offered to that model — Khayt asks before adding it, and the download stays where it is. In Safari, Khayt looks in your Downloads folder for those 10 minutes only.",
-                                   "ar": "بعد حفظ صفحة، يُعرض عليك أي نموذج تنزّله منها خلال 10 دقائق لإضافته إلى ذلك النموذج — يسألك خيط قبل الإضافة، ويبقى الملف المُنزَّل في مكانه. في Safari، ينظر خيط في مجلد التنزيلات خلال هذه الدقائق العشر فقط."],
+        "mac.sfw_downloads_note": ["en": "After you save a page, a model you download from it within {min} minutes is offered to that model — Khayt asks before adding it, and the download stays where it is. In Safari, Khayt looks in your Downloads folder for those {min} minutes only.",
+                                   "ar": "بعد حفظ صفحة، يُعرض عليك أي نموذج تنزّله منها خلال \u{2068}{min}\u{2069} دقائق لإضافته إلى ذلك النموذج — يسألك خيط قبل الإضافة، ويبقى الملف المُنزَّل في مكانه. في Safari، ينظر خيط في مجلد التنزيلات خلال هذه الدقائق العشر فقط."],
     ]
 }

@@ -113,7 +113,8 @@ extension Shop {
             throw .failed(LibraryImport.Failure.notOurs.said(words))
         }
         guard let roots = libraryRoots else { throw .failed(LibraryImport.Failure.noLibrary.said(words)) }
-        guard let engine else { throw .failed("the engine is not loaded") }
+        // In the shop's words: this sentence reaches the prompt as it is.
+        guard let engine else { throw .failed(words.callIt("mac.engine_failed")) }
         guard WebDownloads.isOfferable(offer.path, home: home), Self.webAttachable(offer.path) else { throw .gone }
         guard let saved = WebSaveRecord.record(offer.recordId, in: libraryRows) else { throw .gone }
 
@@ -316,26 +317,42 @@ struct WebAttachPrompt: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-            Text(w.callIt(offer.isArchive ? "mac.sfw_attach_note_archive" : "mac.sfw_attach_note"))
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // A dead end (nothing Khayt can read in it, or the download is
+            // gone): no promise of what Add will do, Add switched off, and
+            // Show in Finder becomes the default — the shop's way on.
+            let deadEnd = inbox.attachProblem.map { [w.callIt("mac.sfw_attach_no_model"),
+                                                     w.callIt("mac.sfw_attach_gone")].contains($0) } ?? false
+            if !deadEnd {
+                Text(w.callIt(offer.isArchive ? "mac.sfw_attach_note_archive" : "mac.sfw_attach_note"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let problem = inbox.attachProblem {
                 Label(problem, systemImage: "exclamationmark.triangle")
                     .font(.callout).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
-                Button(w.callIt("mac.sfw_attach_show")) {
-                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: offer.path)])
+                if deadEnd {
+                    Button(w.callIt("mac.sfw_attach_show")) {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: offer.path)])
+                    }
+                    .keyboardShortcut(.defaultAction)
+                } else {
+                    Button(w.callIt("mac.sfw_attach_show")) {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: offer.path)])
+                    }
                 }
                 Spacer()
                 if inbox.attaching { ProgressView().controlSize(.small) }
                 Button(w.callIt("mac.sfw_attach_not_now")) { inbox.dismissOffer() }
                     .keyboardShortcut(.cancelAction)
                     .disabled(inbox.attaching)
-                Button(w.callIt("mac.sfw_attach_add")) { Task { await inbox.accept(offer, shop: shop) } }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(inbox.attaching)
+                if !deadEnd {
+                    Button(w.callIt("mac.sfw_attach_add")) { Task { await inbox.accept(offer, shop: shop) } }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(inbox.attaching)
+                }
             }
         }
         .padding(20)
@@ -373,7 +390,7 @@ enum WebAttachWords {
     nonisolated static let table: [String: [String: String]] = [
         "mac.sfw_attach_title": ["en": "Add the download to your library?", "ar": "إضافة الملف المُنزَّل إلى مكتبتك؟"],
         "mac.sfw_attach_body": ["en": "“{file}” has finished downloading from the page you saved as “{title}”. Add it to that model?",
-                               "ar": "اكتمل تنزيل «{file}» من الصفحة التي حفظتها باسم «{title}». هل تريد إضافته إلى هذا النموذج؟"],
+                               "ar": "اكتمل تنزيل «\u{2068}{file}\u{2069}» من الصفحة التي حفظتها باسم «\u{2068}{title}\u{2069}». هل تريد إضافته إلى هذا النموذج؟"],
         "mac.sfw_attach_file": ["en": "File", "ar": "الملف"],
         "mac.sfw_attach_size": ["en": "Size", "ar": "الحجم"],
         "mac.sfw_attach_model": ["en": "Model", "ar": "النموذج"],

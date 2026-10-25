@@ -57,7 +57,7 @@ struct CloudPlanSettings: View {
             }
         }
         .task { if !preloaded { await load() } }
-        .alert(asking.map { shop.words.callIt("mac.plan_move_title", ["plan": .string($0.label)]) } ?? "",
+        .alert(asking.map { shop.words.callIt("mac.plan_move_title", ["plan": .string(Self.planName($0.name, $0.label, shop.words))]) } ?? "",
                isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }),
                presenting: asking) { plan in
             Button(shop.words.callIt("mac.plan_move_confirm")) { Task { await choose(plan) } }
@@ -72,7 +72,7 @@ struct CloudPlanSettings: View {
                 ProgressView().controlSize(.small)
             } else if let catalogue {
                 LabeledContent(shop.words.callIt("mac.plan_current")) {
-                    Text(current?.label ?? state.mine?.label ?? currentName).fontWeight(.medium)
+                    Text(Self.planName(currentName, current?.label ?? state.mine?.label ?? currentName, shop.words)).fontWeight(.medium)
                 }
                 // OVER THE VAULT after a move down: said before the plans, so
                 // the way out (Upgrade) is the first thing under it.
@@ -107,7 +107,7 @@ struct CloudPlanSettings: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(plan.label).fontWeight(plan.name == currentName ? .semibold : .regular)
+                    Text(Self.planName(plan.name, plan.label, shop.words)).fontWeight(plan.name == currentName ? .semibold : .regular)
                     if plan.name == currentName {
                         Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint)
                             .accessibilityLabel(shop.words.callIt("mac.plan_current"))
@@ -137,6 +137,15 @@ struct CloudPlanSettings: View {
                                  ["price": .string(money)])
     }
 
+    /// A plan's name as the shop reads it. Free is a word and is said in the
+    /// shop's language ("Free" beside «مجاناً» read as untranslated); Maker,
+    /// Creator and Studio are names, kept as the catalogue spells them and
+    /// isolated so a Latin name cannot turn an Arabic line round.
+    static func planName(_ name: String, _ label: String, _ words: Words) -> String {
+        if name == "free" { return words.callIt("mac.plan_name_free") }
+        return "\u{2068}" + label + "\u{2069}"
+    }
+
     static func losesSelling(_ plan: CloudPlans.Plan, from current: CloudPlans.Plan?) -> Bool {
         current?.limits.publishing == true && plan.limits.publishing != true
     }
@@ -149,12 +158,14 @@ struct CloudPlanSettings: View {
             parts.append(words.callIt("mac.plan_vault", ["size": .string(Format.fileSize(Int64(v)))]))
         }
         if let n = l.maxActiveLinks {
-            parts.append(n > 0 ? words.callIt("mac.plan_links", ["n": .number(Double(n))])
+            parts.append(n > 0 ? words.counting(n, "mac.plan_links")
                                : words.callIt("mac.plan_no_links"))
         }
         if l.publishing == true { parts.append(words.callIt("mac.plan_selling")) }
         if let s = l.maxSeats, s > 1 { parts.append(words.callIt("mac.plan_seats", ["n": .number(Double(s))])) }
-        return parts.joined(separator: " · ")
+        // Each part isolated: an Arabic line joined with " · " let the Latin
+        // "GB" of one part swallow the figure of the next ("خزنة 150 50 · GB").
+        return parts.map { "\u{2068}" + $0 + "\u{2069}" }.joined(separator: " · ")
     }
 
     /// The Upgrade a shop over its vault is offered: the cheapest move up
