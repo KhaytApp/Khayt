@@ -124,7 +124,9 @@ struct LibraryHealthView: View {
             contents(group)
             fixes(group)
         }
-        .card(rail: look.rail)
+        // A neutral rail for a group with no colour of its own, so every card
+        // starts its text on the same line.
+        .card(rail: look.rail ?? Color(nsColor: .separatorColor))
     }
 
     /// What is in the group: models by name, copies by set, products by name.

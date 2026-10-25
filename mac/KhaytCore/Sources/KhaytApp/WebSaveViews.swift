@@ -72,10 +72,10 @@ struct BrowserExtensionSettings: View {
     @Bindable var inbox = WebSaveInbox.shared
     @State private var safari: SafariState = .checking
 
-    enum SafariState { case checking, on, off, notFound }
+    enum SafariState: Sendable { case checking, on, off, notFound }
 
     /// The Safari extension's bundle identifier (`make-app.sh`).
-    static let safariExtensionId = "app.khayt.mac.safari"
+    nonisolated static let safariExtensionId = "app.khayt.mac.safari"
 
     var body: some View {
         let w = shop.words
@@ -133,20 +133,47 @@ struct BrowserExtensionSettings: View {
     }
 
     /// What Safari says about the extension. Pretended in a snapshot.
-    static func safariState() async -> SafariState {
+    ///
+    /// NONISOLATED, AND SO IS SAFARI'S REPLY. This type is a `View`, so
+    /// everything in it is main-actor unless it says otherwise — and a reply
+    /// closure written inline here inherited that, while Safari calls it on
+    /// its own XPC queue (`…SafariServices.ExtensionHelper`). Swift 6 checks
+    /// a closure's isolation when it is entered, so opening Settings ›
+    /// Preferences trapped (SIGTRAP) on every Mac, in release as well. The
+    /// reply is `@Sendable` and touches nothing but the continuation; the
+    /// caller's `await` is what brings the answer back to the main actor.
+    nonisolated static func safariState() async -> SafariState {
         if let pretend = pretendSafari { return pretend }
-        return await withCheckedContinuation { done in
-            SFSafariExtensionManager.getStateOfSafariExtension(withIdentifier: safariExtensionId) { state, error in
-                done.resume(returning: error != nil ? .notFound : (state?.isEnabled == true ? .on : .off))
-            }
+        return await askSafari(safariExtensionId)
+    }
+
+    /// The real question, with no pretending, for a test to call off the
+    /// main thread: an identifier Safari does not know still gets a reply on
+    /// the XPC queue, which is the path that trapped.
+    nonisolated static func askSafari(_ id: String) async -> SafariState {
+        await withCheckedContinuation { (done: CheckedContinuation<SafariState, Never>) in
+            SFSafariExtensionManager.getStateOfSafariExtension(withIdentifier: id, completionHandler: safariReply(done))
+        }
+    }
+
+    /// The reply handed to Safari, built outside any actor so it carries no
+    /// isolation for the runtime to check on Safari's queue.
+    nonisolated static func safariReply(_ done: CheckedContinuation<SafariState, Never>)
+        -> @Sendable (SFSafariExtensionState?, (any Error)?) -> Void {
+        { @Sendable state, error in
+            done.resume(returning: error != nil ? .notFound : (state?.isEnabled == true ? .on : .off))
         }
     }
 
     nonisolated(unsafe) static var pretendSafari: SafariState?
 
+    /// Same rule as `safariState`: Safari answers this on its queue too.
     static func openSafariSettings() {
-        SFSafariApplication.showPreferencesForExtension(withIdentifier: safariExtensionId) { _ in }
+        SFSafariApplication.showPreferencesForExtension(withIdentifier: safariExtensionId,
+                                                        completionHandler: ignoredReply)
     }
+
+    nonisolated static let ignoredReply: @Sendable ((any Error)?) -> Void = { @Sendable _ in }
 }
 
 /// The words of Save to Khayt, in both languages. Merged into `Words.own`.
@@ -165,19 +192,19 @@ enum WebSaveWords {
                                  "ar": "نزّل النموذج من صفحته، ثم أضف الملف إلى المكتبة لطباعته."],
         "mac.sfw_settings": ["en": "Browser extension", "ar": "إضافة المتصفح"],
         "mac.sfw_settings_note": ["en": "Save to Khayt adds a model's page from Printables, MakerWorld, Thingiverse and other sites to your library — its link, creator, licence, tags and picture — on the Print next list.",
-                                 "ar": "تضيف «احفظ في خيط» صفحة نموذج من Printables وMakerWorld وThingiverse وغيرها إلى مكتبتك — رابطه ومصممه وترخيصه ووسومه وصورته — في قائمة «للطباعة لاحقًا»."],
+                                 "ar": "تضيف «احفظ في خيط» صفحة نموذج من Printables وMakerWorld وThingiverse وغيرها إلى مكتبتك — رابطه ومصممه وترخيصه ووسومه وصورته — في قائمة «التالي للطباعة»."],
         "mac.sfw_accept": ["en": "Accept pages saved from the browser", "ar": "قبول الصفحات المحفوظة من المتصفح"],
-        "mac.sfw_safari": ["en": "Safari", "ar": "متصفح Safari"],
+        "mac.sfw_safari": ["en": "Safari", "ar": "Safari"],
         "mac.sfw_safari_checking": ["en": "Checking…", "ar": "جارٍ التحقق…"],
-        "mac.sfw_safari_on": ["en": "On", "ar": "مفعّلة"],
+        "mac.sfw_safari_on": ["en": "Connected", "ar": "متصل"],
         "mac.sfw_safari_off": ["en": "Off — turn it on in Safari's settings", "ar": "متوقفة — فعّلها من إعدادات Safari"],
         "mac.sfw_safari_not_found": ["en": "Not found — open Khayt from Applications once, then try again",
                                     "ar": "غير موجودة — افتح خيط من مجلد التطبيقات مرة، ثم حاول مجددًا"],
         "mac.sfw_safari_open": ["en": "Open Safari Settings…", "ar": "فتح إعدادات Safari…"],
         "mac.sfw_no_group": ["en": "This build of Khayt was not signed by a developer team, so it has no folder to share with the extension. Use a build from khaytapp.com.",
                             "ar": "هذه النسخة من خيط غير موقّعة من فريق مطوّر، لذا لا تملك مجلدًا مشتركًا مع الإضافة. استخدم نسخة من khaytapp.com."],
-        "mac.sfw_last": ["en": "Last saved: {title}", "ar": "آخر ما حُفظ: {title}"],
+        "mac.sfw_last": ["en": "Last saved: {title}", "ar": "آخر ما حُفظ: \u{2068}{title}\u{2069}"],
         "mac.sfw_privacy": ["en": "Page details go to Khayt on this Mac and nowhere else. Khayt fetches only the page's picture, from the site itself.",
-                           "ar": "تذهب تفاصيل الصفحة إلى خيط على هذا الجهاز فقط ولا تُرسل إلى أي مكان آخر. لا يجلب خيط إلا صورة الصفحة، من الموقع نفسه."],
+                           "ar": "تذهب تفاصيل الصفحة إلى خيط على هذا الماك فقط ولا تُرسل إلى أي مكان آخر. لا يجلب خيط إلا صورة الصفحة، من الموقع نفسه."],
     ]
 }

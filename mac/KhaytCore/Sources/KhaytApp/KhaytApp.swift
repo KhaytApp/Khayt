@@ -882,6 +882,36 @@ final class Activator: NSObject, NSApplicationDelegate {
                 subject?.shelf = .inventory
                 try? await Task.sleep(for: .milliseconds(700))
                 capturePanes(named: "08-dark-inventory", into: dir)
+                // ── AND SETTINGS › PREFERENCES, DARK ──────────────────────
+                //
+                // The pane with the switches (notifications, the menu bar's
+                // style, the browser extension) and the one that crashed in
+                // beta.7: Safari answered on its own queue into a main-actor
+                // closure. It asks the REAL Safari here, unpretended, so this
+                // picture existing is the proof that it no longer traps.
+                if !skipped("settings") {
+                    doing("settings-window-dark")
+                    let main = NSApp.windows.first { $0.isVisible && $0.contentView != nil }
+                    if let item = NSApp.mainMenu?.items.first?.submenu?.items.first(where: { $0.keyEquivalent == "," }) {
+                        NSApp.sendAction(item.action ?? #selector(NSApplication.terminate(_:)), to: item.target, from: item)
+                    }
+                    await settle()
+                    try? await Task.sleep(for: .seconds(1))
+                    if let settings = NSApp.windows.first(where: {
+                        $0.isVisible && $0 !== main && $0.contentView != nil
+                            && $0.frame.width >= 300 && $0.frame.height >= 300
+                    }) {
+                        subject?.settingsPane = .preferences
+                        await settle()
+                        try? await Task.sleep(for: .milliseconds(700))
+                        capture(named: "17-dark-settings-preferences", window: settings, into: dir)
+                        capturePanes(named: "17-dark-settings-preferences", window: settings, into: dir)
+                        settings.close()
+                        await settle()
+                    } else {
+                        FileHandle.standardError.write(Data("no settings window (dark)\n".utf8))
+                    }
+                }
                 // Stop here. Everything below is photographed by the light run.
                 NSApp.terminate(nil)
                 return

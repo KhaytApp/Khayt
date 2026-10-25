@@ -90,6 +90,9 @@ struct LibraryInspector: View {
                 }
             }
             // ── PRINT: what it takes and what can go wrong ───────────────
+            // Not for a page saved from the web and not downloaded: there is
+            // nothing to print yet, and the heading stood over nothing.
+            if !file.isWebOnly {
             InspectorSection(id: "print", title: w.callIt("mac.li_sec_print"), symbol: "printer") {
                 if let sliced = slicedSection(file) { sliced }
                 if !file.palette.isEmpty { filament(file) }
@@ -99,6 +102,7 @@ struct LibraryInspector: View {
                 if let estimate = shop.estimates[file.id], !Self.slicerSaidAnything(file) { priced(estimate) }
                 if file.sourceFile?.kind == "model" { risk(file) }
                 if let how = howItPrints(file) { how }
+            }
             }
             // ── THE FILE, AND WHERE ITS BYTES ARE ────────────────────────
             InspectorSection(id: "file", title: w.callIt("mac.li_sec_file"), symbol: "doc") {
@@ -213,10 +217,12 @@ struct LibraryInspector: View {
 
     private func theFile(_ file: LibraryFile) -> some View {
         DetailSection(shop.words.callIt("mac.file")) {
-            if let original = file.sourceFile?.originalName ?? file.originalName {
+            // Not an empty Name row (a page saved from the web has no file yet).
+            if let original = file.sourceFile?.originalName ?? file.originalName, !original.isEmpty {
                 DetailLine(shop.words.callIt("mac.name"), original)
             }
-            if let size = file.size { DetailLine(shop.words.callIt("set.store_size"), Format.bytes(size)) }
+            // "File size" / "Dimensions" / "Volume": Arabic had «الحجم» for all three.
+            if let size = file.size { DetailLine(shop.words.callIt("mac.li_file_size"), Format.bytes(size)) }
             if let material = file.material, !material.isEmpty {
                 DetailLine(shop.words.callIt("plib.material"), material)
             }
@@ -236,6 +242,10 @@ struct LibraryInspector: View {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.cloudlib_in_cloud"), dim: true)
             } else if shop.fileIsPresent(file) {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), "✓", dim: true)
+            } else if file.inArchive {
+                // Inside a compressed file: nothing is lost, it is taken out
+                // when opened (or, locked, never) — `ArchiveMemberNote` says which.
+                DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.arc_inside"), dim: true)
             } else {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.li_not_here"), warn: true)
             }
@@ -285,11 +295,32 @@ struct LibraryInspector: View {
         })
     }
 
+    /// The number in a slicer's own default name for a filament — "Filament
+    /// 2", "Extruder 2", "T2" — or nil for a name somebody chose. Those are
+    /// the slicer's English, not the shop's words, and an Arabic inspector
+    /// listed "Filament 1…4" verbatim; they are said as `mac.filament_n`.
+    static func slicerDefaultNumber(_ label: String) -> Int? {
+        let t = label.trimmingCharacters(in: .whitespaces)
+        guard let m = t.wholeMatch(of: /(?i)(?:filament|extruder|tool|t)\s*#?\s*(\d{1,3})/) else { return nil }
+        return Int(m.1)
+    }
+
+    /// A palette colour's name in the shop's words: its own when it has one,
+    /// "Filament N" said in the shop's language when it is the slicer's default.
+    static func colourLabel(_ label: String?, index: Int, words: Words) -> String {
+        if let label, !label.isEmpty, slicerDefaultNumber(label) == nil { return label }
+        let n = label.flatMap(slicerDefaultNumber) ?? (index + 1)
+        return words.callIt("mac.filament_n", ["n": .number(Double(n))])
+    }
+
     /// "Filament 2 · PLA": which spool slot it is AND what is in it.
     static func slotLabel(_ f: Shop.PlateFilament, words: Words) -> String {
         let slot: String = {
             if let n = Double(f.slot), n.isFinite, n >= 0, n < 1_000_000, n == n.rounded() {
                 return words.callIt("mac.filament_n", ["n": .number(n)])
+            }
+            if let n = slicerDefaultNumber(f.slot) {
+                return words.callIt("mac.filament_n", ["n": .number(Double(n))])
             }
             return f.slot.isEmpty ? "" : words.callIt("mac.filament_n", ["n": .string(f.slot)])
         }()
@@ -310,7 +341,7 @@ struct LibraryInspector: View {
             ForEach(Array(file.palette.enumerated()), id: \.offset) { i, colour in
                 HStack(spacing: 8) {
                     Swatch(rgb: colour.rgb)
-                    Text(colour.label ?? shop.words.callIt("mac.filament_n", ["n": .number(Double(i + 1))]))
+                    Text(Self.colourLabel(colour.label, index: i, words: shop.words))
                         .font(.callout)
                     Spacer(minLength: 8)
                     if let g = colour.grams {
@@ -322,7 +353,7 @@ struct LibraryInspector: View {
                 }
             }
             if file.swaps > 0 {
-                DetailLine(shop.words.callIt("mac.swaps"), "\(file.swaps)", dim: true)
+                DetailLine(shop.words.callIt("mac.swaps"), "\(file.swaps)")
             }
         }
     }
@@ -434,12 +465,13 @@ struct LibraryInspector: View {
         let w = shop.words
         let machines = shop.machineFits(for: file)
         return DetailSection(w.callIt("mac.mesh")) {
-            DetailLine(w.callIt("set.store_size"), "\(Format.mm(mesh.x)) × \(Format.mm(mesh.y)) × \(Format.mm(mesh.z)) mm")
+            DetailLine(w.callIt("mac.li_dimensions"), "\(Format.mm(mesh.x)) × \(Format.mm(mesh.y)) × \(Format.mm(mesh.z)) mm")
+            // Real figures, drawn like their neighbours: dim is for a placeholder.
             if mesh.volumeMm3 > 0 {
                 DetailLine(w.callIt("mac.li_volume"),
-                           Money.quantity(mesh.volumeMm3 / 1000, decimals: 1) + " cm³", dim: true)
+                           Money.quantity(mesh.volumeMm3 / 1000, decimals: 1) + " cm³")
             }
-            DetailLine(w.callIt("mac.triangles"), Format.count(mesh.triangles), dim: true)
+            DetailLine(w.callIt("mac.triangles"), Format.count(mesh.triangles))
             // Silent when nothing is known — a machine with no bed recorded
             // is not a machine that refuses the model.
             ForEach(machines) { m in
@@ -829,6 +861,10 @@ struct ModelSummaryCard: View {
 
     private var facts: some View {
         let none = "\u{2014}"
+        // No time and no weight: no cost either. A figure made of the setup
+        // and machine minimum alone (74.25 beside two dashes) reads as what
+        // the model costs to make, which nobody has worked out yet.
+        let cost = (hours == nil && grams == nil) ? nil : summary?.cost
         return VStack(alignment: .leading, spacing: 6) {
             Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 0) {
                 GridRow {
@@ -838,9 +874,11 @@ struct ModelSummaryCard: View {
                     fact(w.callIt("mac.li_filament"),
                          grams.map { PrintFigures.weight($0, w) } ?? none,
                          unit: nil, approximate: estimated && grams != nil)
+                    // ≈ when what it is made of is estimated, like its neighbours.
                     fact(w.callIt("mac.li_cost"),
-                         summary?.cost.map { Money.figure($0) } ?? none,
-                         unit: summary?.cost == nil ? nil : Money.mark(shop.currency))
+                         cost.map { Money.figure($0) } ?? none,
+                         unit: cost == nil ? nil : Money.mark(shop.currency),
+                         approximate: estimated && cost != nil)
                 }
             }
             if hours == nil && grams == nil {
@@ -995,7 +1033,9 @@ struct ModelSummaryCard: View {
             Label(w.callIt("mac.sfw_download_hint"), systemImage: "safari")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-        } else if !shop.fileIsPresent(file) {
+        } else if !shop.fileIsPresent(file) && !file.inArchive {
+            // Not for a model inside a compressed file: "reconnect its drive"
+            // was said to a password-locked member, whose own note is the answer.
             Label(w.callIt("mac.li_missing_file"), systemImage: "questionmark.folder")
                 .font(.caption).foregroundStyle(Khayt.attention)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1019,8 +1059,20 @@ struct ModelSummaryCard: View {
         .disabled(!shop.canMoveJobs)
         // The door to the catalogue, where it can be seen — it lived only in
         // a right-click menu, and a shop went looking for it.
-        let catalogue = Button { Task { await shop.editingProduct = shop.productFromFile(file) } } label: {
-            Label(w.callIt("mac.li_add_catalogue"), systemImage: "tag")
+        // Once it sells, the door opens the product it sells as: "Add to
+        // Catalogue" under "Sells as Falcon hood" offered a second one.
+        let catalogue = Group {
+            if let product = summary?.product {
+                Button { Task { shop.editingProduct = await shop.productForEditing(product.id) } } label: {
+                    Label(w.callIt("mac.li_open_in_catalogue"), systemImage: "tag")
+                }
+                .help(w.callIt("mac.li_open_product"))
+            } else {
+                Button { Task { await shop.editingProduct = shop.productFromFile(file) } } label: {
+                    Label(w.callIt("mac.li_add_catalogue"), systemImage: "tag")
+                }
+                .disabled(!shop.canWrite)
+            }
         }
         return ViewThatFits(in: .horizontal) {
             HStack(spacing: 6) { quote; job; catalogue }
@@ -1186,8 +1238,9 @@ struct VersionsSection: View {
     private func size(_ v: KhaytEngine.PrintVersions.Version) -> String? {
         var bits: [String] = []
         // The page's one format for both (`PrintFigures`).
-        if let g = v.grams { bits.append(PrintFigures.weight(g, shop.words)) }
+        // Time first, then weight: the order plates and tiles use.
         if let h = v.hours { bits.append(PrintFigures.duration(hours: h, shop.words)) }
+        if let g = v.grams { bits.append(PrintFigures.weight(g, shop.words)) }
         return bits.isEmpty ? nil : bits.joined(separator: " · ")
     }
 }

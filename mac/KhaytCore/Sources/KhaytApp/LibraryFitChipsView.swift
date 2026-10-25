@@ -35,7 +35,7 @@ struct FitChipRow: View {
                         chipBox(text: words.callIt("mac.lfc_more", ["n": .string(words.numeral(n))]), symbol: nil,
                                 ink: selected ? .white : Color.secondary,
                                 fill: selected ? Color.white.opacity(0.2) : Khayt.recessed)
-                            .accessibilityLabel(words.callIt("mac.lfc_more_said", ["n": .string(words.numeral(n))]))
+                            .accessibilityLabel(words.counting(n, "mac.lfc_more_said"))
                     }
                 }
                 .clipped()

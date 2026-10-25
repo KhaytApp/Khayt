@@ -506,7 +506,9 @@ struct FolderCell: View {
                 // height of every other tile.
                 title
                     .font(.system(size: size.isCompact ? 11 : 12, weight: .medium))
-                    .lineLimit(size.isCompact ? 1 : 2, reservesSpace: true)
+                    // Two lines at every size: on a Small tile one line cut "KING Abdulaziz" and
+                    // "KING Abdullah" to the same "KING Abdula…".
+                    .lineLimit(2, reservesSpace: true)
                     .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
                     .help(parent.map { name + " \u{00B7} " + words.callIt("mac.group_in_parent", ["name": .string($0)]) } ?? name)
@@ -810,7 +812,9 @@ struct Cell: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(TitleBreaks.soften(file.title))
                     .font(.system(size: size.isCompact ? 11 : 12, weight: .medium))
-                    .lineLimit(size.isCompact ? 1 : 2, reservesSpace: true)
+                    // Two lines at every size: on a Small tile one line cut "KING Abdulaziz" and
+                    // "KING Abdullah" to the same "KING Abdula…".
+                    .lineLimit(2, reservesSpace: true)
                     .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
                     .help(file.title)

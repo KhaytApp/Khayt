@@ -88,7 +88,7 @@ enum LibraryTileSize: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Small is a contact sheet: one line of title, and none of the badges
+    /// Small is a contact sheet: a short title (two lines, like the others), and none of the badges
     /// that only matter once a model has been picked out.
     var isCompact: Bool { self == .small }
 
