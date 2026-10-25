@@ -83,7 +83,7 @@ struct BrowserHostRows: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let problem {
-                Text(problem).font(.caption).foregroundStyle(.red)
+                Text(problem).font(.caption).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Text(w.callIt("mac.sfw_downloads_note"))

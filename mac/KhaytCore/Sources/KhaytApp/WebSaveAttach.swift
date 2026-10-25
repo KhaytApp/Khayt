@@ -303,7 +303,7 @@ struct WebAttachPrompt: View {
                     Text(offer.name).lineLimit(1).truncationMode(.middle)
                 }
                 LabeledContent(w.callIt("mac.sfw_attach_size")) {
-                    Text(ByteCountFormatter.string(fromByteCount: Int64(offer.size), countStyle: .file))
+                    Text(Format.fileSize(Int64(offer.size)))
                 }
                 LabeledContent(w.callIt("mac.sfw_attach_model")) {
                     Text(offer.title).lineLimit(1).truncationMode(.tail)
@@ -318,7 +318,7 @@ struct WebAttachPrompt: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let problem = inbox.attachProblem {
                 Label(problem, systemImage: "exclamationmark.triangle")
-                    .font(.callout).foregroundStyle(.red)
+                    .font(.callout).foregroundStyle(Khayt.attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
