@@ -4193,6 +4193,127 @@
     }
    ],
    "category": "Functional parts"
+  },
+  {
+   "id": "PF-sample-arc-pen",
+   "name": "pen-cup",
+   "originalName": "pen-cup.stl",
+   "updatedAt": "2026-08-05T10:00:00.000Z",
+   "sourceFile": {
+    "filename": "pen-cup.stl",
+    "originalName": "pen-cup.stl",
+    "size": 142084,
+    "ext": "stl",
+    "kind": "model"
+   },
+   "parsed": {
+    "printTimeMins": 96,
+    "filamentGrams": 38,
+    "filamentType": "PLA",
+    "slicer": null
+   },
+   "colors": [],
+   "swapCount": 0,
+   "thumbFile": "thumb.png",
+   "userPhoto": null,
+   "slicerProfileId": null,
+   "testedNotes": "",
+   "tags": [
+    "desk"
+   ],
+   "folder": "Desk Organiser Pack",
+   "group": "Desk Organiser Pack",
+   "material": "PLA",
+   "favorite": false,
+   "contentHash": "sample-arc-pen",
+   "geometryKey": "2840:61240.5:82x82x96",
+   "category": "Functional parts",
+   "externalPath": "/Users/Shared/Khayt Sample/Downloads/Desk Organiser Pack.zip",
+   "archiveMember": "./STL/pen-cup.stl",
+   "archiveHash": "sample-arc-desk-pack",
+   "autoGroup": "Desk Organiser Pack",
+   "autoName": "pen-cup"
+  },
+{
+   "id": "PF-sample-arc-clip",
+   "name": "cable-clip",
+   "originalName": "cable-clip.stl",
+   "updatedAt": "2026-08-05T10:00:00.000Z",
+   "sourceFile": {
+    "filename": "cable-clip.stl",
+    "originalName": "cable-clip.stl",
+    "size": 30684,
+    "ext": "stl",
+    "kind": "model"
+   },
+   "parsed": {
+    "printTimeMins": 14,
+    "filamentGrams": 4,
+    "filamentType": "PLA",
+    "slicer": null
+   },
+   "colors": [],
+   "swapCount": 0,
+   "thumbFile": "thumb.png",
+   "userPhoto": null,
+   "slicerProfileId": null,
+   "testedNotes": "",
+   "tags": [
+    "desk"
+   ],
+   "folder": "Desk Organiser Pack",
+   "group": "Desk Organiser Pack",
+   "material": "PLA",
+   "favorite": false,
+   "contentHash": "sample-arc-clip",
+   "geometryKey": "612:3420.0:34x18x12",
+   "category": "Functional parts",
+   "externalPath": "/Users/Shared/Khayt Sample/Downloads/Desk Organiser Pack.zip",
+   "archiveMember": "./STL/cable-clip.stl",
+   "archiveHash": "sample-arc-desk-pack",
+   "autoGroup": "Desk Organiser Pack",
+   "autoName": "cable-clip"
+  },
+{
+   "id": "PF-sample-arc-knight",
+   "name": "knight",
+   "originalName": "knight.stl",
+   "updatedAt": "2026-08-05T10:00:00.000Z",
+   "sourceFile": {
+    "filename": "knight.stl",
+    "originalName": "knight.stl",
+    "size": 2480112,
+    "ext": "stl",
+    "kind": "model"
+   },
+   "parsed": {
+    "printTimeMins": null,
+    "filamentGrams": null,
+    "filamentType": null,
+    "slicer": null
+   },
+   "colors": [],
+   "swapCount": 0,
+   "thumbFile": null,
+   "userPhoto": null,
+   "slicerProfileId": null,
+   "testedNotes": "",
+   "tags": [
+    "minis"
+   ],
+   "folder": "Patreon Minis",
+   "group": "Patreon Minis",
+   "material": "",
+   "favorite": false,
+   "contentHash": null,
+   "geometryKey": null,
+   "category": "Decorative",
+   "externalPath": "/Users/Shared/Khayt Sample/Downloads/Patreon Minis.7z",
+   "archiveMember": "./knight.stl",
+   "archiveHash": null,
+   "autoGroup": "Patreon Minis",
+   "autoName": "knight",
+   "archiveLocked": true
   }
  ],
  "inventory": [

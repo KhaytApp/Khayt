@@ -1102,6 +1102,16 @@ extension Shop {
     /// Bring one model back from the cloud, for a shop about to use it.
     func bringBack(_ file: LibraryFile) async {
         cloudLibraryProblem = nil
+        // A member of a compressed file its drive let go of: the ARCHIVE is
+        // brought down (reading it is what fetches it), then the member
+        // extracted. Never `bringDownLinked`, which would read the archive
+        // as the model and write its hash on the member's record.
+        if file.inArchive {
+            cloudLibraryBusy = true
+            defer { cloudLibraryBusy = false }
+            await bringDownArchive(file)
+            return
+        }
         if file.isLinked {
             // Its drive fetches it when it is read; reading it is filling it in.
             cloudLibraryBusy = true

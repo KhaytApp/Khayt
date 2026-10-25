@@ -304,7 +304,8 @@ extension Shop {
             // writes the G-code beside it — the app's own folder for it holds
             // only pictures. That folder can hold a whole shelf of other
             // jobs' G-code, so only files named after this model are taken.
-            if let path = file.externalPath, !path.isEmpty {
+            // Not for a member of a compressed file: its path is the archive.
+            if let path = file.externalPath, !path.isEmpty, !file.inArchive {
                 let model = URL(fileURLWithPath: path)
                 for url in PrinterSend.slicedFiles(in: model.deletingLastPathComponent(),
                                                    namedAfter: model.deletingPathExtension().lastPathComponent)

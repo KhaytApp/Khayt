@@ -2876,6 +2876,15 @@ final class Shop {
     /// For a snapshot or a test: where each model's bytes are, instead of
     /// asking the disk. The sample book has no library folder to ask.
     @ObservationIgnored var pretendHealthPresence: [String: LibraryHealth.Presence]?
+
+    // ── COMPRESSED FILES AS FOLDERS (`Shop+ArchiveFolders.swift`) ────────
+    /// Moves on whenever a member is extracted into the cache, so a view
+    /// that asked `modelFile` for it draws again.
+    var archiveCacheRevision = 0
+    /// Members being extracted right now, by record id.
+    var archiveExtracting: Set<String> = []
+    /// Which groups are an archive's folder, as of `filesRevision`.
+    @ObservationIgnored var archiveGroupMemo: (revision: Int, names: [String: String])?
     /// Models that are the same file, or the same mesh, as another.
     var libraryDuplicatesOnly = false { didSet { libraryViewChanged() } }
     /// Ready on ANY machine that says what it has loaded — the "Ready to

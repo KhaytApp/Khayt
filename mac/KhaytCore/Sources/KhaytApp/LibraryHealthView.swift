@@ -148,7 +148,30 @@ struct LibraryHealthView: View {
             }
             more(group, total: group.clusters.count)
         default:
-            let files = shop.healthFiles(group)
+            // A missing COMPRESSED FILE is one line, however many models it
+            // held — its Locate finds the archive and moves them all.
+            let held = Set(group.archives.flatMap(\.modelIds))
+            let byId = Dictionary(shop.healthFiles(group).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            if !group.archives.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(group.archives, id: \.path) { gone in
+                        HStack(spacing: 8) {
+                            Label(w.callIt("mac.lh_arc_row",
+                                           ["name": .string((gone.path as NSString).lastPathComponent),
+                                            "models": .string(w.counting(gone.modelIds.count, "mac.n_models"))]),
+                                  systemImage: "doc.zipper")
+                                .font(.callout).lineLimit(1).truncationMode(.middle)
+                            Spacer(minLength: 8)
+                            if let first = gone.modelIds.first.flatMap({ byId[$0] }) {
+                                Button(w.callIt("mac.lh_locate") + "\u{2026}") { Task { await shop.locateMissing(first) } }
+                                    .controlSize(.small)
+                                    .disabled(!shop.canWrite)
+                            }
+                        }
+                    }
+                }
+            }
+            let files = shop.healthFiles(group).filter { !held.contains($0.id) }
             let rows = all ? files : Array(files.prefix(Self.shown))
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(rows) { file in

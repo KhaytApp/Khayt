@@ -765,6 +765,13 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only compressed files as folders: a real zip indexed into a
+            // throwaway book, laid over the sample in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBARCHIVE"] == "1", let shop = subject {
+                await captureLibraryArchive(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             // Only Library Health and Print next, on the sample, in memory.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBHEALTH"] == "1", let shop = subject {
                 await captureLibraryHealth(shop, into: dir, dark: dark)

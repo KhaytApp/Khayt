@@ -58,14 +58,20 @@ public enum LibraryHealth {
         public var tags: [String]
         public var category: String?
         public var archived: Bool
+        /// For a model INSIDE a compressed file (`ArchiveFolder`), that
+        /// file's path: its members are there or gone together, and a gone
+        /// one is one thing to find, not a model each.
+        public var inArchive: String?
 
         public init(id: String, title: String, presence: Presence, contentHash: String? = nil,
                     geometryKey: String? = nil, slicedMinutes: Double? = nil, slicedGrams: Double? = nil,
-                    tags: [String] = [], category: String? = nil, archived: Bool = false) {
+                    tags: [String] = [], category: String? = nil, archived: Bool = false,
+                    inArchive: String? = nil) {
             self.id = id; self.title = title; self.presence = presence
             self.contentHash = contentHash; self.geometryKey = geometryKey
             self.slicedMinutes = slicedMinutes; self.slicedGrams = slicedGrams
             self.tags = tags; self.category = category; self.archived = archived
+            self.inArchive = inArchive
         }
 
         /// The mesh is measured: `geometryKey` with a triangle count and a
@@ -140,8 +146,24 @@ public enum LibraryHealth {
         public let clusters: [[String]]
         /// For `orphanProducts`: the products.
         public let productIds: [String]
+        /// For `missing`: each compressed file that is gone, ONCE, with the
+        /// models it held — in `modelIds` too, so Remove counts every one.
+        public var archives: [MissingArchive] = []
 
         public var count: Int { kind == .orphanProducts ? productIds.count : modelIds.count }
+
+        /// The missing models that are NOT inside a missing archive — the
+        /// ones listed one by one.
+        public var looseIds: [String] {
+            let held = Set(archives.flatMap(\.modelIds))
+            return modelIds.filter { !held.contains($0) }
+        }
+    }
+
+    /// A compressed file the library's models are inside, gone from this Mac.
+    public struct MissingArchive: Sendable, Equatable {
+        public let path: String
+        public let modelIds: [String]
     }
 
     /// The groups with anything in them, in the order a shop should work
@@ -155,7 +177,18 @@ public enum LibraryHealth {
             guard !ids.isEmpty || !products.isEmpty else { return }
             out.append(Group(kind: kind, modelIds: ids, clusters: clusters, productIds: products))
         }
-        add(.missing, live.filter { $0.presence == .missing }.map(\.id))
+        let missing = live.filter { $0.presence == .missing }
+        add(.missing, missing.map(\.id))
+        // A missing archive is ONE thing gone, however many models it held.
+        if let i = out.firstIndex(where: { $0.kind == .missing }) {
+            var order: [String] = [], held: [String: [String]] = [:]
+            for m in missing {
+                guard let a = m.inArchive, !a.isEmpty else { continue }
+                if held[a] == nil { order.append(a) }
+                held[a, default: []].append(m.id)
+            }
+            out[i].archives = order.map { MissingArchive(path: $0, modelIds: held[$0] ?? []) }
+        }
         add(.onlineUnmeasured, live.filter { $0.presence == .online && !$0.hasFigures }.map(\.id))
         add(.noFigures, live.filter { ![.online, .missing, .web].contains($0.presence) && !$0.hasFigures }.map(\.id))
         let (same, looks) = duplicates(live)

@@ -10,6 +10,9 @@ import KhaytCore
 struct LibraryHealthFocus: Hashable, Sendable {
     let kind: LibraryHealth.Kind
     let ids: [String]
+    /// What its chip says, when it is not a Health group's own title — an
+    /// archive's name, from its folder tile's Remove (`askToRemoveArchive`).
+    var label: String? = nil
 }
 
 /// ── LIBRARY HEALTH, ON THE MAC ──────────────────────────────────────────
@@ -45,9 +48,21 @@ extension Shop {
     nonisolated static func healthPresence(_ files: [LibraryFile], roots: [String]?, online: Set<String>,
                                            linkedOnline: @Sendable (URL) -> Bool) -> [String: LibraryHealth.Presence] {
         var out: [String: LibraryHealth.Presence] = [:]
+        // A compressed file is asked about ONCE, however many models it holds.
+        var archives: [String: LibraryHealth.Presence] = [:]
         for file in files {
             if file.isWebOnly { out[file.id] = .web; continue }
             if online.contains(file.id) { out[file.id] = .online; continue }
+            if let path = file.archivePath {
+                // No library folder (the sample): nothing is known, as below.
+                guard let roots, !roots.isEmpty else { out[file.id] = .unknown; continue }
+                if let known = archives[path] { out[file.id] = known; continue }
+                let p: LibraryHealth.Presence = !FileManager.default.fileExists(atPath: path) ? .missing
+                    : linkedOnline(URL(fileURLWithPath: path)) ? .online : .here
+                archives[path] = p
+                out[file.id] = p
+                continue
+            }
             if let path = file.externalPath, !path.isEmpty {
                 guard FileManager.default.fileExists(atPath: path) else { out[file.id] = .missing; continue }
                 out[file.id] = linkedOnline(URL(fileURLWithPath: path)) ? .online : .here
@@ -65,7 +80,8 @@ extension Shop {
         return LibraryHealth.Model(id: file.id, title: file.title, presence: presence,
                                    contentHash: file.contentHash, geometryKey: file.geometryKey,
                                    slicedMinutes: sliced.minutes, slicedGrams: sliced.grams,
-                                   tags: file.tags ?? [], category: file.category, archived: file.isArchived)
+                                   tags: file.tags ?? [], category: file.category, archived: file.isArchived,
+                                   inArchive: file.archivePath)
     }
 
     /// The catalogue, as the rule reads it: each product and the library
@@ -170,6 +186,9 @@ extension Shop {
         var reads: [String: DownloadedRead] = [:]
         var skipped = 0
         for file in chosen {
+            // A member of a compressed file: its copy, extracted if the
+            // cache had let it go. A locked one has nothing to measure.
+            if file.inArchive { await materialise(file) }
             let found = await PinWork.run { () -> URL? in
                 guard let url = Shop.modelFile(for: file, roots: roots.roots) else { return nil }
                 return file.isLinked && isOnline(url) ? nil : url
@@ -218,6 +237,12 @@ extension Shop {
         return hash == want
     }
 
+    /// The same, for a member: the ARCHIVE's bytes decide (`archiveHash`).
+    nonisolated static func locatedArchiveMatches(_ file: LibraryFile, hash: String?) -> Bool {
+        guard let want = file.archiveHash, !want.isEmpty else { return true }
+        return hash == want
+    }
+
     /// "Locate…": the shop points at where the file is now. A linked model's
     /// path is changed on its record; a vault model's file is COPIED back
     /// into its own folder (the original is left where it was). Refused when
@@ -232,14 +257,24 @@ extension Shop {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.message = words.callIt("mac.lh_locate_prompt", ["name": .string(file.title)])
+        panel.message = words.callIt("mac.lh_locate_prompt",
+                                     ["name": .string(file.archivePath.map { ($0 as NSString).lastPathComponent } ?? file.title)])
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let hash = await PinWork.run { try? LibraryImport.contentHash(of: url) } ?? nil
-        guard Self.locatedFileMatches(file, hash: hash) else {
+        guard file.inArchive ? Self.locatedArchiveMatches(file, hash: hash) : Self.locatedFileMatches(file, hash: hash) else {
             libraryHealthNote = words.callIt("mac.lh_locate_wrong", ["name": .string(file.title)])
             return
         }
-        if file.isLinked {
+        if let gone = file.archivePath {
+            // A member's ARCHIVE was moved: every model it holds follows it,
+            // the archive's own bytes deciding (`archiveHash`).
+            let path = url.standardizedFileURL.path
+            let ids = files.filter { $0.archivePath == gone }.map(\.id)
+            editFiles(Set(ids), named: words.callIt("mac.lh_locate")) { record in
+                record["externalPath"] = .string(path)
+            }
+            await settleLibraryWrites()
+        } else if file.isLinked {
             let path = url.standardizedFileURL.path
             editFiles([file.id], named: words.callIt("mac.lh_locate")) { record in
                 record["externalPath"] = .string(path)

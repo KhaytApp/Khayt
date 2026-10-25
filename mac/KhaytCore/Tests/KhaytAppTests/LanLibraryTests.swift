@@ -21,8 +21,8 @@ struct LanLibraryTests {
 
         let top = try Self.json(try await bench.get("/api/library", headers: Self.pin))
         let folders = try #require(top["folders"] as? [[String: Any]])
-        #expect(folders.map { $0["name"] as? String } == ["Dental", "Saudi Kings"])
-        #expect(folders.map { $0["count"] as? Int } == [2, 7])
+        #expect(folders.map { $0["name"] as? String } == ["Dental", "Desk Organiser Pack", "Patreon Minis", "Saudi Kings"])
+        #expect(folders.map { $0["count"] as? Int } == [2, 2, 1, 7])
         let items = try #require(top["items"] as? [[String: Any]])
         #expect(top["total"] as? Int == 6 && items.count == 6, "only the ungrouped models at the top")
         #expect(Set(items.prefix(2).compactMap { $0["id"] as? String }) == ["PF-sample-falcon", "PF-sample-lantern"])

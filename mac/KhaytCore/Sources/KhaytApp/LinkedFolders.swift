@@ -183,6 +183,8 @@ extension Shop {
         // deleted linked model keeps its file, and without the second it
         // came back at the next launch.
         let externals = files.compactMap(\.externalPath) + Array(notAdopted)
+        // An archive's members by `memberKey` — indexed, or deleted since.
+        let knownMembers = Set(files.compactMap(\.archiveKey)).union(notAdopted)
         let vaults = roots.roots + [roots.primary]
 
         // THE WALK, metadata only, on a dispatch queue (`PinWork`) — not a
@@ -223,6 +225,15 @@ extension Shop {
                     guard progress.due(done, of: total) else { return }
                     self?.libraryMoveProgress = (done, total, url.lastPathComponent)
                 })
+        }
+        // THE COMPRESSED FILES, as folders: each one's models extracted to the
+        // cache and indexed like loose ones (`indexArchives`).
+        var archived = ArchiveScan()
+        let packs = walked.filter { !$0.archives.isEmpty }.map { (root: $0.root, archives: $0.archives) }
+        if !packs.isEmpty, !stopped() {
+            archived = await Self.indexArchives(packs, known: knownMembers, storeURL: build.storeURL,
+                                                libraryRoot: URL(fileURLWithPath: roots.primary), engine: engine,
+                                                isOnline: linkedIsOnline, owns: owns, whoHasIt: who, stop: stop)
         }
         // Reloaded only when something above wrote to the book.
         await reloadIfWritten(since: &bookAt)
@@ -268,18 +279,20 @@ extension Shop {
         if report.stopped || stopped() {
             lines.append(words.callIt("mac.scan_stopped", ["n": .number(Double(report.moved))]))
         } else if fresh.isEmpty {
-            lines.append(words.callIt("mac.linked_up_to_date"))
+            if archived.added == 0 { lines.append(words.callIt("mac.linked_up_to_date")) }
         } else {
             lines.append(words.callIt("mac.linked_scanned", ["n": .number(Double(report.moved)),
                                                              "same": .number(Double(report.duplicates))]))
         }
         if report.online > 0 { lines.append(words.callIt("mac.linked_online", ["online": .number(Double(report.online))])) }
+        lines += archiveScanLines(archived)
         if regrouped > 0 { lines.append(words.callIt("mac.linked_regrouped", ["n": .number(Double(regrouped))])) }
         if pictures > 0 { lines.append(words.callIt("mac.sort_pictures_added", ["n": .number(Double(pictures))])) }
         if let line = assistant?.line(words) { lines.append(line) }
         libraryMoveNote = lines.joined(separator: " ")
-        if !report.failures.isEmpty {
-            libraryMoveProblem = report.failures.prefix(3).joined(separator: "\n")
+        let failures = report.failures + archived.failures + archived.refused
+        if !failures.isEmpty {
+            libraryMoveProblem = failures.prefix(3).joined(separator: "\n")
         }
     }
 
@@ -376,6 +389,9 @@ extension Shop {
         let plan: PrintSort.Plan
         /// The ones not indexed yet, grouped and with their photos.
         let fresh: [LibraryImport.Incoming]
+        /// Every compressed file under it (`ArchiveFolder`) — names only,
+        /// nothing opened. Indexed by `indexArchives`, after the loose models.
+        var archives: [URL] = []
     }
 
     /// Every model and picture under each linked folder, the folder sorted
@@ -407,10 +423,18 @@ extension Shop {
                                                         options: [.skipsHiddenFiles, .skipsPackageDescendants])
             var models: [URL] = []
             var images: [URL] = []
+            var archives: [URL] = []
             var seen = 0
             while let next = walker?.nextObject() as? URL {
                 seen += 1
                 if seen % 256 == 0, stop?.isStopped == true { break }
+                // A COMPRESSED FILE is a folder of models (`ArchiveFolder`):
+                // kept by name for `indexArchives`, never walked into here.
+                if ArchiveFolder.kind(of: next.lastPathComponent) != nil {
+                    let path = next.standardizedFileURL.path
+                    if LibraryImport.isRegularFile(next), !isInVault(path), !isInner(path) { archives.append(next) }
+                    continue
+                }
                 // Regular files only, as the import walk: a symlink named
                 // `x.stl` is a pointer elsewhere, not a model kept here.
                 let ext = next.pathExtension.lowercased()
@@ -433,7 +457,9 @@ extension Shop {
                 file.photos = photos[url] ?? []
                 return file
             }
-            out.append(LinkedFound(root: root, models: models, images: images, plan: plan, fresh: fresh))
+            archives.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+            out.append(LinkedFound(root: root, models: models, images: images, plan: plan, fresh: fresh,
+                                   archives: archives))
         }
         return out
     }

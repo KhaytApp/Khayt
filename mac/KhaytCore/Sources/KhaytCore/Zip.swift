@@ -72,6 +72,26 @@ public enum Zip {
         /// name and sizes is authoritative; the local header is read only for
         /// its two length fields, because they say where the data starts.
         public let offset: Int
+        /// The general-purpose flags. Bit 0 is "encrypted": the directory
+        /// itself is never encrypted, so a locked zip still lists its names.
+        public var flags: UInt16 = 0
+        /// The external attributes — on a zip made on a Unix, the file's mode
+        /// in the high sixteen bits, which is how a SYMLINK member is told
+        /// from a file wearing a model's name.
+        public var externalAttributes: UInt32 = 0
+
+        public init(name: String, compressedSize: Int, size: Int, method: UInt16, offset: Int,
+                    flags: UInt16 = 0, externalAttributes: UInt32 = 0) {
+            self.name = name; self.compressedSize = compressedSize; self.size = size
+            self.method = method; self.offset = offset
+            self.flags = flags; self.externalAttributes = externalAttributes
+        }
+
+        /// A member whose bytes are encrypted (traditional or AES).
+        public var isEncrypted: Bool { flags & 1 != 0 }
+        /// A member stored as a symbolic link (Unix mode 0o120000).
+        public var isSymlink: Bool { (externalAttributes >> 16) & 0o170000 == 0o120000 }
+        public var isDirectory: Bool { name.hasSuffix("/") }
     }
 
     /// The most a single member may weigh. Generous for a preview or a config
@@ -142,7 +162,9 @@ public enum Zip {
         var at = 0
         while at + 46 <= directory.count, out.count < count {
             guard u32(directory, at) == 0x0201_4b50 else { break }
+            let flags = u16(directory, at + 8)
             let method = u16(directory, at + 10)
+            let attributes = u32(directory, at + 38)
             var compressed = Int(u32(directory, at + 20))
             var uncompressed = Int(u32(directory, at + 24))
             let nameLength = Int(u16(directory, at + 28))
@@ -183,7 +205,7 @@ public enum Zip {
                 }
             }
             out.append(Entry(name: name, compressedSize: compressed, size: uncompressed,
-                             method: method, offset: localAt))
+                             method: method, offset: localAt, flags: flags, externalAttributes: attributes))
             at = nameAt + nameLength + extraLength + commentLength
         }
         return out
