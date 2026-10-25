@@ -57,6 +57,8 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
     public var noFigures = false
     /// A catalogue product is made from this model.
     public var inCatalogue = false
+    /// Saved from a web page with the browser extension (`savedFromWebAt`).
+    public var fromWeb = false
 
     // Ready on.
     /// One machine, by id.
@@ -84,7 +86,7 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
     /// Any axis or range narrowing (the search box aside).
     public var filtersOn: Bool {
         printNext || duplicates || unfiled || neverPrinted || archived || storage != nil
-            || noFigures || inCatalogue || readyOn != nil || readyAnywhere
+            || noFigures || inCatalogue || fromWeb || readyOn != nil || readyAnywhere
             || creator != nil || category != nil || uncategorised || tag != nil || ranges.isActive
     }
 
@@ -228,7 +230,7 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
         if !text.isEmpty { o["text"] = .string(text) }
         for (key, on) in [("printNext", printNext), ("duplicates", duplicates), ("unfiled", unfiled),
                           ("neverPrinted", neverPrinted), ("archived", archived), ("noFigures", noFigures),
-                          ("inCatalogue", inCatalogue), ("readyAnywhere", readyAnywhere),
+                          ("inCatalogue", inCatalogue), ("fromWeb", fromWeb), ("readyAnywhere", readyAnywhere),
                           ("uncategorised", uncategorised)] where on {
             o[key] = .bool(true)
         }
@@ -268,7 +270,7 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
         if case .string(let s)? = o["text"] { self.text = s }
         printNext = flag("printNext"); duplicates = flag("duplicates"); unfiled = flag("unfiled")
         neverPrinted = flag("neverPrinted"); archived = flag("archived"); noFigures = flag("noFigures")
-        inCatalogue = flag("inCatalogue"); readyAnywhere = flag("readyAnywhere")
+        inCatalogue = flag("inCatalogue"); fromWeb = flag("fromWeb"); readyAnywhere = flag("readyAnywhere")
         uncategorised = flag("uncategorised")
         storage = text("storage").flatMap(Storage.init(rawValue:))
         readyOn = text("readyOn"); creator = text("creator"); category = text("category")

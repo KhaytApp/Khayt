@@ -165,7 +165,7 @@ struct LibrarySmartFolderTests {
 
     // MARK: - Built in
 
-    @Test("the five built-in smart folders find what they say")
+    @Test("the six built-in smart folders find what they say")
     func builtIns() async {
         let shop = await Self.sample()
         let live = shop.files.filter { !$0.isArchived }
@@ -180,10 +180,12 @@ struct LibrarySmartFolderTests {
         // Ready to print is every machine's ready set together (`ModelReadiness`).
         shop.readyByMachine = ["M-a": ["PF-sample-lantern"], "M-b": ["PF-sample-vase", "PF-sample-lantern"]]
         #expect(shop.libraryCount(LibrarySmartFolder.ready.query) == 2)
+        // Saved from web: the sample has no page saved from the browser.
+        #expect(shop.libraryCount(LibrarySmartFolder.fromWeb.query) == live.count(where: \.isFromWeb))
         // Always there, and not stored: the sample book's own one comes after.
         let rows = shop.librarySmartRows
-        #expect(rows.prefix(5).map(\.saved) == [nil, nil, nil, nil, nil])
-        #expect(rows.count == 5 + shop.librarySavedSearches.count)
+        #expect(rows.prefix(6).map(\.saved) == [nil, nil, nil, nil, nil, nil])
+        #expect(rows.count == 6 + shop.librarySavedSearches.count)
         #expect(shop.librarySavedSearches.map(\.name) == ["Quick prints under 3 h"],
                 "the sample book carries one saved search, so the sidebar shows one")
     }

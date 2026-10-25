@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: Save to Khayt — save a model page from the browser into the library.**
+  - A browser extension (`extension-khayt/`, one source for Safari, Chrome, Edge, Brave and Firefox). On a model's page, press its toolbar button: the popup shows what it read — title, creator, licence, tags, a short description, the cover picture and any direct model-file links — and Save puts it in the library as a model to print, on the Print next list, with a link back to the page. Readers for Printables, MakerWorld, Thingiverse, Thangs, Cults3D and MyMiniFactory; any other page is read from its JSON-LD and Open Graph. English and Arabic (right to left), light and dark.
+  - The extension reads a page only when its button is pressed, only in that tab, and asks for no site permissions. It sends the page to Khayt on this Mac through the browser's native messaging and to nothing else — no server, no local web address.
+  - Safari: the extension ships inside Khayt.app. Open Khayt once, then turn it on in Safari ▸ Settings ▸ Extensions. Chrome, Edge, Brave and Firefox need a small helper Khayt installs from Settings, which comes next.
+  - Saving the same model again (even at a renamed address) updates its record instead of adding a second one, and never undoes what the shop changed: a renamed title, a bought licence, its own tags. A licence is filled in only when it is a Creative Commons one Khayt can name; a site's own terms are kept as the page's words.
+  - Library: a new built-in smart folder, Saved from web, and a matching Show menu filter. A saved model's page has a From the web section with its site, the licence as the page worded it, the files the page links to, and Open Page. A model saved but not downloaded is not called missing by Library Health.
+  - Settings ▸ Preferences ▸ Browser extension: switch saving from the browser off on this Mac, see whether Safari has the extension on, and open Safari's settings.
+  - Everything a page sends is checked twice (by the extension's native end and again by the app): https only, length caps, no control characters, at most 20 tags and 20 links. The cover picture is fetched over https only, at most 8 MB, and kept only when it is a real picture.
+
 - **Mac: saved searches, smart folders and ranges in the print library.**
   - Under Library in the sidebar: five smart folders that are always there (Ready to print, Never printed, Online only, No print figures, Sells in catalogue) and the shop's own saved searches, each with a live count. Clicking one fills the filter row with its search.
   - "Save Search…" appears in the filter row when anything narrows the library. Saving under a name that is already used replaces that search. Right-click a saved search to Rename, Edit (load it into the row, then Update Search), Duplicate or Delete it. Saved searches are kept in the book's settings (`librarySavedSearches`), so they travel with it.

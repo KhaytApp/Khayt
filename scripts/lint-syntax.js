@@ -32,6 +32,9 @@ const ROOTS = [
   'lib',
   'renderer',
   'scripts',
+  // The "Save to Khayt" browser extension. Its own package.json says
+  // `type: module`, so `node --check` reads src/*.js as the modules they are.
+  'extension-khayt',
 ];
 
 /**

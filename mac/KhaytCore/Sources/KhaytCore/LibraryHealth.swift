@@ -40,6 +40,9 @@ public enum LibraryHealth {
         case missing
         /// Not asked — no library folder to look in (the sample book).
         case unknown
+        /// Saved from a web page and never downloaded: there is no file to be
+        /// missing and nothing to measure yet, so neither group claims it.
+        case web
     }
 
     /// One model, as the rule needs it.
@@ -154,7 +157,7 @@ public enum LibraryHealth {
         }
         add(.missing, live.filter { $0.presence == .missing }.map(\.id))
         add(.onlineUnmeasured, live.filter { $0.presence == .online && !$0.hasFigures }.map(\.id))
-        add(.noFigures, live.filter { $0.presence != .online && $0.presence != .missing && !$0.hasFigures }.map(\.id))
+        add(.noFigures, live.filter { ![.online, .missing, .web].contains($0.presence) && !$0.hasFigures }.map(\.id))
         let (same, looks) = duplicates(live)
         add(.sameFile, same.flatMap { $0 }, clusters: same)
         add(.looksSame, looks.flatMap { $0 }, clusters: looks)

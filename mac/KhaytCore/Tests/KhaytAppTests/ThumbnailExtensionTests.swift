@@ -35,7 +35,7 @@ struct ThumbnailExtensionTests {
     /// EVERY extension bundle, not just the first one written. The rule below
     /// is a property of app extensions, not of thumbnails, and the second
     /// extension is exactly where it would be forgotten.
-    static let extensions = ["KhaytThumbnail", "KhaytPreview"]
+    static let extensions = ["KhaytThumbnail", "KhaytPreview", "KhaytSafari"]
 
     /// THE ONE THAT COST A DAY.
     ///
@@ -220,7 +220,7 @@ struct ExtensionBundleTests {
     /// outside what is sealed, and codesign refuses the whole bundle with
     /// "unsealed contents present in the bundle root". An entitlements file put
     /// there once already cost a build.
-    @Test(arguments: ["KhaytThumbnail", "KhaytPreview"])
+    @Test(arguments: ["KhaytThumbnail", "KhaytPreview", "KhaytSafari"])
     func nothingLooseInTheBundleRoot(_ name: String) throws {
         guard let app = Self.app else { return }
         let appex = app.appending(path: "Contents/PlugIns/\(name).appex")

@@ -87,6 +87,28 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// For a LINKED model — indexed where it sits, never copied — the file's
     /// own path. Absent for a model that lives in the vault.
     let externalPath: String?
+    /// SAVED FROM A WEB PAGE with the browser extension (`WebSaveRecord`):
+    /// the page's canonical address, its site (`printables`, `makerworld`, …,
+    /// `web`), the licence in the page's own words, a short excerpt of its
+    /// description, the model files it links to, and when it was saved.
+    /// `savedFromWebAt` is what "Saved from web" finds; the rest is the page's
+    /// and is refreshed by the next save of it.
+    let sourceUrl: String?
+    let sourceSite: String?
+    let sourceLicenceText: String?
+    let sourceNote: String?
+    let sourceFiles: [SourceLink]?
+    let savedFromWebAt: String?
+    var isFromWeb: Bool { !(savedFromWebAt ?? "").isEmpty }
+    /// Saved from the web and nothing on this Mac yet: no file in the vault,
+    /// none linked. What the inspector offers "Open page" for, and what
+    /// Library Health does not call missing.
+    var isWebOnly: Bool { isFromWeb && sourceFile == nil && !isLinked }
+
+    struct SourceLink: Decodable, Hashable, Sendable {
+        let url: String?
+        let name: String?
+    }
     var isLinked: Bool { !(externalPath ?? "").isEmpty }
 
     /// A 3MF with the preview its slicer embedded, read off a file that was

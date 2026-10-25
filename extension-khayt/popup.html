@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Save to Khayt</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="bar">
+    <img class="mark" src="icons/icon32.png" alt="" width="18" height="18">
+    <span class="brand" data-i18n="popupHeading">Save to Khayt</span>
+  </header>
+
+  <main id="view">
+    <section id="reading" class="state">
+      <p class="quiet" data-i18n="popupReading">Reading this page…</p>
+    </section>
+
+    <section id="unsupported" class="state" hidden>
+      <p data-i18n="popupUnsupported">Open a model's page on a site such as Printables or MakerWorld, then press the button again.</p>
+    </section>
+
+    <section id="preview" class="state" hidden>
+      <div class="card">
+        <div class="cover"><img id="cover" alt=""></div>
+        <div class="facts">
+          <h1 id="title" dir="auto"></h1>
+          <p class="line"><span id="site"></span><span id="creatorSep" class="sep" hidden>·</span><span id="creator" dir="auto"></span></p>
+          <p class="line"><span id="licence" class="chip" dir="auto" hidden></span><span id="files" class="quiet" hidden></span></p>
+        </div>
+      </div>
+      <ul id="tags" class="tags"></ul>
+      <p id="description" class="description" dir="auto" hidden></p>
+      <p class="quiet small" data-i18n="popupWhatHappens">It goes into your Khayt library as a model to print, with a link back to this page. Nothing is sent anywhere else.</p>
+    </section>
+
+    <section id="result" class="state" hidden>
+      <p id="resultText" class="result"></p>
+    </section>
+  </main>
+
+  <footer class="actions">
+    <button id="save" type="button" class="primary" disabled data-i18n="popupSave">Save</button>
+  </footer>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

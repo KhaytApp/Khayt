@@ -77,6 +77,12 @@ struct LibraryInspector: View {
         VStack(alignment: .leading, spacing: 18) {
             ModelSummaryCard(shop: shop, file: file, summary: given ?? summary)
                 .id("model-title")
+            // ── SAVED FROM A WEB PAGE ────────────────────────────────────
+            if file.isFromWeb {
+                InspectorSection(id: "web", title: w.callIt("mac.ws_sec_web"), symbol: "safari") {
+                    WebSourceSection(shop: shop, file: file)
+                }
+            }
             // ── PRINT: what it takes and what can go wrong ───────────────
             InspectorSection(id: "print", title: w.callIt("mac.li_sec_print"), symbol: "printer") {
                 if let sliced = slicedSection(file) { sliced }
@@ -212,7 +218,10 @@ struct LibraryInspector: View {
             // "in the records but not here" look identical in a grid, and only
             // one of them can be put on a printer this afternoon.
             // The FILE, not its folder (alpha.65 review, snapshot 42).
-            if shop.isInCloudOnly(file) {
+            if file.isWebOnly {
+                // Saved from a page and not downloaded: nothing is missing.
+                DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.ws_not_downloaded"), dim: true)
+            } else if shop.isInCloudOnly(file) {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), shop.words.callIt("mac.cloudlib_in_cloud"), dim: true)
             } else if shop.fileIsPresent(file) {
                 DetailLine(shop.words.callIt("mac.on_this_mac"), "✓", dim: true)
