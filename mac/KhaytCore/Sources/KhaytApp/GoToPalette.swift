@@ -29,7 +29,6 @@ struct GoToPalette: View {
     /// The query, the answer and the cursor — see `GoToModel`, which the
     /// tests drive without this view.
     @State private var model: GoToModel
-    @FocusState private var fieldFocused: Bool
 
     init(shop: Shop) {
         self.shop = shop
@@ -41,16 +40,16 @@ struct GoToPalette: View {
     static let debounce: Duration = .milliseconds(60)
 
     var body: some View {
-        ZStack(alignment: .top) {
-            // A click outside closes it, as it does Spotlight.
-            Color.black.opacity(0.12)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture { shop.goingTo = false }
-                .accessibilityHidden(true)
-            panel
-                .padding(.top, 72)
-                .padding(.horizontal, Space.xl)
+        // The chrome is shared with ⌘J (`QuickPaletteFrame`); the rows and
+        // what Return does are this palette's own.
+        QuickPaletteFrame(prompt: shop.words.callIt("mac.goto_prompt"),
+                          label: shop.words.callIt("mac.goto"),
+                          hint: shop.words.callIt("mac.goto_hint"),
+                          query: $model.query,
+                          close: { shop.goingTo = false },
+                          move: { model.move($0) },
+                          submit: { _ in model.open() }) {
+            results
         }
         // The index, once; then whatever is in the field by the time it is
         // ready is answered again (`GoToModel.load`).
@@ -60,49 +59,6 @@ struct GoToPalette: View {
             guard !Task.isCancelled else { return }
             await model.search()
         }
-    }
-
-    private var panel: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: Space.md) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(Role.text3)
-                TextField(shop.words.callIt("mac.goto_prompt"), text: $model.query)
-                    .textFieldStyle(.plain)
-                    .font(TypeScale.title(15, weight: .regular))
-                    .foregroundStyle(Role.text)
-                    .focused($fieldFocused)
-                    .onSubmit { model.open() }
-                    .onKeyPress(.upArrow) { model.move(-1); return .handled }
-                    .onKeyPress(.downArrow) { model.move(1); return .handled }
-                    .onKeyPress(.escape) { shop.goingTo = false; return .handled }
-                    .accessibilityLabel(shop.words.callIt("mac.goto"))
-            }
-            .padding(.horizontal, Space.lg)
-            .padding(.vertical, Space.md + 2)
-
-            Divider().overlay(Role.line)
-
-            results
-                .frame(maxHeight: 380)
-
-            Divider().overlay(Role.line)
-            Text(shop.words.callIt("mac.goto_hint"))
-                .font(TypeScale.label(10, weight: .regular))
-                .foregroundStyle(Role.text3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Space.lg)
-                .padding(.vertical, Space.sm)
-        }
-        .frame(maxWidth: 580)
-        .background(Role.sheet, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Role.line2, lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.22), radius: 24, y: 10)
-        .onAppear { fieldFocused = true }
-        .onExitCommand { shop.goingTo = false }
     }
 
     /// The answer, drawn from one value: each section's heading with its own
@@ -153,29 +109,8 @@ struct GoToPalette: View {
     }
 
     private func row(_ entry: GoToIndex.Entry, selected: Bool) -> some View {
-        HStack(spacing: Space.md) {
-            Image(systemName: Self.symbol(for: entry))
-                .frame(width: 18)
-                .foregroundStyle(selected ? Role.accInk : Role.text2)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(entry.title)
-                    .font(TypeScale.row(12.5))
-                    .foregroundStyle(Role.text)
-                    .lineLimit(1)
-                if !entry.subtitle.isEmpty {
-                    Text(entry.subtitle)
-                        .font(TypeScale.body(10.5))
-                        .foregroundStyle(Role.text3)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, Space.lg)
-        .padding(.vertical, Space.sm)
-        .background(selected ? Role.accSoft : Color.clear)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        QuickPaletteRow(symbol: Self.symbol(for: entry), title: entry.title,
+                        subtitle: entry.subtitle, selected: selected)
     }
 
     static func symbol(for entry: GoToIndex.Entry) -> String {
@@ -186,6 +121,10 @@ struct GoToPalette: View {
         case .product: "tag"
         case .machine: "printer"
         case .screen: entry.id.hasPrefix("command:") ? "command" : "rectangle.stack"
+        case .folder: "folder"
+        case .archive: "doc.zipper"
+        case .tag: "number"
+        case .search: "line.3.horizontal.decrease.circle"
         }
     }
 }

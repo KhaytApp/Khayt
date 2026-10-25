@@ -33,6 +33,7 @@ extension Shop {
             q.fromWeb = libraryFromWebOnly
             q.readyOn = libraryReadyOn
             q.readyAnywhere = libraryReadyAnywhere
+            q.fitsOn = libraryFitsOn
             q.creator = libraryCreator
             switch libraryCategory {
             case .named(let name)?: q.category = name
@@ -59,6 +60,7 @@ extension Shop {
             if libraryFromWebOnly != q.fromWeb { libraryFromWebOnly = q.fromWeb }
             if libraryReadyOn != q.readyOn { libraryReadyOn = q.readyOn }
             if libraryReadyAnywhere != q.readyAnywhere { libraryReadyAnywhere = q.readyAnywhere }
+            if libraryFitsOn != q.fitsOn { libraryFitsOn = q.fitsOn }
             if libraryCreator != q.creator { libraryCreator = q.creator }
             let category: FilterChoice? = q.category.map { .named($0) } ?? (q.uncategorised ? .unfiled : nil)
             if libraryCategory != category { libraryCategory = category }
@@ -100,6 +102,9 @@ extension Shop {
             if q.readyAnywhere { return readyByMachine.values.reduce(into: Set<String>()) { $0.formUnion($1) } }
             return nil
         }()
+        // Fits one machine: its chip is on the tile. The whole book's sets,
+        // once per change (`libraryFitSets`), never a fit worked out here.
+        let fits: Set<String>? = axis == .fits ? nil : q.fitsOn.map { libraryFitSets()[$0] ?? [] }
         let dupes = duplicateOf
         let storage: LibraryStorageFilter? = axis == .storage ? nil
             : q.storage.map { $0 == .onlineOnly ? .onlineOnly : .thisMacOnly }
@@ -126,6 +131,7 @@ extension Shop {
             if axis != .unfiled, q.unfiled, !(f.groupName ?? "").isEmpty { return false }
             if axis != .neverPrinted, q.neverPrinted, f.printCount != 0 { return false }
             if let ready, !ready.contains(f.id) { return false }
+            if let fits, !fits.contains(f.id) { return false }
             if let category, !category.matches(f.category) { return false }
             if let tag, !(f.tags ?? []).contains(where: { $0.lowercased() == tag }) { return false }
             if let creator, f.creator?.lowercased() != creator { return false }

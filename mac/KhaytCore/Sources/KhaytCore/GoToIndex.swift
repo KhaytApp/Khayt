@@ -38,6 +38,10 @@ public struct GoToIndex: Sendable {
     /// their best hits tie.
     public enum Kind: String, Sendable, CaseIterable, Comparable {
         case screen, job, customer, model, product, machine
+        /// ⌘J's own kinds — the library's folders, the compressed files shown
+        /// as folders, its tags and its saved searches. ⌘K never lists them
+        /// (`Shop.goToKinds` names its kinds one by one).
+        case folder, archive, tag, search
 
         public static func < (a: Kind, b: Kind) -> Bool {
             allCases.firstIndex(of: a)! < allCases.firstIndex(of: b)!
@@ -151,6 +155,41 @@ public struct GoToIndex: Sendable {
 
         let groups = Self.ordered(byKind.map { Group(kind: $0, hits: Array(Self.best($1, perGroup))) })
         return Result(query: q, kinds: kinds, groups: groups, matched: matched, touched: touched)
+    }
+
+    /// One answer, best first across every kind — ⌘J's list, where a model,
+    /// a folder and a tag compete for the same eight rows. Scored exactly as
+    /// `search` scores (see "HOW A MATCH RANKS"), and between equal scores by
+    /// position, which the caller makes its own prior (`LibraryJump.index`
+    /// orders by recency, then times printed). `groups` holds the one list
+    /// under the first hit's kind; `matched` narrows the next keystroke.
+    public func ranked(_ query: String, kinds: Set<Kind> = Set(Kind.allCases),
+                       limit: Int = 8, narrowing previous: Result? = nil) -> (result: Result, hits: [Hit]) {
+        let q = SearchText.fold(query.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard !q.isEmpty, !kinds.isEmpty else {
+            return (Result(query: q, kinds: kinds, groups: [], matched: [], touched: 0), [])
+        }
+        let words = q.split(whereSeparator: { $0 == " " }).map(String.init)
+        let candidates: AnySequence<Int>
+        if let previous, !previous.query.isEmpty, previous.kinds == kinds, q.hasPrefix(previous.query) {
+            candidates = AnySequence(previous.matched)
+        } else {
+            candidates = AnySequence(entries.indices)
+        }
+        var touched = 0
+        var matched: [Int] = []
+        var hits: [Hit] = []
+        for i in candidates {
+            let entry = entries[i]
+            guard kinds.contains(entry.kind) else { continue }
+            touched += 1
+            guard let score = Self.score(entry, q, words) else { continue }
+            matched.append(i)
+            hits.append(Hit(entry: entry, score: score, position: i))
+        }
+        let best = Array(Self.best(hits, limit))
+        let groups = best.first.map { [Group(kind: $0.entry.kind, hits: best)] } ?? []
+        return (Result(query: q, kinds: kinds, groups: groups, matched: matched, touched: touched), best)
     }
 
     /// Several answers as one list — the screens' and the book's, which are

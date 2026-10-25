@@ -305,6 +305,13 @@ private struct GoMenu: View {
         Button(Words.upfront("mac.goto") + "\u{2026}") { shop.goingTo = true }
             .keyboardShortcut("k")
             .disabled(!shop.canGoToAnything)
+        // ⌘J, "Jump to in Library…": the library alone — models, folders,
+        // compressed files, tags, saved searches — see `LibraryJumpPalette`.
+        // ⌘J was free: checked against every `keyboardShortcut` in the app
+        // (`MenuCoverageTests.shortcutsAreUnique` holds it so).
+        Button(Words.upfront("mac.jump") + "\u{2026}") { shop.jumping = true }
+            .keyboardShortcut("j")
+            .disabled(!shop.canJumpInLibrary)
         Divider()
         Button(Words.upfront("mac.dashboard")) { shop.shelf = .dashboard }
             .keyboardShortcut("1", modifiers: .command)

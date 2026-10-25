@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import KhaytCore
 
 // MARK: - The trailing half of the filter row
 
@@ -86,6 +87,8 @@ struct LibraryRow: Identifiable, Hashable {
         var facts: [Int]
         var sync: Int
         var language: String
+        /// What the printer chips were made from (`machineFitsKey`).
+        var fits: [Int]
     }
 
     let id: String
@@ -103,6 +106,8 @@ struct LibraryRow: Identifiable, Hashable {
     let last: Double
     let storage: LibrarySyncIndex.State?
     let kept: Bool
+    /// The tile's printer chips (`Shop.libraryFitChips`); nil for a folder.
+    var fits: LibraryFitChips.Row? = nil
 
     var file: LibraryFile? {
         if case .file(let f) = entry { return f }
@@ -118,7 +123,8 @@ extension Shop {
         let entries = memoEntries().entries
         let memo = libraryMemo
         let key = LibraryRow.Key(entries: memo.entriesKey, facts: libraryFactsKey(),
-                                 sync: librarySyncRevision, language: words.language)
+                                 sync: librarySyncRevision, language: words.language,
+                                 fits: machineFitsKey())
         if memo.rowsKey == key { return memo.rows }
         let rows: [LibraryRow] = entries.map { entry in
             switch entry {
@@ -139,7 +145,8 @@ extension Shop {
                                   grams: facts.grams ?? -1, gramsEstimated: facts.gramsEstimated,
                                   price: facts.price ?? -1, size: file.size ?? -1, times: file.printCount,
                                   last: file.lastPrintedDate?.timeIntervalSince1970 ?? -1,
-                                  storage: storageBadge(for: file), kept: isKeptOnThisMac(file))
+                                  storage: storageBadge(for: file), kept: isKeptOnThisMac(file),
+                                  fits: modelMachines.isEmpty ? nil : libraryFitChips(file))
             }
         }
         memo.rowsKey = key
@@ -190,6 +197,17 @@ struct LibraryList: View {
                 Text(row.material).lineLimit(1)
             }
             .width(min: 44, ideal: 56)
+            // WHERE IT PRINTS — the tile's printer chips, the same memo. Beside
+            // the name rather than at the far end: the table is wider than
+            // the window with the inspector open, and the last column was
+            // the one cut off (Oct 2026 capture).
+            TableColumn(shop.words.callIt("mac.lg_col_fits")) { row in
+                if let fits = row.fits {
+                    FitChipRow(row: LibraryFitChips.leading(fits, shop.libraryFitsOn ?? shop.libraryReadyOn),
+                               words: shop.words)
+                }
+            }
+            .width(min: 70, ideal: 130)
             Group {
                 TableColumn(shop.words.callIt("mac.lg_sort_time"), value: \LibraryRow.minutes) { row in
                     figure(row.minutes < 0 ? ""

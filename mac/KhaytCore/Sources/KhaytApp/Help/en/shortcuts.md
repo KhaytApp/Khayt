@@ -6,6 +6,10 @@
   customer's name or phone, a model, a product, a machine or a screen, then
   **↑**/**↓** to choose, **↩** to open it and **Esc** to close. Arabic digits
   work too.
+- **⌘J** — jump in the library: a model, a folder, a compressed file, a tag
+  or a saved search, best match first and the ones you used lately before
+  the rest. **↩** opens it, **⌘↩** starts a quote from a model and **⌥↩** a
+  new job.
 - **⌘F** — the search box.
 - **⌘R** — reload the book from disk.
 - **⌘,** — settings.

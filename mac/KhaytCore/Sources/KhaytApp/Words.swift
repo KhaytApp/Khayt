@@ -2978,7 +2978,9 @@ final class Words {
         "mac.lib_view_groups": ["en": "Groups", "ar": "المجموعات"],
         "mac.lib_view_help":   ["en": "Every model in one grid, or grouped into folders", "ar": "كل النماذج في شبكة واحدة، أو مجمّعة في مجلدات"],
         "mac.lib_show":        ["en": "Show", "ar": "عرض"],
-        "mac.lib_printer":     ["en": "Ready on", "ar": "جاهز على"],
+        // The Printer menu holds Ready on AND Fits (stage 3a), so it is named
+        // for the machine rather than for one of the two questions.
+        "mac.lib_printer":     ["en": "Printer", "ar": "الطابعة"],
         "mac.lib_creator":     ["en": "Creator", "ar": "المصمم"],
         "mac.lib_tag":         ["en": "Tag", "ar": "الوسم"],
         "mac.sort_added":    ["en": "Date added", "ar": "تاريخ الإضافة"],
@@ -5595,6 +5597,32 @@ final class Words {
         "mac.li_state_fits": ["en": "Fits", "ar": "يتسع"],
         "mac.li_state_fits_turned": ["en": "Fits turned 90°", "ar": "يتسع بعد تدويره 90°"],
         "mac.li_state_too_big": ["en": "Too big", "ar": "أكبر من السرير"],
+        // Library stage 3a: the printer chips on a tile, the Fits filter and
+        // the list's Fits column (`LibraryFitChips`).
+        "mac.fits_on": ["en": "Fits {name}", "ar": "يتسع على {name}"],
+        // Held left to right in Arabic too, so it reads "+2" and not "2+".
+        "mac.lfc_more": ["en": "+{n}", "ar": "\u{2066}+{n}\u{2069}"],
+        "mac.lfc_more_said": ["en": "and {n} more printers", "ar": "و{n} طابعات أخرى"],
+        "mac.lfc_where": ["en": "Where it can print: {list}", "ar": "أين يمكن طباعته: {list}"],
+        "mac.lfc_too_big_all": ["en": "Too big for every printer", "ar": "أكبر من كل الطابعات"],
+        "mac.lg_col_fits": ["en": "Fits", "ar": "يتسع على"],
+        // ⌘J, Jump to in Library (`LibraryJumpPalette`).
+        "mac.jump": ["en": "Jump to in Library", "ar": "انتقل داخل المكتبة"],
+        "mac.jump_prompt": ["en": "Models, folders, tags, saved searches\u{2026}",
+                            "ar": "النماذج، المجلدات، الوسوم، عمليات البحث المحفوظة\u{2026}"],
+        "mac.jump_hint": ["en": "\u{21A9} open · \u{2318}\u{21A9} quote · \u{2325}\u{21A9} new job · esc to close",
+                          "ar": "\u{21A9} فتح · \u{2318}\u{21A9} عرض سعر · \u{2325}\u{21A9} عمل جديد · esc للإغلاق"],
+        "mac.jump_hint_open": ["en": "\u{21A9} open · esc to close", "ar": "\u{21A9} فتح · esc للإغلاق"],
+        "mac.jump_none": ["en": "Nothing in the library matches", "ar": "لا شيء في المكتبة يطابق"],
+        "mac.jump_recent": ["en": "Recent models", "ar": "نماذج حديثة"],
+        "mac.jump_kind_folder": ["en": "Folder", "ar": "مجلد"],
+        "mac.jump_kind_archive": ["en": "Compressed file", "ar": "ملف مضغوط"],
+        "mac.jump_kind_tag": ["en": "Tag", "ar": "وسم"],
+        "mac.jump_kind_search": ["en": "Saved search", "ar": "بحث محفوظ"],
+        "mac.goto_group_folder": ["en": "Folders", "ar": "المجلدات"],
+        "mac.goto_group_archive": ["en": "Compressed files", "ar": "الملفات المضغوطة"],
+        "mac.goto_group_tag": ["en": "Tags", "ar": "الوسوم"],
+        "mac.goto_group_search": ["en": "Saved searches", "ar": "عمليات البحث المحفوظة"],
         "mac.li_too_big_all": ["en": "Too big for every printer you have. Scale it down in your slicer.",
                                "ar": "أكبر من كل طابعاتك. صغّره في برنامج التقطيع."],
         "mac.li_online_only": ["en": "The file is online only. Quotes, jobs and the catalogue use its saved figures; bring it back to open or slice it.",

@@ -179,7 +179,7 @@ extension Shop {
         reviewingSyncLosses = false; scanning = false; schedulingWork = false
         sendingFeedback = false; settingUpShop = false; showingOnlineOrders = false
         showingSpoolRepair = false; showingWebStore = false; signingIntoCloud = false
-        takingAJob = false; goingTo = false
+        takingAJob = false; goingTo = false; jumping = false
         libraryRangesShown = false; librarySaveSearchShown = false
         libraryRenamingSearchId = nil; libraryDeletingSearchId = nil
         billingOrder = nil; confirmingCancel = nil; draftingFor = nil; droppingFrom = nil

@@ -21,7 +21,7 @@ import Foundation
 ///   `LibrarySearch` parses it; a saved search keeps the words, not a parse).
 /// - The Show axis (print next, duplicates, unfiled, never printed, archived,
 ///   storage, no print figures, sells in the catalogue), Ready on (one
-///   machine, or any), Creator, Category and Tag.
+///   machine, or any), Fits (one machine), Creator, Category and Tag.
 /// - The ranges (`Ranges`): print time, filament, price, times printed and
 ///   the day a model was added. A model whose figure is NOT KNOWN never
 ///   matches a range — "under two hours" is not a claim about a model nobody
@@ -66,6 +66,10 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
     /// Any machine that says what it has loaded.
     public var readyAnywhere = false
 
+    /// Fits on one machine, by id — the machine's chip is on the tile
+    /// (`LibraryFitChips.shows`): it goes on the bed, ready or not.
+    public var fitsOn: String?
+
     public var creator: String?
     public var category: String?
     /// Models with no category at all.
@@ -86,7 +90,7 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
     /// Any axis or range narrowing (the search box aside).
     public var filtersOn: Bool {
         printNext || duplicates || unfiled || neverPrinted || archived || storage != nil
-            || noFigures || inCatalogue || fromWeb || readyOn != nil || readyAnywhere
+            || noFigures || inCatalogue || fromWeb || readyOn != nil || readyAnywhere || fitsOn != nil
             || creator != nil || category != nil || uncategorised || tag != nil || ranges.isActive
     }
 
@@ -235,7 +239,7 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
             o[key] = .bool(true)
         }
         if let storage { o["storage"] = .string(storage.rawValue) }
-        for (key, value) in [("readyOn", readyOn), ("creator", creator), ("category", category),
+        for (key, value) in [("readyOn", readyOn), ("fitsOn", fitsOn), ("creator", creator), ("category", category),
                              ("tag", tag), ("sort", sort)] {
             if let value, !value.isEmpty { o[key] = .string(value) }
         }
@@ -273,7 +277,7 @@ public struct LibraryQuery: Codable, Equatable, Hashable, Sendable {
         inCatalogue = flag("inCatalogue"); fromWeb = flag("fromWeb"); readyAnywhere = flag("readyAnywhere")
         uncategorised = flag("uncategorised")
         storage = text("storage").flatMap(Storage.init(rawValue:))
-        readyOn = text("readyOn"); creator = text("creator"); category = text("category")
+        readyOn = text("readyOn"); fitsOn = text("fitsOn"); creator = text("creator"); category = text("category")
         tag = text("tag"); sort = text("sort")
         if case .object(let r)? = o["ranges"] {
             func bound(_ k: String) -> Bound {

@@ -758,6 +758,14 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only library stage 3a: printer chips on the tiles, the Fits
+            // filter and column, and the ⌘J palette — on the sample and a
+            // 600-model library, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBSTAGE3A"] == "1", let shop = subject {
+                await captureLibraryStage3a(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             // Only Save to Khayt: the Saved from web folder, a saved page in
             // the inspector, and the Settings row — on the sample, in memory.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_WEBSAVE"] == "1", let shop = subject {

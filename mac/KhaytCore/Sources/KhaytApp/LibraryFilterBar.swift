@@ -149,6 +149,18 @@ struct LibraryFilterBar: View {
                 if shop.libraryReadyOn != nil { shop.libraryReadyAnywhere = false }
             })
         }
+        // WHERE IT GOES ON THE BED, per printer that prints in 3D — the tile's
+        // printer chip, as a filter: a model is under "Fits U1" exactly when
+        // the U1 chip is on its tile (`LibraryFitChips.shows`), ready or not.
+        // In the Printer menu beside Ready on, below a line.
+        for row in facets.fits where row.count > 0 || shop.libraryFitsOn == row.machineId {
+            out.append(FilterChipModel(id: "fits:" + row.machineId,
+                                       label: shop.words.callIt("mac.fits_on", ["name": .string(row.machineName)]),
+                                       count: row.count,
+                                       on: shop.libraryFitsOn == row.machineId) {
+                shop.libraryFitsOn = shop.libraryFitsOn == row.machineId ? nil : row.machineId
+            })
+        }
         // WHO MADE IT — the busiest eight, and the one chosen whatever its count.
         var creators = Array(facets.creators.prefix(8))
         if let chosen = shop.libraryCreator,
@@ -301,10 +313,14 @@ struct LibraryFilterBar: View {
     struct Axis {
         let key: String
         var prefix: String? = nil
+        /// A second family of chips in the same menu — Fits beside Ready on.
+        var alsoPrefix: String? = nil
         var ids: [String] = []
 
         func holds(_ chip: FilterChipModel) -> Bool {
-            if let prefix { return chip.id.hasPrefix(prefix) }
+            if let prefix, chip.id.hasPrefix(prefix) { return true }
+            if let alsoPrefix, chip.id.hasPrefix(alsoPrefix) { return true }
+            if prefix != nil || alsoPrefix != nil { return false }
             return ids.contains(chip.id)
         }
     }
@@ -313,7 +329,7 @@ struct LibraryFilterBar: View {
     static let axes: [Axis] = [
         Axis(key: "mac.lib_show", ids: ["health", "print-next", "duplicates", "unfiled", "never-printed", "archived",
                                         "no-figures", "in-catalogue", "online-only", "this-mac-only"]),
-        Axis(key: "mac.lib_printer", prefix: "ready:"),
+        Axis(key: "mac.lib_printer", prefix: "ready:", alsoPrefix: "fits:"),
         Axis(key: "mac.lib_creator", prefix: "creator:"),
         Axis(key: "mac.category", prefix: "category:"),
         Axis(key: "mac.lib_tag", prefix: "tag:"),
@@ -336,7 +352,16 @@ struct LibraryFilterBar: View {
     }
 
     @ViewBuilder private func items(_ rows: [FilterChipModel]) -> some View {
-        ForEach(rows) { chip in
+        // Ready on, then a line, then Fits — two questions in one menu.
+        let ready = rows.filter { !$0.id.hasPrefix("fits:") }
+        let fits = rows.filter { $0.id.hasPrefix("fits:") }
+        ForEach(ready) { chip in item(chip) }
+        if !ready.isEmpty && !fits.isEmpty { Divider() }
+        ForEach(fits) { chip in item(chip) }
+    }
+
+    private func item(_ chip: FilterChipModel) -> some View {
+        Group {
             Button { chip.press() } label: {
                 if chip.on { Label(chip.label + "  (\(chip.count))", systemImage: "checkmark") }
                 else { Text(chip.label + "  (\(chip.count))") }

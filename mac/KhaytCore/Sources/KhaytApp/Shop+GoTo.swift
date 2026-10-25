@@ -115,6 +115,10 @@ extension Shop {
             // The machines screen keeps no selection to set; the screen is
             // where a machine is.
             shelf = .machines
+        case .folder, .archive, .tag, .search:
+            // ⌘J's kinds — never in ⌘K's index (`goToKinds`), so never here
+            // past the gate above; ⌘J runs them itself (`jump(to:)`).
+            break
         case .screen:
             if entry.id.hasPrefix("command:"),
                let command = GoToCommand(rawValue: String(entry.id.dropFirst("command:".count))) {

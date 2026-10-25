@@ -1765,6 +1765,10 @@ extension Shop {
         var inCatalogue = 0
         /// Saved from a web page with the browser extension.
         var fromWeb = 0
+        /// Per machine that prints in 3D: how many models go on its bed —
+        /// the tile chip's count (`LibraryFitChips`), over what the other
+        /// axes leave.
+        var fits: [Ready] = []
         struct Ready: Equatable, Identifiable {
             let machineId: String
             let machineName: String
@@ -1781,7 +1785,7 @@ extension Shop {
 
     enum LibraryAxis {
         case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates, archived, storage
-        case noFigures, inCatalogue, fromWeb
+        case noFigures, inCatalogue, fromWeb, fits
     }
 
     /// What one axis counts: the shelf, the search, and the other chips.
@@ -1964,6 +1968,16 @@ extension Shop {
         facets.noFigures = noFigures
         facets.inCatalogue = inCatalogue
         facets.fromWeb = ids(.fromWeb).count { byId[$0]?.isFromWeb == true }
+        // Fits, per machine: the sets are the book's, once per change
+        // (`libraryFitSets`); only the count inside the pool is per recount.
+        let fitSets = libraryFitSets()
+        let fitPool = ids(.fits)
+        facets.fits = modelMachines.compactMap { machine in
+            let set = fitSets[machine.id] ?? []
+            guard !set.isEmpty || libraryFitsOn == machine.id else { return nil }
+            return .init(machineId: machine.id, machineName: machine.name,
+                         count: fitPool.count { set.contains($0) })
+        }
         if facets != libraryFacets { libraryFacets = facets }
         // Taken AFTER the run: writing `readyByMachine` and `duplicateOf`
         // above moves the derived revision, and the next recount compares
@@ -2038,7 +2052,7 @@ extension Shop {
 
     var libraryFilterOn: Bool {
         libraryCategory != nil || libraryTag != nil || libraryUnfiledOnly
-            || libraryNeverPrintedOnly || libraryReadyOn != nil
+            || libraryNeverPrintedOnly || libraryReadyOn != nil || libraryFitsOn != nil
             || libraryCreator != nil || libraryPrintNextOnly || libraryDuplicatesOnly
             || libraryShowArchived || libraryStorage != nil
             || libraryReadyAnywhere || libraryNoFiguresOnly || libraryInCatalogueOnly || libraryFromWebOnly || libraryRanges.isActive || libraryHealthFocus != nil
@@ -2050,6 +2064,7 @@ extension Shop {
         libraryUnfiledOnly = false
         libraryNeverPrintedOnly = false
         libraryReadyOn = nil
+        libraryFitsOn = nil
         libraryCreator = nil
         libraryPrintNextOnly = false
         libraryDuplicatesOnly = false
