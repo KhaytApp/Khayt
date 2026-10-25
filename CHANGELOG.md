@@ -8788,6 +8788,34 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.7] - 2026-10-25
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **A new library.** Small, medium and large tiles (⌘+ / ⌘−) and a list view, with each model's print time, filament and price on the tile. A model's page opens with a summary: time, filament, cost, catalogue price and margin, which printers it fits, and Quote, New Job and Add to Catalogue always in reach.
+- **Saved searches and ranges:** Ready to print, Never printed, Online only, No print figures, Sells in catalogue and Saved from web in the sidebar with live counts, your own saved searches, and ranges for time, weight, price, times printed and date added.
+- **Library Health** (View ▸ Library Health): missing files, models never measured, duplicates, look-alikes, models too big for every printer, and catalogue products whose file is gone, each with a fix. Models on a drive that is not connected are listed as such, never offered for removal.
+- **Print next:** mark a model with a note (⌘B); the mark clears when a job starts or a quote is accepted.
+- **Which printers it fits** on medium and large tiles, a Fits column in the list, and a Fits filter.
+- **⌘J Jump to in Library:** any model, folder, compressed file, tag or saved search. ⌘↩ quotes it, ⌥↩ starts a job.
+- **Compressed files as folders:** ZIP, RAR, 7-Zip and tar files in a linked folder show their models as tiles, extracted only when used. The compressed file is never changed, and a locked one never asks for a password.
+- **Save to Khayt**, a browser extension for Safari (inside Khayt.app), Chrome, Edge, Brave, Vivaldi and Firefox: save a model's page from Printables, MakerWorld, Thingiverse, Thangs, Cults3D, MyMiniFactory or any page with its link, creator, licence and cover, and add the file you then download, after Khayt asks. Chrome, Edge and Firefox connect once their store listings are live.
+- **Menu bar:** a progress ring with the time left and a dot when a printer needs you; the panel lists printers that need attention first. Notifications when a print finishes, fails or pauses, each with its own switch.
+- **Khayt Cloud plan:** when a vault holds more than a smaller plan allows, Settings shows how much over, since when, and the date files will be deleted once Khayt Cloud sets one.
+
+### Changed
+
+- Moving to a smaller plan: a vault over its limit becomes read-only, and files still over it 90 days after a dated email are deleted. Share links and product changes say why they are paused.
+- Arabic: one word for a model (نموذج), «التالي للطباعة» for Print next, and counts that read correctly.
+
+### Fixed
+
+- Opening Settings ▸ Preferences could quit the app.
+- Arabic plan lines no longer scramble their figures; the library list's columns fit.
+
 ## [4.0.0-beta.6] - 2026-10-24
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
