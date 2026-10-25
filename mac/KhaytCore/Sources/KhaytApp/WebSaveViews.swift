@@ -194,7 +194,7 @@ enum WebSaveWords {
         "mac.sfw_settings_note": ["en": "Save to Khayt adds a model's page from Printables, MakerWorld, Thingiverse and other sites to your library — its link, creator, licence, tags and picture — on the Print next list.",
                                  "ar": "تضيف «احفظ في خيط» صفحة نموذج من Printables وMakerWorld وThingiverse وغيرها إلى مكتبتك — رابطه ومصممه وترخيصه ووسومه وصورته — في قائمة «التالي للطباعة»."],
         "mac.sfw_accept": ["en": "Accept pages saved from the browser", "ar": "قبول الصفحات المحفوظة من المتصفح"],
-        "mac.sfw_safari": ["en": "Safari", "ar": "Safari"],
+        "mac.sfw_safari": ["en": "In Safari", "ar": "في Safari"],
         "mac.sfw_safari_checking": ["en": "Checking…", "ar": "جارٍ التحقق…"],
         "mac.sfw_safari_on": ["en": "Connected", "ar": "متصل"],
         "mac.sfw_safari_off": ["en": "Off — turn it on in Safari's settings", "ar": "متوقفة — فعّلها من إعدادات Safari"],

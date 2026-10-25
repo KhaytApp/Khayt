@@ -12,7 +12,7 @@ import Testing
 ///
 /// Neither test here is on the main actor, on purpose: both call from where
 /// Safari calls.
-@Suite struct SafariStateIsolationTests {
+@Suite(.serialized) struct SafariStateIsolationTests {
 
     @Test("the reply handed to Safari runs on a queue that is not main without trapping")
     func replyRunsOffMain() async {
