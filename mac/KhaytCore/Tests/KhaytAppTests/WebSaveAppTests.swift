@@ -39,6 +39,38 @@ struct WebSaveAppTests {
         #expect(locked.moveProblem == nil, "nobody at the Mac pressed anything: no alert")
     }
 
+    @Test("saves the lock or the sample cannot take yet wait in the inbox; only a live popup is told refused")
+    func heldSavesWait() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "ws-held-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let old = try Self.entry(url: "https://makerworld.com/en/models/1", title: "Old")
+        let fresh = try Self.entry(url: "https://makerworld.com/en/models/2", title: "Fresh")
+        try WebInbox.write(old, into: dir)
+        try WebInbox.write(fresh, into: dir)
+        let oldFile = dir.appending(path: "\(old.id).json")
+        try FileManager.default.setAttributes([.creationDate: Date().addingTimeInterval(-3600)], ofItemAtPath: oldFile.path)
+
+        // The sample: nothing is claimed — a real book files them.
+        let sample = Shop()
+        await sample.load(.sample)
+        let inbox = WebSaveInbox()
+        inbox.directory = { dir }
+        inbox.start(shop: sample)
+        await inbox.drain()
+        #expect(Set(WebInbox.pending(in: dir).map(\.lastPathComponent)) == ["\(old.id).json", "\(fresh.id).json"])
+        #expect(inbox.heldBack)
+
+        // Locked, nobody signed in: the old save waits for a sign-in; the
+        // fresh one's popup is still open, so it hears why.
+        let locked = await OperatorLockTests.shop()
+        inbox.start(shop: locked)
+        await inbox.drain()
+        #expect(WebInbox.pending(in: dir).map(\.lastPathComponent) == ["\(old.id).json"])
+        #expect(WebInbox.awaitAnswer(fresh.id, inbox: dir, timeout: 1)?.reason == "not-allowed")
+        #expect(WebInbox.awaitAnswer(old.id, inbox: dir, timeout: 0.2) == nil, "the waiting save was answered")
+        #expect(inbox.heldBack)
+    }
+
     @Test("every word of Save to Khayt is its own: no key shared with another screen's")
     func ownWords() {
         // `Words.own` keeps the FIRST table's value for a repeated key, so a
@@ -99,6 +131,34 @@ struct WebSaveAppTests {
         // Refused before anything is asked of the network.
         #expect(await Shop.fetchWebCover("http://example.com/c.jpg") == nil)
         #expect(await Shop.fetchWebCover("file:///etc/hosts") == nil)
+        // Nor to the shop's own network, by name or by address.
+        for host in ["localhost", "printer.local", "127.0.0.1", "10.0.0.5", "192.168.1.20", "172.20.0.1",
+                     "169.254.10.1", "[::1]", "[fe80::1]", "[fd00::1]"] {
+            #expect(!WebCoverFetch.isPublic(host: host), "\(host) was taken as public")
+            #expect(await Shop.fetchWebCover("https://\(host)/c.jpg") == nil)
+        }
+        #expect(WebCoverFetch.isPublic(v4: [93, 184, 215, 14]))
+        #expect(!WebCoverFetch.isPublic(v4: [100, 64, 0, 1]))
+    }
+
+    @Test("a cover is decoded only as JPEG, PNG, WebP or GIF, and only up to a sane size")
+    func coverFormats() throws {
+        let image = NSImage(size: NSSize(width: 40, height: 30), flipped: false) { rect in
+            NSColor.systemBlue.setFill(); rect.fill(); return true
+        }
+        let tiff = try #require(image.tiffRepresentation)
+        // A TIFF is a picture ImageIO reads, and not one a cover may be.
+        #expect(Shop.coverURI(tiff) == nil)
+        let rep = try #require(NSBitmapImageRep(data: tiff))
+        let jpeg = try #require(rep.representation(using: .jpeg, properties: [:]))
+        let gif = try #require(rep.representation(using: .gif, properties: [:]))
+        #expect(Shop.coverURI(jpeg) != nil && Shop.coverURI(gif) != nil)
+        // A PNG header claiming 50,000 × 50,000 is refused before a pixel is made.
+        var png = try #require(rep.representation(using: .png, properties: [:]))
+        let side: [UInt8] = [0x00, 0x00, 0xC3, 0x50]
+        png.replaceSubrange(16..<20, with: side)
+        png.replaceSubrange(20..<24, with: side)
+        #expect(Shop.coverURI(png) == nil)
     }
 
     @Test("the Safari handler and the app agree on the inbox: a save written there is read, filed and answered")

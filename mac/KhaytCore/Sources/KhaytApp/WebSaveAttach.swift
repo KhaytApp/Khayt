@@ -37,10 +37,13 @@ struct WebAttachOffer: Identifiable, Equatable, Sendable {
 
     var isArchive: Bool { WebDownloads.archiveKinds.contains((path as NSString).pathExtension.lowercased()) }
 
-    init(recordId: String, title: String, path: String, name: String? = nil, size: Int, browser: String) {
+    init(recordId: String, title: String, path: String, size: Int, browser: String) {
         self.id = UUID().uuidString
         self.recordId = recordId; self.title = title; self.path = path
-        self.name = name.flatMap { $0.isEmpty ? nil : $0 } ?? (path as NSString).lastPathComponent
+        // The REAL file's name, always — never the one an attach message
+        // gives: whoever writes the inbox could label a client's part
+        // "dragon.stl".
+        self.name = (path as NSString).lastPathComponent
         self.size = size; self.browser = browser
     }
 }
@@ -92,7 +95,7 @@ extension Shop {
         }
         let size = (try? URL(fileURLWithPath: attach.path).resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         let offer = WebAttachOffer(recordId: record.id, title: record.title, path: attach.path,
-                                   name: attach.name, size: size, browser: entry.browser)
+                                   size: size, browser: entry.browser)
         return (.init(id: entry.id, state: .offered, title: record.title), offer)
     }
 

@@ -14,6 +14,18 @@ import KhaytCore
 /// process with an argument list, never a shell string, so a hostile archive
 /// that crashed libarchive would take `tar` with it and not the app.
 ///
+/// ── AND IN A CAGE ────────────────────────────────────────────────────────
+///
+/// A crash is not an exploit, though, and a linked folder's archives are
+/// read with nobody clicking anything. So libarchive gets ONLY the format
+/// the file's name claims (`ArchiveFolder.bytesMatch` on its first bytes),
+/// a `.zip` the app's own reader refused is refused — never handed on to
+/// libarchive to guess at — and `tar` runs under `sandbox-exec` with a
+/// deny-by-default profile (`cage`): it may read, and nothing else. No
+/// network, no file written or made; the member's bytes leave through the
+/// standard output the app opened for it. `sandbox-exec` is deprecated but
+/// shipped; where it is not there `tar` runs as before.
+///
 /// ── NOTHING IS WRITTEN WHERE THE ARCHIVE SAYS ────────────────────────────
 ///
 /// `bsdtar` is never asked to extract to a directory. It is run with `-O`,
@@ -55,6 +67,44 @@ enum ArchiveMembers {
     /// opens nothing; it is not a secret.
     nonisolated static let noPassphrase = "khayt-does-not-ask"
     nonisolated static let tar = "/usr/bin/tar"
+    nonisolated static let sandboxExec = "/usr/bin/sandbox-exec"
+    /// What `tar` may do: be started (`/usr/bin/tar` is a link to `bsdtar`),
+    /// read files and ask the kernel its settings. Everything else — the
+    /// network, writing or making any file, other programs — is refused.
+    nonisolated static let cage = """
+        (version 1)(deny default)\
+        (allow process-exec (literal "/usr/bin/tar") (literal "/usr/bin/bsdtar"))\
+        (allow file-read*)(allow sysctl-read)
+        """
+
+    /// `tar`, in its cage when the cage is there.
+    nonisolated static func runTar(_ args: [String], timeout: TimeInterval, keepOut: Int, every: TimeInterval,
+                                   stdoutTo: FileHandle? = nil,
+                                   watch: (@Sendable () -> Bool)? = nil) throws -> BoundedProcess.Outcome {
+        if FileManager.default.isExecutableFile(atPath: sandboxExec) {
+            return try BoundedProcess.run(sandboxExec, ["-p", cage, tar] + args, timeout: timeout, keepOut: keepOut,
+                                          every: every, stdoutTo: stdoutTo, watch: watch)
+        }
+        return try BoundedProcess.run(tar, args, timeout: timeout, keepOut: keepOut, every: every,
+                                      stdoutTo: stdoutTo, watch: watch)
+    }
+
+    /// The first bytes of a file — enough for every signature
+    /// `ArchiveFolder.bytesMatch` knows (a tar's is at 257).
+    nonisolated static func header(_ url: URL) -> [UInt8] {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return [] }
+        defer { try? h.close() }
+        return [UInt8]((try? h.read(upToCount: 512)) ?? Data())
+    }
+
+    /// Refused unless the bytes are the kind the name says — before any of
+    /// libarchive sees them.
+    nonisolated static func checkKind(_ url: URL) throws {
+        let kind = ArchiveFolder.kind(of: url.lastPathComponent) ?? "archive"
+        guard ArchiveFolder.bytesMatch(kind: kind, header: header(url)) else {
+            throw Failure.unreadable("not a real \(kind)")
+        }
+    }
     /// How long one listing may take, and one member.
     nonisolated static let listPatience: TimeInterval = 120
     nonisolated static let extractPatience: TimeInterval = ArchiveImport.tarPatience
@@ -63,23 +113,26 @@ enum ArchiveMembers {
 
     /// Every entry the archive lists, nothing inflated.
     nonisolated static func list(_ url: URL) throws -> [ArchiveFolder.Member] {
-        if ArchiveFolder.kind(of: url.lastPathComponent) == "zip", let entries = try? Zip.entries(of: url) {
+        if ArchiveFolder.kind(of: url.lastPathComponent) == "zip" {
+            // The app's own reader decides a zip; one it cannot read is not
+            // handed to libarchive to guess what else it might be.
+            guard let entries = try? Zip.entries(of: url) else { throw Failure.unreadable("the zip could not be read") }
             return entries.map { e in
                 ArchiveFolder.Member(path: e.name, size: e.size,
                                      type: e.isDirectory ? .directory : e.isSymlink ? .link : .file,
                                      encrypted: e.isEncrypted)
             }
         }
+        try checkKind(url)
         let common = ["-f", url.path, "--passphrase", noPassphrase]
-        let names = try BoundedProcess.run(tar, ["-t"] + common, timeout: listPatience,
-                                           keepOut: 32 << 20, every: 0.25)
+        let names = try runTar(["-t"] + common, timeout: listPatience, keepOut: 32 << 20, every: 0.25)
         let said = String(decoding: names.stderr, as: UTF8.self)
         guard !names.timedOut, names.status == 0 else {
             if ArchiveFolder.saysLocked(said) { throw Failure.locked }
             throw Failure.unreadable(oneLine(said))
         }
-        let long = try BoundedProcess.run(tar, ["-t", "-v", "--numeric-owner"] + common, timeout: listPatience,
-                                          keepOut: 64 << 20, every: 0.25)
+        let long = try runTar(["-t", "-v", "--numeric-owner"] + common, timeout: listPatience,
+                              keepOut: 64 << 20, every: 0.25)
         guard !long.timedOut, long.status == 0,
               let members = ArchiveFolder.members(names: String(decoding: names.stdout, as: UTF8.self),
                                                   long: String(decoding: long.stdout, as: UTF8.self)) else {
@@ -108,9 +161,13 @@ enum ArchiveMembers {
         let out = try FileHandle(forWritingTo: part)
         var written = 0
         do {
-            if ArchiveFolder.kind(of: archive.lastPathComponent) == "zip",
-               let entry = try? Zip.entries(of: archive).first(where: { $0.name == member.path }),
-               entry.method == 0 || entry.method == 8 {
+            let isZip = ArchiveFolder.kind(of: archive.lastPathComponent) == "zip"
+            let zipEntry = isZip ? (try? Zip.entries(of: archive))?.first(where: { $0.name == member.path }) : nil
+            // A zip the app's own reader cannot read (or that does not hold
+            // this member) is refused, never passed on to libarchive.
+            if isZip, zipEntry == nil { throw Failure.unreadable("the zip could not be read") }
+            if !isZip { try checkKind(archive) }
+            if let entry = zipEntry, entry.method == 0 || entry.method == 8 {
                 guard !entry.isEncrypted else { throw Failure.locked }
                 var failure: Error?
                 do {
@@ -125,10 +182,9 @@ enum ArchiveMembers {
                             "--no-same-owner", "--no-same-permissions", "--no-acls", "--no-fflags",
                             "--no-xattrs", "--no-mac-metadata", "--",
                             ArchiveFolder.exactPattern(member.path)]
-                let ran = try BoundedProcess.run(tar, args, timeout: extractPatience, keepOut: 0, every: 0.25,
-                                                 stdoutTo: out,
-                                                 watch: { size(of: part) > limit })
-                written = size(of: part)
+                let ran = try runTar(args, timeout: extractPatience, keepOut: 0, every: 0.25, stdoutTo: out,
+                                     watch: { size(of: out) > limit })
+                written = size(of: out)
                 let said = String(decoding: ran.stderr, as: UTF8.self)
                 if ran.stopped || written > limit { throw Failure.tooBig }
                 guard !ran.timedOut, ran.status == 0 else {
@@ -147,12 +203,40 @@ enum ArchiveMembers {
             throw Failure.unreadable("\(member.leaf) came out as \(written) bytes, not \(want)")
         }
         guard written > 0 else { throw Failure.unreadable("\(member.leaf) is empty") }
+        // A member of a quarantined download is quarantined too, as Archive
+        // Utility does it: opened from the inspector, Gatekeeper still asks.
+        carryQuarantine(from: archive, to: part)
         try? fm.removeItem(at: dest)
         try fm.moveItem(at: part, to: dest)
     }
 
+    nonisolated static let quarantineKey = "com.apple.quarantine"
+
+    /// The archive's quarantine mark, when it has one, put on `file`.
+    nonisolated static func carryQuarantine(from archive: URL, to file: URL) {
+        let size = getxattr(archive.path, quarantineKey, nil, 0, 0, 0)
+        guard size > 0, size < 4096 else { return }
+        var value = [UInt8](repeating: 0, count: size)
+        guard getxattr(archive.path, quarantineKey, &value, size, 0, 0) == size else { return }
+        _ = setxattr(file.path, quarantineKey, value, size, 0, 0)
+    }
+
+    /// A file's size as it is on disk NOW. Not `URL.resourceValues`: that
+    /// caches on the URL and is cleared only by a run-loop pass, which the
+    /// extraction thread never runs, so a size read while bsdtar was still
+    /// writing stayed frozen — a slow member "came out as 0 bytes" and the
+    /// bomb cap never tripped.
     nonisolated static func size(of url: URL) -> Int {
-        (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { $0 } ?? 0
+        var st = stat()
+        guard stat(url.path, &st) == 0 else { return 0 }
+        return Int(st.st_size)
+    }
+
+    /// The size of the file behind a handle we are writing through.
+    nonisolated static func size(of handle: FileHandle) -> Int {
+        var st = stat()
+        guard fstat(handle.fileDescriptor, &st) == 0 else { return 0 }
+        return Int(st.st_size)
     }
 
     nonisolated static func oneLine(_ s: String) -> String {

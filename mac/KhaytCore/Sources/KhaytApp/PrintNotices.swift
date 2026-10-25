@@ -25,7 +25,10 @@ import KhaytCore
 ///
 /// A finish and a failure come from the finish seam (`Shop.printFinished`),
 /// which `print-finish-photo` already calls once per print. A failure the
-/// fault alert has already told about is not told twice.
+/// fault alert has already told about is not told twice — and the other way
+/// round: the finish seam usually lands FIRST (the alerts run after the whole
+/// sweep), so a fault alert for a print just told as failed has no banner of
+/// its own either.
 enum PrintNoticeKind: String, CaseIterable, Sendable {
     case finished, failed, paused
 
@@ -60,7 +63,13 @@ struct PrintNoticeLedger {
         var inJob: Bool
         /// What has been said about the current (or last) print.
         var told: Set<String>
+        /// When that print was told as failed.
+        var failedAt: Date? = nil
     }
+
+    /// How long after a "Print failed" a fault alert for the same machine is
+    /// taken to be the same failure.
+    static let sameFailure: TimeInterval = 10 * 60
 
     private var seen: [String: Seen] = [:]
 
@@ -74,7 +83,7 @@ struct PrintNoticeLedger {
             seen[machineId] = Seen(inJob: inJob, told: paused ? [PrintNoticeKind.paused.rawValue] : [])
             return []
         }
-        if inJob && !was.inJob { was.told = [] }
+        if inJob && !was.inJob { was.told = []; was.failedAt = nil }
         was.inJob = inJob
         var out: [PrintNoticeKind] = []
         if paused, !was.told.contains(PrintNoticeKind.paused.rawValue) {
@@ -88,11 +97,16 @@ struct PrintNoticeLedger {
     }
 
     /// The fault alert fired for this machine: a failure of the same print
-    /// is not news again.
-    mutating func faultTold(_ machineId: String) {
+    /// is not news again. Returns true when that failure WAS already told
+    /// (the finish seam got there first): then the alert is not a second
+    /// banner.
+    @discardableResult
+    mutating func faultTold(_ machineId: String, now: Date = Date()) -> Bool {
         var was = seen[machineId] ?? Seen(inJob: false, told: [])
         was.told.insert("fault")
         seen[machineId] = was
+        guard was.told.contains(PrintNoticeKind.failed.rawValue), let at = was.failedAt else { return false }
+        return now.timeIntervalSince(at) < Self.sameFailure
     }
 
     /// The finish seam's outcome ("finished" | "failed" | "cancelled").
@@ -109,6 +123,7 @@ struct PrintNoticeLedger {
         case "failed":
             guard !was.told.contains(PrintNoticeKind.failed.rawValue), !was.told.contains("fault") else { return nil }
             was.told.insert(PrintNoticeKind.failed.rawValue)
+            was.failedAt = Date()
             return .failed
         default:
             return nil

@@ -120,6 +120,13 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let archiveHash: String?
     /// The member is encrypted: listed, never extracted, no password asked.
     let archiveLocked: Bool?
+    /// The archive was changed (a newer pack saved over it) and no longer
+    /// holds this member: Library Health lists it as missing.
+    let archiveGone: Bool?
+    /// The archive's size and modification time (epoch ms) when it was last
+    /// hashed — how a rescan tells a changed archive without reading it.
+    let archiveBytes: Double?
+    let archiveModified: Double?
     var inArchive: Bool { isLinked && !(archiveMember ?? "").isEmpty }
     var isLocked: Bool { inArchive && archiveLocked == true }
     /// The archive's path, for a member; nil otherwise.

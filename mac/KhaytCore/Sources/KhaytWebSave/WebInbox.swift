@@ -147,25 +147,99 @@ public enum WebInbox {
                                                                        options: [.skipsHiddenFiles]) else { return [] }
         let saves = names.filter {
             $0.pathExtension == "json" && WebSave.isEntryId($0.deletingPathExtension().lastPathComponent)
-                && (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+                && isRegularFile($0)
         }
         func made(_ u: URL) -> Date { (try? u.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast }
         return saves.sorted { made($0) < made($1) }
     }
 
+    /// A save taken by this process: its bytes, and the hidden name it waits
+    /// under until it is filed (`finish`) or handed back (`putBack`).
+    public struct Claimed: Sendable {
+        public let data: Data
+        public let file: URL
+        public let original: URL
+    }
+
+    static let claimedPrefix = ".claimed-"
+
+    /// A regular file itself — not a symlink to one, a FIFO or a folder.
+    static func isRegularFile(_ url: URL) -> Bool {
+        var st = stat()
+        return lstat(url.path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG
+    }
+
     /// Take one waiting save for this process: moved to a hidden name first,
     /// so a second copy of the app reading the same inbox (an installed build
     /// and a dev build, both open) cannot file it twice. Nil when another got
-    /// there first. The bytes are read with a cap — a file this size is no
-    /// save of ours.
-    public static func claim(_ file: URL) -> Data? {
+    /// there first.
+    ///
+    /// The claimed copy STAYS until the caller says the save is done with —
+    /// filed, or answered for good (`finish`) — so a quit or a crash in the
+    /// middle of filing loses nothing: the next launch hands it back
+    /// (`recoverClaims`).
+    ///
+    /// Read without trusting the name: a symlink is not followed and a FIFO
+    /// does not block (`O_NOFOLLOW | O_NONBLOCK`), only a regular file is
+    /// read, and at most twice the largest save — anything else reads as no
+    /// bytes, which `WebSave` refuses.
+    public static func claim(_ file: URL) -> Claimed? {
         let mine = file.deletingLastPathComponent()
-            .appending(path: ".claimed-\(ProcessInfo.processInfo.processIdentifier)-\(file.lastPathComponent)")
+            .appending(path: "\(claimedPrefix)\(ProcessInfo.processInfo.processIdentifier)-\(file.lastPathComponent)")
         guard (try? FileManager.default.moveItem(at: file, to: mine)) != nil else { return nil }
-        defer { try? FileManager.default.removeItem(at: mine) }
-        guard let size = try? mine.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-              size <= WebSave.maxMessageBytes * 2 else { return Data() }
-        return try? Data(contentsOf: mine)
+        return Claimed(data: readCapped(mine, cap: WebSave.maxMessageBytes * 2), file: mine, original: file)
+    }
+
+    /// A regular file's bytes, up to `cap` — or none.
+    static func readCapped(_ url: URL, cap: Int) -> Data {
+        let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+        guard fd >= 0 else { return Data() }
+        defer { close(fd) }
+        var st = stat()
+        guard fstat(fd, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG, st.st_size <= off_t(cap) else { return Data() }
+        var out = Data()
+        var buffer = [UInt8](repeating: 0, count: 16_384)
+        while out.count <= cap {
+            let n = buffer.withUnsafeMutableBytes { read(fd, $0.baseAddress, $0.count) }
+            if n <= 0 { break }
+            out.append(contentsOf: buffer[0..<n])
+        }
+        return out.count > cap ? Data() : out
+    }
+
+    /// The save is done with — filed, or refused for good.
+    public static func finish(_ claimed: Claimed) {
+        try? FileManager.default.removeItem(at: claimed.file)
+    }
+
+    /// The save goes back into the inbox under its own name, to be read again
+    /// later.
+    public static func putBack(_ claimed: Claimed) {
+        guard (try? FileManager.default.moveItem(at: claimed.file, to: claimed.original)) != nil else {
+            // Its name is taken (written again meanwhile): the newer one stands.
+            try? FileManager.default.removeItem(at: claimed.file)
+            return
+        }
+    }
+
+    /// Saves a copy of the app claimed and never finished — it quit or
+    /// crashed while filing — handed back to the inbox. Only a claim whose
+    /// process is gone; another copy of the app still running keeps its own.
+    public static func recoverClaims(in inbox: URL) {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: inbox.path) else { return }
+        let me = ProcessInfo.processInfo.processIdentifier
+        for name in names where name.hasPrefix(claimedPrefix) {
+            let rest = name.dropFirst(claimedPrefix.count)
+            guard let dash = rest.firstIndex(of: "-"), let pid = Int32(rest[..<dash]) else { continue }
+            let original = String(rest[rest.index(after: dash)...])
+            guard original.hasSuffix(".json"), WebSave.isEntryId(String(original.dropLast(5))) else { continue }
+            // Our own pid is a leftover of an earlier process given the same
+            // number; any other pid that still answers is a live copy.
+            if pid != me, kill(pid, 0) == 0 || errno == EPERM { continue }
+            let from = inbox.appending(path: name), to = inbox.appending(path: original)
+            if FileManager.default.fileExists(atPath: to.path) { try? FileManager.default.removeItem(at: from) }
+            else { try? FileManager.default.moveItem(at: from, to: to) }
+        }
     }
 
     /// Answers nobody collected — the popup closed — taken out once stale.

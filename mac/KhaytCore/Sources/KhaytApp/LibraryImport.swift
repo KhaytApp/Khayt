@@ -467,12 +467,17 @@ enum LibraryImport {
         let member: ArchiveFolder.Member
         let hash: String?
         var locked = false
+        /// The archive's size and modification time, as hashed.
+        var bytes: Int? = nil
+        var modified: Double? = nil
 
         /// The fields that make a record a member (`LibraryFile.archiveMember`).
         func stamp(_ record: inout [String: JSONValue]) {
             record["archiveMember"] = .string(member.path)
             record["archiveHash"] = hash.map(JSONValue.string) ?? .null
             if locked { record["archiveLocked"] = .bool(true) }
+            if let bytes { record["archiveBytes"] = .number(Double(bytes)) }
+            if let modified { record["archiveModified"] = .number(modified) }
         }
     }
 

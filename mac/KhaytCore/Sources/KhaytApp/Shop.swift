@@ -2074,6 +2074,8 @@ final class Shop {
             // stays on screen over the sign-in screen otherwise, half filled
             // in, for whoever walks up (alpha.62 re-check).
             dismissEverySheet()
+            // Saves held back for a sign-in are filed now, if this person may.
+            WebSaveInbox.shared.holdMayHaveLifted()
         }
     }
     /// `lib/rbac.js`'s matrix, read from the engine with the book.
@@ -2082,7 +2084,11 @@ final class Shop {
     /// book on screen. Until then a switched-on lock refuses everything: the
     /// first load published the operators before their levels were read, and
     /// for that moment the lock was not "in force" — open (alpha.62 review).
-    var lockReady = false
+    var lockReady = false {
+        // A book opened, or its staff levels read: saves the browser sent
+        // while they were not are tried again (`WebSaveInbox.drain`).
+        didSet { if lockReady != oldValue { WebSaveInbox.shared.holdMayHaveLifted() } }
+    }
     /// Each operator's access level under the lock: `roleKey`, else the
     /// shared `roleFromLegacy` with the lock on.
     var lockRoles: [String: String] = [:]

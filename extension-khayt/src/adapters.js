@@ -44,6 +44,28 @@ export function siteOf(address) {
   return 'web';
 }
 
+/**
+ * The part of a host a site owns: `www.printables.com` → `printables.com`,
+ * `shop.example.co.uk` → `example.co.uk`. Without the full public-suffix list,
+ * a two-letter country ending under a generic second level (`co`, `com`,
+ * `org`…) counts as one suffix. An address is itself.
+ */
+export function registrable(host) {
+  const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (!h || /^[\d.]+$/.test(h) || h.includes(':')) return h;
+  const labels = h.split('.');
+  if (labels.length <= 2) return h;
+  const second = labels[labels.length - 2];
+  const tld = labels[labels.length - 1];
+  const keep = tld.length === 2 && ['co', 'com', 'net', 'org', 'gov', 'edu', 'ac', 'or', 'ne', 'go'].includes(second) ? 3 : 2;
+  return labels.slice(-keep).join('.');
+}
+
+/** Two addresses on the same site (registrable domain). */
+export function sameSite(a, b) {
+  try { return registrable(new URL(a).hostname) === registrable(new URL(b).hostname); } catch { return false; }
+}
+
 // ── Small helpers ─────────────────────────────────────────────────────────
 
 /** One line of text: white space collapsed, trimmed, cut at `max`. */
@@ -228,8 +250,12 @@ export function cleanTitle(title, siteWords = []) {
 }
 
 export function generic(doc, pageUrl) {
-  const canonical = httpsUrl(doc.querySelector('link[rel="canonical"]')?.getAttribute('href'), pageUrl)
-    || httpsUrl(meta(doc, 'og:url'), pageUrl) || httpsUrl(pageUrl);
+  // The page's own claim of its address counts only on the tab's own site: a
+  // mirror calling itself printables.com/model/123 would otherwise be saved
+  // as that model, and overwrite the shop's record of it.
+  const own = (u) => (u && sameSite(u, pageUrl) ? u : null);
+  const canonical = own(httpsUrl(doc.querySelector('link[rel="canonical"]')?.getAttribute('href'), pageUrl))
+    || own(httpsUrl(meta(doc, 'og:url'), pageUrl)) || httpsUrl(pageUrl);
   const site = siteOf(canonical || pageUrl);
   const ld = jsonLd(doc);
   const model = ld.find((o) => typesOf(o).some((t) => MODEL_TYPES.includes(t))) || {};

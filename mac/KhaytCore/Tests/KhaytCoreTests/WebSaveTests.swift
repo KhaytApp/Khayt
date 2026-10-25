@@ -124,6 +124,21 @@ struct WebSaveTests {
         }
     }
 
+    @Test("a page's claimed address on another site is not believed: the tab's address is saved instead")
+    func canonicalOnAnotherSite() throws {
+        var p = Self.dragon
+        p["url"] = "https://www.printables.com/model/123456-articulated-dragon"
+        p["tabUrl"] = "https://free-stl.example/dragon"
+        let spoofed = try #require(try Self.entry(p).page)
+        #expect(spoofed.url == "https://free-stl.example/dragon")
+        #expect(spoofed.site == .web)
+        // The site's own canonical on another of its hosts stands.
+        p["tabUrl"] = "https://printables.com/model/123456-articulated-dragon/files"
+        #expect(try Self.entry(p).page?.url == "https://www.printables.com/model/123456-articulated-dragon")
+        #expect(WebSave.registrable("shop.example.co.uk") == "example.co.uk")
+        #expect(WebSave.registrable("printables.com.evil.example") == "evil.example")
+    }
+
     // MARK: - The inbox
 
     @Test("written whole, read back through the same checks, claimed once, answered and collected")
@@ -134,15 +149,64 @@ struct WebSaveTests {
         try WebInbox.write(e, into: dir)
         let waiting = WebInbox.pending(in: dir)
         #expect(waiting.map(\.lastPathComponent) == ["\(e.id).json"])
-        let data = try #require(WebInbox.claim(waiting[0]))
+        let claimed = try #require(WebInbox.claim(waiting[0]))
         #expect(WebInbox.claim(waiting[0]) == nil, "a second reader gets nothing")
         #expect(WebInbox.pending(in: dir).isEmpty)
-        let back = try WebSave.entry(fromInboxFile: data)
+        let back = try WebSave.entry(fromInboxFile: claimed.data)
         #expect(back == e)
+        // Kept until it is filed: only `finish` lets it go.
+        #expect(FileManager.default.fileExists(atPath: claimed.file.path))
+        WebInbox.finish(claimed)
+        #expect(!FileManager.default.fileExists(atPath: claimed.file.path))
         try WebInbox.answer(.init(id: e.id, state: .saved, title: "Articulated Dragon"), inbox: dir)
         let answer = WebInbox.awaitAnswer(e.id, inbox: dir, timeout: 1)
         #expect(answer?.state == .saved && answer?.message["ok"] as? Bool == true)
         #expect(WebInbox.awaitAnswer(e.id, inbox: dir, timeout: 0.2) == nil, "collected once")
+    }
+
+    @Test("a claimed save handed back, or left by a copy of the app that died, waits in the inbox again")
+    func inboxPutBackAndRecover() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "ws-inbox-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let e = try Self.entry(Self.dragon)
+        try WebInbox.write(e, into: dir)
+        let claimed = try #require(WebInbox.claim(WebInbox.pending(in: dir)[0]))
+        WebInbox.putBack(claimed)
+        #expect(WebInbox.pending(in: dir).map(\.lastPathComponent) == ["\(e.id).json"])
+        // A claim by a process that is gone (pid 99999 is not running here,
+        // or is not ours) comes back at launch; a live one is left alone.
+        let again = try #require(WebInbox.claim(WebInbox.pending(in: dir)[0]))
+        let dead = dir.appending(path: ".claimed-99999-\(e.id).json")
+        try FileManager.default.moveItem(at: again.file, to: dead)
+        let live = dir.appending(path: ".claimed-1-WS-\(UUID().uuidString.uppercased()).json")
+        try Data("{}".utf8).write(to: live)
+        if kill(99999, 0) != 0 && errno == ESRCH {
+            WebInbox.recoverClaims(in: dir)
+            #expect(WebInbox.pending(in: dir).map(\.lastPathComponent) == ["\(e.id).json"])
+        }
+        #expect(FileManager.default.fileExists(atPath: live.path), "launchd's claim (pid 1, alive) was taken")
+    }
+
+    @Test("claiming never follows a symlink, never blocks on a FIFO, and reads a regular file only")
+    func inboxClaimIsSafe() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "ws-inbox-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let secret = dir.appending(path: "secret.txt")
+        try Data("not a save".utf8).write(to: secret)
+        let link = dir.appending(path: "WS-\(UUID().uuidString.uppercased()).json")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: secret)
+        let fifo = dir.appending(path: "WS-\(UUID().uuidString.uppercased()).json")
+        #expect(mkfifo(fifo.path, 0o600) == 0)
+        // Neither is listed as waiting.
+        #expect(WebInbox.pending(in: dir).isEmpty)
+        // And swapped in after the listing, neither is read: no bytes, at once.
+        let viaLink = try #require(WebInbox.claim(link))
+        #expect(viaLink.data.isEmpty)
+        let viaFifo = try #require(WebInbox.claim(fifo))
+        #expect(viaFifo.data.isEmpty)
+        WebInbox.finish(viaLink); WebInbox.finish(viaFifo)
+        #expect(FileManager.default.fileExists(atPath: secret.path), "the link's target was touched")
     }
 
     @Test("a file in the inbox that was not written by us is ignored, and a tampered one is re-checked")

@@ -210,8 +210,16 @@ struct MenuBarProgressTests {
         // And the one after faults first.
         _ = ledger.observe("m", state: "standby", filamentOut: nil)
         _ = ledger.observe("m", state: "printing", filamentOut: nil)
-        ledger.faultTold("m")
+        #expect(ledger.faultTold("m") == false, "nothing was told yet: the fault alert is the banner")
         #expect(ledger.ended("m", outcome: "failed") == nil)
+        // And one where the finish seam lands first (the usual order: the
+        // alerts run after the sweep): the fault alert is not a second banner.
+        _ = ledger.observe("m", state: "standby", filamentOut: nil)
+        _ = ledger.observe("m", state: "printing", filamentOut: nil)
+        #expect(ledger.ended("m", outcome: "failed") == .failed)
+        #expect(ledger.faultTold("m") == true)
+        // A fault long after that failure is news of its own.
+        #expect(ledger.faultTold("m", now: Date().addingTimeInterval(PrintNoticeLedger.sameFailure + 1)) == false)
         // Forgotten (deleted, retired) starts from nothing.
         ledger.forget("m")
         #expect(ledger.ended("m", outcome: "finished") == .finished)

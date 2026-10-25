@@ -33,6 +33,13 @@ public enum BrowserExtensionIds {
     /// store, so the host manifest names both.
     public static let edgeAddOns: [String] = []
 
+    /// TODO(store): true once Save to Khayt is listed on addons.mozilla.org
+    /// under its gecko id (`BrowserHosts.firefoxExtensionId`). Until then
+    /// the id is only what the extension CLAIMS, and whoever lists an add-on
+    /// with it first could start the host — so Settings keeps Firefox's
+    /// Install waiting for the store, as Chromium's does.
+    public static let firefoxListed = false
+
     /// Every store id, in the order a manifest names them.
     public static var store: [String] { chromeWebStore + edgeAddOns }
 

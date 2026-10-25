@@ -239,7 +239,15 @@ public enum WebSave {
 
     static func page(_ o: [String: Any]?) throws(Refusal) -> Page {
         guard let o else { throw .notJSON }
-        guard let url = https(o["url"]) else { throw .badURL }
+        guard var url = https(o["url"]) else { throw .badURL }
+        // The page's claim of its own address (canonical, og:url) counts only
+        // on the site the tab was showing. A page elsewhere claiming to be a
+        // Printables model is saved as the page it is — the tab's address —
+        // and never matches, or overwrites, the shop's record of that model.
+        if let tab = https(o["tabUrl"]),
+           registrable(URL(string: tab)?.host) != registrable(URL(string: url)?.host) {
+            url = tab
+        }
         let title = line(o["title"] as? String ?? "", max: maxTitle)
         guard !title.isEmpty else { throw .noTitle }
         var tags: [String] = []
@@ -270,6 +278,23 @@ public enum WebSave {
                     licence: line(o["licence"] as? String ?? "", max: maxLicence),
                     description: text(o["description"] as? String ?? "", max: maxDescription),
                     tags: tags, cover: https(o["cover"]), files: files)
+    }
+
+    /// The part of a host a site owns: `www.printables.com` → `printables.com`,
+    /// `shop.example.co.uk` → `example.co.uk` (a two-letter country ending
+    /// under a generic second level counts as one suffix; the extension's
+    /// `registrable` is the same rule). An address is itself.
+    static func registrable(_ host: String?) -> String {
+        var h = (host ?? "").lowercased()
+        if h.hasPrefix("[") && h.hasSuffix("]") { h = String(h.dropFirst().dropLast()) }
+        if h.hasSuffix(".") { h = String(h.dropLast()) }
+        if h.isEmpty || h.contains(":") || h.allSatisfy({ $0.isNumber || $0 == "." }) { return h }
+        let labels = h.split(separator: ".").map(String.init)
+        guard labels.count > 2 else { return h }
+        let second = labels[labels.count - 2], tld = labels[labels.count - 1]
+        let generic: Set<String> = ["co", "com", "net", "org", "gov", "edu", "ac", "or", "ne", "go"]
+        let keep = tld.count == 2 && generic.contains(second) ? 3 : 2
+        return labels.suffix(keep).joined(separator: ".")
     }
 
     static func attach(_ o: [String: Any]?) throws(Refusal) -> Attach {

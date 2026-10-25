@@ -171,9 +171,11 @@ struct CloudPlanSettings: View {
         let up = plans.filter { CloudPlans.isUpgrade($0, from: current) && $0.name != current?.name }
         guard !up.isEmpty else { return nil }
         let holds = (current?.limits.maxVaultBytes ?? 0) + over
-        let fits = up.filter { ($0.limits.maxVaultBytes ?? 0) >= holds }
+        // A plan with no vault limit holds anything: the largest, not none.
+        func room(_ p: CloudPlans.Plan) -> Int { p.limits.maxVaultBytes ?? Int.max }
+        let fits = up.filter { room($0) >= holds }
         if let cheapest = fits.min(by: { ($0.priceSar ?? 0) < ($1.priceSar ?? 0) }) { return cheapest }
-        return up.max(by: { ($0.limits.maxVaultBytes ?? 0) < ($1.limits.maxVaultBytes ?? 0) })
+        return up.max(by: { room($0) < room($1) })
     }
 
     // MARK: - The terms, before the move

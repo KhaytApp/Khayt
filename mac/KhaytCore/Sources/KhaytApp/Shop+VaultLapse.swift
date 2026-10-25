@@ -76,8 +76,13 @@ extension Shop {
     }
 
     /// The deletion date and the count, only when the cloud has set one.
-    static func lapseDeadline(_ d: CloudPlans.Lapse.Display, _ words: Words) -> String? {
+    static func lapseDeadline(_ d: CloudPlans.Lapse.Display, _ words: Words, now: Date = Date()) -> String? {
         guard case .deleting(_, let end, let days, _) = d else { return nil }
+        // A date already behind us (the cloud's deleter has not caught up):
+        // not "today", which it is not, but what is happening.
+        if Calendar.book.startOfDay(for: end) < Calendar.book.startOfDay(for: now) {
+            return words.callIt("mac.lapse_deleting_now", ["date": .string(day(end, words))])
+        }
         let count = days == 0 ? words.callIt("mac.lapse_today") : words.counting(days, "mac.lapse_days")
         return words.callIt("mac.lapse_delete_on", ["date": .string(day(end, words)), "days": .string(count)])
     }

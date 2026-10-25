@@ -63,9 +63,13 @@ final class WebSaveInbox {
     var lastAttached: (name: String, id: String)?
 
     /// Put one download to the shop — once per file, however many times the
-    /// browser and the watch both noticed it.
+    /// browser and the watch both noticed it. At most `maxOffers` wait: a
+    /// flood of files into Downloads (or of attach messages) cannot stack
+    /// questions without end — the rest are simply not asked.
+    static let maxOffers = 10
+
     func enqueue(_ offer: WebAttachOffer) {
-        guard !offers.contains(where: { $0.path == offer.path }) else { return }
+        guard !offers.contains(where: { $0.path == offer.path }), offers.count < Self.maxOffers else { return }
         offers.append(offer)
         // The window may be behind the browser: say so on the Dock, once.
         if offers.count == 1, let app = NSApp as NSApplication?, !app.isActive { app.requestUserAttention(.informationalRequest) }
@@ -85,12 +89,22 @@ final class WebSaveInbox {
     @ObservationIgnored private var watch: DispatchSourceFileSystemObject?
     @ObservationIgnored private var draining = false
     @ObservationIgnored private var again = false
+    /// Saves were left waiting by the last drain — the staff lock was down,
+    /// or no real book was open — so a sign-in or a book opening drains again.
+    @ObservationIgnored private(set) var heldBack = false
+    /// Saves whose write failed this time, put back for later — not tried
+    /// again by the folder event putting them back makes, only once the hold
+    /// lifts or the app comes to the front.
+    @ObservationIgnored private var retryLater: Set<String> = []
 
     /// Start reading the inbox for this shop. Called once the book is open.
     func start(shop: Shop) {
         self.shop = shop
         guard let dir = directory() else { return }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // Saves a copy of the app took and never finished filing (it quit or
+        // crashed mid-write) wait again.
+        WebInbox.recoverClaims(in: dir)
         if watch == nil {
             let fd = open(dir.path, O_EVTONLY)
             if fd >= 0 {
@@ -107,11 +121,23 @@ final class WebSaveInbox {
             // after the watch); coming to the front looks again.
             NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                    object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.drainSoon() }
+                MainActor.assumeIsolated { self?.retryLater = []; self?.drainSoon() }
             }
         }
         drainSoon()
     }
+
+    /// Who is at this Mac, or which book is open, changed: saves held back
+    /// for it are tried again.
+    func holdMayHaveLifted() {
+        guard heldBack else { return }
+        retryLater = []
+        drainSoon()
+    }
+
+    /// A save written this recently may still have its popup waiting for the
+    /// answer (`WebInbox.answerWait`); older, nobody is listening.
+    static let liveAnswerWindow: TimeInterval = WebInbox.answerWait + 2
 
     func drainSoon() {
         guard !draining else { again = true; return }
@@ -126,28 +152,59 @@ final class WebSaveInbox {
     }
 
     /// Every waiting save, filed and answered in the order they came.
-    func drain() async {
+    ///
+    /// A save that cannot be filed YET is left in the inbox, not refused and
+    /// deleted: with nobody signed in (or someone who may not edit the
+    /// library) it waits for a sign-in, and with no real book open (the
+    /// sample) it waits for one — the popup promised it would be added. Only
+    /// a save so new its popup is still waiting is answered `refused`, and
+    /// then it is done with. A claimed save is let go only once it is
+    /// answered for good, so a quit mid-write loses nothing.
+    func drain(now: Date = Date()) async {
         guard let shop, let dir = directory() else { return }
         WebInbox.sweepAnswers(inbox: dir)
+        heldBack = false
+        // A cover is fetched after its save is answered, so a slow picture
+        // never makes a filed save look like "Khayt isn't open".
+        var covers: [(address: String, id: String)] = []
         for file in WebInbox.pending(in: dir) {
-            guard let data = WebInbox.claim(file) else { continue }
+            if retryLater.contains(file.lastPathComponent) { heldBack = true; continue }
+            if let hold = shop.webSaveHold {
+                heldBack = true
+                // The sample: never claimed, so a real book (here later, or
+                // another copy of the app) files it.
+                if hold == "sample" { continue }
+                let made = (try? FileManager.default.attributesOfItem(atPath: file.path)[.creationDate] as? Date) ?? .distantPast
+                if now.timeIntervalSince(made) > Self.liveAnswerWindow { continue }
+            }
+            guard let claimed = WebInbox.claim(file) else { continue }
             let fallbackId = file.deletingPathExtension().lastPathComponent
             let result: WebInbox.Result
             var safariSave: WebSave.Page?
             do {
-                let entry = try WebSave.entry(fromInboxFile: data)
+                let entry = try WebSave.entry(fromInboxFile: claimed.data)
                 if entry.kind == .attach {
                     let (answer, offer) = shop.offerWebAttach(entry, accepting: accepting, home: home())
                     result = answer
                     if let offer { enqueue(offer) }
                 } else {
-                    result = await shop.fileWebSave(entry, accepting: accepting)
+                    let filed = await shop.fileWebSaveRecord(entry, accepting: accepting)
+                    result = filed.result
+                    if let cover = filed.cover { covers.append(cover) }
                     if entry.browser == "safari" { safariSave = entry.page }
                 }
             } catch {
                 result = WebInbox.Result(id: fallbackId, state: .invalid, reason: error.rawValue)
             }
+            // A write that failed may work next time: it waits again.
+            if result.state == .refused, result.reason == "write" {
+                WebInbox.putBack(claimed)
+                retryLater.insert(file.lastPathComponent)
+                heldBack = true
+                continue
+            }
             try? WebInbox.answer(result, inbox: dir)
+            WebInbox.finish(claimed)
             if result.state == .saved || result.state == .updated {
                 lastSaved = (result.title ?? "", Date())
                 savedCount += 1
@@ -158,6 +215,7 @@ final class WebSaveInbox {
                 }
             }
         }
+        for cover in covers { await shop.addWebCover(cover.address, to: cover.id) }
     }
 }
 
@@ -172,16 +230,33 @@ extension Shop {
     /// `lockAllows` rather than `permitted`, because nobody at the Mac pressed
     /// anything here — a refusal goes back to the browser, not into an alert.
     func fileWebSave(_ entry: WebSave.Entry, accepting: Bool) async -> WebInbox.Result {
-        guard accepting else { return .init(id: entry.id, state: .refused, reason: "off") }
+        let filed = await fileWebSaveRecord(entry, accepting: accepting)
+        if let cover = filed.cover { await addWebCover(cover.address, to: cover.id) }
+        return filed.result
+    }
+
+    /// Why a save cannot be filed right now, though it may be later: `not-allowed`
+    /// (the staff lock), `sample` (no real book). Nil when it can.
+    var webSaveHold: String? {
+        if !lockAllows("inventory", "edit") { return "not-allowed" }
+        if source.build == nil { return "sample" }
+        return nil
+    }
+
+    /// The record written, and the cover still to fetch for it — fetched by
+    /// the caller AFTER the answer has gone back (`WebSaveInbox.drain`).
+    func fileWebSaveRecord(_ entry: WebSave.Entry,
+                           accepting: Bool) async -> (result: WebInbox.Result, cover: (address: String, id: String)?) {
+        guard accepting else { return (.init(id: entry.id, state: .refused, reason: "off"), nil) }
         guard entry.kind == .save, let page = entry.page else {
             // A download to attach is `offerWebAttach`'s, and is never filed
             // without the shop's answer.
-            return .init(id: entry.id, state: .refused, reason: "unsupported")
+            return (.init(id: entry.id, state: .refused, reason: "unsupported"), nil)
         }
         guard lockAllows("inventory", "edit") else {
-            return .init(id: entry.id, state: .refused, reason: "not-allowed")
+            return (.init(id: entry.id, state: .refused, reason: "not-allowed"), nil)
         }
-        guard let build = source.build else { return .init(id: entry.id, state: .refused, reason: "sample") }
+        guard let build = source.build else { return (.init(id: entry.id, state: .refused, reason: "sample"), nil) }
         let newId = Self.uid("PF")
         let now = Date()
         let nowMs = now.timeIntervalSince1970 * 1000, nowISO = StoreWriter.iso(now)
@@ -197,13 +272,11 @@ extension Shop {
             }
         } catch {
             writeProblem = said(error)
-            return .init(id: entry.id, state: .refused, reason: "write")
+            return (.init(id: entry.id, state: .refused, reason: "write"), nil)
         }
         await load(source)
-        if outcome.wantsCover, let cover = page.cover {
-            await addWebCover(cover, to: outcome.id)
-        }
-        return .init(id: entry.id, state: outcome.created ? .saved : .updated, title: page.title)
+        let cover = outcome.wantsCover ? page.cover.map { (address: $0, id: outcome.id) } : nil
+        return (.init(id: entry.id, state: outcome.created ? .saved : .updated, title: page.title), cover)
     }
 
     /// The page's cover, as the record's picture — unless it has one by the
@@ -230,7 +303,10 @@ extension Shop {
     /// a library photo is. Nil for anything else.
     nonisolated static func fetchWebCover(_ address: String,
                                           session: URLSession = WebCoverFetch.session) async -> String? {
-        guard let checked = WebSave.https(address), let url = URL(string: checked) else { return nil }
+        guard let checked = WebSave.https(address), let url = URL(string: checked), let host = url.host else { return nil }
+        // Never a machine on the shop's own network: the browser keeps a page
+        // from reaching those, and this fetch is the page's choice of address.
+        guard await PinWork.run({ WebCoverFetch.isPublic(host: host) }) else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("image/*", forHTTPHeaderField: "Accept")
         let cap = ProductPhotos.maxSourceBytes
@@ -251,11 +327,26 @@ extension Shop {
         return await PinWork.run { Self.coverURI(body) }
     }
 
+    /// The picture formats a cover may be. A stranger's bytes reach ImageIO
+    /// here, in the main app: only the formats a web page's picture really
+    /// is get a decoder — never TIFF, RAW, PSD, EXR, ICNS, JPEG XL or the
+    /// rest ImageIO would otherwise guess its way into.
+    nonisolated static let coverTypes: Set<String> = ["public.jpeg", "public.png", "org.webmproject.webp",
+                                                      "com.compuserve.gif"]
+    /// The largest cover, in pixels a side and in all.
+    nonisolated static let coverMaxSide = 12_000
+    nonisolated static let coverMaxPixels = 64_000_000
+
     /// The bytes as a library photo, or nil when they are not a picture.
     nonisolated static func coverURI(_ data: Data) -> String? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, options),
+              let type = CGImageSourceGetType(source) as String?, coverTypes.contains(type),
               CGImageSourceGetCount(source) > 0,
-              CGImageSourceCopyPropertiesAtIndex(source, 0, nil) != nil else { return nil }
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, options) as? [CFString: Any],
+              let w = (props[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+              let h = (props[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue,
+              w > 0, h > 0, w <= coverMaxSide, h <= coverMaxSide, w * h <= coverMaxPixels else { return nil }
         let scratch = FileManager.default.temporaryDirectory
             .appending(path: "khayt-web-cover-scratch-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: scratch) } // scratch
@@ -274,6 +365,62 @@ extension Shop {
 /// The session covers are fetched with: no cookies, no cache, no credentials,
 /// and a redirect followed only to another https address.
 enum WebCoverFetch {
+
+    /// A host on the internet: not a `.local` or `localhost` name, and every
+    /// address it resolves to outside loopback, the private ranges, link-
+    /// local, CGNAT and the unique-local IPv6 block. A name that does not
+    /// resolve is not fetched either.
+    nonisolated static func isPublic(host raw: String) -> Bool {
+        let host = raw.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]."))
+        if host.isEmpty || host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local")
+            || host.hasSuffix(".internal") || host.hasSuffix(".lan") || host.hasSuffix(".home.arpa") { return false }
+        var hints = addrinfo(ai_flags: 0, ai_family: AF_UNSPEC, ai_socktype: SOCK_STREAM, ai_protocol: 0,
+                             ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
+        var list: UnsafeMutablePointer<addrinfo>?
+        guard getaddrinfo(host, nil, &hints, &list) == 0, let first = list else { return false }
+        defer { freeaddrinfo(list) }
+        var node: UnsafeMutablePointer<addrinfo>? = first
+        var any = false
+        while let n = node {
+            defer { node = n.pointee.ai_next }
+            guard let addr = n.pointee.ai_addr else { continue }
+            any = true
+            if addr.pointee.sa_family == sa_family_t(AF_INET) {
+                let v4 = addr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr.s_addr }
+                if !isPublic(v4: [UInt8](withUnsafeBytes(of: v4) { Array($0) })) { return false }
+            } else if addr.pointee.sa_family == sa_family_t(AF_INET6) {
+                let v6 = addr.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) { $0.pointee.sin6_addr }
+                if !isPublic(v6: withUnsafeBytes(of: v6) { Array($0) }) { return false }
+            }
+        }
+        return any
+    }
+
+    /// An IPv4 address, in network order, that is on the internet.
+    nonisolated static func isPublic(v4 b: [UInt8]) -> Bool {
+        guard b.count == 4 else { return false }
+        switch (b[0], b[1]) {
+        case (0, _), (10, _), (127, _): return false
+        case (169, 254), (192, 168): return false
+        case (172, 16...31): return false
+        case (100, 64...127): return false
+        case (224...255, _): return false
+        default: return true
+        }
+    }
+
+    /// An IPv6 address that is on the internet (a mapped IPv4 one is asked
+    /// as IPv4).
+    nonisolated static func isPublic(v6 b: [UInt8]) -> Bool {
+        guard b.count == 16 else { return false }
+        if b.allSatisfy({ $0 == 0 }) || (b[0..<15].allSatisfy { $0 == 0 } && b[15] == 1) { return false }
+        if b[0..<10].allSatisfy({ $0 == 0 }) && b[10] == 0xFF && b[11] == 0xFF { return isPublic(v4: Array(b[12..<16])) }
+        if b[0] & 0xFE == 0xFC { return false }             // fc00::/7 unique local
+        if b[0] == 0xFE && b[1] & 0xC0 == 0x80 { return false } // fe80::/10 link-local
+        if b[0] == 0xFF { return false }                    // multicast
+        return true
+    }
+
     nonisolated static let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieAcceptPolicy = .never
@@ -288,7 +435,8 @@ enum WebCoverFetch {
         func urlSession(_ session: URLSession, task: URLSessionTask,
                         willPerformHTTPRedirection response: HTTPURLResponse,
                         newRequest request: URLRequest) async -> URLRequest? {
-            request.url?.scheme?.lowercased() == "https" ? request : nil
+            guard request.url?.scheme?.lowercased() == "https", let host = request.url?.host else { return nil }
+            return await PinWork.run { WebCoverFetch.isPublic(host: host) } ? request : nil
         }
 
         func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge)

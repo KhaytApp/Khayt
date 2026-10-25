@@ -506,13 +506,16 @@ final class PrinterWatch {
         for alert in found.alerts {
             let name = shop.machineName(forId: alert.machineId)
             // A failed print the fault alert has told about is not told again
-            // by the finish seam.
-            if alert.type == "error" { notices.ledger.faultTold(alert.machineId) }
+            // by the finish seam — and one the seam told first ("Print
+            // failed") is not a second banner here.
+            let toldAsFailed = alert.type == "error" && notices.ledger.faultTold(alert.machineId)
             let title = Self.title(alert.type, machine: name, shop: shop)
             let body = Self.body(alert, machine: name, shop: shop)
-            notices.raise(PrinterNotice.Notice(
-                machineId: alert.machineId, machine: name, kind: alert.type,
-                title: title, body: body, at: Date()))
+            if !toldAsFailed {
+                notices.raise(PrinterNotice.Notice(
+                    machineId: alert.machineId, machine: name, kind: alert.type,
+                    title: title, body: body, at: Date()))
+            }
             // AND TO THE SHOP'S PHONE. A notification on this Mac reaches the
             // person at this Mac; Telegram and ntfy reach the one who is not.
             // The switches for both were saved here and never read.
