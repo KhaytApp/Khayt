@@ -1913,6 +1913,13 @@ final class Shop {
     /// the library's selection (`Shop+VaultProducts.swift`).
     var showingVaultProducts = false
     var makingProduct: VaultProductRequest?
+    /// Over the plan's vault after a move down (`Shop+VaultLapse.swift`):
+    /// the cloud's last word on it, nil until it has been asked.
+    var vaultLapse: CloudPlans.Lapse?
+    var vaultLapseAsked: Date?
+    /// The snapshot runner's owner, for the plan pane's Upgrade: the sample
+    /// book has no cloud sign-in to carry a role.
+    var pretendsOwner = false
 
     /// The shop's own saved messages, in the order it keeps them.
     private(set) var messageTemplates: [MessageTemplate] = []

@@ -57,6 +57,9 @@ struct VaultProductsSheet: View {
             }
             Text(words.callIt("mac.vp_explain"))
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            // Over the plan after a move down: new products, edits, previews
+            // and releases are paused; removing a product still works.
+            VaultLapseNotice(shop: shop, display: shop.vaultLapseDisplay)
             if loading && products.isEmpty {
                 ProgressView().frame(maxWidth: .infinity)
             } else if live.isEmpty && problem == nil {
@@ -173,6 +176,7 @@ struct VaultProductsSheet: View {
         loading = true; problem = nil
         defer { loading = false }
         guard let engine = await shop.vaultProductsEngine() else { problem = words.callIt("mac.vl_err_vault_off"); return }
+        Task { await shop.refreshVaultLapse(force: true) }
         do {
             try? await engine.remote.sync.pull()
             names = await shop.vaultFileNames(engine.remote)

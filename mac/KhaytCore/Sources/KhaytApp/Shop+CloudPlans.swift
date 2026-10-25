@@ -21,6 +21,7 @@ extension Shop {
     /// of `cloudRoleCanWrite`, because the cost of a wrong yes is a button
     /// that answers "owner only", and the cloud still decides.
     var cloudIsOwner: Bool {
+        if pretendsOwner { return true }
         guard case .object(let cloud)? = settingsDict["cloud"],
               case .string(let role)? = cloud["role"] else { return false }
         return role.lowercased() == "owner"

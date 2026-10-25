@@ -12,6 +12,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - Library: a new built-in smart folder, Saved from web, and a matching Show menu filter. A saved model's page has a From the web section with its site, the licence as the page worded it, the files the page links to, and Open Page. A model saved but not downloaded is not called missing by Library Health.
   - Settings ▸ Preferences ▸ Browser extension: switch saving from the browser off on this Mac, see whether Safari has the extension on, and open Safari's settings.
   - Everything a page sends is checked twice (by the extension's native end and again by the app): https only, length caps, no control characters, at most 20 tags and 20 links. The cover picture is fetched over https only, at most 8 MB, and kept only when it is a real picture.
+- **Mac: a vault over its plan after a move down says so, with the date files will be deleted.**
+  - Khayt Cloud now keeps a vault that holds more than the shop's new plan allows read-only for 90 days, then deletes files until it fits: Trash first, then old versions, files in no product, product files nobody has bought, and files buyers hold last, the least recently changed first in each.
+  - Settings ▸ Online ▸ Khayt Cloud plan shows a status box: how much over, read-only since when, and once the cloud has set it, "Files over the limit will be deleted on <date> (N days)", the order above, and an Upgrade to the cheapest plan that holds the vault (owner only). Before the cloud sets a date it says read-only and shows no date.
+  - The library (when the vault is its storage) and the Share by Private Link, Share Links and Products sheets show the same notice while the vault is over.
+  - A new share link, a new or changed product, a preview or a release refused for being over the plan now says "Your shop is over its plan's storage, so new share links and product changes are paused. Upgrade or delete files." instead of a generic error. Deleting, trashing, emptying Trash and removing old versions keep working.
+  - The move-down confirmation now says what happens to a vault over the new plan, matching khaytapp.com/terms §4.
+  - Reads the cloud's `lapse` block on billing/me, vault/usage and the plan move; an older cloud without it reads as not over.
 
 - **Mac: saved searches, smart folders and ranges in the print library.**
   - Under Library in the sidebar: five smart folders that are always there (Ready to print, Never printed, Online only, No print figures, Sells in catalogue) and the shop's own saved searches, each with a live count. Clicking one fills the filter row with its search.

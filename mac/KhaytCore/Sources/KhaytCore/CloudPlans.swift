@@ -96,7 +96,91 @@ public enum CloudPlans {
         public let active: Bool?
         public let until: String?
         public let beta: Beta?
+        /// Over the plan's vault after a move down. Absent from an older
+        /// cloud, which means not over.
+        public let lapse: Lapse?
         public var onFreeUpgrade: Bool { beta?.upgrade == true }
+
+        enum CodingKeys: String, CodingKey { case billingEnabled, plan, label, status, active, until, beta, lapse }
+        public init(from d: Decoder) throws {
+            let c = try d.container(keyedBy: CodingKeys.self)
+            billingEnabled = try c.decodeIfPresent(Bool.self, forKey: .billingEnabled)
+            plan = try c.decodeIfPresent(String.self, forKey: .plan)
+            label = try c.decodeIfPresent(String.self, forKey: .label)
+            status = try c.decodeIfPresent(String.self, forKey: .status)
+            active = try c.decodeIfPresent(Bool.self, forKey: .active)
+            until = try c.decodeIfPresent(String.self, forKey: .until)
+            beta = try c.decodeIfPresent(Beta.self, forKey: .beta)
+            // A lapse this app cannot read is no reason to lose the plan.
+            lapse = (try? c.decodeIfPresent(Lapse.self, forKey: .lapse)) ?? nil
+        }
+    }
+
+    /// `lapse` on `GET /v1/billing/me`, `GET …/vault/usage` and the plan
+    /// move's answer (khayt-cloud #143): a vault over its plan's limit after a
+    /// move down is READ-ONLY for 90 days and then trimmed until it fits —
+    /// Trash first, then old versions, files in no product, product files with
+    /// no buyers, and buyer-held files last, least recently changed first in
+    /// each. `readOnlySince` can be nil for up to an hour after going over,
+    /// and `deleteAfter` is nil while `deleting` is false.
+    ///
+    /// Every field is read leniently: a missing or odd value is "not over" for
+    /// `over`, 0 for `overBytes`, nil for the dates.
+    public struct Lapse: Codable, Sendable, Equatable {
+        public let over: Bool
+        public let overBytes: Int
+        public let readOnlySince: String?
+        public let deleteAfter: String?
+        public let deleting: Bool
+
+        public static let notOver = Lapse(over: false, overBytes: 0, readOnlySince: nil, deleteAfter: nil, deleting: false)
+
+        public init(over: Bool, overBytes: Int, readOnlySince: String?, deleteAfter: String?, deleting: Bool) {
+            self.over = over; self.overBytes = overBytes; self.readOnlySince = readOnlySince
+            self.deleteAfter = deleteAfter; self.deleting = deleting
+        }
+
+        enum CodingKeys: String, CodingKey { case over, overBytes, readOnlySince, deleteAfter, deleting }
+        public init(from d: Decoder) throws {
+            let c = try d.container(keyedBy: CodingKeys.self)
+            over = (try? c.decodeIfPresent(Bool.self, forKey: .over)) ?? nil ?? false
+            let bytes = (try? c.decodeIfPresent(Double.self, forKey: .overBytes)) ?? nil ?? 0
+            overBytes = bytes.isFinite && bytes > 0 ? Int(min(bytes, Double(Int.max / 2))) : 0
+            readOnlySince = (try? c.decodeIfPresent(String.self, forKey: .readOnlySince)) ?? nil
+            deleteAfter = (try? c.decodeIfPresent(String.self, forKey: .deleteAfter)) ?? nil
+            deleting = (try? c.decodeIfPresent(Bool.self, forKey: .deleting)) ?? nil ?? false
+        }
+
+        /// What the shop is shown.
+        public enum Display: Equatable, Sendable {
+            case notOver
+            /// Over, read-only, no deletion date set. `since` is nil in the
+            /// first hour.
+            case readOnly(overBytes: Int, since: Date?)
+            /// Over, and files over the limit will be deleted on
+            /// `deleteAfter` — `daysLeft` whole book-calendar days from today,
+            /// never below 0. `since` as for read-only.
+            case deleting(overBytes: Int, deleteAfter: Date, daysLeft: Int, since: Date?)
+
+            public var isOver: Bool { self != .notOver }
+        }
+
+        /// The display state, in the BOOK's calendar (never `Calendar.current`:
+        /// a Mac on Umm al-Qura would count Hijri days). Days are counted
+        /// between local midnights, so "in 3 days" does not turn into 2 at
+        /// 14:00 the way a count of 24-hour spans would.
+        public func display(now: Date = Date(), calendar: Calendar = .book) -> Display {
+            guard over else { return .notOver }
+            let since = readOnlySince.flatMap(Calendar.instant)
+            // A date with deleting false is not a date the contract gives;
+            // deleting without a readable date is said as read-only.
+            guard deleting, let end = deleteAfter.flatMap(Calendar.instant) else {
+                return .readOnly(overBytes: overBytes, since: since)
+            }
+            let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now),
+                                               to: calendar.startOfDay(for: end)).day ?? 0
+            return .deleting(overBytes: overBytes, deleteAfter: end, daysLeft: max(0, days), since: since)
+        }
     }
 
     /// A refusal the cloud named: `owner-only`, `billing-off`, `unknown-plan`,

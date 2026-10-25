@@ -43,6 +43,11 @@ public struct VaultClient: Sendable {
         case noVault
         /// 402 read-only: the plan lapsed or was downgraded; reads still work.
         case readOnly
+        /// 402 vault-over: the shop moved down a plan and the vault holds more
+        /// than the new plan allows (khayt-cloud #143). New share links and
+        /// product changes are refused; deleting, trashing, purging and
+        /// pruning still work.
+        case vaultOver(used: Int, limit: Int)
         /// 413 file-too-large: one file over the plan's `maxVaultFileBytes`.
         case fileTooLarge(limit: Int)
         /// 409 duplicate: a committed head in this shop already has the tag.
@@ -99,6 +104,7 @@ public struct VaultClient: Sendable {
             case .vaultFull(let used, let limit): return "The vault is full (\(used) of \(limit) bytes used)."
             case .noVault: return "This shop's plan has no vault."
             case .readOnly: return "The vault is read-only: the plan lapsed or no longer includes it."
+            case .vaultOver(let used, let limit): return "The vault holds more than this plan allows (\(used) of \(limit) bytes)."
             case .fileTooLarge(let limit): return "The file is larger than this plan allows (\(limit) bytes)."
             case .duplicate(let fileId, let version): return "The vault already holds this file (\(fileId) v\(version))."
             case .partsMissing(let i): return "The cloud is missing \(i.count) part(s) of the upload."
@@ -222,13 +228,33 @@ public struct VaultClient: Sendable {
     public struct Usage: Codable, Sendable, Equatable {
         public struct Used: Codable, Sendable, Equatable {
             public let current, versions, trash, uploading, total: Int
+            public init(current: Int, versions: Int, trash: Int, uploading: Int, total: Int) {
+                self.current = current; self.versions = versions; self.trash = trash
+                self.uploading = uploading; self.total = total
+            }
         }
         public struct Limits: Codable, Sendable, Equatable {
             public let maxVaultBytes: Int
             public let maxVaultFileBytes: Int?
+            public init(maxVaultBytes: Int, maxVaultFileBytes: Int? = nil) {
+                self.maxVaultBytes = maxVaultBytes; self.maxVaultFileBytes = maxVaultFileBytes
+            }
         }
         public let limits: Limits
         public let used: Used
+        /// Over the plan after a move down; nil from an older cloud.
+        public let lapse: CloudPlans.Lapse?
+
+        enum CodingKeys: String, CodingKey { case limits, used, lapse }
+        public init(from d: Decoder) throws {
+            let c = try d.container(keyedBy: CodingKeys.self)
+            limits = try c.decode(Limits.self, forKey: .limits)
+            used = try c.decode(Used.self, forKey: .used)
+            lapse = (try? c.decodeIfPresent(CloudPlans.Lapse.self, forKey: .lapse)) ?? nil
+        }
+        public init(limits: Limits, used: Used, lapse: CloudPlans.Lapse? = nil) {
+            self.limits = limits; self.used = used; self.lapse = lapse
+        }
     }
 
     // MARK: - Uploads
@@ -422,6 +448,7 @@ public struct VaultClient: Sendable {
         case (402, "vault-full"): return .vaultFull(used: n("used"), limit: n("limit"))
         case (402, "no-vault"): return .noVault
         case (402, "read-only"): return .readOnly
+        case (402, "vault-over"): return .vaultOver(used: n("used"), limit: n("limit"))
         case (402, "links-full"): return .linksFull(limit: n("limit"))
         case (402, "no-links"): return .noLinks
         case (409, "grant-exists"): return .grantExists

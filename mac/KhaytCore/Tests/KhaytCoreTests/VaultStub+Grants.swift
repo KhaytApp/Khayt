@@ -95,6 +95,7 @@ extension VaultStub {
         }
         guard let list = b["items"] as? [[String: Any]], !list.isEmpty else { return reply(url, 422, ["error": "items"]) }
         if let bad = checkItems(url, list) { return bad }
+        if vaultOver { return overReply(url) }
         var lock: [String]?
         if b.keys.contains("emailLock") {
             guard let l = Self.cleanEmailLock(b["emailLock"]) else { return reply(url, 422, ["reason": "bad-email-lock"]) }

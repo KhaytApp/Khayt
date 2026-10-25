@@ -56,6 +56,11 @@ final class VaultStub: @unchecked Sendable {
     var salesHooks: [String: String] = [:]
     var noPublishing = false
     var publishOff = false
+    /// khayt-cloud #143: over the plan after a move down. `lapse` is what
+    /// usage answers (nil leaves the field out, as an older cloud does);
+    /// `vaultOver` refuses the routes the contract names with 402 vault-over.
+    var lapse: [String: Any]?
+    var vaultOver = false
     struct Logged { let method: String; let url: String; let body: Data; let headers: [String: String] }
 
     struct File { var fileId: String; var nextVersion = 1; var head: Int?; var meta: String?; var metaRev = 0
@@ -170,9 +175,16 @@ final class VaultStub: @unchecked Sendable {
     }
 
     func usage(_ url: URL) -> (Data, URLResponse) {
-        reply(url, 200, ["limits": ["maxVaultBytes": limitBytes, "maxVaultFileBytes": 5 << 30],
-                         "used": ["current": used(), "versions": 0, "trash": 0, "uploading": 0, "total": used()],
-                         "links": ["active": 0], "egress": ["month": "2026-10", "bytes": 0]])
+        var o: [String: Any] = ["limits": ["maxVaultBytes": limitBytes, "maxVaultFileBytes": 5 << 30],
+                                "used": ["current": used(), "versions": 0, "trash": 0, "uploading": 0, "total": used()],
+                                "links": ["active": 0], "egress": ["month": "2026-10", "bytes": 0]]
+        if let lapse { o["lapse"] = lapse }
+        return reply(url, 200, o)
+    }
+
+    func overReply(_ url: URL) -> (Data, URLResponse) {
+        reply(url, 402, ["error": "The vault holds more than this plan allows.", "reason": "vault-over",
+                         "used": used(), "limit": limitBytes])
     }
 
     func partList(_ up: Upload, from: Int) -> [[String: Any]] {
