@@ -34,6 +34,7 @@ final class LibraryMemo {
         var unfiled: Bool
         var neverPrinted: Bool
         var readyOn: String?
+        var fitsOn: String?
         var category: Shop.FilterChoice?
         var tag: String?
         var creator: String?
@@ -48,6 +49,8 @@ final class LibraryMemo {
         var inCatalogue = false
         var fromWeb = false
         var ranges = LibraryQuery.Ranges()
+        /// What the printer chips were worked out from, while Fits is on.
+        var fitsKey: [Int] = []
         /// Today, while a "last N days" range is on — tomorrow it finds less.
         var day = ""
         /// `librarySyncRevision`: a model moved out or brought back.
@@ -99,6 +102,10 @@ final class LibraryMemo {
         var facetMemoHits = 0
         /// Saved-search counts worked out (`Shop.libraryCount`).
         var queryCounts = 0
+        /// Models whose printer chips were worked out (`Shop.machineFits`),
+        /// and passes over the whole book for the Fits sets.
+        var fitBuilds = 0
+        var fitSetBuilds = 0
     }
 
     var work = Work()
@@ -186,6 +193,14 @@ final class LibraryMemo {
     var catalogueKey = -1
     var catalogueIds: Set<String>?
 
+    /// Each model's answer machine by machine (`Shop.machineFits`), its tile
+    /// chips, and every machine's set of models it fits — all for the inputs
+    /// in `machineFitsKey`.
+    var machineFitsKey: [Int]?
+    var machineFits: [LibraryFile.ID: [ModelSummary.MachineFit]] = [:]
+    var fitChips: [LibraryFile.ID: LibraryFitChips.Row] = [:]
+    var fitSets: [String: Set<String>]?
+
     /// The list view's rows, for the entries and facts they were made from.
     var rowsKey: LibraryRow.Key?
     var rows: [LibraryRow] = []
@@ -213,12 +228,14 @@ extension Shop {
                      library: library, group: group,
                      archived: libraryShowArchived, unfiled: libraryUnfiledOnly,
                      neverPrinted: libraryNeverPrintedOnly, readyOn: libraryReadyOn,
+                     fitsOn: libraryFitsOn,
                      category: libraryCategory, tag: libraryTag, creator: libraryCreator,
                      printNext: libraryPrintNextOnly, duplicates: libraryDuplicatesOnly,
                      healthFocus: libraryHealthFocus,
                      storage: libraryStorage,
                      readyAnywhere: libraryReadyAnywhere, noFigures: libraryNoFiguresOnly,
                      inCatalogue: libraryInCatalogueOnly, fromWeb: libraryFromWebOnly, ranges: libraryRanges,
+                     fitsKey: libraryFitsOn == nil ? [] : machineFitsKey(),
                      day: libraryRanges.added.lastDays == nil ? "" : Calendar.book.dayString(Date()),
                      sync: libraryStorage == nil ? 0 : librarySyncRevision,
                      sort: librarySort,

@@ -1,6 +1,7 @@
 import SwiftUI
 import KhaytWidgetData
 import AppKit
+import KhaytCore
 
 /// The shop's models.
 ///
@@ -170,6 +171,19 @@ struct LibraryGrid: View {
                     guard let id else { return }
                     withAnimation(Motion.of(Motion.hover, unless: reduced)) { scroller.scrollTo(id, anchor: .center) }
                 }
+                // ⌘J asked for a model to be brought into view. A jump into
+                // another folder rebuilds this grid, and a new grid's
+                // `onChange` never sees the selection it was built with — so
+                // the request is a counter, answered once, after the first
+                // layout has put the tiles where `scrollTo` can find them.
+                .task(id: shop.libraryScrollRequest) {
+                    let request = shop.libraryScrollRequest
+                    guard request != shop.libraryScrollHandled else { return }
+                    try? await Task.sleep(for: .milliseconds(60))
+                    guard !Task.isCancelled, let id = shop.focusedFile else { return }
+                    shop.libraryScrollHandled = request
+                    scroller.scrollTo(id, anchor: .center)
+                }
             }
             // DRAGGING A MODEL ONTO THE LIBRARY IMPORTS IT.
             //
@@ -289,7 +303,9 @@ struct LibraryGrid: View {
              kept: shop.isKeptOnThisMac(file),
              facts: shop.libraryFactsLine(file),
              size: display.tileSize,
-             pixels: pixels)
+             pixels: pixels,
+             fits: display.tileSize.isCompact || shop.modelMachines.isEmpty ? nil
+                : LibraryFitChips.leading(shop.libraryFitChips(file), shop.libraryFitsOn ?? shop.libraryReadyOn))
             .onTapGesture {
                 // SwiftUI's tap gesture does not report modifiers, so they are
                 // read from the event that is arriving. Without this, ⌘-click
@@ -655,6 +671,11 @@ struct Cell: View {
     var size: LibraryTileSize = .medium
     /// What the picture is decoded to (`LibraryTileSize.pixels`).
     var pixels: Int = ThumbnailStore.maxPixels
+    /// The printer chips (`Shop.libraryFitChips`), from the memo — nil on a
+    /// Small tile and in a shop with no 3D printer, where there is no row.
+    /// An empty row still keeps its line, so tiles beside each other stay
+    /// level.
+    var fits: LibraryFitChips.Row? = nil
 
     /// ── ON A CHOSEN TILE, NOTHING IN THE BRAND'S BLUE ────────────────────
     ///
@@ -820,6 +841,11 @@ struct Cell: View {
                 .font(.caption2)
                 .monospacedDigit()
                 .lineLimit(1)
+                // WHERE IT PRINTS, per printer — Medium and Large only.
+                if let fits, !size.isCompact {
+                    FitChipRow(row: fits, words: words, selected: selected)
+                        .padding(.top, 1)
+                }
             }
             .padding(.top, 6)
             .padding(.horizontal, 2)

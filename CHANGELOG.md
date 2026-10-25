@@ -4,6 +4,14 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: printer chips on library tiles, a Fits filter, and ⌘J to jump in the library.**
+  - Medium and Large tiles show a row of printer chips: where the model goes on the bed, with the printers it can start on now (spools loaded) first and marked with a tick, then the ones that need a spool change, then the ones it only fits. A printer it is too big for is left off; too big for every printer is one red chip. Past the tile's width the rest fold into "+N", and every printer is on the hover. Laser and UV beds are never listed. Small tiles show no chips.
+  - The chips are the model page's own "Where it can print" answer, worked out once per model per change to the library, the printers or their spools — never again because the grid redrew.
+  - The library's Printer menu (it was "Ready on") now has Fits <printer> under Ready on, with counts. It is part of the saved-search query (`fitsOn`), so a saved search can keep it and the sidebar's count matches the grid.
+  - The list view has a Fits column with the same chips.
+  - Go ▸ Jump to in Library… (⌘J): type to jump to a model, a folder, a compressed file, a tag or a saved search, best match first, then the ones used most recently, then the most printed. ↩ opens it (a model is selected in the grid and scrolled to; a folder, tag or saved search opens as the sidebar opens it). ⌘↩ starts a quote from a model and ⌥↩ a new job, for whoever the Quote and New Job menu items are enabled for; otherwise ↩ only, and the palette says so. Nothing typed lists recent models. It uses ⌘K's matcher and window, and is gated like the Library screen.
+  - `KHAYT_SNAPSHOT_LIBSTAGE3A=1` photographs the chips at Medium and Large, the Fits filter, the list column, a 600-model library and the ⌘J palette.
+
 - **Desktop: the Khayt Cloud plan picker says what happens to vault files over a smaller plan's limit.**
   - It used to say "Nothing is deleted". Now, in all 9 languages, it says the vault becomes read-only over the new limit. Downloads and existing links keep working, but uploads, new share links and product changes stop. Khayt emails a date 90 days ahead, and files still over the limit then are deleted until the vault fits. This matches Khayt Cloud and /terms §4, and the Mac's wording.
   - The beta warning and the "beta has ended" line say the same.

@@ -65,7 +65,73 @@ extension Shop {
     /// Where this model can go, machine by machine — fit AND spools, through
     /// the one rule (`ModelReadiness`). Machines that know nothing are left
     /// out rather than shown as a refusal.
+    ///
+    /// ONE ANSWER FOR THE PAGE, THE TILE AND THE FILTER: the inspector's
+    /// "Where it can print", the tile's printer chips (`libraryFitChips`) and
+    /// Fits <machine> (`libraryFitSets`) all read this, and it is worked out
+    /// once per model per change to what it depends on (`machineFitsKey`) —
+    /// never again because the grid redrew.
     func machineFits(for file: LibraryFile) -> [ModelSummary.MachineFit] {
+        let memo = refreshMachineFitsMemo()
+        if let known = memo.machineFits[file.id] { return known }
+        let made = workOutMachineFits(for: file)
+        memo.machineFits[file.id] = made
+        memo.work.fitBuilds += 1
+        return made
+    }
+
+    /// The tile's printer chips: `machineFits`, as `LibraryFitChips` orders
+    /// and trims it. Memoised with it.
+    func libraryFitChips(_ file: LibraryFile) -> LibraryFitChips.Row {
+        let memo = refreshMachineFitsMemo()
+        if let known = memo.fitChips[file.id] { return known }
+        let row = LibraryFitChips.row(machineFits(for: file).map { ($0.id, $0.name, $0.state) })
+        memo.fitChips[file.id] = row
+        return row
+    }
+
+    /// Per machine that prints in 3D, the models whose chip for it is on the
+    /// tile — what Fits <machine> narrows to. Once per change, over the book.
+    func libraryFitSets() -> [String: Set<String>] {
+        let memo = refreshMachineFitsMemo()
+        if let known = memo.fitSets { return known }
+        memo.work.fitSetBuilds += 1
+        var sets: [String: Set<String>] = [:]
+        for machine in modelMachines { sets[machine.id] = [] }
+        for file in files {
+            for fit in machineFits(for: file) where LibraryFitChips.shows(fit.state) {
+                sets[fit.id, default: []].insert(file.id)
+            }
+        }
+        memo.fitSets = sets
+        return sets
+    }
+
+    /// Everything a model's fits are worked out from: the records and the
+    /// book (meshes, colours, beds, machines — `libraryFactsKey`) and the
+    /// derived revision, which moves whenever the last recount's spool sets
+    /// do (`spoolReadyByMachine`). A machine's loaded spools changing starts
+    /// that recount (`loadedChanged`), so the live readings are NOT read here:
+    /// a tile that read them would redraw every time a printer reported in.
+    func machineFitsKey() -> [Int] {
+        _ = spoolReadyByMachine.count
+        return libraryFactsKey()
+    }
+
+    private func refreshMachineFitsMemo() -> LibraryMemo {
+        let memo = libraryMemo
+        let key = machineFitsKey()
+        if memo.machineFitsKey != key {
+            memo.machineFitsKey = key
+            memo.machineFits = [:]
+            memo.fitChips = [:]
+            memo.fitSets = nil
+        }
+        return memo
+    }
+
+    /// `machineFits`, worked out — only ever through the memo above.
+    private func workOutMachineFits(for file: LibraryFile) -> [ModelSummary.MachineFit] {
         let bounds = file.mesh.map { ModelReadiness.bounds(x: $0.x, y: $0.y, z: $0.z) }
         return modelMachines.compactMap { machine in
             let spools: Bool? = {

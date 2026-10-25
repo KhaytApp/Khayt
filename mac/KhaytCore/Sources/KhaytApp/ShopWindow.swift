@@ -98,12 +98,14 @@ struct ShopWindow: View {
                 .environment(\.classicShell, false)
                 .modifier(WindowSheets(shop: shop))
                 .overlay { goTo }
+                .overlay { jump }
         } else {
             classic
                 .environment(\.classicShell, true)
                 .windowTitleBar(hidden: false)
                 .modifier(WindowSheets(shop: shop))
                 .overlay { goTo }
+                .overlay { jump }
         }
     }
 
@@ -113,6 +115,15 @@ struct ShopWindow: View {
     @ViewBuilder private var goTo: some View {
         if shop.goingTo && shop.canGoToAnything {
             GoToPalette(shop: shop)
+        }
+    }
+
+    /// ⌘J's palette, the library only — over either shell, on the same terms
+    /// as ⌘K's: never over the sign-in screen, and closed when the lock comes
+    /// down (`dismissEverySheet`).
+    @ViewBuilder private var jump: some View {
+        if shop.jumping && shop.canJumpInLibrary {
+            LibraryJumpPalette(shop: shop)
         }
     }
 

@@ -686,7 +686,18 @@ final class Shop {
     static var whileFiguringForTests: (@MainActor () async -> Void)?
 
     /// ⌘K's palette is open. See `GoToPalette`.
-    var goingTo = false
+    var goingTo = false { didSet { if goingTo { jumping = false } } }
+    /// ⌘J, Jump to in Library, is open (`LibraryJumpPalette`).
+    var jumping = false { didSet { if jumping { goingTo = false } } }
+    /// What ⌘J opens with typed — a snapshot scene's, never the app's.
+    @ObservationIgnored var libraryJumpSeed = ""
+    /// ⌘J's index and the book revision it was built at (`libraryJumpIndex`).
+    @ObservationIgnored var libraryJumpCache: (revision: Int, index: GoToIndex)?
+    @ObservationIgnored var libraryJumpBuilds = 0
+    /// Bumped to ask the grid to bring a model into view — a jump, whose
+    /// shelf change can rebuild the grid before an `onChange` would see it.
+    var libraryScrollRequest = 0
+    @ObservationIgnored var libraryScrollHandled = 0
     /// Moved by every change to the collections ⌘K searches. Not observed:
     /// nothing draws it, and a redraw per write would be for nobody.
     @ObservationIgnored private(set) var bookRevision = 0
@@ -2849,6 +2860,9 @@ final class Shop {
 
     /// Models that can start on this machine now, with what it has loaded.
     var libraryReadyOn: String? { didSet { libraryViewChanged() } }
+    /// Models that go on this machine's bed — its chip is on the tile
+    /// (`LibraryFitChips`, `Shop.libraryFitSets`).
+    var libraryFitsOn: String? { didSet { if libraryFitsOn != oldValue { libraryViewChanged() } } }
     /// One creator's models. See `LibraryFile.creator`.
     var libraryCreator: String? { didSet { libraryViewChanged() } }
     /// The library as models (true, the default — "All models") or as
@@ -2917,7 +2931,10 @@ final class Shop {
     /// The spools half of that answer alone: what `readyToPrint` said before
     /// the bed was asked. The inspector reads it to tell "needs a swap" from
     /// "too big"; nothing filters on it.
-    var spoolReadyByMachine: [String: Set<String>] = [:]
+    ///
+    /// It moves the derived revision too: the tile's printer chips and the
+    /// Fits filter read it (`machineFits`), memoised on that revision.
+    var spoolReadyByMachine: [String: Set<String>] = [:] { didSet { libraryDerivedRevision &+= 1 } }
 
     /// Recomputed with the facets; the grid's filter and the inspector read it.
     var duplicateOf: [String: String] = [:] { didSet { libraryDerivedRevision &+= 1 } }
