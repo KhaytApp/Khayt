@@ -54,6 +54,12 @@ struct LibraryInspector: View {
             // Keyed on the file, not on the book: these are facts about one
             // record and nothing else on this screen moves them.
             .task(id: file.id) {
+                // A member of a compressed file the cache let go of: taken
+                // out again now, so Open, Quick Look and the overhang walk
+                // have its bytes by the time the shop reaches for them.
+                if file.inArchive, !file.isLocked, shop.modelFile(for: file) == nil {
+                    await shop.materialise(file)
+                }
                 setups = await shop.setups(for: file.id)
                 versions = await shop.versions(for: file.id)
                 parts = await shop.parts(for: file.id)
@@ -171,11 +177,16 @@ struct LibraryInspector: View {
     /// place on the page.
     @ViewBuilder private func fileButtons(_ file: LibraryFile) -> some View {
         let url = shop.modelFile(for: file)
+        if file.inArchive { ArchiveMemberNote(shop: shop, file: file, here: url != nil) }
         FlowLayout(spacing: 8) {
-            if let url {
-                Button { FileActions.reveal(url) } label: {
-                    Label(shop.words.callIt("mac.reveal"), systemImage: "folder")
+            // A member is shown in Finder as its ARCHIVE — the cache's copy
+            // is nowhere the shop put anything.
+            if let shown = file.inArchive ? shop.revealable(file) : url {
+                Button { FileActions.reveal(shown) } label: {
+                    Label(shop.words.callIt(file.inArchive ? "mac.arc_reveal" : "mac.reveal"), systemImage: "folder")
                 }
+            }
+            if let url {
                 Button { FileActions.open(url) } label: {
                     Label(shop.words.callIt("mac.open"), systemImage: "arrow.up.forward.app")
                 }
@@ -758,7 +769,13 @@ struct ModelSummaryCard: View {
     /// Who made it, as a way to the rest of their models; and the copies of
     /// it the library holds, each a way to it.
     @ViewBuilder private func creatorAndCopies(_ file: LibraryFile) -> some View {
-        if file.isLinked, let path = file.externalPath {
+        if file.inArchive, let path = file.archivePath {
+            Label(shop.words.callIt("mac.arc_where",
+                                    ["name": .string((path as NSString).lastPathComponent),
+                                     "path": .string(((path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)]),
+                  systemImage: "doc.zipper")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        } else if file.isLinked, let path = file.externalPath {
             Label(shop.words.callIt("mac.linked_where",
                                     ["path": .string(((path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)]),
                   systemImage: "link")
@@ -1398,5 +1415,42 @@ struct PrintNextRow: View {
         let now = typed.trimmingCharacters(in: .whitespacesAndNewlines)
         guard now != (file.printNextFor ?? "").trimmingCharacters(in: .whitespacesAndNewlines) else { return }
         shop.setPrintNextNote(file.id, now)
+    }
+}
+
+/// What the inspector says about a model INSIDE a compressed file: which one,
+/// that the archive is never changed, and — while it is being taken out, or
+/// when it cannot be — why Open is not there yet. A locked member says it is
+/// locked, once, with no button to ask for a password.
+struct ArchiveMemberNote: View {
+    let shop: Shop
+    let file: LibraryFile
+    let here: Bool
+
+    var body: some View {
+        let w = shop.words
+        VStack(alignment: .leading, spacing: 4) {
+            if file.isLocked {
+                Label(w.callIt("mac.arc_locked"), systemImage: "lock.fill")
+                    .font(.callout).foregroundStyle(Khayt.attention)
+                Text(w.callIt("mac.arc_locked_says"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if shop.archiveExtracting.contains(file.id) {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text(w.callIt("mac.arc_extracting")).font(.caption).foregroundStyle(.secondary)
+                }
+            } else if !here {
+                Text(w.callIt("mac.arc_not_here"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !file.isLocked {
+                Text(w.callIt("mac.arc_untouched"))
+                    .font(.caption).foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }

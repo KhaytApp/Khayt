@@ -34,7 +34,9 @@ struct LibraryHealthAppTests {
         func ids(_ kind: LibraryHealth.Kind) -> [String] { groups.first { $0.kind == kind }?.modelIds ?? [] }
         #expect(Set(ids(.missing)) == ["PF-sample-king-6", "PF-sample-gripper"])
         #expect(ids(.onlineUnmeasured) == ["PF-snap-vase-online"])
-        #expect(ids(.noFigures) == ["PF-snap-gripper-raw"])
+        // The sample's locked member (inside an encrypted 7-Zip) has no
+        // figures either: it is never opened.
+        #expect(Set(ids(.noFigures)) == ["PF-snap-gripper-raw", "PF-sample-arc-knight"])
         #expect(groups.first { $0.kind == .sameFile }?.clusters == [["PF-sample-falcon", "PF-snap-falcon-again"]])
         #expect(groups.first { $0.kind == .looksSame }?.clusters == [["PF-sample-bracket", "PF-snap-bracket-mirror"]])
         // The laser cutter and the UV flatbed are bigger than a metre; a

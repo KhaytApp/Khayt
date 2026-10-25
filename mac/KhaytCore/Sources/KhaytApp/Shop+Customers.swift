@@ -941,7 +941,12 @@ extension Shop {
         return LibraryLocation.directory(for: file.id, roots: roots.roots)
     }
 
-    func fileIsPresent(_ file: LibraryFile) -> Bool { directory(for: file) != nil }
+    func fileIsPresent(_ file: LibraryFile) -> Bool {
+        // A member of a compressed file is here while its ARCHIVE is: its
+        // copy is extracted on demand (`materialise`).
+        if let archive = file.archivePath { return FileManager.default.fileExists(atPath: archive) }
+        return directory(for: file) != nil
+    }
 
     /// The guides sitting beside a model — assembly instructions, a colour
     /// guide, whatever came out of the pack with it.
@@ -970,7 +975,10 @@ extension Shop {
     /// survive rather than shrug at, so a single model file in the folder is
     /// taken as the model.
     func modelFile(for file: LibraryFile) -> URL? {
-        Self.modelFile(for: file, roots: libraryRoots?.roots)
+        // A member's copy comes and goes with the cache: read the revision so
+        // a view asking this draws again once `materialise` has extracted it.
+        if file.inArchive { _ = archiveCacheRevision }
+        return Self.modelFile(for: file, roots: libraryRoots?.roots)
     }
 
     /// The same answer, off the main actor. Each call is a stat per library
@@ -979,6 +987,11 @@ extension Shop {
     /// library (ten thousand models in one shop) resolves them with this in
     /// `PinWork` rather than one by one on the main actor at launch.
     nonisolated static func modelFile(for file: LibraryFile, roots: [String]?) -> URL? {
+        // A model INSIDE a compressed file: its extracted copy in the cache,
+        // while the archive is still where it was — never the archive itself,
+        // which is not the model's bytes. Not extracted here (this is asked
+        // from views): `materialise` does that, off the main actor.
+        if file.inArchive { return archiveCopy(of: file) }
         // A linked model is where the shop keeps it, or not reachable right
         // now (a drive unplugged, a NAS asleep) — never a vault file instead.
         if let path = file.externalPath, !path.isEmpty {

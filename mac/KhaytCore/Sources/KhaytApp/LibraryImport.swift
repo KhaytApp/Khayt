@@ -289,7 +289,7 @@ enum LibraryImport {
     static func write(_ made: [Prepared], storeURL: URL,
                       owns: @escaping @Sendable () -> Bool,
                       whoHasIt: @escaping @Sendable () -> String?) async throws {
-        // lock: callers — add, flush
+        // lock: callers — add, flush, writeHeld
         guard !made.isEmpty else { return }
         let records = made.reversed().map { JSONValue.object($0.record) }
         try await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { root in
@@ -326,12 +326,15 @@ enum LibraryImport {
                         photos: [URL] = [],
                         analyseRisk: Bool = false,
                         online: Bool = false,
-                        id fixedId: String? = nil) async throws -> Prepared {
-        // lock: callers — add, addMany
+                        id fixedId: String? = nil,
+                        archive: ArchiveRef? = nil) async throws -> Prepared {
+        // lock: callers — add, addMany, indexArchives
         let ext = source.pathExtension.lowercased()
         guard kinds.contains(ext) else { throw Failure.unknownKind(ext) }
 
-        let originalName = source.lastPathComponent
+        // A member of a compressed file is read from its extracted copy, and
+        // named as the ARCHIVE names it — see `ArchiveFolder`.
+        let originalName = archive?.member.leaf ?? source.lastPathComponent
         // The item ITSELF must be a plain file: a device (`/dev/zero`), a
         // pipe or a directory wearing a model's name hashes for ever or not at
         // all. The walkers already skip symlinks; this is the last door.
@@ -435,7 +438,8 @@ enum LibraryImport {
                                  swapCount: swapCount, thumbFile: thumbFile, group: group,
                                  provenance: said, riskAnalysis: riskAnalysis,
                                  parsed: a.parsed,
-                                 externalPath: inPlace ? source.standardizedFileURL.path : nil)
+                                 externalPath: archive?.path ?? (inPlace ? source.standardizedFileURL.path : nil))
+        if let archive { archive.stamp(&record) }
         // The group the APP gave a linked model, so refiling it later can
         // tell it from one the shop chose (`LinkedRegroup`) — and the name.
         if inPlace {
@@ -454,6 +458,46 @@ enum LibraryImport {
                         added: Added(id: id, name: name, triangleCount: geometry?.triangleCount,
                                      colours: colours.count, contentHash: hash, movedIn: false,
                                      photo: photo != nil))
+    }
+
+    /// Where a model inside a compressed file came from: the archive (its
+    /// path, standardised, and its hash) and the member as listed.
+    struct ArchiveRef: Sendable {
+        let path: String
+        let member: ArchiveFolder.Member
+        let hash: String?
+        var locked = false
+
+        /// The fields that make a record a member (`LibraryFile.archiveMember`).
+        func stamp(_ record: inout [String: JSONValue]) {
+            record["archiveMember"] = .string(member.path)
+            record["archiveHash"] = hash.map(JSONValue.string) ?? .null
+            if locked { record["archiveLocked"] = .bool(true) }
+        }
+    }
+
+    /// A LOCKED member: an encrypted file inside a compressed one, listed by
+    /// name and size and never opened — no hash, no measurement, no picture,
+    /// and no password asked for, ever.
+    static func prepareLocked(_ archive: ArchiveRef, libraryRoot: URL, group: String?,
+                              id fixedId: String? = nil) -> Prepared {
+        let originalName = archive.member.leaf
+        let ext = archive.member.ext
+        let id = fixedId ?? Shop.uid("PF")
+        let dir = libraryRoot.appending(path: LibraryLocation.itemDirName(id))
+        let name = originalName.replacingOccurrences(of: "\\.[^.]+$", with: "", options: .regularExpression)
+        var record = self.record(id: id, name: name, originalName: originalName, filename: originalName,
+                                 ext: ext, size: archive.member.size ?? 0, hash: nil, key: nil,
+                                 colours: [], swapCount: 0, thumbFile: nil, group: group,
+                                 externalPath: archive.path)
+        record["autoGroup"] = .string(group ?? "")
+        record["autoName"] = .string(name)
+        var locked = archive
+        locked.locked = true
+        locked.stamp(&record)
+        return Prepared(dir: dir, record: record,
+                        added: Added(id: id, name: name, triangleCount: nil, colours: 0, contentHash: nil,
+                                     movedIn: false, photo: false))
     }
 
     /// A linked model that is online only, indexed without a byte of it read.

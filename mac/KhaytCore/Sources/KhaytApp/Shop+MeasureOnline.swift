@@ -46,7 +46,7 @@ enum OnlineMeasure {
     /// else on this Mac is not read unasked (as `fillNowLocal`).
     nonisolated static func due(_ files: [LibraryFile], linked: [String]) -> [Due] {
         files.compactMap { file in
-            guard !file.isArchived, (file.geometryKey ?? "").isEmpty,
+            guard !file.isArchived, !file.inArchive, (file.geometryKey ?? "").isEmpty,
                   (file.contentHash ?? "").isEmpty || (file.meshTried ?? 0) < Mesh.readerGeneration,
                   let path = file.externalPath, !path.isEmpty,
                   measurable.contains(Shop.libraryExt(file)),

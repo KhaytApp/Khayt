@@ -160,6 +160,7 @@ enum LinkedRegroup {
         var out: [Change] = []
         for case .object(let o) in rows {
             guard case .string(let id)? = o["id"], case .string(let path)? = o["externalPath"], !path.isEmpty,
+                  o["archiveMember"].map({ if case .string(let m) = $0 { m.isEmpty } else { true } }) ?? true,
                   LibraryMove.under(path, root.path),
                   let url = byPath[key(URL(fileURLWithPath: path))],
                   let now = plan.placement(of: url) else { continue }
@@ -347,6 +348,9 @@ enum LinkedRegroup {
         let roots = Array(seen)
         for case .object(let o) in rows {
             guard case .string(let p)? = o["externalPath"], !p.isEmpty else { continue }
+            // A member of a compressed file is filed by its archive, not by
+            // the folder sort (`indexArchives`).
+            if case .string(let m)? = o["archiveMember"], !m.isEmpty { continue }
             let owner = roots.filter { LibraryMove.under(p, $0) }.max { $0.count < $1.count }
             if let owner, empty.contains(owner) { return false }
         }

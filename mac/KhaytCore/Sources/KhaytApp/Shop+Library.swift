@@ -287,7 +287,7 @@ extension Shop {
     }
 
     func revealSelection() {
-        guard let one = selectedFile, let url = modelFile(for: one) else { return }
+        guard let one = selectedFile, let url = revealable(one) else { return }
         FileActions.reveal(url)
     }
 

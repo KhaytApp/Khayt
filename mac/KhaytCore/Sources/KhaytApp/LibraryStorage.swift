@@ -1115,7 +1115,9 @@ extension Shop {
         for file in files {
             guard let path = file.externalPath, !path.isEmpty,
                   roots.contains(where: { LibraryMove.under(path, $0) }) else { continue }
-            let p = URL(fileURLWithPath: path).standardizedFileURL.path
+            // A member of a compressed file by its own key: the archive and
+            // its other members stay in the library.
+            let p = file.archiveKey ?? URL(fileURLWithPath: path).standardizedFileURL.path
             if seen.insert(p).inserted { out.append(.string(p)) }
         }
         return Array(out.suffix(StorageLedger.cap))

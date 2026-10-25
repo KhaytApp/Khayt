@@ -144,3 +144,21 @@ import Testing
         #expect(kinds == [.missing, .sameFile, .unorganised])
     }
 }
+
+/// A compressed file the library's models are inside, gone: one line, its
+/// models all counted (Remove takes every one), the loose ones listed apart.
+@Suite struct LibraryHealthArchiveTests {
+    @Test("a missing archive is listed once, with every model it held")
+    func missingArchiveOnce() {
+        func m(_ id: String, _ p: LibraryHealth.Presence, _ archive: String?) -> LibraryHealth.Model {
+            LibraryHealth.Model(id: id, title: id, presence: p, geometryKey: "1:1:1x1x1", tags: ["t"], inArchive: archive)
+        }
+        let models = [m("a1", .missing, "/x/Pack.zip"), m("loose", .missing, nil), m("a2", .missing, "/x/Pack.zip"),
+                      m("b1", .missing, "/x/Other.rar"), m("here", .here, "/x/Fine.zip")]
+        let missing = LibraryHealth.groups(models: models).first { $0.kind == .missing }
+        #expect(missing?.count == 4, "Remove counts every model, archive or not")
+        #expect(missing?.archives == [.init(path: "/x/Pack.zip", modelIds: ["a1", "a2"]),
+                                      .init(path: "/x/Other.rar", modelIds: ["b1"])])
+        #expect(missing?.looseIds == ["loose"])
+    }
+}

@@ -143,7 +143,9 @@ struct ModelActions: View {
                 }
                 .disabled(shop.converting)
             }
-            Button(shop.words.callIt("mac.reveal_in_finder")) { FileActions.reveal(url) }
+            Button(shop.words.callIt(file.inArchive ? "mac.arc_reveal" : "mac.reveal_in_finder")) {
+                FileActions.reveal(shop.revealable(file) ?? url)
+            }
         } else if shop.isInCloudOnly(file) {
             // Moved to the cloud to free space: the one thing to do with the
             // FILE is bring it back. Quoting does not need it (below).

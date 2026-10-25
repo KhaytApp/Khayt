@@ -36,7 +36,7 @@ struct LibraryFilterBar: View {
         // A LIBRARY HEALTH GROUP, put on the grid by its Show button: on the
         // Show menu while it is on, and off from there (`libraryHealthFocus`).
         if let focus = shop.libraryHealthFocus {
-            out.append(FilterChipModel(id: "health", label: shop.words.callIt(LibraryHealthView.look(focus.kind).title),
+            out.append(FilterChipModel(id: "health", label: focus.label ?? shop.words.callIt(LibraryHealthView.look(focus.kind).title),
                                        count: focus.ids.count, on: true) { shop.libraryHealthFocus = nil })
         }
         // THE LIST THE SHOP KEEPS of what to print next — first, because it is

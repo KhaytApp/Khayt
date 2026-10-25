@@ -438,6 +438,9 @@ extension SampleShopTests {
                 if case .string(let f)? = file["folder"] { return f == name }
                 return false
             }
+            // An encrypted pack's models are never opened, so nothing in it
+            // can be pictured: that empty square is the honest one.
+            if !held.isEmpty, held.allSatisfy({ $0["archiveLocked"] == .bool(true) }) { continue }
             let withPicture = held.contains { file in
                 if case .string(let t)? = file["thumbFile"] { return !t.isEmpty }
                 if case .string(let t)? = file["thumbnail"] { return !t.isEmpty }
@@ -1241,6 +1244,26 @@ extension SampleShopTests {
                 "the sample book carries an erased deposit, so every screen now warns about money")
         #expect(shop.suspectOrders.isEmpty,
                 "the sample book carries a thousandfold purchase order, so the shelf now warns")
+    }
+
+    @Test("the sample library spans compressed files: an open pack of several models, and a locked one")
+    func samplesCompressedFiles() async throws {
+        let shop = Shop()
+        await shop.load(.sample)
+        let members = shop.files.filter(\.inArchive)
+        let open = members.filter { !$0.isLocked }
+        #expect(Set(open.compactMap(\.archivePath)).count >= 1 && open.count >= 2,
+                "no pack of several models: the archive folder tile is never drawn")
+        let anyLocked = members.contains { $0.isLocked }
+        let allHashed = open.allSatisfy { !($0.archiveHash ?? "").isEmpty }
+        let ordinary = shop.files.contains { !$0.inArchive }
+        #expect(anyLocked, "no locked member: the lock is never drawn")
+        #expect(allHashed, "an open member with no archive hash cannot be cached")
+        #expect(ordinary, "and the ordinary models are still there")
+        // Each pack's group is a folder the grid draws as the archive.
+        for path in Set(members.compactMap(\.groupName)) {
+            #expect(shop.archiveName(ofGroup: path) != nil, "\(path) is not drawn as its archive")
+        }
     }
 
     @Test("every machine in the sample shop says which kind it is")

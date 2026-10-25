@@ -79,6 +79,12 @@ extension Shop {
 
     /// The file in the library folder, when it is on this Mac's disk now.
     func libraryFileOnDisk(_ file: LibraryFile) -> URL? {
+        // A member's extracted copy, never the compressed file itself.
+        if file.inArchive {
+            guard let path = file.archivePath, linkedFolders.contains(where: { LibraryMove.under(path, $0) })
+            else { return nil }
+            return Self.archiveCopy(of: file)
+        }
         if let path = file.externalPath, !path.isEmpty {
             // Only under a folder this book links or keeps its library in:
             // `externalPath` arrives by sync, and a path anywhere else on this

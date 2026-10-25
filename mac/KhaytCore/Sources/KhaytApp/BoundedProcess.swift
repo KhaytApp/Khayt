@@ -49,13 +49,17 @@ enum BoundedProcess {
                     keepOut: Int = 4 << 20, keepErr: Int = 64 << 10,
                     tailOut: Bool = false,
                     every: TimeInterval = 0.25,
+                    stdoutTo file: FileHandle? = nil,
                     watch: (@Sendable () -> Bool)? = nil) throws -> Outcome {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = arguments
         process.standardInput = FileHandle.nullDevice
         let outPipe = Pipe(), errPipe = Pipe()
-        process.standardOutput = outPipe
+        // `stdoutTo`: the program's answer IS bytes to keep — a member
+        // `bsdtar -O` extracts — written straight to a file the caller made,
+        // which `watch` can measure as it grows. Nothing is held here.
+        process.standardOutput = file ?? outPipe
         process.standardError = errPipe
 
         // The head by default (a program's answer is at the top); the TAIL
@@ -63,7 +67,7 @@ enum BoundedProcess {
         // on stdout, last.
         let out = Sink(keep: keepOut, tail: tailOut)
         let err = Sink(keep: keepErr, tail: true)
-        out.attach(outPipe.fileHandleForReading)
+        if file == nil { out.attach(outPipe.fileHandleForReading) } else { out.ended.signal() }
         err.attach(errPipe.fileHandleForReading)
 
         let exited = DispatchSemaphore(value: 0)
@@ -111,7 +115,7 @@ enum BoundedProcess {
         private var bytes = Data()
         private let keep: Int
         private let tail: Bool
-        private let ended = DispatchSemaphore(value: 0)
+        let ended = DispatchSemaphore(value: 0)
         private var handle: FileHandle?
 
         init(keep: Int, tail: Bool) { self.keep = keep; self.tail = tail }

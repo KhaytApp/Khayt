@@ -110,6 +110,25 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
         let name: String?
     }
     var isLinked: Bool { !(externalPath ?? "").isEmpty }
+    /// For a model INSIDE a compressed file in a linked folder
+    /// (`ArchiveFolder`): the member's name exactly as the archive lists it.
+    /// `externalPath` is then the ARCHIVE — never the model's own bytes —
+    /// and every reader goes through `Shop.modelFile`, which hands out the
+    /// member extracted to the cache (`ArchiveMembers`).
+    let archiveMember: String?
+    /// SHA-256 of the archive when the member was indexed: the cache's key.
+    let archiveHash: String?
+    /// The member is encrypted: listed, never extracted, no password asked.
+    let archiveLocked: Bool?
+    var inArchive: Bool { isLinked && !(archiveMember ?? "").isEmpty }
+    var isLocked: Bool { inArchive && archiveLocked == true }
+    /// The archive's path, for a member; nil otherwise.
+    var archivePath: String? { inArchive ? externalPath : nil }
+    /// How the member is named in the linked scan's lists (`memberKey`).
+    var archiveKey: String? {
+        guard inArchive, let path = externalPath, let member = archiveMember else { return nil }
+        return ArchiveFolder.memberKey(archive: URL(fileURLWithPath: path).standardizedFileURL.path, member: member)
+    }
 
     /// A 3MF with the preview its slicer embedded, read off a file that was
     /// on this Mac (`ThreeMF.preview`, `LibraryImport`).

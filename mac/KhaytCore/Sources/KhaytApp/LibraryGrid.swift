@@ -98,7 +98,8 @@ struct LibraryGrid: View {
                                            parent: FolderCell.parent(of: path, open: shop.shelf),
                                            selected: shop.groupSelection.contains(path),
                                            size: display.tileSize,
-                                           pixels: pixels)
+                                           pixels: pixels,
+                                           archive: shop.archiveName(ofGroup: path))
                                     .id(entry.id)
                                     // A folder OPENS. The shelf already filters
                                     // by group, so entering one is setting it —
@@ -140,6 +141,22 @@ struct LibraryGrid: View {
                                         // product: a set, a kit, a figure in parts.
                                         Button(shop.words.callIt("mac.catalogue_add_folder") + "\u{2026}") {
                                             Task { await shop.productFromFolder(path) }
+                                        }
+                                        // A COMPRESSED FILE's folder: its
+                                        // archive in Finder, and its models
+                                        // out of the library — the archive
+                                        // itself is never touched.
+                                        if let archive = shop.archiveName(ofGroup: path) {
+                                            Divider()
+                                            if let first = shop.archiveMembers(ofGroup: path).first,
+                                               let at = shop.revealable(first) {
+                                                Button(shop.words.callIt("mac.arc_reveal")) { FileActions.reveal(at) }
+                                            }
+                                            Button(shop.words.callIt("mac.arc_remove", ["name": .string(archive)]) + "\u{2026}",
+                                                   role: .destructive) {
+                                                shop.askToRemoveArchive(ofGroup: path)
+                                            }
+                                            .disabled(!shop.canWrite)
                                         }
                                     }
                             case .file(let file):
@@ -452,6 +469,9 @@ struct FolderCell: View {
     var size: LibraryTileSize = .medium
     /// What the picture is decoded to (`LibraryTileSize.pixels`).
     var pixels: Int = ThumbnailStore.maxPixels
+    /// The compressed file this folder IS, by name (`Shop.archiveName`):
+    /// drawn with a zipper and said to be one, nil for an ordinary group.
+    var archive: String? = nil
 
     /// How far each card behind the picture shows above it.
     static let peek: CGFloat = 4
@@ -477,7 +497,9 @@ struct FolderCell: View {
                 // "One print · 3 parts" or "Collection · 7 models", so the
                 // words say it as well as the picture. "1 model", not "1
                 // models"; Arabic's one and two are words.
-                Text(Self.caption(kind: kind, count: count, words: words))
+                Text(archive != nil
+                     ? words.callIt("mac.arc_tile") + " \u{00B7} " + words.counting(count, "mac.n_models")
+                     : Self.caption(kind: kind, count: count, words: words))
                     .font(.caption2)
                     .monospacedDigit()
                     .foregroundStyle(Cell.secondaryInk(selected: selected))
@@ -492,7 +514,9 @@ struct FolderCell: View {
         .contentShape(RoundedRectangle(cornerRadius: 8))
         // One element that says what it is: a group, its name, how many.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Self.accessibilityText(
+        .accessibilityLabel(archive.map { words.callIt("mac.arc_tile_a11y", ["name": .string($0),
+                                                                     "models": .string(words.counting(count, "mac.n_models"))]) }
+            ?? Self.accessibilityText(
             name: parent.map { name + ", " + words.callIt("mac.group_in_parent", ["name": .string($0)]) } ?? name,
             count: count, kind: kind, words: words))
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
@@ -582,7 +606,7 @@ struct FolderCell: View {
     /// The kind's mark and the count, big enough to be read across the room.
     private var badge: some View {
         HStack(spacing: 4) {
-            Image(systemName: kind.symbol)
+            Image(systemName: archive != nil ? "doc.zipper" : kind.symbol)
             Text(Format.count(count)).monospacedDigit()
         }
         .font(.system(size: 11, weight: .semibold))
@@ -735,16 +759,31 @@ struct Cell: View {
                 //
                 // QUIETER NOW: only for a format other than STL and 3MF, and
                 // never on a Small tile (`formatBadge`).
+                //
+                // A model INSIDE a compressed file says so beside it — a lock
+                // when the file is encrypted and was never opened.
                 .overlay(alignment: .topLeading) {
-                    if let badge = Self.formatBadge(file.sourceFile?.ext, size: size) {
-                        Text(badge)
-                            .font(.system(size: 8, weight: .semibold))
-                            .tracking(0.4)
-                            .padding(.horizontal, 4).padding(.vertical, 1)
-                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
-                            .foregroundStyle(.secondary)
-                            .padding(5)
+                    HStack(spacing: 3) {
+                        if file.inArchive {
+                            let said = words.callIt(file.isLocked ? "mac.arc_locked" : "mac.arc_member")
+                            Image(systemName: file.isLocked ? "lock.fill" : "doc.zipper")
+                                .font(.system(size: 9, weight: .semibold))
+                                .padding(.horizontal, 4).padding(.vertical, 2)
+                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
+                                .foregroundStyle(file.isLocked ? AnyShapeStyle(Khayt.attention) : AnyShapeStyle(.secondary))
+                                .help(said)
+                                .accessibilityLabel(said)
+                        }
+                        if let badge = Self.formatBadge(file.sourceFile?.ext, size: size) {
+                            Text(badge)
+                                .font(.system(size: 8, weight: .semibold))
+                                .tracking(0.4)
+                                .padding(.horizontal, 4).padding(.vertical, 1)
+                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 3))
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .padding(5)
                 }
 
             VStack(alignment: .leading, spacing: 2) {
