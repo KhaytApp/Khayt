@@ -202,7 +202,7 @@ struct ArchiveFolderScanTests {
         // asked through a zip-kind it reads itself only when the app's own
         // reader cannot stream the member; a zip under a RAR's name is not
         // let near libarchive at all (`bytesMatch`).
-        #expect(throws: ArchiveMembers.Failure.unreadable("it is not the kind of file its name says")) {
+        #expect(throws: ArchiveMembers.Failure.unreadable("not a real rar")) {
             try ArchiveMembers.extract(.init(path: "a.stl", size: nil), from: Self.renamed(zip, to: "Secret.rar"),
                                        to: rig.cache.url(key: "x", leaf: "a.stl"), cap: 1 << 20)
         }
@@ -332,7 +332,7 @@ struct ArchiveFolderScanTests {
         try Self.pack(["b.stl": Self.stl(10)], into: tgz, format: nil)
         // The same bytes under a RAR's name: refused before libarchive reads them.
         let liar = try Self.renamed(tgz, to: "Bits.rar")
-        #expect(throws: ArchiveMembers.Failure.unreadable("it is not the kind of file its name says")) {
+        #expect(throws: ArchiveMembers.Failure.unreadable("not a real rar")) {
             _ = try ArchiveMembers.list(liar)
         }
         // A "zip" its own reader cannot read is not handed on to libarchive

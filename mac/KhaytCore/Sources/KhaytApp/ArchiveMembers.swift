@@ -100,9 +100,9 @@ enum ArchiveMembers {
     /// Refused unless the bytes are the kind the name says — before any of
     /// libarchive sees them.
     nonisolated static func checkKind(_ url: URL) throws {
-        guard let kind = ArchiveFolder.kind(of: url.lastPathComponent),
-              ArchiveFolder.bytesMatch(kind: kind, header: header(url)) else {
-            throw Failure.unreadable("it is not the kind of file its name says")
+        let kind = ArchiveFolder.kind(of: url.lastPathComponent) ?? "archive"
+        guard ArchiveFolder.bytesMatch(kind: kind, header: header(url)) else {
+            throw Failure.unreadable("not a real \(kind)")
         }
     }
     /// How long one listing may take, and one member.
