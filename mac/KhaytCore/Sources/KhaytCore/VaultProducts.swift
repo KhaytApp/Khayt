@@ -58,6 +58,9 @@ public struct VaultProducts: Sendable {
         // A 404 with no reason is the vault switched off; 401 and 429 are the
         // client's own. Everything else the cloud explained is a Refusal.
         if code == 404 && reason.isEmpty || code == 401 || code == 429 { return VaultClient.failure(code, data) }
+        // Over the plan after a move down: the same failure a share link
+        // gets, so the app says it one way wherever it is met.
+        if code == 402 && reason == "vault-over" { return VaultClient.failure(code, data) }
         guard !reason.isEmpty || code == 422 || code == 503 || code == 409 || code == 402 || code == 403 else {
             return VaultClient.failure(code, data)
         }

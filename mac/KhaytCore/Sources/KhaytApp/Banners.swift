@@ -69,6 +69,9 @@ struct MoveBanners: View {
         // SYNC REFUSED FOR GOING BACKWARDS, with the one way on — which lived
         // only in Check Cloud, behind the passphrase.
         WentBackwardsBanner(shop: shop)
+        // THE VAULT OVER ITS PLAN after a move down, on the library — where
+        // share links and products are made — while the vault is its remote.
+        VaultLapseBanner(shop: shop)
         // PRODUCTS COSTED ON A SPOOL SIZE THAT HAS CHANGED. On every screen,
         // not only the catalogue: the edit that causes it is a spool's size,
         // saved on the shelf.

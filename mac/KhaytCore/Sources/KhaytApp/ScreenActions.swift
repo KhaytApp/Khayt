@@ -119,6 +119,9 @@ struct ScreenActions: View {
                     NavyAction(label: shop.words.callIt("mac.vl_links"), symbol: "link") {
                         shop.showingVaultLinks = true
                     }
+                    // Whether the vault is over its plan, for the banner above
+                    // the library (`VaultLapseBanner`); at most every ten minutes.
+                    .task { await shop.refreshVaultLapse() }
                     // Vault files listed for sale on makerrun.com.
                     NavyAction(label: shop.words.callIt("mac.vp_products"), symbol: "tag") {
                         shop.showingVaultProducts = true

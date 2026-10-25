@@ -58,6 +58,9 @@ struct VaultLinksSheet: View {
                 Button(words.callIt("mac.vl_refresh")) { Task { await load() } }
                     .disabled(loading)
             }
+            // Over the plan after a move down: new links are paused, and
+            // revoking still works.
+            VaultLapseNotice(shop: shop, display: shop.vaultLapseDisplay)
             if loading && grants.isEmpty {
                 ProgressView().frame(maxWidth: .infinity)
             } else if grants.isEmpty && problem == nil {
@@ -95,6 +98,7 @@ struct VaultLinksSheet: View {
             problem = words.callIt("mac.vl_err_vault_off")
             return
         }
+        Task { await shop.refreshVaultLapse(force: true) }
         do {
             // `tidy`: a link no longer live has its secret forgotten, and a
             // half-made one left pending too long is revoked.

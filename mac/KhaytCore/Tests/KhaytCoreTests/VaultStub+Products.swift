@@ -26,6 +26,7 @@ extension VaultStub {
         case ("GET", 1): return reply(url, 200, ["products": products.values.map(\.o)])
         case ("POST", 1):
             guard !noPublishing else { return reply(url, 402, ["reason": "no-publishing"]) }
+            if vaultOver { return overReply(url) }
             guard let files = body["files"] as? [String], !files.isEmpty else { return reply(url, 422, ["error": "files"]) }
             let unknown = files.filter { self.files[$0]?.head == nil }
             if !unknown.isEmpty { return reply(url, 422, ["reason": "unknown-items", "fileIds": unknown]) }
@@ -44,6 +45,7 @@ extension VaultStub {
         case ("PATCH", 2):
             guard var p = products[parts[1]] else { return reply(url, 404, ["reason": "unknown-product"]) }
             if p.o["status"] as? String == "removed" { return reply(url, 409, ["reason": "removed"]) }
+            if vaultOver { return overReply(url) }
             for (k, v) in body where k != "previews" { p.o[k] = v }
             if let order = body["previews"] as? [String] {
                 let have = (p.o["previews"] as? [[String: Any]]) ?? []
@@ -59,6 +61,7 @@ extension VaultStub {
         case ("POST", 3) where parts[2] == "previews":
             guard var p = products[parts[1]] else { return reply(url, 404, ["reason": "unknown-product"]) }
             guard contentType == "image/jpeg" || contentType == "image/png" else { return reply(url, 415, ["error": "type"]) }
+            if vaultOver { return overReply(url) }
             let hash = VaultCrypto.hex(VaultCrypto.sha256(raw))
             let prev: [String: Any] = ["hash": hash, "width": 10, "height": 10, "mime": contentType!, "bytes": raw.count]
             var list = (p.o["previews"] as? [[String: Any]]) ?? []
@@ -66,11 +69,18 @@ extension VaultStub {
             p.o["previews"] = list
             products[parts[1]] = p
             return reply(url, 201, prev)
+        case ("DELETE", 4) where parts[2] == "previews":
+            // Allowed over the plan, like every removal.
+            guard var p = products[parts[1]] else { return reply(url, 404, ["reason": "unknown-product"]) }
+            p.o["previews"] = ((p.o["previews"] as? [[String: Any]]) ?? []).filter { $0["hash"] as? String != parts[3] }
+            products[parts[1]] = p
+            return (Data(), HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: nil)!)
         case ("GET", 3) where parts[2] == "release":
             guard let p = products[parts[1]] else { return reply(url, 404, ["reason": "unknown-product"]) }
             return reply(url, 200, ["releasedAt": p.releasedAt as Any? ?? NSNull(),
                                     "items": p.release.map { ["fileId": $0["fileId"]!, "version": $0["version"]!] }])
         case ("POST", 3) where parts[2] == "release":
+            if vaultOver && !noPublishing { return overReply(url) }
             return release(url, parts[1], body)
         case ("GET", 3) where parts[2] == "buyers":
             guard let p = products[parts[1]] else { return reply(url, 404, ["reason": "unknown-product"]) }

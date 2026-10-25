@@ -111,6 +111,12 @@ struct VaultShareSheet: View {
                 Text(words.callIt("mac.vl_share_title")).font(.headline)
                 Text(heading).font(.callout).foregroundStyle(.secondary).lineLimit(2)
             }
+            // Over the plan after a move down: a new link will be refused, so
+            // it is said before the shop fills the form in. The order is in
+            // the Links sheet and the plan pane; here, only what to do.
+            if made == nil {
+                VaultLapseNotice(shop: shop, display: shop.vaultLapseDisplay, showsOrder: false)
+            }
             if let made {
                 result(made)
             } else if let turnedOff {
@@ -145,6 +151,7 @@ struct VaultShareSheet: View {
                 }
             }
         }
+        .task { await shop.refreshVaultLapse() }
     }
 
     // MARK: - Before

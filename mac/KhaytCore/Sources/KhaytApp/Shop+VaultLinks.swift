@@ -89,6 +89,11 @@ extension Shop {
         case VaultClient.Failure.linksFull(let limit):
             return words.callIt("mac.vl_err_links_full", ["n": .number(Double(limit))])
         case VaultClient.Failure.noLinks: return words.callIt("mac.vl_err_no_links")
+        // Over the plan after a move down (khayt-cloud #143): the specific
+        // sentence, and the banner learns it at once.
+        case VaultClient.Failure.vaultOver(let used, let limit):
+            noteVaultOver(used: used, limit: limit)
+            return words.callIt("mac.vault_over_err")
         case VaultClient.Failure.downloadsCap(let limit):
             return words.callIt("mac.vl_err_downloads_cap", ["n": .number(Double(limit))])
         case VaultClient.Failure.vaultOff: return words.callIt("mac.vl_err_vault_off")
