@@ -188,8 +188,11 @@ test('the two languages carry the same keys, and every key the popup uses exists
 test('the manifest asks for the page only when pressed: no host permissions, no content scripts', () => {
   const m = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
   assert.equal(m.manifest_version, 3);
-  assert.deepEqual([...m.permissions].sort(), ['activeTab', 'nativeMessaging', 'scripting'].sort()
-    .concat(m.permissions.includes('downloads') ? ['downloads'] : []).sort());
+  // `downloads` and `storage` are the Chromium/Firefox build's, for the model
+  // downloaded from a page just saved; Safari's manifest leaves both out
+  // (`test/webext-attach.test.js`).
+  assert.deepEqual([...m.permissions].sort(),
+    ['activeTab', 'downloads', 'nativeMessaging', 'scripting', 'storage']);
   assert.equal(m.host_permissions, undefined);
   assert.equal(m.content_scripts, undefined);
   assert.equal(m.optional_host_permissions, undefined);

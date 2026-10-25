@@ -328,7 +328,7 @@ enum LibraryImport {
                         online: Bool = false,
                         id fixedId: String? = nil,
                         archive: ArchiveRef? = nil) async throws -> Prepared {
-        // lock: callers — add, addMany, indexArchives
+        // lock: callers — add, addMany, indexArchives, attachWebDownload
         let ext = source.pathExtension.lowercased()
         guard kinds.contains(ext) else { throw Failure.unknownKind(ext) }
 

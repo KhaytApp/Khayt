@@ -16,10 +16,10 @@ export function extensionApi() {
   return globalThis.browser || globalThis.chrome;
 }
 
-/** Khayt's answer to one message, or `{state: 'no-host'}` when it cannot be reached. */
-export async function askKhayt(api, message) {
+/** Khayt's answer to one message, or `{state: 'no-host'}` when it cannot be reached. `tabId` is the tab a save was read from, so the background can tell its download (`background.js` `matchDownload`). */
+export async function askKhayt(api, message, tabId) {
   try {
-    const reply = await api.runtime.sendMessage({ type: 'khayt', message });
+    const reply = await api.runtime.sendMessage({ type: 'khayt', message, tabId: typeof tabId === 'number' ? tabId : undefined });
     if (reply && typeof reply === 'object' && typeof reply.state === 'string') return reply;
   } catch { /* the background is gone; say so the same way */ }
   return { ok: false, state: 'no-host' };

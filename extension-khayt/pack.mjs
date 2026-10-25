@@ -29,6 +29,14 @@ export const FILES = ['popup.html', 'popup.css', 'popup.js', 'background.js', 's
 /** The gecko id AMO signs under. Turki's to confirm before the first upload. */
 export const GECKO_ID = 'save@khaytapp.com';
 
+/**
+ * Chrome's and Firefox's extra permissions, for the download from a page just
+ * saved: `downloads` to see it finish (its path, address and referrer — nothing
+ * is read from the file), `storage` for `storage.session`, where the last ten
+ * minutes' saves are remembered until the browser quits.
+ */
+export const SAFARI_LEAVES_OUT = ['downloads', 'storage'];
+
 export function manifestFor(browser) {
   const m = JSON.parse(readFileSync(join(here, 'manifest.json'), 'utf8'));
   if (browser === 'firefox') {
@@ -46,6 +54,9 @@ export function manifestFor(browser) {
   } else if (browser === 'safari') {
     delete m.minimum_chrome_version;
     m.background = { scripts: ['background.js'], persistent: false };
+    // Safari has no downloads API — the app watches ~/Downloads for a few
+    // minutes after a save instead — so it asks for neither of these.
+    m.permissions = m.permissions.filter((p) => !SAFARI_LEAVES_OUT.includes(p));
   }
   return m;
 }

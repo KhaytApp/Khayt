@@ -109,8 +109,9 @@ struct WebSaveAppTests {
             .deletingLastPathComponent()
         let handler = try String(contentsOf: root.appending(path: "Sources/KhaytSafari/SafariWebExtensionHandler.swift"),
                                  encoding: .utf8)
-        #expect(handler.contains("WebSave.entry(fromMessage:"))
-        #expect(handler.contains("WebInbox.write("))
+        // Checked and written by the path the browser host shares
+        // (`WebInbox.reply`, which calls `WebSave.entry` and `WebInbox.write`).
+        #expect(handler.contains("WebInbox.reply(toMessageData:"))
         for forbidden in ["URLSession", "khayt-store", "NSWorkspace.shared.open", "Process("] {
             #expect(!handler.contains(forbidden), "the Safari handler must not use \(forbidden)")
         }

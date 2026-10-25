@@ -72,6 +72,9 @@ public enum WebInbox {
         case updated
         /// A download attached to a saved record.
         case attached
+        /// A download that belongs to a saved record, put to the shop: the
+        /// app asks before it adds anything (`WebSaveInbox.offers`).
+        case offered
         /// Written, and no answer yet — Khayt is not open, or busy.
         case queued
         /// The app would not take it: saving from the browser is switched off
@@ -97,7 +100,7 @@ public enum WebInbox {
         /// As the extension receives it.
         public var message: [String: Any] {
             var o: [String: Any] = ["ok": state == .saved || state == .updated || state == .attached
-                                        || state == .queued,
+                                        || state == .offered || state == .queued,
                                     "state": state.rawValue, "id": id]
             if let reason { o["reason"] = reason }
             if let title { o["title"] = title }
