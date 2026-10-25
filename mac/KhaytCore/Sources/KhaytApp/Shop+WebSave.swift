@@ -35,6 +35,8 @@ final class WebSaveInbox {
     /// The inbox, or nil for a build with no app group (ad hoc).
     var directory: () -> URL? = { WebInbox.directory() }
     var available: Bool { directory() != nil }
+    /// The folder a download must be inside to be offered (tests: a temporary one).
+    var home: () -> URL = { Shop.webDownloadHome }
 
     /// The last page filed, for the Settings row.
     private(set) var lastSaved: (title: String, at: Date)?
@@ -42,6 +44,42 @@ final class WebSaveInbox {
     private(set) var savedCount = 0
 
     func setLastSaved(_ value: (title: String, at: Date)?) { lastSaved = value }
+
+    /// Downloads waiting for the shop's answer, oldest first: the browser's
+    /// (an `attach` from the host) and Safari's (`SafariDownloadsWatch`).
+    /// The first is the one the window asks about (`WebAttachPrompt`).
+    private(set) var offers: [WebAttachOffer] = []
+    /// The one being asked about, as the sheet binds it. The sheet setting it
+    /// back is ignored: an offer goes only by Not Now or Add to Library
+    /// (`dismissOffer`), so a sheet replaced by the next one cannot drop it.
+    var offer: WebAttachOffer? {
+        get { offers.first }
+        set { _ = newValue }
+    }
+    /// An offer being added right now, and what went wrong with the last one.
+    var attaching = false
+    var attachProblem: String?
+    /// The last download added, for the Settings row: its name and record.
+    var lastAttached: (name: String, id: String)?
+
+    /// Put one download to the shop — once per file, however many times the
+    /// browser and the watch both noticed it.
+    func enqueue(_ offer: WebAttachOffer) {
+        guard !offers.contains(where: { $0.path == offer.path }) else { return }
+        offers.append(offer)
+        // The window may be behind the browser: say so on the Dock, once.
+        if offers.count == 1, let app = NSApp as NSApplication?, !app.isActive { app.requestUserAttention(.informationalRequest) }
+    }
+
+    /// Not Now, or done: the question in front of the shop goes, and the
+    /// next one (if any) is asked.
+    func dismissOffer() {
+        attachProblem = nil
+        if !offers.isEmpty { offers.removeFirst() }
+    }
+
+    /// Safari's downloads, watched only for a little while after a save.
+    @ObservationIgnored lazy var safariDownloads = SafariDownloadsWatch(inbox: self)
 
     @ObservationIgnored private weak var shop: Shop?
     @ObservationIgnored private var watch: DispatchSourceFileSystemObject?
@@ -95,9 +133,17 @@ final class WebSaveInbox {
             guard let data = WebInbox.claim(file) else { continue }
             let fallbackId = file.deletingPathExtension().lastPathComponent
             let result: WebInbox.Result
+            var safariSave: WebSave.Page?
             do {
                 let entry = try WebSave.entry(fromInboxFile: data)
-                result = await shop.fileWebSave(entry, accepting: accepting)
+                if entry.kind == .attach {
+                    let (answer, offer) = shop.offerWebAttach(entry, accepting: accepting, home: home())
+                    result = answer
+                    if let offer { enqueue(offer) }
+                } else {
+                    result = await shop.fileWebSave(entry, accepting: accepting)
+                    if entry.browser == "safari" { safariSave = entry.page }
+                }
             } catch {
                 result = WebInbox.Result(id: fallbackId, state: .invalid, reason: error.rawValue)
             }
@@ -105,6 +151,11 @@ final class WebSaveInbox {
             if result.state == .saved || result.state == .updated {
                 lastSaved = (result.title ?? "", Date())
                 savedCount += 1
+                // Safari cannot say what it downloads: for a while after a
+                // Safari save, the app looks in ~/Downloads itself.
+                if let page = safariSave, let id = WebSaveRecord.existing(page, in: shop.libraryRows) {
+                    safariDownloads.watch(recordId: id, title: page.title, site: page.site)
+                }
             }
         }
     }
@@ -123,8 +174,8 @@ extension Shop {
     func fileWebSave(_ entry: WebSave.Entry, accepting: Bool) async -> WebInbox.Result {
         guard accepting else { return .init(id: entry.id, state: .refused, reason: "off") }
         guard entry.kind == .save, let page = entry.page else {
-            // A download to attach is the browser host's, in the next part
-            // of this feature; until then it is said rather than dropped.
+            // A download to attach is `offerWebAttach`'s, and is never filed
+            // without the shop's answer.
             return .init(id: entry.id, state: .refused, reason: "unsupported")
         }
         guard lockAllows("inventory", "edit") else {

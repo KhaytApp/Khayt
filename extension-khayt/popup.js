@@ -90,7 +90,7 @@ async function main() {
   save.addEventListener('click', async () => {
     save.disabled = true;
     save.textContent = say('popupSaving');
-    const reply = await askKhayt(api, saveMessage(page));
+    const reply = await askKhayt(api, saveMessage(page), read.tab && read.tab.id);
     result(reply);
     save.textContent = say('popupDone');
     save.disabled = false;

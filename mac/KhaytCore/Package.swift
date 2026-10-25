@@ -89,6 +89,10 @@ let package = Package(
         // "Save to Khayt" in Safari: the web extension's native half, a
         // fourth .appex, on `com.apple.Safari.web-extension`.
         .executable(name: "KhaytSafari", targets: ["KhaytSafari"]),
+        // "Save to Khayt" in Chrome, Edge, Brave, Vivaldi and Firefox: the
+        // native-messaging host those browsers start, copied by `make-app.sh`
+        // to Khayt.app/Contents/MacOS/khayt-browser-host.
+        .executable(name: "khayt-browser-host", targets: ["KhaytBrowserHost"]),
     ],
     // ── SPARKLE, AND WHY A DEPENDENCY AT ALL ─────────────────────────────
     //
@@ -126,6 +130,11 @@ let package = Package(
                               .linkedFramework("SafariServices"),
                               .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_KhaytSafari_main"]),
                           ]),
+        // The browser host: a plain command-line program the browser starts,
+        // speaking native messaging on standard input and output. Not an
+        // extension and not sandboxed — signed into the app group by
+        // `make-app.sh`, which is the one place it writes.
+        .executableTarget(name: "KhaytBrowserHost", dependencies: ["KhaytWebSave"]),
         // The interface. It writes now — jobs, customers, payments, moves —
         // through `StoreWriter`, which reads the book from disk inside every
         // write and swaps the file atomically. `Resources` carries the sample

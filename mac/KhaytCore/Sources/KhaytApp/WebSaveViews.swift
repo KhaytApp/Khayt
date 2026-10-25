@@ -94,6 +94,9 @@ struct BrowserExtensionSettings: View {
                             .controlSize(.small)
                     }
                 }
+                // Chrome, Edge, Brave, Vivaldi, Firefox: the host manifest,
+                // written and removed only on a click here.
+                BrowserHostRows(shop: shop)
             } else {
                 Text(w.callIt("mac.sfw_no_group"))
                     .font(.caption).foregroundStyle(.secondary)
@@ -101,6 +104,11 @@ struct BrowserExtensionSettings: View {
             }
             if let last = inbox.lastSaved {
                 Text(w.callIt("mac.sfw_last", ["title": .string(last.title)]))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+            }
+            if let added = inbox.lastAttached {
+                Text(w.callIt("mac.sfw_last_attached", ["name": .string(added.name)]))
                     .font(.caption).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle)
             }

@@ -186,6 +186,7 @@ swift build -c release --product KhaytThumbnail --package-path "$PKG"
 swift build -c release --product KhaytPreview --package-path "$PKG"
 swift build -c release --product KhaytWidgets --package-path "$PKG"
 swift build -c release --product KhaytSafari --package-path "$PKG"
+swift build -c release --product khayt-browser-host --package-path "$PKG"
 echo "Building Khayt $VERSION (release)…"
 swift build -c release --product Khayt --package-path "$PKG" \
   -Xswiftc -emit-const-values \
@@ -492,6 +493,29 @@ $GROUP_ENT
 </plist>
 SAFENTS
 
+# ── SAVE TO KHAYT, IN CHROME, EDGE, BRAVE, VIVALDI AND FIREFOX ───────────
+#
+# Those browsers reach a native program through native messaging: they start
+# it, write the extension's message to its standard input and read the answer
+# from its standard output. `khayt-browser-host` is that program — a plain
+# executable beside the app's own in Contents/MacOS (so `Bundle.main` is the app
+# and its Info.plist names the group), NOT sandboxed, hardened, and in the app
+# group, which is the one place it writes (`WebInbox`). Nothing points a browser
+# at it until the shop presses Install in Settings ▸ Preferences ▸ Browser
+# extension (`BrowserHosts`). Signed before the app, which seals it in.
+HOST_BIN="$APP/Contents/MacOS/khayt-browser-host"
+cp "$PKG/.build/release/khayt-browser-host" "$HOST_BIN"
+HOST_ENTS="$PKG/.build/browser-host.entitlements"
+cat > "$HOST_ENTS" <<HOSTENTS
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+$GROUP_ENT
+</dict>
+</plist>
+HOSTENTS
+
 # And the APP joins the same group, or macOS asks the shop whether Khayt may
 # "access data from other apps" the first time it writes the snapshot.
 # PlistBuddy, not plutil: plutil reads the dots in the key as a key PATH.
@@ -730,6 +754,14 @@ $GROUP_KEY
        general: anything backticked in here executes, and any \$NAME expands. -->
   <key>NSLocalNetworkUsageDescription</key>
   <string>Khayt looks for 3D printers on this network so you do not have to type their addresses.</string>
+  <!-- SAVE TO KHAYT IN SAFARI. Safari tells an extension nothing about its
+       downloads, so for ten minutes after a page is saved from Safari the app
+       looks in Downloads for the model downloaded from it, and ASKS before
+       adding it (SafariDownloadsWatch). macOS shows this sentence the first
+       time; Khayt never looks there at any other time. English only: the app
+       has no InfoPlist.strings, so every usage sentence here is English. -->
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>For a few minutes after you save a model page from Safari, Khayt looks in Downloads for the model you download from it, and asks before adding it to your library.</string>
   <key>NSBonjourServices</key>
   <array>
     <string>_prusalink._tcp</string>
@@ -901,6 +933,14 @@ if ! SAF_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
       --entitlements "$SAF_ENTS" "$SAF" 2>&1)"; then
   echo "codesign failed for KhaytSafari.appex:"
   echo "$SAF_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
+
+# The browser host: its own identifier, the group, the hardened runtime.
+if ! HOST_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+      --identifier app.khayt.mac.browser-host --entitlements "$HOST_ENTS" "$HOST_BIN" 2>&1)"; then
+  echo "codesign failed for khayt-browser-host:"
+  echo "$HOST_SIGN_ERR" | sed 's/^/  /'
   exit 1
 fi
 

@@ -17,9 +17,6 @@ import KhaytWebSave
 @objc(SafariWebExtensionHandler)
 final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
 
-    /// How long the popup is kept waiting for the app's answer.
-    static let answerWait: TimeInterval = 4
-
     func beginRequest(with context: NSExtensionContext) {
         let item = context.inputItems.first as? NSExtensionItem
         // As bytes, so nothing that is not Sendable crosses to the queue.
@@ -28,7 +25,7 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         let box = ContextBox(context)
         // Off the extension's own thread: waiting for the answer sleeps.
         DispatchQueue.global(qos: .userInitiated).async {
-            let reply = Self.handle(data.flatMap { try? JSONSerialization.jsonObject(with: $0) })
+            let reply = Self.handle(data)
             let response = NSExtensionItem()
             response.userInfo = [SFExtensionMessageKey: reply]
             box.context.completeRequest(returningItems: [response], completionHandler: nil)
@@ -42,43 +39,15 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         init(_ context: NSExtensionContext) { self.context = context }
     }
 
-    static func handle(_ message: Any?) -> [String: Any] {
-        let inbox = WebInbox.directory()
-        // `ping`: can a save go anywhere, and is the app there to take it.
-        if let o = message as? [String: Any], o["kind"] as? String == "ping" {
-            return ["ok": inbox != nil, "state": inbox == nil ? "no-inbox" : "ready",
-                    "running": appIsRunning]
-        }
-        guard let inbox else {
-            return ["ok": false, "state": "no-inbox"]
-        }
-        let id = WebSave.newEntryId()
-        let entry: WebSave.Entry
-        do {
-            entry = try WebSave.entry(fromMessage: message, id: id, at: iso(Date()), browser: "safari")
-        } catch {
-            return WebInbox.Result(id: id, state: .invalid, reason: error.rawValue).message
-        }
-        do {
-            try WebInbox.write(entry, into: inbox)
-        } catch {
-            return ["ok": false, "state": "no-inbox"]
-        }
-        if let answer = WebInbox.awaitAnswer(id, inbox: inbox, timeout: appIsRunning ? answerWait : 0.5) {
-            return answer.message
-        }
-        var queued = WebInbox.Result(id: id, state: .queued).message
-        queued["running"] = appIsRunning
-        return queued
+    /// The extension's message, answered by the one path the browser host
+    /// answers with too (`WebInbox.reply`): checked, written into the inbox,
+    /// and the app's answer or `queued`.
+    static func handle(_ data: Data?) -> [String: Any] {
+        WebInbox.reply(toMessageData: data, browser: "safari", inbox: WebInbox.directory(),
+                       appRunning: appIsRunning)
     }
 
     static var appIsRunning: Bool {
         !NSRunningApplication.runningApplications(withBundleIdentifier: "app.khayt.mac").isEmpty
-    }
-
-    static func iso(_ date: Date) -> String {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f.string(from: date)
     }
 }

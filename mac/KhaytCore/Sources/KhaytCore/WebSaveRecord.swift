@@ -136,6 +136,80 @@ public enum WebSaveRecord {
         record["savedFromWebAt"] = .string(at)
     }
 
+    // MARK: - A download, attached
+
+    /// The fields an import measures and a web record lacks: what the file
+    /// is, where it went, and what it was read as.
+    public static let fileFields: [String] = [
+        "originalName", "sourceFile", "parsed", "externalPath", "colors", "swapCount",
+        "thumbFile", "thumbSource", "contentHash", "geometryKey", "geometryReader", "printRisk",
+    ]
+
+    /// What attaching did: the record that now holds the file, and whether it
+    /// is the saved page's own record or a new one beside it.
+    public struct Attached: Equatable, Sendable {
+        public let id: String
+        public let intoSaved: Bool
+        public init(id: String, intoSaved: Bool) { self.id = id; self.intoSaved = intoSaved }
+    }
+
+    /// Whether the saved record already has a file of its own.
+    public static func hasFile(_ record: [String: JSONValue]) -> Bool {
+        if case .object? = record["sourceFile"] { return true }
+        return !text(record["externalPath"]).isEmpty
+    }
+
+    /// The record `id` in `rows`, if there is one.
+    public static func record(_ id: String, in rows: [JSONValue]) -> [String: JSONValue]? {
+        for case .object(let o) in rows { if case .string(id)? = o["id"] { return o } }
+        return nil
+    }
+
+    /// Put an imported file (`imported`, the record `LibraryImport.prepare`
+    /// made under `newId`) with the saved page `savedId`.
+    ///
+    /// While the saved record has no file yet, the file goes INTO it: the
+    /// record keeps its id, title, creator, licence, tags, picture, Print next
+    /// mark and everything it says about the page, and gains the file's own
+    /// fields (`fileFields`) — the designer and licence the file names only
+    /// where the page left them blank. Once it has a file (a second download
+    /// from the same page), the import is a record of its own beside it,
+    /// carrying the page's facts so it is found under Saved from web too.
+    /// Nil when the saved record is gone.
+    public static func attach(_ imported: [String: JSONValue], newId: String, to savedId: String,
+                              in rows: inout [JSONValue]) -> Attached? {
+        guard let i = rows.firstIndex(where: {
+            if case .object(let o) = $0, case .string(savedId)? = o["id"] { true } else { false }
+        }), case .object(var saved) = rows[i] else { return nil }
+
+        if !hasFile(saved) {
+            for key in fileFields {
+                if let v = imported[key] { saved[key] = v } else { saved.removeValue(forKey: key) }
+            }
+            if text(saved["source"]).isEmpty, let v = imported["source"] { saved["source"] = v }
+            if text(saved["licence"]).isEmpty, let v = imported["licence"] { saved["licence"] = v }
+            if !hasPicture(saved), case .string(let p)? = imported["userPhoto"], p.hasPrefix("data:") {
+                saved["userPhoto"] = .string(p)
+            }
+            StoreWriter.stamp(&saved)
+            rows[i] = .object(saved)
+            return Attached(id: savedId, intoSaved: true)
+        }
+
+        var record = imported
+        record["id"] = .string(newId)
+        for key in ["sourceUrl", "sourceSite", "sourceLicenceText", "sourceNote", "sourceFiles", "savedFromWebAt"] {
+            if let v = saved[key] { record[key] = v }
+        }
+        if text(record["source"]).isEmpty, let v = saved["source"] { record["source"] = v }
+        if text(record["licence"]).isEmpty, let v = saved["licence"] { record["licence"] = v }
+        if case .array(let t)? = saved["tags"], !t.isEmpty, Tags.normalise(record["tags"]).isEmpty {
+            record["tags"] = .array(t)
+        }
+        rows.insert(.object(record), at: 0)
+        return Attached(id: newId, intoSaved: false)
+    }
+
     /// Put the fetched cover on the record, unless it has a picture by now.
     public static func setCover(_ dataURI: String, id: String, in rows: inout [JSONValue]) -> Bool {
         guard dataURI.hasPrefix("data:image/") else { return false }

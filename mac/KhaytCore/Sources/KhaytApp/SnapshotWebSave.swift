@@ -55,24 +55,73 @@ extension Snapshot {
         //    every row added above it).
         BrowserExtensionSettings.pretendSafari = .on
         WebSaveInbox.shared.pretendLastSaved(title: saved[0].0.title)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 460),
+        // A signed build's inbox, pretended: a development build has no app
+        // group, and the rows below only show for a build that has one.
+        // Never read or written — the inbox is not started in a snapshot.
+        WebSaveInbox.shared.directory = { FileManager.default.temporaryDirectory.appending(path: "khayt-snapshot-inbox") }
+        // The browsers: Chrome connected, Edge waiting on nothing, Brave
+        // written by another copy of Khayt, Firefox off — every state a row
+        // can be in but "another program's file", which gets its own picture.
+        BrowserHostRows.pretend = .init(installed: [.chrome, .edge, .brave, .firefox],
+                                        statuses: [.chrome: .on, .edge: .off, .brave: .stale, .firefox: .off],
+                                        hostPath: "/Applications/Khayt.app/Contents/MacOS/khayt-browser-host",
+                                        chromiumIds: ["abcdefghijklmnopabcdefghijklmnop"])
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 760),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.title = shop.words.callIt("mac.sfw_settings")
         window.contentView = NSHostingView(rootView:
             Form { BrowserExtensionSettings(shop: shop) }
                 .formStyle(.grouped)
-                .frame(width: 600, height: 460))
+                .frame(width: 600, height: 760))
         window.center()
         window.makeKeyAndOrderFront(nil)
         await settle(); await settle()
         capture(named: "ws-03-settings" + tag, window: window, into: dir)
+
+        // 3b. Before the store listing (no Chromium id yet), a file of the
+        //     same name someone else wrote, and a build with no host.
+        BrowserHostRows.pretend = .init(installed: [.chrome, .vivaldi, .firefox],
+                                        statuses: [.chrome: .off, .vivaldi: .foreign, .firefox: .on],
+                                        hostPath: "/Applications/Khayt.app/Contents/MacOS/khayt-browser-host",
+                                        chromiumIds: [])
+        window.contentView = NSHostingView(rootView:
+            Form { BrowserExtensionSettings(shop: shop) }
+                .formStyle(.grouped)
+                .frame(width: 600, height: 760))
+        await settle(); await settle()
+        capture(named: "ws-03b-settings-before-store" + tag, window: window, into: dir)
 
         // 4. And without an app group (an ad-hoc build): said, not hidden.
         WebSaveInbox.shared.directory = { nil }
         await settle(); await settle()
         capture(named: "ws-04-settings-no-group" + tag, window: window, into: dir)
         window.close()
+        BrowserHostRows.pretend = nil
+
+        // 5. The question a download from a saved page raises — a model
+        //    file, and a compressed one — and what it says when adding fails.
+        let prompt = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 330),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        prompt.isReleasedWhenClosed = false
+        let offers = [
+            WebAttachOffer(recordId: "PF-snap-web-1", title: saved[0].0.title,
+                           path: "/Users/shop/Downloads/dragon_body.3mf", size: 4_812_330, browser: "chrome"),
+            WebAttachOffer(recordId: "PF-snap-web-2", title: saved[1].0.title,
+                           path: "/Users/shop/Downloads/Gridfinity Bin 2x3.zip", size: 1_204_998, browser: "safari"),
+        ]
+        for (i, offer) in offers.enumerated() {
+            WebSaveInbox.shared.attachProblem = i == 1 ? shop.words.callIt("mac.sfw_attach_no_model") : nil
+            prompt.contentView = NSHostingView(rootView: WebAttachPrompt(shop: shop, offer: offer)
+                .modifier(ShopsLocale(words: shop.words)))
+            prompt.setContentSize(prompt.contentView?.fittingSize ?? NSSize(width: 460, height: 330))
+            prompt.center()
+            prompt.makeKeyAndOrderFront(nil)
+            await settle(); await settle()
+            capture(named: "ws-05-attach-prompt\(i == 0 ? "" : "-archive")" + tag, window: prompt, into: dir)
+        }
+        WebSaveInbox.shared.attachProblem = nil
+        prompt.close()
 
         WebSaveInbox.shared.directory = { WebInbox.directory() }
         WebSaveInbox.shared.pretendLastSaved(title: nil)

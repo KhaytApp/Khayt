@@ -595,6 +595,7 @@ private struct OwedSummary: View {
 /// one place to add one.
 struct WindowSheets: ViewModifier {
     @Bindable var shop: Shop
+    @Bindable var webInbox = WebSaveInbox.shared
 
     /// What the delete question says under the names, once the plan is in.
     private var planLines: [String] {
@@ -887,6 +888,9 @@ struct WindowSheets: ViewModifier {
                 }
             }
             .shopSheet(isPresented: $shop.addingMachine) { MachineSheet(shop: shop, existing: nil) }
+            // A model downloaded from a page saved with Save to Khayt: asked,
+            // never added on its own (`WebAttachPrompt`).
+            .shopSheet(item: $webInbox.offer) { WebAttachPrompt(shop: shop, offer: $0) }
     }
 }
 
