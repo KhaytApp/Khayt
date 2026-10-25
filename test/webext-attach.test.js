@@ -84,6 +84,11 @@ test('the newest save of the same site wins', () => {
   const newer = { ...SAVE, url: 'https://www.printables.com/model/2-new', files: [], at: NOW - 60_000 };
   const it = item({ referrer: 'https://www.printables.com/', url: 'https://cdn.example/x.stl', filename: '/Users/s/Downloads/x.stl' });
   assert.equal(bg.matchDownload(it, [older, newer], null, NOW), newer);
+  // But a download whose referrer IS the older page goes to that page, not to
+  // the newer save on the same site.
+  const fromOlder = item({ referrer: 'https://www.printables.com/model/1-old', url: 'https://cdn.example/y.stl',
+    filename: '/Users/s/Downloads/y.stl' });
+  assert.equal(bg.matchDownload(fromOlder, [older, newer], null, NOW), older);
 });
 
 test('end to end in the sandbox: a save is remembered, its download sends one attach, others send nothing', async () => {

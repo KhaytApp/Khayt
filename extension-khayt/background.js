@@ -85,10 +85,15 @@ function matchDownload(item, saves, tabId, now) {
   const referrer = pageKey(item.referrer || '');
   const refHost = hostOf(item.referrer || '');
   const urls = [item.url, item.finalUrl].filter(Boolean).map(String);
+  // The exact page or one of its own file links first, over every save; only
+  // then the looser tab and same-site rules — a download from another page of
+  // the same site was offered to the last page saved there.
   for (const s of candidates) {
-    if (tabId != null && s.tabId === tabId) return s;
     if (referrer && referrer === pageKey(s.url)) return s;
     if (urls.some((u) => (s.files || []).includes(u))) return s;
+  }
+  for (const s of candidates) {
+    if (tabId != null && s.tabId === tabId) return s;
     if (refHost && refHost === hostOf(s.url)) return s;
   }
   return null;
@@ -116,7 +121,17 @@ async function storeSaves(saves) {
   try { await session.set({ saves: saves.filter((s) => now - s.at <= ATTACH_WINDOW_MS).slice(-10) }); } catch { /* not kept */ }
 }
 
-async function remember(page, tabId) {
+// One read-then-write at a time: two saves within one storage round trip each
+// read the same list and the second write dropped the first save.
+let remembering = Promise.resolve();
+
+function remember(page, tabId) {
+  const next = remembering.then(() => rememberNow(page, tabId), () => rememberNow(page, tabId));
+  remembering = next.catch(() => {});
+  return next;
+}
+
+async function rememberNow(page, tabId) {
   if (!api.downloads || !page || !pageKey(page.url)) return;
   const saves = await loadSaves();
   saves.push({

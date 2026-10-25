@@ -224,6 +224,9 @@ extension Shop {
     func facetMemoKey() -> Int {
         var h = Hasher()
         h.combine(libraryQuery.unsorted)
+        // A Library Health Show narrows the pools (`libraryPool`) but is not
+        // part of `LibraryQuery`, so it goes in on its own.
+        h.combine(libraryHealthFocus)
         if case .library(let g) = shelf { h.combine(1); h.combine(g) } else { h.combine(0) }
         h.combine(libraryRowsRevision)
         h.combine(libraryDerivedRevision)

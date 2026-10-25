@@ -28,21 +28,27 @@ struct VaultLapseUITests {
             #expect(dated.contains(Shop.day(Self.since, w)) && dated != fresh)
 
             let d = CloudPlans.Lapse.Display.deleting(overBytes: Self.gig, deleteAfter: Self.end, daysLeft: 90, since: nil)
-            let when = try #require(Shop.lapseDeadline(d, w))
+            let when = try #require(Shop.lapseDeadline(d, w, now: Self.since))
             #expect(when.contains(Shop.day(Self.end, w)))
             #expect(when.contains(w.numeral(90)))
             for key in ["mac.lapse_over", "mac.lapse_over_since", "mac.lapse_delete_on", "mac.lapse_what",
-                        "mac.lapse_order", "mac.lapse_fix", "mac.vault_over_err", "mac.lapse_today"] {
+                        "mac.lapse_order", "mac.lapse_fix", "mac.vault_over_err", "mac.lapse_today",
+                        "mac.lapse_deleting_now"] {
                 #expect(w.callIt(key) != key, "\(key) has no \(lang)")
                 #expect(!w.callIt(key).contains("{n}"))
             }
         }
         let ar = Words(); await ar.load("ar", engine: engine)
-        #expect(Shop.lapseDeadline(.deleting(overBytes: 1, deleteAfter: Self.end, daysLeft: 0, since: nil), ar)!.contains("اليوم"))
-        #expect(Shop.lapseDeadline(.deleting(overBytes: 1, deleteAfter: Self.end, daysLeft: 2, since: nil), ar)!.contains("يومان"))
-        #expect(Shop.lapseDeadline(.deleting(overBytes: 1, deleteAfter: Self.end, daysLeft: 5, since: nil), ar)!.contains("أيام"))
+        #expect(Shop.lapseDeadline(.deleting(overBytes: 1, deleteAfter: Self.end, daysLeft: 0, since: nil), ar, now: Self.since)!.contains("اليوم"))
+        #expect(Shop.lapseDeadline(.deleting(overBytes: 1, deleteAfter: Self.end, daysLeft: 2, since: nil), ar, now: Self.since)!.contains("يومان"))
+        #expect(Shop.lapseDeadline(.deleting(overBytes: 1, deleteAfter: Self.end, daysLeft: 5, since: nil), ar, now: Self.since)!.contains("أيام"))
         let en = Words(); await en.load("en", engine: engine)
-        #expect(Shop.lapseDeadline(.deleting(overBytes: 1, deleteAfter: Self.end, daysLeft: 1, since: nil), en)!.contains("(1 day)"))
+        #expect(Shop.lapseDeadline(.deleting(overBytes: 1, deleteAfter: Self.end, daysLeft: 1, since: nil), en, now: Self.since)!.contains("(1 day)"))
+        // A date already passed is not "today": the files are being deleted.
+        let late = Shop.lapseDeadline(.deleting(overBytes: 1, deleteAfter: Self.since, daysLeft: 0, since: nil), en,
+                                      now: Self.since.addingTimeInterval(5 * 86_400))!
+        #expect(late == en.callIt("mac.lapse_deleting_now", ["date": .string(Shop.day(Self.since, en))]))
+        #expect(ar.callIt("mac.lapse_deleting_now") != "mac.lapse_deleting_now")
     }
 
     @Test("402 vault-over reads as its own message and marks the vault over; the deletions are not refused")
@@ -85,5 +91,9 @@ struct VaultLapseUITests {
         #expect(CloudPlanSettings.upgradeTarget(over: 200, current: free, plans: plans)?.name == "creator")
         #expect(CloudPlanSettings.upgradeTarget(over: 5000, current: free, plans: plans)?.name == "studio")
         #expect(CloudPlanSettings.upgradeTarget(over: 10, current: studio, plans: plans) == nil)
+        // A top plan with NO vault limit holds anything: it is the one offered.
+        let unlimited = try JSONDecoder().decode(CloudPlans.Plan.self, from: Data(
+            #"{"name":"unlimited","priceSar":400,"limits":{}}"#.utf8))
+        #expect(CloudPlanSettings.upgradeTarget(over: 5000, current: free, plans: plans + [unlimited])?.name == "unlimited")
     }
 }

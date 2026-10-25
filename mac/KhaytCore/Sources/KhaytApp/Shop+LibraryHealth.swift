@@ -45,31 +45,48 @@ extension Shop {
     /// drive's placeholder is online). Vault models: their folder, unless the
     /// sync index says the file is online. With no library folder at all
     /// (the sample) nothing is known, and nothing is called missing.
+    ///
+    /// A file is only MISSING when the place it lives is there to ask: a
+    /// linked folder (or a `/Volumes` drive) that is gone or empty, or a
+    /// library folder that is not there, makes its models `.unreachable` —
+    /// an unplugged drive is not a reason to remove a thousand records. A
+    /// vault model not on disk while the sync index has not loaded yet, with
+    /// online storage set up, is `.unknown`: it may well be online.
     nonisolated static func healthPresence(_ files: [LibraryFile], roots: [String]?, online: Set<String>,
+                                           linkedRoots: [String] = [], indexPending: Bool = false,
                                            linkedOnline: @Sendable (URL) -> Bool) -> [String: LibraryHealth.Presence] {
         var out: [String: LibraryHealth.Presence] = [:]
         // A compressed file is asked about ONCE, however many models it holds.
         var archives: [String: LibraryHealth.Presence] = [:]
+        var reach = HealthReach(linkedRoots: linkedRoots)
+        var vaultReachable: Bool?
         for file in files {
             if file.isWebOnly { out[file.id] = .web; continue }
             if online.contains(file.id) { out[file.id] = .online; continue }
             if let path = file.archivePath {
                 // No library folder (the sample): nothing is known, as below.
                 guard let roots, !roots.isEmpty else { out[file.id] = .unknown; continue }
+                // A changed archive that no longer holds it: gone, on its own.
+                if file.archiveGone == true { out[file.id] = .missing; continue }
                 if let known = archives[path] { out[file.id] = known; continue }
-                let p: LibraryHealth.Presence = !FileManager.default.fileExists(atPath: path) ? .missing
+                let p: LibraryHealth.Presence = !FileManager.default.fileExists(atPath: path)
+                    ? (reach.isReachable(path) ? .missing : .unreachable)
                     : linkedOnline(URL(fileURLWithPath: path)) ? .online : .here
                 archives[path] = p
                 out[file.id] = p
                 continue
             }
             if let path = file.externalPath, !path.isEmpty {
-                guard FileManager.default.fileExists(atPath: path) else { out[file.id] = .missing; continue }
+                guard FileManager.default.fileExists(atPath: path) else {
+                    out[file.id] = reach.isReachable(path) ? .missing : .unreachable; continue
+                }
                 out[file.id] = linkedOnline(URL(fileURLWithPath: path)) ? .online : .here
                 continue
             }
             guard let roots, !roots.isEmpty else { out[file.id] = .unknown; continue }
-            out[file.id] = LibraryLocation.directory(for: file.id, roots: roots) == nil ? .missing : .here
+            guard LibraryLocation.directory(for: file.id, roots: roots) == nil else { out[file.id] = .here; continue }
+            if vaultReachable == nil { vaultReachable = roots.allSatisfy { reach.folderIsThere($0) } }
+            out[file.id] = vaultReachable == false ? .unreachable : indexPending ? .unknown : .missing
         }
         return out
     }
@@ -116,8 +133,11 @@ extension Shop {
         let online = Set(files.lazy.filter { index?.state($0.id, remote: remote) == .online }.map(\.id))
         let pretend = pretendHealthPresence
         let linkedOnline = linkedIsOnline
+        let linkedRoots = linkedFolders
+        let indexPending = index == nil && remote != nil
         let presence = await PinWork.run {
-            pretend ?? Shop.healthPresence(files, roots: roots, online: online, linkedOnline: linkedOnline)
+            pretend ?? Shop.healthPresence(files, roots: roots, online: online, linkedRoots: linkedRoots,
+                                           indexPending: indexPending, linkedOnline: linkedOnline)
         }
         let models = files.map { Self.healthModel($0, presence: presence[$0.id] ?? .here) }
         libraryHealthGroups = LibraryHealth.groups(models: models, machines: healthMachines,
@@ -265,6 +285,20 @@ extension Shop {
             libraryHealthNote = words.callIt("mac.lh_locate_wrong", ["name": .string(file.title)])
             return
         }
+        // A LOCKED member has no archive hash to compare: the file chosen must
+        // at least be a compressed file that lists this member — not any
+        // file at all, every member of the archive re-pointed at it.
+        if file.inArchive, (file.archiveHash ?? "").isEmpty {
+            let member = file.archiveMember ?? ""
+            let holds = await PinWork.run {
+                ArchiveFolder.kind(of: url.lastPathComponent) != nil
+                    && ((try? ArchiveMembers.list(url))?.contains { $0.path == member } ?? false)
+            }
+            guard holds else {
+                libraryHealthNote = words.callIt("mac.lh_locate_wrong", ["name": .string(file.title)])
+                return
+            }
+        }
         if let gone = file.archivePath {
             // A member's ARCHIVE was moved: every model it holds follows it,
             // the archive's own bytes deciding (`archiveHash`).
@@ -307,5 +341,38 @@ extension Shop {
     /// A product's name, for the page.
     func healthProductName(_ id: String) -> String {
         Self.healthProducts(productRows).first { $0.id == id }?.name ?? id
+    }
+}
+
+/// Whether the place a library path lives is there to be asked, each folder
+/// asked once per check (`Shop.healthPresence`).
+struct HealthReach {
+    let linkedRoots: [String]
+    private var known: [String: Bool] = [:]
+
+    init(linkedRoots: [String]) {
+        self.linkedRoots = linkedRoots.map { $0.count > 1 && $0.hasSuffix("/") ? String($0.dropLast()) : $0 }
+    }
+
+    /// A folder that exists and holds something. An EMPTY one is a mount
+    /// point with nothing mounted on it, or a drive's folder with its drive
+    /// signed out — never a reason to call what was in it gone.
+    mutating func folderIsThere(_ path: String) -> Bool {
+        if let k = known[path] { return k }
+        var dir: ObjCBool = false
+        let there = FileManager.default.fileExists(atPath: path, isDirectory: &dir) && dir.boolValue
+            && !((try? FileManager.default.contentsOfDirectory(atPath: path))?.isEmpty ?? true)
+        known[path] = there
+        return there
+    }
+
+    /// The linked folder the path is under (the deepest), and the
+    /// `/Volumes/<name>` drive it is on, are both there.
+    mutating func isReachable(_ path: String) -> Bool {
+        let under = linkedRoots.filter { path.hasPrefix($0 == "/" ? $0 : $0 + "/") }.max { $0.count < $1.count }
+        if let under, !folderIsThere(under) { return false }
+        let parts = path.split(separator: "/")
+        if parts.count >= 2, parts[0] == "Volumes", !folderIsThere("/Volumes/\(parts[1])") { return false }
+        return true
     }
 }

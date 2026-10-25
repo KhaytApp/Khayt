@@ -42,6 +42,30 @@ public enum ArchiveFolder {
         return nil
     }
 
+    /// Whether a file's first bytes are what its name says it is. libarchive
+    /// guesses the format from the BYTES, so a file called `x.rar` would be
+    /// read as whatever it really is (CAB, LHA, ISO 9660, XAR, cpio…) — every
+    /// one of libarchive's readers in reach of a stranger's file. Only the
+    /// format the name claims is let through. A zip is read by the app's own
+    /// reader and never asked about here; a compressed tar is checked for
+    /// its compression, the tar inside is libarchive's to find.
+    public static func bytesMatch(kind: String, header: [UInt8]) -> Bool {
+        func starts(_ sig: [UInt8], at offset: Int = 0) -> Bool {
+            header.count >= offset + sig.count && Array(header[offset..<(offset + sig.count)]) == sig
+        }
+        switch kind {
+        case "zip": return starts([0x50, 0x4B, 0x03, 0x04]) || starts([0x50, 0x4B, 0x05, 0x06])
+            || starts([0x50, 0x4B, 0x07, 0x08])
+        case "rar": return starts([0x52, 0x61, 0x72, 0x21, 0x1A, 0x07])
+        case "7z": return starts([0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C])
+        case "tgz": return starts([0x1F, 0x8B])
+        case "tbz": return starts([0x42, 0x5A, 0x68])
+        case "txz": return starts([0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00])
+        case "tar": return starts(Array("ustar".utf8), at: 257)
+        default: return false
+        }
+    }
+
     /// The archive's name without its ending — `Dragon Pack.tar.gz` is
     /// `Dragon Pack` — which is what its folder is called.
     public static func baseName(of name: String) -> String {

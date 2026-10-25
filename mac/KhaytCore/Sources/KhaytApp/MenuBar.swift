@@ -128,12 +128,22 @@ final class FloorStatus {
         guard let shop, let button = item?.button else { return }
         let lines = FloorRead.lines(shop)
         let label = FloorRead.label(lines, style: MenuBarStyle.current, words: shop.words)
+        // What VoiceOver reads is kept current on its own: in the glyph-only
+        // style the drawing barely changes while "2 printing, next done 14:20"
+        // does, and the redraw guard below left it saying the first figures.
+        let summary = FloorPanel.summary(shop)
+        if summary != spoken {
+            spoken = summary
+            button.setAccessibilityLabel(summary)
+        }
         guard label != shown else { return }
         shown = label
         button.image = StatusGlyph.image(ring: label.ring, attention: label.attention)
         button.title = label.text.isEmpty ? "" : " " + label.text
-        button.setAccessibilityLabel(FloorPanel.summary(shop))
     }
+
+    /// What the item last told VoiceOver.
+    private var spoken: String?
 
     /// A row of the panel, clicked: the machine in the main window, by the
     /// same road a khayt://machine/<id> link takes (`Activator.application(_:open:)`

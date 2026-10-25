@@ -129,6 +129,22 @@ test('the site is the address, never what the page calls itself', async () => {
   assert.equal(siteOf('https://www.makerworld.com/en/models/1'), 'makerworld');
 });
 
+test('a canonical or og:url on another site is not believed: the tab address is saved instead', async () => {
+  const { extract, registrable, sameSite } = await load();
+  const spoof = new JSDOM('<!doctype html><title>Dragon</title><link rel="canonical" href="https://www.printables.com/model/123456-dragon">').window.document;
+  const r = extract(spoof, 'https://free-stl.example/dragon');
+  assert.equal(r.url, 'https://free-stl.example/dragon');
+  assert.equal(r.site, 'web');
+  const og = new JSDOM('<!doctype html><title>Dragon</title><meta property="og:url" content="https://makerworld.com/en/models/5">').window.document;
+  assert.equal(extract(og, 'https://mirror.example/m/5').url, 'https://mirror.example/m/5');
+  // The site's own canonical, on another of its hosts, still counts.
+  const own = new JSDOM('<!doctype html><title>Dragon</title><link rel="canonical" href="https://www.printables.com/model/1-d">').window.document;
+  assert.equal(extract(own, 'https://printables.com/model/1-d/files').url, 'https://www.printables.com/model/1-d');
+  assert.equal(registrable('shop.example.co.uk'), 'example.co.uk');
+  assert.equal(registrable('www.makerworld.com.cn'), 'makerworld.com.cn');
+  assert.ok(!sameSite('https://printables.com.evil.example/', 'https://printables.com/'));
+});
+
 test('licence words become Khayt ids only when they are Creative Commons; anything else is passed as written', async () => {
   const { licenceId } = await load();
   assert.equal(licenceId('Creative Commons — Attribution — Noncommercial — Share Alike'), 'cc-by-nc-sa');

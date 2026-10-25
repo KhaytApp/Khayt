@@ -141,6 +141,60 @@ extension Shop {
         var refused: [String] = []
         var failures: [String] = []
         var addedIds: [String] = []
+        /// Members of a changed archive read again under its new hash, and
+        /// members it no longer holds.
+        var refreshed = 0
+        var gone = 0
+    }
+
+    /// What the book holds about one archive already indexed: the hash its
+    /// members were indexed under, and the archive's size and time then.
+    struct IndexedArchive: Sendable, Equatable {
+        var hash: String?
+        var bytes: Int?
+        var modified: Double?
+        /// When the first member was indexed (epoch ms) — for records made
+        /// before the size and time were kept.
+        var indexedAt: Double?
+        /// Each member's record id and its name in the archive.
+        var members: [(id: String, member: String)] = []
+
+        static func == (a: Self, b: Self) -> Bool {
+            a.hash == b.hash && a.bytes == b.bytes && a.modified == b.modified && a.indexedAt == b.indexedAt
+                && a.members.map(\.id) == b.members.map(\.id) && a.members.map(\.member) == b.members.map(\.member)
+        }
+    }
+
+    /// The archives the book's members came from, by standardised path.
+    /// Locked members (no hash) are left out: nothing of theirs is cached.
+    nonisolated static func indexedArchives(_ files: [LibraryFile]) -> [String: IndexedArchive] {
+        var out: [String: IndexedArchive] = [:]
+        for f in files where f.inArchive && !f.isLocked {
+            guard let path = f.archivePath, let member = f.archiveMember, let hash = f.archiveHash else { continue }
+            let key = URL(fileURLWithPath: path).standardizedFileURL.path
+            var a = out[key] ?? IndexedArchive(hash: hash, bytes: f.archiveBytes.map { Int($0) }, modified: f.archiveModified)
+            let at = f.createdAt?.date.map { $0.timeIntervalSince1970 * 1000 }
+            if let at { a.indexedAt = min(a.indexedAt ?? at, at) }
+            a.members.append((f.id, member))
+            out[key] = a
+        }
+        return out
+    }
+
+    /// The archive's size and modification time (epoch ms) on disk now.
+    nonisolated static func archiveStamp(_ url: URL) -> (bytes: Int, modified: Double?) {
+        let at = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? nil
+        return (ArchiveMembers.size(of: url), at.map { ($0.timeIntervalSince1970 * 1000).rounded() })
+    }
+
+    /// Whether an indexed archive may have changed since: its size or time
+    /// differ from the ones kept, or — for records made before they were
+    /// kept — it was modified after its members were indexed.
+    nonisolated static func mayHaveChanged(_ was: IndexedArchive, bytes: Int, modified: Double?) -> Bool {
+        if let b = was.bytes, b != bytes { return true }
+        if let m = was.modified { return modified != nil && modified != m }
+        guard let modified, let at = was.indexedAt else { return true }
+        return modified > at
     }
 
     /// Index the model members of every archive the linked walk found, that
@@ -156,7 +210,8 @@ extension Shop {
                                           limits: ArchiveFolder.Limits = .init(),
                                           owns: @escaping @Sendable () -> Bool,
                                           whoHasIt: @escaping @Sendable () -> String?,
-                                          stop: ScanStop? = nil) async -> ArchiveScan {
+                                          stop: ScanStop? = nil,
+                                          indexed: [String: IndexedArchive] = [:]) async -> ArchiveScan {
         // lock: callers — rescanLinkedFolders, archiveRows
         var scan = ArchiveScan()
         var held: [LibraryImport.Prepared] = []
@@ -205,22 +260,43 @@ extension Shop {
                 case .refused(let why): scan.refused.append("\(name): \(why)"); continue
                 }
                 let fresh = models.filter { !known.contains(ArchiveFolder.memberKey(archive: path, member: $0.path)) }
+                let stamp = archiveStamp(url)
+                // A CHANGED ARCHIVE — a newer pack saved over the old one —
+                // is a new hash: its members are read again under it, and
+                // one it no longer holds is marked gone. Without this the
+                // records kept the old hash, so the cache handed out the OLD
+                // bytes, and once it let them go the member never opened again.
+                var hash: String?
+                var hashed = false
+                if !lockedAll, let was = indexed[path], was.hash != nil,
+                   mayHaveChanged(was, bytes: stamp.bytes, modified: stamp.modified) {
+                    hash = await PinWork.run { (try? LibraryImport.contentHash(of: url)) ?? nil }
+                    hashed = true
+                    if let hash {
+                        await refreshChanged(was, archive: url, now: hash, stamp: stamp, models: models,
+                                             storeURL: storeURL, engine: engine, cache: cache,
+                                             owns: owns, whoHasIt: whoHasIt, scan: &scan)
+                    }
+                }
                 guard !fresh.isEmpty else { continue }
                 // The archive's own hash keys the cache: read once, here.
-                let hash = lockedAll ? nil : await PinWork.run { (try? LibraryImport.contentHash(of: url)) ?? nil }
+                if !hashed, !lockedAll { hash = await PinWork.run { (try? LibraryImport.contentHash(of: url)) ?? nil } }
+                let archiveHash = hash
                 let group = archiveGroup(url, under: root)
                 for member in fresh {
                     if stopped() { break }
                     var id = Shop.uid("PF")
                     while !ids.insert(id).inserted { id = Shop.uid("PF") }
-                    let ref = LibraryImport.ArchiveRef(path: path, member: member, hash: hash)
+                    var ref = LibraryImport.ArchiveRef(path: path, member: member, hash: hash)
+                    ref.bytes = stamp.bytes
+                    ref.modified = stamp.modified
                     if lockedAll || member.encrypted || hash == nil {
                         held.append(LibraryImport.prepareLocked(ref, libraryRoot: libraryRoot, group: group, id: id))
                         scan.locked += 1
                         continue
                     }
                     let copy: Result<URL, Error> = await PinWork.run {
-                        Result { try ArchiveMembers.materialise(member, of: url, archiveHash: hash ?? "", cache: cache) }
+                        Result { try ArchiveMembers.materialise(member, of: url, archiveHash: archiveHash ?? "", cache: cache) }
                     }
                     do {
                         let file = try copy.get()
@@ -243,6 +319,62 @@ extension Shop {
         }
         await writeHeld()
         return scan
+    }
+
+    /// An indexed archive whose bytes may have changed, hashed again: under a
+    /// NEW hash, each member it still holds is extracted and read again
+    /// (`readDownloaded` / `applyDownloaded`, as Measure does — the shop's
+    /// own fields are never replaced) and re-keyed; a member it no longer
+    /// holds is marked `archiveGone`. Under the SAME hash only the size and
+    /// time are kept, so the next scan does not read it again. One write.
+    static func refreshChanged(_ was: IndexedArchive, archive url: URL, now hash: String,
+                               stamp: (bytes: Int, modified: Double?), models: [ArchiveFolder.Member],
+                               storeURL: URL, engine: KhaytEngine, cache: ArchiveMembers.Cache,
+                               owns: @escaping @Sendable () -> Bool,
+                               whoHasIt: @escaping @Sendable () -> String?,
+                               scan: inout ArchiveScan) async {
+        // lock: callers — indexArchives
+        let changed = hash != was.hash
+        var reads: [String: DownloadedRead] = [:]
+        var present: Set<String> = []
+        if changed {
+            let byPath = Dictionary(models.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
+            for (id, name) in was.members {
+                guard let member = byPath[name] else { continue }
+                present.insert(id)
+                let copy: Result<URL, Error> = await PinWork.run {
+                    Result { try ArchiveMembers.materialise(member, of: url, archiveHash: hash, cache: cache) }
+                }
+                guard let file = try? copy.get() else { continue }
+                if let read = try? await readDownloaded(file: file, pictures: nil, engine: engine) { reads[id] = read }
+            }
+        } else {
+            present = Set(was.members.map(\.id))
+        }
+        let ids = Set(was.members.map(\.id))
+        let held = present, filled = reads
+        do {
+            try await StoreWriter.updateOffMain(storeURL: storeURL, owns: owns, whoHasIt: whoHasIt) { book in
+                var rows = Shop.rows(book, "printFiles")
+                for (i, row) in rows.enumerated() {
+                    guard case .object(var o) = row, let id = Shop.recordId(row), ids.contains(id) else { continue }
+                    o["archiveBytes"] = .number(Double(stamp.bytes))
+                    if let m = stamp.modified { o["archiveModified"] = .number(m) }
+                    if held.contains(id) {
+                        o["archiveHash"] = .string(hash)
+                        o.removeValue(forKey: "archiveGone")
+                    } else {
+                        o["archiveGone"] = .bool(true)
+                    }
+                    rows[i] = .object(o)
+                }
+                book["printFiles"] = .array(rows)
+                if !filled.isEmpty { _ = Shop.applyDownloaded(filled, to: &book) }
+            }
+            if changed { scan.refreshed += present.count; scan.gone += ids.count - present.count }
+        } catch {
+            scan.failures.append("\(url.lastPathComponent): \(error)")
+        }
     }
 
     /// The group an archive's models are filed in: the folders it sits in

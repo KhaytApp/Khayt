@@ -901,7 +901,11 @@ struct WindowSheets: ViewModifier {
             .shopSheet(isPresented: $shop.addingMachine) { MachineSheet(shop: shop, existing: nil) }
             // A model downloaded from a page saved with Save to Khayt: asked,
             // never added on its own (`WebAttachPrompt`).
-            .shopSheet(item: $webInbox.offer) { WebAttachPrompt(shop: shop, offer: $0) }
+            // Not on `Shop`, so `dismissEverySheet` cannot close it: it is
+            // held back instead while the person at the Mac may not edit the
+            // library (the lock came down), and asked again once one may.
+            .shopSheet(item: Binding(get: { shop.lockAllows("inventory", "edit") ? webInbox.offer : nil },
+                                     set: { webInbox.offer = $0 })) { WebAttachPrompt(shop: shop, offer: $0) }
     }
 }
 

@@ -38,6 +38,10 @@ public enum LibraryHealth {
         case online
         /// Neither: the record names a file this Mac cannot find.
         case missing
+        /// Cannot be asked: the drive, share or folder the file lives on is
+        /// not connected right now. Not missing — nothing may be removed for
+        /// it — and asked again when a volume comes back.
+        case unreachable
         /// Not asked — no library folder to look in (the sample book).
         case unknown
         /// Saved from a web page and never downloaded: there is no file to be
@@ -127,6 +131,7 @@ public enum LibraryHealth {
 
     public enum Kind: String, Sendable, CaseIterable, Equatable {
         case missing
+        case unreachable
         case onlineUnmeasured
         case noFigures
         case sameFile
@@ -189,8 +194,9 @@ public enum LibraryHealth {
             }
             out[i].archives = order.map { MissingArchive(path: $0, modelIds: held[$0] ?? []) }
         }
+        add(.unreachable, live.filter { $0.presence == .unreachable }.map(\.id))
         add(.onlineUnmeasured, live.filter { $0.presence == .online && !$0.hasFigures }.map(\.id))
-        add(.noFigures, live.filter { ![.online, .missing, .web].contains($0.presence) && !$0.hasFigures }.map(\.id))
+        add(.noFigures, live.filter { ![.online, .missing, .unreachable, .web].contains($0.presence) && !$0.hasFigures }.map(\.id))
         let (same, looks) = duplicates(live)
         add(.sameFile, same.flatMap { $0 }, clusters: same)
         add(.looksSame, looks.flatMap { $0 }, clusters: looks)

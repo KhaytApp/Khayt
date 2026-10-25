@@ -134,8 +134,9 @@ struct WebSaveHostTests {
         let stop = Date().addingTimeInterval(5)
         let app = Thread {
             while Date() < stop {
-                if let file = WebInbox.pending(in: inbox).first, let data = WebInbox.claim(file),
-                   let e = try? WebSave.entry(fromInboxFile: data) {
+                if let file = WebInbox.pending(in: inbox).first, let claimed = WebInbox.claim(file),
+                   let e = try? WebSave.entry(fromInboxFile: claimed.data) {
+                    WebInbox.finish(claimed)
                     try? WebInbox.answer(.init(id: e.id, state: .saved, title: "Bin"), inbox: inbox)
                     return
                 }
@@ -295,6 +296,11 @@ struct WebSaveHostTests {
         #expect(!WebDownloads.isOfferable(link.path, home: home))
         #expect(!WebDownloads.isOfferable(dl.appending(path: "../../\(outside.lastPathComponent)").path, home: home))
         #expect(!WebDownloads.isOfferable("Downloads/x.stl", home: home))
+        // A FOLDER in Downloads that links outside home: the file under it
+        // is outside home, whatever its spelled path says.
+        let away = dl.appending(path: "away", directoryHint: .isDirectory)
+        try FileManager.default.createSymbolicLink(at: away, withDestinationURL: outside.deletingLastPathComponent())
+        #expect(!WebDownloads.isOfferable(away.appending(path: outside.lastPathComponent).path, home: home))
     }
 
     // MARK: - Attaching to the record

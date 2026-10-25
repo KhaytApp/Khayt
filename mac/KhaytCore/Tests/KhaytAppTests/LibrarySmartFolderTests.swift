@@ -323,6 +323,19 @@ struct LibrarySmartFolderTests {
         for _ in 0..<10 { _ = rows.map { shop.libraryCount($0.query) } }
         #expect(shop.libraryMemo.work.queryCounts == before)
     }
+
+    @Test("a range figure: a comma grouping thousands is not a decimal point, in either language's digits")
+    func rangeNumbers() {
+        #expect(RangeNumber.parse("1,000") == 1000)
+        #expect(RangeNumber.parse("1,000.5") == 1000.5)
+        #expect(RangeNumber.parse("1,000,000") == 1_000_000)
+        #expect(RangeNumber.parse("1,5") == 1.5)
+        #expect(RangeNumber.parse("0,125") == 0.125)
+        #expect(RangeNumber.parse("12.5") == 12.5)
+        #expect(RangeNumber.parse("\u{0661}\u{066C}\u{0660}\u{0660}\u{0660}") == 1000)
+        #expect(RangeNumber.parse("\u{0661}\u{066B}\u{0665}") == 1.5)
+        #expect(RangeNumber.parse("") == nil && RangeNumber.parse("abc") == nil && RangeNumber.parse("-3") == nil)
+    }
 }
 
 extension LibraryEditPerfTests {

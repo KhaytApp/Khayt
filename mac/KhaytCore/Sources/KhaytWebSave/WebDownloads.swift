@@ -47,10 +47,18 @@ public enum WebDownloads {
     /// Whether `path` may be offered at all: absolute, inside `home`, a
     /// model kind, and — read from the item itself, not where a link points —
     /// a plain file that is not empty.
+    ///
+    /// Inside `home` by its REAL path as well: a folder in Downloads that is
+    /// a link to somewhere else does not make a file there one of the shop's
+    /// downloads (`resolvingSymlinksInPath`, both sides).
     public static func isOfferable(_ path: String, home: URL) -> Bool {
         let url = URL(fileURLWithPath: path).standardizedFileURL
         let homePath = home.standardizedFileURL.path
-        guard path.hasPrefix("/"), url.path.hasPrefix(homePath.hasSuffix("/") ? homePath : homePath + "/"),
+        let realHome = home.standardizedFileURL.resolvingSymlinksInPath().path
+        let real = url.deletingLastPathComponent().resolvingSymlinksInPath()
+            .appending(path: url.lastPathComponent).path
+        func inside(_ p: String, _ h: String) -> Bool { p.hasPrefix(h.hasSuffix("/") ? h : h + "/") }
+        guard path.hasPrefix("/"), inside(url.path, homePath), inside(real, realHome),
               WebSave.isModelFile(url.path),
               let v = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]),
               v.isRegularFile == true, v.isSymbolicLink != true, (v.fileSize ?? 0) > 0 else { return false }

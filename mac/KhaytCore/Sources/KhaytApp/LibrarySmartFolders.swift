@@ -162,11 +162,33 @@ private struct RangeNumberField: View {
     }
 
     /// A typed figure, or nil for empty or not a number.
-    static func number(_ typed: String) -> Double? {
+    static func number(_ typed: String) -> Double? { RangeNumber.parse(typed) }
+}
+
+/// A figure typed into a range field, in either language's digits.
+enum RangeNumber {
+
+    /// `1.5`, `1,5` and `١٫٥` are one and a half; `1,000`, `1,000.5` and
+    /// `١٬٠٠٠` are a thousand (and a half). A comma is a decimal point only
+    /// when there is no other point and it is not grouping three digits —
+    /// `1,000` read as 1 made a grams range of "from 1,000" mean "from 1".
+    static func parse(_ typed: String) -> Double? {
+        let chars = Array(typed.trimmingCharacters(in: .whitespaces))
+        let hasPoint = chars.contains { $0 == "." || $0 == "\u{066B}" }
         var out = ""
-        for ch in typed.trimmingCharacters(in: .whitespaces) {
+        for (i, ch) in chars.enumerated() {
             if let v = ch.wholeNumberValue { out.append(String(v)) }
-            else if ch == "." || ch == "," || ch == "\u{066B}" { out.append(".") }
+            else if ch == "\u{066C}" { continue }
+            else if ch == "." || ch == "\u{066B}" { out.append(".") }
+            else if ch == "," {
+                if hasPoint { continue }
+                let rest = chars[(i + 1)...]
+                let digits = rest.prefix { $0.wholeNumberValue != nil }.count
+                let grouping = digits == 3 && (rest.count == 3 || rest[rest.startIndex + 3] == ",")
+                    && out.contains { $0 != "0" && $0 != "-" }
+                if grouping { continue }
+                out.append(".")
+            }
             else if ch == "-" { out.append("-") }
             else { return nil }
         }

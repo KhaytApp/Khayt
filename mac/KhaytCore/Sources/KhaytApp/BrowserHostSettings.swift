@@ -95,7 +95,7 @@ struct BrowserHostRows: View {
     }
 
     private func waitingForStore(_ browser: BrowserHosts.Browser) -> Bool {
-        browser.isChromium && Self.chromiumIds.isEmpty
+        browser.isChromium ? Self.chromiumIds.isEmpty : !BrowserExtensionIds.firefoxListed
     }
 
     private func statusKey(_ browser: BrowserHosts.Browser) -> String {

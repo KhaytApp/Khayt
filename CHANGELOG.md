@@ -4,6 +4,23 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: beta.7 review fixes — models in compressed files, Library Health, Save to Khayt, print notices.**
+  - A model inside a RAR, 7-Zip or tar that took more than a quarter of a second to come out failed every time ("came out as 0 bytes"), and the size cap on a member never stopped one that grew too big. The size is now read off the file as it is written. This was also the intermittent ArchiveFolderScanTests failure on CI.
+  - A compressed file saved over with a newer one is read again: its models are re-measured from the new bytes, and a model the new file no longer holds is listed as missing on its own. Before, the old copy kept being handed out, and once the cache let it go the model never opened again.
+  - Library Health no longer calls the models on a drive, network share or linked folder that is not connected "Missing", and no longer offers to remove them. They are listed as "On a drive that is not connected", with no Remove, and checked again when a drive is connected or disconnected. A library model not on this Mac while the online storage's index has not loaded yet is not called missing either.
+  - Library Health's Show now recounts the filter chips over just that group.
+  - "Locate…" for a locked model inside a compressed file accepts only a compressed file that lists that model.
+  - A Print next note is saved to the model it was typed on when the selection moves mid-edit.
+  - Save to Khayt: the popup gets its answer as soon as the page is filed; the cover picture is fetched afterwards, so a slow picture no longer makes the popup say Khayt is not open. Saves sent while Khayt was closed are no longer thrown away when Khayt opens on its sign-in screen (or on the sample): they wait until someone who may edit the library signs in. A save is removed from the waiting folder only once it is filed, so quitting mid-save loses nothing.
+  - A Klipper or Moonraker print that fails is announced once, not as "Print failed" and again as a printer fault.
+  - Smaller: the library's ⌘J "recent" uses the shop's day, not the UTC day; a range typed as "1,000" is a thousand, not 1; a deletion date that has passed says the files are being deleted now, not "today"; Upgrade treats a plan with no vault limit as the largest; VoiceOver reads the menu bar item's current figures; a download question is held back while the person at the Mac may not edit the library; a download from another page of the same site is matched to its own page first; two saves close together are both remembered.
+- **Mac: beta.7 security hardening.**
+  - A web page's cover picture is decoded only as JPEG, PNG, WebP or GIF, up to 12,000 pixels a side, and never fetched from this Mac, the shop's network or a `.local` name.
+  - A compressed file in a linked folder is handed to libarchive only when its first bytes are the kind its name says; a ZIP Khayt's own reader cannot read is refused rather than passed on. `tar` runs under `sandbox-exec` with a profile that lets it read and nothing else: no network, no files written.
+  - A page's canonical address or `og:url` counts only when it is on the same site as the tab; otherwise the tab's own address is saved. Checked in the extension and again by the app, so a mirror cannot overwrite a saved Printables or MakerWorld record.
+  - The waiting-saves folder is read without following links or opening anything but a plain file; a download is offered only when its real path is inside your home folder, under its real file name; a model taken out of a quarantined download keeps the quarantine; Safari's download questions are capped at 10 waiting.
+  - Firefox's Install waits for the store listing, as Chrome's does, until Save to Khayt is listed on addons.mozilla.org under its id.
+
 - **Mac: printer chips on library tiles, a Fits filter, and ⌘J to jump in the library.**
   - Medium and Large tiles show a row of printer chips: where the model goes on the bed, with the printers it can start on now (spools loaded) first and marked with a tick, then the ones that need a spool change, then the ones it only fits. A printer it is too big for is left off; too big for every printer is one red chip. Past the tile's width the rest fold into "+N", and every printer is on the hover. Laser and UV beds are never listed. Small tiles show no chips.
   - The chips are the model page's own "Where it can print" answer, worked out once per model per change to the library, the printers or their spools — never again because the grid redrew.

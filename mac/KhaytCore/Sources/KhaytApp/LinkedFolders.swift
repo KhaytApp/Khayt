@@ -185,6 +185,7 @@ extension Shop {
         let externals = files.compactMap(\.externalPath) + Array(notAdopted)
         // An archive's members by `memberKey` — indexed, or deleted since.
         let knownMembers = Set(files.compactMap(\.archiveKey)).union(notAdopted)
+        let indexedArchives = Self.indexedArchives(files)
         let vaults = roots.roots + [roots.primary]
 
         // THE WALK, metadata only, on a dispatch queue (`PinWork`) — not a
@@ -233,7 +234,8 @@ extension Shop {
         if !packs.isEmpty, !stopped() {
             archived = await Self.indexArchives(packs, known: knownMembers, storeURL: build.storeURL,
                                                 libraryRoot: URL(fileURLWithPath: roots.primary), engine: engine,
-                                                isOnline: linkedIsOnline, owns: owns, whoHasIt: who, stop: stop)
+                                                isOnline: linkedIsOnline, owns: owns, whoHasIt: who, stop: stop,
+                                                indexed: indexedArchives)
         }
         // Reloaded only when something above wrote to the book.
         await reloadIfWritten(since: &bookAt)

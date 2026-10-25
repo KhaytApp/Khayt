@@ -26,6 +26,8 @@ export async function askKhayt(api, message, tabId) {
 }
 
 /** The message a save is: the page as read, and the format's version. */
-export function saveMessage(page) {
-  return { v: 1, kind: 'save', page };
+export function saveMessage(page, tabUrl) {
+  // The tab's own address beside the page's claim, so the app can make the
+  // same same-site check (`WebSave.page`) without trusting this end.
+  return { v: 1, kind: 'save', page: tabUrl ? { ...page, tabUrl: String(tabUrl) } : page };
 }

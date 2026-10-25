@@ -57,6 +57,91 @@ struct LibraryHealthAppTests {
             .values.allSatisfy { $0 == .unknown })
     }
 
+    static func record(_ id: String, external: String) throws -> LibraryFile {
+        let row: JSONValue = .object(["id": .string(id), "name": .string(id), "title": .string(id),
+                                      "externalPath": .string(external)])
+        return try JSONDecoder().decode(LibraryFile.self, from: JSONEncoder().encode(row))
+    }
+
+    @Test("a linked folder that is gone (an unplugged drive) is unreachable, not missing, and comes back once it is there")
+    func unpluggedIsNotMissing() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "khayt-lh-\(UUID().uuidString)")
+        let linked = dir.appending(path: "Drive"), vault = dir.appending(path: "Library")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        for d in [linked, vault] { try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true) }
+        try Data("solid".utf8).write(to: linked.appending(path: "here.stl"))
+        try Data("x".utf8).write(to: vault.appending(path: ".keep"))
+        let here = try Self.record("PF-here", external: linked.appending(path: "here.stl").path)
+        let gone = try Self.record("PF-gone", external: linked.appending(path: "gone.stl").path)
+        func ask() -> [String: LibraryHealth.Presence] {
+            Shop.healthPresence([here, gone], roots: [vault.path], online: [], linkedRoots: [linked.path],
+                                linkedOnline: { _ in false })
+        }
+        // Connected: the file that is there is here, the one that is not is missing.
+        #expect(ask() == ["PF-here": .here, "PF-gone": .missing])
+
+        // The drive goes away: nothing on it is called missing, and the
+        // groups offer no Remove (`.missing` holds none of them).
+        let away = dir.appending(path: "Away")
+        try FileManager.default.moveItem(at: linked, to: away)
+        #expect(ask() == ["PF-here": .unreachable, "PF-gone": .unreachable])
+        let groups = LibraryHealth.groups(models: [here, gone].map { Shop.healthModel($0, presence: ask()[$0.id]!) })
+        #expect(groups.contains { $0.kind == .missing } == false)
+        #expect(Set(groups.first { $0.kind == .unreachable }?.modelIds ?? []) == ["PF-here", "PF-gone"])
+        #expect(groups.contains { $0.kind == .noFigures } == false, "an unreachable model was offered Measure")
+        // An empty mount point left behind is not the drive either.
+        try FileManager.default.createDirectory(at: linked, withIntermediateDirectories: true)
+        #expect(ask()["PF-gone"] == .unreachable)
+
+        // Back: as it was.
+        try FileManager.default.removeItem(at: linked)
+        try FileManager.default.moveItem(at: away, to: linked)
+        #expect(ask() == ["PF-here": .here, "PF-gone": .missing])
+    }
+
+    @Test("a vault model is unreachable while its library folder is away, and unknown before the sync index loads")
+    func vaultRootAway() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "khayt-lh-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let vault = dir.appending(path: "Library")
+        let row: JSONValue = .object(["id": .string("PF-vault"), "name": .string("v"), "title": .string("v")])
+        let file = try JSONDecoder().decode(LibraryFile.self, from: JSONEncoder().encode(row))
+        func ask(pending: Bool = false) -> LibraryHealth.Presence? {
+            Shop.healthPresence([file], roots: [vault.path], online: [], indexPending: pending,
+                                linkedOnline: { _ in false })["PF-vault"]
+        }
+        #expect(ask() == .unreachable)
+        try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: vault.appending(path: ".keep"))
+        #expect(ask() == .missing)
+        #expect(ask(pending: true) == .unknown)
+    }
+
+    @Test("the unreachable group's words have English and Arabic")
+    func unreachableWords() {
+        for key in ["mac.lh_unreachable", "mac.lh_unreachable_says"] {
+            #expect(Words.own[key]?["en"]?.isEmpty == false)
+            #expect(Words.own[key]?["ar"]?.isEmpty == false)
+        }
+    }
+
+    @Test("a Health Show from a clean library recounts the chips over just the group")
+    func showRecountsChips() async throws {
+        let shop = await Self.sampleWithProblems()
+        shop.shelf = .library(nil)
+        shop.recountLibrarySoon()
+        await shop.settleLibraryFacets()
+        let whole = shop.libraryFacets.neverPrinted
+        await shop.checkLibraryHealth()
+        let missing = try #require(shop.libraryHealthGroups?.first { $0.kind == .missing })
+        shop.showHealthGroup(missing)
+        await shop.settleLibraryFacets()
+        #expect(shop.libraryFacets.neverPrinted <= missing.count)
+        #expect(shop.libraryFacets.neverPrinted != whole, "the chips kept counting the whole library")
+        shop.clearLibraryFilter()
+        shop.pretendHealthPresence = nil
+    }
+
     // MARK: - Remove from Library: the existing question, the exact count
 
     @Test("Remove asks the library's own delete question about exactly the group, models in folders counted")

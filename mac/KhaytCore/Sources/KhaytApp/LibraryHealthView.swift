@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import KhaytCore
 
@@ -51,6 +52,14 @@ struct LibraryHealthView: View {
         // Again whenever the book changes: `files` is observed, and its
         // revision (not observed itself) tells one load from the next.
         .task(id: "\(shop.files.count)|\(shop.filesRevision)") { await shop.checkLibraryHealth() }
+        // And when a drive, share or card comes or goes: a model on it is
+        // unreachable while it is away and back where it was once it returns.
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didMountNotification)) { _ in
+            Task { await shop.checkLibraryHealth() }
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didUnmountNotification)) { _ in
+            Task { await shop.checkLibraryHealth() }
+        }
         .confirmationDialog(w.callIt("mac.measure_online_q"), isPresented: $askMeasureOnline) {
             Button(w.callIt("mac.measure_online")) { Task { await shop.measureOnlineFromHealth() } }
             Button(w.callIt("common.cancel"), role: .cancel) {}
@@ -215,6 +224,12 @@ struct LibraryHealthView: View {
                     shop.askToRemoveHealthGroup(group)
                 }
                 .disabled(!shop.canWrite)
+            case .unreachable:
+                // Never Remove: the files are very likely all there, on a
+                // drive that is not plugged in.
+                Button(w.callIt("mac.lh_show")) { shop.showHealthGroup(group) }
+                Button(w.callIt("mac.lh_check_again")) { Task { await shop.checkLibraryHealth() } }
+                    .disabled(shop.libraryHealthBusy)
             case .onlineUnmeasured:
                 if shop.onlineUnmeasured.count == 0 {
                     // In the bucket, not a linked drive: nothing here can
@@ -261,6 +276,9 @@ struct LibraryHealthView: View {
         switch kind {
         case .missing:
             Look(symbol: "questionmark.folder", title: "mac.lh_missing", sentence: "mac.lh_missing_says", rail: Khayt.late)
+        case .unreachable:
+            Look(symbol: "externaldrive.badge.xmark", title: "mac.lh_unreachable", sentence: "mac.lh_unreachable_says",
+                 rail: Khayt.attention)
         case .onlineUnmeasured:
             Look(symbol: "icloud.slash", title: "mac.lh_online", sentence: "mac.lh_online_says", rail: Khayt.attention)
         case .noFigures:

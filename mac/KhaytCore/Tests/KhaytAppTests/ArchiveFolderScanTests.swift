@@ -198,11 +198,17 @@ struct ArchiveFolderScanTests {
         #expect(rig.cache.bytes() == 0)
         let file = try Self.decoded(o)
         #expect(file.isLocked && Shop.archiveCopy(of: file, cache: rig.cache) == nil)
-        // libarchive, asked directly, refuses at once rather than prompting.
-        #expect(throws: ArchiveMembers.Failure.locked) {
+        // libarchive, asked directly, refuses at once rather than prompting —
+        // asked through a zip-kind it reads itself only when the app's own
+        // reader cannot stream the member; a zip under a RAR's name is not
+        // let near libarchive at all (`bytesMatch`).
+        #expect(throws: ArchiveMembers.Failure.unreadable("it is not the kind of file its name says")) {
             try ArchiveMembers.extract(.init(path: "a.stl", size: nil), from: Self.renamed(zip, to: "Secret.rar"),
                                        to: rig.cache.url(key: "x", leaf: "a.stl"), cap: 1 << 20)
         }
+        let said = try ArchiveMembers.runTar(["-x", "-O", "-f", zip.path, "--passphrase", ArchiveMembers.noPassphrase,
+                                              "--", "a.stl"], timeout: 30, keepOut: 1 << 20, every: 0.25)
+        #expect(said.status != 0 && ArchiveFolder.saysLocked(String(decoding: said.stderr, as: UTF8.self)))
     }
 
     @Test("a symlink wearing a model's name is not a model, and is never followed")
@@ -316,6 +322,127 @@ struct ArchiveFolderScanTests {
             #expect(Words.own[key]?["en"]?.isEmpty == false, "\(key) has no English")
             #expect(Words.own[key]?["ar"]?.isEmpty == false, "\(key) has no Arabic")
         }
+    }
+
+    @Test("libarchive gets only the kind the name says, never a zip the app refused, and runs where it cannot write")
+    func libarchiveIsCaged() async throws {
+        let rig = try Self.rig()
+        defer { rig.tidy() }
+        let tgz = rig.linked.appending(path: "Bits.tar.gz")
+        try Self.pack(["b.stl": Self.stl(10)], into: tgz, format: nil)
+        // The same bytes under a RAR's name: refused before libarchive reads them.
+        let liar = try Self.renamed(tgz, to: "Bits.rar")
+        #expect(throws: ArchiveMembers.Failure.unreadable("it is not the kind of file its name says")) {
+            _ = try ArchiveMembers.list(liar)
+        }
+        // A "zip" its own reader cannot read is not handed on to libarchive
+        // (which would read this tar happily).
+        let notZip = try Self.renamed(tgz, to: "Bits.zip")
+        #expect(throws: ArchiveMembers.Failure.unreadable("the zip could not be read")) {
+            _ = try ArchiveMembers.list(notZip)
+        }
+        // Honest names still open.
+        #expect(try ArchiveMembers.list(tgz).contains { $0.path.hasSuffix("b.stl") })
+        // And tar, run the way the app runs it, cannot make a file.
+        if FileManager.default.isExecutableFile(atPath: ArchiveMembers.sandboxExec) {
+            let out = rig.bench.dir.appending(path: "unpacked")
+            try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+            let ran = try ArchiveMembers.runTar(["-x", "-f", tgz.path, "-C", out.path], timeout: 30,
+                                                keepOut: 1 << 20, every: 0.25)
+            #expect(ran.status != 0)
+            #expect(((try? FileManager.default.contentsOfDirectory(atPath: out.path)) ?? []).isEmpty,
+                    "tar wrote a file from inside its cage")
+        }
+        #expect(ArchiveFolder.bytesMatch(kind: "tar", header: [UInt8](repeating: 0, count: 257) + Array("ustar".utf8)))
+        #expect(!ArchiveFolder.bytesMatch(kind: "7z", header: [0x52, 0x61, 0x72, 0x21, 0x1A, 0x07]))
+    }
+
+    @Test("a member of a quarantined download comes out quarantined")
+    func quarantineCarried() throws {
+        let rig = try Self.rig()
+        defer { rig.tidy() }
+        let tgz = rig.linked.appending(path: "Download.tgz")
+        try Self.pack(["m.stl": Self.stl(10)], into: tgz, format: nil)
+        let mark = Array("0083;6720f000;Safari;".utf8)
+        #expect(setxattr(tgz.path, ArchiveMembers.quarantineKey, mark, mark.count, 0, 0) == 0)
+        let dest = rig.cache.url(key: "q", leaf: "m.stl")
+        try ArchiveMembers.extract(.init(path: "./m.stl", size: Self.stl(10).count), from: tgz, to: dest, cap: 1 << 20)
+        var got = [UInt8](repeating: 0, count: 64)
+        let n = getxattr(dest.path, ArchiveMembers.quarantineKey, &got, got.count, 0, 0)
+        #expect(n == mark.count && Array(got.prefix(max(n, 0))) == mark)
+    }
+
+    @Test("an archive saved over with a newer pack is read again under its new hash; a member it lost is gone")
+    func changedArchive() async throws {
+        let rig = try Self.rig()
+        defer { rig.tidy() }
+        let seven = rig.linked.appending(path: "Pack.7z")
+        try Self.pack(["a.stl": Self.stl(10), "b.stl": Self.stl(12)], into: seven, format: "7zip")
+        _ = try await Self.index(rig, [seven])
+        let first = try Self.rows(rig).map(Self.decoded)
+        let oldHash = try #require(first.first?.archiveHash)
+        #expect(first.allSatisfy { $0.archiveBytes != nil && $0.archiveModified != nil })
+
+        // The same name, new bytes: a is bigger, b is gone, c is new.
+        try FileManager.default.removeItem(at: seven)
+        try Self.pack(["a.stl": Self.stl(20), "c.stl": Self.stl(14)], into: seven, format: "7zip")
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(120)], ofItemAtPath: seven.path)
+        let known = Set(first.compactMap(\.archiveKey))
+        let scan = await Shop.indexArchives([(root: rig.linked, archives: [seven])], known: known,
+                                            storeURL: rig.bench.store, libraryRoot: rig.bench.library,
+                                            engine: try KhaytEngine(), isOnline: { _ in false }, cache: rig.cache,
+                                            owns: { true }, whoHasIt: { nil },
+                                            indexed: Shop.indexedArchives(first))
+        #expect(scan.refreshed == 1 && scan.gone == 1 && scan.added == 1, "\(scan)")
+        let after = try Self.rows(rig).map(Self.decoded)
+        let a = try #require(after.first { $0.archiveMember?.hasSuffix("a.stl") == true })
+        let b = try #require(after.first { $0.archiveMember?.hasSuffix("b.stl") == true })
+        #expect(a.archiveHash != oldHash && a.archiveGone != true)
+        #expect(a.id == first.first { $0.archiveMember == a.archiveMember }?.id, "the record was replaced, not kept")
+        #expect(a.sourceFile?.size == Double(Self.stl(20).count), "the member's new size was not read")
+        #expect(b.archiveGone == true)
+        // The new bytes are what the cache hands out.
+        let copy = try #require(Shop.archiveCopy(of: a, cache: rig.cache) ?? (try? ArchiveMembers.materialise(
+            ArchiveFolder.Member(path: a.archiveMember!, size: Self.stl(20).count), of: seven,
+            archiveHash: a.archiveHash!, cache: rig.cache)))
+        #expect(try Data(contentsOf: copy) == Self.stl(20))
+        // Library Health: the lost member is missing on its own, not the archive.
+        let presence = Shop.healthPresence(after, roots: [rig.bench.library.path], online: [],
+                                           linkedOnline: { _ in false })
+        #expect(presence[b.id] == .missing && presence[a.id] == .here)
+        // Unchanged since: the next scan does not read it again.
+        let again = await Shop.indexArchives([(root: rig.linked, archives: [seven])],
+                                             known: Set(after.compactMap(\.archiveKey)),
+                                             storeURL: rig.bench.store, libraryRoot: rig.bench.library,
+                                             engine: try KhaytEngine(), isOnline: { _ in false }, cache: rig.cache,
+                                             owns: { true }, whoHasIt: { nil },
+                                             indexed: Shop.indexedArchives(after))
+        #expect(again.refreshed == 0 && again.gone == 0 && again.added == 0, "\(again)")
+    }
+
+    @Test("a member's size is read as it is on disk now, off the main thread, while bsdtar is still writing it")
+    func sizeIsNotCached() async throws {
+        let rig = try Self.rig()
+        defer { rig.tidy() }
+        let part = rig.bench.dir.appending(path: ".growing.part")
+        #expect(FileManager.default.createFile(atPath: part.path, contents: nil))
+        // The extraction thread runs no run loop, so a URL resource-value
+        // cache read at the first watch poll would never be cleared: the old
+        // `size(of:)` read 0 here before and after the write.
+        let sizes: (before: Int, after: Int, handle: Int) = await withCheckedContinuation { done in
+            DispatchQueue.global().async {
+                let out = try! FileHandle(forWritingTo: part)
+                let before = ArchiveMembers.size(of: part)
+                try! out.write(contentsOf: Data(count: 684))
+                let after = ArchiveMembers.size(of: part)
+                let handle = ArchiveMembers.size(of: out)
+                try? out.close()
+                done.resume(returning: (before, after, handle))
+            }
+        }
+        #expect(sizes.before == 0)
+        #expect(sizes.after == 684, "a size read before the write stayed cached")
+        #expect(sizes.handle == 684)
     }
 
     // MARK: - Bytes

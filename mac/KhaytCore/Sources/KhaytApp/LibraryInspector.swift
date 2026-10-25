@@ -1379,6 +1379,12 @@ struct PrintNextRow: View {
     let shop: Shop
     let file: LibraryFile
     @State private var typed = ""
+    /// The model `typed` was loaded from, and what its note said then. The
+    /// row is not rebuilt when the inspector moves to another model, so an
+    /// edit is saved to the model it was typed on — never the one shown now,
+    /// and never dropped because the selection moved first.
+    @State private var typedFor: String?
+    @State private var loaded = ""
     @FocusState private var editing: Bool
 
     private var w: Words { shop.words }
@@ -1404,17 +1410,24 @@ struct PrintNextRow: View {
                 }
             }
         }
-        .onAppear { typed = file.printNextFor ?? "" }
-        .onChange(of: file.id) { _, _ in typed = file.printNextFor ?? "" }
-        .onChange(of: file.printNextFor) { _, now in if !editing { typed = now ?? "" } }
+        .onAppear(perform: load)
+        .onChange(of: file.id) { _, _ in save(); load() }
+        .onChange(of: file.printNextFor) { _, _ in if !editing { load() } }
         // Kept when the field is left as well as on Return.
         .onChange(of: editing) { _, now in if !now { save() } }
     }
 
+    private func load() {
+        typed = file.printNextFor ?? ""
+        loaded = typed
+        typedFor = file.id
+    }
+
     private func save() {
         let now = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard now != (file.printNextFor ?? "").trimmingCharacters(in: .whitespacesAndNewlines) else { return }
-        shop.setPrintNextNote(file.id, now)
+        guard let id = typedFor, now != loaded.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+        shop.setPrintNextNote(id, now)
+        loaded = now
     }
 }
 
