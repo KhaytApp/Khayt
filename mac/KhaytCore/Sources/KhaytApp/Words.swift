@@ -3287,7 +3287,7 @@ final class Words {
         "mac.no_customer": ["en": "No customer selected", "ar": "لم يُختر عميل"],
         "mac.no_customer_hint": ["en": "Pick a row to see their jobs and their balance.", "ar": "اختر صفاً لعرض أعماله ورصيده."],
         "mac.models_count": ["en": "models", "ar": "نموذجًا"],
-        "mac.models_count_few": ["en": "models", "ar": "{n} نماذج"],
+        "mac.models_count_few": ["en": "{n} models", "ar": "{n} نماذج"],
         "mac.customers_count": ["en": "customers", "ar": "عملاء"],
         // One of a thing. English needs the singular and Arabic reads better
         // with it, and the window said "1 machines" until it had one.
