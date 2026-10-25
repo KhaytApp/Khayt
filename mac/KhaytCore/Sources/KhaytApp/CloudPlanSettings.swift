@@ -180,9 +180,9 @@ struct CloudPlanSettings: View {
 
     private var betaNote: String {
         if let end = state.mine?.beta?.graceEndsAt, !end.isEmpty {
-            return shop.words.callIt("mac.plan_grace_until", ["day": .string(Calendar.localDay(ofInstant: end))])
+            return shop.words.callIt("mac.plan_grace_until", ["day": .string(Calendar.localDay(ofInstant: end)), "lapse": .number(90)])
         }
-        return shop.words.callIt("mac.plan_beta_free", ["days": .number(Double(graceDays))])
+        return shop.words.callIt("mac.plan_beta_free", ["days": .number(Double(graceDays)), "lapse": .number(90)])
     }
 
     private func confirmText(_ plan: CloudPlans.Plan) -> String {
@@ -192,7 +192,7 @@ struct CloudPlanSettings: View {
             guard Self.losesSelling(plan, from: current) else { return note }
             return note + "\n\n" + shop.words.callIt("mac.plan_move_down_selling")
         }
-        return shop.words.callIt("mac.plan_beta_free", ["days": .number(Double(graceDays))])
+        return shop.words.callIt("mac.plan_beta_free", ["days": .number(Double(graceDays)), "lapse": .number(90)])
     }
 
     // MARK: - Asking the cloud

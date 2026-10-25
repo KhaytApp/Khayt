@@ -1542,10 +1542,10 @@ final class Words {
         "mac.plan_move": ["en": "Move to this plan", "ar": "الانتقال إلى هذه الخطة"],
         "mac.plan_move_title": ["en": "Move to {plan}?", "ar": "الانتقال إلى {plan}؟"],
         "mac.plan_move_confirm": ["en": "Move", "ar": "انتقال"],
-        "mac.plan_beta_free": ["en": "Free during the beta. When the beta ends you have {days} days to start paying, or the shop moves back to Free. Nothing is deleted; over Free’s limits the vault becomes read-only.",
-          "ar": "مجاناً أثناء النسخة التجريبية. وحين تنتهي يكون لديك {days} يوماً لبدء الدفع، وإلا تعود المطبعة إلى الخطة المجانية. ولا يُحذف شيء؛ وتصبح الخزنة للقراءة فقط فيما يتجاوز حدود الخطة المجانية."],
-        "mac.plan_grace_until": ["en": "The beta has ended. This plan stays until {day}; start paying before then, or the shop moves back to Free. Nothing is deleted.",
-          "ar": "انتهت النسخة التجريبية. تبقى هذه الخطة حتى {day}؛ ابدأ الدفع قبل ذلك، وإلا تعود المطبعة إلى الخطة المجانية. ولا يُحذف شيء."],
+        "mac.plan_beta_free": ["en": "Free during the beta. When the beta ends you have {days} days to start paying, or the shop moves back to Free. Over Free’s limits the vault becomes read-only; if it still holds too much {lapse} days later, files are deleted until it fits (Khayt emails you the date first).",
+          "ar": "مجاناً أثناء النسخة التجريبية. وحين تنتهي يكون لديك {days} يوماً لبدء الدفع، وإلا تعود المطبعة إلى الخطة المجانية. وتصبح الخزنة للقراءة فقط فيما يتجاوز حدود الخطة المجانية؛ فإن بقيت تحوي أكثر من اللازم بعد {lapse} يوماً، حُذفت ملفات حتى تتّسع (ويراسلك خيط بالتاريخ أولاً)."],
+        "mac.plan_grace_until": ["en": "The beta has ended. This plan stays until {day}; start paying before then, or the shop moves back to Free. Over Free’s limits the vault then becomes read-only, and files still over the limit {lapse} days later are deleted.",
+          "ar": "انتهت النسخة التجريبية. تبقى هذه الخطة حتى {day}؛ ابدأ الدفع قبل ذلك، وإلا تعود المطبعة إلى الخطة المجانية. وتصبح الخزنة حينها للقراءة فقط فيما يتجاوز حدودها، وتُحذف الملفات التي تبقى زائدة بعد {lapse} يوماً."],
         // khaytapp.com/terms §4 says the same (website lane, Oct 25 2026). `{days}`
         // is 90, passed as a number so the Mac's digit setting applies.
         "mac.plan_move_down_note": ["en": "If the vault holds more than this plan allows, it becomes read-only: downloads and existing links keep working, but uploads, new share links and product changes stop. Khayt emails you a date {days} days ahead; if the vault still holds too much then, files are deleted until it fits.",
