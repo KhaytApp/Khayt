@@ -72,3 +72,40 @@ test('wired: Settings asks the server, and the picker is loaded', () => {
   assert.match(read('main.js'), /ipcMain\.handle\('hub:cloud-set-plan'[\s\S]{0,200}cloudToken\(token, url\)/);
   assert.ok(read('renderer/index.html').includes('<script src="../lib/cloud-plan-picker.js"></script>'));
 });
+
+test('a move to a smaller plan shrinks the vault, whichever plan it ends on', () => {
+  const cat = { plans: [
+    { name: 'free', limits: { maxVaultBytes: 2147483648 } },
+    { name: 'maker', limits: { maxVaultBytes: 161061273600 } },
+    { name: 'studio', limits: { maxVaultBytes: 1099511627776 } },
+    { name: 'odd', limits: {} },
+  ] };
+  assert.equal(P.isSmaller(cat, 'studio', 'maker'), true);
+  assert.equal(P.isSmaller(cat, 'maker', 'free'), true);
+  assert.equal(P.isSmaller(cat, 'free', 'maker'), false);
+  assert.equal(P.isSmaller(cat, 'maker', 'maker'), false);
+  assert.equal(P.isSmaller(cat, 'maker', 'odd'), false, 'an unknown size says nothing');
+  assert.equal(P.isSmaller(cat, undefined, 'free'), false);
+  assert.equal(P.isSmaller(null, 'studio', 'maker'), false);
+});
+
+// Oct 25 (khayt-cloud #143, /terms §4): over a smaller plan's limit the vault
+// goes read-only, and files still over it 90 days after Khayt's email are
+// deleted. No plan string may still promise that nothing is deleted.
+test('every language says read-only, then deleted after {lapse} days', () => {
+  assert.equal(P.OVER_LIMIT_DELETE_DAYS, 90);
+  const dir = path.join(__dirname, '..', 'renderer', 'locales');
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.js'))) {
+    const src = fs.readFileSync(path.join(dir, f), 'utf8');
+    for (const k of ['beta_warning', 'grace_until', 'down_note']) {
+      const m = src.match(new RegExp(`"cplan\\.${k}": (".*"),$`, 'm'));
+      assert.ok(m, `${f}: cplan.${k}`);
+      assert.ok(JSON.parse(m[1]).includes('{lapse}'), `${f}: cplan.${k} names the {lapse} days`);
+    }
+  }
+  const en = fs.readFileSync(path.join(dir, 'en.js'), 'utf8');
+  assert.doesNotMatch(en.split('\n').filter((l) => l.includes('"cplan.')).join('\n'), /Nothing is deleted/i);
+  const settings = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'settings.js'), 'utf8');
+  assert.match(settings, /KhaytCloudPlanPicker\.isSmaller\(cat, billing && billing\.plan, name\)/);
+  assert.match(settings, /t\('cplan\.down_note', \{ lapse \}\)/);
+});

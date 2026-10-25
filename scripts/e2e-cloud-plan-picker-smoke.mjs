@@ -72,11 +72,11 @@ try {
   c = await cards();
   ok(c.maker.pick && /free during the beta/i.test(c.maker.btn), `with upgrades open, Maker offers "${c.maker.btn}"`);
   const note = await window.evaluate(() => document.getElementById('cloudPlanPickNote').innerText);
-  ok(/30 days to start paying/.test(note) && /Nothing is deleted/.test(note) && /read-only/.test(note), 'the beta warning is on the card, in the Mac pane\'s words');
+  ok(/30 days to start paying/.test(note) && /read-only/.test(note) && /90 days later, files are deleted/.test(note) && !/Nothing is deleted/.test(note), 'the beta warning is on the card, in the Mac pane\'s words (read-only, then deleted after 90 days)');
   await window.click('#cloudPlanCards [data-plan-pick="maker"]');
   await window.waitForSelector('.confirm-modal-overlay [data-act="ok"]');
   const ask = await window.evaluate(() => document.querySelector('.confirm-modal-overlay .modal').innerText);
-  ok(/Move this shop to Maker\?/.test(ask) && /30 days to start paying/.test(ask), 'upgrading asks first, with the warning');
+  ok(/Move this shop to Maker\?/.test(ask) && /30 days to start paying/.test(ask) && !/more than this plan allows/.test(ask), 'upgrading asks first, with the warning (and no shrink note: Maker is bigger)');
   await window.click('.confirm-modal-overlay [data-act="ok"]');
   await window.waitForFunction(() => /Your plan/.test(document.querySelector('#cloudPlanCards [data-plan-card="maker"]')?.innerText || ''), null, { timeout: 10000 });
   c = await cards();
@@ -87,7 +87,7 @@ try {
   await window.click('#cloudPlanCards [data-plan-pick="free"]');
   await window.waitForSelector('.confirm-modal-overlay [data-act="ok"]');
   const downAsk = await window.evaluate(() => document.querySelector('.confirm-modal-overlay .modal').innerText);
-  ok(/Nothing is deleted/.test(downAsk) && /Existing links keep working/.test(downAsk) && !/makerrun/.test(downAsk), 'going back to Free asks, and says what stops (nothing deleted; no selling note from Maker)');
+  ok(/becomes read-only/.test(downAsk) && /existing links keep working/.test(downAsk) && /a date 90 days ahead/.test(downAsk) && /files are deleted until it fits/.test(downAsk) && !/Nothing is deleted/.test(downAsk) && !/makerrun/.test(downAsk), 'going back to Free asks, and says read-only now, deleted after the emailed date (no selling note from Maker)');
   await window.click('.confirm-modal-overlay [data-act="ok"]');
   await window.waitForFunction(() => /Your plan/.test(document.querySelector('#cloudPlanCards [data-plan-card="free"]')?.innerText || ''), null, { timeout: 10000 });
   ok(true, 'back on Free');

@@ -4,6 +4,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: the Khayt Cloud plan picker says what happens to vault files over a smaller plan's limit.**
+  - It used to say "Nothing is deleted". Now, in all 9 languages, it says the vault becomes read-only over the new limit. Downloads and existing links keep working, but uploads, new share links and product changes stop. Khayt emails a date 90 days ahead, and files still over the limit then are deleted until the vault fits. This matches Khayt Cloud and /terms §4, and the Mac's wording.
+  - The beta warning and the "beta has ended" line say the same.
+  - Moving to any smaller plan now shows this note, not only moving back to Free.
 - **Mac: Save to Khayt — save a model page from the browser into the library.**
   - A browser extension (`extension-khayt/`, one source for Safari, Chrome, Edge, Brave and Firefox). On a model's page, press its toolbar button: the popup shows what it read — title, creator, licence, tags, a short description, the cover picture and any direct model-file links — and Save puts it in the library as a model to print, on the Print next list, with a link back to the page. Readers for Printables, MakerWorld, Thingiverse, Thangs, Cults3D and MyMiniFactory; any other page is read from its JSON-LD and Open Graph. English and Arabic (right to left), light and dark.
   - The extension reads a page only when its button is pressed, only in that tab, and asks for no site permissions. It sends the page to Khayt on this Mac through the browser's native messaging and to nothing else — no server, no local web address.
