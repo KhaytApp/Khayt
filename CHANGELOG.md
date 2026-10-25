@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Docs:** weekly competitive review, 2026-10-25.
+
 - **Mac: saved searches, smart folders and ranges in the print library.**
   - Under Library in the sidebar: five smart folders that are always there (Ready to print, Never printed, Online only, No print figures, Sells in catalogue) and the shop's own saved searches, each with a live count. Clicking one fills the filter row with its search.
   - "Save Search…" appears in the filter row when anything narrows the library. Saving under a name that is already used replaces that search. Right-click a saved search to Rename, Edit (load it into the row, then Update Search), Duplicate or Delete it. Saved searches are kept in the book's settings (`librarySavedSearches`), so they travel with it.
