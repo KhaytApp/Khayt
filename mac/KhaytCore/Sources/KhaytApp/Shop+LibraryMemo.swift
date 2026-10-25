@@ -46,6 +46,7 @@ final class LibraryMemo {
         var readyAnywhere = false
         var noFigures = false
         var inCatalogue = false
+        var fromWeb = false
         var ranges = LibraryQuery.Ranges()
         /// Today, while a "last N days" range is on — tomorrow it finds less.
         var day = ""
@@ -217,7 +218,7 @@ extension Shop {
                      healthFocus: libraryHealthFocus,
                      storage: libraryStorage,
                      readyAnywhere: libraryReadyAnywhere, noFigures: libraryNoFiguresOnly,
-                     inCatalogue: libraryInCatalogueOnly, ranges: libraryRanges,
+                     inCatalogue: libraryInCatalogueOnly, fromWeb: libraryFromWebOnly, ranges: libraryRanges,
                      day: libraryRanges.added.lastDays == nil ? "" : Calendar.book.dayString(Date()),
                      sync: libraryStorage == nil ? 0 : librarySyncRevision,
                      sort: librarySort,

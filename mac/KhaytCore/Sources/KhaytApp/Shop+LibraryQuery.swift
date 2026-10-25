@@ -30,6 +30,7 @@ extension Shop {
             q.storage = libraryStorage.map { $0 == .onlineOnly ? .onlineOnly : .thisMacOnly }
             q.noFigures = libraryNoFiguresOnly
             q.inCatalogue = libraryInCatalogueOnly
+            q.fromWeb = libraryFromWebOnly
             q.readyOn = libraryReadyOn
             q.readyAnywhere = libraryReadyAnywhere
             q.creator = libraryCreator
@@ -55,6 +56,7 @@ extension Shop {
             if libraryStorage != storage { libraryStorage = storage }
             if libraryNoFiguresOnly != q.noFigures { libraryNoFiguresOnly = q.noFigures }
             if libraryInCatalogueOnly != q.inCatalogue { libraryInCatalogueOnly = q.inCatalogue }
+            if libraryFromWebOnly != q.fromWeb { libraryFromWebOnly = q.fromWeb }
             if libraryReadyOn != q.readyOn { libraryReadyOn = q.readyOn }
             if libraryReadyAnywhere != q.readyAnywhere { libraryReadyAnywhere = q.readyAnywhere }
             if libraryCreator != q.creator { libraryCreator = q.creator }
@@ -104,6 +106,7 @@ extension Shop {
         let index = syncIndex, remote = libraryRemoteId
         let sells: Set<String>? = q.inCatalogue && axis != .inCatalogue ? catalogueFileIds() : nil
         let noFigures = q.noFigures && axis != .noFigures
+        let fromWeb = q.fromWeb && axis != .fromWeb
         let ranges = q.ranges.isActive ? q.ranges : nil
         let today = Calendar.book.dayString(Date())
         let category: FilterChoice? = axis == .category ? nil
@@ -132,6 +135,7 @@ extension Shop {
             if let storage, !storage.matches(index?.state(f.id, remote: remote)) { return false }
             if let sells, !sells.contains(f.id) { return false }
             if noFigures, !libraryHasNoFigures(f) { return false }
+            if fromWeb, !f.isFromWeb { return false }
             if let ranges, !ranges.matches(libraryFigures(f), today: today) { return false }
             return true
         }
@@ -267,6 +271,8 @@ enum LibrarySmartFolder: String, CaseIterable, Identifiable, Sendable {
     case noFigures
     /// A catalogue product is made from it.
     case inCatalogue
+    /// Saved from a model page with the browser extension ("Save to Khayt").
+    case fromWeb
 
     var id: String { rawValue }
 
@@ -277,6 +283,7 @@ enum LibrarySmartFolder: String, CaseIterable, Identifiable, Sendable {
         case .onlineOnly: "mac.lib_online_only"
         case .noFigures: "mac.ls_no_figures"
         case .inCatalogue: "mac.ls_in_catalogue"
+        case .fromWeb: "mac.sfw_saved_from_web"
         }
     }
 
@@ -287,6 +294,7 @@ enum LibrarySmartFolder: String, CaseIterable, Identifiable, Sendable {
         case .onlineOnly: "icloud"
         case .noFigures: "questionmark.circle"
         case .inCatalogue: "tag"
+        case .fromWeb: "safari"
         }
     }
 
@@ -298,6 +306,7 @@ enum LibrarySmartFolder: String, CaseIterable, Identifiable, Sendable {
         case .onlineOnly: q.storage = .onlineOnly
         case .noFigures: q.noFigures = true
         case .inCatalogue: q.inCatalogue = true
+        case .fromWeb: q.fromWeb = true
         }
         return q
     }

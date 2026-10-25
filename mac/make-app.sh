@@ -185,6 +185,7 @@ AIP
 swift build -c release --product KhaytThumbnail --package-path "$PKG"
 swift build -c release --product KhaytPreview --package-path "$PKG"
 swift build -c release --product KhaytWidgets --package-path "$PKG"
+swift build -c release --product KhaytSafari --package-path "$PKG"
 echo "Building Khayt $VERSION (release)…"
 swift build -c release --product Khayt --package-path "$PKG" \
   -Xswiftc -emit-const-values \
@@ -432,6 +433,65 @@ $GROUP_ENT
 </dict>
 </plist>
 WIDENTS
+# ── SAVE TO KHAYT, IN SAFARI ──────────────────────────────────────────────
+#
+# A fourth .appex, on `com.apple.Safari.web-extension`: the browser
+# extension's native end. Safari reads the extension itself — manifest, popup,
+# scripts, `_locales` — out of this bundle's Resources, and hands every
+# `runtime.sendNativeMessage` to `SafariWebExtensionHandler`, which writes the
+# save into the app group's inbox (`WebInbox`) for the app to file.
+#
+# Built like the Quick Look ones: no Swift entry point (`Entry.swift`,
+# `-parse-as-library`, `ThumbnailExtensionTests` checks the binary), signed
+# inside out, sandboxed — and in the group, which is the only place a
+# sandboxed extension can leave something for the app. Safari only lists it
+# once Khayt has been opened from a scanned place (pluginkit's rule); then it
+# is switched on in Safari ▸ Settings ▸ Extensions, never by the app.
+#
+# The web extension is staged by `extension-khayt/pack.mjs` — the same source
+# the Chrome and Firefox packages are made from — straight into Resources.
+SAF="$APP/Contents/PlugIns/KhaytSafari.appex"
+mkdir -p "$SAF/Contents/MacOS" "$SAF/Contents/Resources"
+cp "$PKG/.build/release/KhaytSafari" "$SAF/Contents/MacOS/KhaytSafari"
+node "$REPO/extension-khayt/pack.mjs" safari "$SAF/Contents/Resources" \
+  || { echo "could not stage the Safari web extension"; exit 1; }
+cat > "$SAF/Contents/Info.plist" <<SAFPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>KhaytSafari</string>
+  <key>CFBundleDisplayName</key><string>Save to Khayt</string>
+  <key>CFBundleExecutable</key><string>KhaytSafari</string>
+  <key>CFBundleIdentifier</key><string>app.khayt.mac.safari</string>
+  <key>CFBundlePackageType</key><string>XPC!</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>ar</string></array>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD_VERSION</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
+  <key>NSHumanReadableDescription</key><string>Save a 3D model page into your Khayt library, with its link.</string>
+$GROUP_KEY
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key><string>com.apple.Safari.web-extension</string>
+    <key>NSExtensionPrincipalClass</key><string>SafariWebExtensionHandler</string>
+  </dict>
+</dict>
+</plist>
+SAFPLIST
+SAF_ENTS="$PKG/.build/safari.entitlements"
+cat > "$SAF_ENTS" <<SAFENTS
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+$GROUP_ENT
+</dict>
+</plist>
+SAFENTS
+
 # And the APP joins the same group, or macOS asks the shop whether Khayt may
 # "access data from other apps" the first time it writes the snapshot.
 # PlistBuddy, not plutil: plutil reads the dots in the key as a key PATH.
@@ -833,6 +893,14 @@ if ! WID_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
       --entitlements "$WID_ENTS" "$WID" 2>&1)"; then
   echo "codesign failed for KhaytWidgets.appex:"
   echo "$WID_SIGN_ERR" | sed 's/^/  /'
+  exit 1
+fi
+
+# Save to Khayt's Safari half: the sandbox and the group, like the widgets.
+if ! SAF_SIGN_ERR="$(codesign --force --sign "$IDENTITY" $STAMP $RUNTIME \
+      --entitlements "$SAF_ENTS" "$SAF" 2>&1)"; then
+  echo "codesign failed for KhaytSafari.appex:"
+  echo "$SAF_SIGN_ERR" | sed 's/^/  /'
   exit 1
 fi
 

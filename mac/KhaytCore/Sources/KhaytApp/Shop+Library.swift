@@ -1763,6 +1763,8 @@ extension Shop {
         var noFigures = 0
         /// A catalogue product is made from it.
         var inCatalogue = 0
+        /// Saved from a web page with the browser extension.
+        var fromWeb = 0
         struct Ready: Equatable, Identifiable {
             let machineId: String
             let machineName: String
@@ -1773,13 +1775,13 @@ extension Shop {
             categories.isEmpty && tags.isEmpty && unfiled == 0 && neverPrinted == 0 && ready.isEmpty
                 && creators.isEmpty && printNext == 0 && duplicates == 0 && archived == 0
                 && onlineOnly == 0 && thisMacOnly == 0 && readyAnywhere == 0 && noFigures == 0
-                && inCatalogue == 0
+                && inCatalogue == 0 && fromWeb == 0
         }
     }
 
     enum LibraryAxis {
         case unfiled, category, tag, neverPrinted, ready, creator, printNext, duplicates, archived, storage
-        case noFigures, inCatalogue
+        case noFigures, inCatalogue, fromWeb
     }
 
     /// What one axis counts: the shelf, the search, and the other chips.
@@ -1961,6 +1963,7 @@ extension Shop {
         facets.readyAnywhere = readyAnywhere
         facets.noFigures = noFigures
         facets.inCatalogue = inCatalogue
+        facets.fromWeb = ids(.fromWeb).count { byId[$0]?.isFromWeb == true }
         if facets != libraryFacets { libraryFacets = facets }
         // Taken AFTER the run: writing `readyByMachine` and `duplicateOf`
         // above moves the derived revision, and the next recount compares
@@ -2038,7 +2041,7 @@ extension Shop {
             || libraryNeverPrintedOnly || libraryReadyOn != nil
             || libraryCreator != nil || libraryPrintNextOnly || libraryDuplicatesOnly
             || libraryShowArchived || libraryStorage != nil
-            || libraryReadyAnywhere || libraryNoFiguresOnly || libraryInCatalogueOnly || libraryRanges.isActive || libraryHealthFocus != nil
+            || libraryReadyAnywhere || libraryNoFiguresOnly || libraryInCatalogueOnly || libraryFromWebOnly || libraryRanges.isActive || libraryHealthFocus != nil
     }
 
     func clearLibraryFilter() {
@@ -2055,6 +2058,7 @@ extension Shop {
         libraryReadyAnywhere = false
         libraryNoFiguresOnly = false
         libraryInCatalogueOnly = false
+        libraryFromWebOnly = false
         libraryRanges = LibraryQuery.Ranges()
         libraryHealthFocus = nil
     }

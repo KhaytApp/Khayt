@@ -117,6 +117,14 @@ struct LibraryFilterBar: View {
                 shop.libraryInCatalogueOnly.toggle()
             })
         }
+        // SAVED FROM A WEB PAGE with the browser extension — its own smart
+        // folder, and a chip so the bar can say it is on and take it off.
+        if facets.fromWeb > 0 || shop.libraryFromWebOnly {
+            out.append(FilterChipModel(id: "from-web", label: shop.words.callIt("mac.sfw_saved_from_web"),
+                                       count: facets.fromWeb, on: shop.libraryFromWebOnly) {
+                shop.libraryFromWebOnly.toggle()
+            })
+        }
         // Any machine at all — the "Ready to print" smart folder, typed into
         // the Ready on menu as its first item. One or the other: choosing a
         // machine takes "any" off, and the other way round.

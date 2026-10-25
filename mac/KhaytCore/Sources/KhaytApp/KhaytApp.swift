@@ -142,6 +142,12 @@ struct KhaytApp: App {
                     // Opt-in crash reports and usage counts (#1789). Sends
                     // nothing unless the book says so; see `Telemetry`.
                     Telemetry.shared.start(shop: shop)
+                    // Pages saved with the browser extension, waiting in the
+                    // app group's inbox (`WebSaveInbox`). Never in a snapshot
+                    // run: that is the sample, which would refuse and drop them.
+                    if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_DIR"] == nil {
+                        WebSaveInbox.shared.start(shop: shop)
+                    }
                     // EVERY MOVED MODEL, ASKED FOR: on launch and once a day
                     // while the app is open. After "Free up space" the cloud
                     // holds the only copy, and nothing else ever looks again —
@@ -749,6 +755,13 @@ final class Activator: NSObject, NSApplicationDelegate {
             // sample and a 600-model library in memory.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBSMART"] == "1", let shop = subject {
                 await captureLibrarySmart(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
+            // Only Save to Khayt: the Saved from web folder, a saved page in
+            // the inspector, and the Settings row — on the sample, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_WEBSAVE"] == "1", let shop = subject {
+                await captureWebSave(shop, into: dir, dark: dark)
                 NSApp.terminate(nil)
                 return
             }

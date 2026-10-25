@@ -2878,6 +2878,8 @@ final class Shop {
     var libraryNoFiguresOnly = false { didSet { if libraryNoFiguresOnly != oldValue { libraryViewChanged() } } }
     /// Models a catalogue product is made from.
     var libraryInCatalogueOnly = false { didSet { if libraryInCatalogueOnly != oldValue { libraryViewChanged() } } }
+    /// Models saved from a web page with the browser extension.
+    var libraryFromWebOnly = false { didSet { if libraryFromWebOnly != oldValue { libraryViewChanged() } } }
     /// Print time, filament, price, times printed and the day added. Part of
     /// `libraryQuery`, the one value the bar and the saved searches share.
     var libraryRanges = LibraryQuery.Ranges() { didSet { if libraryRanges != oldValue { libraryViewChanged() } } }

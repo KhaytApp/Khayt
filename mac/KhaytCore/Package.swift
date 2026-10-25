@@ -86,6 +86,9 @@ let package = Package(
         // The desktop widgets — Printing now, and Today. A third .appex, on
         // `com.apple.widgetkit-extension`, assembled by `make-app.sh`.
         .executable(name: "KhaytWidgets", targets: ["KhaytWidgets"]),
+        // "Save to Khayt" in Safari: the web extension's native half, a
+        // fourth .appex, on `com.apple.Safari.web-extension`.
+        .executable(name: "KhaytSafari", targets: ["KhaytSafari"]),
     ],
     // ── SPARKLE, AND WHY A DEPENDENCY AT ALL ─────────────────────────────
     //
@@ -104,13 +107,31 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.0"),
     ],
     targets: [
-        .target(name: "KhaytCore", resources: [.copy("JS")]),
+        .target(name: "KhaytCore", dependencies: ["KhaytWebSave"], resources: [.copy("JS")]),
+        // A model page saved from the browser: the message's checks and the
+        // inbox both ends share (`WebSave`, `WebInbox`). Foundation only and
+        // its own target, because the Safari extension and the browser host
+        // need exactly this and none of KhaytCore — and KhaytCore depends on
+        // it, so the library rule that files a save reads the same types.
+        .target(name: "KhaytWebSave"),
+        // The Safari web extension's native end. Shaped like the Quick Look
+        // extensions — no Swift entry point, `NSExtensionMain` from
+        // `Entry.swift`, the entry symbol named for the linker — and
+        // sandboxed with the app group, which is the one place it may write.
+        .executableTarget(name: "KhaytSafari", dependencies: ["KhaytWebSave"],
+                          swiftSettings: [
+                              .unsafeFlags(["-parse-as-library"]),
+                          ],
+                          linkerSettings: [
+                              .linkedFramework("SafariServices"),
+                              .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_KhaytSafari_main"]),
+                          ]),
         // The interface. It writes now — jobs, customers, payments, moves —
         // through `StoreWriter`, which reads the book from disk inside every
         // write and swaps the file atomically. `Resources` carries the sample
         // shop and the invoice's stylesheet, synced from the renderer.
         .executableTarget(name: "KhaytApp",
-                          dependencies: ["KhaytCore", "KhaytWidgetData",
+                          dependencies: ["KhaytCore", "KhaytWidgetData", "KhaytWebSave",
                                          .product(name: "Sparkle", package: "Sparkle")],
                           resources: [
                               .process("Resources"),
@@ -252,12 +273,13 @@ let package = Package(
         // library out — see `Library` for what that deliberately cannot see.
         .executableTarget(name: "KhaytMcp", dependencies: ["KhaytCore"]),
         .testTarget(name: "KhaytMcpTests", dependencies: ["KhaytMcp", "KhaytCore"]),
-        .testTarget(name: "KhaytCoreTests", dependencies: ["KhaytCore"]),
+        .testTarget(name: "KhaytCoreTests", dependencies: ["KhaytCore", "KhaytWebSave"]),
         // `Resources/fake-smtp.py` is run as a program by `SmtpWireTests`, which
         // finds it by `#filePath`, not as a bundled resource. Excluded rather
         // than declared, so SwiftPM stops calling it an unhandled file and the
         // shipping app does not carry a copy of a test server.
-        .testTarget(name: "KhaytAppTests", dependencies: ["KhaytApp", "KhaytCore", "KhaytWidgetData", "KhaytWidgetViews"],
+        .testTarget(name: "KhaytAppTests", dependencies: ["KhaytApp", "KhaytCore", "KhaytWidgetData", "KhaytWidgetViews",
+                                                          "KhaytWebSave"],
                     exclude: ["Resources/fake-smtp.py"]),
     ]
 )

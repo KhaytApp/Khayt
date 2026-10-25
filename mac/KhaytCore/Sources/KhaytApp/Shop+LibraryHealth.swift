@@ -46,6 +46,7 @@ extension Shop {
                                            linkedOnline: @Sendable (URL) -> Bool) -> [String: LibraryHealth.Presence] {
         var out: [String: LibraryHealth.Presence] = [:]
         for file in files {
+            if file.isWebOnly { out[file.id] = .web; continue }
             if online.contains(file.id) { out[file.id] = .online; continue }
             if let path = file.externalPath, !path.isEmpty {
                 guard FileManager.default.fileExists(atPath: path) else { out[file.id] = .missing; continue }

@@ -1249,6 +1249,9 @@ struct PreferencesPane: View {
                 // saved on the spot rather than with the bar below.
                 TelemetrySettings(shop: shop)
                 ActiveCountSettings(shop: shop)
+                // Save to Khayt: whether this Mac takes pages from the
+                // browser extension, and the door to switching it on.
+                BrowserExtensionSettings(shop: shop)
                 Section(shop.words.callIt("set.locale_section")) {
                     Toggle(shop.words.callIt("set.use_hijri"), isOn: $draft.useHijri)
                     Toggle(shop.words.callIt("set.use_arabic_nums"), isOn: $draft.useArabicNumerals)
