@@ -126,6 +126,14 @@ extension Snapshot {
         // Missing: two models whose files are gone, one filed in a group.
         presence["PF-sample-king-6"] = .missing
         presence["PF-sample-gripper"] = .missing
+        // Deleted from the vault by the plan limit: moved online by Free Up
+        // Space, then purged while the vault was over (beta.8).
+        copy("PF-sample-dallah", as: "PF-snap-dallah-purged") {
+            $0["name"] = .string("Dallah — moved online")
+            $0["vaultPurgedAt"] = .string("2026-10-26T09:00:00Z")
+            $0["contentHash"] = .string("snapshot-purged-hash"); $0["geometryKey"] = .null
+        }
+        presence["PF-snap-dallah-purged"] = .deletedByPlan
         // Online and never measured.
         copy("PF-sample-vase", as: "PF-snap-vase-online") {
             $0["name"] = .string("Spiral vase — 150 mm")

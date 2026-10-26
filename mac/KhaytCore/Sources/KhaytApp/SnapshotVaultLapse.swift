@@ -21,7 +21,7 @@ extension Snapshot {
         shop.pretendsWritable = true
         defer {
             shop.pretendsWritable = false; shop.pretendsOwner = false
-            shop.vaultLapse = nil; shop.vaultLapseAsked = nil
+            shop.vaultLapse = nil; shop.vaultLapseAsked = nil; shop.vaultOnlyIds = []
         }
         await settle()
 
@@ -54,6 +54,10 @@ extension Snapshot {
         for (name, lapse) in scenes {
             shop.vaultLapse = lapse
             shop.vaultLapseAsked = Date()   // no refresh: the sample has no cloud to ask
+            // Three sample models moved online by Free Up Space: the warning
+            // and "Bring back 3 models …" (beta.8). The sample has no library
+            // folder, so nothing recounts them away.
+            shop.vaultOnlyIds = lapse.over ? ["PF-sample-falcon", "PF-sample-vase", "PF-sample-dallah"] : []
             await settle()
             shot("\(name)-plan", width: 560,
                  CloudPlanSettings(shop: shop, shown: planState(lapse), flat: true).padding(18))

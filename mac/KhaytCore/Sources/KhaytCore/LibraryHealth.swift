@@ -38,6 +38,10 @@ public enum LibraryHealth {
         case online
         /// Neither: the record names a file this Mac cannot find.
         case missing
+        /// Moved to the vault by Free Up Space, then deleted there by the plan
+        /// limit (`VaultOnlyCopies.deletedByPlan`): no bytes anywhere. Not
+        /// missing — there is nothing to Locate, only the record to remove.
+        case deletedByPlan
         /// Cannot be asked: the drive, share or folder the file lives on is
         /// not connected right now. Not missing — nothing may be removed for
         /// it — and asked again when a volume comes back.
@@ -130,6 +134,7 @@ public enum LibraryHealth {
     public static let modelKinds: Set<String> = ["fdm", "resin"]
 
     public enum Kind: String, Sendable, CaseIterable, Equatable {
+        case deletedByPlan
         case missing
         case unreachable
         case onlineUnmeasured
@@ -182,6 +187,8 @@ public enum LibraryHealth {
             guard !ids.isEmpty || !products.isEmpty else { return }
             out.append(Group(kind: kind, modelIds: ids, clusters: clusters, productIds: products))
         }
+        // Lost for good first: the vault deleted the only copy.
+        add(.deletedByPlan, live.filter { $0.presence == .deletedByPlan }.map(\.id))
         let missing = live.filter { $0.presence == .missing }
         add(.missing, missing.map(\.id))
         // A missing archive is ONE thing gone, however many models it held.
@@ -196,7 +203,7 @@ public enum LibraryHealth {
         }
         add(.unreachable, live.filter { $0.presence == .unreachable }.map(\.id))
         add(.onlineUnmeasured, live.filter { $0.presence == .online && !$0.hasFigures }.map(\.id))
-        add(.noFigures, live.filter { ![.online, .missing, .unreachable, .web].contains($0.presence) && !$0.hasFigures }.map(\.id))
+        add(.noFigures, live.filter { ![.online, .missing, .deletedByPlan, .unreachable, .web].contains($0.presence) && !$0.hasFigures }.map(\.id))
         let (same, looks) = duplicates(live)
         add(.sameFile, same.flatMap { $0 }, clusters: same)
         add(.looksSame, looks.flatMap { $0 }, clusters: looks)

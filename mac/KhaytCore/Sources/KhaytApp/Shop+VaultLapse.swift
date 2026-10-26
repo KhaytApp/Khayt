@@ -30,6 +30,8 @@ extension Shop {
     func noteVaultLapse(_ lapse: CloudPlans.Lapse?) {
         vaultLapse = lapse ?? .notOver
         vaultLapseAsked = Date()
+        // Which models only the vault holds: counted while over, cleared once not.
+        Task { await countVaultOnlyModels() }
     }
 
     /// Ask vault/usage, at most every ten minutes unless `force`. Quiet on
@@ -37,7 +39,12 @@ extension Shop {
     /// matters still gets its own 402.
     func refreshVaultLapse(force: Bool = false) async {
         guard libraryOnVault || force, cloudDek != nil else { return }
-        if !force, let at = vaultLapseAsked, Date().timeIntervalSince(at) < 600 { return }
+        if !force, let at = vaultLapseAsked, Date().timeIntervalSince(at) < 600 {
+            // The cloud is not asked again so soon, but the disk is: a model
+            // brought back or moved since changes who is at risk.
+            await countVaultOnlyModels()
+            return
+        }
         guard let (connection, token) = await vaultSession() else { return }
         let client = VaultClient(connection: connection, token: token, fetch: CloudLibrary.fetch)
         if let usage = try? await client.usage() { noteVaultLapse(usage.lapse) }
@@ -123,6 +130,9 @@ struct VaultLapseNotice: View {
                         Text(when).font(.callout.weight(.medium)).foregroundStyle(Khayt.attention)
                     }
                     Text(words.callIt("mac.lapse_what")).font(.callout)
+                    // The models whose only copy is in the vault, and Bring
+                    // Back for exactly those (`Shop+VaultOnly.swift`).
+                    VaultOnlyOffer(shop: shop)
                     if showsOrder {
                         Text(words.callIt("mac.lapse_order")).font(.caption).foregroundStyle(.secondary)
                     }
@@ -165,11 +175,15 @@ struct VaultLapseBanner: View {
         let d = shop.vaultLapseDisplay
         Group {
             if shown, let head = Shop.lapseHeadline(d, shop.words) {
-                Banner(text: [head, Shop.lapseDeadline(d, shop.words), shop.words.callIt("mac.lapse_what")]
+                Banner(text: [head, Shop.lapseDeadline(d, shop.words), shop.words.callIt("mac.lapse_what"),
+                              Shop.vaultOnlyWarning(count: shop.vaultOnlyIds.count, shop.words)]
                            .compactMap { $0 }.joined(separator: " "),
                        symbol: "lock.fill", tint: Khayt.attention) {
-                    SettingsLink { Text(shop.words.callIt("mac.plan_upgrade") + "\u{2026}") }
-                        .simultaneousGesture(TapGesture().onEnded { shop.settingsPane = .online })
+                    HStack(spacing: 8) {
+                        VaultOnlyOffer(shop: shop, compact: true)
+                        SettingsLink { Text(shop.words.callIt("mac.plan_upgrade") + "\u{2026}") }
+                            .simultaneousGesture(TapGesture().onEnded { shop.settingsPane = .online })
+                    }
                 }
             }
         }

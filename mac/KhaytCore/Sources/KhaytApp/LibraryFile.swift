@@ -64,6 +64,13 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// whose figures are its own.
     let figuresStaleFor: String?
     var figuresStale: Bool { !(figuresStaleFor ?? "").isEmpty }
+    /// The record's vault file (`docs/vault-format.md`), dropped when the
+    /// vault purges it (`Shop.applyVaultEdits`).
+    let vaultFileId: String?
+    /// When the vault purged this record's copy (`VaultApply.Edit.purged`).
+    /// With only a vault sidecar on this Mac, that was the last copy:
+    /// Library Health says "deleted from the vault by the plan limit".
+    let vaultPurgedAt: String?
     /// The model that took its place, by id. Absent when a model was put aside
     /// on its own rather than replaced by a conversion.
     let supersededBy: String?

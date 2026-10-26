@@ -142,11 +142,13 @@ extension PrinterWatch {
             guard let status = readings[machine.id]?.status else { continue }
             for kind in notices.ledger.observe(machine.id, state: status.state, filamentOut: status.filamentOut)
             where kind.wanted {
-                notices.raise(PrinterNotice.Notice(
+                let notice = PrinterNotice.Notice(
                     machineId: machine.id, machine: machine.name, kind: kind.rawValue,
                     title: shop.words.callIt(kind.titleKey, ["machine": .string(machine.name)]),
                     body: Self.noticeBody(filename: status.filename, progress: status.progress, shop: shop),
-                    at: Date()))
+                    at: Date())
+                notices.raise(notice)
+                shop.sendPrintNotice(kind, notice)
             }
         }
     }
@@ -177,5 +179,16 @@ extension Shop {
             body: PrinterWatch.noticeBody(filename: ended.filename, progress: 0, shop: self, project: project),
             at: Date())
         if kind == .finished { printers.notices.announce(notice) } else { printers.notices.raise(notice) }
+        sendPrintNotice(kind, notice)
+    }
+
+    /// AND TO THE SHOP'S PHONE: the same notice through its Telegram and
+    /// ntfy, when they are set up (`lib/alert-routes.js`, `NOTICE_TYPES`) —
+    /// the path every printer alert takes (`sendAlert`). Told once: the
+    /// ledger has already decided this is news, and the Mac's own switch for
+    /// the kind (`wanted`) has already said yes. Not awaited: nothing waits
+    /// on a message to a phone.
+    func sendPrintNotice(_ kind: PrintNoticeKind, _ notice: PrinterNotice.Notice) {
+        Task { await sendAlert(type: kind.rawValue, title: notice.title, body: notice.body) }
     }
 }

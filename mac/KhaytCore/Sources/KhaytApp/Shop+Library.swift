@@ -1884,36 +1884,14 @@ extension Shop {
         // Across the whole book, once per machine that reports what it has
         // loaded; the chip's count is that set within what the other chips and
         // the search have left.
-        var byMachine: [String: Set<String>] = [:]
-        var spoolsByMachine: [String: Set<String>] = [:]
+        // The sets are the book's (`readinessSets`), worked out the same way
+        // whether or not this screen is up; only the count inside the pool is
+        // the recount's.
+        let sets = await readinessSets()
+        let byMachine = sets.onBed, spoolsByMachine = sets.spools
         var ready: [LibraryFacets.Ready] = []
-        // The beds, once: a model loaded for a machine it does not fit on is
-        // not ready there (`ModelReadiness`).
-        let meshes = Dictionary(files.compactMap { f in f.mesh.map { (f.id, $0) } },
-                                uniquingKeysWith: { a, _ in a })
         for machine in machinesInUse {
-            let loaded = loadedSlots(for: machine.id)
-            guard !loaded.isEmpty else { continue }
-            // Asked of the engine only when the book or the machine's spools
-            // changed — never because a key was typed: it is the whole book
-            // across the bridge, per machine, and was most of a recount
-            // (240 ms of 300 at 6,600 models, Oct 2026).
-            let ids: Set<String>
-            let rowsAt = libraryRowsRevision
-            if let held = readyMemo[machine.id], held.revision == rowsAt, held.loaded == loaded {
-                ids = held.ids
-            } else {
-                ids = Set((try? await engine.readyToPrint(libraryRows, loaded: loaded)) ?? [])
-                readyMemo[machine.id] = (rowsAt, loaded, ids)
-            }
-            spoolsByMachine[machine.id] = ids
-            let bed = bed(of: machine.id)
-            let onBed = bed == nil ? ids : ids.filter { id in
-                guard let m = meshes[id] else { return true }
-                return ModelReadiness.canStart(ModelReadiness.state(
-                    bounds: ModelReadiness.bounds(x: m.x, y: m.y, z: m.z), bed: bed, spoolsReady: true))
-            }
-            byMachine[machine.id] = onBed
+            guard let onBed = byMachine[machine.id] else { continue }
             let count = libraryPool(skipping: .ready, searched: searched).count { onBed.contains(Self.rowText($0, "id")) }
             ready.append(.init(machineId: machine.id, machineName: machine.name, count: count))
         }
@@ -2047,8 +2025,60 @@ extension Shop {
         readyByMachine[machineId]?.contains(file.id) ?? false
     }
 
-    /// A machine's loaded spools changed: the ready counts are stale.
-    func loadedChanged() { recountLibrarySoon() }
+    /// A machine's loaded spools changed: the ready counts are stale. The
+    /// sets are put right on their own (`refreshReadiness`), not only by the
+    /// chips' recount, which a screen or a newer recount can cut short.
+    func loadedChanged() {
+        recountLibrarySoon()
+        Task { await refreshReadiness() }
+    }
+
+    /// Which models are ready on which machine — loaded AND on the bed
+    /// (`ModelReadiness`) — and the spools half alone, for the whole book.
+    /// No screen, search or filter goes in: the sidebar's "Ready to print"
+    /// count reads these, and read 0 until the Library screen had been
+    /// opened once, because only the chips' recount ever wrote them.
+    func readinessSets() async -> (onBed: [String: Set<String>], spools: [String: Set<String>]) {
+        guard let engine, !libraryRows.isEmpty else { return ([:], [:]) }
+        var byMachine: [String: Set<String>] = [:]
+        var spoolsByMachine: [String: Set<String>] = [:]
+        // The beds, once: a model loaded for a machine it does not fit on is
+        // not ready there (`ModelReadiness`).
+        let meshes = Dictionary(files.compactMap { f in f.mesh.map { (f.id, $0) } },
+                                uniquingKeysWith: { a, _ in a })
+        for machine in machinesInUse {
+            let loaded = loadedSlots(for: machine.id)
+            guard !loaded.isEmpty else { continue }
+            // Asked of the engine only when the book or the machine's spools
+            // changed — never because a key was typed: it is the whole book
+            // across the bridge, per machine, and was most of a recount
+            // (240 ms of 300 at 6,600 models, Oct 2026).
+            let ids: Set<String>
+            let rowsAt = libraryRowsRevision
+            if let held = readyMemo[machine.id], held.revision == rowsAt, held.loaded == loaded {
+                ids = held.ids
+            } else {
+                ids = Set((try? await engine.readyToPrint(libraryRows, loaded: loaded)) ?? [])
+                readyMemo[machine.id] = (rowsAt, loaded, ids)
+            }
+            spoolsByMachine[machine.id] = ids
+            let bed = bed(of: machine.id)
+            byMachine[machine.id] = bed == nil ? ids : ids.filter { id in
+                guard let m = meshes[id] else { return true }
+                return ModelReadiness.canStart(ModelReadiness.state(
+                    bounds: ModelReadiness.bounds(x: m.x, y: m.y, z: m.z), bed: bed, spoolsReady: true))
+            }
+        }
+        return (byMachine, spoolsByMachine)
+    }
+
+    /// Put the ready sets right, whatever is on screen. Written only when
+    /// they moved: each is observed and moves the derived revision.
+    func refreshReadiness() async {
+        let sets = await readinessSets()
+        if sets.onBed != readyByMachine { readyByMachine = sets.onBed }
+        if sets.spools != spoolReadyByMachine { spoolReadyByMachine = sets.spools }
+    }
 
     var libraryFilterOn: Bool {
         libraryCategory != nil || libraryTag != nil || libraryUnfiledOnly

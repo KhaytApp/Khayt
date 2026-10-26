@@ -104,7 +104,8 @@ struct LoadFiguresTests {
         #expect(old.estimates.values.contains { $0.isCalibrated })
         #expect(old.estimates.values.contains { $0.shellUnreliable })
         let sources = Set(old.estimates.values.compactMap(\.shellSource))
-        #expect(sources == ["surface-area", "assumed"])
+        // "plate": a thin, wide model with no measured area (`stl-estimate.js`).
+        #expect(sources == ["surface-area", "assumed", "plate"])
         let sellable = Set(old.licences.values.map { String(describing: $0.sellable) })
         #expect(sellable.count == 3, "sellable should be yes, no and unknown: \(sellable)")
         #expect(old.risks.values.contains { !$0.risks.isEmpty })

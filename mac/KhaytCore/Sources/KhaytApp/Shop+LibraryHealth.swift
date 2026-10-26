@@ -65,6 +65,16 @@ extension Shop {
         var vaultReachable: Bool?
         for file in files {
             if file.isWebOnly { out[file.id] = .web; continue }
+            // Purged from the vault while this Mac held only the vault's
+            // sidecar: the sync index still says "online", and it is not.
+            // Asked only of a record the purge stamped, so a library with no
+            // purges reads no sidecar here.
+            if !(file.vaultPurgedAt ?? "").isEmpty, !file.isLinked, file.archivePath == nil,
+               let roots, let dir = LibraryLocation.directory(for: file.id, roots: roots),
+               VaultOnlyCopies.deletedByPlan(purgedAt: file.vaultPurgedAt, vaultFileId: file.vaultFileId,
+                                             found: vaultFindings(in: dir), own: file.sourceFile?.filename) {
+                out[file.id] = .deletedByPlan; continue
+            }
             if online.contains(file.id) { out[file.id] = .online; continue }
             if let path = file.archivePath {
                 // No library folder (the sample): nothing is known, as below.
@@ -184,7 +194,7 @@ extension Shop {
     /// (`askToDeleteFromLibrary` refuses), and the shop is told how many.
     @discardableResult
     func askToRemoveHealthGroup(_ group: LibraryHealth.Group) -> [LibraryFile] {
-        guard group.kind == .missing, permitted("inventory", "delete") else { return [] }
+        guard group.kind == .missing || group.kind == .deletedByPlan, permitted("inventory", "delete") else { return [] }
         let chosen = healthFiles(group)
         guard !chosen.isEmpty else { return [] }
         showHealthGroup(group)

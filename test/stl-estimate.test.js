@@ -160,3 +160,23 @@ test('geometry with no surface area is not branded unreliable', () => {
   assert.equal(r.reliable, true);
   assert.equal(r.rawShell, null);
 });
+
+test('a thin, wide plate with no measured area (a HueForge relief) is priced solid and said to be unreliable', () => {
+  // 200x200x4.56 mm, about 120 cm3: the assumed 35%/20% mix priced it at under
+  // half its plastic and about 2 h, marked reliable.
+  const relief = estimateFromStl({ volumeMm3: 120000, bbox: { x: 200, y: 200, z: 4.56 } });
+  assert.equal(relief.shellSource, 'plate');
+  assert.equal(relief.shellFraction, 1);
+  assert.equal(relief.reliable, false, 'a relief must say to slice it');
+  const assumed = estimateFromStl({ volumeMm3: 120000, bbox: { x: 200, y: 200, z: 40 } });
+  assert.equal(assumed.shellSource, 'assumed', 'a tall part keeps the assumption');
+  assert.ok(relief.estPrintTimeH > assumed.estPrintTimeH * 2, `${relief.estPrintTimeH} h`);
+  // Time still follows printed plastic.
+  const rate = (r) => r.estPrintTimeH / r.estWeightG;
+  assert.ok(Math.abs(rate(relief) / rate(assumed) - 1) < 0.02, 'hours per gram moved');
+  // A measured area still decides: the plate rule is only for the no-area case.
+  const measured = estimateFromStl({ volumeMm3: 120000, areaMm2: 90000, bbox: { x: 200, y: 200, z: 4.56 } });
+  assert.equal(measured.shellSource, 'surface-area');
+  // A small coin is not a plate (50 mm / 4 mm is under 15:1)... nor a 10 mm cube.
+  assert.equal(estimateFromStl({ volumeMm3: 7000, bbox: { x: 50, y: 50, z: 4 } }).shellSource, 'assumed');
+});
