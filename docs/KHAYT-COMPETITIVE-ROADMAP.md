@@ -662,3 +662,64 @@ Re-read the §0/§6/§7 products from an environment where the fetches resolve, 
 the Meshory price change on 28 Oct and the Stimalo free period ending 31 Dec.
 
 *Caveat, as §5–§7: marketing pages and listing snippets, not hands-on evaluations.*
+
+## Weekly reading — 2026-10-25
+
+Nothing material changed, and again nothing could be confirmed from a product's own pages.
+Direct fetches of printago.io, foxtrack.studio, stimalo.com and layers.app all failed with
+`ENOTFOUND` from this environment, as on 2026-10-11. Only web search worked, so every
+product in §0, §6 and §7 is **❌ not re-read** and no price, feature or shutdown is reported
+as changed. The Meshory price rise (28 Oct) and the end of Stimalo's free period (31 Dec)
+are still unconfirmed.
+
+### What search showed
+
+| Product | What search showed | Read? |
+|---|---|---|
+| [SimplyPrint](https://simplyprint.io/blog/whats-new-early-2026/) | Early-2026 post: rebuilt Filament Manager (storage locations, NFC tags) and queue additions. Not tied to a date this week. | ⚠️ search snippet only |
+| [FoxTrack](https://www.producthunt.com/products/foxtrack/launches/foxtrack) | Product Hunt listing gives a launch date of 22 Apr 2026. Nothing newer found. | ⚠️ snippet only |
+| [Printforge CRM](https://www.capterra.com/p/10037915/Printforge/) | Capterra listing repeats §7: STL/G-code costing, quotes, kanban, AI quote assistant, Xero and Shopify. No change visible. | ⚠️ snippet only |
+| [AutoQuote3D](https://3dprinting.com/news/autoquote3d-launches-full-platform-to-streamline-3d-printing-quoting-and-order-management), printport, Printelize, DigiFabster | Service-bureau quoting and order platforms (upload a file, get a quote, manage orders). Printelize from €75/month. Undated, so not tied to this week. | ⚠️ snippet only |
+| [MakerOS](https://www.tctmagazine.com/makeros-releases-first-version-of-cloud-business-management/) | Cloud business management for makers; the article is undated. | ⚠️ snippet only |
+
+All are in categories §7 already covers (quote calculators, order-to-job, service-bureau
+platforms). None showed tax-compliant invoicing, and none is aimed at Saudi Arabia. Reddit
+threads were again unreachable through search.
+
+### Verified gaps, false alarms, ranked ideas
+
+No new claim about Khayt was made, so nothing was checked against the code. §7's gaps,
+false alarms and ranked ideas stand unchanged.
+
+### Next reading
+
+From an environment where fetches resolve: re-read the §0/§6/§7 products, confirm Meshory's
+28 Oct price and Stimalo's free period, and read AutoQuote3D and printport properly.
+
+*Caveat, as §5–§7: search snippets and listings, not hands-on evaluations.*
+
+## Added to the watch list — 2026-10-26
+
+Turki asked about **Spoolara** (Oct 26). Read from search results and crowdfunding trackers;
+spoolara.com returned only its title to a fetch, so treat these as ⚠️ snippets.
+
+| Product | What it is | Price | Read? |
+|---|---|---|---|
+| [Spoolara](https://spoolara.com/) (FantasyDesigns) | Web "3D printing suite". **Library**: store working print files, one-click reprint, tick off parts as they are finished. **Builder**: assemble a project virtually before printing (their GridCube system), with live hardware quantities, filament and print time. Add-ons: Paint Studio (colour schemes), Texture Suite (surface detail), Armory (fit cosplay parts to a mannequin). Files local, on Spoolara Cloud, your own cloud or a NAS. Desktop app "coming soon". | Hobbyist $9.99/mo billed yearly; Maker tier more (5,000 files, unlimited workshops) | ⚠️ snippets ([Kicktraq](https://kicktraq.com/projects/fantasydesigns/spoolara/), [BackerKit](https://www.backerkit.com/projects/fantasydesigns/spoolara), [Tabletop Analytics](https://www.tabletopanalytics.com/project/spoolara-the-3d-printing-suite-55928)) |
+| CableScape Builder (FantasyDesigns) | Per a backer note Turki shared: an online builder where each backer saves multiple projects, revisits different configurations, and exports builds; exported files download for local keeping, so designs do not depend on the cloud. | free for backers | ⚠️ quoted by Turki, not read |
+
+Kickstarter 21 Jul – 21 Aug 2026; one tracker shows ~$150k from 848 backers on a $5k goal,
+so there is demand, much of it from the creator's own audience. **Bucket: model library**
+(with Meshory, MeshVault). No orders, customers, invoices, VAT or printer monitoring were
+seen, so it does not compete with Khayt's books.
+
+**Ideas taken (Turki, Oct 26: "adopt any good ideas"), each to be verified against the code first:**
+1. **Parts checklist for multi-part prints**: which parts of a job or project are printed,
+   a count per part.
+2. **Builds**: pick models (or a catalogue product) with quantities and colours, save it as
+   a named build, keep several configurations, and see total filament, time, cost, plates
+   and hardware before printing. Export a build (Khayt's model bundle format) for keeping.
+3. **Hardware / bill of materials** per model or product (screws, magnets, inserts), counted
+   into a build. Check `consumables` on products and library records first.
+
+Watch next: Spoolara's desktop app, and any shop or selling features.
