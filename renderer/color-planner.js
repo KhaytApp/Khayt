@@ -158,6 +158,14 @@
   // Synthesize ONE calculator part from an assigned colour plan and push it onto the
   // current build. Machine/labour rate fields are read from the live calculator form so
   // the synthesized part costs consistently with a normally-entered part.
+  /** The slicer's time for this record, in hours; 0 when it has none or its
+   *  figures belong to older bytes. */
+  function slicerHours(rec) {
+    if (!rec || (rec.figuresStaleFor && String(rec.figuresStaleFor).trim())) return 0;
+    const mins = +(rec.parsed && rec.parsed.printTimeMins);
+    return mins > 0 ? mins / 60 : 0;
+  }
+
   function addPlannedPartToCalculator(rec, assigned) {
     const cands = coloredFilaments();
     const colours = assigned.map((p) => {
@@ -178,7 +186,12 @@
       spoolWeight: Math.max(1, totalGrams),
       printWeight: totalGrams,
       supportWeight: 0,
-      printTime: (rec.parsed && +rec.parsed.printTimeMins) || rf('#printTime'),
+      // HOURS, as every part's printTime is (the calculator's #printTime, the
+      // plate picker's printTimeMins / 60). This passed the slicer's MINUTES,
+      // so a 5-hour print was costed as 300 hours of machine, power and wear.
+      // Figures measured from an older version of the file (figuresStaleFor,
+      // set by the Mac) are not this file's, so the calculator's time stands.
+      printTime: slicerHours(rec) || rf('#printTime'),
       wearRate: rf('#wearRate'),
       powerDraw: rf('#powerDraw'),
       elecRate: rf('#elecRate'),
@@ -204,6 +217,6 @@
 
   const pub = { openColorPlanner, plannableFiles };
   Object.assign(global, pub);
-  global.KhaytColorPlanner = pub;
-  if (typeof module !== 'undefined' && module.exports) module.exports = pub;
+  global.KhaytColorPlanner = Object.assign({ slicerHours }, pub);
+  if (typeof module !== 'undefined' && module.exports) module.exports = global.KhaytColorPlanner;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
