@@ -119,6 +119,19 @@ struct LibraryInspector: View {
                     geometry(mesh, file)
                 }
             }
+            // ── HOW IT LOOKS FROM EACH SIDE, AND ONE PLATE AT A TIME ─────
+            if ModelViewer.canDraw(file) {
+                // Closed until asked for: drawing walks the whole mesh, and a
+                // 400 MB project is seconds of work on every click otherwise.
+                InspectorSection(id: "views", title: w.callIt("mac.mv_sec"), symbol: "rotate.3d",
+                                 openByDefault: false) {
+                    ModelViewer(shop: shop, file: file)
+                }
+            }
+            // ── ITS VARIANTS: THE STACK, OR ONE SUGGESTED ─────────────────
+            InspectorSection(id: "stack", title: w.callIt("mac.stk_sec"), symbol: "square.stack") {
+                StackSection(shop: shop, file: file)
+            }
             // ── WHAT IT IS MADE OF, AND HOW IT HAS BEEN MADE ─────────────
             // Parts only for a print that IS several files, versions only
             // where there is more than one: a heading over a list of one says

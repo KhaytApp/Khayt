@@ -2893,6 +2893,16 @@ final class Shop {
     /// The grid narrowed to one group's models, from its Show button — a
     /// filter like the others, on the Show menu, cleared with them.
     var libraryHealthFocus: LibraryHealthFocus? { didSet { libraryViewChanged() } }
+    /// The stacks drawn OPEN — their members inline after the cover
+    /// (`Shop+LibraryStacks.swift`). This window's, never written: opening a
+    /// stack is looking, not filing. Closing one takes its members out of
+    /// the selection, which may only hold what is drawn.
+    var libraryOpenStacks: Set<String> = [] { didSet { pruneSelectionToVisible() } }
+    /// The side the inspector's viewer looks from (View ▸ Model View, ⌥⌘1–4),
+    /// and the plate it shows of a project laid out on several — this
+    /// window's, kept while the shop walks from model to model.
+    var libraryViewAngle: ModelViewAngle = .iso
+    var libraryViewPlate: Int?
     /// For a snapshot or a test: where each model's bytes are, instead of
     /// asking the disk. The sample book has no library folder to ask.
     @ObservationIgnored var pretendHealthPresence: [String: LibraryHealth.Presence]?

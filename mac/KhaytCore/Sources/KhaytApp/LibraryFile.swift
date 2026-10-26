@@ -128,6 +128,15 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let archiveBytes: Double?
     let archiveModified: Double?
     var inArchive: Bool { isLinked && !(archiveMember ?? "").isEmpty }
+    /// STACKED with its variants (`LibraryStacks`): the same id on every
+    /// member, and `stackTop` on the one that wears the tile. Two plain
+    /// fields, no container record — the Electron app carries them untouched
+    /// and shows each member as its own model.
+    let stackId: String?
+    let stackTop: Bool?
+    /// The stack id as the rules read it: trimmed, empty is none.
+    var stack: String? { LibraryStacks.Member.clean(stackId) }
+    var isStackTop: Bool { stackTop == true }
     var isLocked: Bool { inArchive && archiveLocked == true }
     /// The archive's path, for a member; nil otherwise.
     var archivePath: String? { inArchive ? externalPath : nil }

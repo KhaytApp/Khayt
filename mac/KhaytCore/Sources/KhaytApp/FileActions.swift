@@ -190,6 +190,9 @@ struct ModelActions: View {
         Button(shop.words.callIt(allOn ? "mac.print_next_remove" : "mac.print_next_add")) {
             shop.setPrintNext(marked, on: !allOn)
         }
+        // The models most like this one, as a focus on the grid — nothing
+        // written (`Shop.findSimilar`).
+        Button(shop.words.callIt("mac.sim_find")) { shop.findSimilar(to: file) }
         Divider()
 
         // ── ORGANISE ─────────────────────────────────────────────────────
@@ -242,6 +245,7 @@ struct ModelActions: View {
                 }
                 .disabled(!shop.canWrite)
             }
+            StackActions(file: file, shop: shop, picked: picked)
             Divider()
             // This model's picture as its group's, from the model itself.
             if let group = file.groupName, shop.thumbnail(for: file) != nil {
@@ -354,5 +358,42 @@ extension ModelActions {
     @MainActor fileprivate func addTag(_ tag: String) {
         adoptSelection()
         Task { await shop.addTagToSelection(tag) }
+    }
+}
+
+
+/// The stack items of a model's right-click menu (`LibraryStacks`): stack
+/// the selection, accept a suggestion, open or close the stack, put this one
+/// on top, take it out, or take the whole stack apart. Every write is
+/// undoable (`Shop+LibraryStacks.swift`).
+struct StackActions: View {
+    let file: LibraryFile
+    let shop: Shop
+    let picked: Set<LibraryFile.ID>
+
+    var body: some View {
+        let w = shop.words
+        Divider()
+        if picked.contains(file.id), picked.count > 1 {
+            Button(w.callIt("mac.stk_stack_n", ["n": .number(Double(picked.count))])) { shop.stackSelection() }
+                .disabled(!shop.canStackSelection)
+        }
+        if let s = shop.stackOf(file) {
+            let open = shop.isStackOpen(s)
+            Button(w.callIt(open ? "mac.stk_hide" : "mac.stk_show")) { shop.toggleStackOpen(s) }
+            if shop.stackMembers(s).first?.id != file.id {
+                Button(w.callIt("mac.stk_make_cover")) { shop.makeStackCover(file.id) }
+                    .disabled(!shop.canWrite)
+            }
+            Button(w.callIt("mac.stk_remove")) { shop.removeFromStack([file.id]) }
+                .disabled(!shop.canWrite)
+            Button(w.callIt("mac.stk_unstack")) { shop.unstack(s) }
+                .disabled(!shop.canWrite)
+        } else if let suggestion = shop.stackSuggestion(for: file), !(picked.contains(file.id) && picked.count > 1) {
+            Button(w.callIt("mac.stk_accept", ["variants": .string(w.counting(suggestion.ids.count - 1, "mac.stk_n_variants"))])) {
+                shop.acceptStackSuggestion(suggestion, cover: file.id)
+            }
+            .disabled(!shop.canWrite)
+        }
     }
 }

@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import KhaytCore
 
 /// A picture of a model that has none of its own.
 ///
@@ -34,26 +35,58 @@ enum MeshPreview {
 
     /// A PNG of the model, or nil when the file holds no triangles to draw.
     static func png(of url: URL, size: Int = 256) throws -> Data? {
-        let isOBJ = url.pathExtension.lowercased() == "obj"
-        guard let box = try (isOBJ ? Mesh.measureOBJ(url) : Mesh.measureSTL(url)),
-              box.triangleCount > 0 else { return nil }
+        try render(url, size: size)?.png
+    }
+
+    /// A picture from one side (`ModelViewAngle`), and for a slicer project
+    /// laid out on several plates, of ONE plate.
+    struct Drawn: Equatable, Sendable {
+        let png: Data
+        /// The plates a picker offers — empty for a file of one plate.
+        let plates: [Int]
+        /// The plate drawn, when there is a choice.
+        let plate: Int?
+    }
+
+    /// `png`, from `angle`, of `plate` (the first plate when nil or not in the
+    /// file). STL and OBJ have no plates. A 3MF is walked twice — once for
+    /// each plate's box, once to draw — through `Mesh.each3MFTriangle`, the
+    /// reader that measures it, so the plates here are the plates Khayt
+    /// measured (numbered in `model_settings.config` order).
+    static func render(_ url: URL, size: Int = 256, angle: ModelViewAngle = .iso,
+                       plate wanted: Int? = nil) throws -> Drawn? {
+        let ext = url.pathExtension.lowercased()
+        let isOBJ = ext == "obj", is3MF = ext == "3mf"
+        var plates: [Int] = []
+        var plate: Int?
+        let measured: Mesh.Measurement?
+        if is3MF {
+            var perPlate: [Int: Mesh.Measurement] = [:]
+            try Mesh.each3MFTriangle(url) { p, ax, ay, az, bx, by, bz, cx, cy, cz in
+                guard Mesh.allFinite(ax, ay, az, bx, by, bz, cx, cy, cz) else { return }
+                perPlate[p, default: Mesh.Measurement()].add(ax, ay, az, bx, by, bz, cx, cy, cz)
+            }
+            plates = ModelViewAngle.platesToPick(perPlate.keys)
+            if !plates.isEmpty { plate = wanted.flatMap { plates.contains($0) ? $0 : nil } ?? plates[0] }
+            measured = plate.flatMap { perPlate[$0] } ?? perPlate.values.first
+        } else {
+            measured = try isOBJ ? Mesh.measureOBJ(url) : Mesh.measureSTL(url)
+        }
+        guard let box = measured, box.triangleCount > 0 else { return nil }
         let side = size * scale
 
-        // The model, centred and turned to a three-quarter view. Straight on it
-        // is a rectangle; turned, a shape a person recognises as the thing.
+        // The model, centred, seen from the side asked for — a right-handed
+        // camera (`ModelViewAngle.Camera`), so the picture is never the
+        // model's mirror image.
         let cx = (box.minX + box.maxX) / 2
         let cy = (box.minY + box.maxY) / 2
         let cz = (box.minZ + box.maxZ) / 2
-        let yaw = 35.0 * .pi / 180, pitch = 24.0 * .pi / 180
-        let cosY = cos(yaw), sinY = sin(yaw), cosP = cos(pitch), sinP = sin(pitch)
+        let camera = angle.camera
 
-        // Z is up in a print file, so the camera's "up" is the model's Z.
         @inline(__always)
         func view(_ x: Double, _ y: Double, _ z: Double) -> (Double, Double, Double) {
-            let dx = x - cx, dy = y - cy, dz = z - cz
-            let rx = dx * cosY + dy * sinY
-            let ry = -dx * sinY + dy * cosY
-            return (rx, dz * cosP - ry * sinP, ry * cosP + dz * sinP)
+            let p = camera.project(x - cx, y - cy, z - cz)
+            return (p.u, p.v, p.depth)
         }
 
         // A first pass for the extent of the TURNED model: the box of the
@@ -82,8 +115,12 @@ enum MeshPreview {
         var covered = [Bool](repeating: false, count: side * side)
 
         // Light over the viewer's left shoulder, which is where a person
-        // expects it and what makes a curve read as a curve.
-        let lx = -0.45, ly = 0.62, lz = 0.64
+        // expects it and what makes a curve read as a curve — held to the
+        // camera, so every side is lit the same way.
+        let (rgx, rgy, rgz) = camera.right, (upx, upy, upz) = camera.up, (twx, twy, twz) = camera.towards
+        let lx = -0.35 * rgx + 0.45 * upx + 0.82 * twx
+        let ly = -0.35 * rgy + 0.45 * upy + 0.82 * twy
+        let lz = -0.35 * rgz + 0.45 * upz + 0.82 * twz
 
         // The draw itself, given a triangle. Both formats feed it: a text STL
         // is a CAD package's default and sixteen of this shop's models are one,
@@ -155,14 +192,19 @@ enum MeshPreview {
         // Streamed a line at a time for the text forms, as the measurement
         // above reads them: a whole OBJ read into a String and split was
         // several times the file's size resident.
-        if isOBJ {
+        if is3MF {
+            try Mesh.each3MFTriangle(url) { p, ax, ay, az, bx, by, bz, cx, cy, cz in
+                if plate == nil || p == plate { draw(ax, ay, az, bx, by, bz, cx, cy, cz) }
+            }
+        } else if isOBJ {
             _ = Mesh.eachOBJTriangle(url, draw)
         } else if try !Mesh.eachSTLTriangle(url, draw) {
             _ = Mesh.eachAsciiSTLTriangle(url, draw)
         }
 
-        guard covered.contains(true) else { return nil }
-        return encode(shade: shade, covered: covered, side: side, out: size)
+        guard covered.contains(true),
+              let png = encode(shade: shade, covered: covered, side: side, out: size) else { return nil }
+        return Drawn(png: png, plates: plates, plate: plate)
     }
 
     /// Grey on transparency, halved as it goes.

@@ -10,6 +10,8 @@
   or a saved search, best match first and the ones you used lately before
   the rest. **↩** opens it, **⌘↩** starts a quote from a model and **⌥↩** a
   new job.
+- **⌥⌘1** to **⌥⌘4** — the selected model in the details pane seen three-quarters,
+  from the front, from the top or from the side (View ▸ Model View).
 - **⌘F** — the search box.
 - **⌘R** — reload the book from disk.
 - **⌘,** — settings.

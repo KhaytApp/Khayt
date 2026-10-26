@@ -62,6 +62,8 @@ struct KhaytCommands: Commands {
         Group {
             CommandGroup(after: .saveItem) { EditCommands().environment(shop).disabled(shop.needsSignIn) }
             CommandGroup(replacing: .printItem) { PrintCommands().environment(shop).disabled(shop.needsSignIn) }
+            // One model out as a `.khaytbundle`, and back in (`Shop+ModelBundle`).
+            CommandGroup(after: .importExport) { ModelBundleCommands().environment(shop).disabled(shop.needsSignIn) }
         }
 
         CommandGroup(replacing: .appInfo) {
@@ -81,6 +83,8 @@ struct KhaytCommands: Commands {
             SortMenu().environment(shop).disabled(shop.needsSignIn)
             // Grid or list, and the tile size — `LibraryDisplay`.
             LibraryViewCommands().environment(shop).disabled(shop.needsSignIn)
+            // The inspector's viewer: front, top, side, three-quarters.
+            ModelViewCommands().environment(shop).disabled(shop.needsSignIn)
             Divider()
             KioskCommand().disabled(shop.needsSignIn)
         }
@@ -463,6 +467,23 @@ private struct EditCommands: View {
     }
 }
 
+/// File ▸ Export Model Bundle… and Import Model Bundle….
+///
+/// Export is the one selected model whose file is on this Mac; Import makes a
+/// new model, so it waits on a book this app may write. No shortcuts: neither
+/// is something a shop does every hour.
+private struct ModelBundleCommands: View {
+    @Environment(Shop.self) private var shop
+
+    var body: some View {
+        Divider()
+        Button(Words.upfront("mac.mb_export") + "\u{2026}") { Task { await shop.exportModelBundle() } }
+            .disabled(!shop.showingLibrary || !shop.selectionIsOnThisMac)
+        Button(Words.upfront("mac.mb_import_menu") + "\u{2026}") { Task { await shop.chooseModelBundle() } }
+            .disabled(!shop.canMoveJobs || shop.importing)
+    }
+}
+
 /// File ▸ Share… and Print….
 ///
 /// Print is the DOCUMENT in front — a job's invoice or quotation, the P&L on
@@ -735,6 +756,13 @@ private struct ModelMenu: View {
             .disabled(!canEdit || shop.selectedArchiveIds(false).isEmpty)
         Button(Words.upfront("mac.unarchive_model")) { shop.unarchive(shop.selectedArchiveIds(true)) }
             .disabled(!canEdit || shop.selectedArchiveIds(true).isEmpty)
+        // VARIANTS OF ONE MODEL AS ONE TILE (`LibraryStacks`). Two items, as
+        // Archive and Restore are: a frozen title cannot say which it would
+        // do. No shortcut — ⌘G is Find Next on every Mac.
+        Button(Words.upfront("mac.stk_stack")) { shop.stackSelection() }
+            .disabled(!shop.showingLibrary || !shop.canStackSelection)
+        Button(Words.upfront("mac.stk_unstack")) { shop.unstackSelection() }
+            .disabled(!canEdit || shop.selectedStacks.isEmpty)
         Divider()
         // ⌘Y, and Space in the grid — the two gestures Finder uses, because a
         // library of print files is a Finder window in everything but name.
@@ -743,6 +771,9 @@ private struct ModelMenu: View {
             .disabled(!canReach)
         Button(Words.upfront("mac.reveal_in_finder")) { shop.revealSelection() }
             .keyboardShortcut("r", modifiers: [.command, .shift])
+        // The models most like the selected one, as a focus on the grid.
+        Button(Words.upfront("mac.sim_find")) { shop.findSimilarToSelection() }
+            .disabled(!shop.showingLibrary || shop.selectedFile == nil)
         Divider()
         // The library knew what a model weighs and how long it takes; the
         // catalogue asked a shop to type both in. This is the door between them.
@@ -809,5 +840,27 @@ private struct HelpCommand: View {
     var body: some View {
         Button(Words.upfront("mac.help_title")) { openWindow(id: HelpWindow.id) }
             .keyboardShortcut("?", modifiers: .command)
+    }
+}
+
+/// View ▸ Model View: the four sides, ⌥⌘1 to ⌥⌘4 — checked against every
+/// `keyboardShortcut` in the app (⌘1–9 are the screens, ⌥⌘0 the tile size,
+/// ⌥⌘I the details pane). Written out one by one so the clash test reads them.
+private struct ModelViewCommands: View {
+    @Environment(Shop.self) private var shop
+
+    var body: some View {
+        let off = !shop.showingLibrary || !(shop.selectedFile.map(ModelViewer.canDraw) ?? false)
+        Menu(Words.upfront("mac.mv_menu")) {
+            Button(Words.upfront("mac.mv_iso")) { shop.libraryViewAngle = .iso }
+                .keyboardShortcut("1", modifiers: [.command, .option])
+            Button(Words.upfront("mac.mv_front")) { shop.libraryViewAngle = .front }
+                .keyboardShortcut("2", modifiers: [.command, .option])
+            Button(Words.upfront("mac.mv_top")) { shop.libraryViewAngle = .top }
+                .keyboardShortcut("3", modifiers: [.command, .option])
+            Button(Words.upfront("mac.mv_side")) { shop.libraryViewAngle = .side }
+                .keyboardShortcut("4", modifiers: [.command, .option])
+        }
+        .disabled(off)
     }
 }

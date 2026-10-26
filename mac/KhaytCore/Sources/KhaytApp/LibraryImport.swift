@@ -239,7 +239,7 @@ enum LibraryImport {
                                      inPlace: inPlace, group: group, documents: documents, title: title,
                                      tags: tags, photos: photos, analyseRisk: analyseRisk, online: online)
         do {
-            // lock: callers — convertModel, addModelToLibrary, addModelsToLibrary, addMany
+            // lock: callers — convertModel, addModelToLibrary, addModelsToLibrary, addMany, importModelBundle
             try await write([made], storeURL: storeURL, owns: owns, whoHasIt: whoHasIt)
         } catch {
             // The book refused it, so the copy has no record to belong to.

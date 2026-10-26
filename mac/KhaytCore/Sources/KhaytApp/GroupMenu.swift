@@ -260,6 +260,11 @@ struct ManyModels: View {
                     .disabled(!shop.canWrite)
                 }
                 group(w.callIt("mac.li_group_organise")) {
+                    // Variants of one model as one tile (`LibraryStacks`).
+                    Button { shop.stackSelection() } label: {
+                        Label(w.callIt("mac.stk_stack_n", ["n": .number(Double(chosen.count))]), systemImage: "square.stack")
+                    }
+                    .disabled(!shop.canStackSelection)
                     Button { typedTag = ""; tagging = true } label: {
                         Label(w.callIt("mac.li_add_tag"), systemImage: "number")
                     }
