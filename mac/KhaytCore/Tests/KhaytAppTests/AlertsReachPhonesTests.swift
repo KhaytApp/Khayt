@@ -84,7 +84,9 @@ struct AlertsReachPhonesTests {
         #expect(watch.contains("try? await engine.alertEnable(settings: shop.settingsDict)"))
         #expect(!watch.contains("enable: KhaytEngine.Alerting.sensible) else {"),
                 "the fixed set is back, so runouts and requested stalls are lost again")
-        #expect(watch.contains("await shop.sendAlert(type: alert.type, title: title, body: body,"))
+        #expect(watch.contains("await shop.sendAlert(type: alert.type, title: title, body: bare, namedBody: body,"),
+                "a fault alert reaches the phones, and its file name only where the shop asked for names")
+        #expect(watch.contains("withFile: false"))
         #expect(MenuCoverageTests.source("Integrations.swift").contains("NtfySettings(shop: shop)"))
         let engine = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytCore/KhaytEngine.swift")
