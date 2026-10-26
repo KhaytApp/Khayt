@@ -28,8 +28,9 @@
   const DEFAULT_SERVER = 'https://ntfy.sh';
   /** A print's own news, from the finish seam and the pause watch (the Mac's
    *  `PrintNotices`): not faults, so not in `TYPES` and never in `enable`.
-   *  On by default wherever a channel is set up — the app's own per-event
-   *  switch decides first — and off for a channel told `false`. */
+   *  OPT-IN per channel: off unless the shop switched them on (`true`) for
+   *  that channel. A shop that set a channel up for printer FAULTS did not
+   *  ask to hear about every print, and ntfy.sh topics are readable by name. */
   const NOTICE_TYPES = ['finished', 'failed', 'paused'];
   const NOTICE_KEYS = { finished: 'notifyPrintFinished', failed: 'notifyPrintFailed', paused: 'notifyPrintPaused' };
 
@@ -45,7 +46,7 @@
       case 'offline': return tg.notifyPrinterOffline !== false;
       case 'stall': return !!tg.notifyPrinterStall;
       case 'runout': return tg.notifyPrinterRunout !== false;
-      case 'finished': case 'failed': case 'paused': return tg[NOTICE_KEYS[type]] !== false;
+      case 'finished': case 'failed': case 'paused': return tg[NOTICE_KEYS[type]] === true;
       default: return false;
     }
   }
@@ -66,9 +67,19 @@
     const n = (settings && settings.ntfy) || {};
     if (!n.enabled || !validTopic(n.topic) || !server(settings)) return false;
     const events = n.events || {};
-    if (NOTICE_TYPES.indexOf(type) !== -1) return events[type] !== false;
+    if (NOTICE_TYPES.indexOf(type) !== -1) return events[type] === true;
     if (TYPES.indexOf(type) === -1) return false;
     return events[type] === undefined ? DEFAULT_ON[type] : !!events[type];
+  }
+
+  /** May a print notice to this channel carry the job's title and the file's
+   *  name? A job or a G-code file is often named after the customer, so no
+   *  unless the shop ticked "include job and file names" (`printNoticeNames`)
+   *  for that channel. Without it a notice says the printer and what happened. */
+  function noticeNames(settings) {
+    const tg = (settings && settings.telegram) || {};
+    const n = (settings && settings.ntfy) || {};
+    return { telegram: tg.printNoticeNames === true, ntfy: n.printNoticeNames === true };
   }
 
   /** The channels this alert goes to. */
@@ -119,7 +130,7 @@
   }
 
   const api = { TYPES, NOTICE_TYPES, DEFAULT_ON, DEFAULT_SERVER, telegramWants, ntfyWants, routes, enable,
-                validTopic, server, ntfyRequest };
+                noticeNames, validTopic, server, ntfyRequest };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.KhaytAlertRoutes = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

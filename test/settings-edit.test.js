@@ -734,6 +734,24 @@ test('ntfy settings merge over what is stored, and a token absent from the form 
   assert.deepEqual(apply(stored, { shopName: 'x' }).ntfy, stored.ntfy, 'a form without it leaves it');
 });
 
+test('print notices: the Telegram and ntfy panes save their opt-in switches, and a form without them leaves none', () => {
+  const tgOut = apply({ telegram: { chatId: '-1' } }, { telegram: { notifyPrintFinished: true, notifyPrintFailed: true,
+    notifyPrintPaused: false, printNoticeNames: true } }).telegram;
+  assert.equal(tgOut.notifyPrintFinished, true);
+  assert.equal(tgOut.notifyPrintFailed, true);
+  assert.equal(tgOut.notifyPrintPaused, false);
+  assert.equal(tgOut.printNoticeNames, true);
+  const bare = apply({}, { telegram: { chatId: '-1' } }).telegram;
+  for (const k of ['notifyPrintFinished', 'notifyPrintFailed', 'notifyPrintPaused', 'printNoticeNames']) {
+    assert.equal(k in bare, false, `${k} written by a form that did not name it`);
+  }
+  const n = apply({ ntfy: { enabled: true, topic: 'x', events: { error: true } } },
+    { ntfy: { events: { finished: true, failed: false, paused: true }, printNoticeNames: true } }).ntfy;
+  assert.deepEqual(n.events, { error: true, finished: true, failed: false, paused: true });
+  assert.equal(n.printNoticeNames, true);
+  assert.equal('printNoticeNames' in apply({}, { ntfy: { topic: 'x' } }).ntfy, false);
+});
+
 test('minutes per spool change is saved, clamped, and left alone when absent', () => {
   assert.equal(apply({}, { swapMinutes: 4 }, { year: 2026 }).swapMinutes, 4);
   assert.equal(apply({}, { swapMinutes: 500 }, { year: 2026 }).swapMinutes, 60);

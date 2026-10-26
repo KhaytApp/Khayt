@@ -105,7 +105,9 @@ test('both languages carry the same placeholders', () => {
     // English does not — is wrong there.
     const spellsItOut = /_(one|two)$/.test(key);
     const same = en.join(',') === ar.join(',');
-    const arabicMayOmit = spellsItOut && ar.length === 0;
+    // Only the NUMBER may go: a counted sentence (`mac.stk_suggest_one`)
+    // still carries its other placeholders in both languages.
+    const arabicMayOmit = spellsItOut && en.filter((x) => x !== 'n').join(',') === ar.join(',');
     if (!same && !arabicMayOmit) {
       wrong.push(`${key}: en has [${en}] and ar has [${ar}]`);
     }
