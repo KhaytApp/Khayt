@@ -227,31 +227,11 @@ struct LibraryStage3bTests {
         #expect(!topInk.isEmpty && topInk.allSatisfy { $0 > mid }, "the tower at +X was drawn on the left")
     }
 
-    /// A 3MF with two plates: a cube on plate 1, a tall post on plate 2.
+    /// A 3MF with two plates: a cube on plate 1, a tall post on plate 2 —
+    /// the snapshot scene's own.
     static func twoPlates(_ dir: URL) throws -> URL {
-        func mesh(_ facets: [(Double, Double, Double)]) -> String {
-            var v = "", t = ""
-            for (i, c) in facets.enumerated() { v += "<vertex x=\"\(c.0)\" y=\"\(c.1)\" z=\"\(c.2)\"/>" ; if i % 3 == 2 { t += "<triangle v1=\"\(i - 2)\" v2=\"\(i - 1)\" v3=\"\(i)\"/>" } }
-            return "<mesh><vertices>\(v)</vertices><triangles>\(t)</triangles></mesh>"
-        }
-        let root = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
-         <resources>
-          <object id="1" type="model">\(mesh(MeshTests.boxFacets(20, 20, 20)))</object>
-          <object id="2" type="model">\(mesh(MeshTests.boxFacets(10, 10, 60)))</object>
-         </resources>
-         <build><item objectid="1"/><item objectid="2" transform="1 0 0 0 1 0 0 0 1 200 0 0"/></build>
-        </model>
-        """
-        let config = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <config><plate><metadata key="object_id" value="1"/></plate>
-        <plate><metadata key="object_id" value="2"/></plate></config>
-        """
         let url = dir.appending(path: "two-plates.3mf")
-        try ZipWrite.archive([ZipWrite.Member("3D/3dmodel.model", Data(root.utf8)),
-                              ZipWrite.Member("Metadata/model_settings.config", Data(config.utf8))]).write(to: url)
+        try Snapshot.twoPlateProject(at: url)
         return url
     }
 
@@ -281,6 +261,82 @@ struct LibraryStage3bTests {
         for angle in ModelViewAngle.allCases {
             #expect(Words.own[angle.key]?["en"]?.isEmpty == false && Words.own[angle.key]?["ar"]?.isEmpty == false)
         }
+    }
+    // MARK: The snapshot scene
+
+    @Test("the stage 3b scene's data shows what it says: a stack, a shape suggestion, a mirror note, two plates")
+    func sceneData() async throws {
+        let shop = await Self.sample()
+        let dir = Self.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let project = dir.appending(path: "two-plates.3mf")
+        try Snapshot.twoPlateProject(at: project)
+        let rows = Snapshot.stage3bRows(shop.libraryRows, project: project)
+        shop.pretendLibrary(rows)
+        shop.libraryRows = rows
+        shop.shelf = .library("Saudi Kings")
+        #expect(shop.libraryStackTile("PF-sample-king-1")?.isStack == true)
+        let khalid = try #require(shop.files.first { $0.id == "PF-sample-king-4" })
+        #expect(shop.stackSuggestion(for: khalid)?.reason == .sameShape, "no mirror caveat on the Variants shot")
+        let plates = try #require(shop.files.first { $0.id == Snapshot.stage3bProject })
+        let url = try #require(shop.modelFile(for: plates), "the viewer shot has nothing to draw")
+        #expect(ModelViewer.canDraw(plates))
+        #expect(try MeshPreview.render(url, size: 32)?.plates == [1, 2])
+        shop.findSimilar(to: khalid)
+        #expect(shop.libraryHealthFocus?.note == "mac.lh_mirror_note")
+        shop.clearLibraryFilter()
+        // The hook: its own `if`, ending the run.
+        let app = try Self.source("KhaytApp.swift")
+        let hook = try #require(app.range(of: "KHAYT_SNAPSHOT_LIBSTAGE3B"))
+        let body = String(app[hook.upperBound...].prefix(300))
+        #expect(body.contains("captureLibraryStage3b(shop, into: dir, dark: dark)")
+                && body.contains("NSApp.terminate(nil)") && body.contains("return"))
+    }
+
+    // MARK: Old mesh-drawn thumbnails
+
+    static func libraryFile(_ o: [String: JSONValue]) throws -> LibraryFile {
+        try JSONDecoder().decode(LibraryFile.self, from: JSONEncoder().encode(JSONValue.object(o)))
+    }
+
+    @Test("only a picture this app's renderer drew is a candidate; photos, 3MF previews and Electron's are not")
+    func redrawCandidates() throws {
+        func file(_ ext: String, _ thumb: String?, _ source: String?) throws -> LibraryFile {
+            var o: [String: JSONValue] = ["id": .string("x"), "name": .string("x"),
+                                          "sourceFile": .object(["ext": .string(ext), "filename": .string("m." + ext)])]
+            if let thumb { o["thumbFile"] = .string(thumb) }
+            if let source { o["thumbSource"] = .string(source) }
+            return try Self.libraryFile(o)
+        }
+        #expect(Shop.mayBeMeshDrawn(try file("stl", "thumb.png", "embedded")), "an import's drawing")
+        #expect(Shop.mayBeMeshDrawn(try file("obj", "thumb.png", "mesh")), "the --thumbnails pass")
+        #expect(!Shop.mayBeMeshDrawn(try file("stl", "thumb.png", "render")), "Electron's render")
+        #expect(!Shop.mayBeMeshDrawn(try file("3mf", "thumb.png", "embedded")), "a 3MF's own preview")
+        #expect(!Shop.mayBeMeshDrawn(try file("stl", "thumb.jpg", "embedded")))
+        #expect(!Shop.mayBeMeshDrawn(try file("stl", nil, nil)))
+    }
+
+    @Test("an old drawing is drawn again once, and marked; a current one is left alone")
+    func redrawOnce() throws {
+        let dir = Self.temp()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let model = dir.appending(path: "m.stl")
+        try MeshTests.binarySTL(MeshTests.boxFacets(30, 10, 5) + MeshTests.boxFacets(10, 10, 40, originX: 30)).write(to: model)
+        let thumb = dir.appending(path: "thumb.png")
+        let old = Data("not the new picture".utf8)
+        try old.write(to: thumb)
+        #expect(MeshPreview.renderVersion(of: thumb) == 0)
+        #expect(Shop.redrawIfOld(thumbnail: thumb, model: model))
+        #expect(try Data(contentsOf: thumb) != old && NSImage(contentsOf: thumb) != nil)
+        #expect(MeshPreview.renderVersion(of: thumb) == MeshPreview.renderVersion)
+        let drawn = try Data(contentsOf: thumb)
+        #expect(!Shop.redrawIfOld(thumbnail: thumb, model: model), "a current picture was drawn again")
+        #expect(try Data(contentsOf: thumb) == drawn)
+        #expect(try !FileManager.default.contentsOfDirectory(atPath: dir.path).contains { $0.hasPrefix(".thumb-redraw") })
+        // A redrawn picture's cache key differs, and it still decodes by path.
+        var parts = try #require(URLComponents(url: thumb, resolvingAgainstBaseURL: false))
+        parts.fragment = "r1"
+        #expect(ThumbnailStore.decode(.file(try #require(parts.url)), maxPixels: 64) != nil)
     }
 }
 
@@ -429,6 +485,54 @@ extension LibraryEditPerfTests {
             await shop.importModelBundle(evil)
             #expect(shop.importProblem == shop.words.callIt("mac.mb_bad_name", ["name": .string("model/../../escape.stl")]))
             #expect(shop.files.count == count + 1)
+        }
+    }
+
+    @Test("old drawings are redrawn as their tiles are drawn — never by a pass over the library")
+    func redrawLazily() async throws {
+        var root = Self.dragonBook()
+        guard case .array(var rows)? = root["printFiles"] else { return }
+        for i in 0..<3 {
+            guard case .object(var o) = rows[i] else { continue }
+            o.removeValue(forKey: "externalPath")
+            o["sourceFile"] = .object(["filename": .string("m.stl"), "ext": .string("stl"), "kind": .string("model")])
+            o["thumbFile"] = .string("thumb.png")
+            o["thumbSource"] = .string(i == 2 ? "render" : "embedded")
+            o["userPhoto"] = .string("")
+            rows[i] = .object(o)
+        }
+        root["printFiles"] = .array(rows)
+        try await withPerfBook(root) { shop, _ in
+            let primary = try #require(shop.libraryRoots?.primary)
+            let ids = ["pf000000000000", "pf000000000001", "pf000000000002"]
+            var thumbs: [String: URL] = [:]
+            for id in ids {
+                let dir = URL(fileURLWithPath: primary).appending(path: LibraryLocation.itemDirName(id))
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try MeshTests.binarySTL(MeshTests.boxFacets(10, 20, 30)).write(to: dir.appending(path: "m.stl"))
+                try Data("old".utf8).write(to: dir.appending(path: "thumb.png"))
+                thumbs[id] = dir.appending(path: "thumb.png")
+            }
+            shop.forgetLibraryDisk()
+            let files = try ids.map { id in try #require(shop.files.first { $0.id == id }) }
+            let start = shop.libraryMemo.work.thumbRedraws
+            // Everything that is not a tile being drawn asks nothing.
+            for f in shop.files { _ = shop.thumbnail(for: f) }
+            _ = shop.phoneLibrary(q: "", folder: "", offset: 0, limit: 500)
+            #expect(shop.libraryMemo.thumbQueue.isEmpty && shop.libraryMemo.thumbChecked.isEmpty,
+                    "a read that draws nothing queued a redraw")
+            // Drawing the three tiles: the two this app drew are redrawn, Electron's is not.
+            for f in files { _ = shop.displayedThumbnail(for: f) }
+            while shop.libraryMemo.thumbRedrawing { try await Task.sleep(for: .milliseconds(20)) }
+            #expect(shop.libraryMemo.work.thumbRedraws - start == 2)
+            #expect(try Data(contentsOf: thumbs[ids[0]]!) != Data("old".utf8))
+            #expect(try Data(contentsOf: thumbs[ids[2]]!) == Data("old".utf8), "Electron's picture was redrawn")
+            // A redrawn tile's source is a new key for the picture cache.
+            if case .file(let url)? = shop.thumbnail(for: files[0]) { #expect(url.fragment == "1") }
+            else { Issue.record("no picture") }
+            // Drawn again this run: not checked twice.
+            for f in files { _ = shop.displayedThumbnail(for: f) }
+            #expect(shop.libraryMemo.thumbQueue.isEmpty && !shop.libraryMemo.thumbRedrawing)
         }
     }
 }

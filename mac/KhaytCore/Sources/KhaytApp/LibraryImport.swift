@@ -664,6 +664,8 @@ enum LibraryImport {
         if thumbFile == nil, ext == "stl" || ext == "obj",
            let drawn = await offMain({ try? MeshPreview.png(of: destination) }),
            (try? drawn.write(to: dir.appending(path: "thumb.png"))) != nil {
+            // Drawn by today's projection: never redrawn (`Shop+ThumbnailRedraw`).
+            MeshPreview.markCurrent(dir.appending(path: "thumb.png"))
             thumbFile = "thumb.png"
         }
         return Analysis(size: size, provenance: said, geometry: geometry, riskAnalysis: riskAnalysis,

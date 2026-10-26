@@ -303,7 +303,7 @@ struct LibraryGrid: View {
     @ViewBuilder private func cell(for file: LibraryFile, pixels: Int) -> some View {
         // ONCE per cell: the tile and its right-click preview drew the same
         // picture from two separate asks.
-        let thumbnail = shop.thumbnail(for: file)
+        let thumbnail = shop.displayedThumbnail(for: file)
         Cell(file: file,
              thumbnail: thumbnail,
              selected: shop.fileSelection.contains(file.id),

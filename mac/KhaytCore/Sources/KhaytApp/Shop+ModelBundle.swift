@@ -62,7 +62,8 @@ extension Shop {
                 out.model.append((ModelBundle.memberPath(leaf, in: .model, taken: &taken), url))
             }
         }
-        if case .file(let thumb)? = cachedThumbnail(for: file), let data = try? Data(contentsOf: thumb) {
+        if case .file(let shown)? = cachedThumbnail(for: file),
+           case let thumb = URL(fileURLWithPath: shown.path), let data = try? Data(contentsOf: thumb) {
             out.pictures.append((ModelBundle.memberPath(thumb.lastPathComponent, in: .pictures, taken: &taken), data))
         }
         if let uri = file.userPhoto, let data = Self.dataURIBytes(uri) {

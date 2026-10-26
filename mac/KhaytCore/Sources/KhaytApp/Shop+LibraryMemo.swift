@@ -108,6 +108,8 @@ final class LibraryMemo {
         /// and passes over the whole book for the Fits sets.
         var fitBuilds = 0
         var fitSetBuilds = 0
+        /// Old mesh-drawn pictures drawn again (`considerRedraw`).
+        var thumbRedraws = 0
     }
 
     var work = Work()
@@ -216,6 +218,14 @@ final class LibraryMemo {
     /// Each drawn tile's stack, by the model it shows — from the last
     /// `memoEntries`, so a tile asks nothing to draw its badge.
     var stackTiles: [LibraryFile.ID: LibraryStacks.Tile] = [:]
+
+    /// Old mesh-drawn pictures (`Shop+ThumbnailRedraw.swift`): the models
+    /// whose picture was looked at this run, those waiting to be checked,
+    /// and how many times each was drawn again (the picture cache's key).
+    var thumbChecked: Set<LibraryFile.ID> = []
+    var thumbQueue: [(id: LibraryFile.ID, thumbnail: URL, model: URL)] = []
+    var thumbRedrawing = false
+    var thumbGeneration: [LibraryFile.ID: Int] = [:]
 }
 
 extension Shop.Shelf {
@@ -407,7 +417,9 @@ extension Shop {
         }
         if let known = memo.thumbs[file.id], known.file == file { return known.source }
         memo.work.diskChecks += 1
-        let found = Self.thumbnailOnDisk(file, roots: roots)
+        var found = Self.thumbnailOnDisk(file, roots: roots)
+        // A picture drawn again this run is a new key for the picture cache.
+        if case .file(let url)? = found { found = redrawnSource(url, id: file.id) }
         memo.thumbs[file.id] = (file, found)
         return found
     }

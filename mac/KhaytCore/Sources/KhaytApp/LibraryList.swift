@@ -407,7 +407,7 @@ struct LibraryList: View {
         Group {
             switch row.entry {
             case .file(let file):
-                Thumbnail(source: shop.thumbnail(for: file), pixels: 64, tint: file.firstColour,
+                Thumbnail(source: shop.displayedThumbnail(for: file), pixels: 64, tint: file.firstColour,
                           well: LibraryTile.well)
             case .folder(_, let path, _, let cover):
                 Thumbnail(source: shop.groupThumbnail(path, automatic: cover), pixels: 64, well: LibraryTile.well)

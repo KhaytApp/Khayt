@@ -687,7 +687,7 @@ struct ModelSummaryCard: View {
     private var picture: some View {
         // A fixed height, not an aspect ratio: `Thumbnail` has no size of its
         // own, and a 1:1 fit inside a vertical ScrollView drew nothing.
-        Thumbnail(source: shop.thumbnail(for: file))
+        Thumbnail(source: shop.displayedThumbnail(for: file))
             .frame(maxWidth: .infinity)
             .frame(height: 190)
             .clipShape(RoundedRectangle(cornerRadius: Radius.card))

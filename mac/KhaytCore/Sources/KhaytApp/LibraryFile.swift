@@ -21,6 +21,11 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let colors: [Colour]?
     let swapCount: Int?
     let thumbFile: String?
+    /// What made `thumbFile`: "embedded" (a file's own preview, or for an
+    /// STL a drawing an import made), "mesh" (the Mac's `--thumbnails` pass),
+    /// "render" (Electron's STL renderer). Read only to decide whether a
+    /// picture is one `MeshPreview` drew (`Shop.mayBeMeshDrawn`).
+    let thumbSource: String?
     /// A `data:image/jpeg;base64,…` URI, inline in the store — not a path. A
     /// shop that has photographed a print carries the photo in `khayt-store.json`
     /// itself, which is most of why that file is large.

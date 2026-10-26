@@ -766,6 +766,14 @@ final class Activator: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
                 return
             }
+            // Only library stage 3b: stacks closed and open, the Variants
+            // section's suggestion and mirror caveat, Find Similar's focus, and
+            // a two-plate project in the Views section — over the sample, in memory.
+            if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_LIBSTAGE3B"] == "1", let shop = subject {
+                await captureLibraryStage3b(shop, into: dir, dark: dark)
+                NSApp.terminate(nil)
+                return
+            }
             // Only Save to Khayt: the Saved from web folder, a saved page in
             // the inspector, and the Settings row — on the sample, in memory.
             if ProcessInfo.processInfo.environment["KHAYT_SNAPSHOT_WEBSAVE"] == "1", let shop = subject {

@@ -279,7 +279,9 @@ actor ThumbnailStore {
         let image: CGImageSource?
         switch source {
         case .file(let url):
-            image = CGImageSourceCreateWithURL(url as CFURL, nil)
+            // By path: a redrawn picture's URL carries a fragment that only
+            // keeps it apart in the cache (`Shop.redrawnSource`).
+            image = CGImageSourceCreateWithURL(URL(fileURLWithPath: url.path) as CFURL, nil)
         case .inlineData(let uri):
             // `data:[<mediatype>][;base64],<data>` — anything else is not ours.
             guard let comma = uri.firstIndex(of: ","),
