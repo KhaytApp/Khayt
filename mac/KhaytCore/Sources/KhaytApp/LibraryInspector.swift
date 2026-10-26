@@ -868,6 +868,9 @@ struct ModelSummaryCard: View {
     }
 
     private var estimated: Bool {
+        // Figures from before another Mac's newer version: not to be read as
+        // this file's (`LibraryFile.figuresStale`), ≈ like any estimate.
+        if file.figuresStale { return true }
         if let summary { return summary.estimated }
         return (file.parsed?.printTimeMins ?? 0) <= 0 || (file.parsed?.filamentGrams ?? 0) <= 0
     }
@@ -894,7 +897,11 @@ struct ModelSummaryCard: View {
                          approximate: estimated && cost != nil)
                 }
             }
-            if hours == nil && grams == nil {
+            if file.figuresStale {
+                Text(w.callIt("mac.li_figures_stale"))
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if hours == nil && grams == nil {
                 Text(w.callIt("mac.li_no_figures"))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

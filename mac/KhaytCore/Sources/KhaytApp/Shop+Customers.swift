@@ -737,7 +737,7 @@ extension Shop {
     /// already reports — rather than going for good. Found by a file-safety
     /// scan; the Finder can still delete it by hand.
     nonisolated static func trash(_ url: URL) throws {
-        // lock: callers — moveStrandedFiles, unlinkFolder, deleteLibraryFiles, removeLocalCopy
+        // lock: callers — moveStrandedFiles, unlinkFolder, deleteLibraryFiles, removeLocalCopy, resolveVaultConflict
         try FileManager.default.trashItem(at: url, resultingItemURL: nil)
     }
 

@@ -12,7 +12,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 - **Mac: what another Mac does in the Khayt Vault now reaches this one.** When another Mac added a model, put up a new version, trashed, restored or purged one, this Mac's library never caught up, and every vault request it made used the change up, so it could not catch up later either. Changes are now kept until applied, at launch, hourly and on opening the Library:
   - A model added elsewhere is online here, fetched on use.
   - A new version replaces a copy nobody has edited since the last sync.
-  - A copy edited here keeps both: the other Mac's version sits beside it with "vault v" and its version in the name, and a banner says so.
+  - When a new version arrives, the model's time, grams and cost are marked out of date in the inspector and measured again, so the old file's figures never pass as the new one's.
+  - A copy edited here keeps both: the other Mac's version sits beside it with "vault v" and its version in the name. A banner offers Keep This Mac's or Use the Vault's, and the copy not kept goes to the Trash. A kept copy is never uploaded as a model of its own.
   - A trash archives the record after an hour, and a restore un-archives it. A purge drops the link and keeps the record.
   - Nothing is applied while the staff lock refuses library edits, and nothing is lost meanwhile. No model is ever deleted, and the shop's own folders are never written.
   - The first pass after updating also applies what earlier builds missed.

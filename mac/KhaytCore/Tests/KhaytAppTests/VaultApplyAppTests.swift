@@ -52,6 +52,70 @@ struct VaultApplyAppTests {
         #expect(r["vaultFileId"] == nil && r["name"] == .string("Bracket"))
     }
 
+    @Test("a new version marks the record's figures out of date; the same bytes do not")
+    func figuresMarkedStale() throws {
+        var measured = Self.old
+        measured["contentHash"] = .string("old-hash")
+        var root = Self.book([measured, ["id": .string("PF-nohash")], ["id": .string("PF-same"), "contentHash": .string("s")]])
+        Shop.applyVaultEdits([.holds(recordId: "PF-old", fileId: "f1", sha256: "new-hash", size: 1),
+                              .holds(recordId: "PF-nohash", fileId: "f2", sha256: "n", size: 1),
+                              .holds(recordId: "PF-same", fileId: "f3", sha256: "s", size: 1)],
+                             replaced: ["PF-nohash"], at: "T", to: &root)
+        #expect(Self.record(root, "PF-old")?["figuresStaleFor"] == .string("new-hash"))
+        #expect(Self.record(root, "PF-nohash")?["figuresStaleFor"] == .string("n"),
+                "replaced here: stale even with no hash to compare")
+        #expect(Self.record(root, "PF-same")?["figuresStaleFor"] == nil)
+        // Read back as the inspector reads it.
+        let file = try JSONDecoder().decode(LibraryFile.self,
+                                            from: JSONEncoder().encode(JSONValue.object(Self.record(root, "PF-old")!)))
+        #expect(file.figuresStale)
+        let fresh = try JSONDecoder().decode(LibraryFile.self, from: JSONEncoder().encode(JSONValue.object(Self.old)))
+        #expect(!fresh.figuresStale, "an old record without the field is not stale")
+    }
+
+    @Test("a re-measure replaces the old bytes' figures and clears the mark; the shop's own fields stay")
+    func remeasureReplacesFigures() throws {
+        var stale = Self.old
+        stale["contentHash"] = .string("old"); stale["figuresStaleFor"] = .string("new")
+        stale["geometryKey"] = .string("1:1.0:1x1x1"); stale["geometryReader"] = .number(1)
+        stale["parsed"] = .object(["printTimeMins": .number(99), "filamentGrams": .number(12)])
+        stale["colors"] = .array([.object(["hex": .string("#FF0000")])])
+        var root = Self.book([stale])
+        let read = Shop.DownloadedRead(hash: "new", key: nil, reader: 4, colours: [], swapCount: 0, thumbFile: nil,
+                                       parsed: ["printTimeMins": .number(5)], size: 77, designer: nil, licence: nil)
+        Shop.applyRemeasured(["PF-old": read], to: &root)
+        let r = try #require(Self.record(root, "PF-old"))
+        #expect(r["figuresStaleFor"] == nil && r["contentHash"] == .string("new"))
+        #expect(r["parsed"] == .object(["printTimeMins": .number(5)]), "the new slicer figures, not the old")
+        #expect(r["geometryKey"] == nil, "a new file that will not measure keeps no old geometry")
+        #expect(r["meshTried"] != nil && r["geometryReader"] == .number(4))
+        #expect(r["colors"] == stale["colors"] && r["name"] == .string("Bracket"))
+    }
+
+    @Test("kept-both copies are never backed up or freed: known by their marker, not their name")
+    func keptCopiesAreNotUploaded() throws {
+        let tmp = FileManager.default.temporaryDirectory.appending(path: "vault-kept-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let folder = tmp.appending(path: LibraryLocation.itemDirName("PF-k"))
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        for n in ["part.stl", "part (vault v2).stl", "own (vault v9).stl"] { try Data(n.utf8).write(to: folder.appending(path: n)) }
+        // Only the one VaultApply kept carries the marker; the other is the
+        // shop's own file that happens to be named like one.
+        let marker = VaultApply.KeptMarker(of: "part.stl", fileId: "f", version: 2)
+        try JSONEncoder().encode(marker).write(to: VaultApply.keptMarkerURL(for: folder.appending(path: "part (vault v2).stl")))
+        let listed = CloudLibrary.libraryFiles(root: tmp.path)
+        #expect(listed.count == 3, "the marker is hidden: never listed as a file of its own")
+        let rows: [JSONValue] = [.object(["id": .string("PF-k")])]
+        let kept = CloudLibrary.ownFoldersOnly(listed, printFiles: rows, orders: []).map(\.filename).sorted()
+        #expect(kept == ["own (vault v9).stl", "part.stl"])
+        let roots = LibraryLocation.Roots(primary: tmp.path, mirror: nil, isCustom: true, roots: [tmp.path])
+        let found = Shop.vaultKeptCopies(rows: rows, roots: roots)
+        #expect(found.map(\.copy.lastPathComponent) == ["part (vault v2).stl"])
+        #expect(found.first?.mine.lastPathComponent == "part.stl" && found.first?.version == 2)
+        #expect(try LockRound3Tests.source("CloudLibrary.swift").contains("if VaultApply.isKeptCopy(url) { continue }"),
+                "the per-import backup skips them too")
+    }
+
     @Test("a model the shop archived itself stays archived whatever the vault does")
     func shopsOwnArchiveStays() throws {
         var mine = Self.old
@@ -123,6 +187,11 @@ struct VaultApplyAppTests {
         let screen = try source("ScreenActions.swift")
         let vault = try #require(screen.range(of: "if shop.libraryOnVault {"))
         #expect(screen[vault.upperBound...].prefix(900).contains("await shop.applyVaultChangesIfDue()"))
-        #expect(try source("Banners.swift").contains("shop.vaultConflictNote"))
+        let banners = try source("Banners.swift")
+        #expect(banners.contains("shop.resolveVaultConflict(kept, keepMine: true)")
+                && banners.contains("shop.resolveVaultConflict(kept, keepMine: false)"))
+        #expect(try source("Shop+VaultApply.swift").contains("if await remeasureStaleVaultModels(build: build, engine: engine, roots: roots) > 0"),
+                "a pass measures again what it replaced")
+        #expect(try source("LibraryInspector.swift").contains("if file.figuresStale { return true }"))
     }
 }

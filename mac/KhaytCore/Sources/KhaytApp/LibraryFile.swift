@@ -57,6 +57,13 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// have been printed from a file it never saw. The record stays, the file
     /// stays, and the library simply stops offering it.
     let archivedAt: String?
+    /// A newer version of the model came from another Mac through the vault
+    /// (`Shop+VaultApply`), and its measured figures — geometry, time, grams,
+    /// and so cost and price — are still the OLD bytes'. The hash of the bytes
+    /// they are due for; cleared by the re-measure. Absent on every record
+    /// whose figures are its own.
+    let figuresStaleFor: String?
+    var figuresStale: Bool { !(figuresStaleFor ?? "").isEmpty }
     /// The model that took its place, by id. Absent when a model was put aside
     /// on its own rather than replaced by a conversion.
     let supersededBy: String?

@@ -289,7 +289,7 @@ public enum VaultApply {
                 downloads += 1
                 let got = try await fetch(row, version: v, beside: local, sync: sync, seq: e.seq)
                 if got.sha256 == here.sha256 { try? fm.removeItem(at: got.url); continue }
-                try move(got.url, to: name)
+                try keep(got.url, as: name, of: filename, fileId: fileId, version: v)
                 copies.append(name)
             }
             if !copies.isEmpty { out.conflicts.append(Conflict(recordId: record.id, kept: local, copies: copies)) }
@@ -308,7 +308,7 @@ public enum VaultApply {
             let again = try await OffPool.digest(local)
             if again.sha256 != here.sha256 {
                 let name = folder.appending(path: keptName(filename, version: head.version))
-                if fm.fileExists(atPath: name.path) { try? fm.removeItem(at: got.url) } else { try move(got.url, to: name) }
+                if fm.fileExists(atPath: name.path) { try? fm.removeItem(at: got.url) } else { try keep(got.url, as: name, of: filename, fileId: fileId, version: head.version) }
                 out.conflicts.append(Conflict(recordId: record.id, kept: local, copies: [name]))
                 return .done
             }
@@ -328,7 +328,7 @@ public enum VaultApply {
                 holds(here.sha256, here.size, changedHere: false)
                 return .done
             }
-            try move(got.url, to: name)
+            try keep(got.url, as: name, of: filename, fileId: fileId, version: head.version)
             out.conflicts.append(Conflict(recordId: record.id, kept: local, copies: [name]))
         }
         return .done
@@ -393,6 +393,59 @@ public enum VaultApply {
             try? FileManager.default.removeItem(at: dest)
             throw error
         }
+    }
+
+    // MARK: - Kept-both copies
+
+    /// What marks a file as another device's version kept beside the shop's,
+    /// not a model of its own: a hidden `.<name>.vault-kept` beside it, so no
+    /// listing (`skipsHiddenFiles`) ever sees the marker as a file, and the
+    /// copy is known by the marker, never by its name alone — a shop may
+    /// well call a file "part (vault v2).stl" itself.
+    public struct KeptMarker: Codable, Equatable, Sendable {
+        public var v = 1
+        /// The shop's own file it was kept beside.
+        public var of: String
+        public var fileId: String
+        public var version: Int
+
+        public init(of: String, fileId: String, version: Int) {
+            self.of = of; self.fileId = fileId; self.version = version
+        }
+    }
+
+    public static func keptMarkerURL(for copy: URL) -> URL {
+        copy.deletingLastPathComponent().appending(path: ".\(copy.lastPathComponent).vault-kept")
+    }
+
+    /// The marker of a kept-both copy, or nil when `url` is not one.
+    public static func keptMarker(of url: URL) -> KeptMarker? {
+        guard let d = try? Data(contentsOf: keptMarkerURL(for: url)),
+              let m = try? JSONDecoder().decode(KeptMarker.self, from: d), !m.of.isEmpty else { return nil }
+        return m
+    }
+
+    public static func isKeptCopy(_ url: URL) -> Bool { keptMarker(of: url) != nil }
+
+    /// Every kept-both copy in one record folder, with its marker.
+    public static func keptCopies(in folder: URL) -> [(copy: URL, marker: KeptMarker)] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        return names.filter { $0.hasPrefix(".") && $0.hasSuffix(".vault-kept") }.sorted().compactMap { n in
+            let copy = folder.appending(path: String(n.dropFirst().dropLast(".vault-kept".count)))
+            guard FileManager.default.fileExists(atPath: copy.path), let m = keptMarker(of: copy) else { return nil }
+            return (copy, m)
+        }
+    }
+
+    /// The marker FIRST, then the copy: a crash between the two leaves a
+    /// marker naming nothing (ignored), never an unmarked copy a backup
+    /// would upload as a model of its own.
+    static func keep(_ download: URL, as copy: URL, of filename: String, fileId: String, version: Int) throws {
+        let enc = JSONEncoder()
+        enc.outputFormatting = .sortedKeys
+        try enc.encode(KeptMarker(of: filename, fileId: fileId, version: version))
+            .write(to: keptMarkerURL(for: copy), options: .atomic)
+        try move(download, to: copy)
     }
 
     /// A proved download into its place in one rename: a model is never half

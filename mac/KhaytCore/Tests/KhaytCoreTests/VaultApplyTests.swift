@@ -159,7 +159,12 @@ struct VaultApplyTests {
         let again = try await z.pass()
         #expect(again.conflicts.isEmpty)
         #expect(try FileManager.default.contentsOfDirectory(atPath: z.folder.path).sorted()
-                == ["part (vault v2).stl", "part.stl"])
+                == [".part (vault v2).stl.vault-kept", "part (vault v2).stl", "part.stl"])
+        // Marked as the vault's copy (so no backup uploads it); the shop's is not.
+        let fileId = try #require(a.sync.load().keys[Self.key])
+        #expect(VaultApply.keptMarker(of: copy) == VaultApply.KeptMarker(of: "part.stl", fileId: fileId, version: 2))
+        #expect(!VaultApply.isKeptCopy(z.model))
+        #expect(VaultApply.keptCopies(in: z.folder).map(\.copy) == [copy])
     }
 
     @Test("VaultApply: this Mac's own upload that conflicted keeps the other Mac's version beside it")

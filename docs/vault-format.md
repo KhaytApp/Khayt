@@ -327,6 +327,11 @@ KhaytCore. Another client may do these things differently and still read the sam
   - a `.cloud` sidecar with `provider: "vault"`, so the model is fetched on use;
   - the new head over a local copy that still hashes to `base`;
   - the other version beside a copy edited since then, named `<name> (vault v<N>).<ext>`.
+  A kept copy is marked by a hidden `.<copy name>.vault-kept` file (`{v, of, fileId, version}`)
+  beside it, so backups and Free Up Space skip it. The marker is what decides, never the
+  name. The shop then chooses which to keep, and the other goes to the Trash.
+  A replaced version marks the record's figures out of date (`figuresStaleFor`, the new
+  hash) until it is measured again.
   It never deletes a model and never writes a linked or adopted file. The record
   fields it writes are `vaultFileId`, `contentHash`/`sourceFile.size`, and for a
   vault trash `vaultTrashedAt`. A trash also sets `archivedAt` with `vaultArchived: true`

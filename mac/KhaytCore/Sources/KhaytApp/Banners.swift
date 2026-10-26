@@ -73,12 +73,24 @@ struct MoveBanners: View {
         // share links and products are made — while the vault is its remote.
         VaultLapseBanner(shop: shop)
         // A MODEL CHANGED ON ANOTHER MAC WHILE IT WAS EDITED HERE. Both are
-        // kept, the other Mac's beside the shop's (`VaultApply`). A problem
-        // to look at, not news: it stays until closed.
-        if let note = shop.vaultConflictNote {
-            Banner(text: note, symbol: "doc.on.doc", tint: Khayt.attention) {
-                BannerClose(words: shop.words) { shop.vaultConflictNote = nil }
+        // kept, the vault's beside the shop's (`VaultApply.keep`), until the
+        // shop says which stays: the other goes to the Trash. Three at most,
+        // and how many more.
+        ForEach(shop.vaultKeptCopies.prefix(3)) { kept in
+            Banner(text: shop.words.callIt("mac.vault_kept_both", ["name": .string(kept.title),
+                                                                   "copy": .string(kept.copy.lastPathComponent)]),
+                   symbol: "doc.on.doc", tint: Khayt.attention) {
+                Button(shop.words.callIt("mac.vault_keep_mine")) {
+                    Task { await shop.resolveVaultConflict(kept, keepMine: true) }
+                }
+                Button(shop.words.callIt("mac.vault_use_vaults")) {
+                    Task { await shop.resolveVaultConflict(kept, keepMine: false) }
+                }
             }
+        }
+        if shop.vaultKeptCopies.count > 3 {
+            Banner(text: shop.words.callIt("mac.vault_more_kept", ["n": .number(Double(shop.vaultKeptCopies.count - 3))]),
+                   symbol: "doc.on.doc", tint: Khayt.attention)
         }
         // PRODUCTS COSTED ON A SPOOL SIZE THAT HAS CHANGED. On every screen,
         // not only the catalogue: the edit that causes it is a spool's size,
