@@ -24,6 +24,28 @@ final class LibraryCopyTests: XCTestCase {
         XCTAssertNil(LibraryCopy.slim(try record(#"{"name":"no id"}"#)))
     }
 
+    func testANewVersionTheMacHasNotMeasuredIsNotPricedFromTheOldOne() async throws {
+        let engine = try KhaytEngine()
+        let fresh = #"{"id":"PF-1","name":"Lantern","parsed":{"printTimeMins":318,"filamentGrams":154,"plates":[{"index":1,"printTimeMins":100,"filamentGrams":50},{"index":2,"printTimeMins":218,"filamentGrams":104}]},"geometryKey":"1200:52000.5:80x80x120"}"#
+        let stale = fresh.replacingOccurrences(of: #""name":"Lantern""#, with: #""name":"Lantern","figuresStaleFor":"sha-of-v2""#)
+        guard let row = LibraryCopy.slim(try record(stale)) else { return XCTFail("kept nothing") }
+
+        let item = try XCTUnwrap(LibraryCopy.item(row))
+        XCTAssertTrue(item.figuresStale)
+        XCTAssertFalse(item.estimable)
+        XCTAssertNil(item.printTimeMins, "the old file's time is not shown as this one's")
+        XCTAssertNil(item.grams)
+        XCTAssertTrue(item.plates.isEmpty)
+        let priced = await LibraryCopy.figures(row, plate: nil, engine: engine, settings: [:], orders: [])
+        XCTAssertNil(priced, "neither the old slicer figures nor the old shape")
+
+        // Measured again on the Mac: the field goes, and the model prices as before.
+        let back = try XCTUnwrap(LibraryCopy.item(try XCTUnwrap(LibraryCopy.slim(try record(fresh)))))
+        XCTAssertFalse(back.figuresStale)
+        XCTAssertEqual(back.grams, 154)
+        XCTAssertTrue(back.estimable)
+    }
+
     func testTheGeometryKeyReadsAsVolumeAndBox() {
         XCTAssertEqual(LibraryCopy.mesh("4295525:3487958.9:1141.57x757.09x207.37"),
                        .init(volume: 3487958.9, x: 1141.57, y: 757.09, z: 207.37))

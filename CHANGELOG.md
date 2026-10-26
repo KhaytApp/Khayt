@@ -4,6 +4,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **iPhone: a model with a new version the Mac has not measured yet is not priced from the old one.** Away from the shop the library copy priced such a model (`figuresStaleFor`) from the previous file's slicer figures or shape, which the Mac no longer uses for it. The copy now shows no time or weight for it and says to price it on the shop Wi-Fi or use the calculator, until the Mac measures it again.
 - **iPhone: archived models stay off the library away from the shop.** The library copy the phone keeps for pricing on mobile data listed models put aside on the Mac (`archivedAt`), which the Mac's own library and the list it serves the phone on Wi-Fi both leave out. The copy now leaves them out too, and a model brought back on the Mac returns with its next sync.
 - **iPhone: library pictures from every folder, not only the top one.** Keeping the library's pictures for away from the shop asked the Mac for its list with no folder, which lists the top folder's models and nothing below it, so models in folders had no picture away from the shop. It now walks every folder, and a walk that finishes lets go of the pictures of models the Mac no longer lists (archived, deleted, or without a picture now).
 - **Mac: beta.8 — a warning before the vault deletes the only copy, and four follow-ups.**
