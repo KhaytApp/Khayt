@@ -376,6 +376,8 @@
   "plib.group_ph": "例: サウジ歴代国王",
   "plib.no_filter_match": "この絞り込みに合うファイルはありません。",
   "plib.tag_clear": "クリア",
+  "plib.archived": "アーカイブ済み",
+  "plib.archived_hint": "Macでアーカイブしたモデルです。記録には残り、すでに使っている注文や商品はそのまま使えます。",
   "plib.uncategorised": "カテゴリーなし",
   "plib.unfiled": "グループなし",
   "webhook.resent": "再送しました",

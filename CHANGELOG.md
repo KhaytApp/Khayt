@@ -4,6 +4,10 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Desktop: models archived on the Mac leave the desktop library too.** The Mac archives a model when the shop asks, or when its Khayt Vault file is moved to the Trash on another device. The desktop didn't know that and still showed those models as live, searchable and pickable for a product's part.
+  - They are now out of the library grid, its counts, its group, category and tag chips, the gallery, and the product part picker.
+  - They stay in your records, so jobs and products that already use them still work.
+  - When there are archived models, an "Archived" chip shows how many, and pressing it shows only those, as the Mac's Archived filter does.
 - **Mac: library stage 3b — stacks, Find Similar, viewer sides and plates, model bundles.**
   - Stacks: variants of one model ("Dragon", "Dragon supportless", "Dragon 150%") show as one tile with a count badge. Select tiles and choose Model ▸ Stack (or the right-click menu, or the multi-select pane), or accept the suggestion in a model's Variants section: the same group and name once words like supportless, 150% or v2 are taken off, the same file, or the same size and shape (with Library Health's mirror caveat). Click the badge to show the variants inline. Unstack, Remove from Stack and Show on Top of Stack are undoable. Filters and counts still count models through the one matcher: a stack shows when any of its variants matches, and its badge says how many of them are shown. A stack is two fields on each model (`stackId`, and `stackTop` on the cover), with no container record; the Electron app keeps them and shows each variant as its own model.
   - Find Similar (right-click, Model menu, the model's Variants section): the same file, then the same shape, then models near it in box, volume and triangle count, in the same group or with the same tags, ranked, as a focus on the grid. A same-shape match shows the mirror caveat above the grid.

@@ -376,6 +376,8 @@
   "plib.group_ph": "مثال: ملوك السعودية",
   "plib.no_filter_match": "لا توجد ملفات تطابق هذه التصفية.",
   "plib.tag_clear": "مسح",
+  "plib.archived": "المؤرشفة",
+  "plib.archived_hint": "نماذج أُرشفت على الماك. تبقى في سجلاتك، وتبقى الطلبات والمنتجات التي تستخدمها تعمل.",
   "plib.uncategorised": "بدون تصنيف",
   "plib.unfiled": "بدون مجموعة",
   "webhook.resent": "أُعيد الإرسال",

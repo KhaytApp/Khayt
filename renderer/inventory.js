@@ -3607,7 +3607,10 @@ function openProductEditor(productId = null) {
             <label>${escapeHtml(t('pe.print_file') || 'Print file')}</label>
             <select data-f="printFileId" class="part-printfile" data-pi="${i}">
               <option value="">${escapeHtml(t('pe.no_print_file') || '— none —')}</option>
-              ${(typeof printFiles !== 'undefined' ? printFiles : []).map((f) =>
+              ${(typeof printFiles !== 'undefined' ? printFiles : [])
+                // An archived model is offered only to the part that already names it.
+                .filter((f) => part.printFileId === f.id || !(typeof KhaytLibraryArchive !== 'undefined' && KhaytLibraryArchive.isArchived(f)))
+                .map((f) =>
                 `<option value="${escapeHtml(f.id)}"${part.printFileId === f.id ? ' selected' : ''}>${escapeHtml(f.name || f.originalName || f.id)}</option>`).join('')}
             </select>
           </div>

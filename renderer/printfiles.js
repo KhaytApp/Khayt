@@ -71,8 +71,19 @@
     });
   }
 
+  /* The library the grid is about: live models, or only the archived ones.
+   * A model the Mac archived (archivedAt — by the shop, or because its vault
+   * file was trashed) stays in the book but out of the grid, its counts and
+   * its chips, as on the Mac (lib/library-archive.js). */
+  const _LA = () => (typeof window !== 'undefined' && window.KhaytLibraryArchive) || null;
+  function pool() {
+    const all = Array.isArray(printFiles) ? printFiles : [];
+    const la = _LA();
+    return la ? la.pool(all, _archived) : all;
+  }
+
   function filtered(query) {
-    const list = Array.isArray(printFiles) ? printFiles : [];
+    const list = pool();
     const q = (query || '').trim().toLowerCase();
     let rows = q
       ? list.filter((r) => (r.name + ' ' + (r.originalName || '') + ' ' + (r.tags || []).join(' ') + ' ' + (r.material || '')).toLowerCase().includes(q))
@@ -131,7 +142,7 @@
   /** Everything the OTHER filters leave standing — the search box and the tag
    *  bar included, since both narrow the grid too. */
   function rowsExcept(field) {
-    const list = Array.isArray(printFiles) ? printFiles : [];
+    const list = pool();
     const q = (_query || '').trim().toLowerCase();
     return list.filter((r) => {
       if (q && !(r.name + ' ' + (r.originalName || '') + ' ' + (r.tags || []).join(' ') + ' ' + (r.material || '')).toLowerCase().includes(q)) return false;
@@ -222,13 +233,24 @@
   const _V = () => (typeof window !== 'undefined' && window.KhaytPrintVersions) || null;
   function allTags() {
     const shared = _T();
-    if (shared) return shared.tagCounts(printFiles || []);
+    if (shared) return shared.tagCounts(pool());
     const counts = new Map();
-    for (const r of (printFiles || [])) for (const tg of (r.tags || [])) {
+    for (const r of pool()) for (const tg of (r.tags || [])) {
       const key = String(tg).trim();
       if (key) counts.set(key, (counts.get(key) || 0) + 1);
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }
+
+  /** "Archived N", only while the Mac has archived something. Pressed, the
+   *  grid shows only the archived models, as the Mac's Archived filter does. */
+  function archivedBarHtml() {
+    const la = _LA();
+    const n = la ? la.archivedCount(printFiles) : 0;
+    if (!n) return '';
+    return `<div class="pf-folderbar" role="group" aria-label="${escapeHtml(t('plib.archived') || 'Archived')}">`
+      + `<button type="button" class="pf-folderchip ${_archived ? 'on' : ''}" data-act="pf-archived" aria-pressed="${_archived}" title="${escapeHtml(t('plib.archived_hint') || '')}">`
+      + `${escapeHtml(t('plib.archived') || 'Archived')} <span class="pf-tagchip-n">${n}</span></button></div>`;
   }
 
   function tagBarHtml() {
@@ -867,6 +889,7 @@
 
   let _query = '';
   let _tagFilter = ''; // active tag filter (empty = all)
+  let _archived = false; // true = only the models archived on the Mac
   /* "In neither" is its OWN ATTRIBUTE, not a magic value in the name attribute.
    *
    * This was `'\u0000unfiled'`, written into `data-folder` — and the HTML
@@ -924,7 +947,7 @@
    */
   function visibleRows() {
     return _view === 'gallery'
-      ? (printFiles || []).filter((r) => r.userPhoto)
+      ? pool().filter((r) => r.userPhoto)
       : filtered(_query);
   }
 
@@ -962,7 +985,10 @@
   // Drop a folder/tag filter that no longer matches any file (e.g. its last file was re-foldered or
   // deleted) so the grid can't get stuck on an empty, unclearable filter.
   function normalizeFilters() {
-    const list = printFiles || [];
+    // The last archived model brought back (or gone) leaves no Archived view to stand in.
+    const la = _LA();
+    if (_archived && !(la && la.archivedCount(printFiles) > 0)) _archived = false;
+    const list = pool();
     if (_folderFilter === UNFILED) { if (!list.some((r) => !groupOf(r))) _folderFilter = ''; }
     else if (_folderFilter && !list.some((r) => groupOf(r).toLowerCase() === _folderFilter.toLowerCase())) _folderFilter = '';
     if (_catFilter === UNFILED) { if (!list.some((r) => !categoryOf(r))) _catFilter = ''; }
@@ -975,7 +1001,7 @@
     const hasHub = !!(api() && api().printLibPick);
     const isGallery = _view === 'gallery';
     const rows = visibleRows();
-    const total = (printFiles || []).length;
+    const total = pool().length;
     if (!hasHub) return `<div class="pf-empty">${escapeHtml(t('plib.desktop_only') || 'The print-file library is available in the desktop app.')}</div>`;
     if (isGallery) return galleryHtml();
     const painted = rows.slice(0, _page);
@@ -987,7 +1013,7 @@
              <span class="pf-more-n">${escapeHtml(t('plib.n_of_m', { n: String(painted.length), m: String(rows.length) }))}</span>
            </div>` : '')
       : `<div class="pf-empty">${escapeHtml(total ? ((_tagFilter || _folderFilter || _catFilter) ? (t('plib.no_filter_match') || 'No files match this filter.') : (t('plib.no_match') || 'No files match your search.')) : (t('plib.empty') || 'No print files yet. Add your first STL, 3MF or G-code file.'))}</div>`;
-    return fileBarHtml('group') + fileBarHtml('category') + tagBarHtml() + grid;
+    return archivedBarHtml() + fileBarHtml('group') + fileBarHtml('category') + tagBarHtml() + grid;
   }
 
   /** Drop from the selection whatever the current filter, search or view
@@ -1169,6 +1195,7 @@
        * into one group and then picks another is asking a new question. */
       case 'pf-tag': { const tg = btn.dataset.tag || ''; _tagFilter = (_tagFilter.toLowerCase() === tg.toLowerCase()) ? '' : tg; resetPage(); renderList(); break; }
       case 'pf-tag-clear': _tagFilter = ''; resetPage(); renderList(); break;
+      case 'pf-archived': _archived = !_archived; resetPage(); renderList(); break;
       /* `data-unfiled` rather than a value, and case-folded like every other
        * comparison here: the bar's chip carries the spelling used MOST while a
        * card's carries that record's own, so a strict === meant pressing the lit
