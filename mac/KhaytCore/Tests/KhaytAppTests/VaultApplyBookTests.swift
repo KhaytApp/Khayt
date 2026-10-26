@@ -109,7 +109,8 @@ extension LibraryEditPerfTests {
             let copy = folder.appending(path: "m (vault v2).stl")
             try JSONEncoder().encode(VaultApply.KeptMarker(of: "m.stl", fileId: "f", version: 2))
                 .write(to: VaultApply.keptMarkerURL(for: copy))
-            let kept = try #require(Shop.vaultKeptCopies(rows: shop.fileRows, roots: shop.libraryRoots!).first)
+            let known = [LibraryLocation.itemDirName("PF-vc") + "/m.stl": "f"]
+            let kept = try #require(Shop.vaultKeptCopies(rows: shop.fileRows, roots: shop.libraryRoots!, known: known).first)
             shop.vaultKeptCopies = [kept]
             await shop.resolveVaultConflict(kept, keepMine: false)
             #expect(try Data(contentsOf: folder.appending(path: "m.stl")) == Self.tetra)
@@ -119,6 +120,50 @@ extension LibraryEditPerfTests {
             let file = try #require(shop.files.first)
             #expect(file.contentHash == Self.hash(Self.tetra))
             #expect(!file.figuresStale && file.geometryKey != nil, "measured again at once")
+        }
+    }
+
+    @Test("Vault: two answers to one kept copy carry out one, and the model file is never left missing (M5)")
+    func vaultOneAnswer() async throws {
+        let mine = Data("solid mine\nendsolid mine\n".utf8)
+        let record: [String: JSONValue] = [
+            "id": .string("PF-v2"), "name": .string("Tetra"), "contentHash": .string(Self.hash(mine)),
+            "sourceFile": .object(["filename": .string("m.stl"), "ext": .string("stl"), "size": .number(1)]),
+        ]
+        try await Self.withVaultBook(record, files: ["m.stl": mine, "m (vault v2).stl": Self.tetra]) { shop, folder in
+            let copy = folder.appending(path: "m (vault v2).stl")
+            try JSONEncoder().encode(VaultApply.KeptMarker(of: "m.stl", fileId: "f", version: 2))
+                .write(to: VaultApply.keptMarkerURL(for: copy))
+            let known = [LibraryLocation.itemDirName("PF-v2") + "/m.stl": "f"]
+            let kept = try #require(Shop.vaultKeptCopies(rows: shop.fileRows, roots: shop.libraryRoots!, known: known).first)
+            shop.vaultKeptCopies = [kept]
+            async let first: Void = shop.resolveVaultConflict(kept, keepMine: false)
+            async let second: Void = shop.resolveVaultConflict(kept, keepMine: false)
+            _ = await (first, second)
+            await shop.resolveVaultConflict(kept, keepMine: true)   // a late second button
+            #expect(try Data(contentsOf: folder.appending(path: "m.stl")) == Self.tetra, "the vault's, in place")
+            #expect(shop.vaultKeptCopies.isEmpty)
+        }
+    }
+
+    @Test("Vault: figures from an older version price as an estimate, said so, never as sliced (M1)")
+    func staleFiguresAreNotSliced() async throws {
+        let record: [String: JSONValue] = [
+            "id": .string("PF-vs"), "name": .string("Tetra"),
+            "sourceFile": .object(["filename": .string("m.stl"), "ext": .string("stl"), "size": .number(1)]),
+            "contentHash": .string(Self.hash(Self.tetra)), "figuresStaleFor": .string(Self.hash(Self.tetra)),
+            "parsed": .object(["printTimeMins": .number(999), "filamentGrams": .number(500)]),
+        ]
+        try await Self.withVaultBook(record, files: ["m.stl": Self.tetra]) { shop, _ in
+            let file = try #require(shop.files.first)
+            let made = try #require(await shop.modelPart(from: file))
+            #expect(Shop.plainNumber(made.part["printWeight"]) != 500, "the old file's grams are not this file's")
+            #expect(Shop.plainNumber(made.part["printTime"]) != 999.0 / 60)
+            #expect(made.note?.contains(shop.words.callIt("mac.figures_stale_reason")) == true)
+            let facts = LibraryFacts.sliced(file)
+            #expect(facts.gramsEstimated && facts.minutesEstimated, "≈ on the tile")
+            let list = Shop.totals([file], estimates: [:], onlineOnly: { _ in false }, present: { _ in true })
+            #expect(list.anyEstimated)
         }
     }
 
@@ -133,11 +178,12 @@ extension LibraryEditPerfTests {
             let copy = folder.appending(path: "m (vault v2).stl")
             try JSONEncoder().encode(VaultApply.KeptMarker(of: "m.stl", fileId: "f", version: 2))
                 .write(to: VaultApply.keptMarkerURL(for: copy))
-            let kept = try #require(Shop.vaultKeptCopies(rows: shop.fileRows, roots: shop.libraryRoots!).first)
+            let known = [LibraryLocation.itemDirName("PF-vk") + "/m.stl": "f"]
+            let kept = try #require(Shop.vaultKeptCopies(rows: shop.fileRows, roots: shop.libraryRoots!, known: known).first)
             await shop.resolveVaultConflict(kept, keepMine: true)
             #expect(try Data(contentsOf: folder.appending(path: "m.stl")) == mine)
             #expect(!FileManager.default.fileExists(atPath: copy.path))
-            #expect(Shop.vaultKeptCopies(rows: shop.fileRows, roots: shop.libraryRoots!).isEmpty)
+            #expect(Shop.vaultKeptCopies(rows: shop.fileRows, roots: shop.libraryRoots!, known: known).isEmpty)
             #expect(shop.files.first?.contentHash == Self.hash(mine))
         }
     }

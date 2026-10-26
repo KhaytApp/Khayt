@@ -45,11 +45,29 @@ public enum VaultApply {
         public var contentHash: String?
         public var vaultFileId: String?
         public var vaultTrashed: Bool
+        /// The record's OWN file name (`sourceFile.filename`). A folder can
+        /// hold several vault files — a 3MF and its G-code, a pack's parts —
+        /// and only this one's bytes are the record's: its hash, its size,
+        /// its trash. The others are brought into line as files and never
+        /// written onto the record (beta.8 security review M2). Nil: an older
+        /// record that does not say, and any file in the folder stands in.
+        public var filename: String?
+        /// `vaultPurgedAt` is set: the vault deleted its copy once. A copy
+        /// seen in the vault again clears it (`.holds`).
+        public var vaultPurged: Bool
 
         public init(id: String, folderName: String, inPlace: Bool = false, contentHash: String? = nil,
-                    vaultFileId: String? = nil, vaultTrashed: Bool = false) {
+                    vaultFileId: String? = nil, vaultTrashed: Bool = false, filename: String? = nil,
+                    vaultPurged: Bool = false) {
             self.id = id; self.folderName = folderName; self.inPlace = inPlace; self.contentHash = contentHash
             self.vaultFileId = vaultFileId; self.vaultTrashed = vaultTrashed
+            self.filename = filename; self.vaultPurged = vaultPurged
+        }
+
+        /// Is `name` this record's own file, not one of its parts?
+        public func owns(_ name: String) -> Bool {
+            guard let filename, !filename.isEmpty else { return true }
+            return filename.lowercased() == name.lowercased()
         }
     }
 
@@ -87,11 +105,14 @@ public enum VaultApply {
         /// Out of the Trash: archived again only if the vault archived it.
         case restored(recordId: String)
         /// Gone from the vault for good: the link dropped, the record kept.
-        case purged(recordId: String)
+        /// `onlyCopy`: this device held only the vault's sidecar for it, so
+        /// no byte of it is left HERE (`vaultPurgedAt`, Library Health). It
+        /// says nothing about other devices.
+        case purged(recordId: String, onlyCopy: Bool)
 
         public var recordId: String {
             switch self {
-            case .holds(let r, _, _, _), .trashed(let r, _), .restored(let r), .purged(let r): r
+            case .holds(let r, _, _, _), .trashed(let r, _), .restored(let r), .purged(let r, _): r
             }
         }
     }
@@ -117,6 +138,8 @@ public enum VaultApply {
         public var held = 0
         /// Why a change could not be applied this time (not for the shop's eyes).
         public var problems: [String] = []
+        /// Downloads made this pass so far (`run`'s `downloadsSoFar`).
+        public var downloads = 0
     }
 
     /// A trash is applied to the record only after this long. A vault trash
@@ -126,6 +149,10 @@ public enum VaultApply {
     public static let trashGrace: TimeInterval = 3600
     /// How long a change waits for its record to arrive with the book's sync.
     public static let recordWait: TimeInterval = 7 * 86_400
+    /// How long another device's new version waits for ITS RECORD — the one
+    /// naming the new bytes' hash — to arrive with the book's sync, before
+    /// this device brings the bytes and writes the hash itself (`bytes`).
+    public static let bookWait: TimeInterval = 86_400
     /// Downloads in one pass; the rest wait for the next.
     public static let downloadsPerPass = 25
 
@@ -151,16 +178,22 @@ public enum VaultApply {
 
     // MARK: - The pass
 
+    /// The pass over `only` (a slice of `pendingChanges()`, so the app can
+    /// write and settle a large first pass a batch at a time), or over every
+    /// pending change. `downloadsSoFar`: what earlier batches of the same
+    /// pass already fetched, so the cap is per pass, not per batch.
     public static func run(_ sync: VaultSync, library: Library, engine: KhaytEngine,
-                           now: Date = Date()) async -> Outcome {
+                           now: Date = Date(), only: [VaultSync.Pending]? = nil,
+                           downloadsSoFar: Int = 0) async -> Outcome {
         var out = Outcome()
-        var downloads = 0
+        var downloads = downloadsSoFar
         let st = sync.load()
-        for p in sync.pendingChanges() {
+        let digests = DigestMemo(file: DigestMemo.url(for: sync))
+        for p in only ?? sync.pendingChanges() {
             let verdict: Verdict
             do {
                 verdict = try await one(p, sync: sync, state: st, library: library, engine: engine, now: now,
-                                        downloads: &downloads, out: &out)
+                                        digests: digests, downloads: &downloads, out: &out)
             } catch {
                 verdict = .held
                 out.problems.append("\(p.change.fileId): \(error)")
@@ -170,6 +203,8 @@ public enum VaultApply {
             case .held: out.held += 1
             }
         }
+        digests.save()
+        out.downloads = downloads
         return out
     }
 
@@ -185,13 +220,37 @@ public enum VaultApply {
     static func target(_ meta: VaultMeta, fileId: String, state: VaultSyncState,
                        library: Library) -> (Record, String)? {
         let key = meta.key ?? state.keys.first { $0.value == fileId }?.key
-        guard let key, let place = place(of: key) else { return nil }
+        guard let key else { return nil }
+        return target(key: key, recordId: meta.recordId, library: library)
+    }
+
+    static func target(key: String, recordId: String?, library: Library) -> (Record, String)? {
+        guard let place = place(of: key) else { return nil }
         // The FOLDER the key names decides: that is where the bytes live.
         // The meta's record id only stands in when no record owns it.
         let id = library.byFolder[place.folder]
-            ?? meta.recordId.flatMap { library.records[$0]?.folderName == place.folder ? $0 : nil }
+            ?? recordId.flatMap { library.records[$0]?.folderName == place.folder ? $0 : nil }
         guard let id, let record = library.records[id] else { return nil }
         return (record, place.filename)
+    }
+
+    /// Does this record's folder hold the vault's sidecar for `filename`
+    /// (naming `key`, when it is known) and no bytes beside it — so the
+    /// vault's copy was the only one on this device?
+    static func onlyVaultSidecar(_ record: Record, filename: String, key: String?, library: Library) -> Bool {
+        guard let folder = library.folder(record) else { return false }
+        let fm = FileManager.default
+        let model = folder.appending(path: filename)
+        let side = folder.appending(path: filename + ".cloud")
+        guard !fm.fileExists(atPath: model.path),
+              let attrs = try? fm.attributesOfItem(atPath: side.path),
+              let size = (attrs[.size] as? NSNumber)?.intValue, size > 0, size < 64 * 1024,
+              let data = try? Data(contentsOf: side) else { return false }
+        struct Side: Decodable { let provider: String?; let key: String? }
+        guard let s = try? JSONDecoder().decode(Side.self, from: data),
+              s.provider == VaultOnlyCopies.vaultProvider else { return false }
+        if let key, let k = s.key, !k.isEmpty, k != key { return false }
+        return true
     }
 
     /// The state entry's current meta, opened.
@@ -201,15 +260,31 @@ public enum VaultApply {
     }
 
     static func one(_ p: VaultSync.Pending, sync: VaultSync, state st: VaultSyncState, library: Library,
-                    engine: KhaytEngine, now: Date, downloads: inout Int, out: inout Outcome) async throws -> Verdict {
+                    engine: KhaytEngine, now: Date, digests: DigestMemo, downloads: inout Int,
+                    out: inout Outcome) async throws -> Verdict {
         switch p.change {
         case .refused:
             return .done
 
         case .purged(let fileId, let recordId):
-            let id = library.byVaultFile[fileId] ?? recordId
-            if let id, let r = library.records[id], r.vaultFileId == fileId || r.vaultTrashed {
-                out.edits.append(.purged(recordId: id))
+            // Decided by what this device holds, not by `vaultFileId` alone:
+            // a record whose copy already matched never had the link written
+            // (`holds`), and a model moved online by Free Up Space here is
+            // exactly the one whose last copy this was (beta.8 review H1).
+            var record: Record?
+            var filename: String?
+            if let key = p.key, let (r, name) = target(key: key, recordId: recordId, library: library) {
+                record = r; filename = name
+            } else if let id = library.byVaultFile[fileId] ?? recordId {
+                record = library.records[id]
+            }
+            guard let r = record else { return .done }
+            // A part of the record (another file in its folder) going says
+            // nothing about the record's own copy.
+            if let filename, !r.owns(filename), r.vaultFileId != fileId { return .done }
+            let only = filename.map { onlyVaultSidecar(r, filename: $0, key: p.key, library: library) } ?? false
+            if r.vaultFileId == fileId || r.vaultTrashed || only {
+                out.edits.append(.purged(recordId: r.id, onlyCopy: only))
             }
             return .done
 
@@ -218,35 +293,53 @@ public enum VaultApply {
             guard let e = st.files[fileId], e.trashed else { return .done }
             guard now.timeIntervalSince(p.at) >= trashGrace else { return .held }
             guard let meta = currentMeta(e, keys: sync.keys),
-                  let (record, _) = target(meta, fileId: fileId, state: st, library: library) else {
+                  let (record, name) = target(meta, fileId: fileId, state: st, library: library) else {
                 // Its record is gone: deleted with it, by the book's sync.
                 return .done
             }
+            // A part trashed is not the model trashed.
+            guard record.owns(name) else { return .done }
             if !record.vaultTrashed { out.edits.append(.trashed(recordId: record.id, fileId: fileId)) }
             return .done
 
         case .restored(let fileId, _):
             guard let e = st.files[fileId], !e.trashed else { return .done }
             guard let meta = currentMeta(e, keys: sync.keys),
-                  let (record, _) = target(meta, fileId: fileId, state: st, library: library) else { return .done }
+                  let (record, name) = target(meta, fileId: fileId, state: st, library: library),
+                  record.owns(name) else { return .done }
             if record.vaultTrashed { out.edits.append(.restored(recordId: record.id)) }
             return .done
 
         case .appeared(let fileId, _), .changed(let fileId, _):
             return try await bytes(p, fileId: fileId, versions: nil, sync: sync, state: st, library: library,
-                                   engine: engine, now: now, downloads: &downloads, out: &out)
+                                   engine: engine, now: now, digests: digests, downloads: &downloads, out: &out)
 
         case .conflict(let fileId, _, let versions):
             return try await bytes(p, fileId: fileId, versions: versions, sync: sync, state: st, library: library,
-                                   engine: engine, now: now, downloads: &downloads, out: &out)
+                                   engine: engine, now: now, digests: digests, downloads: &downloads, out: &out)
         }
     }
 
     /// A new file, a new head, or a conflict: the record's copy brought
     /// into line. `versions` (a conflict) are kept side by side.
+    ///
+    /// ── ANOTHER DEVICE'S NEW VERSION WAITS FOR ITS RECORD ─────────────────
+    ///
+    /// The vault carries the bytes at once; the book's sync carries the
+    /// record the other device changed with them (its new hash, its new
+    /// figures, maybe a new name or version entry) a little later. Applied
+    /// before that record arrives, the change would write the new hash onto
+    /// THIS device's old copy of the record and stamp it — and the book
+    /// merges whole records, last writer wins (`lib/sync.js`), so that stamp
+    /// would beat the other device's edit and drop everything else in it
+    /// (beta.8 review H2; khayt-two-machines-one-old). So nothing is done —
+    /// no bytes, no book — until the record here already names the head's
+    /// hash; then the bytes come down and the book is not written at all.
+    /// Only after `bookWait` with no such record (the other device does not
+    /// sync its book) is the hash written from here.
     static func bytes(_ p: VaultSync.Pending, fileId: String, versions: [Int]?, sync: VaultSync,
                       state st: VaultSyncState, library: Library, engine: KhaytEngine, now: Date,
-                      downloads: inout Int, out: inout Outcome) async throws -> Verdict {
+                      digests: DigestMemo, downloads: inout Int, out: inout Outcome) async throws -> Verdict {
         // Purged since, or in the Trash (its `.trashed` change deals with
         // the record): no bytes brought down for it.
         guard let e = st.files[fileId], !e.trashed, let row = e.row, let head = row.headVersion,
@@ -257,26 +350,43 @@ public enum VaultApply {
         // The shop's own file, or a folder this device must not write.
         guard !record.inPlace, let folder = library.folder(record) else { return .done }
         let local = folder.appending(path: filename)
+        // Only the record's own file speaks for the record (security M2):
+        // a part's bytes are brought into line, its hash never written.
+        let own = record.owns(filename)
         // What the head's bytes hash to, when the meta record is the head's own.
         let newSha = meta.uploadId == head.uploadId ? meta.sha256 : nil
+        // The head is this device's own upload.
+        let mine = head.deviceId != nil && head.deviceId == sync.deviceId
+        if versions == nil, own, !mine, let newSha, let has = record.contentHash, !has.isEmpty,
+           has.lowercased() != newSha.lowercased(), now.timeIntervalSince(p.at) < bookWait {
+            return .held
+        }
         func holds(_ sha: String, _ size: Int, changedHere: Bool) {
+            guard own else { return }
             Self.holds(record, fileId: fileId, sha: sha, size: size, changedHere: changedHere, out: &out)
         }
 
         let fm = FileManager.default
         guard fm.fileExists(atPath: local.path) else {
             guard let sha = newSha else { return .done }
+            // A rename: the record's own file, under its old name, already
+            // is these bytes. No second entry beside it (review L8).
+            if !own, let ownName = record.filename, !ownName.isEmpty {
+                let theirs = folder.appending(path: ownName)
+                if fm.fileExists(atPath: theirs.path),
+                   try await digests.digest(theirs).sha256.lowercased() == sha.lowercased() { return .done }
+            }
             switch try await markOnline(local, key: meta.key ?? "", sha: sha, size: head.plaintextSize,
                                         engine: engine) {
             case .wrote:
-                if !out.online.contains(record.id) { out.online.append(record.id) }
+                if own, !out.online.contains(record.id) { out.online.append(record.id) }
                 holds(sha, head.plaintextSize, changedHere: true)
             case .already: holds(sha, head.plaintextSize, changedHere: false)
             case .left: break
             }
             return .done
         }
-        let here = try await OffPool.digest(local)
+        let here = try await digests.digest(local)
         if let versions {
             // Keep both: every newer version that is not the shop's own bytes.
             // The first listed is the head this device knew, when there was one.
@@ -299,6 +409,11 @@ public enum VaultApply {
             holds(here.sha256, here.size, changedHere: false)
             return .done
         }
+        // The head is this device's own upload, and the file has changed
+        // since: an edit the backup has not uploaded yet. It will; nothing
+        // is brought down beside it, and it is never called another
+        // device's change (beta.8 review M7).
+        if mine { return .done }
         // Untouched since this device last synced it: the new version over it.
         if let base = p.base, here.sha256 == base {
             guard downloads < downloadsPerPass else { return .held }
@@ -313,7 +428,8 @@ public enum VaultApply {
                 return .done
             }
             try move(got.url, to: local)
-            out.replaced.append(record.id)
+            digests.forget(local)
+            if own { out.replaced.append(record.id) }
             holds(got.sha256, got.size, changedHere: true)
             return .done
         }
@@ -371,11 +487,22 @@ public enum VaultApply {
     /// each the newest in the book's last-writer-wins sync, over any edit
     /// another Mac made to them meanwhile. So the book is written when its
     /// hash is wrong, or when this pass changed the bytes on this device.
+    ///
+    /// Nor is it stamped to add the link after this pass changed the bytes,
+    /// once the record already names them: that record is the other
+    /// device's, freshly arrived, and a stamp here would win the merge over
+    /// its next edit (beta.8 review H2). What the link was for — telling a
+    /// purge of the record's own copy — is read from the vault and the
+    /// folder now (`.purged`), not from the field.
+    ///
+    /// Written: the hash is wrong (absent, with the bytes changed here; or
+    /// another), or the record still says the vault purged its copy.
     static func holds(_ record: Record, fileId: String, sha: String, size: Int, changedHere: Bool,
                       out: inout Outcome) {
-        let hashDiffers = record.contentHash?.lowercased() != sha.lowercased()
-        let stale = record.contentHash != nil && hashDiffers
-        guard stale || (changedHere && (hashDiffers || record.vaultFileId != fileId)) else { return }
+        let has = (record.contentHash ?? "").lowercased()
+        let stale = !has.isEmpty && has != sha.lowercased()
+        let missing = has.isEmpty && changedHere
+        guard stale || missing || record.vaultPurged else { return }
         out.edits.append(.holds(recordId: record.id, fileId: fileId, sha256: sha, size: size))
     }
 
@@ -419,10 +546,27 @@ public enum VaultApply {
     }
 
     /// The marker of a kept-both copy, or nil when `url` is not one.
+    ///
+    /// A marker is a file in a folder that may be shared (a NAS, a cloud
+    /// drive), so its `of` is taken only as ONE safe name in the copy's own
+    /// folder: never a path, never hidden, never the copy itself (beta.8
+    /// security review M3). "Use the vault's" sends `of` to the Trash.
     public static func keptMarker(of url: URL) -> KeptMarker? {
-        guard let d = try? Data(contentsOf: keptMarkerURL(for: url)),
-              let m = try? JSONDecoder().decode(KeptMarker.self, from: d), !m.of.isEmpty else { return nil }
+        let marker = keptMarkerURL(for: url)
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: marker.path),
+              (attrs[.size] as? NSNumber)?.intValue ?? 0 < 64 * 1024,
+              let d = try? Data(contentsOf: marker),
+              let m = try? JSONDecoder().decode(KeptMarker.self, from: d),
+              isSafeLeaf(m.of), m.of != url.lastPathComponent, !m.fileId.isEmpty else { return nil }
         return m
+    }
+
+    /// One file name, safe to join to a folder: no separator, no `.`/`..`,
+    /// not hidden, no control characters.
+    public static func isSafeLeaf(_ name: String) -> Bool {
+        guard !name.isEmpty, name.utf8.count <= 255, name != ".", name != "..", !name.hasPrefix("."),
+              !name.contains("/"), !name.contains("\\"), !name.contains(":") else { return false }
+        return !name.unicodeScalars.contains { $0.properties.generalCategory == .control }
     }
 
     public static func isKeptCopy(_ url: URL) -> Bool { keptMarker(of: url) != nil }
@@ -479,5 +623,66 @@ enum OffPool {
                 }
             }
         }
+    }
+}
+
+/// What a model's bytes hashed to, by path, while the file's size and
+/// modification time are what they were then. The first pass after the
+/// update looks at every file the vault holds; without this, every held
+/// change (and every pass a quit cut short) read every model again in full
+/// (beta.8 review M6). Kept beside the vault state; a miss costs a hash.
+final class DigestMemo: @unchecked Sendable {
+    struct Seen: Codable, Equatable { var size: Int; var mtime: Double; var sha256: String }
+    private var seen: [String: Seen]
+    private var dirty = false
+    private let file: URL
+    private let lock = NSLock()
+
+    static func url(for sync: VaultSync) -> URL {
+        sync.stateURL.deletingPathExtension().appendingPathExtension("digests.json")
+    }
+
+    init(file: URL) {
+        self.file = file
+        seen = (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode([String: Seen].self, from: $0) } ?? [:]
+    }
+
+    static func stamp(_ url: URL) -> (size: Int, mtime: Double)? {
+        guard let a = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = (a[.size] as? NSNumber)?.intValue,
+              let m = a[.modificationDate] as? Date else { return nil }
+        return (size, m.timeIntervalSince1970)
+    }
+
+    func digest(_ url: URL) async throws -> (sha256: String, size: Int) {
+        let key = url.standardizedFileURL.path
+        let before = Self.stamp(url)
+        if let before, let s = lock.withLock({ seen[key] }), s.size == before.size, s.mtime == before.mtime {
+            return (s.sha256, s.size)
+        }
+        let d = try await OffPool.digest(url)
+        // Changed while it was read: not remembered.
+        if let before, let after = Self.stamp(url), after == before, after.size == d.size {
+            lock.withLock { seen[key] = Seen(size: d.size, mtime: before.mtime, sha256: d.sha256); dirty = true }
+        }
+        return d
+    }
+
+    func forget(_ url: URL) {
+        lock.withLock { if seen.removeValue(forKey: url.standardizedFileURL.path) != nil { dirty = true } }
+    }
+
+    func save() {
+        let (data, write): (Data?, Bool) = lock.withLock {
+            guard dirty else { return (nil, false) }
+            dirty = false
+            // A library is thousands of files, not millions: no cap needed
+            // beyond dropping entries for files gone from the disk.
+            seen = seen.filter { FileManager.default.fileExists(atPath: $0.key) }
+            return (try? JSONEncoder().encode(seen), true)
+        }
+        guard write, let data else { return }
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: file, options: .atomic)
     }
 }

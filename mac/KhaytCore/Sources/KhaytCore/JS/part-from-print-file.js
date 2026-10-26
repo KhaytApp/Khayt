@@ -53,7 +53,16 @@
     const missing = [];
     if (!rec) return { fields, from, missing: ['printWeight', 'printTime', 'material'], setup: null };
 
-    const parsed = rec.parsed || {};
+    // ── FIGURES FROM OLDER BYTES ARE NOT FIGURES ──────────────────────────
+    //
+    // `figuresStaleFor` (written by the Mac when another Mac's new version
+    // of the file arrives through the vault) says the slicer's time and
+    // weight on this record were measured from the PREVIOUS bytes. Priced as
+    // if sliced, a model twice the weight quoted at the old grams, labelled
+    // exact (beta.8 review M1). So they are missing here, as for a file never
+    // sliced: an estimate fills them, and says so.
+    const stale = !!(rec.figuresStaleFor && String(rec.figuresStaleFor).trim());
+    const parsed = stale ? {} : (rec.parsed || {});
     const setups = Array.isArray(rec.setups) ? rec.setups : [];
     // The named setup, else the one the shop has had most success with, else the
     // first. "Most ok runs" beats "most recent": a setup that worked eleven
@@ -77,7 +86,7 @@
     //
     // The sum is the slicer's own arithmetic, not an estimate, so it is
     // labelled `slicer` exactly as the single figure is.
-    const colourGrams = (Array.isArray(rec.colors) ? rec.colors : [])
+    const colourGrams = (stale ? [] : Array.isArray(rec.colors) ? rec.colors : [])
       .reduce((sum, c) => sum + Math.max(0, num(c && c.grams) || 0), 0);
     const grams = num(parsed.filamentGrams) || (colourGrams > 0 ? colourGrams : null);
     if (grams) { fields.printWeight = grams; from.printWeight = 'slicer'; }
@@ -92,7 +101,8 @@
 
     // Material: the setup knows what the shop actually ran, the slicer knows
     // what the file was sliced for, and the record's own field is the fallback.
-    const material = (setup && setup.material) || parsed.filamentType || rec.material || '';
+    const material = (setup && setup.material) || parsed.filamentType
+      || (stale && rec.parsed && rec.parsed.filamentType) || rec.material || '';
     if (material) {
       fields.material = material;
       from.material = (setup && setup.material) ? 'setup' : 'slicer';
@@ -118,7 +128,7 @@
       fields.consumables = rec.consumables.filter((c) => c && c.consumableId).map((c) => ({ ...c }));
     }
 
-    return { fields, from, missing, setup };
+    return { fields, from, missing, setup, stale };
   }
 
   /**

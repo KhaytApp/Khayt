@@ -12,6 +12,7 @@ import KhaytCore
 ///   l3b-03  Find Similar's focus, with the mirror caveat above the grid
 ///   l3b-04  a two-plate project in the Views section, plate 2, from the front
 ///   l3b-05  the same project from the top, plate 1
+///   l3b-06  the Falcon hood with figures from an older version (beta.8 M1)
 ///
 /// The Export Model Bundle panel is the system's save panel, which a window
 /// capture cannot draw; its one option (Include price) is a plain checkbox.
@@ -97,6 +98,14 @@ extension Snapshot {
         shop.libraryViewAngle = .iso
         shop.libraryViewPlate = nil
 
+        // 6. A model whose figures are an older version's: the inspector's
+        //    note, ≈ on its figures, and the reason under "As sliced".
+        shop.fileSelection = ["PF-sample-falcon"]
+        await settle(); await settle()
+        try? await Task.sleep(for: .milliseconds(500))
+        captureMain(named: "l3b-06-figures-stale" + tag, into: dir)
+        capturePanes(named: "l3b-06-figures-stale" + tag, into: dir)
+
         shop.fileSelection = []
         shop.libraryOpenStacks = []
         shop.clearLibraryFilter()
@@ -116,6 +125,10 @@ extension Snapshot {
                 if id == "PF-sample-king-1" { o["stackTop"] = .bool(true) }
             case "PF-sample-king-5":
                 o["geometryKey"] = .string("6290060:117223.2:200x200x4.56")
+            case "PF-sample-falcon":
+                // Another Mac's newer version arrived; these figures are the
+                // old bytes' (l3b-06: the stale-figures note and its ≈).
+                o["figuresStaleFor"] = .string("snap-newer-bytes")
             default: break
             }
             return .object(o)

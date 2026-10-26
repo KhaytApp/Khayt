@@ -418,7 +418,10 @@ extension Shop {
         }
         // ONE PLATE: the record as the shared rule reads it, with that plate's
         // own figures in place of the whole file's.
-        if let plate, let p = plates(of: file).first(where: { $0.index == plate }),
+        // Figures from an older version's bytes (`figuresStaleFor`) are not
+        // swapped in either: `partPatch` treats them as missing, and the
+        // estimate below fills them and says so (beta.8 review M1).
+        if let plate, !file.figuresStale, let p = plates(of: file).first(where: { $0.index == plate }),
            case .object(var r) = rec {
             var parsed: [String: JSONValue] = [:]
             if case .object(let o)? = r["parsed"] { parsed = o }
@@ -494,6 +497,12 @@ extension Shop {
                                         : "mac.product_estimated",
                 ["fields": .string(estimated.joined(separator: ", ")),
                  "n": .number(Double(e?.jobs ?? 0))])
+        }
+        // WHY the slicer's figures were not used: they are an older
+        // version's. Said first, so the estimate is not read as a slip.
+        if file.figuresStale {
+            let why = words.callIt("mac.figures_stale_reason")
+            note = note.map { why + " " + $0 } ?? why
         }
         // ── WHAT IT COSTS TO MAKE, NOT ONLY WHAT IT WEIGHS ────────────────
         //

@@ -40,9 +40,12 @@ struct VaultLapseBringBackTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let files = try ["PF-vault", "PF-both", "PF-bucket", "PF-here", "PF-nofolder"].map { try Self.file($0) }
         #expect(Shop.vaultOnlyModels(files, roots: [root.path]) == ["PF-vault"])
-        // Archived, linked: never counted.
+        // Archived by the shop: put aside, not deleted, so counted (beta.8
+        // review M4). Archived by the vault's own Trash: never.
         let archived = try Self.file("PF-vault", extra: ["archivedAt": .string("2026-10-01")])
-        #expect(Shop.vaultOnlyModels([archived], roots: [root.path]).isEmpty)
+        #expect(Shop.vaultOnlyModels([archived], roots: [root.path]) == ["PF-vault"])
+        let byVault = try Self.file("PF-vault", extra: ["archivedAt": .string("2026-10-01"), "vaultArchived": .bool(true)])
+        #expect(Shop.vaultOnlyModels([byVault], roots: [root.path]).isEmpty)
     }
 
     @Test("the count follows the lapse: cleared once the vault is not over")
@@ -67,6 +70,9 @@ struct VaultLapseBringBackTests {
             let ro = try #require(Shop.vaultOnlyButton(.whileReadOnly, count: 1, w))
             #expect(ro != dated && !ro.contains("{"))
             #expect(Shop.vaultOnlyButton(nil, count: 3, w) == nil)
+            // The banner's sentence already says the date: its button does not (UI review LOW-4).
+            let short = try #require(Shop.vaultOnlyButton(.before(end), count: 3, w, compact: true))
+            #expect(!short.contains(Shop.day(end, w)) && short.contains(w.counting(3, "mac.n_models")))
             #expect(Shop.vaultOnlyWarning(count: 0, w) == nil)
             let warn = try #require(Shop.vaultOnlyWarning(count: 2, w))
             #expect(!warn.contains("{"))
@@ -98,7 +104,8 @@ struct VaultLapseBringBackTests {
             .object(["id": .string("PF-a"), "name": .string("A"), "vaultFileId": .string("f1")]),
             .object(["id": .string("PF-b"), "name": .string("B")]),
         ])]
-        Shop.applyVaultEdits([.purged(recordId: "PF-a"), .purged(recordId: "PF-b")], at: "T9", to: &root)
+        Shop.applyVaultEdits([.purged(recordId: "PF-a", onlyCopy: true), .purged(recordId: "PF-b", onlyCopy: false)],
+                             at: "T9", to: &root)
         func rec(_ id: String) -> [String: JSONValue]? {
             guard case .array(let rows)? = root["printFiles"] else { return nil }
             for case .object(let r) in rows where r["id"] == .string(id) { return r }
@@ -106,6 +113,9 @@ struct VaultLapseBringBackTests {
         }
         #expect(rec("PF-a")?["vaultPurgedAt"] == .string("T9") && rec("PF-a")?["vaultFileId"] == nil)
         #expect(rec("PF-b")?["vaultPurgedAt"] == nil)
+        #expect(rec("PF-a")?["vaultPurgeReason"] == nil, "not named as the plan's: the lapse had set no date")
+        Shop.applyVaultEdits([.purged(recordId: "PF-b", onlyCopy: true)], at: "T9", planDeleting: true, to: &root)
+        #expect(rec("PF-b")?["vaultPurgeReason"] == .string("plan"))
         Shop.applyVaultEdits([.holds(recordId: "PF-a", fileId: "f2", sha256: "ab", size: 5)], at: "T10", to: &root)
         #expect(rec("PF-a")?["vaultPurgedAt"] == nil && rec("PF-a")?["vaultFileId"] == .string("f2"))
     }
@@ -132,7 +142,19 @@ struct VaultLapseBringBackTests {
         let view = MenuCoverageTests.source("LibraryHealthView.swift")
         #expect(view.contains("case .missing, .deletedByPlan:"))
         #expect(view.contains("if group.kind == .missing {"), "Locate is for missing files only")
-        #expect(LibraryHealthView.look(.deletedByPlan).title == "mac.lh_plan_deleted")
+        // Named for what is known; the plan only when the lapse said so (H3).
+        #expect(LibraryHealthView.look(.deletedByPlan).title == "mac.lh_vault_gone")
+        #expect(LibraryHealthView.look(.deletedByPlan, byPlan: true).title == "mac.lh_plan_deleted")
+        let w = Words()
+        for key in ["mac.lh_vault_gone_says", "mac.lh_plan_deleted_says"] {
+            #expect(!w.callIt(key).contains("No copy is left"), "it cannot know no other Mac holds one")
+            #expect(w.callIt(key).contains("another Mac") || w.callIt(key).contains("Another Mac"))
+        }
+        // Remove warns that another Mac may still hold the files.
+        let gone = try? Self.file("PF-gone", extra: ["vaultPurgedAt": .string("T")])
+        if let gone {
+            #expect(Shop.libraryDeleteLines([gone], words: w).contains(w.callIt("mac.delete_vault_gone")))
+        }
         #expect(MenuCoverageTests.source("Shop+LibraryHealth.swift")
             .contains("group.kind == .missing || group.kind == .deletedByPlan"))
     }

@@ -4,6 +4,15 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: beta.8 review fixes for applying the vault, the lapse warning and Library Health.**
+  - Another Mac's new version of a model now waits until this book holds that Mac's record (the new hash) before the bytes come down, and then nothing is written to the book. Before, the hash was stamped onto this Mac's old copy of the record, and in a sync merge that stamp beat the other Mac's edit (name, tags, figures). After a day with no such record, the change is applied as before.
+  - A vault purge is now decided by what this Mac holds (a vault sidecar with no bytes beside it), not by `vaultFileId` alone, so a model moved online by Free Up Space here does show in Library Health once the vault deletes it.
+  - Library Health says "Not on this Mac and gone from the vault". It names the plan limit only for models purged while the vault had set a deletion date. Remove from Library warns that another Mac may still have the files.
+  - Figures measured from an older version (`figuresStaleFor`) are no longer priced as sliced: the catalogue, "Quote this model", the phone's library price and list, and the LAN owner quote (`lib/part-from-print-file.js`, `lib/lan-library.js`) treat them as missing, estimate instead, and say why. Tiles and totals show them with ≈.
+  - Re-measuring after a new version no longer stops at 25 models that are only online. Archived models whose only copy is in the vault are offered for Bring Back too. A double click on "Use the Vault’s" can no longer send both copies to the Trash. The first pass after the update no longer calls this Mac's own unuploaded edit "changed on another Mac", and files are hashed once while unchanged, with the pass written and settled 200 changes at a time.
+  - Security: a second vault file in a record's folder (a G-code, a part) never writes its hash onto the record or archives it. A kept-copy marker is believed only when it names one file of its own folder and a vault file this Mac knows.
+  - The kept-both banner says that the other copy goes to the Trash, and isolates the file names in Arabic. The lapse banner's button no longer repeats the date.
+
 - **iPhone: archived models stay off the library away from the shop.** The library copy the phone keeps for pricing on mobile data listed models put aside on the Mac (`archivedAt`), which the Mac's own library and the list it serves the phone on Wi-Fi both leave out. The copy now leaves them out too, and a model brought back on the Mac returns with its next sync.
 - **iPhone: library pictures from every folder, not only the top one.** Keeping the library's pictures for away from the shop asked the Mac for its list with no folder, which lists the top folder's models and nothing below it, so models in folders had no picture away from the shop. It now walks every folder, and a walk that finishes lets go of the pictures of models the Mac no longer lists (archived, deleted, or without a picture now).
 - **Mac: beta.8 — a warning before the vault deletes the only copy, and four follow-ups.**

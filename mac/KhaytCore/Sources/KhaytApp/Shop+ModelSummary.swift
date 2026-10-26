@@ -311,6 +311,8 @@ extension Shop {
             let g = (f.parsed?.filamentGrams ?? 0) > 0 ? (f.parsed?.filamentGrams ?? 0) : (e?.grams ?? 0)
             if h > 0 || g > 0 { t.withFigures += 1 }
             if (mins <= 0 && h > 0) || ((f.parsed?.filamentGrams ?? 0) <= 0 && g > 0) { t.anyEstimated = true }
+            // An older version's figures: ≈ like any estimate (review M1).
+            if f.figuresStale, h > 0 || g > 0 { t.anyEstimated = true }
             t.hours += max(0, h)
             t.grams += max(0, g)
             if onlineOnly(f) { t.onlineOnly += 1 } else if !present(f) { t.notHere += 1 }

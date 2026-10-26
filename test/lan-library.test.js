@@ -302,3 +302,31 @@ test('a model archived on the Mac is not in the phone\'s library, and its pictur
     store = saved;
   }
 });
+
+test('figures measured from older bytes (figuresStaleFor) are never priced as the model\'s', () => {
+  const PartFromPrintFile = require(path.join(ROOT, 'lib/part-from-print-file.js'));
+  const rec = {
+    id: 'PF-stale', name: 'Hood', figuresStaleFor: 'abc',
+    sourceFile: { filename: 'hood.stl' },
+    parsed: { printTimeMins: 120, filamentGrams: 40, filamentType: 'PETG',
+              plates: [{ index: 1, printTimeMins: 120, filamentGrams: 40 }] },
+    colors: [{ hex: '#fff', grams: 40 }],
+  };
+  const patch = PartFromPrintFile.partPatch(rec);
+  assert.equal(patch.stale, true);
+  assert.equal(patch.fields.printWeight, undefined);
+  assert.equal(patch.fields.printTime, undefined);
+  assert.deepEqual(patch.missing.sort(), ['printTime', 'printWeight']);
+  assert.equal(patch.fields.material, 'PETG', 'the material is still the file\'s');
+  assert.equal(LanLibrary.recordedFigures(rec, null), null);
+  assert.equal(LanLibrary.recordedFigures(rec, 1), null, 'a real plate: no figures, not unknown');
+  assert.equal(LanLibrary.recordedFigures(rec, 7), false);
+  const item = LanLibrary.itemOf(rec);
+  assert.equal(item.printTimeMins, null);
+  assert.equal(item.grams, null);
+  assert.equal(item.plates, undefined);
+  // The same record, current: figures as before.
+  const fresh = { ...rec, figuresStaleFor: undefined };
+  assert.equal(PartFromPrintFile.partPatch(fresh).fields.printWeight, 40);
+  assert.equal(LanLibrary.recordedFigures(fresh, null).exact, true);
+});

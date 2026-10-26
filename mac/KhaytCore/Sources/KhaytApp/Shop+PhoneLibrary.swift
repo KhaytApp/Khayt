@@ -124,10 +124,14 @@ extension Shop {
             if let n = file.timesPrinted { o["timesPrinted"] = .number(Double(n)) }
             if let d = file.lastPrinted, !d.isEmpty { o["lastPrinted"] = .string(d) }
             if let notes = file.testedNotes, !notes.isEmpty { o["testedNotes"] = .string(notes) }
-            let mins = file.parsed?.printTimeMins ?? 0, grams = file.parsed?.filamentGrams ?? 0
+            // Figures from an older version's bytes are not sent as this
+            // model's (beta.8 review M1): the phone asks for an estimate,
+            // which comes back `exact: false`. `lib/lan-library.js` itemOf.
+            let stale = file.figuresStale
+            let mins = stale ? 0 : file.parsed?.printTimeMins ?? 0, grams = stale ? 0 : file.parsed?.filamentGrams ?? 0
             o["printTimeMins"] = mins > 0 ? .number(mins) : .null
             o["grams"] = grams > 0 ? .number(grams) : .null
-            let plates = plates(of: file)
+            let plates = stale ? [] : plates(of: file)
             if plates.count > 1 {
                 o["plates"] = .array(plates.map { p in
                     var row: [String: JSONValue] = ["index": .number(Double(p.index)),
