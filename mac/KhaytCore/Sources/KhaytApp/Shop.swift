@@ -281,9 +281,16 @@ final class Shop {
     /// say (`lib/alert-routes.js`). NOT awaited by anyone and NOT shown when it
     /// fails — like the low-stock warning, nothing is waiting on it — but
     /// logged, and the last ntfy failure is kept for the settings pane.
-    func sendAlert(type: String, title: String, body: String) async {
+    ///
+    /// `unlessSentAs`: the same news already went out as that type (a "Print
+    /// failed" from the finish seam, before the printer's own fault alert) —
+    /// each channel that took that type is not told again.
+    func sendAlert(type: String, title: String, body: String, unlessSentAs earlier: String? = nil) async {
         guard let engine, source.build != nil,
-              let routes = try? await engine.alertRoutes(type: type, settings: settingsDict) else { return }
+              var routes = try? await engine.alertRoutes(type: type, settings: settingsDict) else { return }
+        if let earlier, let took = try? await engine.alertRoutes(type: earlier, settings: settingsDict) {
+            routes = Self.routesNotSentAlready(routes, took: took)
+        }
         if routes.telegram, case .object(let tg)? = settingsDict["telegram"],
            case .string(let sealed)? = tg["botToken"], case .string(let chat)? = tg["chatId"] {
             do {
@@ -302,6 +309,16 @@ final class Shop {
                 FileHandle.standardError.write(Data("printer alert ntfy failed: \(RedactedError.describe(error))\n".utf8))
             }
         }
+    }
+
+    /// The channels left once those that already took the same news are
+    /// taken out (`sendAlert(unlessSentAs:)`).
+    nonisolated static func routesNotSentAlready(_ routes: KhaytEngine.AlertRoutes,
+                                                 took: KhaytEngine.AlertRoutes) -> KhaytEngine.AlertRoutes {
+        var out = routes
+        if took.telegram { out.telegram = false }
+        if took.ntfy { out.ntfy = false }
+        return out
     }
 
     /// The last ntfy send that failed, for the settings pane.
@@ -1169,6 +1186,11 @@ final class Shop {
             libraryShownRows = libraryRows
             reapplyPendingLibraryChanges()
             await readLibraryFacets()
+            // The ready sets again on their own, in a task of their own: the
+            // recount above stops early when it is cancelled or overtaken,
+            // and the sidebar's "Ready to print" must not wait for the
+            // Library screen to start the next one.
+            Task { await refreshReadiness() }
             if overtaken() { return }
             // And the names those chips can be filed under, which is the whole
             // book rather than what the chips are currently counting.
@@ -1396,6 +1418,11 @@ final class Shop {
                                                  settings: kpiSettings.isEmpty ? settingsDict : kpiSettings,
                                                  statusCache: fleet.cache,
                                                  inventory: inventoryRows)
+        // The dispatcher's answer, after every sweep — not only while the
+        // Machines screen is open. The menu bar's "Bed not cleared" reads it
+        // (`MenuBarProgress.lines`), and it was only as fresh as the last time
+        // that screen had been looked at.
+        await planDispatch()
     }
 
     /// Ask the shared rule what every job still owes, and put it on the rows.
@@ -1928,6 +1955,11 @@ final class Shop {
     /// the cloud's last word on it, nil until it has been asked.
     var vaultLapse: CloudPlans.Lapse?
     var vaultLapseAsked: Date?
+    /// The library models whose ONLY copy is in the vault while it is over
+    /// (`Shop+VaultOnly.swift`), counted off the disk; and the Bring Back of
+    /// exactly those, while it runs.
+    var vaultOnlyIds: [String] = []
+    var vaultBringBack: (done: Int, total: Int)?
     /// Bringing the library into line with the vault (`Shop+VaultApply.swift`):
     /// one pass at a time, when the last one began, and the models another
     /// Mac changed while they were edited here (both kept), for the banner

@@ -336,7 +336,10 @@ KhaytCore. Another client may do these things differently and still read the sam
   fields it writes are `vaultFileId`, `contentHash`/`sourceFile.size`, and for a
   vault trash `vaultTrashedAt`. A trash also sets `archivedAt` with `vaultArchived: true`
   when the record was not already archived. A restore clears what the trash set, and a
-  purge drops the link.
+  purge drops the link. A purge of a record that had the link also stamps
+  `vaultPurgedAt` (cleared when the vault holds the record again), so a model whose only
+  copy was the vault's (a `.cloud` sidecar with `provider: "vault"` and no bytes) can be
+  told apart from a missing file: Library Health calls it deleted by the plan limit.
   - It is kept out of the book because the last-seen `seq` protects against rollback only if
     it is this device's own memory.
   - It is kept out of the library root and its parent because either can be iCloud, a NAS

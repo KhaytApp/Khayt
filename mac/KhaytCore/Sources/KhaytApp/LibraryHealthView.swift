@@ -220,7 +220,9 @@ struct LibraryHealthView: View {
     @ViewBuilder private func fixes(_ group: LibraryHealth.Group) -> some View {
         HStack(spacing: 8) {
             switch group.kind {
-            case .missing:
+            case .missing, .deletedByPlan:
+                // Deleted by the plan limit: no Locate anywhere on the card —
+                // there are no bytes left to find. Remove is the fix.
                 Button(w.callIt("mac.lh_show")) { shop.showHealthGroup(group) }
                 Button(w.callIt("mac.lh_remove") + "\u{2026}", role: .destructive) {
                     shop.askToRemoveHealthGroup(group)
@@ -276,6 +278,9 @@ struct LibraryHealthView: View {
 
     static func look(_ kind: LibraryHealth.Kind) -> Look {
         switch kind {
+        case .deletedByPlan:
+            Look(symbol: "xmark.icloud", title: "mac.lh_plan_deleted", sentence: "mac.lh_plan_deleted_says",
+                 rail: Khayt.late)
         case .missing:
             Look(symbol: "questionmark.folder", title: "mac.lh_missing", sentence: "mac.lh_missing_says", rail: Khayt.late)
         case .unreachable:

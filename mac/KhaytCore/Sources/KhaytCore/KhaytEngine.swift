@@ -10083,8 +10083,9 @@ public actor KhaytEngine {
     }
 
     public struct AlertRoutes: Decodable, Sendable, Equatable {
-        public let telegram: Bool
-        public let ntfy: Bool
+        public var telegram: Bool
+        public var ntfy: Bool
+        public init(telegram: Bool, ntfy: Bool) { self.telegram = telegram; self.ntfy = ntfy }
     }
 
     /// Which channels one alert goes to, from the shop's switches.

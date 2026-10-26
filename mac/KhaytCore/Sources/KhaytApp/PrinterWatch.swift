@@ -519,7 +519,12 @@ final class PrinterWatch {
             // AND TO THE SHOP'S PHONE. A notification on this Mac reaches the
             // person at this Mac; Telegram and ntfy reach the one who is not.
             // The switches for both were saved here and never read.
-            await shop.sendAlert(type: alert.type, title: title, body: body)
+            // A fault the finish seam already told as "Print failed" went to
+            // the phones then too (`noticePrintEnded`): not a second message
+            // on a channel that took it.
+            await shop.sendAlert(type: alert.type, title: title, body: body,
+                                 unlessSentAs: toldAsFailed && PrintNoticeKind.failed.wanted
+                                     ? PrintNoticeKind.failed.rawValue : nil)
         }
     }
 

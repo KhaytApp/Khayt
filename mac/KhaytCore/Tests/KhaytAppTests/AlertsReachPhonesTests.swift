@@ -84,11 +84,45 @@ struct AlertsReachPhonesTests {
         #expect(watch.contains("try? await engine.alertEnable(settings: shop.settingsDict)"))
         #expect(!watch.contains("enable: KhaytEngine.Alerting.sensible) else {"),
                 "the fixed set is back, so runouts and requested stalls are lost again")
-        #expect(watch.contains("await shop.sendAlert(type: alert.type, title: title, body: body)"))
+        #expect(watch.contains("await shop.sendAlert(type: alert.type, title: title, body: body,"))
         #expect(MenuCoverageTests.source("Integrations.swift").contains("NtfySettings(shop: shop)"))
         let engine = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/KhaytCore/KhaytEngine.swift")
         #expect(((try? String(contentsOf: engine, encoding: .utf8)) ?? "")
             .contains("\"runout\": .bool(enable.runout)"), "runout is not passed to printer-alerts")
+    }
+
+    // MARK: The print's own news (beta.8)
+
+    @Test("finished, failed and paused go to a Telegram or ntfy that is set up, through the alerts' own path")
+    func printNoticesReachPhones() async throws {
+        let engine = try KhaytEngine()
+        let both: [String: JSONValue] = [
+            "telegram": .object(["botToken": .string("__enc__x"), "chatId": .string("-100")]),
+            "ntfy": .object(["enabled": .bool(true), "topic": .string("athar-printers")]),
+        ]
+        for kind in PrintNoticeKind.allCases {
+            let routes = try await engine.alertRoutes(type: kind.rawValue, settings: both)
+            #expect(routes == .init(telegram: true, ntfy: true), "\(kind.rawValue)")
+            let none = try await engine.alertRoutes(type: kind.rawValue, settings: [:])
+            #expect(none == .init(telegram: false, ntfy: false))
+            let req = try #require(try await engine.ntfyRequest(type: kind.rawValue, title: "t", body: "b", settings: both))
+            #expect(req.url.hasSuffix("/athar-printers"))
+        }
+        // Wired: both seams send, after the Mac's own switch and the ledger.
+        let notices = MenuCoverageTests.source("PrintNotices.swift")
+        #expect(notices.components(separatedBy: "sendPrintNotice(kind, notice)").count - 1 == 2,
+                "the pause watch and the finish seam each send once")
+        #expect(notices.contains("Task { await sendAlert(type: kind.rawValue, title: notice.title, body: notice.body) }"))
+    }
+
+    @Test("a fault already told as Print failed is not sent again on a channel that took it")
+    func noDoubleSend() {
+        let took = KhaytEngine.AlertRoutes(telegram: true, ntfy: false)
+        #expect(Shop.routesNotSentAlready(.init(telegram: true, ntfy: true), took: took) == .init(telegram: false, ntfy: true))
+        #expect(Shop.routesNotSentAlready(.init(telegram: true, ntfy: true), took: .init(telegram: false, ntfy: false))
+                == .init(telegram: true, ntfy: true))
+        #expect(MenuCoverageTests.source("PrinterWatch.swift")
+            .contains("unlessSentAs: toldAsFailed && PrintNoticeKind.failed.wanted"))
     }
 }

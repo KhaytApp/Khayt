@@ -261,6 +261,7 @@ extension Shop {
                         record["figuresStaleFor"] = .string(sha)
                     }
                     record["vaultFileId"] = .string(fileId)
+                    record.removeValue(forKey: "vaultPurgedAt")
                     record["contentHash"] = .string(sha)
                     if case .object(var source)? = record["sourceFile"] {
                         source["size"] = .number(Double(size))
@@ -280,6 +281,11 @@ extension Shop {
                         record.removeValue(forKey: "vaultArchived")
                     }
                 case .purged:
+                    // Stamped, so Library Health can tell a model whose only
+                    // copy the vault deleted from one that was never there
+                    // (`VaultOnlyCopies.deletedByPlan`). Kept until the vault
+                    // holds it again (`.holds` clears it).
+                    if case .string(let f)? = record["vaultFileId"], !f.isEmpty { record["vaultPurgedAt"] = .string(at) }
                     record.removeValue(forKey: "vaultFileId")
                     record.removeValue(forKey: "vaultTrashedAt")
                     record.removeValue(forKey: "vaultArchived")
