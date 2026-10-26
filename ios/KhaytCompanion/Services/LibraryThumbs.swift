@@ -89,6 +89,13 @@ actor LibraryThumbs {
         if let u = used { used = u - size }
     }
 
+    /// Every picture but these models' goes: the Mac lists the rest no more.
+    func keepOnly(_ ids: Set<String>) {
+        let names = Set(ids.map(name))
+        for file in files() where !names.contains(file.lastPathComponent) { try? fileManager.removeItem(at: file) }
+        used = total()
+    }
+
     /// Forget every picture: unpairing ends this shop on the phone.
     func clear() {
         for file in files() { try? fileManager.removeItem(at: file) }

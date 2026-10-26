@@ -73,6 +73,27 @@ final class LibraryThumbsTests: XCTestCase {
         XCTAssertEqual(ThumbMac.asked, asked, "not again within twelve hours")
     }
 
+    func testEveryFolderIsWalkedAndPicturesTheMacNoLongerListsGo() async {
+        let s = ConnectionSettings()
+        let saved = (s.host, s.port, s.isPaired, s.isSampleShop)
+        defer { s.host = saved.0; s.port = saved.1; s.isPaired = saved.2; s.isSampleShop = saved.3 }
+        s.host = "khayt-thumbs.invalid"; s.port = 3219; s.isPaired = true; s.isSampleShop = false
+        let defaults = UserDefaults(suiteName: "pics-\(UUID().uuidString)")!
+        ThumbMac.library = ["PF-top", "PF-toy", "PF-car", "PF-deep"]
+        ThumbMac.folderOf = ["PF-toy": "Toys", "PF-car": "Toys/Cars", "PF-deep": "Home/Kitchen/Hooks"]
+        ThumbMac.withPicture = Set(ThumbMac.library)
+        ThumbMac.image = picture(400)
+        let api = KhaytAPIClient(settings: s, protocols: [ThumbMac.self], withBook: false)
+        api.thumbShelf = LibraryThumbs(directory: dir)
+        // Kept before the model was archived on the Mac, which lists it no more.
+        await api.thumbShelf.put("PF-archived", Data([1, 2, 3]))
+
+        let fetched = await api.keepAllLibraryPictures(now: Date(), defaults: defaults)
+        XCTAssertEqual(fetched, 4, "the models in folders too, not only the top folder's")
+        let kept = await api.thumbShelf.kept(ThumbMac.library + ["PF-archived"])
+        XCTAssertEqual(kept, Set(ThumbMac.library))
+    }
+
     func testOverTheBudgetTheLeastRecentlySeenGoFirst() async {
         let shelf = LibraryThumbs(directory: dir, budget: 1000)
         let t0 = Date(timeIntervalSince1970: 1_800_000_000)
@@ -128,9 +149,11 @@ final class ThumbMac: URLProtocol, @unchecked Sendable {
     /// A library to page through, and which of it has a picture.
     nonisolated(unsafe) static var library: [String] = []
     nonisolated(unsafe) static var withPicture: Set<String> = []
+    /// Each model's folder; none is the top folder.
+    nonisolated(unsafe) static var folderOf: [String: String] = [:]
     nonisolated(unsafe) static var image = Data("jpeg".utf8)
 
-    static func reset() { reachable = true; hasPicture = true; asked = 0; library = []; withPicture = []; image = Data("jpeg".utf8) }
+    static func reset() { reachable = true; hasPicture = true; asked = 0; library = []; withPicture = []; folderOf = [:]; image = Data("jpeg".utf8) }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "khayt-thumbs.invalid" }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -144,8 +167,20 @@ final class ThumbMac: URLProtocol, @unchecked Sendable {
         Self.asked += 1
         let path = request.url?.path() ?? ""
         if path == "/api/library" {
-            let items = Self.library.map { #"{"id":"\#($0)","name":"\#($0)","thumb":\#(Self.withPicture.contains($0))}"# }
-            let body = #"{"total":\#(Self.library.count),"offset":0,"folders":[],"items":[\#(items.joined(separator: ","))]}"#
+            // As the Mac answers with no search: one folder's models, and the
+            // folders directly under it (`Shop.libraryPage`).
+            let here = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?
+                .queryItems?.first { $0.name == "folder" }?.value ?? ""
+            let models = Self.library.filter { (Self.folderOf[$0] ?? "") == here }
+            let prefix = here.isEmpty ? "" : here + "/"
+            let under = Set(Self.library.compactMap { id -> String? in
+                let f = Self.folderOf[id] ?? ""
+                guard !f.isEmpty, f != here, f.hasPrefix(prefix) else { return nil }
+                return prefix + (f.dropFirst(prefix.count).split(separator: "/").first.map(String.init) ?? "")
+            }).sorted()
+            let folders = under.map { #"{"path":"\#($0)","name":"\#($0.split(separator: "/").last ?? "")","count":1}"# }
+            let items = models.map { #"{"id":"\#($0)","name":"\#($0)","thumb":\#(Self.withPicture.contains($0))}"# }
+            let body = #"{"total":\#(models.count),"offset":0,"folders":[\#(folders.joined(separator: ","))],"items":[\#(items.joined(separator: ","))]}"#
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: Data(body.utf8))
