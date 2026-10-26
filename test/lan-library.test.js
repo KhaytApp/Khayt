@@ -272,3 +272,33 @@ test('a model file is read only from its own folder', async () => {
     assert.equal((await estimate('PF-cube')).status, 409);
   } finally { store.printFiles[1].sourceFile.filename = saved; }
 });
+
+// A model archived on the Mac (archivedAt — by the shop, or because its vault
+// file was trashed elsewhere, #2071) is out of the phone's library from either
+// computer: the Mac's own LAN listing filters it (Shop+PhoneLibrary.swift) and
+// 404s its estimate.
+test('a model archived on the Mac is not in the phone\'s library, and its picture and price are not found', async () => {
+  const saved = store;
+  store = baseStore();
+  const lantern = store.printFiles.find((r) => r.id === 'PF-lantern');
+  const cube = store.printFiles.find((r) => r.id === 'PF-cube');
+  lantern.archivedAt = '2026-10-26T09:00:00Z';
+  Object.assign(cube, { archivedAt: '2026-10-26T09:00:00Z', vaultArchived: true, vaultTrashedAt: '2026-10-26T08:00:00Z' });
+  try {
+    const top = await (await fetch(`${BASE}/api/library`, { headers: OWNER })).json();
+    const ids = (top.items || []).map((i) => i.id);
+    assert.ok(!ids.includes('PF-lantern'), 'archived is not listed');
+    assert.ok(!(top.folders || []).some((f) => f.path === 'Home'), 'a folder holding only archived models is gone');
+    const kings = (top.folders || []).find((f) => f.path === 'Saudi Kings');
+    assert.equal(kings && kings.count, 2, 'folder counts leave the archived cube out');
+    const found = await (await fetch(`${BASE}/api/library?q=lantern`, { headers: OWNER })).json();
+    assert.deepEqual(found.items, [], 'search does not find it');
+    assert.equal((await fetch(`${BASE}/api/library/PF-lantern/thumb`, { headers: OWNER })).status, 404);
+    const est = await estimate('PF-cube');
+    assert.equal(est.status, 404);
+    assert.equal((await est.json()).reason, 'not-found');
+    assert.deepEqual(LanLibrary.list(store.printFiles, { q: 'cube' }).items, []);
+  } finally {
+    store = saved;
+  }
+});

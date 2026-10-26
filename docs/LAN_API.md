@@ -213,6 +213,11 @@ phone search it and have a model priced the way the intake form prices a
 customer's file, without moving the file. All three need the owner (the PIN
 or a signed request).
 
+A model archived on the Mac (`archivedAt` is a non-empty string — by the shop,
+or because its Khayt Vault file was trashed) is not in this library: it is left
+out of the items, the folder counts and the paging, and its thumbnail and
+estimate answer 404 `not-found`. The Mac's own LAN server does the same.
+
 **`GET /api/library?q=&folder=&offset=0&limit=50`**
 
 - `q` — words matched against `name`, `originalName`, `folder`, `tags` and
