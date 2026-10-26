@@ -3269,6 +3269,16 @@ extension Shop {
         return cachedThumbnail(for: file)
     }
 
+    /// `thumbnail`, for a picture about to be DRAWN — a tile, a list row, the
+    /// model page. Only these ask for an old mesh-drawn picture to be checked
+    /// (`considerRedraw`); a count, the phone's list or a group's cover never
+    /// do, so nothing ever passes over the whole library.
+    func displayedThumbnail(for file: LibraryFile) -> ThumbnailSource? {
+        let source = thumbnail(for: file)
+        if case .file(let url)? = source { considerRedraw(file, thumbnail: URL(fileURLWithPath: url.path)) }
+        return source
+    }
+
     /// Does ANY job name a customer, or promise a date?
     ///
     /// The jobs table drops those columns when nothing in the book fills them:

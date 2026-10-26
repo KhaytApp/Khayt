@@ -21,6 +21,11 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let colors: [Colour]?
     let swapCount: Int?
     let thumbFile: String?
+    /// What made `thumbFile`: "embedded" (a file's own preview, or for an
+    /// STL a drawing an import made), "mesh" (the Mac's `--thumbnails` pass),
+    /// "render" (Electron's STL renderer). Read only to decide whether a
+    /// picture is one `MeshPreview` drew (`Shop.mayBeMeshDrawn`).
+    let thumbSource: String?
     /// A `data:image/jpeg;base64,…` URI, inline in the store — not a path. A
     /// shop that has photographed a print carries the photo in `khayt-store.json`
     /// itself, which is most of why that file is large.
@@ -128,6 +133,15 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     let archiveBytes: Double?
     let archiveModified: Double?
     var inArchive: Bool { isLinked && !(archiveMember ?? "").isEmpty }
+    /// STACKED with its variants (`LibraryStacks`): the same id on every
+    /// member, and `stackTop` on the one that wears the tile. Two plain
+    /// fields, no container record — the Electron app carries them untouched
+    /// and shows each member as its own model.
+    let stackId: String?
+    let stackTop: Bool?
+    /// The stack id as the rules read it: trimmed, empty is none.
+    var stack: String? { LibraryStacks.Member.clean(stackId) }
+    var isStackTop: Bool { stackTop == true }
     var isLocked: Bool { inArchive && archiveLocked == true }
     /// The archive's path, for a member; nil otherwise.
     var archivePath: String? { inArchive ? externalPath : nil }

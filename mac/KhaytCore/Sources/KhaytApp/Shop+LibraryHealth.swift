@@ -13,6 +13,9 @@ struct LibraryHealthFocus: Hashable, Sendable {
     /// What its chip says, when it is not a Health group's own title — an
     /// archive's name, from its folder tile's Remove (`askToRemoveArchive`).
     var label: String? = nil
+    /// A word key said above the grid while it is on — the mirror caveat for
+    /// a same-shape group or a Find Similar that matched by shape.
+    var note: String? = nil
 }
 
 /// ── LIBRARY HEALTH, ON THE MAC ──────────────────────────────────────────
@@ -169,7 +172,8 @@ extension Shop {
         search = ""
         shelf = .library(nil)
         libraryFlat = true
-        libraryHealthFocus = LibraryHealthFocus(kind: group.kind, ids: group.modelIds)
+        libraryHealthFocus = LibraryHealthFocus(kind: group.kind, ids: group.modelIds,
+                                                note: group.kind == .looksSame ? "mac.lh_mirror_note" : nil)
         libraryHealthOpen = false
         fileSelection = select ? Set(visibleFiles.map(\.id)) : []
     }

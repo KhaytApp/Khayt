@@ -239,7 +239,7 @@ enum LibraryImport {
                                      inPlace: inPlace, group: group, documents: documents, title: title,
                                      tags: tags, photos: photos, analyseRisk: analyseRisk, online: online)
         do {
-            // lock: callers — convertModel, addModelToLibrary, addModelsToLibrary, addMany
+            // lock: callers — convertModel, addModelToLibrary, addModelsToLibrary, addMany, importModelBundle
             try await write([made], storeURL: storeURL, owns: owns, whoHasIt: whoHasIt)
         } catch {
             // The book refused it, so the copy has no record to belong to.
@@ -664,6 +664,8 @@ enum LibraryImport {
         if thumbFile == nil, ext == "stl" || ext == "obj",
            let drawn = await offMain({ try? MeshPreview.png(of: destination) }),
            (try? drawn.write(to: dir.appending(path: "thumb.png"))) != nil {
+            // Drawn by today's projection: never redrawn (`Shop+ThumbnailRedraw`).
+            MeshPreview.markCurrent(dir.appending(path: "thumb.png"))
             thumbFile = "thumb.png"
         }
         return Analysis(size: size, provenance: said, geometry: geometry, riskAnalysis: riskAnalysis,

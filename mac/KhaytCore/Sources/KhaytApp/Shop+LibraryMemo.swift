@@ -75,6 +75,8 @@ final class LibraryMemo {
         var shown: ShownKey
         var flat: Bool
         var showsFlat: Bool
+        /// The stacks drawn open (`Shop.libraryOpenStacks`).
+        var openStacks: Set<String> = []
     }
 
     /// The work done, counted — so a test can prove a draw that changed
@@ -106,6 +108,8 @@ final class LibraryMemo {
         /// and passes over the whole book for the Fits sets.
         var fitBuilds = 0
         var fitSetBuilds = 0
+        /// Old mesh-drawn pictures drawn again (`considerRedraw`).
+        var thumbRedraws = 0
     }
 
     var work = Work()
@@ -204,6 +208,24 @@ final class LibraryMemo {
     /// The list view's rows, for the entries and facts they were made from.
     var rowsKey: LibraryRow.Key?
     var rows: [LibraryRow] = []
+
+    /// Who is in which stack, for the book revision it was read at
+    /// (`Shop.libraryStacks`), and the suggestions worked out from it.
+    var stacksRevision = -1
+    var stacks = Shop.StackIndex()
+    var stackSuggestionsRevision = -1
+    var stackSuggestions: [LibraryStacks.Suggestion] = []
+    /// Each drawn tile's stack, by the model it shows — from the last
+    /// `memoEntries`, so a tile asks nothing to draw its badge.
+    var stackTiles: [LibraryFile.ID: LibraryStacks.Tile] = [:]
+
+    /// Old mesh-drawn pictures (`Shop+ThumbnailRedraw.swift`): the models
+    /// whose picture was looked at this run, those waiting to be checked,
+    /// and how many times each was drawn again (the picture cache's key).
+    var thumbChecked: Set<LibraryFile.ID> = []
+    var thumbQueue: [(id: LibraryFile.ID, thumbnail: URL, model: URL)] = []
+    var thumbRedrawing = false
+    var thumbGeneration: [LibraryFile.ID: Int] = [:]
 }
 
 extension Shop.Shelf {
@@ -338,17 +360,26 @@ extension Shop {
         let shown = memoShownFiles()
         let memo = libraryMemo
         guard let shownKey = memo.shownKey else { return ([], [], [:]) }
-        let key = LibraryMemo.EntriesKey(shown: shownKey, flat: libraryFlat, showsFlat: libraryShowsFlat)
+        let key = LibraryMemo.EntriesKey(shown: shownKey, flat: libraryFlat, showsFlat: libraryShowsFlat,
+                                         openStacks: libraryOpenStacks)
         _ = libraryGroupKinds.count
         if memo.entriesKey == key { return (memo.entries, memo.visible, memo.visiblePosition) }
         memo.work.entryBuilds += 1
-        let entries: [LibraryEntry]
+        var entries: [LibraryEntry]
         if key.showsFlat || !shownKey.library {
             entries = shown.map { LibraryEntry.file($0) }
         } else {
             entries = Self.libraryEntries(shown, under: shownKey.group, flat: libraryFlat,
                                           showingMatches: libraryShowsMatches, kinds: libraryGroupKinds,
                                           order: librarySort.ordering(libraryFacts))
+        }
+        // Variants of one model as one tile (`LibraryStacks`) — never under
+        // a Library Health or Find Similar focus, which is a list of exactly
+        // those models to look at side by side.
+        if shownKey.library, shownKey.healthFocus == nil {
+            entries = stacked(entries)
+        } else {
+            memo.stackTiles = [:]
         }
         let visible = Self.modelTiles(entries)
         var position: [LibraryFile.ID: Int] = [:]
@@ -386,7 +417,9 @@ extension Shop {
         }
         if let known = memo.thumbs[file.id], known.file == file { return known.source }
         memo.work.diskChecks += 1
-        let found = Self.thumbnailOnDisk(file, roots: roots)
+        var found = Self.thumbnailOnDisk(file, roots: roots)
+        // A picture drawn again this run is a new key for the picture cache.
+        if case .file(let url)? = found { found = redrawnSource(url, id: file.id) }
         memo.thumbs[file.id] = (file, found)
         return found
     }

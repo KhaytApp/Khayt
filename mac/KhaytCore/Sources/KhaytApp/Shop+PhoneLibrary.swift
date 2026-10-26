@@ -170,7 +170,7 @@ extension Shop {
             return (data, mime)
         case .file(let url):
             let data: Data? = await withCheckedContinuation { done in
-                LanServer.measureQueue.async { done.resume(returning: try? Data(contentsOf: url)) }
+                LanServer.measureQueue.async { done.resume(returning: try? Data(contentsOf: URL(fileURLWithPath: url.path))) }
             }
             guard let data else { return nil }
             let mime = switch url.pathExtension.lowercased() {

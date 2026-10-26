@@ -60,6 +60,17 @@ struct LibraryGrid: View {
             // and a control that narrows a grid from another column is a
             // control a shop has to remember it set.
             LibraryFilterBar(shop: shop)
+            // What a focus must say before anything is removed for it: a
+            // same-shape match may be a mirrored twin (`LibraryHealthFocus.note`).
+            if let note = shop.libraryHealthFocus?.note {
+                Label(shop.words.callIt(note), systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Metric.screen)
+                    .padding(.bottom, 6)
+            }
             if display.layout == .list {
                 LibraryList(shop: shop)
             } else {
@@ -292,7 +303,7 @@ struct LibraryGrid: View {
     @ViewBuilder private func cell(for file: LibraryFile, pixels: Int) -> some View {
         // ONCE per cell: the tile and its right-click preview drew the same
         // picture from two separate asks.
-        let thumbnail = shop.thumbnail(for: file)
+        let thumbnail = shop.displayedThumbnail(for: file)
         Cell(file: file,
              thumbnail: thumbnail,
              selected: shop.fileSelection.contains(file.id),
@@ -305,7 +316,9 @@ struct LibraryGrid: View {
              size: display.tileSize,
              pixels: pixels,
              fits: display.tileSize.isCompact || shop.modelMachines.isEmpty ? nil
-                : LibraryFitChips.leading(shop.libraryFitChips(file), shop.libraryFitsOn ?? shop.libraryReadyOn))
+                : LibraryFitChips.leading(shop.libraryFitChips(file), shop.libraryFitsOn ?? shop.libraryReadyOn),
+             stack: shop.libraryStackTile(file.id),
+             toggleStack: { shop.toggleStackOpen($0) })
             .onTapGesture {
                 // SwiftUI's tap gesture does not report modifiers, so they are
                 // read from the event that is arriving. Without this, ⌘-click
@@ -678,6 +691,26 @@ struct Cell: View {
     /// An empty row still keeps its line, so tiles beside each other stay
     /// level.
     var fits: LibraryFitChips.Row? = nil
+    /// The stack this tile stands for, or sits inside when it is open
+    /// (`Shop.libraryStackTile`); nil for a plain model.
+    var stack: LibraryStacks.Tile? = nil
+    /// Open or close a stack, by id — the badge is a button.
+    var toggleStack: (String) -> Void = { _ in }
+
+    /// What a stack's badge says: the members shown, and of how many when
+    /// the filters left some out.
+    static func stackBadge(_ tile: LibraryStacks.Tile, words: Words) -> String {
+        tile.shown.count < tile.total
+            ? words.callIt("mac.stk_badge_of", ["n": .string(words.numeral(tile.shown.count)),
+                                                 "total": .string(words.numeral(tile.total))])
+            : words.numeral(tile.total)
+    }
+
+    /// The badge read aloud, and on hover.
+    static func stackSaid(_ tile: LibraryStacks.Tile, words: Words) -> String {
+        let n: [String: JSONValue] = ["variants": .string(words.counting(tile.total, "mac.stk_n_variants"))]
+        return words.callIt(tile.open ? "mac.stk_badge_close" : "mac.stk_badge_open", n)
+    }
 
     /// ── ON A CHOSEN TILE, NOTHING IN THE BRAND'S BLUE ────────────────────
     ///
@@ -727,8 +760,39 @@ struct Cell: View {
             Thumbnail(source: thumbnail, pixels: pixels, tint: file.firstColour, well: LibraryTile.well)
                 .aspectRatio(1, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
+                // A STACK: the cards behind it, so it reads as several
+                // before the badge is read.
+                .background(alignment: .center) {
+                    if let stack, stack.isStack {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.10))
+                                .offset(x: 6, y: -6)
+                            RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.16))
+                                .offset(x: 3, y: -3)
+                        }
+                        .accessibilityHidden(true)
+                    }
+                }
                 .overlay(alignment: .topTrailing) {
                     HStack(spacing: 4) {
+                        // HOW MANY VARIANTS, and the way to see them.
+                        if let stack, let id = stack.stackId {
+                            let said = Self.stackSaid(stack, words: words)
+                            Button { toggleStack(id) } label: {
+                                HStack(spacing: 2) {
+                                    Image(systemName: stack.inside ? "square.stack" : "square.stack.fill")
+                                    if stack.isStack { Text(verbatim: Self.stackBadge(stack, words: words)) }
+                                }
+                                .font(.system(size: 10, weight: .semibold))
+                                .monospacedDigit()
+                                .padding(.horizontal, 5).padding(.vertical, 3)
+                                .background(.regularMaterial, in: Capsule())
+                                .foregroundStyle(stack.open || stack.inside ? AnyShapeStyle(Khayt.brand) : AnyShapeStyle(.primary))
+                            }
+                            .buttonStyle(.plain)
+                            .help(said)
+                            .accessibilityLabel(said)
+                        }
                         // ON THE PRINT NEXT LIST, with who it is for on hover.
                         if file.isPrintNext {
                             let said = Self.printNextSaid(file, words: words)
@@ -856,6 +920,12 @@ struct Cell: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(6)
+        // An open stack's tiles share a wash, so the run reads as one thing.
+        .background {
+            if let stack, stack.open || stack.inside {
+                RoundedRectangle(cornerRadius: 8).fill(Khayt.brand.opacity(0.07))
+            }
+        }
         .tileSelection(selected)
         .contentShape(RoundedRectangle(cornerRadius: 8))
     }

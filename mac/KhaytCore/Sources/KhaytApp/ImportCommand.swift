@@ -296,6 +296,7 @@ enum ImportCommand {
                     failures.append("\(file.title): nothing to draw"); continue
                 }
                 try png.write(to: model.deletingLastPathComponent().appending(path: "thumb.png"))
+                MeshPreview.markCurrent(model.deletingLastPathComponent().appending(path: "thumb.png"))
                 drawn[file.id] = "thumb.png"
             } catch {
                 failures.append("\(file.title): \(error)")

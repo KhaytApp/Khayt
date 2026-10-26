@@ -183,6 +183,20 @@ struct LibraryList: View {
                     if row.file?.isFavourite == true {
                         Image(systemName: "star.fill").font(.caption2).foregroundStyle(Khayt.marked)
                     }
+                    // A stack's cover: the variants it stands for, as the tile's badge.
+                    if let file = row.file, let stack = shop.libraryStackTile(file.id), stack.isStack {
+                        let said = Cell.stackSaid(stack, words: shop.words)
+                        Button { if let id = stack.stackId { shop.toggleStackOpen(id) } } label: {
+                            HStack(spacing: 1) {
+                                Image(systemName: "square.stack.fill")
+                                Text(verbatim: Cell.stackBadge(stack, words: shop.words))
+                            }
+                            .font(.caption2).monospacedDigit()
+                        }
+                        .buttonStyle(.plain)
+                        .help(said)
+                        .accessibilityLabel(said)
+                    }
                     if let file = row.file, file.isPrintNext {
                         Image(systemName: "bookmark.fill").font(.caption2).foregroundStyle(Khayt.brand)
                             .help(Cell.printNextSaid(file, words: shop.words))
@@ -393,7 +407,7 @@ struct LibraryList: View {
         Group {
             switch row.entry {
             case .file(let file):
-                Thumbnail(source: shop.thumbnail(for: file), pixels: 64, tint: file.firstColour,
+                Thumbnail(source: shop.displayedThumbnail(for: file), pixels: 64, tint: file.firstColour,
                           well: LibraryTile.well)
             case .folder(_, let path, _, let cover):
                 Thumbnail(source: shop.groupThumbnail(path, automatic: cover), pixels: 64, well: LibraryTile.well)
