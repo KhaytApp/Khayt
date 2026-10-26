@@ -121,7 +121,12 @@ struct ScreenActions: View {
                     }
                     // Whether the vault is over its plan, for the banner above
                     // the library (`VaultLapseBanner`); at most every ten minutes.
-                    .task { await shop.refreshVaultLapse() }
+                    .task {
+                        await shop.refreshVaultLapse()
+                        // Another Mac's vault changes, on coming back to the
+                        // library (`Shop+VaultApply`); at most once a minute.
+                        await shop.applyVaultChangesIfDue()
+                    }
                     // Vault files listed for sale on makerrun.com.
                     NavyAction(label: shop.words.callIt("mac.vp_products"), symbol: "tag") {
                         shop.showingVaultProducts = true

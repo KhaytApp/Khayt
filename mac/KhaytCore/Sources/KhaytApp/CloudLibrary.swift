@@ -736,7 +736,10 @@ enum CloudLibrary {
     nonisolated static func ownFoldersOnly(_ listed: [KhaytEngine.TierFile], printFiles: [JSONValue],
                                            orders: [JSONValue]) -> [KhaytEngine.TierFile] {
         let mine = Set(dirNames(printFiles: printFiles, orders: orders).values)
-        return listed.filter { mine.contains($0.id ?? "") }
+        // Nor another Mac's version kept beside the shop's (`VaultApply.keep`):
+        // it is the vault's already, and uploaded it would come back to every
+        // Mac as a model of its own. Known by its marker, not its name.
+        return listed.filter { mine.contains($0.id ?? "") && !VaultApply.isKeptCopy(URL(fileURLWithPath: $0.fullPath)) }
     }
 
     /// "a, b, c and 4 more" — the first few names in a confirmation.
@@ -914,6 +917,8 @@ extension Shop {
             // their ids here — every one would have come down (alpha.66
             // review). Its drive already keeps it in the cloud.
             if file.isLinked, LinkedCloud.isOnlineOnly(url) { continue }
+            // Never a kept-both copy (`CloudLibrary.ownFoldersOnly` says why).
+            if VaultApply.isKeptCopy(url) { continue }
             let key = S3.objectKey(prefix: config.prefix, id: LibraryLocation.itemDirName(file.id),
                                    filename: url.lastPathComponent)
             do {

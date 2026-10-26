@@ -1928,6 +1928,13 @@ final class Shop {
     /// the cloud's last word on it, nil until it has been asked.
     var vaultLapse: CloudPlans.Lapse?
     var vaultLapseAsked: Date?
+    /// Bringing the library into line with the vault (`Shop+VaultApply.swift`):
+    /// one pass at a time, when the last one began, and the models another
+    /// Mac changed while they were edited here (both kept), for the banner
+    /// that asks which to keep. Read off the disk by each pass.
+    var vaultApplyBusy = false
+    var vaultAppliedAt: Date?
+    var vaultKeptCopies: [VaultKeptCopy] = []
     /// The snapshot runner's owner, for the plan pane's Upgrade: the sample
     /// book has no cloud sign-in to carry a role.
     var pretendsOwner = false
