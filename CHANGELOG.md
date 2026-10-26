@@ -107,6 +107,7 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - The rules (safe paths, limits, keys, cache order) are in KhaytCore (`ArchiveFolder`). Listing and extraction use Khayt's own zip reader for ZIP and `/usr/bin/tar` (libarchive) for the rest, run as a separate process with an argument list. The sample shop has a compressed pack and a locked one, and `KHAYT_SNAPSHOT_LIBARCHIVE=1` photographs them.
 - **Docs:** weekly competitive review, 2026-10-25.
 - **Docs:** Spoolara added to the competitive watch list (2026-10-26).
+- **Docs:** weekly competitive review, 2026-10-26.
 
 - **Mac: saved searches, smart folders and ranges in the print library.**
   - Under Library in the sidebar: five smart folders that are always there (Ready to print, Never printed, Online only, No print figures, Sells in catalogue) and the shop's own saved searches, each with a live count. Clicking one fills the filter row with its search.
