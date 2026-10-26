@@ -8838,6 +8838,32 @@ missing its dot. And a Prusa can be sent binary G-code.
   before the lift. The window is also told about the record that was written
   rather than a draft built before the write.
 
+## [4.0.0-beta.8] - 2026-10-26
+
+*Khayt for macOS only. The Windows and Linux app is on its own version — see
+[VERSIONING.md](./VERSIONING.md).*
+
+### Added
+
+- **Stacks:** keep a model's variants under one tile (Model ▸ Stack, or accept a suggestion on the model's page). Unstacking can be undone.
+- **Find Similar:** the same file, the same shape (with the mirrored-copy caveat), then the closest in size and volume.
+- **Model views:** front, top, side and iso (⌥⌘1–4), and one plate at a time from a multi-plate 3MF.
+- **Model bundles:** File ▸ Export Model Bundle… and Import Model Bundle… — a model with its pictures, papers and slicer settings in one file. Nothing private goes out unless you tick it.
+- **Vault changes from your other Macs now arrive here:** new files, new versions, trash and restore. A file edited on both sides keeps both copies until you choose.
+- **Before a vault over its plan deletes anything:** "Bring back N models" for the models whose only copy is in the vault. Library Health lists any that were deleted.
+- **Save to Khayt** connects to Chrome, Edge, Brave, Vivaldi and Firefox from Settings ▸ Preferences ▸ Browser extension.
+- **Print notices to Telegram and ntfy** (opt-in per channel): a print finishes, fails or pauses. Job and file names only if you turn them on.
+
+### Changed
+
+- A model whose file changed on another Mac shows its print figures as out of date and is measured again; until then nothing is priced from the old figures.
+- Thin, wide reliefs (HueForge) are estimated as solid and marked "slice it for an exact time".
+- STL and OBJ thumbnails are no longer drawn as mirror images; old ones redraw as they come on screen.
+
+### Fixed
+
+- Ready to print could read 0 until the Library was opened; "Bed not cleared" in the menu bar no longer needs the Machines screen.
+
 ## [4.0.0-beta.7] - 2026-10-25
 
 *Khayt for macOS only. The Windows and Linux app is on its own version — see
