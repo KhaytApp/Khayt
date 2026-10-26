@@ -376,6 +376,8 @@
   "plib.group_ph": "z. B. Saudische Könige",
   "plib.no_filter_match": "Keine Datei passt zu diesem Filter.",
   "plib.tag_clear": "Zurücksetzen",
+  "plib.archived": "Archiviert",
+  "plib.archived_hint": "Auf dem Mac archivierte Modelle. Sie bleiben in deinen Unterlagen, und Aufträge und Produkte, die sie schon verwenden, funktionieren weiter.",
   "plib.uncategorised": "Ohne Kategorie",
   "plib.unfiled": "Ohne Gruppe",
   "webhook.resent": "Erneut gesendet",

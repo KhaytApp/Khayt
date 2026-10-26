@@ -251,6 +251,50 @@ async function testAChipsNumberIsAPromise(window) {
   await window.waitForTimeout(150);
 }
 
+async function testArchivedModelsLeaveTheLibrary(window) {
+  // A model the Mac archived (archivedAt — by the shop, or because its vault
+  // file was trashed elsewhere, #2071) stays in the book but out of the
+  // library, as on the Mac. The desktop showed it as a live model.
+  await window.evaluate(() => {
+    const at = '2026-10-26T09:00:00Z';
+    Object.assign(printFiles.find((r) => r.id === 'BIG-7'), { name: 'Archived Zebra', archivedAt: at });
+    Object.assign(printFiles.find((r) => r.id === 'BIG-8'), { name: 'Archived Zebra two', archivedAt: at, vaultArchived: true, vaultTrashedAt: at });
+    Object.assign(printFiles.find((r) => r.id === 'BIG-9'), { name: 'Trashed Zebra not archived', vaultTrashedAt: at });
+    renderPrintFiles();
+  });
+  const label = await moreLabel(window);
+  if (!label.includes(String(N - 2))) throw new Error(`the library still counts archived models: "${label}"`);
+  const found = await window.evaluate(async () => {
+    const box = document.getElementById('pfSearch');
+    box.value = 'Zebra'; box.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 400));
+    return [...document.querySelectorAll('#printfiles-tab .pf-card')].map((c) => c.textContent).join(' | ');
+  });
+  if (/Archived Zebra/.test(found) || !/Trashed Zebra not archived/.test(found)) throw new Error(`search should find only the live Zebra: ${found}`);
+  const archived = await window.evaluate(async () => {
+    const chip = document.querySelector('[data-act="pf-archived"]');
+    if (!chip) return null;
+    const n = chip.textContent.trim();
+    chip.click();
+    await new Promise((r) => setTimeout(r, 150));
+    const shown = [...document.querySelectorAll('#printfiles-tab .pf-card')].map((c) => c.textContent);
+    document.querySelector('[data-act="pf-archived"]').click();
+    const box = document.getElementById('pfSearch');
+    box.value = ''; box.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 400));
+    return { n, shown };
+  });
+  if (!archived) throw new Error('no Archived chip while the Mac has archived models');
+  if (!/2$/.test(archived.n)) throw new Error(`the Archived chip should count 2: "${archived.n}"`);
+  if (archived.shown.length !== 2 || !archived.shown.every((x) => /Archived Zebra/.test(x))) throw new Error(`Archived should show only the two archived models: ${archived.shown.join(' | ')}`);
+  const offered = await window.evaluate(() => typeof KhaytLibraryArchive !== 'undefined'
+    && KhaytLibraryArchive.pool(printFiles, false).every((r) => !r.archivedAt));
+  if (!offered) throw new Error('the shared rule is not loaded in the app');
+  // Back to an all-live library for the tests after this one.
+  await window.evaluate(() => { for (const r of printFiles) delete r.archivedAt; renderPrintFiles(); });
+  if (await window.evaluate(() => !!document.querySelector('[data-act="pf-archived"]'))) throw new Error('the Archived chip stays with nothing archived');
+}
+
 async function testPaintingAPageIsFast(window) {
   // The number this exists for. Generous against CI, and still ~20x under what
   // painting every card cost.
@@ -282,9 +326,10 @@ try {
   await testTheBarsCountFollowsTheFilter(window);
   await testAChipsNumberIsAPromise(window);
   await testTheGalleryIsPagedToo(window);
+  await testArchivedModelsLeaveTheLibrary(window);
   await testPaintingAPageIsFast(window);
 
-  console.log('e2e-big-library: ok (a page is painted, the rest on demand, filters and search see all of it, select-all means every match)');
+  console.log('e2e-big-library: ok (a page is painted, the rest on demand, filters and search see all of it, select-all means every match, Mac-archived models leave the library)');
 } finally {
   if (electronApp) await electronApp.close().catch(() => {});
   fs.rmSync(userData, { recursive: true, force: true });

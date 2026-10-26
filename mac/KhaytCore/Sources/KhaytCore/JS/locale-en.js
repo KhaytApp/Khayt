@@ -376,6 +376,8 @@
   "plib.group_ph": "e.g. Saudi Kings",
   "plib.no_filter_match": "No files match this filter.",
   "plib.tag_clear": "Clear",
+  "plib.archived": "Archived",
+  "plib.archived_hint": "Models archived on the Mac. They stay in your records, and jobs and products that already use them still work.",
   "plib.uncategorised": "Uncategorised",
   "plib.unfiled": "Ungrouped",
   "webhook.resent": "Resent",

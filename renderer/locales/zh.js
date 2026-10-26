@@ -376,6 +376,8 @@
   "plib.group_ph": "例如：沙特历代国王",
   "plib.no_filter_match": "没有文件符合此筛选。",
   "plib.tag_clear": "清除",
+  "plib.archived": "已归档",
+  "plib.archived_hint": "在 Mac 上归档的模型。它们仍保留在你的记录中，已使用它们的订单和商品照常可用。",
   "plib.uncategorised": "未分类",
   "plib.unfiled": "未分组",
   "webhook.resent": "已重新发送",

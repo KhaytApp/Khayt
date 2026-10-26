@@ -376,6 +376,8 @@
   "plib.group_ph": "örn. Suudi Kralları",
   "plib.no_filter_match": "Bu süzgece uyan dosya yok.",
   "plib.tag_clear": "Temizle",
+  "plib.archived": "Arşivlenenler",
+  "plib.archived_hint": "Mac'te arşivlenen modeller. Kayıtlarınızda kalırlar; onları zaten kullanan işler ve ürünler çalışmaya devam eder.",
   "plib.uncategorised": "Kategorisiz",
   "plib.unfiled": "Grupsuz",
   "webhook.resent": "Yeniden gönderildi",

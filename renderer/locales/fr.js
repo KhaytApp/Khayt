@@ -376,6 +376,8 @@
   "plib.group_ph": "p. ex. Rois saoudiens",
   "plib.no_filter_match": "Aucun fichier ne correspond à ce filtre.",
   "plib.tag_clear": "Effacer",
+  "plib.archived": "Archivés",
+  "plib.archived_hint": "Modèles archivés sur le Mac. Ils restent dans vos registres, et les travaux et produits qui les utilisent déjà continuent de fonctionner.",
   "plib.uncategorised": "Sans catégorie",
   "plib.unfiled": "Sans groupe",
   "webhook.resent": "Renvoyé",
