@@ -71,6 +71,11 @@ struct LibraryFile: Identifiable, Decodable, Hashable, Sendable {
     /// With only a vault sidecar on this Mac, that was the last copy:
     /// Library Health says "deleted from the vault by the plan limit".
     let vaultPurgedAt: String?
+    /// "plan" when the vault purged it while the lapse had set a deletion
+    /// date — the only time Health names the plan limit (beta.8 review H3).
+    let vaultPurgeReason: String?
+    /// Archived BY the vault's Trash (`Shop.applyVaultEdits`), not by the shop.
+    let vaultArchived: Bool?
     /// The model that took its place, by id. Absent when a model was put aside
     /// on its own rather than replaced by a conversion.
     let supersededBy: String?

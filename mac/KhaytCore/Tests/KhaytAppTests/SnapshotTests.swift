@@ -627,6 +627,22 @@ import KhaytCore
         _ = shop
     }
 
+    /// The kept-both vault banner (beta.8 UI review): three copies drawn and
+    /// "And 1 more", each saying the other copy goes to the Trash.
+    @Test("the kept-both vault banners, with how many more")
+    func vaultKeptBanners() throws {
+        let shop = Shop()
+        let folder = URL(fileURLWithPath: "/tmp/khayt-kept")
+        shop.vaultKeptCopies = (1...4).map { n in
+            VaultKeptCopy(recordId: "PF-\(n)", title: "Model \(n)", mine: folder.appending(path: "m\(n).stl"),
+                          copy: folder.appending(path: "m\(n) (vault v2).stl"), version: 2)
+        }
+        let text = shop.words.callIt("mac.vault_kept_both", ["name": .string("Model 1"), "copy": .string("m1 (vault v2).stl")])
+        #expect(text.contains("Trash"))
+        try render(VStack(spacing: 0) { VaultKeptBanners(shop: shop) }.frame(width: 820),
+                   "30b-vault-kept-banners", size: CGSize(width: 820, height: 260))
+    }
+
     /// The state a search leaves behind, on the two screens that reach it
     /// differently — a shelf, where the word is the only filter, and the jobs
     /// table, where the sidebar's stage is narrowing too.

@@ -53,10 +53,13 @@ struct VaultApplyTests {
             for e in edits {
                 guard let i = records.firstIndex(where: { $0.id == e.recordId }) else { continue }
                 switch e {
-                case .holds(_, let f, let sha, _): records[i].vaultFileId = f; records[i].contentHash = sha
+                case .holds(_, let f, let sha, _):
+                    records[i].vaultFileId = f; records[i].contentHash = sha; records[i].vaultPurged = false
                 case .trashed(_, let f): records[i].vaultFileId = f; records[i].vaultTrashed = true
                 case .restored: records[i].vaultTrashed = false
-                case .purged: records[i].vaultFileId = nil; records[i].vaultTrashed = false
+                case .purged(_, let only):
+                    records[i].vaultFileId = nil; records[i].vaultTrashed = false
+                    if only { records[i].vaultPurged = true }
                 }
             }
         }
@@ -133,9 +136,15 @@ struct VaultApplyTests {
         try await Self.upload(a, b, Self.bytes(1), name: "v1.stl")
         _ = try await z.pass()
         try await Self.upload(a, b, Self.bytes(2), name: "v2.stl")
+        // The book here still says v1: the change waits for Mac A's record
+        // (beta.8 review H2), and nothing is written meanwhile.
+        let early = try await z.pass()
+        #expect(early.held == 1 && early.edits.isEmpty)
+        #expect(try await Self.sidecar(z)?.sha256 == Self.sha(Self.bytes(1)))
+        z.records[0].contentHash = Self.sha(Self.bytes(2))      // the book's sync brings it
         let out = try await z.pass()
         #expect(try await Self.sidecar(z)?.sha256 == Self.sha(Self.bytes(2)))
-        #expect(out.online == ["PF-1"] && z.records[0].contentHash == Self.sha(Self.bytes(2)))
+        #expect(out.online == ["PF-1"] && out.edits.isEmpty, "the record already says so: not stamped")
         #expect(!FileManager.default.fileExists(atPath: z.model.path))
     }
 
@@ -245,7 +254,7 @@ struct VaultApplyTests {
         let fileId = try #require(a.sync.load().keys[Self.key])
         try await b.stub.client().purge(fileId: fileId)
         let out = try await z.pass()
-        #expect(out.edits == [.purged(recordId: "PF-1")])
+        #expect(out.edits == [.purged(recordId: "PF-1", onlyCopy: false)], "its bytes are here: not the last copy")
         #expect(z.records[0].vaultFileId == nil)
         #expect(try Data(contentsOf: z.model) == Self.bytes(1))
     }

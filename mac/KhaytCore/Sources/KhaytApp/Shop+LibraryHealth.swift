@@ -166,6 +166,14 @@ extension Shop {
     }
 
     /// One group's models, as the book holds them, in the group's order.
+    /// A "gone from the vault" group whose every model the vault purged
+    /// while the lapse had set a deletion date: the plan's doing, said so.
+    func healthGroupIsByPlan(_ group: LibraryHealth.Group) -> Bool {
+        guard group.kind == .deletedByPlan else { return false }
+        let chosen = healthFiles(group)
+        return !chosen.isEmpty && chosen.allSatisfy { $0.vaultPurgeReason == "plan" }
+    }
+
     func healthFiles(_ group: LibraryHealth.Group) -> [LibraryFile] {
         let byId = Dictionary(files.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         return group.modelIds.compactMap { byId[$0] }

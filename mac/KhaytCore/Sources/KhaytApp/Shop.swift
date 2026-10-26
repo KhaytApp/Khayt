@@ -1967,6 +1967,8 @@ final class Shop {
     var vaultApplyBusy = false
     var vaultAppliedAt: Date?
     var vaultKeptCopies: [VaultKeptCopy] = []
+    /// Kept copies (by path) whose answer is being carried out: one answer each.
+    @ObservationIgnored var vaultResolving: Set<String> = []
     /// The snapshot runner's owner, for the plan pane's Upgrade: the sample
     /// book has no cloud sign-in to carry a role.
     var pretendsOwner = false

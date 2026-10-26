@@ -76,22 +76,7 @@ struct MoveBanners: View {
         // kept, the vault's beside the shop's (`VaultApply.keep`), until the
         // shop says which stays: the other goes to the Trash. Three at most,
         // and how many more.
-        ForEach(shop.vaultKeptCopies.prefix(3)) { kept in
-            Banner(text: shop.words.callIt("mac.vault_kept_both", ["name": .string(kept.title),
-                                                                   "copy": .string(kept.copy.lastPathComponent)]),
-                   symbol: "doc.on.doc", tint: Khayt.attention) {
-                Button(shop.words.callIt("mac.vault_keep_mine")) {
-                    Task { await shop.resolveVaultConflict(kept, keepMine: true) }
-                }
-                Button(shop.words.callIt("mac.vault_use_vaults")) {
-                    Task { await shop.resolveVaultConflict(kept, keepMine: false) }
-                }
-            }
-        }
-        if shop.vaultKeptCopies.count > 3 {
-            Banner(text: shop.words.callIt("mac.vault_more_kept", ["n": .number(Double(shop.vaultKeptCopies.count - 3))]),
-                   symbol: "doc.on.doc", tint: Khayt.attention)
-        }
+        VaultKeptBanners(shop: shop)
         // PRODUCTS COSTED ON A SPOOL SIZE THAT HAS CHANGED. On every screen,
         // not only the catalogue: the edit that causes it is a spool's size,
         // saved on the shelf.
@@ -343,6 +328,36 @@ struct EngineBanner: View {
                    symbol: "exclamationmark.octagon", tint: Khayt.attention) {
                 Button(shop.words.callIt("mac.feedback_menu")) { shop.askForFeedback() }
             }
+        }
+    }
+}
+
+/// A model whose vault copy is not the one on this Mac, both kept
+/// (`VaultApply.keep`), until the shop says which stays: the other goes to
+/// the Trash, which the banner and each button's help say. Three at most,
+/// and how many more. Its own view so a snapshot can draw it alone
+/// (`Snapshot.captureVaultLapse`).
+struct VaultKeptBanners: View {
+    let shop: Shop
+
+    var body: some View {
+        ForEach(shop.vaultKeptCopies.prefix(3)) { kept in
+            Banner(text: shop.words.callIt("mac.vault_kept_both", ["name": .string(kept.title),
+                                                                   "copy": .string(kept.copy.lastPathComponent)]),
+                   symbol: "doc.on.doc", tint: Khayt.attention) {
+                Button(shop.words.callIt("mac.vault_keep_mine")) {
+                    Task { await shop.resolveVaultConflict(kept, keepMine: true) }
+                }
+                .help(shop.words.callIt("mac.vault_keep_mine_help"))
+                Button(shop.words.callIt("mac.vault_use_vaults")) {
+                    Task { await shop.resolveVaultConflict(kept, keepMine: false) }
+                }
+                .help(shop.words.callIt("mac.vault_use_vaults_help"))
+            }
+        }
+        if shop.vaultKeptCopies.count > 3 {
+            Banner(text: shop.words.callIt("mac.vault_more_kept", ["n": .number(Double(shop.vaultKeptCopies.count - 3))]),
+                   symbol: "doc.on.doc", tint: Khayt.attention)
         }
     }
 }

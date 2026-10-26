@@ -280,8 +280,14 @@ struct LibraryInspector: View {
         func g(_ n: Double) -> String { PrintFigures.weight(n, w) }
         return AnyView(DetailSection(w.callIt(plates.isEmpty ? "mac.sliced_title" : "mac.sliced_project",
                                               ["plates": .string(w.counting(plates.count, "mac.n_plates"))])) {
-            if mins > 0 { DetailLine(w.callIt("mac.est_time"), hours(mins), strong: true) }
-            if grams > 0 { DetailLine(w.callIt("mac.est_filament"), g(grams), strong: true) }
+            if mins > 0 { DetailLine(w.callIt("mac.est_time"), hours(mins), strong: !file.figuresStale) }
+            if grams > 0 { DetailLine(w.callIt("mac.est_filament"), g(grams), strong: !file.figuresStale) }
+            // What the slicer said about the OLD bytes (review M1): said so.
+            if file.figuresStale {
+                Text(w.callIt("mac.figures_stale_reason"))
+                    .font(.caption).foregroundStyle(Khayt.attention)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             ForEach(plates, id: \.index) { plate in
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
