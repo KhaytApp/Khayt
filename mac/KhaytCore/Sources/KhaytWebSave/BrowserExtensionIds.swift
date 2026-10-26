@@ -25,20 +25,20 @@ public enum BrowserExtensionIds {
     /// first upload (Developer Dashboard ▸ the item ▸ "Item ID", 32 letters
     /// a–p). Brave and Vivaldi install from the Chrome Web Store, so this one
     /// id serves them too.
-    public static let chromeWebStore: [String] = []
+    public static let chromeWebStore: [String] = ["dfaafmaijpbjlfchomelcndpinphnpln"]
 
     /// TODO(store): the id Microsoft Edge Add-ons assigns on its first upload
     /// (Partner Center ▸ the extension ▸ Extension overview ▸ "Extension ID").
     /// Different from the Chrome Web Store's; Edge can install from either
     /// store, so the host manifest names both.
-    public static let edgeAddOns: [String] = []
+    public static let edgeAddOns: [String] = ["phaddgncdojaiihhbcdgcnokfogmhdbk"]
 
     /// TODO(store): true once Save to Khayt is listed on addons.mozilla.org
     /// under its gecko id (`BrowserHosts.firefoxExtensionId`). Until then
     /// the id is only what the extension CLAIMS, and whoever lists an add-on
     /// with it first could start the host — so Settings keeps Firefox's
     /// Install waiting for the store, as Chromium's does.
-    public static let firefoxListed = false
+    public static let firefoxListed = true
 
     /// Every store id, in the order a manifest names them.
     public static var store: [String] { chromeWebStore + edgeAddOns }
