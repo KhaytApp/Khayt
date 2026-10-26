@@ -391,7 +391,8 @@ ships a snapshot, or contributes back.
 **R10 — decide the automation line, in writing.** Khayt now finds printers,
 controls them and proposes dispatch. It is not going to do cloud slicing or
 lights-out production. Saying where the line falls stops it being redecided one
-feature at a time.
+feature at a time. *Written on 2026-10-26: see "R10 — the automation line" in that
+week's reading.*
 
 *Caveat, as §5: vendor marketing pages read once, not hands-on evaluations.
 Enough to place a product, not to trust a feature matrix.*
@@ -841,7 +842,7 @@ model generators.
 | Saudi accounting exports (ranked idea 5) | **Closed for Wafeq and Daftra.** Qoyod was left out on purpose, and the code says why | `lib/accounting-export.js`, under "THE SAUDI PACKAGES". Qoyod takes only its own Excel template |
 | Repositioning the website (ranked idea 4) | **Done** | khaytapp.com leads with native Mac and iPhone, local data, measured cost and ZATCA invoices. It has a FoxTrack/PrintMate table "as of 10 October 2026" |
 | Real figures for Bambu jobs (ranked idea 2) | **Still open**, and still blocked on hardware | The `bambu` branch of `lib/printer-actuals.js` says "nothing is claimed here", and the Mac has no sliced-figure path either |
-| Writing R10, the automation line (ranked idea 6) | **Still open** | No document in `docs/` states it |
+| Writing R10, the automation line (ranked idea 6) | **Written in this entry** (see "R10 — the automation line") | One gap was found: a person's own start does not ask about the bed (R10.2) |
 | Saving models from the browser (MeshVault, §0) | **Closed** | Save to Khayt works in Safari, Chrome, Edge, Brave, Vivaldi and Firefox (#2060, #2066, #2070) |
 | The library as a surface (Meshory/MeshVault, R6) | **Closed, well beyond R6** | Grid redesign, smart folders, Library Health, stacks, Find Similar, model bundles, archives as folders (#2055–#2072) |
 | Spoolara idea 3: hardware per model | **False alarm, it already exists** | `ModelConsumables.swift`: magnets, inserts and screws on the model record carry onto the product, the job, the cost (`calculator-cost.js`) and the shelf (`order-deduction.js`) |
@@ -942,19 +943,9 @@ The buyer is unchanged: a small Saudi shop with 2 printers, working in Arabic an
    - *Why:* AutoQuote3D, Quote3D and PrintQuote show that the quote belongs on the seller's
      page. Khayt already prices the upload; only the doorway is missing.
    - *Effort:* small to medium. *Lanes:* Cloud, then the website's docs.
-5. **Write R10, the automation line.**
-   - *Why now:* the field moved towards automation this month.
-     - Printago now does spool costing.
-     - SimplyPrint's Shop is weeks away.
-     - Watchtower sells Auto-Eject and a farm agent you can text.
-     - AutoQuote3D lets an agent *write* quotes and orders.
-   - *What it should say Khayt does not do:*
-     - no cloud slicing;
-     - no lights-out production, and no auto-start onto a bed nobody cleared;
-     - no race to add marketplace connectors;
-     - **agents read the books and never write them** (the `KhaytMcp` rule, which keeps the
-       store's write chain whole).
-   - *Effort:* tiny. *Lane:* docs.
+5. **Write R10, the automation line.** — **written below, in this entry.** One point the code
+   does not yet enforce came out of writing it: a person's own start does not ask about the
+   bed. See R10.2.
 6. **Real figures for Bambu jobs.** This is §7's idea 2, unchanged and still blocked on
    hardware. Idea 2 above covers jobs sent from the slicer. Jobs started elsewhere still need
    this.
@@ -963,6 +954,86 @@ The buyer is unchanged: a small Saudi shop with 2 printers, working in Arabic an
    - *What:* FoxTrack now has a Free tier, and the table is still dated 10 October. Consider
      adding a Watchtower row (local and lifetime-licensed, like Khayt, but with no books).
    - *Effort:* tiny. *Lane:* the khaytapp.com website.
+
+### R10 — the automation line — **written 2026-10-26**
+
+Proposed in §6 and left unwritten through §7. It is written now because the field moved
+towards automation this month:
+
+- Printago costs spools.
+- SimplyPrint's Shop is weeks away.
+- Watchtower sells routing "for now, or later" and Auto-Eject.
+- AutoQuote3D lets an agent write quotes and orders.
+
+Khayt is books-first. Automation that touches the books or a printer stops at a person. The
+four points below say where. Each says where the code holds the line, and each place the
+code does not yet hold it is marked as a gap.
+
+**R10.1. No cloud slicing.** Slicing runs the shop's own slicer, on the shop's own machine.
+- *Enforced.* The desktop spawns the local slicer binary (`main.js`, `spawn(slicerPath, …)`;
+  the paths come from `lib/slicers.js`). The Mac runs it through `SlicerRun.swift` and
+  `BoundedProcess.swift`.
+- Khayt Cloud is its own repository. Its `src/` has no `child_process`, `spawn` or `execFile`
+  at all, so it cannot run a slicer.
+- The customer's upload-a-price in R5 is a geometric estimate (`lib/public-quote.js`), labelled
+  as one, not a slice.
+- *Not a gap.*
+
+**R10.2. A person starts every print, and nothing auto-starts onto a bed nobody cleared.**
+This is why Khayt has no "schedule for later", no Auto-Eject and no lights-out queue.
+- *Enforced, for everything automatic.* `lib/auto-dispatch.js` and `lib/scheduling.js`
+  **propose only**. Neither reaches a socket. `auto-dispatch.js` refuses any machine nobody
+  has marked clear since its last print (`bedClearedAt`; the Mac writes it in
+  `Shop+Jobs.swift`), and gives that refusal as a reason.
+- No timed or deferred start exists: `scheduledAt`, `startAt` and `notBefore` match nothing
+  relevant.
+- From a phone, the LAN API's printer commands are `pause`, `resume` and `cancel` only
+  (`lib/printer-commands.js`, `COMMANDS`). Nothing remote can start a print.
+- A store order arriving by Salla or Zid webhook becomes a job, not a print.
+- A start happens only behind a person's own action. On the desktop that is a confirm dialog
+  (`renderer/machines.js`, `slicer.start_confirm`: "Slice and start printing on {name}?"). On
+  the Mac it is the Send sheet's Start switch (`SendToPrinterSheet.swift`).
+- **Gap: the person's own start does not ask about the bed.**
+  - Neither the desktop's confirm nor the Mac's sheet reads `bedClearedAt`.
+  - The Mac's Start switch defaults to on (`@State private var start = true`).
+  - So the rule protects every proposal, but not the button press itself.
+  - *Fix, small:* when the machine has not been marked clear since its last print, the start
+    confirmation says so ("Nobody has said the bed is clear", the words already in
+    `Words.swift` as `ad.bed_unknown`) and offers "Bed is clear — start". Same on the desktop.
+  - *Lanes:* Mac, then Electron.
+
+**R10.3. No race to add marketplace connectors.**
+- The connectors are the ones a Saudi shop sells through: Salla, Zid, WhatsApp, plus
+  Shopify, Etsy, WooCommerce and Medusa (`lib/integrations-registry.js`).
+- Printago added three this month (Wix, Shippo, TikTok Shop). Following it would be a weekly
+  race for a buyer Khayt does not have.
+- *Not enforced by code, and it cannot be.* This is a product decision.
+  `integrations-registry.js` is where a new one would have to be added, so a PR that adds
+  one is where this line gets argued.
+- *Not a gap; a decision.*
+
+**R10.4. AI agents read the books. They never write them.**
+- *Enforced for the agent interface Khayt ships.* `KhaytMcp` has three tools for the library
+  and five for the books (`Server.swift`: "five READ-ONLY questions about the books ... none
+  of them writes"). It reads through `Books.open`, which masks secrets first, and
+  `Library.bookData`, which never writes (`main.swift`).
+- A test proves it on a real file: `McpBooksTests.swift`, "asking every tool leaves the book
+  and its folder untouched" (no write, no temporary file, no `.prev`).
+- `quote_draft` drafts; it does not save.
+- The in-app assistant returns drafts for a person to accept. `lib/ai-tools.js`:
+  `draft_customer_message` is "for the owner to review and edit before sending", `quote_extract`
+  hands facts to "the shop calculator to price", and `suggest_price` makes a recommendation.
+- Why it matters: a write that bypassed the app would bypass the store's write chain and its
+  sync merge. AutoQuote3D's connector that lets an agent manage quotes and orders is exactly
+  what this point rules out.
+- *Boundary, noted, not a gap:* the AI library sort (`lib/ai-library.js`) does shape how
+  folders group in the library. That is the library, not the books, and its answers are
+  filtered to paths and roles that exist (`readLibraryAnswer`).
+- *Not a gap* for what Khayt ships. The LAN API's write routes are for paired phones, and
+  pairing a phone is a person's act.
+
+**Where the line moves, if it ever does:** only by a written change to this section. A
+feature that crosses one of these four points should say so in its PR and point here.
 
 ### Deliberately not doing
 
