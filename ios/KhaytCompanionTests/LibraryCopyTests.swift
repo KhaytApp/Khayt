@@ -119,6 +119,29 @@ final class LibraryCopyTests: XCTestCase {
         else { return XCTFail("PF-a missing") }
         XCTAssertEqual(a["areaMm2"], .number(5), "slimmed again after the fold")
     }
+
+    func testAModelArchivedOnTheMacLeavesTheCopyAndComesBackWithIt() async throws {
+        let engine = try KhaytEngine()
+        let rows = LibraryCopy.slimAll(try record(#"""
+        [{"id":"PF-a","rev":1,"name":"Lamp"},{"id":"PF-b","rev":1,"name":"Shelved","archivedAt":"2026-10-12T09:30:00.000Z"},
+         {"id":"PF-c","rev":1,"name":"Kept","archivedAt":""}]
+        """#))
+        XCTAssertEqual(LibraryCopy.items(rows).map(\.id), ["PF-a", "PF-c"], "an empty archivedAt is not archived")
+
+        func fold(_ base: [JSONValue], _ json: String) async throws -> [JSONValue] {
+            let delta = try JSONDecoder().decode([String: JSONValue].self, from: Data(json.utf8))
+            let folded = try await engine.foldDeltas(base: ["printFiles": .array(base), "tombstones": .array([])], deltas: [delta])
+            return LibraryCopy.slimAll(folded.store["printFiles"])
+        }
+        let archived = try await fold(rows, #"""
+        {"deltas":[{"collection":"printFiles","record":{"id":"PF-a","rev":2,"name":"Lamp","archivedAt":"2026-10-26T08:00:00.000Z"}}]}
+        """#)
+        XCTAssertEqual(LibraryCopy.items(archived).map(\.id), ["PF-c"])
+        let back = try await fold(archived, #"""
+        {"deltas":[{"collection":"printFiles","record":{"id":"PF-a","rev":3,"name":"Lamp"}}]}
+        """#)
+        XCTAssertEqual(Set(LibraryCopy.items(back).map(\.id)), ["PF-a", "PF-c"])
+    }
 }
 
 private func XCTUnwrapAsync<T>(_ value: T?, file: StaticString = #filePath, line: UInt = #line) async throws -> T {

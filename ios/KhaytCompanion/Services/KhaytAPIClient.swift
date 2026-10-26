@@ -1052,6 +1052,12 @@ final class KhaytAPIClient: ObservableObject {
     /// phone, so the library looks the same away from the shop. Once every
     /// twelve hours at most, one picture at a time, only the ones not kept
     /// yet; it stops at the first sign the Mac has gone.
+    ///
+    /// Folder by folder: `/api/library` with no search lists ONE folder's
+    /// models and the folders under it, on the Mac and on the desktop alike,
+    /// so asking for folder "" alone kept the top folder's pictures and no
+    /// others. A walk that reaches the end also lets go of every picture the
+    /// Mac no longer lists — a model archived, deleted or left without one.
     private var keepingPictures = false
     static let picturesKeptAtKey = "khayt.library.picturesKeptAt"
 
@@ -1061,20 +1067,29 @@ final class KhaytAPIClient: ObservableObject {
         if let last = defaults.object(forKey: Self.picturesKeptAtKey) as? Date, now.timeIntervalSince(last) < 12 * 3600 { return 0 }
         keepingPictures = true
         defer { keepingPictures = false }
-        var fetched = 0, offset = 0
-        while !Task.isCancelled {
-            guard let page = try? await libraryPage(query: "", folder: "", offset: offset, limit: 200) else { return fetched }
-            let want = page.items.filter(\.thumb).map(\.id)
-            let kept = await thumbShelf.kept(want)
-            for id in want where !kept.contains(id) {
+        var fetched = 0
+        var folders = [""], walked: Set<String> = [], pictured: Set<String> = []
+        while let folder = folders.popLast() {
+            guard walked.insert(folder).inserted else { continue }
+            var offset = 0
+            while true {
                 if Task.isCancelled { return fetched }
-                if await libraryThumb(id: id) != nil { fetched += 1 }
-                // The Mac stopped answering: try again on the next visit.
-                if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60 { return fetched }
+                guard let page = try? await libraryPage(query: "", folder: folder, offset: offset, limit: 200) else { return fetched }
+                if offset == 0 { folders += page.folders.map(\.path) }
+                let want = page.items.filter(\.thumb).map(\.id)
+                pictured.formUnion(want)
+                let kept = await thumbShelf.kept(want)
+                for id in want where !kept.contains(id) {
+                    if Task.isCancelled { return fetched }
+                    if await libraryThumb(id: id) != nil { fetched += 1 }
+                    // The Mac stopped answering: try again on the next visit.
+                    if let down = libraryMacDownSince, Date().timeIntervalSince(down) < 60 { return fetched }
+                }
+                offset += page.items.count
+                if page.items.isEmpty || offset >= page.total { break }
             }
-            offset += page.items.count
-            if page.items.isEmpty || offset >= page.total { break }
         }
+        await thumbShelf.keepOnly(pictured)
         defaults.set(now, forKey: Self.picturesKeptAtKey)
         return fetched
     }

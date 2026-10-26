@@ -31,9 +31,19 @@ enum LibraryCopy {
         "geometryKey", "testedNotes", "sourceFile",
     ]
 
+    /// Every model the Mac's library shows, slimmed. A model put aside on the
+    /// Mac (`archivedAt`) is left out, as the Mac's own list and its
+    /// `/api/library` leave it out — the phone's two libraries, at the shop
+    /// and away from it, list the same models. Sync carries whole records, so
+    /// one brought back on the Mac arrives again with its next change.
     static func slimAll(_ printFiles: JSONValue?) -> [JSONValue] {
         guard case .array(let rows)? = printFiles else { return [] }
-        return rows.compactMap(slim)
+        return rows.filter { !isArchived($0) }.compactMap(slim)
+    }
+
+    static func isArchived(_ row: JSONValue) -> Bool {
+        guard case .object(let o) = row, case .string(let at)? = o["archivedAt"] else { return false }
+        return !at.isEmpty
     }
 
     static func slim(_ row: JSONValue) -> JSONValue? {
