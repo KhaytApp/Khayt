@@ -730,7 +730,10 @@ This is the first run since §7 that could read products' own pages. It ran on T
 not in the cloud environment that got `ENOTFOUND` on 2026-10-11 and 2026-10-25. Pages were
 read with WebFetch, which summarises through a small model, so each figure is what the page
 reported. The three pages that contradicted §7 (Stimalo, MeshVault, Meshory) were fetched a
-second time, and they matched. Every claim about Khayt below was checked against `lib/`,
+second time, and they matched. **Method addition:** a page that is JavaScript-only (WebFetch
+gets only its title) is read in a headless Chrome running a throwaway profile, which never
+touches the user's browser. That is how Watchtower's site was read. A page read this way is
+marked "✅ own site, rendered". Every claim about Khayt below was checked against `lib/`,
 `renderer/`, `mac/KhaytCore/Sources` and `ios/` on `origin/main` (`9cab627e`).
 
 ### The two open items
@@ -775,7 +778,7 @@ There were no shutdowns. **No product added ZATCA, Saudi e-invoicing or a Saudi 
 
 | Product | What it is | Price | Read? |
 |---|---|---|---|
-| [Watchtower](https://www.kicktraq.com/projects/watchtower3d/watchtower-3d-printer-dashboard-and-farm-management/) (watchtower3d) | **A local, cloud-free farm dashboard** from a two-person team. Monitor, control and queue Bambu, Klipper, OctoPrint and PrusaLink printers, with Anycubic and Elegoo in development. It runs on Mac, Windows, Linux or a Raspberry Pi. Features: a camera wall ("40+ streams"), one alarm feed across brands, and a queue that **sends pre-sliced files to available printers with Auto-Eject and Auto-Ready**. It also has spool tracking, spaghetti detection, alerts (iMessage, SMS, email, Discord, Slack, push), a "farm agent you can text", Kasa/Matter plugs with energy cost, and a tunnel it sets up itself (WireGuard, Tailscale or Cloudflare). It **appears as a printer inside Bambu Studio, OrcaSlicer and PrusaSlicer**. Etsy/Shopify import comes at Pro tier. Slicing and more storefronts are only stretch goals. **No costing, quotes, invoices or tax.** In public beta; licences are expected Nov–Dec 2026. The campaign ends 31 Oct. Kicktraq shows CAD 289,437 from 1,388 backers on a CAD 10,000 goal. | One-time by printer count: Hobby 5 printers $99, Basic 10 $199, Pro 15 $349, **Farm 25 $599**, 50 $899, 100 $1,349. Early bird is about 40% off (Farm $359). One year of updates (two for backers), then 50% of retail to extend. | ⚠️ **Its own pages could not be read.** watchtower3d.com returned only its title (a JS shell), and Kickstarter returned 403. Funding is from the Kicktraq tracker. Features, prices and the slicer claim come from **competitors' comparison pages**, [Printago](https://printago.io/alternatives/watchtower) and [SimplyPrint](https://simplyprint.io/alternatives/watchtower-3d.md), so treat them as second-hand. |
+| [Watchtower](https://www.kicktraq.com/projects/watchtower3d/watchtower-3d-printer-dashboard-and-farm-management/) (watchtower3d) | **A farm dashboard, "100% local, cloud-free".** The site says "Trusted by 100+ print farms"; the beta has a Discord community.<br>**Printers:** Bambu Lab, PrusaLink, OctoPrint, Klipper, Anycubic and Elegoo, found on the network with no plugins. Multi-material: AMS, CFS, QIDI Box, ACE, CANVAS, and toolchangers, **including the Snapmaker U1** by name.<br>**One screen:** "Monitoring, queue, orders, alarms, and analytics"; a testimonial mentions "storefront integration".<br>**Cameras:** 40+ streams, with "AI failure detection".<br>**Queue:** "smart job routing. Upload direct from your slicer. Route each job to the best available printer by type, material, and status; schedule it for now, or later."<br>**Also:** analytics (success rate, material, uptime and cost across the fleet), a live console per printer, filament management with a low-stock notice, alerts by iMessage, SMS, email, Discord and Slack, one file browser across the fleet, smart plugs (auto-discovered, power draw, on/off), and remote access through Tailscale, WireGuard or a Cloudflare tunnel with no Watchtower cloud.<br>**Hardware:** runs on a desktop or a Raspberry Pi, "one per 10–50 printers".<br>**Not seen on the site:** costing, quotes, invoices or tax.<br>**Status:** the campaign ends 31 Oct. Kicktraq shows CAD 289,437 from 1,388 backers on a CAD 10,000 goal. | Lifetime licences at launch; the site contrasts this with "$5 per printer per month". Tier prices are not on the site. Printago's comparison page gives one-time tiers of 5 printers $99, 10 $199, 15 $349, **25 $599**, 50 $899 and 100 $1,349, with early-bird pricing about 40% lower and one year of updates. | ✅ own site, rendered ([watchtower3d.com](https://watchtower3d.com/), in headless Chrome). Kickstarter returned 403, and the funding figures come from the Kicktraq tracker. The tier prices, Auto-Eject and the "farm agent you can text" come only from **competitors' comparison pages** ([Printago](https://printago.io/alternatives/watchtower), [SimplyPrint](https://simplyprint.io/alternatives/watchtower-3d.md)). |
 | [AutoQuote3D](https://autoquote3d.com/pricing) | A service-bureau quote widget: upload, slice, price and pay through Stripe, plus a dashboard of quotes, orders and customers. It has **net-terms pay-by-invoice** on Professional, and flat or % add-ons. It has **a REST API, plus an MCP server listed as a Claude connector and a ChatGPT app that can manage quotes, orders and customers**. Languages: EN/FR/IT/HE/DE/ES. Nothing on VAT. | $25 / $50 / $175 per month | ✅ |
 | [Printventory](https://printventory.com/) | A free, open-source, local-first library and print tracker. It indexes folders in place, finds duplicates by content hash, tracks print stages (Want → Printed/Failed) and spools (with Spoolman), and auto-detects Klipper, PrusaLink and Bambu printers. It deducts parts stock per print, suggests **AI tags** and has an **MCP server**. No invoicing. | Free | ✅ |
 | [Spoolara](https://spoolara.com/) | Confirms the 10-26 watch-list entry, and adds an **Inventory Manager** (spools, resin, nozzles, plates). Its creator menu (Storefront, Coupons, Commercial Licences, Kickstarter delivery) sells *files*, not prints. An Enterprise tier "for studios, shops and teams" is coming soon, and so is the desktop app. No invoicing, tax or quoting. | Free / $9.99 / $19.99 per month (billed annually) | ✅ home page only (docs and pricing load the same SPA shell); Kickstarter 403 |
@@ -791,21 +794,37 @@ There were no shutdowns. **No product added ZATCA, Saudi e-invoicing or a Saudi 
 **Watchtower against Khayt.** It is in the fleet-automation bucket (§6), and it is the
 first local-first product there that sells a lifetime licence. Checked against the code:
 
-- **Monitoring.** Khayt covers it with seven protocols.
-- **Cameras.** Khayt shows one camera per machine (`Machine.swift`), not a wall of them.
-- **Brand alarms.** Khayt covers these, Bambu's own spaghetti codes included (`lib/bambu-faults.js`).
-  Khayt does no detection of its own.
-- **Routing a job to a fitting printer.** Khayt has this in `lib/auto-dispatch.js`, by
-  material and colour. It **proposes and does not press the button**, because a machine is
-  offered only after someone says the bed is clear (`bedClearedAt`).
+- **Monitoring.** Khayt covers it with seven protocols. The U1 is the printer on Khayt's own
+  bench.
+- **Orders and storefronts.** Khayt covers both, and goes much further: Shopify, Etsy,
+  WooCommerce, Salla, Zid and Medusa (`lib/integrations-registry.js`), then on to quotes,
+  invoices and VAT.
+- **Cameras.** Khayt shows one camera per machine (`Machine.swift`, `lib/webcam.js`), not a
+  wall of them.
+- **AI failure detection from the camera.** **Not in Khayt.** Khayt passes on Bambu's own
+  spaghetti codes (`lib/bambu-faults.js`). It runs no camera model of its own: searches for
+  `obico`, `failureDetect` and `detectFailure` matched nothing.
+- **Routing a job to a fitting printer.** Khayt has this in `lib/auto-dispatch.js` and
+  `lib/scheduling.js`, by material and colour. It **proposes and does not press the button**:
+  a machine is offered only after someone says its bed is clear (`bedClearedAt`).
+- **Scheduling a job "for later".** **Not in Khayt.** No timed start exists (`scheduledAt`,
+  `startAt` and `notBefore` matched nothing relevant). Khayt proposes the queue order and a
+  person starts the job. That follows from the bed-clear rule, so it is not ranked.
 - **Sending the file to the printer.** Covered by `lib/printer-upload.js` and `lib/bambu-ftp.js`.
-- **Spool tracking and costing.** Khayt covers both, with costing well beyond Watchtower's.
-- **Plugs.** Khayt speaks to Shelly, Tasmota and Home Assistant (`lib/smart-plug.js`), not Kasa
-  or Matter directly.
-- **Slack and Discord alerts.** Through `settings.webhooks`.
+- **Upload direct from your slicer.** **Not in Khayt**; this is now confirmed on Watchtower's
+  own site. See the gaps below and idea 2.
+- **Spool tracking and costing.** Khayt covers both, and its costing goes well beyond
+  Watchtower's.
+- **Smart plugs and power draw.** Khayt reads Shelly, Shelly Gen2, Tasmota and Home Assistant
+  plugs, power draw included (`apower`, `lib/smart-plug.js`). **It does not auto-discover
+  plugs**: the shop types in the address.
+- **SMS, Discord and Slack alerts.** SMS goes through `lib/sms.js` (Twilio and Unifonic),
+  WhatsApp through the shop's own account, and Slack and Discord through `settings.webhooks`.
+  **iMessage is not supported.** The phone gets push notifications and Live Activities instead.
 
-**Auto-Eject is deliberately absent**: it is the step `auto-dispatch.js` refuses to assume. The
-one real gap is the slicer claim (below). Watchtower has nothing of Khayt's books.
+**Auto-Eject is deliberately absent**: it is the step `auto-dispatch.js` refuses to assume.
+The real gaps are the slicer upload (idea 2) and camera failure detection. Plug discovery and
+timed starts are small. Watchtower has none of Khayt's books.
 
 **Saudi / Arabic.** Searches in Arabic and English again found **no 3D-print shop software
 aimed at Saudi Arabia**. They found only general ZATCA tools (fatora.io, and WooCommerce and
@@ -854,8 +873,9 @@ model generators.
     on net 30 shows as overdue from its first day.
   - AutoQuote3D sells net-terms invoicing as a paid tier.
   - Khayt already has `creditLimit`. The due date is the missing half.
-- **Sending from the slicer straight into Khayt.** Watchtower appears as a printer in Bambu
-  Studio, OrcaSlicer and PrusaSlicer, according to the competitors' pages. Khayt does not.
+- **Sending from the slicer straight into Khayt.** Watchtower's own site says "Upload direct from
+  your slicer". The competitors' pages add that it shows up as a printer in Bambu Studio,
+  OrcaSlicer and PrusaSlicer. Khayt does not.
   Neither `lib/lan-server.js` nor `LanServer.swift` has an OctoPrint-style upload route
   (`/api/version`, `/api/files/local`), so a sliced file reaches Khayt only by being saved and
   then dropped in.
@@ -873,6 +893,10 @@ model generators.
   - Khayt has the pipeline (`lib/public-quote.js`, and the Cloud page `mobile/intake.html`).
   - The only iframe or embed in `lib/` is the status page (`lib/status-html.js`), so a Salla or
     Zid store has nowhere to put a quote form.
+- **AI failure detection from the camera.** Watchtower's own site advertises it, as SimplyPrint
+  did in §6. Khayt only passes on Bambu's own detection codes. This is real and stays
+  unranked: a small Saudi shop with 2 printers is usually standing next to them, and
+  dependable detection needs a model the shop has to trust.
 - **Real figures for Bambu jobs.** Still open, as above. Printago (19 Oct) and 3D Print
   Manager now both cost Bambu prints from the printer's own data.
 
@@ -937,7 +961,7 @@ The buyer is unchanged: a small Saudi shop with 2 printers, working in Arabic an
    - *Effort:* medium. *Lanes:* lib, then Mac, then Electron.
 7. **Update the comparison table on the website.**
    - *What:* FoxTrack now has a Free tier, and the table is still dated 10 October. Consider
-     a Watchtower row once its own pages can be read.
+     adding a Watchtower row (local and lifetime-licensed, like Khayt, but with no books).
    - *Effort:* tiny. *Lane:* the khaytapp.com website.
 
 ### Deliberately not doing
@@ -955,7 +979,8 @@ The buyer is unchanged: a small Saudi shop with 2 printers, working in Arabic an
 - Has SimplyPrint's Shop launched?
 - Did Meshory move to $39.99?
 - Has Printago's Part Estimation shipped?
-- Read Watchtower's own site once the licences ship.
+- Check whether Watchtower's tier prices go up on its own site once the licences ship, and how
+  far its "orders" go.
 - See how the `mac/builds` branch lands.
 - Retry 3D Filament Profiles, Layova and the Bambu wiki.
 - Look for an official site for printport.
@@ -964,7 +989,7 @@ The buyer is unchanged: a small Saudi shop with 2 printers, working in Arabic an
 hands-on evaluations.*
 
 Sources: foxtrack.studio/pricing, foxtrack.studio/roadmap, printago.io/changelog,
-printago.io/roadmap, printago.io/alternatives/watchtower, simplyprint.io/alternatives/watchtower-3d.md,
+printago.io/roadmap, watchtower3d.com (headless Chrome), printago.io/alternatives/watchtower, simplyprint.io/alternatives/watchtower-3d.md,
 simplyprint.io/blog/3d-print-farm-software-projects-shop/, kicktraq.com (watchtower3d and
 fantasydesigns/spoolara), stimalo.com/pricing, meshory.com, meshvault.app, layers.app/plans,
 3dprintmanager.eu, apps.apple.com (PrintMate id6743996044, Spool id6758672926, 3dPrintOps
