@@ -4,6 +4,8 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
 
 ## [Unreleased]
 
+- **Mac: Save to Khayt connects to Chrome, Edge, Brave, Vivaldi and Firefox.** The extension is in the Chrome Web Store, Edge Add-ons and Firefox Add-ons, so Settings ▸ Preferences ▸ Browser extension can now install the connection for each browser (it waited for the store listings until now).
+
 - **Mac: beta.7 review fixes — models in compressed files, Library Health, Save to Khayt, print notices.**
   - A model inside a RAR, 7-Zip or tar that took more than a quarter of a second to come out failed every time ("came out as 0 bytes"), and the size cap on a member never stopped one that grew too big. The size is now read off the file as it is written. This was also the intermittent ArchiveFolderScanTests failure on CI.
   - A compressed file saved over with a newer one is read again: its models are re-measured from the new bytes, and a model the new file no longer holds is listed as missing on its own. Before, the old copy kept being handed out, and once the cache let it go the model never opened again.
