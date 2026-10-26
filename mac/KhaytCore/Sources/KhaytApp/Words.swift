@@ -1713,6 +1713,8 @@ final class Words {
           "ar": "أصبحت المكتبة تحفظ نسختها في خزنة خيط."],
         "mac.vault_no_longer_used": ["en": "The library no longer copies to the vault.",
           "ar": "لم تعد المكتبة تنسخ إلى الخزنة."],
+        "mac.vault_kept_both": ["en": "Models changed on another Mac after they were edited here: {n}. Both copies are kept. The other Mac’s is beside yours, with “vault v” and its version in the name.",
+          "ar": "نماذج تغيّرت على ماك آخر بعد تعديلها هنا: {n}. حُفظت النسختان، ونسخة الماك الآخر بجانب نسختك وفي اسمها «vault v» ورقم إصدارها."],
         "mac.vp_products": ["en": "Products",
           "ar": "المنتجات"],
         "mac.vp_sell": ["en": "Sell as a Product",

@@ -36,6 +36,15 @@ public struct VaultSyncState: Codable, Equatable, Sendable {
     /// (see `docs/vault-format.md` "Client state"); this index is the copy
     /// that lets a record that lost the field be matched again.
     public var records: [String: String] = [:]
+    /// What `pull` has said that the app has not applied yet
+    /// (`VaultSync.pendingChanges` / `settle`). EVERY pull appends here,
+    /// whoever asked for it, so an incidental one (a `head`, a backup's
+    /// read-back) cannot use a change up.
+    ///
+    /// NIL — the key absent — is a state file written before this existed:
+    /// its next pull seeds it with every file it already knows, once, so
+    /// what the older build pulled and threw away is brought into line too.
+    public var pending: [VaultSync.Pending]?
 
     public struct Entry: Codable, Equatable, Sendable {
         /// The last meta `seq` this device accepted, for rollback.
@@ -46,6 +55,10 @@ public struct VaultSyncState: Codable, Equatable, Sendable {
         public var recordId: String?
         /// The last feed row, as the cloud sent it.
         public var row: VaultClient.FeedFile?
+        /// The plaintext SHA-256 of the head this device accepted (its meta's
+        /// `sha256`). Absent on an entry written before it existed; the row
+        /// then answers (`VaultSync.acceptedSha256`).
+        public var sha256: String?
     }
 
     public init(shopId: String, deviceId: String) { self.shopId = shopId; self.deviceId = deviceId }
@@ -102,7 +115,7 @@ public struct VaultSync: Sendable {
         return appFolder.appending(path: "vault-state.\(safe(shopId)).\(h).json")
     }
 
-    public enum Change: Equatable, Sendable {
+    public enum Change: Codable, Equatable, Sendable {
         /// A file this device has not seen.
         case appeared(fileId: String, meta: VaultMeta)
         /// A new head, or new meta (a rename or a move), with no conflict.
@@ -116,7 +129,34 @@ public struct VaultSync: Sendable {
         /// A row whose meta would not open, or is older than one already seen
         /// (`rollback`). Its last good state is kept.
         case refused(fileId: String, reason: String)
+
+        public var fileId: String {
+            switch self {
+            case .appeared(let f, _), .changed(let f, _), .conflict(let f, _, _), .trashed(let f, _),
+                 .restored(let f, _), .purged(let f, _), .refused(let f, _): f
+            }
+        }
     }
+
+    /// A change `pull` said, kept until the app has applied it.
+    public struct Pending: Codable, Equatable, Sendable {
+        public var change: Change
+        /// For a head that moved: the plaintext SHA-256 of the version this
+        /// device held BEFORE it — what a local copy nobody has touched since
+        /// the last sync still hashes to. Nil when there was none.
+        public var base: String?
+        /// When this device first heard of it.
+        public var at: Date
+
+        public init(change: Change, base: String? = nil, at: Date = Date()) {
+            self.change = change; self.base = base; self.at = at
+        }
+    }
+
+    /// At most this many kept, the newest: a Mac locked for months must not
+    /// grow its state file without end. Each is applied against the vault as
+    /// it is NOW (`VaultApply`), so the oldest are the least worth keeping.
+    public static let pendingCap = 5000
 
     // MARK: - State
 
@@ -150,6 +190,7 @@ public struct VaultSync: Sendable {
     public func pull(localEdits: Set<String> = []) async throws -> [Change] {
         try await locked {
             var st = load()
+            if st.pending == nil { st.pending = seed(st) }
             var out: [Change] = []
             while true {
                 let page = try await client.files(since: st.rev)
@@ -163,11 +204,22 @@ public struct VaultSync: Sendable {
     }
 
     func apply(_ f: VaultClient.FeedFile, to st: inout VaultSyncState, changes out: inout [Change],
-               localEdits: Set<String>) {
+               localEdits: Set<String>, now: Date = Date()) {
         let old = st.files[f.fileId]
+        let held = old.flatMap(acceptedSha256)
+        // Said to the caller AND kept for the app (`pending`).
+        func say(_ c: Change) {
+            out.append(c)
+            var list = st.pending ?? []
+            if !list.contains(where: { $0.change == c && $0.base == held }) {
+                list.append(Pending(change: c, base: held, at: now))
+            }
+            if list.count > Self.pendingCap { list.removeFirst(list.count - Self.pendingCap) }
+            st.pending = list
+        }
         if f.purged {
             if let old {
-                out.append(.purged(fileId: f.fileId, recordId: old.recordId))
+                say(.purged(fileId: f.fileId, recordId: old.recordId))
                 st.files[f.fileId] = nil
                 st.keys = st.keys.filter { $0.value != f.fileId }
                 st.records = st.records.filter { $0.value != f.fileId }
@@ -177,9 +229,9 @@ public struct VaultSync: Sendable {
         let opened: (meta: VaultMeta, seq: Int)
         do { opened = try VaultMeta.open(f, vaultKey: keys.vaultKey, lastSeenSeq: old?.seq) }
         catch VaultCrypto.Failure.rollback(let seq, let lastSeen) {
-            out.append(.refused(fileId: f.fileId, reason: "rollback: seq \(seq) < \(lastSeen)")); return
+            say(.refused(fileId: f.fileId, reason: "rollback: seq \(seq) < \(lastSeen)")); return
         } catch {
-            out.append(.refused(fileId: f.fileId, reason: "meta: \(error)")); return
+            say(.refused(fileId: f.fileId, reason: "meta: \(error)")); return
         }
         let meta = opened.meta
         var e = old ?? VaultSyncState.Entry()
@@ -190,28 +242,76 @@ public struct VaultSync: Sendable {
         let wasTrashed = old?.trashed ?? false
         e.trashed = f.trashed
         e.head = f.head
+        e.sha256 = meta.sha256
         st.files[f.fileId] = e
         if let key = meta.key, st.keys[key] == nil { st.keys[key] = f.fileId }
         if let r = meta.recordId, st.records[r] == nil { st.records[r] = f.fileId }
 
-        guard let old else { out.append(.appeared(fileId: f.fileId, meta: meta)); return }
-        if !wasTrashed && f.trashed { out.append(.trashed(fileId: f.fileId, recordId: e.recordId)) }
-        if wasTrashed && !f.trashed { out.append(.restored(fileId: f.fileId, recordId: e.recordId)) }
+        guard let old else {
+            say(.appeared(fileId: f.fileId, meta: meta))
+            // First seen already in the Trash (a full re-pull, or a file
+            // added and deleted elsewhere between two looks).
+            if f.trashed { say(.trashed(fileId: f.fileId, recordId: e.recordId)) }
+            return
+        }
+        if !wasTrashed && f.trashed { say(.trashed(fileId: f.fileId, recordId: e.recordId)) }
+        if wasTrashed && !f.trashed { say(.restored(fileId: f.fileId, recordId: e.recordId)) }
         if f.head != old.head {
             let base = old.head ?? 0
             let newer = f.versions.filter { $0.version > base }
             let devices = Set(newer.map { $0.deviceId ?? "" })
             let edited = e.recordId.map(localEdits.contains) ?? false
             if edited || (newer.count > 1 && devices.count > 1) {
-                out.append(.conflict(fileId: f.fileId, recordId: e.recordId,
-                                     versions: (old.head.map { [$0] } ?? []) + newer.map(\.version)))
+                say(.conflict(fileId: f.fileId, recordId: e.recordId,
+                              versions: (old.head.map { [$0] } ?? []) + newer.map(\.version)))
             } else {
-                out.append(.changed(fileId: f.fileId, meta: meta))
+                say(.changed(fileId: f.fileId, meta: meta))
             }
         } else if f.metaRev != old.metaRev, old.row != nil {
             // (An entry with no row yet is this device's own upload, noted by
             // `record`: its first sight in the feed is not news.)
-            out.append(.changed(fileId: f.fileId, meta: meta))
+            say(.changed(fileId: f.fileId, meta: meta))
+        }
+    }
+
+    /// The plaintext SHA-256 of the head this device last accepted for an
+    /// entry: its own field, else (an entry from before the field) its row's
+    /// meta, opened.
+    func acceptedSha256(_ e: VaultSyncState.Entry) -> String? {
+        if let s = e.sha256 { return s }
+        guard let row = e.row else { return nil }
+        return try? VaultMeta.open(row, vaultKey: keys.vaultKey, lastSeenSeq: nil).meta.sha256
+    }
+
+    /// What a state file from before `pending` had already pulled, said
+    /// again: every file it knows as `.appeared` (and `.trashed` where it is),
+    /// so the app brings the library into line with the vault as it is now.
+    func seed(_ st: VaultSyncState) -> [Pending] {
+        var out: [Pending] = []
+        for (fileId, e) in st.files.sorted(by: { $0.key < $1.key }) {
+            guard let row = e.row,
+                  let meta = try? VaultMeta.open(row, vaultKey: keys.vaultKey, lastSeenSeq: nil).meta else { continue }
+            out.append(Pending(change: .appeared(fileId: fileId, meta: meta)))
+            if e.trashed { out.append(Pending(change: .trashed(fileId: fileId, recordId: e.recordId))) }
+        }
+        return Array(out.suffix(Self.pendingCap))
+    }
+
+    // MARK: - What the app has not applied yet
+
+    /// Every change said since the app last settled, oldest first. A state
+    /// file from before `pending` is seeded by the next `pull`, not here.
+    public func pendingChanges() -> [Pending] { load().pending ?? [] }
+
+    /// The app applied these: forget them. Anything said since stays.
+    public func settle(_ done: [Pending]) async throws {
+        guard !done.isEmpty else { return }
+        try await locked {
+            var st = load()
+            var list = st.pending ?? []
+            for d in done { if let i = list.firstIndex(of: d) { list.remove(at: i) } }
+            st.pending = list
+            try save(st)
         }
     }
 
@@ -234,7 +334,7 @@ public struct VaultSync: Sendable {
                 var e = st.files[fileId] ?? VaultSyncState.Entry()
                 e.seq = max(e.seq ?? 0, meta.seq)
                 e.recordId = recordId ?? e.recordId
-                if c.conflict { conflict = true } else { e.head = c.version }
+                if c.conflict { conflict = true } else { e.head = c.version; e.sha256 = meta.sha256 }
                 st.files[fileId] = e
             case .adopted(let fid, _, _, _):
                 fileId = fid

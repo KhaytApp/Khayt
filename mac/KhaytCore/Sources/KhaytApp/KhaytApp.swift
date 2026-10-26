@@ -154,6 +154,9 @@ struct KhaytApp: App {
                     // see `Shop.verifyCloudCopies`.
                     while !Task.isCancelled {
                         await shop.verifyCloudCopiesIfDue()
+                        // WHAT ANOTHER MAC DID IN THE VAULT, applied here: on
+                        // launch and every hour after (`Shop+VaultApply`).
+                        await shop.applyVaultChangesIfDue()
                         try? await Task.sleep(for: .seconds(3600))
                     }
                 }

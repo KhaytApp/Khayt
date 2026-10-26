@@ -72,6 +72,14 @@ struct MoveBanners: View {
         // THE VAULT OVER ITS PLAN after a move down, on the library — where
         // share links and products are made — while the vault is its remote.
         VaultLapseBanner(shop: shop)
+        // A MODEL CHANGED ON ANOTHER MAC WHILE IT WAS EDITED HERE. Both are
+        // kept, the other Mac's beside the shop's (`VaultApply`). A problem
+        // to look at, not news: it stays until closed.
+        if let note = shop.vaultConflictNote {
+            Banner(text: note, symbol: "doc.on.doc", tint: Khayt.attention) {
+                BannerClose(words: shop.words) { shop.vaultConflictNote = nil }
+            }
+        }
         // PRODUCTS COSTED ON A SPOOL SIZE THAT HAS CHANGED. On every screen,
         // not only the catalogue: the edit that causes it is a spool's size,
         // saved on the shelf.

@@ -9,6 +9,13 @@ All notable changes to Khayt are documented here. Version format: [VERSIONING.md
   - Find Similar (right-click, Model menu, the model's Variants section): the same file, then the same shape, then models near it in box, volume and triangle count, in the same group or with the same tags, ranked, as a focus on the grid. A same-shape match shows the mirror caveat above the grid.
   - The model page's new Views section draws the model from the front, the top, the side or three-quarters (View ▸ Model View, ⌥⌘1 to ⌥⌘4), and for a Bambu or Orca project with several plates, one plate at a time. The renderer the tiles use was drawing a mirror image of the model; it no longer does, and a picture it drew before is drawn again the next time its tile is shown (one at a time, off the main thread, never as a pass over the library). Photos, 3MF previews and the Electron app's pictures are left as they are.
   - File ▸ Export Model Bundle… writes a `.khaytbundle` (a zip) with the model file, its pictures, the papers and slicer profiles in its folder, and a manifest of an allowlist of its fields: never a customer's name, a licence code or a path on this Mac, and a price only when Include price is ticked. File ▸ Import Model Bundle… checks every name and size before unpacking, imports the model as any import does (refused if the library already has those bytes), and fills in what the import left empty from the manifest.
+- **Mac: what another Mac does in the Khayt Vault now reaches this one.** When another Mac added a model, put up a new version, trashed, restored or purged one, this Mac's library never caught up, and every vault request it made used the change up, so it could not catch up later either. Changes are now kept until applied, at launch, hourly and on opening the Library:
+  - A model added elsewhere is online here, fetched on use.
+  - A new version replaces a copy nobody has edited since the last sync.
+  - A copy edited here keeps both: the other Mac's version sits beside it with "vault v" and its version in the name, and a banner says so.
+  - A trash archives the record after an hour, and a restore un-archives it. A purge drops the link and keeps the record.
+  - Nothing is applied while the staff lock refuses library edits, and nothing is lost meanwhile. No model is ever deleted, and the shop's own folders are never written.
+  - The first pass after updating also applies what earlier builds missed.
 
 - **Mac: Save to Khayt connects to Chrome, Edge, Brave, Vivaldi and Firefox.** The extension is in the Chrome Web Store, Edge Add-ons and Firefox Add-ons, so Settings ▸ Preferences ▸ Browser extension can now install the connection for each browser (it waited for the store listings until now).
 

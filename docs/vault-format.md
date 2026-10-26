@@ -313,9 +313,25 @@ KhaytCore. Another client may do these things differently and still read the sam
   reports changes, and the app writes `vaultFileId`.
 - **The per-device state file** lives in the app's own folder (on the Mac, the book's
   folder): `<app folder>/vault-state.<shopId>.<first 16 hex of sha256(root path)>.json`.
-  - It holds the feed's `rev`, each file's last-seen `seq`, the key → fileId and
-    recordId → fileId indexes, and the last feed row of each file. Those rows are
-    ciphertext and wraps only.
+  - It holds the feed's `rev`, each file's last-seen `seq` and accepted plaintext
+    `sha256`, the key → fileId and recordId → fileId indexes, and the last feed row of
+    each file. Those rows are ciphertext and wraps only.
+  - It also holds `pending`: every change a pull reported that the app has not applied
+    yet. Each one carries `base`, the hash of the version this device held before the
+    head moved. Every pull appends to it, whoever made the pull, and the app removes
+    entries only after the library edits are written (`VaultApply`, `Shop+VaultApply`).
+    A state file without the key was written before it existed. Its next pull seeds
+    `pending` once from the files it already knows.
+- **Applying changes.** The app applies a change only inside a record's own folder
+  under the primary library root. It writes one of three things:
+  - a `.cloud` sidecar with `provider: "vault"`, so the model is fetched on use;
+  - the new head over a local copy that still hashes to `base`;
+  - the other version beside a copy edited since then, named `<name> (vault v<N>).<ext>`.
+  It never deletes a model and never writes a linked or adopted file. The record
+  fields it writes are `vaultFileId`, `contentHash`/`sourceFile.size`, and for a
+  vault trash `vaultTrashedAt`. A trash also sets `archivedAt` with `vaultArchived: true`
+  when the record was not already archived. A restore clears what the trash set, and a
+  purge drops the link.
   - It is kept out of the book because the last-seen `seq` protects against rollback only if
     it is this device's own memory.
   - It is kept out of the library root and its parent because either can be iCloud, a NAS
