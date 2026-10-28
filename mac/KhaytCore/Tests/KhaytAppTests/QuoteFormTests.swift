@@ -197,8 +197,8 @@ struct QuoteFormEmbedTests {
                 == "https://x.example/q?s=1&lang=ar&theme=light")
         #expect(QuoteFormEmbed.script("https://cloud.khaytapp.com/embed.js", shopId: "shop_a1", lang: "en", theme: "light")
                 == #"<script src="https://cloud.khaytapp.com/embed.js" data-shop="shop_a1" data-lang="en" data-theme="light" async></script>"#)
-        #expect(QuoteFormEmbed.frame("https://x.example/f?a=1&b=2", title: "Quote \"form\"")
-                .contains(#"src="https://x.example/f?a=1&amp;b=2" title="Quote &quot;form&quot;""#))
+        #expect(QuoteFormEmbed.frame("https://x.example/f?a=1&b=2", title: "Quote \"form\"", lang: "ar", theme: "dark")
+                .contains(#"src="https://x.example/f?a=1&amp;b=2&amp;lang=ar&amp;theme=dark" title="Quote &quot;form&quot;""#))
     }
 }
 
@@ -302,7 +302,7 @@ struct QuoteFormImportTests {
             order, meta: meta, input: input, paid: false, engine: engine,
             storeURL: scratch.store, libraryRoot: scratch.library, existingModel: existing,
             expiredNote: "FILE EXPIRED NOTE", owns: { true }, whoHasIt: { nil },
-            download: { try await CloudIntake.file(connection, token: "t", id: "21", fetch: fetch) },
+            download: { try await CloudIntake.file(connection, token: "t", id: "21", maxBytes: meta.bytes, fetch: fetch) },
             drain: { try await CloudIntake.drain(connection, token: "t", id: "21", fetch: fetch) })
     }
 
@@ -405,6 +405,18 @@ struct QuoteFormImportTests {
         let cloud = Cloud(scratch: scratch, body: tampered)
         let result = try await Self.run(Self.payload(Self.model), cloud: cloud, scratch: scratch, engine: engine)
         #expect(result.refusal == .checksum)
+        #expect(!cloud.log.contains(Self.drainPath))
+    }
+
+    @Test("a download larger than the request declared: refused, nothing written, nothing drained")
+    func oversizeStaysQueued() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        let big = Self.model + Data(repeating: 0, count: 4096)
+        let cloud = Cloud(scratch: scratch, body: big, headers: ["X-Content-SHA256": Self.sha(Self.model)])
+        let result = try await Self.run(Self.payload(Self.model), cloud: cloud, scratch: scratch, engine: engine)
+        #expect(result.refusal != nil)
         #expect(!cloud.log.contains(Self.drainPath))
     }
 

@@ -336,7 +336,7 @@ extension Shop {
             expiredNote: words.callIt("mac.qfe_file_expired_note", ["name": .string(meta.name)]),
             owns: { StoreLock.weOwnIt(build) },
             whoHasIt: { StoreLock.describe(StoreLock.verdict(for: build)) },
-            download: { try await CloudIntake.file(connection, token: token, id: order.id, fetch: network) },
+            download: { try await CloudIntake.file(connection, token: token, id: order.id, maxBytes: meta.bytes, fetch: network) },
             drain: { try await CloudIntake.drain(connection, token: token, id: order.id, fetch: network) })
 
         if let refusal = result.refusal {

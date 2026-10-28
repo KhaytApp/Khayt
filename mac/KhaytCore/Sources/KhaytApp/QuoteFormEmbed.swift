@@ -183,8 +183,10 @@ enum QuoteFormEmbed {
         return parts.string ?? link
     }
 
-    static func frame(_ link: String, title: String) -> String {
-        "<iframe src=\"\(attribute(link))\" title=\"\(attribute(title))\" "
+    /// `links.frame` comes with no query; the frame reads `lang` and `theme`
+    /// exactly as the page does, so the shop's picks go on it the same way.
+    static func frame(_ link: String, title: String, lang: String, theme: String) -> String {
+        "<iframe src=\"\(attribute(page(link, lang: lang, theme: theme)))\" title=\"\(attribute(title))\" "
             + "style=\"width:100%;min-height:640px;border:0\" loading=\"lazy\"></iframe>"
     }
 

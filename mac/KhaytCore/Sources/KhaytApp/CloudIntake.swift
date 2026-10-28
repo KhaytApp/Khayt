@@ -68,12 +68,15 @@ enum CloudIntake {
         /// 404 `reason:"no-route"`: the cloud has this route switched off
         /// (the quote form is dark until the shop's privacy policy covers it).
         case notOffered
+        /// The download was bigger than the request said its file is.
+        case tooLarge(Int)
 
         var errorDescription: String? {
             switch self {
             case .notConnected: return "This book is not connected to Khayt Cloud."
             case .malformed: return "The cloud answered with something this app could not read."
             case .notOffered: return "Khayt Cloud does not offer this yet."
+            case .tooLarge(let most): return "The file was larger than the \(most) bytes it should be."
             case .refused(let code, let why):
                 return why.isEmpty ? "The cloud refused the request (HTTP \(code))" : why
             }
@@ -127,8 +130,13 @@ enum CloudIntake {
     /// A 404 is two different things and they must not be confused:
     /// `no-file` is a file that has expired (import without it, then drain);
     /// `no-route` is the whole feature switched off (keep everything queued).
+    ///
+    /// `maxBytes` is the size the request declared. A body (or a
+    /// `Content-Length`) over it is refused before anything is hashed: the
+    /// cloud caps a file at `files.maxFileBytes` (32 MB unless its server env
+    /// says otherwise), so an answer past what was declared is not the file.
     static func file(_ connection: CloudReader.Connection, token: String, id: String,
-                     fetch: Fetch) async throws -> FileAnswer {
+                     maxBytes: Int, fetch: Fetch) async throws -> FileAnswer {
         var request = try CloudReader.request(connection, token: token, method: "GET",
                                               tail: "/intake/" + id.uriComponent + "/file")
         // A model is not a JSON answer: give it longer than the 30 seconds
@@ -138,6 +146,8 @@ enum CloudIntake {
         let http = response as? HTTPURLResponse
         let status = http?.statusCode ?? 0
         if status == 200 {
+            let declared = response.expectedContentLength
+            if declared > Int64(maxBytes) || data.count > maxBytes { throw Failure.tooLarge(maxBytes) }
             return .file(data, sha256: http?.value(forHTTPHeaderField: "X-Content-SHA256"))
         }
         let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]

@@ -173,7 +173,8 @@ struct QuoteFormEmbedSection: View {
             }
             if let frame = links.frame {
                 snippet("mac.qfe_frame", hint: "mac.qfe_frame_hint",
-                        QuoteFormEmbed.frame(frame, title: words.callIt("mac.qfe_title")))
+                        QuoteFormEmbed.frame(frame, title: words.callIt("mac.qfe_title"),
+                                             lang: lang, theme: theme))
             }
             if let script = links.script, let shopId = shopId {
                 snippet("mac.qfe_script", hint: "mac.qfe_script_hint",
