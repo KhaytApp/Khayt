@@ -47,7 +47,7 @@ struct VaultApplyAppTests {
         r = try #require(Self.record(root, "PF-old"))
         #expect(r["vaultTrashedAt"] == nil && r["archivedAt"] == nil && r["vaultArchived"] == nil)
         // Purged: the link goes, the record stays.
-        Shop.applyVaultEdits([.purged(recordId: "PF-old")], at: "T4", to: &root)
+        Shop.applyVaultEdits([.purged(recordId: "PF-old", onlyCopy: false)], at: "T4", to: &root)
         r = try #require(Self.record(root, "PF-old"))
         #expect(r["vaultFileId"] == nil && r["name"] == .string("Bracket"))
     }
@@ -109,7 +109,10 @@ struct VaultApplyAppTests {
         let kept = CloudLibrary.ownFoldersOnly(listed, printFiles: rows, orders: []).map(\.filename).sorted()
         #expect(kept == ["own (vault v9).stl", "part.stl"])
         let roots = LibraryLocation.Roots(primary: tmp.path, mirror: nil, isCustom: true, roots: [tmp.path])
-        let found = Shop.vaultKeptCopies(rows: rows, roots: roots)
+        let known = [LibraryLocation.itemDirName("PF-k") + "/part.stl": "f"]
+        #expect(Shop.vaultKeptCopies(rows: rows, roots: roots, known: [:]).isEmpty,
+                "a marker naming no vault file this Mac knows is not offered (security M3)")
+        let found = Shop.vaultKeptCopies(rows: rows, roots: roots, known: known)
         #expect(found.map(\.copy.lastPathComponent) == ["part (vault v2).stl"])
         #expect(found.first?.mine.lastPathComponent == "part.stl" && found.first?.version == 2)
         #expect(try LockRound3Tests.source("CloudLibrary.swift").contains("if VaultApply.isKeptCopy(url) { continue }"),
@@ -130,7 +133,7 @@ struct VaultApplyAppTests {
     @Test("an edit that changes nothing is not stamped, and a record not in the book is not made")
     func noOpIsNotStamped() throws {
         var root = Self.book([Self.old])
-        Shop.applyVaultEdits([.purged(recordId: "PF-old"), .restored(recordId: "PF-old"),
+        Shop.applyVaultEdits([.purged(recordId: "PF-old", onlyCopy: false), .restored(recordId: "PF-old"),
                               .holds(recordId: "PF-gone", fileId: "f", sha256: "x", size: 1)], at: "T", to: &root)
         #expect(Self.record(root, "PF-old") == Self.old)
         #expect(Self.record(root, "PF-gone") == nil)

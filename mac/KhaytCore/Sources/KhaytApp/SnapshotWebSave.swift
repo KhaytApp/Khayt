@@ -65,7 +65,11 @@ extension Snapshot {
         BrowserHostRows.pretend = .init(installed: [.chrome, .edge, .brave, .firefox],
                                         statuses: [.chrome: .on, .edge: .off, .brave: .stale, .firefox: .off],
                                         hostPath: "/Applications/Khayt.app/Contents/MacOS/khayt-browser-host",
-                                        chromiumIds: ["abcdefghijklmnopabcdefghijklmnop"])
+                                        // The REAL store ids (`BrowserExtensionIds`),
+                                        // no development id: so the picture shows
+                                        // what this build ships — Install live
+                                        // because the listings are.
+                                        chromiumIds: BrowserHosts.chromiumIds(dev: []))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 760),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -79,18 +83,19 @@ extension Snapshot {
         await settle(); await settle()
         capture(named: "ws-03-settings" + tag, window: window, into: dir)
 
-        // 3b. Before the store listing (no Chromium id yet), a file of the
-        //     same name someone else wrote, and a build with no host.
-        BrowserHostRows.pretend = .init(installed: [.chrome, .vivaldi, .firefox],
-                                        statuses: [.chrome: .off, .vivaldi: .foreign, .firefox: .on],
+        // 3b. A file of the same name someone else wrote. (The "waiting for
+        //     the store listing" state is gone: beta.8 ships the store ids,
+        //     so no build can reach it.)
+        BrowserHostRows.pretend = .init(installed: [.vivaldi],
+                                        statuses: [.vivaldi: .foreign],
                                         hostPath: "/Applications/Khayt.app/Contents/MacOS/khayt-browser-host",
-                                        chromiumIds: [])
+                                        chromiumIds: BrowserHosts.chromiumIds(dev: []))
         window.contentView = NSHostingView(rootView:
             Form { BrowserExtensionSettings(shop: shop) }
                 .formStyle(.grouped)
                 .frame(width: 600, height: 760))
         await settle(); await settle()
-        capture(named: "ws-03b-settings-before-store" + tag, window: window, into: dir)
+        capture(named: "ws-03b-settings-foreign" + tag, window: window, into: dir)
 
         // 4. And without an app group (an ad-hoc build): said, not hidden.
         WebSaveInbox.shared.directory = { nil }

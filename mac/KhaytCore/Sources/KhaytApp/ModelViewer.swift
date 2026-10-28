@@ -3,7 +3,7 @@ import AppKit
 import KhaytCore
 
 /// The inspector's viewer: the model drawn from the front, the top, the side
-/// or three-quarters (`ModelViewAngle`), and for a slicer project laid out on
+/// or iso (`ModelViewAngle`), and for a slicer project laid out on
 /// several plates, one plate at a time.
 ///
 /// THE RENDERER THE TILES USE (`MeshPreview`), asked for a side and a plate —

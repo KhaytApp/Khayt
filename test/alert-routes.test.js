@@ -60,19 +60,28 @@ test('it loads without require, as JavaScriptCore loads it', () => {
   assert.equal(vm.runInContext("KhaytAlertRoutes.enable({}).runout", c), true);
 });
 
-test("a print's own news (finished, failed, paused) reaches a channel that is set up, unless told not to", () => {
+test("a print's own news (finished, failed, paused) is OPT-IN per channel: off until that channel says true", () => {
   for (const t of R.NOTICE_TYPES) {
-    assert.equal(R.telegramWants(t, tg()), true, `${t}: Telegram set up`);
-    assert.equal(R.telegramWants(t, {}), false, `${t}: no Telegram, no send`);
-    assert.equal(R.ntfyWants(t, { ntfy: { enabled: true, topic: 'x' } }), true, `${t}: ntfy set up`);
-    assert.equal(R.ntfyWants(t, { ntfy: { enabled: false, topic: 'x' } }), false, `${t}: ntfy off`);
+    const key = { finished: 'notifyPrintFinished', failed: 'notifyPrintFailed', paused: 'notifyPrintPaused' }[t];
+    assert.equal(R.telegramWants(t, tg()), false, `${t}: a Telegram set up for faults is not told about prints`);
+    assert.equal(R.telegramWants(t, tg({ [key]: true })), true, `${t}: Telegram switched on`);
+    assert.equal(R.telegramWants(t, { telegram: { [key]: true } }), false, `${t}: no Telegram, no send`);
+    assert.equal(R.ntfyWants(t, { ntfy: { enabled: true, topic: 'x' } }), false, `${t}: ntfy set up, not asked`);
+    assert.equal(R.ntfyWants(t, { ntfy: { enabled: true, topic: 'x', events: { [t]: true } } }), true, `${t}: ntfy asked`);
+    assert.equal(R.ntfyWants(t, { ntfy: { enabled: false, topic: 'x', events: { [t]: true } } }), false, `${t}: ntfy off`);
     assert.equal(R.ntfyWants(t, { ntfy: { enabled: true, topic: 'x', events: { [t]: false } } }), false);
   }
-  assert.equal(R.telegramWants('finished', tg({ notifyPrintFinished: false })), false);
-  assert.equal(R.telegramWants('failed', tg({ notifyPrintFinished: false })), true, 'one switch, one event');
+  assert.equal(R.telegramWants('failed', tg({ notifyPrintFinished: true })), false, 'one switch, one event');
   // Not faults: computing printer alerts is unchanged by them.
   assert.deepEqual(Object.keys(R.enable(tg())).sort(), ['error', 'offline', 'runout', 'stall']);
   const done = R.ntfyRequest({ type: 'finished', title: 'Print finished on U1', body: 'Falcon' }, { ntfy: { topic: 'x' } });
   assert.equal(done.headers.Tags, 'white_check_mark');
   assert.equal(R.ntfyRequest({ type: 'failed', title: 't' }, { ntfy: { topic: 'x' } }).headers.Priority, 'high');
+});
+
+test('a print notice names the job and the file only on a channel ticked to (default off)', () => {
+  assert.deepEqual(R.noticeNames({}), { telegram: false, ntfy: false });
+  assert.deepEqual(R.noticeNames(tg({ printNoticeNames: true })), { telegram: true, ntfy: false });
+  assert.deepEqual(R.noticeNames({ ntfy: { printNoticeNames: true } }), { telegram: false, ntfy: true });
+  assert.deepEqual(R.noticeNames({ ntfy: { printNoticeNames: 'yes' } }), { telegram: false, ntfy: false }, 'true only');
 });

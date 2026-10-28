@@ -10094,6 +10094,12 @@ public actor KhaytEngine {
                           as: AlertRoutes.self)
     }
 
+    /// Which channels may carry a print notice's job title and file name
+    /// (`KhaytAlertRoutes.noticeNames`): none unless the shop ticked it.
+    public func alertNoticeNames(settings: [String: JSONValue]) throws -> AlertRoutes {
+        try runtime.call2("KhaytAlertRoutes.noticeNames(ARG0)", [.object(settings)], as: AlertRoutes.self)
+    }
+
     public struct NtfyRequest: Decodable, Sendable, Equatable {
         public let url: String
         public let headers: [String: String]

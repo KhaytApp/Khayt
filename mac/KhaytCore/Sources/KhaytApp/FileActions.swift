@@ -375,7 +375,7 @@ struct StackActions: View {
         let w = shop.words
         Divider()
         if picked.contains(file.id), picked.count > 1 {
-            Button(w.callIt("mac.stk_stack_n", ["n": .number(Double(picked.count))])) { shop.stackSelection() }
+            Button(w.counting(picked.count, "mac.stk_stack_n")) { shop.stackSelection() }
                 .disabled(!shop.canStackSelection)
         }
         if let s = shop.stackOf(file) {

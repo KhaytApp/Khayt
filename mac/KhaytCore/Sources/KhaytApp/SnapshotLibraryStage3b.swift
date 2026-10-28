@@ -10,11 +10,16 @@ import KhaytCore
 ///           mirror caveat is on the page
 ///   l3b-02  the stack open, a member chosen: "In a stack of 3"
 ///   l3b-03  Find Similar's focus, with the mirror caveat above the grid
+///   l3b-03b Find Similar with no match (the banner)
+///   l3b-03c a bundle import's note and a refusal
+///   l3b-03d the stack in the list layout, its badge on the row
 ///   l3b-04  a two-plate project in the Views section, plate 2, from the front
 ///   l3b-05  the same project from the top, plate 1
+///   l3b-06  the Falcon hood with figures from an older version (beta.8 M1)
 ///
 /// The Export Model Bundle panel is the system's save panel, which a window
-/// capture cannot draw; its one option (Include price) is a plain checkbox.
+/// capture cannot draw; its choices (`BundleExportOptions`) are drawn by
+/// `SnapshotTests.bundleExportAndNotes` instead.
 ///
 /// ALL IN MEMORY, over the sample (`pretendLibrary`): the stack, the shared
 /// key and the project row are laid over its rows. The project is a real
@@ -80,6 +85,32 @@ extension Snapshot {
         captureMain(named: "l3b-03-find-similar" + tag, into: dir)
         shop.clearLibraryFilter()
 
+        // 3b. Find Similar with nothing like it: the library's banner says so.
+        //     (The sentence the seam writes, put up directly so the picture
+        //     does not depend on what the sample happens to hold.)
+        shop.shelf = .library("Saudi Kings")
+        shop.fileSelection = ["PF-sample-king-4"]
+        shop.importNote = shop.words.callIt("mac.sim_none", ["name": .string("KING Khalid")])
+        await settle(); await settle()
+        captureMain(named: "l3b-03b-find-similar-none" + tag, into: dir)
+
+        // 3c. What a model bundle's export and import leave behind: the note,
+        //     and a refusal.
+        shop.importNote = shop.words.callIt("mac.mb_imported", ["name": .string("KING Khalid")])
+        shop.importProblem = shop.words.callIt("mac.mb_bad_name", ["name": .string("model/../../escape.stl")])
+        await settle(); await settle()
+        captureMain(named: "l3b-03c-bundle-notes" + tag, into: dir)
+        shop.importNote = nil
+        shop.importProblem = nil
+
+        // 3d. The stack in the LIST layout: its badge on the row.
+        display.layout = .list
+        shop.libraryOpenStacks = []
+        await settle(); await settle()
+        try? await Task.sleep(for: .milliseconds(500))
+        captureMain(named: "l3b-03d-stack-list" + tag, into: dir)
+        display.layout = .grid
+
         // 4–5. The project in the viewer: plate 2 from the front, plate 1 from the top.
         UserDefaults.standard.set(true, forKey: viewsKey)
         shop.shelf = .library(nil)
@@ -96,6 +127,14 @@ extension Snapshot {
         }
         shop.libraryViewAngle = .iso
         shop.libraryViewPlate = nil
+
+        // 6. A model whose figures are an older version's: the inspector's
+        //    note, ≈ on its figures, and the reason under "As sliced".
+        shop.fileSelection = ["PF-sample-falcon"]
+        await settle(); await settle()
+        try? await Task.sleep(for: .milliseconds(500))
+        captureMain(named: "l3b-06-figures-stale" + tag, into: dir)
+        capturePanes(named: "l3b-06-figures-stale" + tag, into: dir)
 
         shop.fileSelection = []
         shop.libraryOpenStacks = []
@@ -116,6 +155,10 @@ extension Snapshot {
                 if id == "PF-sample-king-1" { o["stackTop"] = .bool(true) }
             case "PF-sample-king-5":
                 o["geometryKey"] = .string("6290060:117223.2:200x200x4.56")
+            case "PF-sample-falcon":
+                // Another Mac's newer version arrived; these figures are the
+                // old bytes' (l3b-06: the stale-figures note and its ≈).
+                o["figuresStaleFor"] = .string("snap-newer-bytes")
             default: break
             }
             return .object(o)

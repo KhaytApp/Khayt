@@ -183,6 +183,12 @@ struct LibraryFacts: Equatable, Sendable {
             out.gramsEstimated = true
         }
         if let price, price > 0 { out.price = price }
+        // An older version's figures (`figuresStaleFor`) are shown, but as
+        // what they are now — an estimate for these bytes, ≈ (review M1).
+        if file.figuresStale {
+            if out.minutes != nil { out.minutesEstimated = true }
+            if out.grams != nil { out.gramsEstimated = true }
+        }
         return out
     }
 

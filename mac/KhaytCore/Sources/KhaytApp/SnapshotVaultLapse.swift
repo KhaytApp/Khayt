@@ -7,7 +7,8 @@ import KhaytCore
 /// `KHAYT_SNAPSHOT_VAULTLAPSE=1`: the plan pane, the library's banner and the
 /// Links, Products and Share sheets in three states — not over (nothing
 /// shown), read-only with no date yet, and deleting with a date — in whichever
-/// appearance and language this run was started in.
+/// appearance and language this run was started in. Then the kept-both
+/// banner (`VaultKeptBanners`), with two copies and with four ("And 1 more").
 ///
 /// ALL IN MEMORY. The plan pane is handed a catalogue and a billing answer
 /// written here, the sheets are handed no links and no products, and the
@@ -73,6 +74,25 @@ extension Snapshot {
             shot("\(name)-share", width: SheetMetrics.outerWidth(440),
                  VaultShareSheet(shop: shop, request: VaultShareRequest(recordIds: ["PF-sample-falcon"],
                                                                         titles: ["Falcon hood"])))
+        }
+
+        // THE KEPT-BOTH BANNER (beta.8 review): two models whose vault copy is
+        // not this Mac's, then four, for "And 1 more". Copies named here,
+        // nothing on disk: the banner only draws them.
+        defer { shop.vaultKeptCopies = [] }
+        let folder = URL(fileURLWithPath: "/tmp/khayt-snap-kept")
+        func kept(_ id: String, _ title: String, _ file: String, _ v: Int) -> VaultKeptCopy {
+            VaultKeptCopy(recordId: id, title: title, mine: folder.appending(path: file),
+                          copy: folder.appending(path: VaultApply.keptName(file, version: v)), version: v)
+        }
+        let all = [kept("PF-sample-falcon", "Falcon hood", "Falcon hood.3mf", 2),
+                   kept("PF-sample-vase", "Spiral vase", "vase.stl", 3),
+                   kept("PF-sample-dallah", "Dallah", "dallah.stl", 4),
+                   kept("PF-sample-king-1", "King Abdulaziz", "king-1.3mf", 2)]
+        for (name, n) in [("4-kept-two", 2), ("5-kept-four", 4)] {
+            shop.vaultKeptCopies = Array(all.prefix(n))
+            await settle()
+            shot(name, width: 820, VStack(spacing: 0) { VaultKeptBanners(shop: shop) }.frame(minHeight: 8))
         }
     }
 

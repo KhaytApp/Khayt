@@ -148,7 +148,8 @@ extension PrinterWatch {
                     body: Self.noticeBody(filename: status.filename, progress: status.progress, shop: shop),
                     at: Date())
                 notices.raise(notice)
-                shop.sendPrintNotice(kind, notice)
+                shop.sendPrintNotice(kind, notice,
+                                     bare: Self.noticeBody(filename: "", progress: status.progress, shop: shop))
             }
         }
     }
@@ -179,7 +180,7 @@ extension Shop {
             body: PrinterWatch.noticeBody(filename: ended.filename, progress: 0, shop: self, project: project),
             at: Date())
         if kind == .finished { printers.notices.announce(notice) } else { printers.notices.raise(notice) }
-        sendPrintNotice(kind, notice)
+        sendPrintNotice(kind, notice, bare: "")
     }
 
     /// AND TO THE SHOP'S PHONE: the same notice through its Telegram and
@@ -188,7 +189,15 @@ extension Shop {
     /// ledger has already decided this is news, and the Mac's own switch for
     /// the kind (`wanted`) has already said yes. Not awaited: nothing waits
     /// on a message to a phone.
-    func sendPrintNotice(_ kind: PrintNoticeKind, _ notice: PrinterNotice.Notice) {
-        Task { await sendAlert(type: kind.rawValue, title: notice.title, body: notice.body) }
+    ///
+    /// OPT-IN per channel (beta.8 review): a channel set up for printer
+    /// faults hears about prints only once the shop switches it on in that
+    /// channel's pane. And a phone gets `bare` — the printer and what
+    /// happened (and how far a paused print got) — unless the shop ticked
+    /// "include job and file names" for that channel: a job or a G-code file
+    /// is often named after the customer, and an ntfy.sh topic is readable
+    /// by anyone who knows its name.
+    func sendPrintNotice(_ kind: PrintNoticeKind, _ notice: PrinterNotice.Notice, bare: String) {
+        Task { await sendAlert(type: kind.rawValue, title: notice.title, body: bare, namedBody: notice.body) }
     }
 }

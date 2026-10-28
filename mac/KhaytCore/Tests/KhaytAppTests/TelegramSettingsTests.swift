@@ -84,6 +84,29 @@ struct TelegramSettingsTests {
         #expect(tg["notifyPrinterOffline"] == .bool(true), "an unset alert must stay on")
     }
 
+    /// The beta.8 review: the ntfy pane's form named only the four fault
+    /// events, and `settings-edit` merged only those, so a print notice
+    /// switch could never be saved. Both panes, through the real save path.
+    @Test("the print notice switches in the Telegram and ntfy panes reach the book, default off")
+    func printNoticeSwitchesSave() async throws {
+        let engine = try KhaytEngine()
+        #expect(!TelegramSettings.Draft.read([:]).printNotices && !NtfySettings.Draft.read([:]).printNotices)
+        var tgDraft = TelegramSettings.Draft(); tgDraft.chatId = "-100"
+        tgDraft.printNotices = true; tgDraft.printNames = true
+        var ntDraft = NtfySettings.Draft(); ntDraft.enabled = true; ntDraft.topic = "athar-printers"
+        ntDraft.printNotices = true
+        var root = Self.book([:])
+        try await Shop.applySettings(to: &root, form: [
+            "telegram": .object(TelegramSettings.form(tgDraft)), "ntfy": .object(NtfySettings.form(ntDraft)),
+        ], country: nil, engine: engine)
+        guard case .object(let settings)? = root["settings"] else { Issue.record("no settings"); return }
+        let tg = TelegramSettings.Draft.read(settings), nt = NtfySettings.Draft.read(settings)
+        #expect(tg.printNotices && tg.printNames, "the Telegram switches were dropped on save")
+        #expect(nt.printNotices && !nt.printNames, "the ntfy switches were dropped on save")
+        guard case .object(let n)? = settings["ntfy"], case .object(let ev)? = n["events"] else { return }
+        #expect(ev["finished"] == .bool(true) && ev["failed"] == .bool(true) && ev["paused"] == .bool(true))
+    }
+
     @Test("a masked token is kept, and forgetting it is deliberate")
     func tokenSurvivesASave() async throws {
         let engine = try KhaytEngine()

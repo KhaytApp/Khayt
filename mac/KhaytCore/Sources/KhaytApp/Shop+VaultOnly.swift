@@ -37,9 +37,13 @@ extension Shop {
     /// The models among `files` whose only copy is the vault's, in the
     /// library's order. Only Khayt's own folders: a linked model, a member of
     /// a compressed file and a page saved from the web are never moved there.
+    ///
+    /// A model the SHOP archived counts: archived is put aside, not deleted,
+    /// and its record was kept on purpose (beta.8 review M4). One archived by
+    /// the vault's own Trash (`vaultArchived`) was deleted elsewhere: not.
     nonisolated static func vaultOnlyModels(_ files: [LibraryFile], roots: [String]) -> [String] {
         files.compactMap { file in
-            guard !file.isLinked, file.archivePath == nil, !file.isWebOnly, !file.isArchived,
+            guard !file.isLinked, file.archivePath == nil, !file.isWebOnly, file.vaultArchived != true,
                   let dir = LibraryLocation.directory(for: file.id, roots: roots) else { return nil }
             let found = vaultFindings(in: dir)
             return VaultOnlyCopies.onlyInVault(found, own: file.sourceFile?.filename) ? file.id : nil
@@ -67,9 +71,13 @@ extension Shop {
 
     /// "Bring back N models before {date}" — or, with no date yet, "…while
     /// the vault is read-only". Nil when there is nothing to offer.
-    static func vaultOnlyButton(_ offer: VaultOnlyCopies.Offer?, count: Int, _ words: Words) -> String? {
+    /// `compact`: the library banner, whose sentence already says the date,
+    /// says only "Bring Back N Models" (beta.8 UI review LOW-4).
+    static func vaultOnlyButton(_ offer: VaultOnlyCopies.Offer?, count: Int, _ words: Words,
+                                compact: Bool = false) -> String? {
         guard let offer else { return nil }
         let models = words.counting(count, "mac.n_models")
+        if compact { return words.callIt("mac.lapse_bring_back", ["models": .string(models)]) }
         switch offer {
         case .before(let end):
             return words.callIt("mac.lapse_bring_back_before", ["models": .string(models), "date": .string(day(end, words))])
@@ -161,7 +169,7 @@ struct VaultOnlyOffer: View {
 
     var body: some View {
         let count = shop.vaultOnlyIds.count
-        if let label = Shop.vaultOnlyButton(shop.vaultOnlyOffer, count: count, shop.words) {
+        if let label = Shop.vaultOnlyButton(shop.vaultOnlyOffer, count: count, shop.words, compact: compact) {
             VStack(alignment: .leading, spacing: 5) {
                 if !compact, let warning = Shop.vaultOnlyWarning(count: count, shop.words) {
                     Text(warning).font(.callout.weight(.medium))
