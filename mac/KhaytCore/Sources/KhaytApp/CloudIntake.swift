@@ -48,6 +48,10 @@ enum CloudIntake {
         var contact: String { text("contact") ?? "" }
         var source: String { text("source") ?? "" }
         var reference: String { text("ref") ?? "" }
+        /// A request from the shop's embedded quote form (khayt-cloud #144).
+        var isQuoteForm: Bool { source == "quote-form" }
+        /// The model the visitor uploaded with it, when the payload names one.
+        var file: QuoteFormFile.Meta? { QuoteFormFile.Meta(payload) }
 
         func text(_ key: String) -> String? {
             guard case .object(let fields) = payload,
@@ -61,11 +65,15 @@ enum CloudIntake {
         case notConnected
         case refused(Int, String)
         case malformed
+        /// 404 `reason:"no-route"`: the cloud has this route switched off
+        /// (the quote form is dark until the shop's privacy policy covers it).
+        case notOffered
 
         var errorDescription: String? {
             switch self {
             case .notConnected: return "This book is not connected to Khayt Cloud."
             case .malformed: return "The cloud answered with something this app could not read."
+            case .notOffered: return "Khayt Cloud does not offer this yet."
             case .refused(let code, let why):
                 return why.isEmpty ? "The cloud refused the request (HTTP \(code))" : why
             }
@@ -99,6 +107,48 @@ enum CloudIntake {
                                               tail: "/intake/" + id.uriComponent)
         let (data, response) = try await fetch(request)
         try check(response, data)
+    }
+
+    /// What the file route answered.
+    enum FileAnswer: Sendable {
+        /// The bytes, and the `X-Content-SHA256` the cloud sent with them.
+        case file(Data, sha256: String?)
+        /// 404 `reason:"no-file"`: the cloud kept it for its time and has
+        /// deleted it. The request itself is still worth importing.
+        case expired
+    }
+
+    /// The model a quote-form request carries (`GET …/intake/{id}/file`).
+    ///
+    /// Read BEFORE the request is written into the book and long before it is
+    /// drained: `DELETE /intake/{id}` deletes the file on the cloud too, so a
+    /// drain that went first would throw the customer's model away.
+    ///
+    /// A 404 is two different things and they must not be confused:
+    /// `no-file` is a file that has expired (import without it, then drain);
+    /// `no-route` is the whole feature switched off (keep everything queued).
+    static func file(_ connection: CloudReader.Connection, token: String, id: String,
+                     fetch: Fetch) async throws -> FileAnswer {
+        var request = try CloudReader.request(connection, token: token, method: "GET",
+                                              tail: "/intake/" + id.uriComponent + "/file")
+        // A model is not a JSON answer: give it longer than the 30 seconds
+        // every other call gets.
+        request.timeoutInterval = 300
+        let (data, response) = try await fetch(request)
+        let http = response as? HTTPURLResponse
+        let status = http?.statusCode ?? 0
+        if status == 200 {
+            return .file(data, sha256: http?.value(forHTTPHeaderField: "X-Content-SHA256"))
+        }
+        let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        if status == 404 {
+            switch body?["reason"] as? String {
+            case "no-file": return .expired
+            case "no-route": throw Failure.notOffered
+            default: break
+            }
+        }
+        throw Failure.refused(status, (body?["error"] as? String) ?? "")
     }
 
     // MARK: - Reading the answer

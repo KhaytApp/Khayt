@@ -328,6 +328,11 @@ struct OnlinePane: View {
                         Text(shop.words.callIt("lan.iq_enable")).font(.callout)
                     }
                 }
+                // ── THE QUOTE FORM ON THE SHOP'S OWN STORE ────────────────
+                //
+                // Under the instant quote because it prices from the sheet
+                // that switch publishes. Saves itself; not the Save bar's.
+                QuoteFormEmbedSection(shop: shop)
                 Section {
                     if let url = shop.lanURL {
                         Text(shop.words.callIt("mac.lan_open")).font(.callout)

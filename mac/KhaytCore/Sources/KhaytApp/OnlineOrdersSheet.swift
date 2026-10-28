@@ -138,6 +138,12 @@ private struct OnlineOrderCard: View {
             if !order.customer.isEmpty {
                 Text(order.customer).font(.caption).foregroundStyle(.secondary)
             }
+            // THE VISITOR'S MODEL, from the quote form: what it is, and how
+            // long the cloud keeps it. Imported with the request; after the
+            // date the request comes in without it.
+            if let file = order.item.file {
+                QuoteFormFileRow(shop: shop, file: file)
+            }
 
             // ── LINE BY LINE, BECAUSE THAT IS THE DECISION ───────────────
             //
@@ -209,6 +215,7 @@ private struct OnlineOrderCard: View {
     /// The platform's name, when the title has not already said it.
     private var platformChip: String? {
         guard !order.source.isEmpty else { return nil }
+        if order.item.isQuoteForm { return shop.words.callIt("mac.qfe_chip") }
         let name = order.source.capitalized
         return order.title.localizedCaseInsensitiveContains(name) ? nil : name
     }
@@ -239,5 +246,30 @@ private struct OnlineOrderCard: View {
         }
         .disabled(shop.onlineBusy || !shop.canMoveJobs)
         .controlSize(.small)
+    }
+}
+
+/// A quote-form request's file: name, size, and until when the cloud keeps it.
+private struct QuoteFormFileRow: View {
+    let shop: Shop
+    let file: QuoteFormFile.Meta
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "cube").font(.caption).foregroundStyle(.secondary)
+            Text(verbatim: file.name).font(.caption).lineLimit(1).truncationMode(.middle)
+            if file.bytes >= 0 {
+                Text(Figure.isolated(Format.fileSize(Int64(file.bytes)))).font(.caption)
+                    .foregroundStyle(.secondary).monospacedDigit()
+            }
+            Spacer(minLength: 6)
+            if let until = file.expiresAt {
+                Text(until < Date()
+                     ? shop.words.callIt("mac.qfe_file_gone")
+                     : shop.words.callIt("mac.qfe_file_until", [
+                         "day": .string(shop.words.say(until, Date.FormatStyle(date: .abbreviated, time: .shortened)))]))
+                    .font(.caption).foregroundStyle(until < Date() ? Khayt.attention : .secondary)
+            }
+        }
     }
 }
