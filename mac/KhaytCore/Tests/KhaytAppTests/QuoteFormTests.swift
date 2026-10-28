@@ -384,12 +384,25 @@ struct QuoteFormImportTests {
         #expect(scratch.libraryFolders().isEmpty)
     }
 
-    @Test("a missing checksum header is a refusal, not a pass")
-    func missingHeaderStaysQueued() async throws {
+    @Test("a missing checksum header still imports: the payload's hash decides")
+    func missingHeaderImports() async throws {
         let engine = try KhaytEngine()
         let scratch = try Self.scratch()
         defer { try? FileManager.default.removeItem(at: scratch.dir) }
         let cloud = Cloud(scratch: scratch, body: Self.model)
+        let result = try await Self.run(Self.payload(Self.model), cloud: cloud, scratch: scratch, engine: engine)
+        #expect(result.refusal == nil)
+        #expect(cloud.log.contains(Self.drainPath))
+    }
+
+    @Test("bytes that disagree with the payload are refused even with no header")
+    func noHeaderTamperedStaysQueued() async throws {
+        let engine = try KhaytEngine()
+        let scratch = try Self.scratch()
+        defer { try? FileManager.default.removeItem(at: scratch.dir) }
+        var tampered = Self.model
+        tampered[0] ^= 0xFF
+        let cloud = Cloud(scratch: scratch, body: tampered)
         let result = try await Self.run(Self.payload(Self.model), cloud: cloud, scratch: scratch, engine: engine)
         #expect(result.refusal == .checksum)
         #expect(!cloud.log.contains(Self.drainPath))

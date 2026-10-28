@@ -95,17 +95,18 @@ enum QuoteFormFile {
 
     /// The bytes, checked. Nil when they are what the cloud said they are.
     ///
-    /// Both hashes must be there and must agree with the bytes: the payload's
-    /// is what the visitor's upload hashed to when the cloud filed it, the
-    /// header is what the cloud says it is sending now. Either missing is a
-    /// refusal, not a pass — a refusal only keeps the request queued.
+    /// The payload's hash is required: it is what the visitor's upload hashed
+    /// to when the cloud filed it, and without it nothing can be checked. The
+    /// header is checked whenever it is there, but its absence alone is not a
+    /// refusal — a proxy that strips an unknown response header would
+    /// otherwise strand every quote-form request in the queue for good.
     static func verify(_ data: Data, meta: Meta, header: String?) -> Refusal? {
         let expected = meta.sha256.trimmingCharacters(in: .whitespaces).lowercased()
         guard expected.count == 64 else { return .noChecksum }
         if meta.bytes >= 0, data.count != meta.bytes { return .size(expected: meta.bytes, got: data.count) }
         let sent = (header ?? "").trimmingCharacters(in: .whitespaces).lowercased()
         let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        guard actual == expected, sent == expected else { return .checksum }
+        guard actual == expected, sent.isEmpty || sent == expected else { return .checksum }
         return nil
     }
 
